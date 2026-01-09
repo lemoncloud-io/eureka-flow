@@ -4,6 +4,7 @@
     "license": "MIT",
     "private": true,
     "scripts": {
+        "prepare": "husky",
         "clean:cache": "(rm -rf ./node_modules/.vite ./node_modules/.cache || true) && (rm -rf ./.nx || true)",
         "lint": "npx nx run-many --target=lint",
         "lint:fix": "npx nx run-many --target=lint --fix",
@@ -52,6 +53,8 @@
         "zustand": "^5.0.0"
     },
     "devDependencies": {
+        "@commitlint/cli": "^19.6.0",
+        "@commitlint/config-conventional": "^19.6.0",
         "@eslint/js": "^9.8.0",
         "@lemoncloud/eureka-flows-api": "^0.25.1234",
         "@nx/eslint": "22.3.3",
@@ -78,8 +81,10 @@
         "eslint-plugin-react": "7.35.0",
         "eslint-plugin-react-hooks": "5.0.0",
         "eslint-plugin-unused-imports": "^4.3.0",
+        "husky": "^9.1.7",
         "jiti": "2.4.2",
         "jsdom": "~22.1.0",
+        "lint-staged": "^15.0.0",
         "nx": "22.3.3",
         "postcss": "^8.4.0",
         "prettier": "~3.6.2",
