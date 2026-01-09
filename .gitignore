@@ -1,9 +1,11 @@
+llms.txt
+experiments/*
+/.claude
+CLAUDE_ARCHIVE.md
+CLAUDE.md
+
 # Dependencies
 node_modules/
-
-# sample files but not zip files
-# sample/*.zip
-# sample/**
 
 # Build outputs
 dist/
@@ -41,3 +43,6 @@ Thumbs.db
 # AI
 .claude
 
+# Nx
+.nx
+tmp
