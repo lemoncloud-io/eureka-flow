@@ -1,4 +1,5 @@
 import axios from 'axios';
+const _log = console.log.bind(console, '[axios]');
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _env = (): { [key: string]: string | undefined } => {
@@ -15,8 +16,8 @@ const _env = (): { [key: string]: string | undefined } => {
 };
 
 const $env = _env();
-export const API_URL = $env?.API_URL || $env?.VITE_API_URL || 'http://localhost:8000';
-console.log('API Base URL:', API_URL);
+export const API_URL = $env?.API_URL || $env?.VITE_API_URL || 'http://localhost:8800';
+_log('API Base URL:', API_URL);
 export const API_TOKEN = $env?.API_TOKEN || $env?.VITE_API_TOKEN || '';
 
 // Axios 인스턴스 생성
