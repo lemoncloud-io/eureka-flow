@@ -1,3 +1,9 @@
+llms.txt
+experiments/*
+/.claude
+CLAUDE_ARCHIVE.md
+CLAUDE.md
+
 # Dependencies
 node_modules/
 
