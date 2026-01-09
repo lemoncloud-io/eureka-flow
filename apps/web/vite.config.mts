@@ -1,4 +1,6 @@
 /// <reference types='vitest' />
+import { resolve } from 'path';
+
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -31,6 +33,15 @@ export default defineConfig(() => ({
     host: 'localhost',
   },
   plugins: [react(), htmlEnvInjectionPlugin()],
+  resolve: {
+    alias: {
+      '@eureka/web-core': resolve(__dirname, '../../libs/web-core/src/index.ts'),
+      '@eureka/shared': resolve(__dirname, '../../libs/shared/src/index.ts'),
+      '@eureka/theme': resolve(__dirname, '../../libs/theme/src/index.ts'),
+      '@eureka/ui-kit': resolve(__dirname, '../../libs/ui-kit/src/index.ts'),
+      '@eureka/lib/utils': resolve(__dirname, '../../libs/ui-kit/src/utils/index.ts'),
+    },
+  },
   build: {
     outDir: '../../dist/apps/web',
     emptyOutDir: true,

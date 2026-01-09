@@ -1,41 +1,37 @@
-import { NodeData, WorkflowState, DataPacket } from "../types";
-import { BLOCK_REGISTRY } from "../constants"; // Circular ref warning handled by runtime usually or design
+import { BLOCK_REGISTRY } from '../constants'; // Circular ref warning handled by runtime usually or design
+
+import type { DataPacket, NodeData, WorkflowState } from '../types';
 
 /* Utility Functions for Workflow Editor */
 export const generateId = (): string => Math.random().toString(36).substr(2, 9);
 
-export const getBezierPath = (
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-): string => {
-  const dist = Math.abs(x2 - x1);
-  const cp1x = x1 + dist * 0.5;
-  const cp1y = y1;
-  const cp2x = x2 - dist * 0.5;
-  const cp2y = y2;
-  return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
+export const getBezierPath = (x1: number, y1: number, x2: number, y2: number): string => {
+    const dist = Math.abs(x2 - x1);
+    const cp1x = x1 + dist * 0.5;
+    const cp1y = y1;
+    const cp2x = x2 - dist * 0.5;
+    const cp2y = y2;
+    return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
 };
 
 export const isValidConnection = (
-  sourceNode: NodeData,
-  sourceIdx: number, 
-  targetNode: NodeData,
-  targetIdx: number,
-  sourceType: string,
-  targetType: string
+    sourceNode: NodeData,
+    sourceIdx: number,
+    targetNode: NodeData,
+    targetIdx: number,
+    sourceType: string,
+    targetType: string
 ): boolean => {
-  if (sourceNode.id === targetNode.id) return false;
-  if (targetType === 'any') return true;
-  if (sourceType === 'any') return true;
-  return sourceType === targetType;
+    if (sourceNode.id === targetNode.id) return false;
+    if (targetType === 'any') return true;
+    if (sourceType === 'any') return true;
+    return sourceType === targetType;
 };
 
 // --- HEADLESS ENGINE FOR COMPONENTS ---
 
 export const executeHeadlessWorkflow = async (
-    state: WorkflowState, 
+    state: WorkflowState,
     inputData: DataPacket
 ): Promise<DataPacket | null> => {
     // 1. Deep copy to avoid mutating source
@@ -45,7 +41,7 @@ export const executeHeadlessWorkflow = async (
     // 2. Identify Entry Nodes (Input nodes)
     // For this MVP component logic: We inject the component input into ALL 'input-text' or 'input-image' nodes within the component.
     const entryNodes = nodes.filter(n => n.type === 'input-text' || n.type === 'input-image' || n.type === 'buffer');
-    
+
     // Inject Data
     entryNodes.forEach(node => {
         // We override the config or output of input nodes to simulate user entry
@@ -54,8 +50,8 @@ export const executeHeadlessWorkflow = async (
         } else if (inputData.type === 'image' && node.type === 'input-image') {
             node.config.imageData = inputData.value;
         } else {
-             // For buffer or others, we treat the 'in' port as receiving data
-             node.inputData['in'] = inputData;
+            // For buffer or others, we treat the 'in' port as receiving data
+            node.inputData['in'] = inputData;
         }
         node.status = 'RUNNING'; // Mark as ready to process
     });
@@ -66,7 +62,8 @@ export const executeHeadlessWorkflow = async (
     let iterations = 0;
     let lastOutputPacket: DataPacket | null = null;
 
-    while (active && iterations < 50) { // Safety break
+    while (active && iterations < 50) {
+        // Safety break
         active = false;
         iterations++;
 
@@ -110,10 +107,9 @@ export const executeHeadlessWorkflow = async (
                     if (outKeys.length > 0) {
                         lastOutputPacket = result[outKeys[0]];
                     }
-
                 } catch (e) {
                     node.status = 'ERROR';
-                    console.error("Headless Error", e);
+                    console.error('Headless Error', e);
                 }
             }
         }

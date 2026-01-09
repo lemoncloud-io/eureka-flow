@@ -5,13 +5,17 @@ export interface UserProfile {
     name: string;
     email?: string;
     roles?: string[];
+    [key: string]: unknown;
 }
+
+export type UserView = Partial<UserProfile>;
 
 export interface WebCoreState {
     isInitialized: boolean;
     isAuthenticated: boolean;
     error: Error | null;
     profile: UserProfile | null;
+    userName: string;
 }
 
 export interface WebCoreStore extends WebCoreState {
@@ -19,6 +23,7 @@ export interface WebCoreStore extends WebCoreState {
     logout: () => Promise<void>;
     setIsAuthenticated: (isAuth: boolean) => void;
     setProfile: (profile: UserProfile) => void;
+    updateProfile: (user: UserView) => void;
     registerLogoutCallback: (callback: () => void) => () => void;
 }
 
@@ -27,6 +32,7 @@ const initialState: Pick<WebCoreStore, keyof WebCoreState> = {
     isAuthenticated: false,
     error: null,
     profile: null,
+    userName: '',
 };
 
 export const useWebCoreStore = create<WebCoreStore>()(set => {
@@ -48,12 +54,28 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
                 }
             });
 
-            set({ isAuthenticated: false, profile: null });
+            set({ isAuthenticated: false, profile: null, userName: '' });
         },
 
         setIsAuthenticated: (isAuthenticated: boolean) => set({ isAuthenticated }),
 
-        setProfile: (profile: UserProfile) => set({ profile }),
+        setProfile: (profile: UserProfile) =>
+            set({
+                profile,
+                userName: profile.name || 'Unknown',
+            }),
+
+        updateProfile: (user: UserView) => {
+            set(state => {
+                if (!state.profile) return state;
+                const profile = { ...state.profile, ...user };
+                return {
+                    ...state,
+                    profile,
+                    userName: profile.name || state.userName,
+                };
+            });
+        },
 
         registerLogoutCallback: (callback: () => void) => {
             logoutCallbacks.add(callback);

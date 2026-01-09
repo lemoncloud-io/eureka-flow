@@ -1,12 +1,5 @@
-import {
-    Toast,
-    ToastClose,
-    ToastDescription,
-    ToastProvider,
-    ToastTitle,
-    ToastViewport,
-} from '@lemon/ui-kit/components/ui/toast';
-import { useToast } from '@lemon/ui-kit/hooks/use-toast';
+import { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from './toast';
+import { useToast } from '../../hooks/use-toast';
 
 export function Toaster() {
     const { toasts } = useToast();

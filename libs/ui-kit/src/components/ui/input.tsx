@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import { cn } from '@lemon/lib/utils';
+import { cn } from '../../utils/index';
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
     ({ className, type, onChange, onKeyDown, ...props }, ref) => {

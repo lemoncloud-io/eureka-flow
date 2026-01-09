@@ -2,7 +2,7 @@ import * as React from 'react';
 
 import { type VariantProps, cva } from 'class-variance-authority';
 
-import { cn } from '@lemon/lib/utils';
+import { cn } from '../../utils/index';
 
 const badgeVariants = cva(
     'inline-flex items-center justify-center whitespace-nowrap rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',

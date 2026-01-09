@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import { cn } from '@lemon/lib/utils';
+import { cn } from '../../utils/index';
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
     ({ className, ...props }, ref) => (

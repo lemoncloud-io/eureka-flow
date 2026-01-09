@@ -131,8 +131,8 @@ export const CustomPagination = ({
                                 page === currentPage
                                     ? 'bg-point text-white'
                                     : page === '...'
-                                    ? 'text-gray-400 cursor-default'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                      ? 'text-gray-400 cursor-default'
+                                      : 'text-gray-600 hover:text-gray-900'
                             }`}
                         >
                             {page}

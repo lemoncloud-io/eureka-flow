@@ -1,10 +1,10 @@
 import axios from 'axios';
 const _log = console.log.bind(console, '[axios]');
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const _env = (): { [key: string]: string | undefined } => {
     if (typeof window !== 'undefined' && (window as any)) {
-        return (window as any);
+        return window as any;
     }
     if (typeof process !== 'undefined' && process.env) {
         return process.env;
@@ -26,7 +26,7 @@ const apiClient = axios.create({
     headers: {
         'Content-Type': 'application/json',
         // 여기에 Authorization 헤더 등을 추가할 수 있습니다.
-        'Authorization': API_TOKEN ? `Bearer ${API_TOKEN}` : undefined,
+        Authorization: API_TOKEN ? `Bearer ${API_TOKEN}` : undefined,
     },
     timeout: 35000, // 요청 타임아웃 설정 (35초)
 });
@@ -43,7 +43,7 @@ apiClient.interceptors.request.use(
     },
     error => {
         return Promise.reject(error);
-    },
+    }
 );
 
 export default apiClient;

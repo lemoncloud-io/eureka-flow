@@ -2,7 +2,7 @@ import * as React from 'react';
 
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
-import { cn } from '@lemon/lib/utils';
+import { cn } from '../../utils/index';
 
 const Pagination = ({ className, ...props }: React.ComponentProps<'nav'>) => (
     <nav

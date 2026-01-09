@@ -1,5 +1,5 @@
 {
-  "name": "@eureka-flows-nx/web",
-  "version": "0.0.1",
-  "private": true
+    "name": "@eureka/web",
+    "version": "0.0.1",
+    "private": true
 }

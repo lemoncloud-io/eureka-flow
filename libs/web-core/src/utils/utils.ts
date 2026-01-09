@@ -3,6 +3,32 @@ import { ENV } from '../core';
 
 export const isDev = ENV === 'local' || ENV === 'dev';
 
+export interface ValidatedToken {
+    identityToken: string;
+    [key: string]: unknown;
+}
+
+/**
+ * Validates that a token response contains required fields
+ */
+export const validateTokenResponse = (tokenData: unknown): ValidatedToken => {
+    if (!tokenData || typeof tokenData !== 'object') {
+        throw new Error('INVALID_TOKEN: Token data is missing or invalid');
+    }
+
+    const data = tokenData as Record<string, unknown>;
+    const token = data.Token as Record<string, unknown> | undefined;
+    const tokenIdentityToken = token?.identityToken;
+    const responseIdentityToken = data.identityToken;
+
+    const identityToken = tokenIdentityToken || responseIdentityToken;
+    if (!identityToken || typeof identityToken !== 'string') {
+        throw new Error('INVALID_TOKEN: identityToken is missing from refresh response');
+    }
+
+    return tokenData as ValidatedToken;
+};
+
 /**
  * Async delay helper
  */
@@ -13,11 +39,7 @@ export const delay = (ms: number): Promise<void> => {
 /**
  * Retry operation with exponential backoff
  */
-export const withRetry = async <T>(
-    operation: () => Promise<T>,
-    maxRetries = 4,
-    context = 'API call'
-): Promise<T> => {
+export const withRetry = async <T>(operation: () => Promise<T>, maxRetries = 4, context = 'API call'): Promise<T> => {
     let lastError: unknown;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {

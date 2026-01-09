@@ -1,21 +1,24 @@
 {
-  "extends": "./tsconfig.base.json",
-  "compilerOptions": {
-    "baseUrl": "."
-  },
-  "files": [],
-  "references": [
-    {
-      "path": "./apps/web"
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {
+        "baseUrl": "."
     },
-    {
-      "path": "./libs/web-core"
-    },
-    {
-      "path": "./libs/theme"
-    },
-    {
-      "path": "./libs/ui-kit"
-    }
-  ]
+    "files": [],
+    "references": [
+        {
+            "path": "./apps/web"
+        },
+        {
+            "path": "./libs/web-core"
+        },
+        {
+            "path": "./libs/theme"
+        },
+        {
+            "path": "./libs/ui-kit"
+        },
+        {
+            "path": "./libs/shared"
+        }
+    ]
 }
