@@ -1,10 +1,6 @@
 # Dependencies
 node_modules/
 
-# sample files but not zip files
-# sample/*.zip
-# sample/**
-
 # Build outputs
 dist/
 build/
@@ -41,3 +37,6 @@ Thumbs.db
 # AI
 .claude
 
+# Nx
+.nx
+tmp

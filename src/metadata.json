@@ -1,5 +1,0 @@
-{
-  "name": "FlowMosaic Engine",
-  "description": "A visual, node-based workflow automation engine similar to n8n. Supports text/image processing with automatic execution flow.",
-  "requestFramePermissions": []
-}

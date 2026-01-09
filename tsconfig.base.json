@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "importHelpers": true,
+    "isolatedModules": true,
+    "lib": ["es2022", "DOM", "DOM.Iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmitOnError": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "es2022",
+    "jsx": "react-jsx",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "customConditions": ["@eureka-flows/source"],
+    "baseUrl": ".",
+    "paths": {
+      "@lemon/web-core": ["libs/web-core/src/index.ts"],
+      "@lemon/theme": ["libs/theme/src/index.ts"],
+      "@lemon/ui-kit": ["libs/ui-kit/src/index.ts"],
+      "@lemon/ui-kit/*": ["libs/ui-kit/src/*"],
+      "@lemon/lib/utils": ["libs/ui-kit/src/utils/index.ts"]
+    }
+  }
+}

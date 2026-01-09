@@ -1,20 +1,20 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Sidebar } from './components/Sidebar';
-import { Header } from './components/Header';
-import { WorkflowCanvas, WorkflowCanvasRef } from './components/WorkflowCanvas';
-import { api, FlowMeta } from './api';
-import { initBlockRegistry } from './constants';
-import { generateId } from './utils/';
+import { Sidebar } from '../components/Sidebar';
+import { Header } from '../components/Header';
+import { WorkflowCanvas, WorkflowCanvasRef } from '../components/WorkflowCanvas';
+import { api, FlowMeta } from '../api';
+import { initBlockRegistry } from '../constants';
+import { generateId } from '../utils/';
 
 const App: React.FC = () => {
   const canvasRef = useRef<WorkflowCanvasRef>(null);
-  
+
   // App Initialization State
   const [isAppReady, setIsAppReady] = useState(false);
   const [loadingText, setLoadingText] = useState('Initializing FlowMosaic Engine...');
   const [currentFlowId, setCurrentFlowId] = useState<string | null>(null);
   const [flowName, setFlowName] = useState("Untitled Workflow");
-  
+
   // Runtime State
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false); // For AutoSave indicator
@@ -29,7 +29,7 @@ const App: React.FC = () => {
   const _updateUrl = (flowId: string | null, nodeId?: string | null) => {
       let path = '/';
       if (flowId) path = `/flows/${flowId}`;
-      
+
       const hash = nodeId ? `#${nodeId}` : '';
       const url = path + hash;
 
@@ -60,33 +60,33 @@ const App: React.FC = () => {
             const nodeIdFromHash = window.location.hash.replace('#', '') || null;
 
             setLoadingText(flowIdFromUrl ? `Loading Flow ${flowIdFromUrl}...` : 'Loading Default Flow...');
-            
+
             // Step 3: Load Flow Data
             let initialFlow;
             let loadedId = flowIdFromUrl;
 
             // Fetch flow metadata to get name
             const flows = await api.listFlows();
-            
+
             if (flowIdFromUrl) {
                 initialFlow = await api.loadFlow(flowIdFromUrl);
                 const meta = flows.find(f => f.id === flowIdFromUrl);
                 if (meta) setFlowName(meta.name);
             } else {
-                initialFlow = await api.loadFlow(); 
-                loadedId = generateId(); 
+                initialFlow = await api.loadFlow();
+                loadedId = generateId();
                 // Default name for new session
             }
 
             // Step 4: Ready
             setCurrentFlowId(loadedId);
             setIsAppReady(true);
-            
+
             // Step 5: Initialize Canvas
             setTimeout(() => {
                 if (canvasRef.current) {
                     canvasRef.current.loadWorkflow(initialFlow);
-                    
+
                     updateUrl(loadedId, nodeIdFromHash);
 
                     if (nodeIdFromHash) {
@@ -114,7 +114,7 @@ const App: React.FC = () => {
             const flows = await api.listFlows();
             const meta = flows.find(f => f.id === flowId);
             if (meta) setFlowName(meta.name);
-            
+
             if (canvasRef.current) {
                 canvasRef.current.loadWorkflow(flow);
                 canvasRef.current.selectNode(nodeId);
@@ -128,7 +128,7 @@ const App: React.FC = () => {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []); 
+  }, []);
 
   // --- CORE ACTIONS ---
 
@@ -139,13 +139,13 @@ const App: React.FC = () => {
 
       const data = canvasRef.current.getWorkflow();
       const saveId = currentFlowId || generateId();
-      
-      const result = await api.saveFlow(data, flowName); 
-      
+
+      const result = await api.saveFlow(data, flowName);
+
       if (result.success) {
           setLastSavedAt(new Date());
           if (!silent) showNotification(`Saved as "${flowName}"`, 'success');
-          
+
           if (result.id !== currentFlowId) {
               setCurrentFlowId(result.id);
               updateUrl(result.id, window.location.hash.replace('#',''));
@@ -153,7 +153,7 @@ const App: React.FC = () => {
       } else {
           if (!silent) showNotification("Failed to save workflow", 'error');
       }
-      
+
       if (!silent) setLoading(false);
       else setTimeout(() => setSaving(false), 500); // Visual delay for quick saves
   };
@@ -162,7 +162,7 @@ const App: React.FC = () => {
 
   const triggerAutoSave = useCallback(() => {
       if (!isAutoSaveEnabled) return;
-      
+
       if (autoSaveTimerRef.current) {
           window.clearTimeout(autoSaveTimerRef.current);
       }
@@ -178,7 +178,7 @@ const App: React.FC = () => {
       if (isAutoSaveEnabled) {
           // Trigger faster autosave for name changes
           if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
-          autoSaveTimerRef.current = window.setTimeout(() => performSave(true), 500); 
+          autoSaveTimerRef.current = window.setTimeout(() => performSave(true), 500);
       }
   };
 
@@ -206,10 +206,10 @@ const App: React.FC = () => {
           showNotification("No saved flows found", 'error');
           return;
       }
-      
+
       const flowListStr = flows.map((f, i) => `${i + 1}. ${f.name} (ID: ${f.id})`).join('\n');
       const selection = prompt(`Enter number to load:\n${flowListStr}`);
-      
+
       if (selection) {
           const index = parseInt(selection) - 1;
           if (flows[index]) {
@@ -220,7 +220,7 @@ const App: React.FC = () => {
                   canvasRef.current.loadWorkflow(data);
                   setCurrentFlowId(flowId);
                   setFlowName(flows[index].name);
-                  updateUrl(flowId, null); 
+                  updateUrl(flowId, null);
                   showNotification(`Loaded "${flows[index].name}"`, 'success');
               }
               setLoading(false);
@@ -244,7 +244,7 @@ const App: React.FC = () => {
   const handleShare = async () => {
       // Force save before share if changed
       await performSave(true);
-      
+
       const url = window.location.href;
       try {
           await navigator.clipboard.writeText(url);
@@ -273,12 +273,12 @@ const App: React.FC = () => {
 
   const handleExport = () => {
       if (!canvasRef.current) return;
-      
+
       const data = canvasRef.current.getWorkflow();
       const jsonString = JSON.stringify(data, null, 2);
       const blob = new Blob([jsonString], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      
+
       const link = document.createElement('a');
       link.href = url;
       link.download = `${flowName.replace(/\s+/g, '-').toLowerCase()}-${currentFlowId || Date.now()}.json`;
@@ -311,8 +311,8 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-white font-sans overflow-hidden animate-in fade-in duration-500">
-      
-      <Header 
+
+      <Header
         flowName={flowName}
         onNameChange={handleNameChange}
         onNew={handleNew}
@@ -331,18 +331,18 @@ const App: React.FC = () => {
       />
 
       <div className="flex flex-1 relative overflow-hidden">
-          <Sidebar 
-            onAddNode={handleAddNode} 
+          <Sidebar
+            onAddNode={handleAddNode}
             isLoading={loading}
           />
-          
+
           <div className="flex-1 relative h-full">
-              <WorkflowCanvas 
-                ref={canvasRef} 
+              <WorkflowCanvas
+                ref={canvasRef}
                 onNodeSelect={handleSelectionChange}
                 onChange={handleCanvasChange}
               />
-              
+
               {/* Notification Toast */}
               {notification && (
                   <div className={`absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded shadow-lg text-sm font-semibold animate-in slide-in-from-top-2 fade-in z-50 ${
