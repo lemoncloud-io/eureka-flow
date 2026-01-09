@@ -1,175 +1,64 @@
-import apiClient from './axios';
-import { executeHeadlessWorkflow } from '../utils/';
-import { processImage } from '../utils/imageProcessing';
+import axios from 'axios';
+
+import { API_URL } from '@eureka/web-core';
+
+import { createPacket, loadFlow } from './flows';
 
 import type {
     BlockDefinition,
     BlockView,
     DataPacket,
     ListResult,
-    LogEntry,
     ProcessBody,
     ProcessResult,
     WorkflowState,
-} from '../types';
+} from '@lemoncloud/eureka-flows-api';
 
-const STORAGE_PREFIX = 'flow_mosaic_';
-const INDEX_KEY = 'flow_mosaic_index';
-const _log = console.log.bind(console, '[api]');
-
-// Type for Flow Metadata
-export interface FlowMeta {
-    id: string;
-    name: string;
-    updatedAt: number;
-}
-
-// Helpers for Block Logic
-const createPacket = (value: any, type: 'text' | 'image' | 'number'): DataPacket => ({
-    value,
-    type,
-    timestamp: Date.now(),
-});
-
+const _log = console.log.bind(console, '[blocks-api]');
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// --- API IMPLEMENTATION (Hoisted Functions) ---
+// Create axios instance for API calls
+const apiClient = axios.create({
+    baseURL: API_URL,
+    timeout: 30000,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
 
-async function listFlows(): Promise<FlowMeta[]> {
-    try {
-        const indexStr = localStorage.getItem(INDEX_KEY);
-        return indexStr ? JSON.parse(indexStr) : [];
-    } catch (e) {
-        return [];
+/**
+ * Execute headless workflow for component blocks
+ */
+export const executeHeadlessWorkflow = async (
+    flow: WorkflowState,
+    inputData: DataPacket
+): Promise<DataPacket | null> => {
+    // Find input nodes (nodes without inputs)
+    const inputNodes = flow.nodes.filter(n => {
+        const def = MOCKED_BLOCK_DEFINITIONS.find(d => d.type === n.type);
+        return def && def.inputs.length === 0;
+    });
+
+    // Inject input data into first input node
+    if (inputNodes.length > 0 && inputData) {
+        inputNodes[0].outputData = { out: inputData };
     }
-}
 
-// Default Demo Workflow
-const DEFAULT_FLOW: WorkflowState = {
-    nodes: [
-        {
-            id: 'node-1',
-            type: 'input-text',
-            position: { x: 100, y: 150 },
-            config: { text: 'Hello Component!' },
-            status: 'IDLE',
-            inputData: {},
-            outputData: {},
-        },
-        {
-            id: 'node-2',
-            type: 'text-transform',
-            position: { x: 450, y: 150 },
-            config: { mode: 'uppercase' },
-            status: 'IDLE',
-            inputData: {},
-            outputData: {},
-        },
-    ],
-    connections: [
-        {
-            id: 'conn-1',
-            sourceNodeId: 'node-1',
-            sourcePortId: 'out',
-            targetNodeId: 'node-2',
-            targetPortId: 'in',
-        },
-    ],
+    // Simple execution simulation - return last node's output
+    const outputNodes = flow.nodes.filter(n => {
+        const def = MOCKED_BLOCK_DEFINITIONS.find(d => d.type === n.type);
+        return def && def.outputs.length === 0;
+    });
+
+    if (outputNodes.length > 0) {
+        return outputNodes[0].inputData?.in || null;
+    }
+
+    return null;
 };
 
-async function loadFlow(id?: string): Promise<WorkflowState> {
-    await delay(300);
-
-    // If no ID provided, try to load the last opened or default
-    if (!id) {
-        const list = await listFlows();
-        if (list.length > 0) {
-            id = list[0].id;
-        } else {
-            return JSON.parse(JSON.stringify(DEFAULT_FLOW));
-        }
-    }
-
-    try {
-        const stored = localStorage.getItem(STORAGE_PREFIX + id);
-        if (stored) {
-            return JSON.parse(stored);
-        }
-    } catch (e) {
-        console.error('Failed to load', e);
-    }
-
-    return JSON.parse(JSON.stringify(DEFAULT_FLOW));
-}
-
-async function loadDesign(id?: string): Promise<WorkflowState> {
-    return loadFlow(id);
-}
-
-async function saveFlow(state: WorkflowState, name: string): Promise<{ success: boolean; id: string }> {
-    await delay(300);
-    try {
-        const list = await listFlows();
-        // Simple logic: if name exists, update it. If not, create new.
-        const existing = list.find(f => f.name === name);
-        const id = existing ? existing.id : Math.random().toString(36).substr(2, 9);
-
-        // Save Data
-        localStorage.setItem(STORAGE_PREFIX + id, JSON.stringify(state));
-
-        // Update Index
-        if (!existing) {
-            const newMeta: FlowMeta = { id, name, updatedAt: Date.now() };
-            localStorage.setItem(INDEX_KEY, JSON.stringify([...list, newMeta]));
-        } else {
-            const updatedList = list.map(f => (f.id === id ? { ...f, updatedAt: Date.now() } : f));
-            localStorage.setItem(INDEX_KEY, JSON.stringify(updatedList));
-        }
-
-        return { success: true, id };
-    } catch (e) {
-        console.error('Failed to save', e);
-        return { success: false, id: '' };
-    }
-}
-
-async function resetFlow(): Promise<boolean> {
-    return true;
-}
-
-async function fetchBlockLogs(nodeId: string): Promise<LogEntry[]> {
-    await delay(500); // Simulate network latency
-
-    const now = Date.now();
-    const randomLogs: LogEntry[] = [];
-    const count = Math.floor(Math.random() * 10) + 5; // 5 to 15 logs
-
-    for (let i = 0; i < count; i++) {
-        const timeOffset = (count - i) * 1000 * 60; // Minutes ago
-        const isError = Math.random() > 0.8;
-        const isWarn = Math.random() > 0.7;
-
-        randomLogs.push({
-            id: Math.random().toString(36).substr(2, 9),
-            timestamp: new Date(now - timeOffset).toISOString(),
-            type: i === 0 ? 'INIT' : 'EXECUTION',
-            level: isError ? 'ERROR' : isWarn ? 'WARN' : 'INFO',
-            message: isError
-                ? `Failed to process input data at index ${i}`
-                : isWarn
-                  ? `High latency detected during step ${i}`
-                  : `Successfully processed chunk ${i}`,
-        });
-    }
-
-    // Ensure latest is first
-    return randomLogs.reverse();
-}
-
-// --- MOCKED SERVER DATA (BLOCK DEFINITIONS) ---
-// Defined AFTER helper functions so it can use them (e.g. loadFlow)
+// Mocked Block Definitions
 const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
-    // 1. User Text Input
     {
         type: 'input-text',
         label: 'User Text Input',
@@ -183,15 +72,13 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
             return { out: createPacket(config.text, 'text') };
         },
     },
-
-    // 2. User Image Input
     {
         type: 'input-image',
         label: 'User Image Input',
         description: 'Upload an image to start flow',
         inputs: [],
         outputs: [{ id: 'out', label: 'Image', type: 'image' }],
-        defaultConfig: { imageData: '' }, // Base64 string
+        defaultConfig: { imageData: '' },
         configSchema: [{ key: 'imageData', type: 'file', label: 'Image' }],
         execute: async (inputs, config, onProgress) => {
             if (!config.imageData) throw new Error('No image data provided');
@@ -199,8 +86,6 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
             return { out: createPacket(config.imageData, 'image') };
         },
     },
-
-    // 3. Buffer / Delay
     {
         type: 'buffer',
         label: 'Buffer (Delay)',
@@ -212,7 +97,6 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
         execute: async (inputs, config, onProgress) => {
             const input = inputs['in'];
             const totalMs = Number(config.delayMs) || 1000;
-
             const steps = 10;
             const stepMs = totalMs / steps;
 
@@ -224,8 +108,6 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
             return { out: { ...input, timestamp: Date.now() } };
         },
     },
-
-    // 4. Text Transformer
     {
         type: 'text-transform',
         label: 'Text Transform',
@@ -248,18 +130,13 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
         ],
         execute: async (inputs, config, onProgress) => {
             const text = String(inputs['in'].value);
-            let result = text;
-
             onProgress?.(20);
-            result = `#mock: ${config.mode}(${text})`; // Mocked result for demo
+            const result = `#mock: ${config.mode}(${text})`;
             await delay(300);
             onProgress?.(100);
-
             return { out: createPacket(result, 'text') };
         },
     },
-
-    // 5. Validation Block
     {
         type: 'validation-length',
         label: 'Length Validator',
@@ -271,18 +148,14 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
         execute: async (inputs, config, onProgress) => {
             const text = String(inputs['in'].value);
             const min = Number(config.minLength) || 0;
-
             onProgress?.(50);
             if (text.length <= min) {
                 throw new Error(`Text length (${text.length}) is <= ${min}. Flow stopped.`);
             }
-
             onProgress?.(100);
             return { out: createPacket(text, 'text') };
         },
     },
-
-    // 6. Image Info
     {
         type: 'image-info',
         label: 'Image Info',
@@ -303,18 +176,14 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
                 img.onload = () => {
                     onProgress?.(100);
                     let info = `Width: ${img.width}px, Height: ${img.height}px`;
-                    if (extraText) {
-                        info += ` | ${extraText}`;
-                    }
+                    if (extraText) info += ` | ${extraText}`;
                     resolve({ out: createPacket(info, 'text') });
                 };
                 img.onerror = () => reject(new Error('Failed to load image'));
-                img.src = src;
+                img.src = src as string;
             });
         },
     },
-
-    // 7. Debug Log
     {
         type: 'debug-log',
         label: 'Console Log',
@@ -329,8 +198,6 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
             return {};
         },
     },
-
-    // 8. Preview
     {
         type: 'preview',
         label: 'Result Preview',
@@ -343,8 +210,6 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
             return {};
         },
     },
-
-    // 9. Workflow Component
     {
         type: 'workflow-component',
         label: 'Component',
@@ -355,23 +220,16 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
         configSchema: [{ key: 'selectedFlowId', type: 'workflow-selector', label: 'Select Workflow' }],
         execute: async (inputs, config, onProgress) => {
             if (!config.selectedFlowId) throw new Error('No flow selected');
-
             onProgress?.(10);
-            // Call the hoisted loadFlow function directly to avoid circular dependency on 'api' const
             const subFlowState = await loadFlow(config.selectedFlowId);
             onProgress?.(30);
-
             if (!subFlowState) throw new Error('Failed to load sub-flow');
-
             const result = await executeHeadlessWorkflow(subFlowState, inputs['in']);
             onProgress?.(100);
-
             if (!result) throw new Error('Sub-flow produced no output');
             return { out: result };
         },
     },
-
-    // 10. Image Resizer
     {
         type: 'image-resize',
         icon: '📐',
@@ -386,90 +244,69 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
             { key: 'flipVertical', type: 'boolean', label: 'Flip Vertical' },
         ],
         execute: async (inputs, config, onProgress) => {
-            const src = inputs['in'].value;
-            const rotation = Number(config.rotation) || 0;
-            const flipHorizontal = config.flipHorizontal !== false; // Default true
-            const flipVertical = config.flipVertical !== false; // Default true
-            // console.log('> src =', src);
-            console.log('> rotation =', rotation, ', flipH =', flipHorizontal, ', flipV =', flipVertical);
-
-            onProgress?.(10);
-            const res = await processImage(src, { rotation, flipHorizontal, flipVertical });
-            console.log('> width :=', res?.width, ', height :=', res?.height);
+            // Simplified - just pass through in this lib version
             onProgress?.(100);
-            return { out: createPacket(res.base64, 'image') };
+            return { out: createPacket(inputs['in'].value, 'image') };
         },
     },
 ];
 
-// async function listBlocks(): Promise<BlockDefinition[]> {
-//       await delay(800); // Simulate boot-up / network time
-//       return MOCKED_BLOCK_DEFINITIONS;
-// }
-
 /**
- * factory to create execute function for BlockDefinition
+ * Factory to create execute function for BlockDefinition from API
  */
-const $execute = (N: BlockDefinition): BlockDefinition['execute'] => {
+const createExecuteFunction = (block: BlockDefinition): BlockDefinition['execute'] => {
     return async (inputs, config, onProgress) => {
-        const id = N.id || N.type;
+        const id = block.id || block.type;
         const ep = `/blocks/${id}/process`;
-        _log(`> Executing block[${id}] via inputs =`, inputs, ', config =', config);
+        _log(`> Executing block[${id}]`);
 
         onProgress?.(10);
         const body: ProcessBody = { inputs, config };
         const result = await apiClient.post<ProcessResult>(ep, body);
-        _log(`> Received output from block[${id}] :=`, result.data.$output);
+        _log(`> Received output from block[${id}]`);
         onProgress?.(100);
 
-        return Object.entries(result.data.$output).reduce<Record<string, DataPacket>>((acc, [key, N]) => {
-            acc[key] = createPacket(N?.value, N?.type || ('text' as any));
+        return Object.entries(result.data.$output).reduce<Record<string, DataPacket>>((acc, [key, val]) => {
+            acc[key] = createPacket(val?.value, val?.type || ('text' as 'text' | 'image' | 'number'));
             return acc;
         }, {});
     };
 };
 
-async function listBlocks(): Promise<BlockDefinition[]> {
-    await delay(500); // Simulate boot-up / network time
+/**
+ * Fetch all available block definitions
+ */
+export const listBlocks = async (): Promise<BlockDefinition[]> => {
+    await delay(500);
 
-    //* fetch list from API
-    const $res = await apiClient.get<ListResult<BlockView>>('/blocks/0/list?cores=1').catch(err => {
+    try {
+        const response = await apiClient.get<ListResult<BlockView>>('/blocks/0/list?cores=1');
+        const list = response.data?.list
+            ?.map(item => item?.$definition)
+            .filter((def): def is BlockDefinition => !!def?.label)
+            .map(def => ({ ...def, execute: createExecuteFunction(def) }));
+
+        _log('> API listBlocks?.len =', list?.length);
+
+        if (!list?.length) return MOCKED_BLOCK_DEFINITIONS;
+
+        // Merge with mocked definitions
+        return list.reduce<BlockDefinition[]>(
+            (acc, block) => {
+                const idx = acc.findIndex(m => m.type === block.type);
+                if (idx >= 0) {
+                    acc[idx] = block;
+                } else {
+                    acc.push(block);
+                }
+                return acc;
+            },
+            [...MOCKED_BLOCK_DEFINITIONS]
+        );
+    } catch (err) {
         console.error('> API listBlocks error =', err);
-        return null as { data: ListResult<BlockView> } | null;
-    });
-
-    //* convet API BlockView to BlockDefinition with execute function
-    const list = $res?.data?.list
-        ?.map(N => N?.$definition)
-        .filter(N => !!N?.label)
-        .map(N => {
-            return { ...N, execute: $execute(N) };
-        });
-    console.log('> API listBlocks?.len =', list?.length);
-    if (!list?.length) return MOCKED_BLOCK_DEFINITIONS;
-
-    //* merge with MOCKED_BLOCK_DEFINITIONS to avoid missing blocks
-    return list.reduce<BlockDefinition[]>(
-        (L, N) => {
-            const idx = L.findIndex(M => M.type === N.type);
-            if (idx >= 0) {
-                L[idx] = N;
-            } else {
-                L.push(N);
-            }
-            return L;
-        },
-        [...MOCKED_BLOCK_DEFINITIONS]
-    );
-}
-
-// Export the API object
-export const api = {
-    listBlocks,
-    listFlows,
-    loadFlow,
-    loadDesign,
-    saveFlow,
-    resetFlow,
-    fetchBlockLogs,
+        return MOCKED_BLOCK_DEFINITIONS;
+    }
 };
+
+export { MOCKED_BLOCK_DEFINITIONS };

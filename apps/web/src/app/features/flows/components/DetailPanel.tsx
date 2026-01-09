@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 
-import { BLOCK_REGISTRY } from '../constants';
+import { useBlockRegistry } from '@eureka/flows';
 
-import type { BlockDefinition, ConfigControlType, ConfigField, Connection, DataPacket, NodeData } from '../types';
+import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@eureka/flows';
 
 interface DetailPanelProps {
     selectedNode: NodeData | null;
     selectedConnection: Connection | null;
     nodes: NodeData[];
-    connections: Connection[]; // New prop for lookup
-    onConfigChange: (nodeId: string, key: string, value: any) => void;
+    connections: Connection[];
+    onConfigChange: (nodeId: string, key: string, value: unknown) => void;
     onDescriptionChange: (nodeId: string, description: string) => void;
     onLabelChange: (nodeId: string, label: string) => void; // New
     onToggleAuto: (nodeId: string) => void; // New
@@ -101,6 +101,8 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     onSelectConnection,
     onClose,
 }) => {
+    const blockRegistry = useBlockRegistry();
+
     if (!selectedNode && !selectedConnection) return null;
 
     // --- Render Helpers ---
@@ -213,7 +215,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
     // --- View: Node Selection ---
     if (selectedNode) {
-        const def = BLOCK_REGISTRY[selectedNode.type];
+        const def = blockRegistry[selectedNode.type];
         if (!def) return null;
 
         const isAuto = selectedNode.autoExecutionEnabled !== false;
@@ -497,8 +499,8 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         const sourceNode = nodes.find(n => n.id === selectedConnection.sourceNodeId);
         const targetNode = nodes.find(n => n.id === selectedConnection.targetNodeId);
 
-        const sourceDef = sourceNode ? BLOCK_REGISTRY[sourceNode.type] : null;
-        const targetDef = targetNode ? BLOCK_REGISTRY[targetNode.type] : null;
+        const sourceDef = sourceNode ? blockRegistry[sourceNode.type] : null;
+        const targetDef = targetNode ? blockRegistry[targetNode.type] : null;
 
         const sourcePort = sourceDef?.outputs.find(p => p.id === selectedConnection.sourcePortId);
         const targetPort = targetDef?.inputs.find(p => p.id === selectedConnection.targetPortId);

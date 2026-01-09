@@ -27,7 +27,7 @@
                     "watchDepsName": "watch-deps"
                 }
             },
-            "exclude": ["libs/web-core/*", "libs/theme/*", "libs/ui-kit/*", "libs/shared/*"]
+            "exclude": ["libs/web-core/*", "libs/theme/*", "libs/ui-kit/*", "libs/shared/*", "libs/flows/*"]
         },
         {
             "plugin": "@nx/eslint/plugin",
@@ -51,7 +51,7 @@
         },
         {
             "plugin": "@nx/js/typescript",
-            "include": ["libs/web-core/*", "libs/theme/*", "libs/ui-kit/*", "libs/shared/*"],
+            "include": ["libs/web-core/*", "libs/theme/*", "libs/ui-kit/*", "libs/shared/*", "libs/flows/*"],
             "options": {
                 "typecheck": {
                     "targetName": "typecheck"

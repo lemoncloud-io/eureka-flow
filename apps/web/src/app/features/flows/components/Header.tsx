@@ -56,7 +56,19 @@ export const Header: React.FC<HeaderProps> = ({
         }
     };
 
-    const IconButton = ({ onClick, icon, label, danger = false, tooltip }: any) => (
+    const IconButton = ({
+        onClick,
+        icon,
+        label,
+        danger = false,
+        tooltip,
+    }: {
+        onClick: () => void;
+        icon: string;
+        label: string;
+        danger?: boolean;
+        tooltip?: string;
+    }) => (
         <button
             onClick={onClick}
             className={`

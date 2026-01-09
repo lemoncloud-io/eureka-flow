@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { api } from '../api';
-import { BLOCK_REGISTRY } from '../constants';
+import { listFlows, useBlockRegistry } from '@eureka/flows';
 
-import type { FlowMeta } from '../api';
-import type { ConfigField, NodeData, PortDefinition} from '../types';
+import type { ConfigField, FlowMeta, NodeData, PortDefinition } from '@eureka/flows';
 
 // --- Sub-Components ---
 
@@ -98,7 +96,7 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
     // Load flows for selector
     useEffect(() => {
         if (field.type === 'workflow-selector') {
-            api.listFlows().then(setFlows);
+            listFlows().then(setFlows);
         }
     }, [field.type]);
 
@@ -202,7 +200,7 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
                             className="w-full bg-gray-950 border border-gray-700 rounded p-2 text-sm text-white focus:border-blue-500 outline-none"
                             value={value || ''}
                             onChange={e => onChange(field.key, e.target.value)}
-                            onFocus={() => api.listFlows().then(setFlows)}
+                            onFocus={() => listFlows().then(setFlows)}
                         >
                             <option value="">-- Select Workflow --</option>
                             {flows.map(f => (
@@ -360,7 +358,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     onViewComponent,
     onViewLogs,
 }) => {
-    const definition = BLOCK_REGISTRY[node.type];
+    const blockRegistry = useBlockRegistry();
+    const definition = blockRegistry[node.type];
     const isAuto = node.autoExecutionEnabled !== false;
 
     // Local UI State

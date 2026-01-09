@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 
-import { BLOCK_REGISTRY } from '../constants';
+import { useBlockRegistry } from '@eureka/flows';
 
 interface SidebarProps {
     onAddNode: (type: string) => void;
@@ -51,6 +51,7 @@ const NodeButton = ({
 );
 
 export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
+    const blockRegistry = useBlockRegistry();
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [hoveredNode, setHoveredNode] = useState<{ type: string; top: number } | null>(null);
 
@@ -82,18 +83,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
 
     // Group blocks dynamically
     const blockGroups = useMemo(() => {
-        const blocks = Object.values(BLOCK_REGISTRY);
+        const blocks = Object.values(blockRegistry);
         return {
             inputs: blocks.filter(b => b.type.startsWith('input-')),
             process: blocks.filter(b => !b.type.startsWith('input-') && !['preview', 'debug-log'].includes(b.type)),
             outputs: blocks.filter(b => ['preview', 'debug-log'].includes(b.type)),
         };
-    }, [BLOCK_REGISTRY]); // Re-compute if registry changes (mostly stable)
+    }, [blockRegistry]);
 
     // Render Tooltip
     const renderTooltip = () => {
         if (!hoveredNode) return null;
-        const def = BLOCK_REGISTRY[hoveredNode.type];
+        const def = blockRegistry[hoveredNode.type];
         if (!def) return null;
 
         const leftPos = isCollapsed ? '4.5rem' : '15.5rem'; // w-16 is 4rem, w-60 is 15rem. Add some gap.

@@ -19,6 +19,9 @@
         },
         {
             "path": "./libs/shared"
+        },
+        {
+            "path": "./libs/flows"
         }
     ]
 }

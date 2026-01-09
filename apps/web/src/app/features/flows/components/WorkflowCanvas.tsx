@@ -1,14 +1,14 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { BLOCK_REGISTRY } from '../constants';
-import { generateId, isValidConnection } from '../utils';
+import type { Connection, LogEntry, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+
+import { fetchBlockLogs, loadFlow, useBlockRegistry } from '@eureka/flows';
+
 import { ConnectionLine } from './ConnectionLine';
 import { DetailPanel } from './DetailPanel';
 import { NodeBlock } from './NodeBlock';
-import { api } from '../api';
-
-import type { Connection, LogEntry, NodeData, WorkflowState } from '../types';
+import { generateId, isValidConnection } from '../utils';
 
 // Define Ref Interface
 export interface WorkflowCanvasRef {
@@ -61,7 +61,7 @@ const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) 
 
     useEffect(() => {
         setLoading(true);
-        api.fetchBlockLogs(nodeId).then(data => {
+        fetchBlockLogs(nodeId).then(data => {
             setLogs(data);
             setLoading(false);
         });
@@ -98,7 +98,7 @@ const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) 
                     <button
                         onClick={() => {
                             setLoading(true);
-                            api.fetchBlockLogs(nodeId).then(data => {
+                            fetchBlockLogs(nodeId).then(data => {
                                 setLogs(data);
                                 setLoading(false);
                             });
@@ -140,6 +140,9 @@ const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) 
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
     ({ readOnly, initialData, onNodeSelect, onChange }, ref) => {
+        // --- BLOCK REGISTRY FROM STORE ---
+        const blockRegistry = useBlockRegistry();
+
         // --- STATE ---
         const [nodes, setNodes] = useState<NodeData[]>([]);
         const [connections, setConnections] = useState<Connection[]>([]);
@@ -260,7 +263,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         // Load Sub-Flow for Modal
         useEffect(() => {
             if (modalFlowId) {
-                api.loadFlow(modalFlowId).then(setModalFlowData);
+                loadFlow(modalFlowId).then(setModalFlowData);
             } else {
                 setModalFlowData(null);
             }
@@ -298,7 +301,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     if (readOnly) return;
                     saveCheckpoint(); // Save before adding
 
-                    const newDef = BLOCK_REGISTRY[type];
+                    const newDef = blockRegistry[type];
                     if (!newDef) return;
 
                     // --- Auto Connect Logic ---
@@ -311,7 +314,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         targetPortId = firstInput.id;
 
                         const findCompatibleOutput = (n: NodeData) => {
-                            const def = BLOCK_REGISTRY[n.type];
+                            const def = blockRegistry[n.type];
                             if (!def) return undefined;
                             return def.outputs.find(
                                 out => out.type === firstInput.type || out.type === 'any' || firstInput.type === 'any'
@@ -365,7 +368,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             x: snappedX,
                             y: snappedY,
                         },
-                        config: { ...BLOCK_REGISTRY[type].defaultConfig },
+                        config: { ...blockRegistry[type].defaultConfig },
                         status: 'IDLE',
                         inputData: {},
                         outputData: {},
@@ -603,7 +606,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 if (!currentNode) return;
 
                 const inputs = manualOverrideInputs || currentNode.inputData;
-                const nodeDef = BLOCK_REGISTRY[currentNode.type];
+                const nodeDef = blockRegistry[currentNode.type];
 
                 if (!nodeDef) {
                     setNodes(prev =>
@@ -686,7 +689,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         useEffect(() => {
             if (readOnly) return;
             nodes.forEach(node => {
-                const def = BLOCK_REGISTRY[node.type];
+                const def = blockRegistry[node.type];
                 if (!def) return;
 
                 if (def.inputs.length === 0) return;
@@ -953,7 +956,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const getPortPosition = (nodeId: string, portId: string, type: 'input' | 'output') => {
             const node = nodes.find(n => n.id === nodeId);
             if (!node) return { x: 0, y: 0 };
-            const def = BLOCK_REGISTRY[node.type];
+            const def = blockRegistry[node.type];
             if (!def) return { x: node.position.x, y: node.position.y };
             const portIndex =
                 type === 'input'

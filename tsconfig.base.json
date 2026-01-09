@@ -23,6 +23,7 @@
         "baseUrl": ".",
         "paths": {
             "@eureka/web-core": ["libs/web-core/src/index.ts"],
+            "@eureka/flows": ["libs/flows/src/index.ts"],
             "@eureka/shared": ["libs/shared/src/index.ts"],
             "@eureka/theme": ["libs/theme/src/index.ts"],
             "@eureka/ui-kit": ["libs/ui-kit/src/index.ts"],

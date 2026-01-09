@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { getBezierPath } from '../utils/';
+import { getBezierPath } from '../utils';
 
 interface ConnectionLineProps {
     x1: number;
