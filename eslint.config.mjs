@@ -1,6 +1,6 @@
 import nx from '@nx/eslint-plugin';
-import importPlugin from 'eslint-plugin-import';
 import unusedImports from 'eslint-plugin-unused-imports';
+import importPlugin from 'eslint-plugin-import';
 
 export default [
     ...nx.configs['flat/base'],
@@ -22,7 +22,7 @@ export default [
                 'error',
                 {
                     enforceBuildableLibDependency: true,
-                    allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?js$'],
+                    allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
                     depConstraints: [
                         {
                             sourceTag: '*',
@@ -34,7 +34,7 @@ export default [
         },
     },
     {
-        files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
+        files: ['**/*.ts', '**/*.tsx', '**/*.cts', '**/*.mts', '**/*.js', '**/*.jsx', '**/*.cjs', '**/*.mjs'],
         rules: {
             '@typescript-eslint/no-empty-object-type': 'off',
             '@typescript-eslint/no-empty-interface': 'off',
@@ -54,7 +54,7 @@ export default [
                             position: 'before',
                         },
                         {
-                            pattern: '@eureka/**',
+                            pattern: '@flows/**',
                             group: 'internal',
                             position: 'before',
                         },

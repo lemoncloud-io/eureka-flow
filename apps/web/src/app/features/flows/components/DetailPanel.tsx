@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 
-import { useBlockRegistry } from '@eureka/flows';
+import { useBlockRegistry } from '@flows/flows';
 
-import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@eureka/flows';
+import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@flows/flows';
 
 interface DetailPanelProps {
     selectedNode: NodeData | null;

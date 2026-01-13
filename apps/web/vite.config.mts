@@ -26,14 +26,14 @@ const htmlEnvInjectionPlugin = () => {
                 );
 
             const envScript = `
-            <script>
-                (function() {
-                    ${Object.entries(envVars)
-                        .map(([key, value]) => `window.${key}="${value}";`)
-                        .join('\n')}
-                })();
-            </script>
-        `;
+                <script>
+                    (function() {
+                        ${Object.entries(envVars)
+                            .map(([key, value]) => `window.${key}="${value}";`)
+                            .join('\n')}
+                    })();
+                </script>
+            `;
 
             return html.replace(/<body>/, `${envScript}\n<body>`);
         },
@@ -41,7 +41,7 @@ const htmlEnvInjectionPlugin = () => {
 };
 
 export default defineConfig({
-    root: __dirname,
+    root: import.meta.dirname,
     cacheDir: '../../node_modules/.vite/apps/web',
 
     base: process.env.VITE_BASE_PATH || '/',
@@ -60,15 +60,15 @@ export default defineConfig({
 
     resolve: {
         alias: {
-            '@eureka/web-core': resolve(__dirname, '../../libs/web-core/src/index.ts'),
-            '@eureka/flows': resolve(__dirname, '../../libs/flows/src/index.ts'),
-            '@eureka/shared': resolve(__dirname, '../../libs/shared/src/index.ts'),
-            '@eureka/theme': resolve(__dirname, '../../libs/theme/src/index.ts'),
-            '@eureka/ui-kit': resolve(__dirname, '../../libs/ui-kit/src/index.ts'),
-            '@eureka/lib/utils': resolve(__dirname, '../../libs/ui-kit/src/utils/index.ts'),
+            '@flows/web-core': resolve(import.meta.dirname, '../../libs/web-core/src/index.ts'),
+            '@flows/flows': resolve(import.meta.dirname, '../../libs/flows/src/index.ts'),
+            '@flows/shared': resolve(import.meta.dirname, '../../libs/shared/src/index.ts'),
+            '@flows/theme': resolve(import.meta.dirname, '../../libs/theme/src/index.ts'),
+            '@flows/ui-kit': resolve(import.meta.dirname, '../../libs/ui-kit/src/index.ts'),
+            '@flows/lib/utils': resolve(import.meta.dirname, '../../libs/ui-kit/src/utils/index.ts'),
             ...(process.env.NODE_ENV !== 'development'
                 ? {
-                      './runtimeConfig': './runtimeConfig.browser', // fix production build
+                      './runtimeConfig': './runtimeConfig.browser',
                   }
                 : {}),
         },
@@ -76,14 +76,14 @@ export default defineConfig({
 
     server: {
         port: 3000,
-        host: '0.0.0.0',
+        host: 'localhost',
         fs: {
             allow: [searchForWorkspaceRoot(process.cwd())],
         },
     },
 
     preview: {
-        port: 4300,
+        port: 3000,
         host: 'localhost',
     },
 

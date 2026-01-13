@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 
-import { useBlockRegistry } from '@eureka/flows';
+import { useBlockRegistry } from '@flows/flows';
 
 interface SidebarProps {
     onAddNode: (type: string) => void;

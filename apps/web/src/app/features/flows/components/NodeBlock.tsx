@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { listFlows, useBlockRegistry } from '@eureka/flows';
+import { listFlows, useBlockRegistry } from '@flows/flows';
 
-import type { ConfigField, FlowMeta, NodeData, PortDefinition } from '@eureka/flows';
+import type { ConfigField, FlowMeta, NodeData, PortDefinition } from '@flows/flows';
 
 // --- Sub-Components ---
 
@@ -225,7 +225,73 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
     }
 };
 
-// 3. Visualization Components Dictionary
+// 3. Visualization Components
+
+// Preview Visualization Component (needs useState, so must be proper React component)
+const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
+    const lastInput = node.inputData['in'];
+    const [dims, setDims] = useState<string | null>(null);
+
+    if (!lastInput) {
+        return (
+            <div className="mt-2 text-xs text-gray-500 italic text-center py-4 bg-gray-900/30 rounded border border-dashed border-gray-700">
+                Waiting for data...
+            </div>
+        );
+    }
+
+    return (
+        <div className="mt-2 p-1 bg-gray-900 rounded border border-gray-700 flex justify-center items-center min-h-[40px] relative">
+            {lastInput.type === 'image' ? (
+                <>
+                    <img
+                        src={lastInput.value}
+                        className="max-w-full max-h-32 rounded"
+                        alt="Preview"
+                        onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
+                    />
+                    {dims && (
+                        <div className="absolute bottom-1 right-1 bg-black/70 text-[9px] text-white px-1.5 py-0.5 rounded backdrop-blur-sm border border-gray-700/50 shadow-sm pointer-events-none">
+                            {dims}
+                        </div>
+                    )}
+                </>
+            ) : (
+                <div className="text-xs p-2 text-white break-words w-full text-center">{String(lastInput.value)}</div>
+            )}
+        </div>
+    );
+};
+
+// Input Image Visualization Component (needs useState, so must be proper React component)
+const InputImageVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
+    const img = node.config.imageData;
+    const [dims, setDims] = useState<string | null>(null);
+
+    return (
+        <div className="mt-2 rounded border border-gray-800 overflow-hidden bg-black/30 flex justify-center items-center h-20 relative">
+            {img ? (
+                <>
+                    <img
+                        src={img}
+                        className="h-full w-full object-cover"
+                        alt="Input"
+                        onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
+                    />
+                    {dims && (
+                        <div className="absolute bottom-1 right-1 bg-black/70 text-[9px] text-white px-1.5 py-0.5 rounded backdrop-blur-sm border border-gray-700/50 shadow-sm pointer-events-none">
+                            {dims}
+                        </div>
+                    )}
+                </>
+            ) : (
+                <span className="text-[9px] text-gray-600">No Image</span>
+            )}
+        </div>
+    );
+};
+
+// Visualization Components Dictionary
 const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
     'debug-log': ({ node }) => {
         const lastInput = node.inputData['in']?.value;
@@ -243,41 +309,7 @@ const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
             </div>
         );
     },
-    preview: ({ node }) => {
-        const lastInput = node.inputData['in'];
-        const [dims, setDims] = useState<string | null>(null);
-
-        if (!lastInput)
-            {return (
-                <div className="mt-2 text-xs text-gray-500 italic text-center py-4 bg-gray-900/30 rounded border border-dashed border-gray-700">
-                    Waiting for data...
-                </div>
-            );}
-
-        return (
-            <div className="mt-2 p-1 bg-gray-900 rounded border border-gray-700 flex justify-center items-center min-h-[40px] relative">
-                {lastInput.type === 'image' ? (
-                    <>
-                        <img
-                            src={lastInput.value}
-                            className="max-w-full max-h-32 rounded"
-                            alt="Preview"
-                            onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
-                        />
-                        {dims && (
-                            <div className="absolute bottom-1 right-1 bg-black/70 text-[9px] text-white px-1.5 py-0.5 rounded backdrop-blur-sm border border-gray-700/50 shadow-sm pointer-events-none">
-                                {dims}
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <div className="text-xs p-2 text-white break-words w-full text-center">
-                        {String(lastInput.value)}
-                    </div>
-                )}
-            </div>
-        );
-    },
+    preview: PreviewVisualization,
     'input-text': ({ node }) => {
         const text = node.config.text;
         return (
@@ -289,32 +321,7 @@ const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
             </div>
         );
     },
-    'input-image': ({ node }) => {
-        const img = node.config.imageData;
-        const [dims, setDims] = useState<string | null>(null);
-
-        return (
-            <div className="mt-2 rounded border border-gray-800 overflow-hidden bg-black/30 flex justify-center items-center h-20 relative">
-                {img ? (
-                    <>
-                        <img
-                            src={img}
-                            className="h-full w-full object-cover"
-                            alt="Input"
-                            onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
-                        />
-                        {dims && (
-                            <div className="absolute bottom-1 right-1 bg-black/70 text-[9px] text-white px-1.5 py-0.5 rounded backdrop-blur-sm border border-gray-700/50 shadow-sm pointer-events-none">
-                                {dims}
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <span className="text-[9px] text-gray-600">No Image</span>
-                )}
-            </div>
-        );
-    },
+    'input-image': InputImageVisualization,
 };
 
 // --- Main Component ---

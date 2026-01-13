@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useBlocks, useFlows, useFlowsStore } from '@eureka/flows';
+import { useBlocks, useFlows, useFlowsStore } from '@flows/flows';
 
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
@@ -13,7 +13,7 @@ export const FlowEditorPage = () => {
     const canvasRef = useRef<WorkflowCanvasRef>(null);
 
     // Store state
-    const { blockRegistry, isBlocksLoaded } = useFlowsStore();
+    const { blockRegistry: _blockRegistry, isBlocksLoaded: _isBlocksLoaded } = useFlowsStore();
 
     // Hooks
     const { loadBlocks } = useBlocks();
@@ -49,7 +49,7 @@ export const FlowEditorPage = () => {
             if (window.location.pathname + window.location.hash !== url) {
                 window.history.pushState({ flowId, nodeId }, '', url);
             }
-        } catch (e) {
+        } catch (_e) {
             // ignore
         }
     }, []);
@@ -158,7 +158,7 @@ export const FlowEditorPage = () => {
 
     const handleNew = () => {
         if (!canvasRef.current) return;
-        if (confirm('Create new flow? Unsaved changes will be lost.')) {
+        if (window.confirm('Create new flow? Unsaved changes will be lost.')) {
             canvasRef.current.newWorkflow();
             const newId = generateId();
             createNewFlow(newId);
@@ -183,14 +183,14 @@ export const FlowEditorPage = () => {
         try {
             await navigator.clipboard.writeText(window.location.href);
             showNotification('Link copied to clipboard!', 'success');
-        } catch (err) {
+        } catch (_err) {
             showNotification('Failed to copy link', 'error');
         }
     };
 
     const handleClear = () => {
         if (!canvasRef.current) return;
-        if (confirm('Clear the canvas?')) {
+        if (window.confirm('Clear the canvas?')) {
             canvasRef.current.clearWorkflow();
             showNotification('Canvas cleared', 'success');
         }

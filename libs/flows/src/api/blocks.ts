@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-import { API_URL } from '@eureka/web-core';
+import { API_URL } from '@flows/web-core';
 
 import { createPacket, loadFlow } from './flows';
 

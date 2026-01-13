@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import type { BlockDefinition, FlowMeta, WorkflowState } from '../api';
+import type { BlockDefinition, FlowMeta } from '../api';
 
 interface FlowsState {
     // Block Registry

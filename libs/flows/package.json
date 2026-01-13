@@ -1,5 +1,5 @@
 {
-    "name": "@eureka/flows",
+    "name": "@flows/flows",
     "version": "0.0.1",
     "private": true,
     "type": "module",

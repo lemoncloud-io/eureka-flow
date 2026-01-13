@@ -1,14 +1,14 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { Connection, LogEntry, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
-
-import { fetchBlockLogs, loadFlow, useBlockRegistry } from '@eureka/flows';
+import { fetchBlockLogs, loadFlow, useBlockRegistry } from '@flows/flows';
 
 import { ConnectionLine } from './ConnectionLine';
 import { DetailPanel } from './DetailPanel';
 import { NodeBlock } from './NodeBlock';
 import { generateId, isValidConnection } from '../utils';
+
+import type { Connection, LogEntry, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 // Define Ref Interface
 export interface WorkflowCanvasRef {
@@ -786,7 +786,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             }
         };
 
-        const handleDoubleClick = (e: React.MouseEvent) => {
+        const handleDoubleClick = (_e: React.MouseEvent) => {
             handleSelectionChange(null);
             setSelectedConnectionId(null);
         };
@@ -1115,7 +1115,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     }
                                 };
 
-                                const handleClick = (e: React.MouseEvent) => {
+                                const handleClick = (_e: React.MouseEvent) => {
                                     setSelectedConnectionId(conn.id);
                                     handleSelectionChange(null);
                                 };
