@@ -11,7 +11,14 @@ import { DetailPanel } from './DetailPanel';
 import { NodeBlock } from './NodeBlock';
 import { generateId, isValidConnection } from '../utils';
 
-import type { Connection, LogEntry, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type {
+    Connection,
+    DataPacket,
+    LogEntry,
+    NodeData,
+    PortDefinition,
+    WorkflowState,
+} from '@lemoncloud/eureka-flows-api';
 
 // Define Ref Interface
 export interface WorkflowCanvasRef {
@@ -166,6 +173,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const futureRef = useRef<WorkflowState[]>([]);
         const dragStartSnapshotRef = useRef<WorkflowState | null>(null);
 
+        // Input hash tracking for reactive execution (prevents re-execution with same inputs)
+        const nodeInputHashesRef = useRef<Map<string, string>>(new Map());
+
         // Viewport State (Zoom & Pan)
         const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
         const [isPanning, setIsPanning] = useState(false);
@@ -186,7 +196,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             initialX: number;
             initialY: number;
         } | null>(null);
-        const [tooltip, setTooltip] = useState<{ x: number; y: number; content: any; type: string } | null>(null);
+        const [tooltip, setTooltip] = useState<{ x: number; y: number; content: unknown; type: string } | null>(null);
 
         // Component Modal State
         const [modalFlowId, setModalFlowId] = useState<string | null>(null);
@@ -558,7 +568,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         // --- ENGINE LOGIC ---
         const propagateOutputs = useCallback(
-            (sourceNodeId: string, outputs: any) => {
+            (sourceNodeId: string, outputs: Record<string, DataPacket>) => {
                 const relevantConnections = connections.filter(c => c.sourceNodeId === sourceNodeId);
                 if (relevantConnections.length === 0) return;
 
@@ -592,7 +602,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         );
 
         const executeNode = useCallback(
-            async (nodeId: string, manualOverrideInputs?: any) => {
+            async (nodeId: string, manualOverrideInputs?: Record<string, DataPacket>) => {
                 if (readOnly) return;
                 const startTime = Date.now();
 
@@ -649,31 +659,32 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const endTime = Date.now();
                     const duration = endTime - startTime;
 
-                    setNodes(prev =>
-                        prev.map(n => {
-                            if (n.id === nodeId) {
-                                const hash = nodeDef.inputs.map((p: any) => inputs[p.id]?.timestamp).join('|');
-                                (n as any).__lastHash = hash;
+                    // Store input hash to prevent re-execution with same inputs
+                    const hash = nodeDef.inputs.map((p: PortDefinition) => inputs[p.id]?.timestamp).join('|');
+                    nodeInputHashesRef.current.set(nodeId, hash);
 
-                                return {
-                                    ...n,
-                                    status: 'COMPLETED',
-                                    outputData: results,
-                                    executionStats: {
-                                        startTime,
-                                        duration,
-                                        progress: 100,
-                                    },
-                                };
-                            }
-                            return n;
-                        })
+                    setNodes(prev =>
+                        prev.map(n =>
+                            n.id === nodeId
+                                ? {
+                                      ...n,
+                                      status: 'COMPLETED',
+                                      outputData: results,
+                                      executionStats: {
+                                          startTime,
+                                          duration,
+                                          progress: 100,
+                                      },
+                                  }
+                                : n
+                        )
                     );
 
                     propagateOutputs(nodeId, results);
-                } catch (e: any) {
+                } catch (e: unknown) {
                     const endTime = Date.now();
                     const duration = endTime - startTime;
+                    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
 
                     setNodes(prev =>
                         prev.map(n =>
@@ -681,7 +692,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 ? {
                                       ...n,
                                       status: 'ERROR',
-                                      errorMessage: e.message,
+                                      errorMessage,
                                       executionStats: {
                                           startTime,
                                           duration,
@@ -693,7 +704,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [nodes, propagateOutputs, readOnly]
+            [nodes, propagateOutputs, readOnly, blockRegistry]
         );
 
         // Reactive Trigger
@@ -711,18 +722,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                 if (hasInputs) {
                     const currentInputHash = def.inputs.map(p => node.inputData[p.id]?.timestamp).join('|');
-                    const lastHash = (node as any).__lastHash;
+                    const lastHash = nodeInputHashesRef.current.get(node.id);
 
                     if (currentInputHash !== lastHash) {
-                        (node as any).__lastHash = currentInputHash;
+                        nodeInputHashesRef.current.set(node.id, currentInputHash);
                         executeNode(node.id);
                     }
                 }
             });
-        }, [nodes, executeNode, readOnly]);
+        }, [nodes, executeNode, readOnly, blockRegistry]);
 
         // --- UI HANDLERS ---
-        const handleConfigChange = (nodeId: string, key: string, value: any) => {
+        const handleConfigChange = (nodeId: string, key: string, value: unknown) => {
             if (readOnly) return;
             saveCheckpoint();
             setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, config: { ...n.config, [key]: value } } : n)));

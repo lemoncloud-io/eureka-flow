@@ -5,8 +5,66 @@ import { useTranslation } from 'react-i18next';
 import { Eye, MoreVertical, Pencil, Play, ScrollText, Settings, X, Zap } from 'lucide-react';
 
 import { listFlows, useBlockRegistry } from '@flows/flows';
+import { cn } from '@flows/lib/utils';
 
 import type { ConfigField, FlowMeta, NodeData, PortDefinition } from '@flows/flows';
+
+// --- Types ---
+type ConfigValue = string | number | boolean | string[] | null;
+
+type NodeStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'ERROR';
+
+interface StatusVisual {
+    border: string;
+    header: string;
+    icon: React.ReactNode;
+    textColor: string;
+}
+
+// --- Status Visual Factory ---
+const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisual> => ({
+    RUNNING: {
+        border: isSelected
+            ? 'border-yellow-400 ring-1 ring-primary shadow-[0_0_20px_rgba(234,179,8,0.6)]'
+            : 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]',
+        header: 'bg-gradient-to-r from-yellow-900/80 to-node-header',
+        icon: (
+            <div className="absolute inset-0 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+        ),
+        textColor: 'text-yellow-100',
+    },
+    COMPLETED: {
+        border: isSelected
+            ? 'border-green-400 ring-2 ring-primary ring-offset-1 ring-offset-background shadow-[0_0_25px_rgba(34,197,94,0.5)]'
+            : 'border-green-600 shadow-[0_0_15px_rgba(34,197,94,0.3)]',
+        header: 'bg-gradient-to-r from-green-900/80 to-node-header',
+        icon: <div className="text-green-400 font-bold text-[10px]">✓</div>,
+        textColor: 'text-green-100',
+    },
+    ERROR: {
+        border: isSelected
+            ? 'border-red-400 ring-1 ring-primary shadow-[0_0_20px_rgba(239,68,68,0.5)]'
+            : 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]',
+        header: 'bg-gradient-to-r from-red-900/80 to-node-header',
+        icon: <div className="text-red-400 font-bold text-[10px]">!</div>,
+        textColor: 'text-red-100',
+    },
+    IDLE: {
+        border: isSelected
+            ? 'border-primary ring-1 ring-primary/50 shadow-[0_0_15px_rgba(59,130,246,0.5)]'
+            : 'border-node-border hover:border-muted-foreground',
+        header: 'bg-node-header',
+        icon: null,
+        textColor: 'text-foreground',
+    },
+});
+
+const HIGHLIGHTED_VISUAL: StatusVisual = {
+    border: 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.5)]',
+    header: 'bg-gradient-to-r from-card to-node-header',
+    icon: null,
+    textColor: 'text-yellow-200',
+};
 
 // --- Sub-Components ---
 
@@ -27,9 +85,25 @@ interface PortItemProps {
 }
 
 const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHighlighted, onMouseDown, onMouseUp }) => {
+    const portClasses = cn(
+        'w-3 h-3 rounded-full border cursor-crosshair transition-all duration-200',
+        type === 'input' ? 'mr-2' : 'ml-2',
+        isHighlighted && 'scale-150 border-yellow-400 bg-yellow-400 ring-2 ring-yellow-400/50',
+        !isHighlighted && 'border-muted-foreground hover:scale-125',
+        hasData &&
+            !isHighlighted &&
+            type === 'input' &&
+            'bg-port-input shadow-[0_0_8px_rgba(34,197,94,0.6)] border-green-300',
+        hasData &&
+            !isHighlighted &&
+            type === 'output' &&
+            'bg-port-output shadow-[0_0_8px_rgba(59,130,246,0.6)] border-blue-300',
+        !hasData && !isHighlighted && 'bg-port-empty hover:border-foreground'
+    );
+
     return (
         <div
-            className={`flex items-center ${type === 'output' ? 'justify-end' : 'justify-start'} h-6 relative group`}
+            className={cn('flex items-center h-6 relative group', type === 'output' ? 'justify-end' : 'justify-start')}
             onMouseUp={e => {
                 e.stopPropagation();
                 onMouseUp(nodeId, port.id, type, port.type);
@@ -37,11 +111,7 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
         >
             {type === 'input' && (
                 <div
-                    className={`w-3 h-3 rounded-full border mr-2 cursor-crosshair transition-all duration-200
-                        ${isHighlighted ? 'scale-150 border-yellow-400 bg-yellow-400 ring-2 ring-yellow-400/50' : 'border-muted-foreground hover:scale-125'}
-                        ${hasData && !isHighlighted ? 'bg-port-input shadow-[0_0_8px_rgba(34,197,94,0.6)] border-green-300' : ''}
-                        ${!hasData && !isHighlighted ? 'bg-port-empty hover:border-foreground' : ''}
-                    `}
+                    className={portClasses}
                     onMouseDown={e => {
                         e.stopPropagation();
                         onMouseDown(nodeId, port.id, type, port.type, e);
@@ -49,17 +119,16 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
                 />
             )}
             <span
-                className={`text-[10px] uppercase tracking-wider font-semibold select-none transition-colors ${isHighlighted ? 'text-yellow-400' : 'text-muted-foreground'}`}
+                className={cn(
+                    'text-[10px] uppercase tracking-wider font-semibold select-none transition-colors',
+                    isHighlighted ? 'text-yellow-400' : 'text-muted-foreground'
+                )}
             >
                 {port.label}
             </span>
             {type === 'output' && (
                 <div
-                    className={`w-3 h-3 rounded-full border ml-2 cursor-crosshair transition-all duration-200
-                        ${isHighlighted ? 'scale-150 border-yellow-400 bg-yellow-400 ring-2 ring-yellow-400/50' : 'border-muted-foreground hover:scale-125'}
-                        ${hasData && !isHighlighted ? 'bg-port-output shadow-[0_0_8px_rgba(59,130,246,0.6)] border-blue-300' : ''}
-                        ${!hasData && !isHighlighted ? 'bg-port-empty hover:border-foreground' : ''}
-                    `}
+                    className={portClasses}
                     onMouseDown={e => {
                         e.stopPropagation();
                         onMouseDown(nodeId, port.id, type, port.type, e);
@@ -77,9 +146,9 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
 // 2. Config Field Renderer
 interface ConfigControlProps {
     field: ConfigField;
-    value: any;
+    value: ConfigValue;
     nodeId: string;
-    onChange: (key: string, value: any) => void;
+    onChange: (key: string, value: ConfigValue) => void;
     onViewComponent?: (flowId: string) => void;
 }
 
@@ -351,7 +420,7 @@ interface NodeBlockProps {
         e: React.MouseEvent
     ) => void;
     onPortMouseUp: (nodeId: string, portId: string, type: 'input' | 'output', portType: string) => void;
-    onConfigChange: (key: string, value: any) => void;
+    onConfigChange: (key: string, value: ConfigValue) => void;
     onLabelChange: (label: string) => void;
     onDelete: () => void;
     onTrigger: () => void;
@@ -417,67 +486,25 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
         if (!definition) return [];
         if (definition.configSchema) return definition.configSchema;
         return Object.entries(definition.defaultConfig).map(([key, value]): ConfigField => {
-            let type: any = 'text';
-            if (typeof value === 'number') type = 'number';
-            if (typeof value === 'boolean') type = 'boolean';
+            const inferType = (): string => {
+                if (typeof value === 'number') return 'number';
+                if (typeof value === 'boolean') return 'boolean';
+                return 'text';
+            };
             return {
                 key,
-                type,
+                type: inferType(),
                 label: key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()),
             };
         });
     }, [definition]);
 
-    const STATUS_VISUALS = {
-        RUNNING: {
-            border: isSelected
-                ? 'border-yellow-400 ring-1 ring-primary shadow-[0_0_20px_rgba(234,179,8,0.6)]'
-                : 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]',
-            header: 'bg-gradient-to-r from-yellow-900/80 to-node-header',
-            icon: (
-                <div className="absolute inset-0 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-            ),
-            textColor: 'text-yellow-100',
-        },
-        COMPLETED: {
-            border: isSelected
-                ? 'border-green-400 ring-2 ring-primary ring-offset-1 ring-offset-background shadow-[0_0_25px_rgba(34,197,94,0.5)]'
-                : 'border-green-600 shadow-[0_0_15px_rgba(34,197,94,0.3)]',
-            header: 'bg-gradient-to-r from-green-900/80 to-node-header',
-            icon: <div className="text-green-400 font-bold text-[10px]">✓</div>,
-            textColor: 'text-green-100',
-        },
-        ERROR: {
-            border: isSelected
-                ? 'border-red-400 ring-1 ring-primary shadow-[0_0_20px_rgba(239,68,68,0.5)]'
-                : 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]',
-            header: 'bg-gradient-to-r from-red-900/80 to-node-header',
-            icon: <div className="text-red-400 font-bold text-[10px]">!</div>,
-            textColor: 'text-red-100',
-        },
-        IDLE: {
-            border: isSelected
-                ? 'border-primary ring-1 ring-primary/50 shadow-[0_0_15px_rgba(59,130,246,0.5)]'
-                : 'border-node-border hover:border-muted-foreground',
-            header: 'bg-node-header',
-            icon: null,
-            textColor: 'text-foreground',
-        },
-    };
+    const statusVisuals = useMemo(() => createStatusVisuals(isSelected), [isSelected]);
 
-    const getVisuals = () => {
-        if (isHighlighted) {
-            return {
-                border: 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.5)]',
-                header: 'bg-gradient-to-r from-card to-node-header',
-                icon: null,
-                textColor: 'text-yellow-200',
-            };
-        }
-        return STATUS_VISUALS[node.status] || STATUS_VISUALS.IDLE;
-    };
-
-    const visuals = getVisuals();
+    const visuals = useMemo((): StatusVisual => {
+        if (isHighlighted) return HIGHLIGHTED_VISUAL;
+        return statusVisuals[node.status as NodeStatus] || statusVisuals.IDLE;
+    }, [isHighlighted, statusVisuals, node.status]);
 
     const duration = node.status === 'RUNNING' ? elapsedTime : node.executionStats?.duration;
     const displayDuration =
