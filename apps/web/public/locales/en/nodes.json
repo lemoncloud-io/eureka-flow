@@ -1,0 +1,44 @@
+{
+    "contextMenu": {
+        "rename": "Rename",
+        "viewLogs": "View Logs",
+        "viewConfig": "View Config",
+        "delete": "Delete"
+    },
+    "actions": {
+        "run": "Run",
+        "forceRun": "Force Run"
+    },
+    "status": {
+        "running": "Running",
+        "completed": "Completed",
+        "error": "Error",
+        "idle": "Idle"
+    },
+    "autoExecution": {
+        "on": "Auto Execution: ON",
+        "off": "Auto Execution: OFF"
+    },
+    "config": {
+        "noConfigurable": "No configurable settings.",
+        "doubleClickRename": "Double-click to rename"
+    },
+    "visualization": {
+        "waitingForData": "Waiting for data...",
+        "noImage": "No Image",
+        "noImageSelected": "No Image Selected",
+        "empty": "Empty",
+        "value": "Value",
+        "chooseFile": "Choose File",
+        "selectWorkflow": "-- Select Workflow --",
+        "openWorkflowDesign": "Open Workflow Design"
+    },
+    "errors": {
+        "executionFailed": "Execution Failed",
+        "unknownBlockType": "Unknown Block Type"
+    },
+    "ports": {
+        "in": "In",
+        "out": "Out"
+    }
+}

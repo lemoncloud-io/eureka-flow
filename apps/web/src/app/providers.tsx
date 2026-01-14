@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { HelmetProvider } from 'react-helmet-async';
+import { I18nextProvider } from 'react-i18next';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
@@ -8,6 +9,8 @@ import { Toaster } from 'sonner';
 
 import { ErrorFallback, GlobalLoader, LoadingFallback } from '@flows/shared';
 import { ThemeProvider } from '@flows/theme';
+
+import i18n from '../i18n';
 
 import type { ReactNode } from 'react';
 
@@ -32,16 +35,18 @@ export const Providers = ({ children }: ProvidersProps) => {
     return (
         <Suspense fallback={<LoadingFallback />}>
             <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => window.location.reload()}>
-                <HelmetProvider>
-                    <QueryClientProvider client={queryClient}>
-                        <ThemeProvider defaultTheme="dark" storageKey="flows-theme">
-                            {children}
-                            <GlobalLoader />
-                            <Toaster />
-                        </ThemeProvider>
-                        {import.meta.env.DEV && <ReactQueryDevtools />}
-                    </QueryClientProvider>
-                </HelmetProvider>
+                <I18nextProvider i18n={i18n}>
+                    <HelmetProvider>
+                        <QueryClientProvider client={queryClient}>
+                            <ThemeProvider defaultTheme="dark" storageKey="flows-theme">
+                                {children}
+                                <GlobalLoader />
+                                <Toaster />
+                            </ThemeProvider>
+                            {import.meta.env.DEV && <ReactQueryDevtools />}
+                        </QueryClientProvider>
+                    </HelmetProvider>
+                </I18nextProvider>
             </ErrorBoundary>
         </Suspense>
     );

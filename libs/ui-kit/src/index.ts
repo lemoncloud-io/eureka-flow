@@ -28,5 +28,7 @@ export * from './components/ui/toast';
 export * from './components/ui/toaster';
 export * from './components/ui/toggle';
 export * from './components/ui/tooltip';
+export * from './components/ui/theme-toggle';
+export * from './components/ui/language-switcher';
 export * from './hooks/use-toast';
 export * from './utils';

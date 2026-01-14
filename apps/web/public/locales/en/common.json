@@ -1,0 +1,31 @@
+{
+    "actions": {
+        "save": "Save",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "run": "Run",
+        "close": "Close",
+        "refresh": "Refresh",
+        "clear": "Clear",
+        "done": "Done"
+    },
+    "status": {
+        "saving": "Saving...",
+        "saved": "Saved",
+        "unsaved": "Unsaved",
+        "loading": "Loading...",
+        "running": "Running",
+        "completed": "Completed",
+        "error": "Error",
+        "idle": "Idle"
+    },
+    "theme": {
+        "light": "Light",
+        "dark": "Dark",
+        "system": "System"
+    },
+    "language": {
+        "en": "English",
+        "ko": "한국어"
+    }
+}

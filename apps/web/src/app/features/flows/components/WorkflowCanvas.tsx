@@ -1,5 +1,8 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
+
+import { ScrollText, X } from 'lucide-react';
 
 import { fetchBlockLogs, loadFlow, useBlockRegistry } from '@flows/flows';
 
@@ -8,7 +11,14 @@ import { DetailPanel } from './DetailPanel';
 import { NodeBlock } from './NodeBlock';
 import { generateId, isValidConnection } from '../utils';
 
-import type { Connection, LogEntry, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type {
+    Connection,
+    DataPacket,
+    LogEntry,
+    NodeData,
+    PortDefinition,
+    WorkflowState,
+} from '@lemoncloud/eureka-flows-api';
 
 // Define Ref Interface
 export interface WorkflowCanvasRef {
@@ -41,11 +51,11 @@ const TooltipImage = ({ src }: { src: string }) => {
             <img
                 src={src}
                 alt="Preview"
-                className="max-w-[140px] max-h-[140px] rounded border border-gray-700 bg-black/50 block"
+                className="max-w-[140px] max-h-[140px] rounded border border-border bg-background/50 block"
                 onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
             />
             {dims && (
-                <div className="absolute bottom-1 right-1 bg-black/80 text-[9px] text-white px-1.5 py-0.5 rounded backdrop-blur-md border border-white/10 font-mono shadow-sm">
+                <div className="absolute bottom-1 right-1 bg-popover/80 text-[9px] text-foreground px-1.5 py-0.5 rounded backdrop-blur-md border border-border/10 font-mono shadow-sm">
                     {dims}
                 </div>
             )}
@@ -55,6 +65,7 @@ const TooltipImage = ({ src }: { src: string }) => {
 
 // --- Log Modal Component (Centralized) ---
 const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) => {
+    const { t } = useTranslation('flows');
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [filter, setFilter] = useState('');
@@ -71,27 +82,29 @@ const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) 
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-background/60 backdrop-blur-sm"
             onMouseDown={e => e.stopPropagation()}
         >
-            <div className="bg-gray-950 border border-gray-700 rounded-lg shadow-2xl w-[600px] max-w-[95vw] h-[500px] flex flex-col animate-in fade-in zoom-in-95 duration-200 font-mono">
-                <div className="flex items-center justify-between p-3 border-b border-gray-800 bg-gray-900">
+            <div className="bg-popover border border-border rounded-lg shadow-2xl w-[600px] max-w-[95vw] h-[500px] flex flex-col animate-in fade-in zoom-in-95 duration-200 font-mono">
+                <div className="flex items-center justify-between p-3 border-b border-border bg-muted">
                     <div className="flex items-center gap-2">
-                        <span className="text-lg">📜</span>
+                        <ScrollText className="w-5 h-5 text-muted-foreground" />
                         <div>
-                            <h3 className="text-sm font-bold text-gray-200">Execution Logs</h3>
-                            <p className="text-[10px] text-gray-500">Node ID: {nodeId}</p>
+                            <h3 className="text-sm font-bold text-foreground">{t('canvas.executionLogs')}</h3>
+                            <p className="text-[10px] text-muted-foreground">
+                                {t('canvas.nodeId')}: {nodeId}
+                            </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white">
-                        ✕
+                    <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+                        <X className="w-4 h-4" />
                     </button>
                 </div>
-                <div className="p-2 border-b border-gray-800 bg-gray-900/50 flex gap-2">
+                <div className="p-2 border-b border-border bg-muted/50 flex gap-2">
                     <input
                         type="text"
-                        placeholder="Filter logs..."
-                        className="flex-1 bg-black border border-gray-700 rounded px-2 py-1 text-xs text-white focus:border-blue-500 outline-none"
+                        placeholder={t('canvas.filterLogs')}
+                        className="flex-1 bg-background border border-border rounded px-2 py-1 text-xs text-foreground focus:border-primary outline-none"
                         value={filter}
                         onChange={e => setFilter(e.target.value)}
                     />
@@ -103,31 +116,35 @@ const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) 
                                 setLoading(false);
                             });
                         }}
-                        className="px-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-xs text-gray-300"
+                        className="px-3 bg-muted hover:bg-accent border border-border rounded text-xs text-muted-foreground"
                     >
-                        Refresh
+                        {t('canvas.refresh')}
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-black/30">
+                <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-background/30">
                     {loading ? (
-                        <div className="flex justify-center items-center h-full text-gray-500 text-xs">Loading...</div>
+                        <div className="flex justify-center items-center h-full text-muted-foreground text-xs">
+                            {t('canvas.loading')}
+                        </div>
                     ) : filteredLogs.length === 0 ? (
-                        <div className="text-center text-gray-600 text-xs py-10 italic">No logs found.</div>
+                        <div className="text-center text-muted-foreground text-xs py-10 italic">
+                            {t('canvas.noLogs')}
+                        </div>
                     ) : (
                         filteredLogs.map(log => (
                             <div
                                 key={log.id}
-                                className="text-[11px] flex gap-2 p-1.5 hover:bg-white/5 rounded border-b border-gray-800/50 last:border-0"
+                                className="text-[11px] flex gap-2 p-1.5 hover:bg-accent/50 rounded border-b border-border/50 last:border-0"
                             >
-                                <div className="text-gray-500 w-24 shrink-0 font-mono">
+                                <div className="text-muted-foreground w-24 shrink-0 font-mono">
                                     {new Date(log.timestamp).toLocaleTimeString()}
                                 </div>
                                 <div
-                                    className={`w-14 shrink-0 font-bold ${log.level === 'ERROR' ? 'text-red-500' : log.level === 'WARN' ? 'text-yellow-500' : 'text-blue-400'}`}
+                                    className={`w-14 shrink-0 font-bold ${log.level === 'ERROR' ? 'text-destructive' : log.level === 'WARN' ? 'text-warning' : 'text-primary'}`}
                                 >
                                     {log.level}
                                 </div>
-                                <div className="text-gray-300 flex-1 break-all">{log.message}</div>
+                                <div className="text-foreground flex-1 break-all">{log.message}</div>
                             </div>
                         ))
                     )}
@@ -140,6 +157,7 @@ const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) 
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
     ({ readOnly, initialData, onNodeSelect, onChange }, ref) => {
+        const { t } = useTranslation('flows');
         // --- BLOCK REGISTRY FROM STORE ---
         const blockRegistry = useBlockRegistry();
 
@@ -154,6 +172,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const pastRef = useRef<WorkflowState[]>([]);
         const futureRef = useRef<WorkflowState[]>([]);
         const dragStartSnapshotRef = useRef<WorkflowState | null>(null);
+
+        // Input hash tracking for reactive execution (prevents re-execution with same inputs)
+        const nodeInputHashesRef = useRef<Map<string, string>>(new Map());
 
         // Viewport State (Zoom & Pan)
         const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
@@ -175,7 +196,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             initialX: number;
             initialY: number;
         } | null>(null);
-        const [tooltip, setTooltip] = useState<{ x: number; y: number; content: any; type: string } | null>(null);
+        const [tooltip, setTooltip] = useState<{ x: number; y: number; content: unknown; type: string } | null>(null);
 
         // Component Modal State
         const [modalFlowId, setModalFlowId] = useState<string | null>(null);
@@ -547,7 +568,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         // --- ENGINE LOGIC ---
         const propagateOutputs = useCallback(
-            (sourceNodeId: string, outputs: any) => {
+            (sourceNodeId: string, outputs: Record<string, DataPacket>) => {
                 const relevantConnections = connections.filter(c => c.sourceNodeId === sourceNodeId);
                 if (relevantConnections.length === 0) return;
 
@@ -581,7 +602,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         );
 
         const executeNode = useCallback(
-            async (nodeId: string, manualOverrideInputs?: any) => {
+            async (nodeId: string, manualOverrideInputs?: Record<string, DataPacket>) => {
                 if (readOnly) return;
                 const startTime = Date.now();
 
@@ -638,31 +659,32 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const endTime = Date.now();
                     const duration = endTime - startTime;
 
-                    setNodes(prev =>
-                        prev.map(n => {
-                            if (n.id === nodeId) {
-                                const hash = nodeDef.inputs.map((p: any) => inputs[p.id]?.timestamp).join('|');
-                                (n as any).__lastHash = hash;
+                    // Store input hash to prevent re-execution with same inputs
+                    const hash = nodeDef.inputs.map((p: PortDefinition) => inputs[p.id]?.timestamp).join('|');
+                    nodeInputHashesRef.current.set(nodeId, hash);
 
-                                return {
-                                    ...n,
-                                    status: 'COMPLETED',
-                                    outputData: results,
-                                    executionStats: {
-                                        startTime,
-                                        duration,
-                                        progress: 100,
-                                    },
-                                };
-                            }
-                            return n;
-                        })
+                    setNodes(prev =>
+                        prev.map(n =>
+                            n.id === nodeId
+                                ? {
+                                      ...n,
+                                      status: 'COMPLETED',
+                                      outputData: results,
+                                      executionStats: {
+                                          startTime,
+                                          duration,
+                                          progress: 100,
+                                      },
+                                  }
+                                : n
+                        )
                     );
 
                     propagateOutputs(nodeId, results);
-                } catch (e: any) {
+                } catch (e: unknown) {
                     const endTime = Date.now();
                     const duration = endTime - startTime;
+                    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
 
                     setNodes(prev =>
                         prev.map(n =>
@@ -670,7 +692,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 ? {
                                       ...n,
                                       status: 'ERROR',
-                                      errorMessage: e.message,
+                                      errorMessage,
                                       executionStats: {
                                           startTime,
                                           duration,
@@ -682,7 +704,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [nodes, propagateOutputs, readOnly]
+            [nodes, propagateOutputs, readOnly, blockRegistry]
         );
 
         // Reactive Trigger
@@ -700,18 +722,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                 if (hasInputs) {
                     const currentInputHash = def.inputs.map(p => node.inputData[p.id]?.timestamp).join('|');
-                    const lastHash = (node as any).__lastHash;
+                    const lastHash = nodeInputHashesRef.current.get(node.id);
 
                     if (currentInputHash !== lastHash) {
-                        (node as any).__lastHash = currentInputHash;
+                        nodeInputHashesRef.current.set(node.id, currentInputHash);
                         executeNode(node.id);
                     }
                 }
             });
-        }, [nodes, executeNode, readOnly]);
+        }, [nodes, executeNode, readOnly, blockRegistry]);
 
         // --- UI HANDLERS ---
-        const handleConfigChange = (nodeId: string, key: string, value: any) => {
+        const handleConfigChange = (nodeId: string, key: string, value: unknown) => {
             if (readOnly) return;
             saveCheckpoint();
             setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, config: { ...n.config, [key]: value } } : n)));
@@ -1067,7 +1089,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             >
                 <div
                     ref={canvasRef}
-                    className={`relative flex-1 bg-gray-900 overflow-hidden outline-none ${readOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+                    className={`relative flex-1 bg-canvas overflow-hidden outline-none ${readOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                     onMouseMove={handleMouseMove}
                     onMouseDown={handleCanvasMouseDown}
                     tabIndex={0}
@@ -1076,7 +1098,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         className="absolute inset-0 pointer-events-none transition-opacity duration-300 ease-in-out z-0"
                         style={{
                             opacity: dragState ? 0.3 : 0,
-                            backgroundImage: 'radial-gradient(#9ca3af 1px, transparent 1px)',
+                            backgroundImage: 'radial-gradient(hsl(var(--muted-foreground) / 0.4) 1px, transparent 1px)',
                             backgroundSize: `${GRID_SIZE * viewport.zoom}px ${GRID_SIZE * viewport.zoom}px`,
                             backgroundPosition: `${viewport.x}px ${viewport.y}px`,
                         }}
@@ -1201,14 +1223,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                     {tooltip && (
                         <div
-                            className="absolute z-50 bg-gray-800 border border-gray-600 rounded p-2 shadow-xl pointer-events-none transform -translate-y-full -translate-x-1/2 mt-[-10px]"
+                            className="absolute z-50 bg-popover border border-border rounded p-2 shadow-xl pointer-events-none transform -translate-y-full -translate-x-1/2 mt-[-10px]"
                             style={{ left: tooltip.x, top: tooltip.y }}
                         >
-                            <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">{tooltip.type}</div>
+                            <div className="text-[10px] text-muted-foreground uppercase font-bold mb-1">
+                                {tooltip.type}
+                            </div>
                             {tooltip.type === 'image' ? (
                                 <TooltipImage src={tooltip.content} />
                             ) : (
-                                <div className="text-xs text-white max-w-[200px] break-all">
+                                <div className="text-xs text-foreground max-w-[200px] break-all">
                                     {typeof tooltip.content === 'object'
                                         ? JSON.stringify(tooltip.content).slice(0, 100) +
                                           (JSON.stringify(tooltip.content).length > 100 ? '...' : '')
@@ -1219,25 +1243,27 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     )}
 
                     {!readOnly && (
-                        <div className="absolute bottom-4 right-4 bg-gray-800/80 p-2 rounded text-xs text-gray-400 pointer-events-none">
-                            Zoom: {Math.round(viewport.zoom * 100)}% | Pos: {Math.round(viewport.x)},{' '}
-                            {Math.round(viewport.y)}
+                        <div className="absolute bottom-4 right-4 bg-popover/80 p-2 rounded text-xs text-muted-foreground pointer-events-none">
+                            {t('canvas.zoom')}: {Math.round(viewport.zoom * 100)}% | {t('canvas.position')}:{' '}
+                            {Math.round(viewport.x)}, {Math.round(viewport.y)}
                         </div>
                     )}
 
                     {modalFlowId && modalFlowData && (
                         <div
-                            className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-10 backdrop-blur-sm"
+                            className="absolute inset-0 z-50 bg-background/80 flex items-center justify-center p-10 backdrop-blur-sm"
                             onMouseDown={e => e.stopPropagation()}
                         >
-                            <div className="bg-gray-900 border border-gray-700 w-full h-full rounded shadow-2xl flex flex-col overflow-hidden">
-                                <div className="p-3 border-b border-gray-700 flex justify-between items-center bg-gray-800">
-                                    <h3 className="text-sm font-bold text-gray-200">Component Design View</h3>
+                            <div className="bg-surface border border-border w-full h-full rounded shadow-2xl flex flex-col overflow-hidden">
+                                <div className="p-3 border-b border-border flex justify-between items-center bg-muted">
+                                    <h3 className="text-sm font-bold text-foreground">
+                                        {t('canvas.componentDesignView')}
+                                    </h3>
                                     <button
                                         onClick={() => setModalFlowId(null)}
-                                        className="text-gray-400 hover:text-white"
+                                        className="text-muted-foreground hover:text-foreground flex items-center gap-1"
                                     >
-                                        ✕ Close
+                                        <X className="w-4 h-4" /> {t('canvas.close')}
                                     </button>
                                 </div>
                                 <div className="flex-1 relative">

@@ -230,18 +230,18 @@ export const FlowEditorPage = () => {
     // Loading screen
     if (!isAppReady) {
         return (
-            <div className="flex h-screen bg-gray-950 text-white font-sans items-center justify-center flex-col gap-4">
+            <div className="flex h-screen bg-background text-foreground font-sans items-center justify-center flex-col gap-4">
                 <div className="relative w-16 h-16">
-                    <div className="absolute inset-0 border-4 border-gray-800 rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+                    <div className="absolute inset-0 border-4 border-border rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin"></div>
                 </div>
-                <div className="text-gray-400 font-mono text-sm animate-pulse">{loadingText}</div>
+                <div className="text-muted-foreground font-mono text-sm animate-pulse">{loadingText}</div>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col h-screen bg-gray-900 text-white font-sans overflow-hidden animate-in fade-in duration-500">
+        <div className="flex flex-col h-screen bg-background text-foreground font-sans overflow-hidden animate-in fade-in duration-500">
             <Header
                 flowName={flowName}
                 onNameChange={handleNameChange}
@@ -276,7 +276,9 @@ export const FlowEditorPage = () => {
                     {notification && (
                         <div
                             className={`absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded shadow-lg text-sm font-semibold animate-in slide-in-from-top-2 fade-in z-50 ${
-                                notification.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                                notification.type === 'success'
+                                    ? 'bg-success text-success-foreground'
+                                    : 'bg-destructive text-destructive-foreground'
                             }`}
                         >
                             {notification.message}
@@ -284,10 +286,10 @@ export const FlowEditorPage = () => {
                     )}
 
                     {isLoading && (
-                        <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
+                        <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-sm">
                             <div className="flex flex-col items-center">
-                                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
-                                <span className="text-sm font-semibold">Processing...</span>
+                                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
+                                <span className="text-sm font-semibold text-foreground">Processing...</span>
                             </div>
                         </div>
                     )}
