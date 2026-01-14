@@ -24,28 +24,78 @@
         --input: 20 5.9% 90%;
         --ring: 20 14.3% 4.1%;
         --radius: 0.5rem;
+
+        /* Semantic Colors */
+        --success: 142 76% 36%;
+        --success-foreground: 0 0% 100%;
+        --warning: 38 92% 50%;
+        --warning-foreground: 0 0% 0%;
+        --info: 217 91% 60%;
+        --info-foreground: 0 0% 100%;
+
+        /* Flow Editor Semantic Tokens - Light Mode */
+        --surface: 0 0% 98%;
+        --surface-elevated: 0 0% 100%;
+        --surface-overlay: 0 0% 96%;
+        --canvas-bg: 210 20% 96%;
+        --node-bg: 0 0% 100%;
+        --node-border: 214 32% 91%;
+        --node-header: 0 0% 98%;
+        --sidebar-bg: 0 0% 98%;
+        --header-bg: 0 0% 100%;
+        --toolbar-bg: 0 0% 96%;
+        --connection-line: 214 32% 50%;
+        --connection-active: 142 76% 36%;
+        --port-empty: 0 0% 85%;
+        --port-filled-input: 142 76% 36%;
+        --port-filled-output: 217 91% 60%;
     }
 
     .dark {
-        --background: 20 14.3% 4.1%;
+        --background: 222 47% 11%;
         --foreground: 60 9.1% 97.8%;
-        --card: 20 14.3% 4.1%;
+        --card: 217 33% 17%;
         --card-foreground: 60 9.1% 97.8%;
-        --popover: 20 14.3% 4.1%;
+        --popover: 222 47% 11%;
         --popover-foreground: 60 9.1% 97.8%;
         --primary: 60 9.1% 97.8%;
         --primary-foreground: 24 9.8% 10%;
-        --secondary: 12 6.5% 15.1%;
+        --secondary: 217 33% 17%;
         --secondary-foreground: 60 9.1% 97.8%;
-        --muted: 12 6.5% 15.1%;
-        --muted-foreground: 24 5.4% 63.9%;
-        --accent: 12 6.5% 15.1%;
+        --muted: 217 33% 17%;
+        --muted-foreground: 215 20% 65%;
+        --accent: 217 33% 17%;
         --accent-foreground: 60 9.1% 97.8%;
         --destructive: 0 62.8% 30.6%;
         --destructive-foreground: 60 9.1% 97.8%;
-        --border: 12 6.5% 15.1%;
-        --input: 12 6.5% 15.1%;
+        --border: 215 28% 17%;
+        --input: 215 28% 17%;
         --ring: 24 5.7% 82.9%;
+
+        /* Semantic Colors */
+        --success: 142 76% 50%;
+        --success-foreground: 0 0% 0%;
+        --warning: 38 92% 50%;
+        --warning-foreground: 0 0% 0%;
+        --info: 217 91% 70%;
+        --info-foreground: 0 0% 0%;
+
+        /* Flow Editor Semantic Tokens - Dark Mode */
+        --surface: 222 47% 11%;
+        --surface-elevated: 217 33% 17%;
+        --surface-overlay: 215 28% 17%;
+        --canvas-bg: 222 47% 8%;
+        --node-bg: 217 33% 17%;
+        --node-border: 215 28% 25%;
+        --node-header: 222 47% 11%;
+        --sidebar-bg: 222 47% 11%;
+        --header-bg: 222 47% 11%;
+        --toolbar-bg: 217 33% 17%;
+        --connection-line: 215 28% 35%;
+        --connection-active: 142 76% 50%;
+        --port-empty: 215 28% 25%;
+        --port-filled-input: 142 76% 50%;
+        --port-filled-output: 217 91% 60%;
     }
 }
 

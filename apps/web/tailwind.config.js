@@ -53,6 +53,43 @@ module.exports = {
                     DEFAULT: 'hsl(var(--card))',
                     foreground: 'hsl(var(--card-foreground))',
                 },
+                /* Semantic State Colors */
+                success: {
+                    DEFAULT: 'hsl(var(--success))',
+                    foreground: 'hsl(var(--success-foreground))',
+                },
+                warning: {
+                    DEFAULT: 'hsl(var(--warning))',
+                    foreground: 'hsl(var(--warning-foreground))',
+                },
+                info: {
+                    DEFAULT: 'hsl(var(--info))',
+                    foreground: 'hsl(var(--info-foreground))',
+                },
+                /* Flow Editor Semantic Colors */
+                surface: {
+                    DEFAULT: 'hsl(var(--surface))',
+                    elevated: 'hsl(var(--surface-elevated))',
+                    overlay: 'hsl(var(--surface-overlay))',
+                },
+                canvas: 'hsl(var(--canvas-bg))',
+                node: {
+                    bg: 'hsl(var(--node-bg))',
+                    border: 'hsl(var(--node-border))',
+                    header: 'hsl(var(--node-header))',
+                },
+                sidebar: 'hsl(var(--sidebar-bg))',
+                header: 'hsl(var(--header-bg))',
+                toolbar: 'hsl(var(--toolbar-bg))',
+                connection: {
+                    DEFAULT: 'hsl(var(--connection-line))',
+                    active: 'hsl(var(--connection-active))',
+                },
+                port: {
+                    empty: 'hsl(var(--port-empty))',
+                    input: 'hsl(var(--port-filled-input))',
+                    output: 'hsl(var(--port-filled-output))',
+                },
             },
             borderRadius: {
                 lg: 'var(--radius)',

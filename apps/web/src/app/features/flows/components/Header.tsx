@@ -1,4 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { Download, FileText, FolderOpen, Hexagon, Link, Redo2, Save, Sparkles, Trash2, Undo2 } from 'lucide-react';
+
+import { LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 
 interface HeaderProps {
     flowName: string;
@@ -35,9 +40,9 @@ export const Header: React.FC<HeaderProps> = ({
     isSaving,
     lastSavedAt,
 }) => {
+    const { t } = useTranslation(['flows', 'common']);
     const [nameInput, setNameInput] = useState(flowName);
 
-    // Sync internal state if prop changes
     useEffect(() => {
         setNameInput(flowName);
     }, [flowName]);
@@ -46,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
         if (nameInput.trim()) {
             onNameChange(nameInput);
         } else {
-            setNameInput(flowName); // Revert if empty
+            setNameInput(flowName);
         }
     };
 
@@ -59,37 +64,35 @@ export const Header: React.FC<HeaderProps> = ({
     const IconButton = ({
         onClick,
         icon,
-        label,
         danger = false,
         tooltip,
     }: {
         onClick: () => void;
-        icon: string;
-        label: string;
+        icon: React.ReactNode;
         danger?: boolean;
         tooltip?: string;
     }) => (
         <button
             onClick={onClick}
             className={`
-        flex items-center justify-center w-8 h-8 rounded transition-colors relative group
-        ${danger ? 'hover:bg-red-900/50 text-gray-400 hover:text-red-200' : 'hover:bg-gray-700 text-gray-400 hover:text-white'}
-      `}
-            title={tooltip || label}
+                flex items-center justify-center w-8 h-8 rounded transition-colors relative group
+                ${danger ? 'hover:bg-destructive/20 text-muted-foreground hover:text-destructive' : 'hover:bg-accent text-muted-foreground hover:text-foreground'}
+            `}
+            title={tooltip}
         >
-            <span className="text-lg">{icon}</span>
+            {icon}
         </button>
     );
 
-    const Separator = () => <div className="h-5 w-px bg-gray-700 mx-2" />;
+    const Separator = () => <div className="h-5 w-px bg-border mx-2" />;
 
     return (
-        <div className="h-14 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4 z-30 shadow-md shrink-0">
+        <div className="h-14 bg-header border-b border-border flex items-center justify-between px-4 z-30 shadow-sm shrink-0 transition-colors">
             {/* Left: Logo & File Info */}
             <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 select-none">
-                    <span className="text-2xl">💠</span>
-                    <span className="font-bold text-gray-200 hidden sm:block">FlowMosaic</span>
+                    <Hexagon className="w-6 h-6 text-primary" />
+                    <span className="font-bold text-foreground hidden sm:block">{t('flows:header.title')}</span>
                 </div>
 
                 <Separator />
@@ -101,50 +104,91 @@ export const Header: React.FC<HeaderProps> = ({
                         onChange={e => setNameInput(e.target.value)}
                         onBlur={handleBlur}
                         onKeyDown={handleKeyDown}
-                        className="bg-transparent border border-transparent hover:border-gray-700 focus:border-blue-500 rounded px-2 py-1 text-sm font-semibold text-white outline-none w-48 transition-all"
+                        className="bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-2 py-1 text-sm font-semibold text-foreground outline-none w-48 transition-all"
                         placeholder="Untitled Workflow"
                     />
                 </div>
 
-                <div className="text-[10px] text-gray-500 flex items-center gap-2">
+                <div className="text-[10px] text-muted-foreground flex items-center gap-2">
                     {isSaving ? (
-                        <span className="text-yellow-500 flex items-center gap-1">
-                            <span className="block w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" /> Saving...
+                        <span className="text-warning flex items-center gap-1">
+                            <span className="block w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
+                            {t('common:status.saving')}
                         </span>
                     ) : lastSavedAt ? (
-                        <span>Saved {lastSavedAt.toLocaleTimeString()}</span>
+                        <span>
+                            {t('common:status.saved')} {lastSavedAt.toLocaleTimeString()}
+                        </span>
                     ) : (
-                        <span>Unsaved</span>
+                        <span>{t('common:status.unsaved')}</span>
                     )}
                 </div>
             </div>
 
             {/* Middle: Actions Toolbar */}
             <div className="flex items-center gap-1">
-                <div className="flex items-center bg-gray-800/50 rounded-lg p-1 border border-gray-800">
-                    <IconButton onClick={onNew} icon="📄" tooltip="New Flow" />
-                    <IconButton onClick={onLoad} icon="📂" tooltip="Load Flow" />
-                    <IconButton onClick={onSave} icon="💾" tooltip="Save Flow (Ctrl+S)" />
-                    <IconButton onClick={onExport} icon="📤" tooltip="Export JSON" />
+                <div className="flex items-center bg-toolbar rounded-lg p-1 border border-border">
+                    <IconButton
+                        onClick={onNew}
+                        icon={<FileText className="w-4 h-4" />}
+                        tooltip={t('flows:header.newFlow')}
+                    />
+                    <IconButton
+                        onClick={onLoad}
+                        icon={<FolderOpen className="w-4 h-4" />}
+                        tooltip={t('flows:header.openFlow')}
+                    />
+                    <IconButton
+                        onClick={onSave}
+                        icon={<Save className="w-4 h-4" />}
+                        tooltip={`${t('flows:header.saveFlow')} (Ctrl+S)`}
+                    />
+                    <IconButton
+                        onClick={onExport}
+                        icon={<Download className="w-4 h-4" />}
+                        tooltip={t('flows:header.exportJson')}
+                    />
                 </div>
 
                 <Separator />
 
-                <div className="flex items-center bg-gray-800/50 rounded-lg p-1 border border-gray-800">
-                    <IconButton onClick={onUndo} icon="↩️" tooltip="Undo (Ctrl+Z)" />
-                    <IconButton onClick={onRedo} icon="↪️" tooltip="Redo (Ctrl+Y)" />
+                <div className="flex items-center bg-toolbar rounded-lg p-1 border border-border">
+                    <IconButton
+                        onClick={onUndo}
+                        icon={<Undo2 className="w-4 h-4" />}
+                        tooltip={`${t('flows:header.undo')} (Ctrl+Z)`}
+                    />
+                    <IconButton
+                        onClick={onRedo}
+                        icon={<Redo2 className="w-4 h-4" />}
+                        tooltip={`${t('flows:header.redo')} (Ctrl+Y)`}
+                    />
                 </div>
 
                 <Separator />
 
-                <div className="flex items-center bg-gray-800/50 rounded-lg p-1 border border-gray-800">
-                    <IconButton onClick={onAutoLayout} icon="✨" tooltip="Auto Layout" />
-                    <IconButton onClick={onClear} icon="🗑️" tooltip="Clear Canvas" danger />
+                <div className="flex items-center bg-toolbar rounded-lg p-1 border border-border">
+                    <IconButton
+                        onClick={onAutoLayout}
+                        icon={<Sparkles className="w-4 h-4" />}
+                        tooltip={t('flows:header.autoLayout')}
+                    />
+                    <IconButton
+                        onClick={onClear}
+                        icon={<Trash2 className="w-4 h-4" />}
+                        tooltip={t('flows:header.clearCanvas')}
+                        danger
+                    />
                 </div>
             </div>
 
-            {/* Right: Auto Save & Share */}
-            <div className="flex items-center gap-4">
+            {/* Right: Theme, Language, Auto Save & Share */}
+            <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <LanguageSwitcher />
+
+                <Separator />
+
                 {/* Auto Save Toggle */}
                 <div
                     className="flex items-center gap-2 cursor-pointer group"
@@ -152,24 +196,24 @@ export const Header: React.FC<HeaderProps> = ({
                     title="Toggle Auto Save"
                 >
                     <div
-                        className={`w-8 h-4 rounded-full p-0.5 transition-colors relative ${isAutoSaveEnabled ? 'bg-green-600/80' : 'bg-gray-700'}`}
+                        className={`w-8 h-4 rounded-full p-0.5 transition-colors relative ${isAutoSaveEnabled ? 'bg-success/80' : 'bg-muted'}`}
                     >
                         <div
                             className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform absolute top-0.5 ${isAutoSaveEnabled ? 'left-[calc(100%-14px)]' : 'left-0.5'}`}
                         />
                     </div>
                     <span
-                        className={`text-xs font-semibold select-none ${isAutoSaveEnabled ? 'text-green-400' : 'text-gray-500 group-hover:text-gray-400'}`}
+                        className={`text-xs font-semibold select-none ${isAutoSaveEnabled ? 'text-success' : 'text-muted-foreground group-hover:text-foreground'}`}
                     >
-                        Auto Save
+                        {t('flows:header.autoSave')}
                     </span>
                 </div>
 
                 <button
                     onClick={onShare}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-lg hover:shadow-blue-500/20 active:scale-95"
+                    className="flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-lg hover:shadow-primary/20 active:scale-95"
                 >
-                    <span>🔗</span> Share
+                    <Link className="w-3.5 h-3.5" /> {t('flows:header.share')}
                 </button>
             </div>
         </div>
