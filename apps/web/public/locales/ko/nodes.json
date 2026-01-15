@@ -1,6 +1,10 @@
 {
     "contextMenu": {
         "rename": "이름 변경",
+        "duplicate": "복제",
+        "disable": "비활성화",
+        "enable": "활성화",
+        "retry": "재시도",
         "viewLogs": "로그 보기",
         "viewConfig": "설정 보기",
         "delete": "삭제"

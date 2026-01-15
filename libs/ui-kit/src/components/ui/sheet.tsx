@@ -69,7 +69,7 @@ SheetContent.displayName = SheetPrimitive.Content.displayName;
 const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
     <div
         className={cn(
-            'h-[59px] sticky top-0 z-50 bg-dialog flex items-center justify-center border-b border-gray-200',
+            'h-[59px] sticky top-0 z-50 bg-background flex items-center justify-center border-b border-border',
             className
         )}
         {...props}
@@ -82,7 +82,7 @@ const SheetFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
         className={cn(
             'relative flex justify-end gap-2 sticky bottom-0 bg-background',
             'before:content-[""] before:absolute before:bottom-full before:left-0 before:right-0 before:h-10',
-            'before:bg-gradient-to-t before:from-white before:via-white/40 before:to-transparent before:pointer-events-none',
+            'before:bg-background/80 before:backdrop-blur-sm before:pointer-events-none',
             className
         )}
         {...props}

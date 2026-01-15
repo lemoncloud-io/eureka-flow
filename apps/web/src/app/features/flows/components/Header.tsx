@@ -1,7 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Download, FileText, FolderOpen, Hexagon, Link, Redo2, Save, Sparkles, Trash2, Undo2 } from 'lucide-react';
+import {
+    Download,
+    FileText,
+    FolderOpen,
+    Hexagon,
+    Link,
+    Play,
+    Redo2,
+    Save,
+    Sparkles,
+    Square,
+    Trash2,
+    Undo2,
+    Upload,
+} from 'lucide-react';
 
 import { LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 
@@ -12,11 +26,15 @@ interface HeaderProps {
     onLoad: () => void;
     onSave: () => void;
     onExport: () => void;
+    onImport: () => void;
     onUndo: () => void;
     onRedo: () => void;
     onAutoLayout: () => void;
     onClear: () => void;
     onShare: () => void;
+    onRunAll: () => void;
+    onStopAll: () => void;
+    isRunning: boolean;
     isAutoSaveEnabled: boolean;
     onToggleAutoSave: () => void;
     isSaving: boolean;
@@ -30,11 +48,15 @@ export const Header: React.FC<HeaderProps> = ({
     onLoad,
     onSave,
     onExport,
+    onImport,
     onUndo,
     onRedo,
     onAutoLayout,
     onClear,
     onShare,
+    onRunAll,
+    onStopAll,
+    isRunning,
     isAutoSaveEnabled,
     onToggleAutoSave,
     isSaving,
@@ -105,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
                         onBlur={handleBlur}
                         onKeyDown={handleKeyDown}
                         className="bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-2 py-1 text-sm font-semibold text-foreground outline-none w-48 transition-all"
-                        placeholder="Untitled Workflow"
+                        placeholder={t('flows:header.untitledWorkflow')}
                     />
                 </div>
 
@@ -148,6 +170,11 @@ export const Header: React.FC<HeaderProps> = ({
                         icon={<Download className="w-4 h-4" />}
                         tooltip={t('flows:header.exportJson')}
                     />
+                    <IconButton
+                        onClick={onImport}
+                        icon={<Upload className="w-4 h-4" />}
+                        tooltip={t('flows:header.importJson')}
+                    />
                 </div>
 
                 <Separator />
@@ -180,6 +207,29 @@ export const Header: React.FC<HeaderProps> = ({
                         danger
                     />
                 </div>
+
+                <Separator />
+
+                {/* Run/Stop Buttons */}
+                <div className="flex items-center gap-1">
+                    {isRunning ? (
+                        <button
+                            onClick={onStopAll}
+                            className="flex items-center gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90 px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-md active:scale-95"
+                        >
+                            <Square className="w-3.5 h-3.5" />
+                            {t('flows:header.stopAll')}
+                        </button>
+                    ) : (
+                        <button
+                            onClick={onRunAll}
+                            className="flex items-center gap-1.5 bg-success text-success-foreground hover:bg-success/90 px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-md active:scale-95"
+                        >
+                            <Play className="w-3.5 h-3.5" />
+                            {t('flows:header.runAll')}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Right: Theme, Language, Auto Save & Share */}
@@ -193,7 +243,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <div
                     className="flex items-center gap-2 cursor-pointer group"
                     onClick={onToggleAutoSave}
-                    title="Toggle Auto Save"
+                    title={t('flows:header.toggleAutoSave')}
                 >
                     <div
                         className={`w-8 h-4 rounded-full p-0.5 transition-colors relative ${isAutoSaveEnabled ? 'bg-success/80' : 'bg-muted'}`}

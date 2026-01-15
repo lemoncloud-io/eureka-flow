@@ -6,7 +6,7 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
     <div
         ref={ref}
         className={cn(
-            'rounded-[20px] sm:rounded-[26px] overflow-hidden flex flex-col border border-gray-300 bg-card text-card-foreground shadow-custom max-w-full',
+            'rounded-[20px] sm:rounded-[26px] overflow-hidden flex flex-col border border-border bg-card text-card-foreground shadow-custom max-w-full',
             className
         )}
         {...props}
@@ -19,7 +19,7 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
         <div
             ref={ref}
             className={cn(
-                'shrink-0 flex items-center border-b border-gray-200 h-[60px] px-4 sm:h-[76px] sm:px-6',
+                'shrink-0 flex items-center border-b border-border h-[60px] px-4 sm:h-[76px] sm:px-6',
                 className
             )}
             {...props}
@@ -60,7 +60,7 @@ const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
             className={cn(
                 'relative flex justify-end gap-2 sticky bottom-0 bg-background py-3 px-4 sm:pb-6 sm:px-[18px]',
                 'before:content-[""] before:absolute before:bottom-full before:left-0 before:right-0 before:h-10',
-                'before:bg-gradient-to-t before:from-background before:via-background/40 before:to-transparent before:pointer-events-none',
+                'before:bg-background/80 before:backdrop-blur-sm before:pointer-events-none',
                 className
             )}
             {...props}

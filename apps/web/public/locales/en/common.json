@@ -7,7 +7,13 @@
         "close": "Close",
         "refresh": "Refresh",
         "clear": "Clear",
-        "done": "Done"
+        "done": "Done",
+        "retry": "Retry",
+        "login": "Login",
+        "goHome": "Go Home",
+        "goBack": "Go Back",
+        "later": "Later",
+        "retrying": "Retrying..."
     },
     "status": {
         "saving": "Saving...",
@@ -22,10 +28,53 @@
     "theme": {
         "light": "Light",
         "dark": "Dark",
-        "system": "System"
+        "system": "System",
+        "toggle": "Toggle theme"
     },
     "language": {
         "en": "English",
-        "ko": "한국어"
+        "ko": "한국어",
+        "change": "Change language"
+    },
+    "errors": {
+        "network": {
+            "title": "Connection Error",
+            "description": "Unable to connect to the server. Please check your internet connection."
+        },
+        "auth": {
+            "title": "Authentication Error",
+            "description": "Your session has expired. Please log in again."
+        },
+        "server": {
+            "title": "Server Error",
+            "description": "A server error occurred. Please try again later."
+        },
+        "client": {
+            "title": "Request Error",
+            "description": "There was a problem with your request. Please try again."
+        },
+        "unknown": {
+            "title": "Error Occurred",
+            "description": "An unexpected error occurred."
+        },
+        "notFound": {
+            "title": "Page Not Found",
+            "description": "The requested page does not exist or has been moved."
+        },
+        "invalidToken": "Token is invalid",
+        "authExpired": "Authentication has expired",
+        "checkNetwork": "Please check your network connection",
+        "serverError": "A server error occurred",
+        "requestError": "There was a problem with the request",
+        "unknownError": "An unknown error occurred",
+        "authError": "Authentication error"
+    },
+    "version": {
+        "newAvailable": "New version available",
+        "newReleased": "New version ({{latestVersion}}) has been released. Current version: {{currentVersion}}"
+    },
+    "accessibility": {
+        "goToHome": "Go to home",
+        "tryAgain": "Try again"
     }
 }

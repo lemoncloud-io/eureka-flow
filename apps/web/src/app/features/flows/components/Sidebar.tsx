@@ -10,10 +10,12 @@ import {
     Puzzle,
     RefreshCw,
     Ruler,
+    Search,
     Shield,
     Terminal,
     Timer,
     Type,
+    X,
 } from 'lucide-react';
 
 import { useBlockRegistry } from '@flows/flows';
@@ -79,10 +81,11 @@ const NodeButton = ({
 );
 
 export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
-    const { t } = useTranslation('flows');
+    const { t } = useTranslation(['flows']);
     const blockRegistry = useBlockRegistry();
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [hoveredNode, setHoveredNode] = useState<{ type: string; top: number } | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const SectionHeader = ({ title }: { title: string }) =>
         !isCollapsed ? (
@@ -113,12 +116,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
 
     const blockGroups = useMemo(() => {
         const blocks = Object.values(blockRegistry);
-        return {
-            inputs: blocks.filter(b => b.type.startsWith('input-')),
-            process: blocks.filter(b => !b.type.startsWith('input-') && !['preview', 'debug-log'].includes(b.type)),
-            outputs: blocks.filter(b => ['preview', 'debug-log'].includes(b.type)),
+        const query = searchQuery.toLowerCase().trim();
+
+        const filterBySearch = (b: (typeof blocks)[number]) => {
+            if (!query) return true;
+            return (
+                b.type.toLowerCase().includes(query) ||
+                b.label.toLowerCase().includes(query) ||
+                b.description.toLowerCase().includes(query)
+            );
         };
-    }, [blockRegistry]);
+
+        return {
+            inputs: blocks.filter(b => b.type.startsWith('input-') && filterBySearch(b)),
+            process: blocks.filter(
+                b => !b.type.startsWith('input-') && !['preview', 'debug-log'].includes(b.type) && filterBySearch(b)
+            ),
+            outputs: blocks.filter(b => ['preview', 'debug-log'].includes(b.type) && filterBySearch(b)),
+        };
+    }, [blockRegistry, searchQuery]);
 
     const renderTooltip = () => {
         if (!hoveredNode) return null;
@@ -202,72 +218,110 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
                 </span>
             </div>
 
+            {/* Search */}
+            {!isCollapsed && (
+                <div className="p-3 border-b border-border">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            placeholder={t('sidebar.searchBlocks')}
+                            className="w-full pl-8 pr-8 py-1.5 text-xs bg-background border border-border rounded focus:border-primary focus:outline-none text-foreground placeholder:text-muted-foreground"
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Node Library */}
             <div
                 className={`flex-1 overflow-y-auto ${isCollapsed ? 'p-2 space-y-2' : 'p-4 space-y-1'}`}
                 onScroll={() => setHoveredNode(null)}
             >
-                <div>
-                    <SectionHeader title={t('sidebar.inputs')} />
-                    <div className="space-y-2">
-                        {blockGroups.inputs.map(b => (
-                            <NodeButton
-                                key={b.type}
-                                type={b.type}
-                                icon={getIcon(b.icon ?? b.type)}
-                                label={b.label}
-                                isCollapsed={isCollapsed}
-                                disabled={isLoading}
-                                onAddNode={onAddNode}
-                                onHover={handleHover}
-                                onLeave={handleLeave}
-                            />
-                        ))}
-                    </div>
-                </div>
+                {/* No Results Message */}
+                {searchQuery &&
+                    blockGroups.inputs.length === 0 &&
+                    blockGroups.process.length === 0 &&
+                    blockGroups.outputs.length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground text-sm">{t('sidebar.noResults')}</div>
+                    )}
 
-                <div>
-                    <SectionHeader title={t('sidebar.process')} />
-                    <div className="space-y-2">
-                        {blockGroups.process.map(b => (
-                            <NodeButton
-                                key={b.type}
-                                type={b.type}
-                                icon={getIcon(b?.icon ?? b.type)}
-                                label={b.label}
-                                isCollapsed={isCollapsed}
-                                disabled={isLoading}
-                                onAddNode={onAddNode}
-                                onHover={handleHover}
-                                onLeave={handleLeave}
-                                colorClass={
-                                    b.type === 'workflow-component'
-                                        ? 'bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-900/80 border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-100'
-                                        : undefined
-                                }
-                            />
-                        ))}
+                {blockGroups.inputs.length > 0 && (
+                    <div>
+                        <SectionHeader title={t('sidebar.inputs')} />
+                        <div className="space-y-2">
+                            {blockGroups.inputs.map(b => (
+                                <NodeButton
+                                    key={b.type}
+                                    type={b.type}
+                                    icon={getIcon(b.icon ?? b.type)}
+                                    label={b.label}
+                                    isCollapsed={isCollapsed}
+                                    disabled={isLoading}
+                                    onAddNode={onAddNode}
+                                    onHover={handleHover}
+                                    onLeave={handleLeave}
+                                />
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
 
-                <div>
-                    <SectionHeader title={t('sidebar.output')} />
-                    <div className="space-y-2">
-                        {blockGroups.outputs.map(b => (
-                            <NodeButton
-                                key={b.type}
-                                type={b.type}
-                                icon={getIcon(b?.icon ?? b.type)}
-                                label={b.label}
-                                isCollapsed={isCollapsed}
-                                disabled={isLoading}
-                                onAddNode={onAddNode}
-                                onHover={handleHover}
-                                onLeave={handleLeave}
-                            />
-                        ))}
+                {blockGroups.process.length > 0 && (
+                    <div>
+                        <SectionHeader title={t('sidebar.process')} />
+                        <div className="space-y-2">
+                            {blockGroups.process.map(b => (
+                                <NodeButton
+                                    key={b.type}
+                                    type={b.type}
+                                    icon={getIcon(b?.icon ?? b.type)}
+                                    label={b.label}
+                                    isCollapsed={isCollapsed}
+                                    disabled={isLoading}
+                                    onAddNode={onAddNode}
+                                    onHover={handleHover}
+                                    onLeave={handleLeave}
+                                    colorClass={
+                                        b.type === 'workflow-component'
+                                            ? 'bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-900/80 border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-100'
+                                            : undefined
+                                    }
+                                />
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
+
+                {blockGroups.outputs.length > 0 && (
+                    <div>
+                        <SectionHeader title={t('sidebar.output')} />
+                        <div className="space-y-2">
+                            {blockGroups.outputs.map(b => (
+                                <NodeButton
+                                    key={b.type}
+                                    type={b.type}
+                                    icon={getIcon(b?.icon ?? b.type)}
+                                    label={b.label}
+                                    isCollapsed={isCollapsed}
+                                    disabled={isLoading}
+                                    onAddNode={onAddNode}
+                                    onHover={handleHover}
+                                    onLeave={handleLeave}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Footer */}

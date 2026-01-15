@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
-import { Eye, MoreVertical, Pencil, Play, ScrollText, Settings, X, Zap } from 'lucide-react';
+import { Ban, Copy, Eye, MoreVertical, Pencil, Play, RefreshCw, ScrollText, Settings, X, Zap } from 'lucide-react';
 
 import { listFlows, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -22,36 +22,37 @@ interface StatusVisual {
 }
 
 // --- Status Visual Factory ---
+// Minimal approach: status indicated by border color and icon only, header stays neutral
 const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisual> => ({
     RUNNING: {
         border: isSelected
-            ? 'border-yellow-400 ring-1 ring-primary shadow-[0_0_20px_rgba(234,179,8,0.6)]'
-            : 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]',
-        header: 'bg-gradient-to-r from-yellow-900/80 to-node-header',
+            ? 'border-status-running ring-1 ring-status-running/30 shadow-lg'
+            : 'border-status-running shadow-md',
+        header: 'bg-node-header',
         icon: (
-            <div className="absolute inset-0 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="absolute inset-0 border-2 border-status-running border-t-transparent rounded-full animate-spin"></div>
         ),
-        textColor: 'text-yellow-100',
+        textColor: 'text-foreground',
     },
     COMPLETED: {
         border: isSelected
-            ? 'border-green-400 ring-2 ring-primary ring-offset-1 ring-offset-background shadow-[0_0_25px_rgba(34,197,94,0.5)]'
-            : 'border-green-600 shadow-[0_0_15px_rgba(34,197,94,0.3)]',
-        header: 'bg-gradient-to-r from-green-900/80 to-node-header',
-        icon: <div className="text-green-400 font-bold text-[10px]">✓</div>,
-        textColor: 'text-green-100',
+            ? 'border-status-completed ring-1 ring-status-completed/30 shadow-lg'
+            : 'border-status-completed shadow-md',
+        header: 'bg-node-header',
+        icon: <div className="text-status-completed font-bold text-[10px]">✓</div>,
+        textColor: 'text-foreground',
     },
     ERROR: {
         border: isSelected
-            ? 'border-red-400 ring-1 ring-primary shadow-[0_0_20px_rgba(239,68,68,0.5)]'
-            : 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]',
-        header: 'bg-gradient-to-r from-red-900/80 to-node-header',
-        icon: <div className="text-red-400 font-bold text-[10px]">!</div>,
-        textColor: 'text-red-100',
+            ? 'border-status-error ring-1 ring-status-error/30 shadow-lg'
+            : 'border-status-error shadow-md',
+        header: 'bg-node-header',
+        icon: <div className="text-status-error font-bold text-[10px]">!</div>,
+        textColor: 'text-foreground',
     },
     IDLE: {
         border: isSelected
-            ? 'border-primary ring-1 ring-primary/50 shadow-[0_0_15px_rgba(59,130,246,0.5)]'
+            ? 'border-primary ring-1 ring-primary/30 shadow-lg'
             : 'border-node-border hover:border-muted-foreground',
         header: 'bg-node-header',
         icon: null,
@@ -60,10 +61,17 @@ const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisu
 });
 
 const HIGHLIGHTED_VISUAL: StatusVisual = {
-    border: 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.5)]',
-    header: 'bg-gradient-to-r from-card to-node-header',
+    border: 'border-accent shadow-lg shadow-accent/20',
+    header: 'bg-node-header',
     icon: null,
-    textColor: 'text-yellow-200',
+    textColor: 'text-accent',
+};
+
+const DISABLED_VISUAL: StatusVisual = {
+    border: 'border-muted-foreground/30 opacity-50',
+    header: 'bg-muted/50',
+    icon: <Ban className="w-3 h-3 text-muted-foreground" />,
+    textColor: 'text-muted-foreground',
 };
 
 // --- Sub-Components ---
@@ -153,7 +161,7 @@ interface ConfigControlProps {
 }
 
 const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onChange, onViewComponent }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes']);
     const [flows, setFlows] = useState<FlowMeta[]>([]);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -299,13 +307,13 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
 // 3. Visualization Components
 
 const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes']);
     const lastInput = node.inputData['in'];
     const [dims, setDims] = useState<string | null>(null);
 
     if (!lastInput) {
         return (
-            <div className="mt-2 text-xs text-muted-foreground italic text-center py-4 bg-muted/30 rounded border border-dashed border-border">
+            <div className="mt-2 text-xs text-background/60 italic text-center py-4 bg-foreground/60 rounded border border-border">
                 {t('visualization.waitingForData')}
             </div>
         );
@@ -322,7 +330,7 @@ const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
                         onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
                     />
                     {dims && (
-                        <div className="absolute bottom-1 right-1 bg-black/70 text-[9px] text-white px-1.5 py-0.5 rounded backdrop-blur-sm border border-border shadow-sm pointer-events-none">
+                        <div className="absolute bottom-1 right-1 bg-foreground/80 text-[9px] text-background px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm pointer-events-none">
                             {dims}
                         </div>
                     )}
@@ -337,12 +345,12 @@ const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
 };
 
 const InputImageVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes']);
     const img = node.config.imageData;
     const [dims, setDims] = useState<string | null>(null);
 
     return (
-        <div className="mt-2 rounded border border-border overflow-hidden bg-black/30 flex justify-center items-center h-20 relative">
+        <div className="mt-2 rounded border border-border overflow-hidden bg-foreground/60 flex justify-center items-center h-20 relative">
             {img ? (
                 <>
                     <img
@@ -352,23 +360,23 @@ const InputImageVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
                         onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
                     />
                     {dims && (
-                        <div className="absolute bottom-1 right-1 bg-black/70 text-[9px] text-white px-1.5 py-0.5 rounded backdrop-blur-sm border border-border shadow-sm pointer-events-none">
+                        <div className="absolute bottom-1 right-1 bg-foreground/80 text-[9px] text-background px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm pointer-events-none">
                             {dims}
                         </div>
                     )}
                 </>
             ) : (
-                <span className="text-[9px] text-muted-foreground">{t('visualization.noImage')}</span>
+                <span className="text-[9px] text-background/60 italic">{t('visualization.noImage')}</span>
             )}
         </div>
     );
 };
 
 const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes']);
     const lastInput = node.inputData['in']?.value;
     return (
-        <div className="mt-2 p-2 bg-black/50 rounded border border-border text-success font-mono text-[10px] break-all max-h-24 overflow-y-auto">
+        <div className="mt-2 p-2 bg-foreground rounded border border-border text-background font-mono text-[10px] break-all max-h-24 overflow-y-auto">
             {lastInput !== undefined ? (
                 typeof lastInput === 'object' ? (
                     JSON.stringify(lastInput, null, 2)
@@ -376,14 +384,14 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
                     String(lastInput)
                 )
             ) : (
-                <span className="text-muted-foreground">{t('visualization.waitingForData')}</span>
+                <span className="text-background/50 italic">{t('visualization.waitingForData')}</span>
             )}
         </div>
     );
 };
 
 const InputTextVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes']);
     const text = node.config.text;
     return (
         <div className="mt-2 p-2 bg-background rounded border border-border group relative">
@@ -425,6 +433,8 @@ interface NodeBlockProps {
     onDelete: () => void;
     onTrigger: () => void;
     onToggleAuto: () => void;
+    onToggleDisabled?: () => void;
+    onDuplicate?: () => void;
     onViewComponent?: (flowId: string) => void;
     onViewLogs: () => void;
 }
@@ -442,13 +452,16 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     onDelete,
     onTrigger,
     onToggleAuto,
+    onToggleDisabled,
+    onDuplicate,
     onViewComponent,
     onViewLogs,
 }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes', 'flows']);
     const blockRegistry = useBlockRegistry();
     const definition = blockRegistry[node.type];
     const isAuto = node.autoExecutionEnabled !== false;
+    const isDisabled = (node as NodeData & { disabled?: boolean }).disabled === true;
 
     const [showConfig, setShowConfig] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -502,9 +515,10 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const statusVisuals = useMemo(() => createStatusVisuals(isSelected), [isSelected]);
 
     const visuals = useMemo((): StatusVisual => {
+        if (isDisabled) return DISABLED_VISUAL;
         if (isHighlighted) return HIGHLIGHTED_VISUAL;
         return statusVisuals[node.status as NodeStatus] || statusVisuals.IDLE;
-    }, [isHighlighted, statusVisuals, node.status]);
+    }, [isDisabled, isHighlighted, statusVisuals, node.status]);
 
     const duration = node.status === 'RUNNING' ? elapsedTime : node.executionStats?.duration;
     const displayDuration =
@@ -627,7 +641,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 onBlur={commitLabel}
                                 onKeyDown={handleLabelKeyDown}
                                 className="w-full bg-background/80 text-foreground text-xs px-1 py-0.5 rounded border border-primary outline-none"
-                                placeholder="Label..."
+                                placeholder={t('flows:detailPanel.labelPlaceholder')}
                             />
                         </div>
                     ) : (
@@ -686,7 +700,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                         setShowMenu(false);
                                     }}
                                 />
-                                <div className="absolute right-0 top-7 w-32 bg-popover border border-border rounded shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100">
+                                <div className="absolute right-0 top-7 w-36 bg-popover border border-border rounded shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100">
                                     <button
                                         onClick={e => {
                                             e.stopPropagation();
@@ -697,6 +711,44 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                     >
                                         <Pencil className="w-3 h-3" /> {t('contextMenu.rename')}
                                     </button>
+                                    {onDuplicate && (
+                                        <button
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setShowMenu(false);
+                                                onDuplicate();
+                                            }}
+                                            className="text-left px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                                        >
+                                            <Copy className="w-3 h-3" /> {t('contextMenu.duplicate')}
+                                        </button>
+                                    )}
+                                    {onToggleDisabled && (
+                                        <button
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setShowMenu(false);
+                                                onToggleDisabled();
+                                            }}
+                                            className="text-left px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                                        >
+                                            <Ban className="w-3 h-3" />{' '}
+                                            {isDisabled ? t('contextMenu.enable') : t('contextMenu.disable')}
+                                        </button>
+                                    )}
+                                    {node.status === 'ERROR' && (
+                                        <button
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setShowMenu(false);
+                                                onTrigger();
+                                            }}
+                                            className="text-left px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                                        >
+                                            <RefreshCw className="w-3 h-3" /> {t('contextMenu.retry')}
+                                        </button>
+                                    )}
+                                    <div className="border-t border-border my-1" />
                                     <button
                                         onClick={e => {
                                             e.stopPropagation();
@@ -792,7 +844,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     </div>
                     {node.status === 'ERROR' && (
                         <div className="mt-2 text-destructive text-[10px] bg-destructive/10 p-2 rounded border border-destructive/30 flex items-start gap-1 animate-in fade-in slide-in-from-top-1">
-                            <span className="font-bold">Error:</span> {node.errorMessage || t('errors.executionFailed')}
+                            <span className="font-bold">{t('flows:nodeBlock.error')}</span>{' '}
+                            {node.errorMessage || t('errors.executionFailed')}
                         </div>
                     )}
                 </div>
@@ -810,7 +863,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         )}
 
                         {displayDuration && (
-                            <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-[9px] text-foreground px-1.5 py-0.5 rounded font-mono border border-border/50 shadow-sm pointer-events-none z-10">
+                            <div className="absolute bottom-2 right-2 bg-foreground/80 backdrop-blur-md text-[9px] text-background px-1.5 py-0.5 rounded font-mono shadow-sm pointer-events-none z-10">
                                 {displayDuration}
                             </div>
                         )}

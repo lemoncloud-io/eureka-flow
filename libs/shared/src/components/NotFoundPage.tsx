@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { ArrowLeft, Home } from 'lucide-react';
 
 import { Button } from '@flows/ui-kit';
 
-import { ERROR_MESSAGES } from '../consts';
-
-const messages = ERROR_MESSAGES.notFound;
+import { ERROR_MESSAGE_KEYS } from '../consts';
 
 export const NotFoundPage = (): JSX.Element => {
+    const { t } = useTranslation(['common']);
     const navigate = useNavigate();
     const containerRef = useRef<HTMLDivElement>(null);
+
+    const messageKeys = ERROR_MESSAGE_KEYS.notFound;
 
     useEffect(() => {
         containerRef.current?.focus();
@@ -38,23 +40,23 @@ export const NotFoundPage = (): JSX.Element => {
 
                 <div className="space-y-3">
                     <h2 id="notfound-title" className="text-2xl font-bold text-foreground">
-                        {messages.title}
+                        {t(messageKeys.title)}
                     </h2>
-                    <p className="leading-relaxed text-muted-foreground">{messages.description}</p>
+                    <p className="leading-relaxed text-muted-foreground">{t(messageKeys.description)}</p>
                 </div>
 
                 <div className="flex justify-center gap-3 pt-4">
-                    <Button variant="outline" onClick={handleGoBack} aria-label={messages.secondaryAction}>
+                    <Button variant="outline" onClick={handleGoBack} aria-label={t(messageKeys.secondaryAction)}>
                         <ArrowLeft className="mr-2 h-4 w-4" />
-                        <span>{messages.secondaryAction}</span>
+                        <span>{t(messageKeys.secondaryAction)}</span>
                     </Button>
                     <Button
                         onClick={handleGoHome}
                         className="bg-orange-500 text-white hover:bg-orange-600"
-                        aria-label={messages.primaryAction}
+                        aria-label={t(messageKeys.primaryAction)}
                     >
                         <Home className="mr-2 h-4 w-4" />
-                        <span>{messages.primaryAction}</span>
+                        <span>{t(messageKeys.primaryAction)}</span>
                     </Button>
                 </div>
             </div>

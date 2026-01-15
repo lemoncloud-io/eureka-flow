@@ -1,6 +1,10 @@
 {
     "contextMenu": {
         "rename": "Rename",
+        "duplicate": "Duplicate",
+        "disable": "Disable",
+        "enable": "Enable",
+        "retry": "Retry",
         "viewLogs": "View Logs",
         "viewConfig": "View Config",
         "delete": "Delete"

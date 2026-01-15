@@ -7,10 +7,15 @@
         "openFlow": "Open Flow",
         "saveFlow": "Save Flow",
         "exportJson": "Export JSON",
+        "importJson": "Import JSON",
         "undo": "Undo",
         "redo": "Redo",
         "autoLayout": "Auto Layout",
-        "clearCanvas": "Clear Canvas"
+        "clearCanvas": "Clear Canvas",
+        "untitledWorkflow": "Untitled Workflow",
+        "toggleAutoSave": "Toggle Auto Save",
+        "runAll": "Run All",
+        "stopAll": "Stop"
     },
     "sidebar": {
         "library": "Library",
@@ -20,7 +25,9 @@
         "output": "Output",
         "dragHint": "Drag & Drop nodes to canvas",
         "expandSidebar": "Expand Sidebar",
-        "collapseSidebar": "Collapse Sidebar"
+        "collapseSidebar": "Collapse Sidebar",
+        "searchBlocks": "Search blocks...",
+        "noResults": "No blocks found"
     },
     "canvas": {
         "executionLogs": "Execution Logs",
@@ -32,7 +39,11 @@
         "nodeId": "Node ID",
         "loading": "Loading...",
         "refresh": "Refresh",
-        "close": "Close"
+        "close": "Close",
+        "zoomIn": "Zoom In",
+        "zoomOut": "Zoom Out",
+        "fitToScreen": "Fit to Screen",
+        "resetView": "Reset View"
     },
     "detailPanel": {
         "configuration": "Configuration",
@@ -68,10 +79,24 @@
         "useNodeSettings": "Use node settings (gear icon) for workflow selection.",
         "uploadFile": "Upload File",
         "changeFile": "Change File",
-        "removeImage": "Remove Image"
+        "removeImage": "Remove Image",
+        "img": "IMG",
+        "downloadImage": "Download Image",
+        "true": "True",
+        "false": "False",
+        "nodeType": "Node Type",
+        "viewExecutionLogs": "View Execution Logs",
+        "subFlowId": "Sub-Flow ID",
+        "unknown": "Unknown",
+        "labelPlaceholder": "Label..."
     },
     "flowEditor": {
         "initializingEngine": "Initializing FlowMosaic Engine...",
         "processing": "Processing..."
+    },
+    "nodeBlock": {
+        "inputAlt": "Input",
+        "previewAlt": "Preview",
+        "error": "Error:"
     }
 }

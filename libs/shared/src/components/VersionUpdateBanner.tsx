@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { RefreshCw, X } from 'lucide-react';
 
 import { Button, cn } from '@flows/ui-kit';
@@ -17,6 +19,8 @@ export const VersionUpdateBanner = ({
     onDismiss,
     className,
 }: VersionUpdateBannerProps): JSX.Element | null => {
+    const { t } = useTranslation(['common']);
+
     if (!isVisible) {
         return null;
     }
@@ -31,9 +35,9 @@ export const VersionUpdateBanner = ({
                         <RefreshCw className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div className="flex-1">
-                        <h4 className="text-sm font-semibold text-foreground">새 버전이 있습니다</h4>
+                        <h4 className="text-sm font-semibold text-foreground">{t('common:version.newAvailable')}</h4>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            새 버전({latestVersion})이 출시되었습니다. 현재 버전: {currentVersion}
+                            {t('common:version.newReleased', { latestVersion, currentVersion })}
                         </p>
                         <div className="mt-3 flex gap-2">
                             <Button
@@ -42,14 +46,18 @@ export const VersionUpdateBanner = ({
                                 className="bg-orange-500 text-white hover:bg-orange-600"
                             >
                                 <RefreshCw className="mr-2 h-3 w-3" />
-                                새로고침
+                                {t('common:actions.refresh')}
                             </Button>
                             <Button size="sm" variant="outline" onClick={onDismiss}>
-                                나중에
+                                {t('common:actions.later')}
                             </Button>
                         </div>
                     </div>
-                    <button onClick={onDismiss} className="shrink-0 rounded-md p-1 hover:bg-muted" aria-label="닫기">
+                    <button
+                        onClick={onDismiss}
+                        className="shrink-0 rounded-md p-1 hover:bg-muted"
+                        aria-label={t('common:actions.close')}
+                    >
                         <X className="h-4 w-4 text-muted-foreground" />
                     </button>
                 </div>

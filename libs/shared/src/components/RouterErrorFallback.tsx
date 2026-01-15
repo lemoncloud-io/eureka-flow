@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { isRouteErrorResponse, useNavigate, useRouteError } from 'react-router-dom';
 
 import { AlertTriangle, Home, RefreshCw, ServerCrash } from 'lucide-react';
 
 import { Button } from '@flows/ui-kit';
 
-import { ERROR_MESSAGES } from '../consts';
+import { ERROR_MESSAGE_KEYS } from '../consts';
 import { NotFoundPage } from './NotFoundPage';
 
 import type { ReactNode } from 'react';
@@ -30,23 +31,24 @@ const inferRouterErrorType = (error: unknown): RouterErrorType => {
     return 'unknown';
 };
 
-const getErrorMessage = (error: unknown): string => {
+const getErrorMessage = (error: unknown, t: (key: string) => string): string => {
     if (isRouteErrorResponse(error)) {
         return `${error.status} ${error.statusText}`;
     }
     if (error instanceof Error) {
         return error.message;
     }
-    return '알 수 없는 오류가 발생했습니다';
+    return t('common:errors.unknownError');
 };
 
 export const RouterErrorFallback = ({ onError }: RouterErrorFallbackProps): JSX.Element => {
+    const { t } = useTranslation(['common']);
     const error = useRouteError();
     const navigate = useNavigate();
     const containerRef = useRef<HTMLDivElement>(null);
 
     const errorType = inferRouterErrorType(error);
-    const errorMessage = getErrorMessage(error);
+    const errorMessage = getErrorMessage(error, t);
     const errorStack = error instanceof Error ? error.stack : undefined;
 
     useEffect(() => {
@@ -75,7 +77,7 @@ export const RouterErrorFallback = ({ onError }: RouterErrorFallbackProps): JSX.
         return <NotFoundPage />;
     }
 
-    const messages = errorType === 'server' ? ERROR_MESSAGES.server : ERROR_MESSAGES.unknown;
+    const messageKeys = errorType === 'server' ? ERROR_MESSAGE_KEYS.server : ERROR_MESSAGE_KEYS.unknown;
     const icon = ERROR_ICONS[errorType];
 
     return (
@@ -92,10 +94,10 @@ export const RouterErrorFallback = ({ onError }: RouterErrorFallbackProps): JSX.
 
                 <div className="space-y-3">
                     <h2 id="error-title" className="text-2xl font-bold text-foreground">
-                        {messages.title}
+                        {t(messageKeys.title)}
                     </h2>
                     <p id="error-description" className="leading-relaxed text-muted-foreground">
-                        {messages.description}
+                        {t(messageKeys.description)}
                     </p>
                 </div>
 
@@ -106,17 +108,17 @@ export const RouterErrorFallback = ({ onError }: RouterErrorFallbackProps): JSX.
                 </div>
 
                 <div className="flex justify-center gap-3">
-                    <Button variant="outline" onClick={handleGoHome} aria-label="홈으로 이동">
+                    <Button variant="outline" onClick={handleGoHome} aria-label={t('common:accessibility.goToHome')}>
                         <Home className="mr-2 h-4 w-4" />
-                        <span>{messages.secondaryAction}</span>
+                        <span>{t(messageKeys.secondaryAction)}</span>
                     </Button>
                     <Button
                         onClick={handleRetry}
                         className="bg-orange-500 text-white hover:bg-orange-600"
-                        aria-label="다시 시도"
+                        aria-label={t('common:accessibility.tryAgain')}
                     >
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        <span>{messages.primaryAction}</span>
+                        <span>{t(messageKeys.primaryAction)}</span>
                     </Button>
                 </div>
             </div>

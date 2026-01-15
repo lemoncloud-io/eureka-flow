@@ -9,6 +9,7 @@ import { fetchBlockLogs, loadFlow, useBlockRegistry } from '@flows/flows';
 import { ConnectionLine } from './ConnectionLine';
 import { DetailPanel } from './DetailPanel';
 import { NodeBlock } from './NodeBlock';
+import { ZoomControls } from './ZoomControls';
 import { generateId, isValidConnection } from '../utils';
 
 import type {
@@ -31,6 +32,8 @@ export interface WorkflowCanvasRef {
     redo: () => void;
     autoLayout: () => void;
     selectNode: (nodeId: string | null) => void;
+    runAll: () => void;
+    stopAll: () => void;
 }
 
 interface WorkflowCanvasProps {
@@ -44,13 +47,13 @@ const GRID_SIZE = 20;
 
 // --- Helper Components ---
 
-const TooltipImage = ({ src }: { src: string }) => {
+const TooltipImage = ({ src, altText }: { src: string; altText: string }) => {
     const [dims, setDims] = useState<string | null>(null);
     return (
         <div className="relative inline-block">
             <img
                 src={src}
-                alt="Preview"
+                alt={altText}
                 className="max-w-[140px] max-h-[140px] rounded border border-border bg-background/50 block"
                 onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
             />
@@ -65,7 +68,7 @@ const TooltipImage = ({ src }: { src: string }) => {
 
 // --- Log Modal Component (Centralized) ---
 const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) => {
-    const { t } = useTranslation('flows');
+    const { t } = useTranslation(['flows']);
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [filter, setFilter] = useState('');
@@ -157,7 +160,7 @@ const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) 
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
     ({ readOnly, initialData, onNodeSelect, onChange }, ref) => {
-        const { t } = useTranslation('flows');
+        const { t } = useTranslation(['flows', 'nodes']);
         // --- BLOCK REGISTRY FROM STORE ---
         const blockRegistry = useBlockRegistry();
 
@@ -562,8 +565,39 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     setNodes(positionedNodes);
                     setViewport({ x: 20, y: 20, zoom: 1 });
                 },
+                runAll: () => {
+                    // Trigger execution on all input nodes (nodes without incoming connections)
+                    const inputNodeIds = nodes
+                        .filter(n => {
+                            const hasIncoming = connections.some(c => c.targetNodeId === n.id);
+                            const def = blockRegistry[n.type];
+                            return !hasIncoming || (def && def.inputs.length === 0);
+                        })
+                        .filter(n => !(n as NodeData & { disabled?: boolean }).disabled)
+                        .map(n => n.id);
+
+                    // Set all input nodes to 'running' status
+                    setNodes(prev =>
+                        prev.map(n => (inputNodeIds.includes(n.id) ? { ...n, status: 'running' as const } : n))
+                    );
+                },
+                stopAll: () => {
+                    // Reset all nodes to idle status
+                    setNodes(prev => prev.map(n => (n.status === 'running' ? { ...n, status: 'idle' as const } : n)));
+                },
             }),
-            [nodes, connections, viewport, readOnly, undo, redo, saveCheckpoint, selectedNodeId, handleSelectionChange]
+            [
+                nodes,
+                connections,
+                viewport,
+                readOnly,
+                undo,
+                redo,
+                saveCheckpoint,
+                selectedNodeId,
+                handleSelectionChange,
+                blockRegistry,
+            ]
         );
 
         // --- ENGINE LOGIC ---
@@ -632,7 +666,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 if (!nodeDef) {
                     setNodes(prev =>
                         prev.map(n =>
-                            n.id === nodeId ? { ...n, status: 'ERROR', errorMessage: 'Unknown Block Type' } : n
+                            n.id === nodeId
+                                ? { ...n, status: 'ERROR', errorMessage: t('nodes:errors.unknownBlockType') }
+                                : n
                         )
                     );
                     return;
@@ -684,7 +720,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 } catch (e: unknown) {
                     const endTime = Date.now();
                     const duration = endTime - startTime;
-                    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+                    const errorMessage = e instanceof Error ? e.message : t('flows:detailPanel.unknownError');
 
                     setNodes(prev =>
                         prev.map(n =>
@@ -780,12 +816,57 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [readOnly, saveCheckpoint]
         );
 
+        const duplicateNode = useCallback(
+            (nodeId: string) => {
+                if (readOnly) return;
+                const node = nodes.find(n => n.id === nodeId);
+                if (!node) return;
+
+                saveCheckpoint();
+                const newNode: NodeData = {
+                    ...node,
+                    id: generateId(),
+                    position: {
+                        x: Math.round((node.position.x + 40) / GRID_SIZE) * GRID_SIZE,
+                        y: Math.round((node.position.y + 40) / GRID_SIZE) * GRID_SIZE,
+                    },
+                    status: 'IDLE',
+                    inputData: {},
+                    outputData: {},
+                    errorMessage: undefined,
+                    config: JSON.parse(JSON.stringify(node.config)),
+                    autoExecutionEnabled: node.autoExecutionEnabled ?? true,
+                    customLabel: node.customLabel ? `${node.customLabel} (copy)` : undefined,
+                };
+
+                setNodes(prev => [...prev, newNode]);
+                handleSelectionChange(newNode.id);
+            },
+            [readOnly, nodes, saveCheckpoint, handleSelectionChange]
+        );
+
+        const toggleNodeDisabled = useCallback(
+            (nodeId: string) => {
+                if (readOnly) return;
+                saveCheckpoint();
+                setNodes(prev =>
+                    prev.map(n =>
+                        n.id === nodeId ? { ...n, disabled: !(n as NodeData & { disabled?: boolean }).disabled } : n
+                    )
+                );
+            },
+            [readOnly, saveCheckpoint]
+        );
+
         // --- PAN & ZOOM HANDLERS ---
+        const MIN_ZOOM = 0.1;
+        const MAX_ZOOM = 5;
+
         const handleWheel = (e: React.WheelEvent) => {
             const rect = canvasRef.current?.getBoundingClientRect();
             if (!rect) return;
             const delta = -e.deltaY * 0.001;
-            const newZoom = Math.min(Math.max(viewport.zoom + delta, 0.1), 5);
+            const newZoom = Math.min(Math.max(viewport.zoom + delta, MIN_ZOOM), MAX_ZOOM);
 
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
@@ -798,6 +879,64 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             setViewport({ x: newX, y: newY, zoom: newZoom });
         };
+
+        const handleZoomIn = useCallback(() => {
+            setViewport(prev => ({
+                ...prev,
+                zoom: Math.min(prev.zoom * 1.2, MAX_ZOOM),
+            }));
+        }, []);
+
+        const handleZoomOut = useCallback(() => {
+            setViewport(prev => ({
+                ...prev,
+                zoom: Math.max(prev.zoom / 1.2, MIN_ZOOM),
+            }));
+        }, []);
+
+        const handleFitToScreen = useCallback(() => {
+            if (nodes.length === 0) return;
+            const rect = canvasRef.current?.getBoundingClientRect();
+            if (!rect) return;
+
+            const NODE_WIDTH = 220;
+            const NODE_HEIGHT = 150;
+            const PADDING = 50;
+
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+
+            nodes.forEach(node => {
+                minX = Math.min(minX, node.position.x);
+                minY = Math.min(minY, node.position.y);
+                maxX = Math.max(maxX, node.position.x + NODE_WIDTH);
+                maxY = Math.max(maxY, node.position.y + NODE_HEIGHT);
+            });
+
+            const contentWidth = maxX - minX;
+            const contentHeight = maxY - minY;
+
+            const availableWidth = rect.width - PADDING * 2;
+            const availableHeight = rect.height - PADDING * 2;
+
+            const scaleX = availableWidth / contentWidth;
+            const scaleY = availableHeight / contentHeight;
+            const newZoom = Math.min(Math.max(Math.min(scaleX, scaleY), MIN_ZOOM), MAX_ZOOM);
+
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+
+            const newX = rect.width / 2 - centerX * newZoom;
+            const newY = rect.height / 2 - centerY * newZoom;
+
+            setViewport({ x: newX, y: newY, zoom: newZoom });
+        }, [nodes]);
+
+        const handleResetView = useCallback(() => {
+            setViewport({ x: 0, y: 0, zoom: 1 });
+        }, []);
 
         const handleCanvasMouseDown = (e: React.MouseEvent) => {
             if (e.button === 0 || e.button === 1) {
@@ -1212,6 +1351,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             onDelete={() => deleteNode(node.id)}
                                             onTrigger={() => executeNode(node.id)}
                                             onToggleAuto={() => handleToggleAuto(node.id)}
+                                            onToggleDisabled={() => toggleNodeDisabled(node.id)}
+                                            onDuplicate={() => duplicateNode(node.id)}
                                             onViewComponent={id => setModalFlowId(id)}
                                             onViewLogs={() => setLogViewerNodeId(node.id)}
                                         />
@@ -1230,7 +1371,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 {tooltip.type}
                             </div>
                             {tooltip.type === 'image' ? (
-                                <TooltipImage src={tooltip.content} />
+                                <TooltipImage src={tooltip.content} altText={t('flows:nodeBlock.previewAlt')} />
                             ) : (
                                 <div className="text-xs text-foreground max-w-[200px] break-all">
                                     {typeof tooltip.content === 'object'
@@ -1243,10 +1384,14 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     )}
 
                     {!readOnly && (
-                        <div className="absolute bottom-4 right-4 bg-popover/80 p-2 rounded text-xs text-muted-foreground pointer-events-none">
-                            {t('canvas.zoom')}: {Math.round(viewport.zoom * 100)}% | {t('canvas.position')}:{' '}
-                            {Math.round(viewport.x)}, {Math.round(viewport.y)}
-                        </div>
+                        <ZoomControls
+                            zoom={viewport.zoom}
+                            onZoomIn={handleZoomIn}
+                            onZoomOut={handleZoomOut}
+                            onFitToScreen={handleFitToScreen}
+                            onReset={handleResetView}
+                            className="absolute bottom-4 right-4 z-20"
+                        />
                     )}
 
                     {modalFlowId && modalFlowData && (

@@ -39,6 +39,11 @@ export const reportError = async (
     app: AppType,
     userId?: string
 ): Promise<void> => {
+    if (ENV?.toUpperCase() === 'LOCAL') {
+        console.warn('[ErrorReport] Skipped in local environment:', error.message);
+        return;
+    }
+
     try {
         const payload: ErrorReportPayload = {
             message: error.message,
@@ -51,12 +56,6 @@ export const reportError = async (
             userId,
             userAgent: navigator.userAgent,
         };
-
-        // Log to console in development
-        if (ENV !== 'prod') {
-            console.error('[ErrorReport]', payload);
-            return;
-        }
 
         // In production, send to backend if endpoint is configured
         const backendEndpoint = import.meta.env.VITE_BACKEND_API_ENDPOINT;

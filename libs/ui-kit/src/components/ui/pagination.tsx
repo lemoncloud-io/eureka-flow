@@ -18,7 +18,7 @@ const PaginationContent = React.forwardRef<HTMLUListElement, React.ComponentProp
     ({ className, ...props }, ref) => (
         <ul
             ref={ref}
-            className={cn('flex items-center gap-[6px] rounded-full py-[6px] px-2 bg-gray-100', className)}
+            className={cn('flex items-center gap-[6px] rounded-full py-[6px] px-2 bg-muted', className)}
             {...props}
         />
     )
@@ -39,7 +39,7 @@ const PaginationLink = ({ className, isActive, children, ...props }: PaginationL
     <button
         className={cn(
             'w-7 h-7 flex items-center justify-center rounded-full text-base font-medium transition-all duration-200',
-            isActive ? 'bg-point text-white' : 'text-gray-800 hover:text-black hover:bg-gray-300',
+            isActive ? 'bg-primary text-primary-foreground' : 'text-foreground hover:text-foreground hover:bg-muted',
             className
         )}
         {...props}
@@ -54,7 +54,9 @@ const PaginationPrevious = ({ disabled }: { disabled?: boolean }) => (
         disabled={disabled}
         className={cn(
             'w-8 h-8 flex items-center justify-center rounded-full transition-colors duration-200',
-            disabled ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-700'
+            disabled
+                ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                : 'bg-foreground text-background hover:bg-foreground/80'
         )}
     >
         <ChevronLeft className="w-5 h-5" />
@@ -66,7 +68,9 @@ const PaginationNext = ({ disabled }: { disabled?: boolean }) => (
         disabled={disabled}
         className={cn(
             'w-8 h-8 flex items-center justify-center rounded-full transition-colors duration-200',
-            disabled ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-700'
+            disabled
+                ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                : 'bg-foreground text-background hover:bg-foreground/80'
         )}
     >
         <ChevronRight className="w-5 h-5" />
@@ -78,7 +82,9 @@ const PaginationFirst = ({ disabled }: { disabled?: boolean }) => (
         disabled={disabled}
         className={cn(
             'w-8 h-8 flex items-center justify-center rounded-full transition-colors duration-200',
-            disabled ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-700'
+            disabled
+                ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                : 'bg-foreground text-background hover:bg-foreground/80'
         )}
     >
         <ChevronsLeft className="w-5 h-5" />
@@ -90,7 +96,9 @@ const PaginationLast = ({ disabled }: { disabled?: boolean }) => (
         disabled={disabled}
         className={cn(
             'w-8 h-8 flex items-center justify-center rounded-full transition-colors duration-200',
-            disabled ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-700'
+            disabled
+                ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                : 'bg-foreground text-background hover:bg-foreground/80'
         )}
     >
         <ChevronsRight className="w-5 h-5" />
