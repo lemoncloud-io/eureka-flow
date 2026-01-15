@@ -18,7 +18,10 @@
         "web:build": "npx nx build web",
         "web:build:dev": "yarn clean:cache && npx nx build --configuration=dev web",
         "web:build:prod": "yarn clean:cache && npx nx build --configuration=prod web",
-        "web:test": "npx nx test web"
+        "web:test": "npx nx test web",
+        "web:deploy": "./scripts/deploy-web.sh",
+        "web:deploy:dev": "./scripts/deploy-web.sh dev",
+        "web:deploy:prod": "./scripts/deploy-web.sh prod"
     },
     "dependencies": {
         "@hookform/resolvers": "^3.9.1",
