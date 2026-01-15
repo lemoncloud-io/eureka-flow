@@ -22,36 +22,37 @@ interface StatusVisual {
 }
 
 // --- Status Visual Factory ---
+// Minimal approach: status indicated by border color and icon only, header stays neutral
 const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisual> => ({
     RUNNING: {
         border: isSelected
-            ? 'border-yellow-400 ring-1 ring-primary shadow-[0_0_20px_rgba(234,179,8,0.6)]'
-            : 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]',
-        header: 'bg-gradient-to-r from-yellow-900/80 to-node-header',
+            ? 'border-status-running ring-1 ring-status-running/30 shadow-lg'
+            : 'border-status-running shadow-md',
+        header: 'bg-node-header',
         icon: (
-            <div className="absolute inset-0 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="absolute inset-0 border-2 border-status-running border-t-transparent rounded-full animate-spin"></div>
         ),
-        textColor: 'text-yellow-100',
+        textColor: 'text-foreground',
     },
     COMPLETED: {
         border: isSelected
-            ? 'border-green-400 ring-2 ring-primary ring-offset-1 ring-offset-background shadow-[0_0_25px_rgba(34,197,94,0.5)]'
-            : 'border-green-600 shadow-[0_0_15px_rgba(34,197,94,0.3)]',
-        header: 'bg-gradient-to-r from-green-900/80 to-node-header',
-        icon: <div className="text-green-400 font-bold text-[10px]">✓</div>,
-        textColor: 'text-green-100',
+            ? 'border-status-completed ring-1 ring-status-completed/30 shadow-lg'
+            : 'border-status-completed shadow-md',
+        header: 'bg-node-header',
+        icon: <div className="text-status-completed font-bold text-[10px]">✓</div>,
+        textColor: 'text-foreground',
     },
     ERROR: {
         border: isSelected
-            ? 'border-red-400 ring-1 ring-primary shadow-[0_0_20px_rgba(239,68,68,0.5)]'
-            : 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]',
-        header: 'bg-gradient-to-r from-red-900/80 to-node-header',
-        icon: <div className="text-red-400 font-bold text-[10px]">!</div>,
-        textColor: 'text-red-100',
+            ? 'border-status-error ring-1 ring-status-error/30 shadow-lg'
+            : 'border-status-error shadow-md',
+        header: 'bg-node-header',
+        icon: <div className="text-status-error font-bold text-[10px]">!</div>,
+        textColor: 'text-foreground',
     },
     IDLE: {
         border: isSelected
-            ? 'border-primary ring-1 ring-primary/50 shadow-[0_0_15px_rgba(59,130,246,0.5)]'
+            ? 'border-primary ring-1 ring-primary/30 shadow-lg'
             : 'border-node-border hover:border-muted-foreground',
         header: 'bg-node-header',
         icon: null,
@@ -60,10 +61,10 @@ const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisu
 });
 
 const HIGHLIGHTED_VISUAL: StatusVisual = {
-    border: 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.5)]',
-    header: 'bg-gradient-to-r from-card to-node-header',
+    border: 'border-accent shadow-lg shadow-accent/20',
+    header: 'bg-node-header',
     icon: null,
-    textColor: 'text-yellow-200',
+    textColor: 'text-accent',
 };
 
 // --- Sub-Components ---
@@ -305,7 +306,7 @@ const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
 
     if (!lastInput) {
         return (
-            <div className="mt-2 text-xs text-muted-foreground italic text-center py-4 bg-muted/30 rounded border border-dashed border-border">
+            <div className="mt-2 text-xs text-background/60 italic text-center py-4 bg-foreground/60 rounded border border-border">
                 {t('visualization.waitingForData')}
             </div>
         );
@@ -322,7 +323,7 @@ const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
                         onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
                     />
                     {dims && (
-                        <div className="absolute bottom-1 right-1 bg-black/70 text-[9px] text-white px-1.5 py-0.5 rounded backdrop-blur-sm border border-border shadow-sm pointer-events-none">
+                        <div className="absolute bottom-1 right-1 bg-foreground/80 text-[9px] text-background px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm pointer-events-none">
                             {dims}
                         </div>
                     )}
@@ -342,7 +343,7 @@ const InputImageVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
     const [dims, setDims] = useState<string | null>(null);
 
     return (
-        <div className="mt-2 rounded border border-border overflow-hidden bg-black/30 flex justify-center items-center h-20 relative">
+        <div className="mt-2 rounded border border-border overflow-hidden bg-foreground/60 flex justify-center items-center h-20 relative">
             {img ? (
                 <>
                     <img
@@ -352,13 +353,13 @@ const InputImageVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
                         onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
                     />
                     {dims && (
-                        <div className="absolute bottom-1 right-1 bg-black/70 text-[9px] text-white px-1.5 py-0.5 rounded backdrop-blur-sm border border-border shadow-sm pointer-events-none">
+                        <div className="absolute bottom-1 right-1 bg-foreground/80 text-[9px] text-background px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm pointer-events-none">
                             {dims}
                         </div>
                     )}
                 </>
             ) : (
-                <span className="text-[9px] text-muted-foreground">{t('visualization.noImage')}</span>
+                <span className="text-[9px] text-background/60 italic">{t('visualization.noImage')}</span>
             )}
         </div>
     );
@@ -368,7 +369,7 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
     const { t } = useTranslation('nodes');
     const lastInput = node.inputData['in']?.value;
     return (
-        <div className="mt-2 p-2 bg-black/50 rounded border border-border text-success font-mono text-[10px] break-all max-h-24 overflow-y-auto">
+        <div className="mt-2 p-2 bg-foreground rounded border border-border text-background font-mono text-[10px] break-all max-h-24 overflow-y-auto">
             {lastInput !== undefined ? (
                 typeof lastInput === 'object' ? (
                     JSON.stringify(lastInput, null, 2)
@@ -376,7 +377,7 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
                     String(lastInput)
                 )
             ) : (
-                <span className="text-muted-foreground">{t('visualization.waitingForData')}</span>
+                <span className="text-background/50 italic">{t('visualization.waitingForData')}</span>
             )}
         </div>
     );
@@ -810,7 +811,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         )}
 
                         {displayDuration && (
-                            <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-[9px] text-foreground px-1.5 py-0.5 rounded font-mono border border-border/50 shadow-sm pointer-events-none z-10">
+                            <div className="absolute bottom-2 right-2 bg-foreground/80 backdrop-blur-md text-[9px] text-background px-1.5 py-0.5 rounded font-mono shadow-sm pointer-events-none z-10">
                                 {displayDuration}
                             </div>
                         )}

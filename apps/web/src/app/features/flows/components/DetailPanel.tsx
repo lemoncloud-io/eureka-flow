@@ -255,7 +255,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 onDoubleClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="p-4 border-b border-border bg-gradient-to-r from-muted to-popover">
+                <div className="p-4 border-b border-border bg-surface-elevated">
                     <div className="flex items-center gap-2 mb-2">
                         <Package className="w-5 h-5 text-muted-foreground" />
                         <input
@@ -539,7 +539,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 onMouseDown={e => e.stopPropagation()}
                 onDoubleClick={e => e.stopPropagation()}
             >
-                <div className="p-3 border-b border-border flex items-center justify-between bg-gradient-to-r from-muted to-popover">
+                <div className="p-3 border-b border-border flex items-center justify-between bg-surface-elevated">
                     <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                         <Zap className="w-4 h-4 text-warning" /> {t('flows:detailPanel.connection')}
                     </h2>

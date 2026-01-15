@@ -53,6 +53,8 @@ module.exports = {
                     DEFAULT: 'hsl(var(--card))',
                     foreground: 'hsl(var(--card-foreground))',
                 },
+                /* Point color (alias for primary - used in UI kit) */
+                point: 'hsl(var(--point))',
                 /* Semantic State Colors */
                 success: {
                     DEFAULT: 'hsl(var(--success))',
@@ -65,6 +67,18 @@ module.exports = {
                 info: {
                     DEFAULT: 'hsl(var(--info))',
                     foreground: 'hsl(var(--info-foreground))',
+                },
+                /* Status Colors for Flow Editor */
+                status: {
+                    running: 'hsl(var(--status-running))',
+                    'running-bg': 'hsl(var(--status-running-bg))',
+                    'running-border': 'hsl(var(--status-running-border))',
+                    completed: 'hsl(var(--status-completed))',
+                    'completed-bg': 'hsl(var(--status-completed-bg))',
+                    'completed-border': 'hsl(var(--status-completed-border))',
+                    error: 'hsl(var(--status-error))',
+                    'error-bg': 'hsl(var(--status-error-bg))',
+                    'error-border': 'hsl(var(--status-error-border))',
                 },
                 /* Flow Editor Semantic Colors */
                 surface: {

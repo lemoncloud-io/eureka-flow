@@ -129,10 +129,10 @@ export const CustomPagination = ({
                             disabled={page === '...'}
                             className={`${pageButtonSize} max-md:w-auto max-md:h-auto max-md:px-0 p-0 rounded-full flex items-center justify-center font-medium transition-colors ${
                                 page === currentPage
-                                    ? 'bg-point text-white'
+                                    ? 'bg-primary text-primary-foreground'
                                     : page === '...'
-                                      ? 'text-gray-400 cursor-default'
-                                      : 'text-gray-600 hover:text-gray-900'
+                                      ? 'text-muted-foreground cursor-default'
+                                      : 'text-muted-foreground hover:text-foreground'
                             }`}
                         >
                             {page}
