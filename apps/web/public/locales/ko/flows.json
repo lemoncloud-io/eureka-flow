@@ -67,7 +67,7 @@
         "goToTargetNode": "대상 노드로 이동",
         "link": "링크",
         "settings": "설정",
-        "useNodeSettings": "워크플로우 선택은 노드 설정(톱니바퀴 아이콀)을 사용하세요.",
+        "useNodeSettings": "워크플로우 선택은 노드 설정(톱니바퀴 아이콘)을 사용하세요.",
         "uploadFile": "파일 업로드",
         "changeFile": "파일 변경",
         "removeImage": "이미지 제거",

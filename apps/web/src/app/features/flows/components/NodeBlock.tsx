@@ -154,7 +154,7 @@ interface ConfigControlProps {
 }
 
 const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onChange, onViewComponent }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes']);
     const [flows, setFlows] = useState<FlowMeta[]>([]);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -300,7 +300,7 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
 // 3. Visualization Components
 
 const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes']);
     const lastInput = node.inputData['in'];
     const [dims, setDims] = useState<string | null>(null);
 
@@ -338,7 +338,7 @@ const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
 };
 
 const InputImageVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes']);
     const img = node.config.imageData;
     const [dims, setDims] = useState<string | null>(null);
 
@@ -366,7 +366,7 @@ const InputImageVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
 };
 
 const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes']);
     const lastInput = node.inputData['in']?.value;
     return (
         <div className="mt-2 p-2 bg-foreground rounded border border-border text-background font-mono text-[10px] break-all max-h-24 overflow-y-auto">
@@ -384,7 +384,7 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
 };
 
 const InputTextVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes']);
     const text = node.config.text;
     return (
         <div className="mt-2 p-2 bg-background rounded border border-border group relative">

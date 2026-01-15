@@ -79,7 +79,7 @@ const NodeButton = ({
 );
 
 export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
-    const { t } = useTranslation('flows');
+    const { t } = useTranslation(['flows']);
     const blockRegistry = useBlockRegistry();
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [hoveredNode, setHoveredNode] = useState<{ type: string; top: number } | null>(null);

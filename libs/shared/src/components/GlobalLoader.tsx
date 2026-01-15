@@ -7,7 +7,7 @@ import { useLoaderStore } from '../hooks/useGlobalLoader';
  * Full-screen loading overlay rendered via portal
  * Uses the global loader store for visibility control
  */
-export const GlobalLoader = () => {
+export const GlobalLoader = (): JSX.Element | null => {
     const { t } = useTranslation(['common']);
     const isLoading = useLoaderStore(state => state.isLoading);
 

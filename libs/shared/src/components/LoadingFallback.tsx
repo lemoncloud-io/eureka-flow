@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
  * Loading state fallback component
  * Used for Suspense boundaries and loading states
  */
-export const LoadingFallback = () => {
+export const LoadingFallback = (): JSX.Element => {
     const { t } = useTranslation(['common']);
 
     return (

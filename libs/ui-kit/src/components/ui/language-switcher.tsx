@@ -12,7 +12,7 @@ const languageFlags: Record<string, string> = {
     ko: '🇰🇷',
 };
 
-export const LanguageSwitcher = () => {
+export const LanguageSwitcher = (): JSX.Element => {
     const { t, i18n } = useTranslation(['common']);
 
     const handleLanguageChange = (language: string) => {

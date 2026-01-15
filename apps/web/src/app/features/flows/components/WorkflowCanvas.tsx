@@ -65,7 +65,7 @@ const TooltipImage = ({ src, altText }: { src: string; altText: string }) => {
 
 // --- Log Modal Component (Centralized) ---
 const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) => {
-    const { t } = useTranslation('flows');
+    const { t } = useTranslation(['flows']);
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [filter, setFilter] = useState('');

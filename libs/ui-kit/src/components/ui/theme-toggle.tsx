@@ -6,7 +6,7 @@ import { useTheme } from '@flows/theme';
 
 import { Button } from './button';
 
-export const ThemeToggle = () => {
+export const ThemeToggle = (): JSX.Element => {
     const { t } = useTranslation(['common']);
     const { theme, setTheme } = useTheme();
 
