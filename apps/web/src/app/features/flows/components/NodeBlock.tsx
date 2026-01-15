@@ -446,7 +446,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     onViewComponent,
     onViewLogs,
 }) => {
-    const { t } = useTranslation('nodes');
+    const { t } = useTranslation(['nodes', 'flows']);
     const blockRegistry = useBlockRegistry();
     const definition = blockRegistry[node.type];
     const isAuto = node.autoExecutionEnabled !== false;
@@ -628,7 +628,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 onBlur={commitLabel}
                                 onKeyDown={handleLabelKeyDown}
                                 className="w-full bg-background/80 text-foreground text-xs px-1 py-0.5 rounded border border-primary outline-none"
-                                placeholder="Label..."
+                                placeholder={t('flows:detailPanel.labelPlaceholder')}
                             />
                         </div>
                     ) : (
@@ -793,7 +793,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     </div>
                     {node.status === 'ERROR' && (
                         <div className="mt-2 text-destructive text-[10px] bg-destructive/10 p-2 rounded border border-destructive/30 flex items-start gap-1 animate-in fade-in slide-in-from-top-1">
-                            <span className="font-bold">Error:</span> {node.errorMessage || t('errors.executionFailed')}
+                            <span className="font-bold">{t('flows:nodeBlock.error')}</span>{' '}
+                            {node.errorMessage || t('errors.executionFailed')}
                         </div>
                     )}
                 </div>

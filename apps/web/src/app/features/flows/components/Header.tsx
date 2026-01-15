@@ -105,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
                         onBlur={handleBlur}
                         onKeyDown={handleKeyDown}
                         className="bg-transparent border border-transparent hover:border-border focus:border-primary rounded px-2 py-1 text-sm font-semibold text-foreground outline-none w-48 transition-all"
-                        placeholder="Untitled Workflow"
+                        placeholder={t('flows:header.untitledWorkflow')}
                     />
                 </div>
 
@@ -193,7 +193,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <div
                     className="flex items-center gap-2 cursor-pointer group"
                     onClick={onToggleAutoSave}
-                    title="Toggle Auto Save"
+                    title={t('flows:header.toggleAutoSave')}
                 >
                     <div
                         className={`w-8 h-4 rounded-full p-0.5 transition-colors relative ${isAutoSaveEnabled ? 'bg-success/80' : 'bg-muted'}`}

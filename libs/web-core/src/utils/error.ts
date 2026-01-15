@@ -1,9 +1,9 @@
 export enum ErrorType {
-    AUTHENTICATION = 'authentication', // 403 - 로그아웃 필요
-    NETWORK = 'network', // 네트워크 연결 문제 - 재시도
-    SERVER = 'server', // 5xx - 재시도
-    CLIENT = 'client', // 4xx (403 제외) - 즉시 실패
-    UNKNOWN = 'unknown', // 기타
+    AUTHENTICATION = 'authentication', // 403 - requires logout
+    NETWORK = 'network', // Network connection issue - retry
+    SERVER = 'server', // 5xx - retry
+    CLIENT = 'client', // 4xx (except 403) - fail immediately
+    UNKNOWN = 'unknown', // Other
 }
 
 export interface ErrorClassification {
@@ -15,7 +15,7 @@ export interface ErrorClassification {
 
 export const MAX_RETRIES = 2;
 
-const DEFAULT_ERROR_MESSAGE = '알 수 없는 오류가 발생했습니다';
+const DEFAULT_ERROR_MESSAGE = 'An unknown error occurred';
 
 export const classifyError = (error: any): ErrorClassification => {
     const status = error?.status || error?.response?.status || error?.statusCode;
@@ -26,7 +26,7 @@ export const classifyError = (error: any): ErrorClassification => {
             type: ErrorType.AUTHENTICATION,
             shouldRetry: false,
             shouldLogout: true,
-            message: '토큰이 유효하지 않습니다',
+            message: 'Token is invalid',
         };
     }
 
@@ -35,7 +35,7 @@ export const classifyError = (error: any): ErrorClassification => {
             type: ErrorType.AUTHENTICATION,
             shouldRetry: false,
             shouldLogout: true,
-            message: '인증이 만료되었습니다',
+            message: 'Authentication has expired',
         };
     }
 
@@ -44,7 +44,7 @@ export const classifyError = (error: any): ErrorClassification => {
             type: ErrorType.NETWORK,
             shouldRetry: true,
             shouldLogout: false,
-            message: '네트워크 연결을 확인해주세요',
+            message: 'Please check your network connection',
         };
     }
 
@@ -53,7 +53,7 @@ export const classifyError = (error: any): ErrorClassification => {
             type: ErrorType.SERVER,
             shouldRetry: true,
             shouldLogout: false,
-            message: '서버 오류가 발생했습니다',
+            message: 'A server error occurred',
         };
     }
 
@@ -62,7 +62,7 @@ export const classifyError = (error: any): ErrorClassification => {
             type: ErrorType.CLIENT,
             shouldRetry: false,
             shouldLogout: false,
-            message: '요청에 문제가 있습니다',
+            message: 'There was a problem with the request',
         };
     }
 
@@ -70,24 +70,24 @@ export const classifyError = (error: any): ErrorClassification => {
         type: ErrorType.UNKNOWN,
         shouldRetry: true,
         shouldLogout: false,
-        message: '알 수 없는 오류가 발생했습니다',
+        message: 'An unknown error occurred',
     };
 };
 
 const isNetworkError = (error: any): boolean => {
-    // Axios 네트워크 에러
+    // Axios network error
     if (error?.code === 'ERR_NETWORK' || error?.code === 'ERR_INTERNET_DISCONNECTED') {
         return true;
     }
-    // 네트워크 연결 실패
+    // Network connection failure
     if (error?.message?.includes('Network Error') || error?.message?.includes('fetch')) {
         return true;
     }
-    // 타임아웃
+    // Timeout
     if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
         return true;
     }
-    // 연결 거부
+    // Connection refused
     if (error?.code === 'ECONNREFUSED') {
         return true;
     }
@@ -134,10 +134,10 @@ export const handleAuthError = (error: any, shouldLogout: boolean, message?: str
 
     console.log('213', shouldLogout);
     if (shouldLogout) {
-        alert(`인증 오류: ${errorMessage}`);
+        alert(`Authentication error: ${errorMessage}`);
         window.location.href = '/auth/logout';
     } else {
-        console.error(`요청 오류: ${errorMessage}`);
+        console.error(`Request error: ${errorMessage}`);
     }
 
     throw error;

@@ -40,7 +40,7 @@ interface DetailPanelProps {
 
 type ConfigControlType = 'text' | 'number' | 'boolean' | 'select' | 'file' | 'workflow-selector';
 
-const ImagePreview = ({ src }: { src: string }) => {
+const ImagePreview = ({ src, t }: { src: string; t: (key: string) => string }) => {
     const [dims, setDims] = useState<string | null>(null);
 
     const handleDownload = (e: React.MouseEvent) => {
@@ -71,14 +71,14 @@ const ImagePreview = ({ src }: { src: string }) => {
                     </div>
                 )}
                 <div className="bg-blue-900/80 text-[9px] px-1.5 py-0.5 rounded text-blue-100 backdrop-blur-md border border-blue-700/50 font-bold shadow-sm">
-                    IMG
+                    {t('flows:detailPanel.img')}
                 </div>
             </div>
 
             <button
                 onClick={handleDownload}
                 className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-muted/90 hover:bg-primary text-foreground hover:text-primary-foreground rounded border border-border shadow-md opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100"
-                title="Download Image"
+                title={t('flows:detailPanel.downloadImage')}
             >
                 <svg
                     width="12"
@@ -127,7 +127,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         }
 
         if (packet.type === 'image') {
-            return <ImagePreview src={packet.value} />;
+            return <ImagePreview src={packet.value} t={t} />;
         }
         return (
             <div className="bg-muted/50 p-2 rounded border border-border text-xs font-mono text-info break-all max-h-24 overflow-y-auto">
@@ -164,7 +164,9 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${value ? 'translate-x-4' : 'translate-x-0'}`}
                             />
                         </div>
-                        <span className="text-xs text-muted-foreground">{value ? 'True' : 'False'}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {value ? t('flows:detailPanel.true') : t('flows:detailPanel.false')}
+                        </span>
                     </div>
                 );
             case 'select':
@@ -278,7 +280,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             <div className="flex items-center gap-2">
                                 <span
                                     className="font-mono bg-black/30 px-1 rounded border border-border"
-                                    title="Node Type"
+                                    title={t('flows:detailPanel.nodeType')}
                                 >
                                     {def.type}
                                 </span>
@@ -303,7 +305,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             <button
                                 onClick={() => onViewLogs(selectedNode.id)}
                                 className="flex items-center gap-1 hover:text-primary transition-colors"
-                                title="View Execution Logs"
+                                title={t('flows:detailPanel.viewExecutionLogs')}
                             >
                                 <ScrollText className="w-3 h-3" /> {t('flows:detailPanel.logs')}
                             </button>
@@ -312,7 +314,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         {isComponent && subFlowId && (
                             <div className="flex items-center gap-2 text-[10px] bg-indigo-100 dark:bg-indigo-900/30 px-2 py-1.5 rounded border border-indigo-300 dark:border-indigo-500/30">
                                 <span className="uppercase font-bold text-indigo-700 dark:text-indigo-300 opacity-70 tracking-wider">
-                                    Sub-Flow ID
+                                    {t('flows:detailPanel.subFlowId')}
                                 </span>
                                 <span className="font-mono text-indigo-900 dark:text-indigo-200 select-all">
                                     {subFlowId}
@@ -560,7 +562,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 {t('flows:detailPanel.from')}
                             </div>
                             <div className="font-bold text-xs text-primary group-hover:text-foreground">
-                                {sourceDef?.label || 'Unknown'}
+                                {sourceDef?.label || t('flows:detailPanel.unknown')}
                             </div>
                             <div className="text-[9px] text-muted-foreground font-mono mt-0.5">{sourcePort?.label}</div>
                         </div>
@@ -587,7 +589,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 {t('flows:detailPanel.to')}
                             </div>
                             <div className="font-bold text-xs text-green-500 dark:text-green-400 group-hover:text-foreground">
-                                {targetDef?.label || 'Unknown'}
+                                {targetDef?.label || t('flows:detailPanel.unknown')}
                             </div>
                             <div className="text-[9px] text-muted-foreground font-mono mt-0.5">{targetPort?.label}</div>
                         </div>

@@ -10,7 +10,9 @@
         "undo": "Undo",
         "redo": "Redo",
         "autoLayout": "Auto Layout",
-        "clearCanvas": "Clear Canvas"
+        "clearCanvas": "Clear Canvas",
+        "untitledWorkflow": "Untitled Workflow",
+        "toggleAutoSave": "Toggle Auto Save"
     },
     "sidebar": {
         "library": "Library",
@@ -68,10 +70,24 @@
         "useNodeSettings": "Use node settings (gear icon) for workflow selection.",
         "uploadFile": "Upload File",
         "changeFile": "Change File",
-        "removeImage": "Remove Image"
+        "removeImage": "Remove Image",
+        "img": "IMG",
+        "downloadImage": "Download Image",
+        "true": "True",
+        "false": "False",
+        "nodeType": "Node Type",
+        "viewExecutionLogs": "View Execution Logs",
+        "subFlowId": "Sub-Flow ID",
+        "unknown": "Unknown",
+        "labelPlaceholder": "Label..."
     },
     "flowEditor": {
         "initializingEngine": "Initializing FlowMosaic Engine...",
         "processing": "Processing..."
+    },
+    "nodeBlock": {
+        "inputAlt": "Input",
+        "previewAlt": "Preview",
+        "error": "Error:"
     }
 }

@@ -233,8 +233,8 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
     {
         type: 'image-resize',
         icon: '📐',
-        label: '이미지 3:4 필터',
-        description: '기본 3:4 사이즈로 이미지 리사이즈 및 크롭 처리함',
+        label: 'Image 3:4 Filter',
+        description: 'Resize and crop image to 3:4 aspect ratio',
         inputs: [{ id: 'in', label: 'Image', type: 'image' }],
         outputs: [{ id: 'out', label: 'Resized', type: 'image' }],
         defaultConfig: { rotation: 0, flipHorizontal: false, flipVertical: false },

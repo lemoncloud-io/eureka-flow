@@ -44,13 +44,13 @@ const GRID_SIZE = 20;
 
 // --- Helper Components ---
 
-const TooltipImage = ({ src }: { src: string }) => {
+const TooltipImage = ({ src, altText }: { src: string; altText: string }) => {
     const [dims, setDims] = useState<string | null>(null);
     return (
         <div className="relative inline-block">
             <img
                 src={src}
-                alt="Preview"
+                alt={altText}
                 className="max-w-[140px] max-h-[140px] rounded border border-border bg-background/50 block"
                 onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
             />
@@ -157,7 +157,7 @@ const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) 
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
     ({ readOnly, initialData, onNodeSelect, onChange }, ref) => {
-        const { t } = useTranslation('flows');
+        const { t } = useTranslation(['flows', 'nodes']);
         // --- BLOCK REGISTRY FROM STORE ---
         const blockRegistry = useBlockRegistry();
 
@@ -632,7 +632,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 if (!nodeDef) {
                     setNodes(prev =>
                         prev.map(n =>
-                            n.id === nodeId ? { ...n, status: 'ERROR', errorMessage: 'Unknown Block Type' } : n
+                            n.id === nodeId
+                                ? { ...n, status: 'ERROR', errorMessage: t('nodes:errors.unknownBlockType') }
+                                : n
                         )
                     );
                     return;
@@ -684,7 +686,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 } catch (e: unknown) {
                     const endTime = Date.now();
                     const duration = endTime - startTime;
-                    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+                    const errorMessage = e instanceof Error ? e.message : t('flows:detailPanel.unknownError');
 
                     setNodes(prev =>
                         prev.map(n =>
@@ -1230,7 +1232,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 {tooltip.type}
                             </div>
                             {tooltip.type === 'image' ? (
-                                <TooltipImage src={tooltip.content} />
+                                <TooltipImage src={tooltip.content} altText={t('flows:nodeBlock.previewAlt')} />
                             ) : (
                                 <div className="text-xs text-foreground max-w-[200px] break-all">
                                     {typeof tooltip.content === 'object'

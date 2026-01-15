@@ -10,7 +10,9 @@
         "undo": "실행 취소",
         "redo": "다시 실행",
         "autoLayout": "자동 정렬",
-        "clearCanvas": "캔버스 지우기"
+        "clearCanvas": "캔버스 지우기",
+        "untitledWorkflow": "제목 없는 워크플로우",
+        "toggleAutoSave": "자동 저장 토글"
     },
     "sidebar": {
         "library": "라이브러리",
@@ -65,13 +67,27 @@
         "goToTargetNode": "대상 노드로 이동",
         "link": "링크",
         "settings": "설정",
-        "useNodeSettings": "워크플로우 선택은 노드 설정(톱니바퀴 아이콘)을 사용하세요.",
+        "useNodeSettings": "워크플로우 선택은 노드 설정(톱니바퀴 아이콀)을 사용하세요.",
         "uploadFile": "파일 업로드",
         "changeFile": "파일 변경",
-        "removeImage": "이미지 제거"
+        "removeImage": "이미지 제거",
+        "img": "IMG",
+        "downloadImage": "이미지 다운로드",
+        "true": "참",
+        "false": "거짓",
+        "nodeType": "노드 타입",
+        "viewExecutionLogs": "실행 로그 보기",
+        "subFlowId": "서브 플로우 ID",
+        "unknown": "알 수 없음",
+        "labelPlaceholder": "라벨..."
     },
     "flowEditor": {
         "initializingEngine": "FlowMosaic 엔진 초기화 중...",
         "processing": "처리 중..."
+    },
+    "nodeBlock": {
+        "inputAlt": "입력",
+        "previewAlt": "미리보기",
+        "error": "오류:"
     }
 }
