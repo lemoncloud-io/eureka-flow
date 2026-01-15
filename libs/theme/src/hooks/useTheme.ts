@@ -13,7 +13,6 @@ export const useTheme = () => {
     return {
         ...context,
         theme,
-        isDarkTheme:
-            theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches),
+        isDarkTheme: theme === 'dark',
     };
 };
