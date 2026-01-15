@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
-import { Eye, MoreVertical, Pencil, Play, ScrollText, Settings, X, Zap } from 'lucide-react';
+import { Ban, Copy, Eye, MoreVertical, Pencil, Play, RefreshCw, ScrollText, Settings, X, Zap } from 'lucide-react';
 
 import { listFlows, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -65,6 +65,13 @@ const HIGHLIGHTED_VISUAL: StatusVisual = {
     header: 'bg-node-header',
     icon: null,
     textColor: 'text-accent',
+};
+
+const DISABLED_VISUAL: StatusVisual = {
+    border: 'border-muted-foreground/30 opacity-50',
+    header: 'bg-muted/50',
+    icon: <Ban className="w-3 h-3 text-muted-foreground" />,
+    textColor: 'text-muted-foreground',
 };
 
 // --- Sub-Components ---
@@ -426,6 +433,8 @@ interface NodeBlockProps {
     onDelete: () => void;
     onTrigger: () => void;
     onToggleAuto: () => void;
+    onToggleDisabled?: () => void;
+    onDuplicate?: () => void;
     onViewComponent?: (flowId: string) => void;
     onViewLogs: () => void;
 }
@@ -443,6 +452,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     onDelete,
     onTrigger,
     onToggleAuto,
+    onToggleDisabled,
+    onDuplicate,
     onViewComponent,
     onViewLogs,
 }) => {
@@ -450,6 +461,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const blockRegistry = useBlockRegistry();
     const definition = blockRegistry[node.type];
     const isAuto = node.autoExecutionEnabled !== false;
+    const isDisabled = (node as NodeData & { disabled?: boolean }).disabled === true;
 
     const [showConfig, setShowConfig] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -503,9 +515,10 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const statusVisuals = useMemo(() => createStatusVisuals(isSelected), [isSelected]);
 
     const visuals = useMemo((): StatusVisual => {
+        if (isDisabled) return DISABLED_VISUAL;
         if (isHighlighted) return HIGHLIGHTED_VISUAL;
         return statusVisuals[node.status as NodeStatus] || statusVisuals.IDLE;
-    }, [isHighlighted, statusVisuals, node.status]);
+    }, [isDisabled, isHighlighted, statusVisuals, node.status]);
 
     const duration = node.status === 'RUNNING' ? elapsedTime : node.executionStats?.duration;
     const displayDuration =
@@ -687,7 +700,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                         setShowMenu(false);
                                     }}
                                 />
-                                <div className="absolute right-0 top-7 w-32 bg-popover border border-border rounded shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100">
+                                <div className="absolute right-0 top-7 w-36 bg-popover border border-border rounded shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100">
                                     <button
                                         onClick={e => {
                                             e.stopPropagation();
@@ -698,6 +711,44 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                     >
                                         <Pencil className="w-3 h-3" /> {t('contextMenu.rename')}
                                     </button>
+                                    {onDuplicate && (
+                                        <button
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setShowMenu(false);
+                                                onDuplicate();
+                                            }}
+                                            className="text-left px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                                        >
+                                            <Copy className="w-3 h-3" /> {t('contextMenu.duplicate')}
+                                        </button>
+                                    )}
+                                    {onToggleDisabled && (
+                                        <button
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setShowMenu(false);
+                                                onToggleDisabled();
+                                            }}
+                                            className="text-left px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                                        >
+                                            <Ban className="w-3 h-3" />{' '}
+                                            {isDisabled ? t('contextMenu.enable') : t('contextMenu.disable')}
+                                        </button>
+                                    )}
+                                    {node.status === 'ERROR' && (
+                                        <button
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setShowMenu(false);
+                                                onTrigger();
+                                            }}
+                                            className="text-left px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                                        >
+                                            <RefreshCw className="w-3 h-3" /> {t('contextMenu.retry')}
+                                        </button>
+                                    )}
+                                    <div className="border-t border-border my-1" />
                                     <button
                                         onClick={e => {
                                             e.stopPropagation();

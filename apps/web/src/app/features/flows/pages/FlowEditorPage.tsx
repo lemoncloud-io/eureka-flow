@@ -36,7 +36,9 @@ export const FlowEditorPage = () => {
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('Initializing FlowMosaic Engine...');
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [isRunning, setIsRunning] = useState(false);
     const autoSaveTimerRef = useRef<number | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Helper to update URL state without reload
     const updateUrl = useCallback((flowId: string | null, nodeId?: string | null) => {
@@ -227,6 +229,48 @@ export const FlowEditorPage = () => {
         showNotification('Exported to JSON', 'success');
     };
 
+    const handleImport = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = event => {
+            try {
+                const json = JSON.parse(event.target?.result as string);
+                if (canvasRef.current && json.nodes && json.connections) {
+                    canvasRef.current.loadWorkflow(json);
+                    showNotification('Workflow imported successfully', 'success');
+                } else {
+                    showNotification('Invalid workflow file', 'error');
+                }
+            } catch (_err) {
+                showNotification('Failed to parse JSON file', 'error');
+            }
+        };
+        reader.readAsText(file);
+
+        // Reset input value to allow re-importing the same file
+        e.target.value = '';
+    };
+
+    const handleRunAll = () => {
+        if (!canvasRef.current) return;
+        setIsRunning(true);
+        canvasRef.current.runAll();
+        showNotification('Running all nodes...', 'success');
+    };
+
+    const handleStopAll = () => {
+        if (!canvasRef.current) return;
+        setIsRunning(false);
+        canvasRef.current.stopAll();
+        showNotification('Execution stopped', 'success');
+    };
+
     // Loading screen
     if (!isAppReady) {
         return (
@@ -249,6 +293,7 @@ export const FlowEditorPage = () => {
                 onLoad={handleLoad}
                 onSave={handleSave}
                 onExport={handleExport}
+                onImport={handleImport}
                 onUndo={() => canvasRef.current?.undo()}
                 onRedo={() => canvasRef.current?.redo()}
                 onAutoLayout={() => {
@@ -257,11 +302,17 @@ export const FlowEditorPage = () => {
                 }}
                 onClear={handleClear}
                 onShare={handleShare}
+                onRunAll={handleRunAll}
+                onStopAll={handleStopAll}
+                isRunning={isRunning}
                 isAutoSaveEnabled={isAutoSaveEnabled}
                 onToggleAutoSave={toggleAutoSave}
                 isSaving={isSaving}
                 lastSavedAt={lastSavedAt}
             />
+
+            {/* Hidden file input for JSON import */}
+            <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFileChange} />
 
             <div className="flex flex-1 relative overflow-hidden">
                 <Sidebar onAddNode={handleAddNode} isLoading={isLoading} />
