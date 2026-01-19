@@ -61,8 +61,8 @@ setup_aws_profile() {
         log_info "Running in GitHub Actions - using default AWS credentials"
         AWS_PROFILE=""
     else
-        log_info "Using AWS profile: default-dev"
-        AWS_PROFILE="--profile lemon-dev"
+        log_info "Using AWS profile: default"
+        AWS_PROFILE="--profile lemon"
     fi
 }
 

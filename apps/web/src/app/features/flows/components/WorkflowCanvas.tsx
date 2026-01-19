@@ -1340,21 +1340,29 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     <div key={node.id}>
                                         <NodeBlock
                                             node={node}
-                                            isSelected={selectedNodeId === node.id}
-                                            isHighlighted={!!isConnected}
-                                            highlightedPortIds={highlightedPorts}
+                                            highlightState={{
+                                                isSelected: selectedNodeId === node.id,
+                                                isHighlighted: !!isConnected,
+                                                highlightedPortIds: highlightedPorts,
+                                            }}
+                                            portHandlers={{
+                                                onPortMouseDown: handlePortMouseDown,
+                                                onPortMouseUp: handlePortMouseUp,
+                                            }}
+                                            configHandlers={{
+                                                onConfigChange: (k, v) => handleConfigChange(node.id, k, v),
+                                                onLabelChange: label => handleLabelChange(node.id, label),
+                                                onToggleAuto: () => handleToggleAuto(node.id),
+                                            }}
+                                            actions={{
+                                                onDelete: () => deleteNode(node.id),
+                                                onTrigger: () => executeNode(node.id),
+                                                onToggleDisabled: () => toggleNodeDisabled(node.id),
+                                                onDuplicate: () => duplicateNode(node.id),
+                                                onViewComponent: id => setModalFlowId(id),
+                                                onViewLogs: () => setLogViewerNodeId(node.id),
+                                            }}
                                             onMouseDown={e => handleNodeMouseDown(e, node.id)}
-                                            onPortMouseDown={handlePortMouseDown}
-                                            onPortMouseUp={handlePortMouseUp}
-                                            onConfigChange={(k, v) => handleConfigChange(node.id, k, v)}
-                                            onLabelChange={label => handleLabelChange(node.id, label)}
-                                            onDelete={() => deleteNode(node.id)}
-                                            onTrigger={() => executeNode(node.id)}
-                                            onToggleAuto={() => handleToggleAuto(node.id)}
-                                            onToggleDisabled={() => toggleNodeDisabled(node.id)}
-                                            onDuplicate={() => duplicateNode(node.id)}
-                                            onViewComponent={id => setModalFlowId(id)}
-                                            onViewLogs={() => setLogViewerNodeId(node.id)}
                                         />
                                     </div>
                                 );

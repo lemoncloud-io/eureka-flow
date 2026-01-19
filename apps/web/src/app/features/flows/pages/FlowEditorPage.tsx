@@ -287,28 +287,38 @@ export const FlowEditorPage = () => {
     return (
         <div className="flex flex-col h-screen bg-background text-foreground font-sans overflow-hidden animate-in fade-in duration-500">
             <Header
-                flowName={flowName}
-                onNameChange={handleNameChange}
-                onNew={handleNew}
-                onLoad={handleLoad}
-                onSave={handleSave}
-                onExport={handleExport}
-                onImport={handleImport}
-                onUndo={() => canvasRef.current?.undo()}
-                onRedo={() => canvasRef.current?.redo()}
-                onAutoLayout={() => {
-                    canvasRef.current?.autoLayout();
-                    showNotification('Auto-layout applied', 'success');
+                flowInfo={{
+                    flowName,
+                    onNameChange: handleNameChange,
                 }}
-                onClear={handleClear}
+                fileActions={{
+                    onNew: handleNew,
+                    onLoad: handleLoad,
+                    onSave: handleSave,
+                    onExport: handleExport,
+                    onImport: handleImport,
+                }}
+                editActions={{
+                    onUndo: () => canvasRef.current?.undo(),
+                    onRedo: () => canvasRef.current?.redo(),
+                    onAutoLayout: () => {
+                        canvasRef.current?.autoLayout();
+                        showNotification('Auto-layout applied', 'success');
+                    },
+                    onClear: handleClear,
+                }}
+                executionActions={{
+                    onRunAll: handleRunAll,
+                    onStopAll: handleStopAll,
+                    isRunning,
+                }}
+                saveState={{
+                    isSaving,
+                    lastSavedAt,
+                    isAutoSaveEnabled,
+                    onToggleAutoSave: toggleAutoSave,
+                }}
                 onShare={handleShare}
-                onRunAll={handleRunAll}
-                onStopAll={handleStopAll}
-                isRunning={isRunning}
-                isAutoSaveEnabled={isAutoSaveEnabled}
-                onToggleAutoSave={toggleAutoSave}
-                isSaving={isSaving}
-                lastSavedAt={lastSavedAt}
             />
 
             {/* Hidden file input for JSON import */}

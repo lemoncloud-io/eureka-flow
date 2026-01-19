@@ -33,7 +33,7 @@ interface FlowsState {
     toggleAutoSave: () => void;
 }
 
-export const useFlowsStore = create<FlowsState>((set, get) => ({
+export const useFlowsStore = create<FlowsState>((set, _get) => ({
     // Initial State
     blockRegistry: {},
     isBlocksLoaded: false,

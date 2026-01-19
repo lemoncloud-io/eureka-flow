@@ -21,8 +21,40 @@ interface StatusVisual {
     textColor: string;
 }
 
+// --- Grouped Props Types ---
+export interface NodePortHandlers {
+    onPortMouseDown: (
+        nodeId: string,
+        portId: string,
+        type: 'input' | 'output',
+        portType: string,
+        e: React.MouseEvent
+    ) => void;
+    onPortMouseUp: (nodeId: string, portId: string, type: 'input' | 'output', portType: string) => void;
+}
+
+export interface NodeConfigHandlers {
+    onConfigChange: (key: string, value: ConfigValue) => void;
+    onLabelChange: (label: string) => void;
+    onToggleAuto: () => void;
+}
+
+export interface NodeActions {
+    onDelete: () => void;
+    onTrigger: () => void;
+    onToggleDisabled?: () => void;
+    onDuplicate?: () => void;
+    onViewComponent?: (flowId: string) => void;
+    onViewLogs: () => void;
+}
+
+export interface NodeHighlightState {
+    isSelected: boolean;
+    isHighlighted?: boolean;
+    highlightedPortIds?: string[];
+}
+
 // --- Status Visual Factory ---
-// Minimal approach: status indicated by border color and icon only, header stays neutral
 const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisual> => ({
     RUNNING: {
         border: isSelected
@@ -168,7 +200,7 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = evt => evt.target?.result && onChange(field.key, evt.target.result);
+            reader.onload = evt => evt.target?.result && onChange(field.key, evt.target.result as string);
             reader.readAsDataURL(file);
         }
     };
@@ -188,7 +220,7 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
                     <input
                         type={field.type}
                         className="w-full bg-background border border-border rounded p-2 text-sm text-foreground focus:border-primary outline-none"
-                        value={value || (field.type === 'number' ? 0 : '')}
+                        value={value ?? (field.type === 'number' ? 0 : '')}
                         onChange={e =>
                             onChange(field.key, field.type === 'number' ? parseFloat(e.target.value) : e.target.value)
                         }
@@ -219,7 +251,7 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
                     <label className="text-xs text-muted-foreground block mb-1 font-semibold">{field.label}</label>
                     <select
                         className="w-full bg-background border border-border rounded p-2 text-sm text-foreground focus:border-primary outline-none"
-                        value={value}
+                        value={value as string}
                         onChange={e => onChange(field.key, e.target.value)}
                     >
                         {field.options?.map(opt => (
@@ -236,7 +268,7 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
                     <label className="text-xs text-muted-foreground w-full mb-1 font-semibold">{field.label}</label>
                     {value ? (
                         <img
-                            src={value}
+                            src={value as string}
                             className="w-full h-32 object-contain rounded mb-2 border border-border bg-black/50"
                             alt="Preview"
                         />
@@ -277,7 +309,7 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
                         <label className="text-xs text-muted-foreground block mb-1 font-semibold">{field.label}</label>
                         <select
                             className="w-full bg-background border border-border rounded p-2 text-sm text-foreground focus:border-primary outline-none"
-                            value={value || ''}
+                            value={(value as string) || ''}
                             onChange={e => onChange(field.key, e.target.value)}
                             onFocus={() => listFlows().then(setFlows)}
                         >
@@ -291,7 +323,7 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
                     </div>
                     {value && (
                         <button
-                            onClick={() => onViewComponent && onViewComponent(value)}
+                            onClick={() => onViewComponent && onViewComponent(value as string)}
                             className="w-full bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-200 dark:hover:bg-indigo-800 text-indigo-900 dark:text-indigo-100 text-xs py-2 rounded transition-colors flex items-center justify-center gap-1"
                         >
                             <Eye className="w-3 h-3" /> {t('visualization.openWorkflowDesign')}
@@ -324,7 +356,7 @@ const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
             {lastInput.type === 'image' ? (
                 <>
                     <img
-                        src={lastInput.value}
+                        src={lastInput.value as string}
                         className="max-w-full max-h-32 rounded"
                         alt="Preview"
                         onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
@@ -346,7 +378,7 @@ const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
 
 const InputImageVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
     const { t } = useTranslation(['nodes']);
-    const img = node.config.imageData;
+    const img = node.config.imageData as string | undefined;
     const [dims, setDims] = useState<string | null>(null);
 
     return (
@@ -392,7 +424,7 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
 
 const InputTextVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
     const { t } = useTranslation(['nodes']);
-    const text = node.config.text;
+    const text = node.config.text as string | undefined;
     return (
         <div className="mt-2 p-2 bg-background rounded border border-border group relative">
             <div className="text-[9px] text-muted-foreground mb-0.5 uppercase tracking-wider font-semibold">
@@ -416,50 +448,30 @@ const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
 
 interface NodeBlockProps {
     node: NodeData;
-    isSelected: boolean;
-    isHighlighted?: boolean;
-    highlightedPortIds?: string[];
+    highlightState: NodeHighlightState;
+    portHandlers: NodePortHandlers;
+    configHandlers: NodeConfigHandlers;
+    actions: NodeActions;
     onMouseDown: (e: React.MouseEvent) => void;
-    onPortMouseDown: (
-        nodeId: string,
-        portId: string,
-        type: 'input' | 'output',
-        portType: string,
-        e: React.MouseEvent
-    ) => void;
-    onPortMouseUp: (nodeId: string, portId: string, type: 'input' | 'output', portType: string) => void;
-    onConfigChange: (key: string, value: ConfigValue) => void;
-    onLabelChange: (label: string) => void;
-    onDelete: () => void;
-    onTrigger: () => void;
-    onToggleAuto: () => void;
-    onToggleDisabled?: () => void;
-    onDuplicate?: () => void;
-    onViewComponent?: (flowId: string) => void;
-    onViewLogs: () => void;
 }
 
 export const NodeBlock: React.FC<NodeBlockProps> = ({
     node,
-    isSelected,
-    isHighlighted,
-    highlightedPortIds = [],
+    highlightState,
+    portHandlers,
+    configHandlers,
+    actions,
     onMouseDown,
-    onPortMouseDown,
-    onPortMouseUp,
-    onConfigChange,
-    onLabelChange,
-    onDelete,
-    onTrigger,
-    onToggleAuto,
-    onToggleDisabled,
-    onDuplicate,
-    onViewComponent,
-    onViewLogs,
 }) => {
     const { t } = useTranslation(['nodes', 'flows']);
     const blockRegistry = useBlockRegistry();
     const definition = blockRegistry[node.type];
+
+    const { isSelected, isHighlighted, highlightedPortIds = [] } = highlightState;
+    const { onPortMouseDown, onPortMouseUp } = portHandlers;
+    const { onConfigChange, onLabelChange, onToggleAuto } = configHandlers;
+    const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewComponent, onViewLogs } = actions;
+
     const isAuto = node.autoExecutionEnabled !== false;
     const isDisabled = (node as NodeData & { disabled?: boolean }).disabled === true;
 
@@ -590,7 +602,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 <ConfigControl
                                     key={field.key}
                                     field={field}
-                                    value={node.config[field.key] ?? definition.defaultConfig[field.key]}
+                                    value={
+                                        (node.config[field.key] ?? definition.defaultConfig[field.key]) as ConfigValue
+                                    }
                                     nodeId={node.id}
                                     onChange={onConfigChange}
                                     onViewComponent={onViewComponent}
