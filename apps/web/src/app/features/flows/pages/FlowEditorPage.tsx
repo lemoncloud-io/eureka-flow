@@ -262,11 +262,15 @@ export const FlowEditorPage = () => {
         e.target.value = '';
     };
 
-    const handleRunAll = () => {
+    const handleRunAll = async () => {
         if (!canvasRef.current) return;
         setIsRunning(true);
-        canvasRef.current.runAll();
         showNotification('Running all nodes...', 'success');
+        try {
+            await canvasRef.current.runAll();
+        } finally {
+            setIsRunning(false);
+        }
     };
 
     const handleStopAll = () => {

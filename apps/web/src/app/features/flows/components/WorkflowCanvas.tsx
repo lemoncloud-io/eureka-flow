@@ -26,7 +26,7 @@ export interface WorkflowCanvasRef {
     redo: () => void;
     autoLayout: () => void;
     selectNode: (nodeId: string | null) => void;
-    runAll: () => void;
+    runAll: () => Promise<void>;
     stopAll: () => void;
 }
 
@@ -58,6 +58,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         // Input hash tracking for reactive execution
         const nodeInputHashesRef = useRef<Map<string, string>>(new Map());
+
+        // Ref for executeNode to be used in useImperativeHandle
+        const executeNodeRef = useRef<(nodeId: string) => Promise<void>>();
 
         // Refs to avoid recreating callbacks when nodes/connections change
         const nodesRef = useRef(nodes);
@@ -290,6 +293,50 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
                     }
 
+                    // If no connection was created and the new node has outputs,
+                    // try to connect it to an existing node that needs input
+                    let targetNode: NodeData | undefined;
+                    let targetInputPortId: string | undefined;
+                    let sourceOutputPortId: string | undefined;
+
+                    if (!newConnection && newDef.outputs.length > 0 && nodes.length > 0) {
+                        const firstOutput = newDef.outputs[0];
+
+                        // Find an existing node with a compatible unconnected input
+                        for (const existingNode of nodes) {
+                            const existingDef = blockRegistry[existingNode.type];
+                            if (!existingDef || existingDef.inputs.length === 0) continue;
+
+                            // Find a compatible input that is not already connected
+                            const compatibleInput = existingDef.inputs.find(inp => {
+                                const isConnected = connections.some(
+                                    c => c.targetNodeId === existingNode.id && c.targetPortId === inp.id
+                                );
+                                if (isConnected) return false;
+                                return (
+                                    inp.type === firstOutput.type || inp.type === 'any' || firstOutput.type === 'any'
+                                );
+                            });
+
+                            if (compatibleInput) {
+                                targetNode = existingNode;
+                                targetInputPortId = compatibleInput.id;
+                                sourceOutputPortId = firstOutput.id;
+                                break;
+                            }
+                        }
+
+                        if (targetNode && targetInputPortId && sourceOutputPortId) {
+                            newConnection = {
+                                id: generateId(),
+                                sourceNodeId: newNode.id,
+                                sourcePortId: sourceOutputPortId,
+                                targetNodeId: targetNode.id,
+                                targetPortId: targetInputPortId,
+                            };
+                        }
+                    }
+
                     setNodes(prev => [...prev, newNode]);
                     if (newConnection) {
                         setConnections(prev => [...prev, newConnection!]);
@@ -438,19 +485,21 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     setNodes(positionedNodes);
                     setViewport({ x: 20, y: 20, zoom: 1 });
                 },
-                runAll: () => {
-                    const inputNodeIds = nodes
+                runAll: async () => {
+                    const inputNodes = nodes
                         .filter(n => {
                             const hasIncoming = connections.some(c => c.targetNodeId === n.id);
                             const def = blockRegistry[n.type];
                             return !hasIncoming || (def && def.inputs.length === 0);
                         })
-                        .filter(n => !(n as NodeData & { disabled?: boolean }).disabled)
-                        .map(n => n.id);
+                        .filter(n => !(n as NodeData & { disabled?: boolean }).disabled);
 
-                    setNodes(prev =>
-                        prev.map(n => (inputNodeIds.includes(n.id) ? { ...n, status: 'running' as const } : n))
-                    );
+                    // Execute all input nodes
+                    for (const node of inputNodes) {
+                        if (executeNodeRef.current) {
+                            await executeNodeRef.current(node.id);
+                        }
+                    }
                 },
                 stopAll: () => {
                     setNodes(prev => prev.map(n => (n.status === 'running' ? { ...n, status: 'idle' as const } : n)));
@@ -595,6 +644,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             },
             [propagateOutputs, readOnly, blockRegistry, t]
         );
+
+        // Update ref for use in useImperativeHandle
+        executeNodeRef.current = executeNode;
 
         // Reactive Trigger
         useEffect(() => {
