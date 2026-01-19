@@ -179,11 +179,12 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
         }),
 
     loadWorkflow: (workflowState, flowId) => {
-        // Support both old (connections) and new (edges) format
-        const connections = workflowState.connections || workflowState.edges || [];
+        // Support both old (connections) and new (edges) format with fallbacks
+        const nodes = workflowState?.nodes || [];
+        const connections = workflowState?.connections || workflowState?.edges || [];
 
         set({
-            nodes: workflowState.nodes,
+            nodes: nodes as NodeData[],
             connections: connections as Connection[],
             flowId: flowId || null,
             selectedNodeId: null,
