@@ -11,24 +11,16 @@ import type { BlockDefinition } from '@lemoncloud/eureka-flows-api';
  * See useCanvasStore for node-level state management.
  */
 interface FlowsState {
-    // Block Registry
     blockRegistry: Record<string, BlockDefinition>;
     isBlocksLoaded: boolean;
-
-    // Current Flow
     currentFlowId: string | null;
     flowName: string;
     flows: FlowView[];
-
-    // Loading States
     isLoading: boolean;
     isSaving: boolean;
     lastSavedAt: Date | null;
-
-    // Auto Save
     isAutoSaveEnabled: boolean;
 
-    // Actions
     setBlockRegistry: (blocks: BlockDefinition[]) => void;
     setBlocksLoaded: (loaded: boolean) => void;
     setCurrentFlowId: (id: string | null) => void;
@@ -42,7 +34,6 @@ interface FlowsState {
 }
 
 export const useFlowsStore = create<FlowsState>((set, _get) => ({
-    // Initial State
     blockRegistry: {},
     isBlocksLoaded: false,
     currentFlowId: null,
@@ -53,7 +44,6 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     lastSavedAt: null,
     isAutoSaveEnabled: false,
 
-    // Actions
     setBlockRegistry: blocks => {
         const registry = blocks.reduce<Record<string, BlockDefinition>>((acc, block) => {
             acc[block.type] = block;
@@ -81,7 +71,6 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     toggleAutoSave: () => set(state => ({ isAutoSaveEnabled: !state.isAutoSaveEnabled })),
 }));
 
-// Selector hooks for better performance
 export const useBlockRegistry = () => useFlowsStore(state => state.blockRegistry);
 export const useIsBlocksLoaded = () => useFlowsStore(state => state.isBlocksLoaded);
 export const useCurrentFlowId = () => useFlowsStore(state => state.currentFlowId);

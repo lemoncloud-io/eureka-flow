@@ -15,7 +15,6 @@ import { generateId, isValidConnection } from '../utils';
 
 import type { Connection, DataPacket, NodeData, PortDefinition, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
-// Define Ref Interface
 export interface WorkflowCanvasRef {
     addNode: (type: string) => void;
     getWorkflow: () => WorkflowState;
@@ -44,41 +43,29 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
 
-        // --- STATE ---
         const [nodes, setNodes] = useState<NodeData[]>([]);
         const [connections, setConnections] = useState<Connection[]>([]);
-
-        // Clipboard
         const [clipboard, setClipboard] = useState<NodeData | null>(null);
 
-        // History State
         const pastRef = useRef<WorkflowState[]>([]);
         const futureRef = useRef<WorkflowState[]>([]);
         const dragStartSnapshotRef = useRef<WorkflowState | null>(null);
-
-        // Input hash tracking for reactive execution
         const nodeInputHashesRef = useRef<Map<string, string>>(new Map());
-
-        // Ref for executeNode to be used in useImperativeHandle
         const executeNodeRef = useRef<(nodeId: string) => Promise<void>>();
 
-        // Refs to avoid recreating callbacks when nodes/connections change
         const nodesRef = useRef(nodes);
         const connectionsRef = useRef(connections);
         nodesRef.current = nodes;
         connectionsRef.current = connections;
 
-        // Viewport State
         const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
         const [isPanning, setIsPanning] = useState(false);
         const lastMousePosRef = useRef({ x: 0, y: 0 });
 
-        // UI Interaction State
         const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
         const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
         const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
 
-        // Modal States
         const [logViewerNodeId, setLogViewerNodeId] = useState<string | null>(null);
 
         const [dragState, setDragState] = useState<{
@@ -90,11 +77,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         } | null>(null);
         const [tooltip, setTooltip] = useState<{ x: number; y: number; content: unknown; type: string } | null>(null);
 
-        // Component Modal State
         const [modalFlowId, setModalFlowId] = useState<string | null>(null);
         const [modalFlowData, setModalFlowData] = useState<WorkflowState | null>(null);
 
-        // Connection Creation State
         const [connectionDraft, setConnectionDraft] = useState<{
             sourceNodeId: string;
             sourcePortId: string;
@@ -105,7 +90,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         const canvasRef = useRef<HTMLDivElement>(null);
 
-        // --- CHANGE DETECTION FOR AUTO SAVE ---
         const isMounted = useRef(false);
         useEffect(() => {
             if (isMounted.current) {
@@ -117,7 +101,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             }
         }, [nodes, connections, onChange, readOnly]);
 
-        // --- HISTORY MANAGEMENT ---
         const saveCheckpoint = useCallback(() => {
             if (readOnly) return;
             pastRef.current.push({
@@ -157,7 +140,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             }
         }, [nodes, connections, readOnly]);
 
-        // Load Initial Data
         useEffect(() => {
             if (initialData) {
                 setNodes(initialData.nodes);
@@ -167,7 +149,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             }
         }, [initialData]);
 
-        // Load Sub-Flow for Modal
         useEffect(() => {
             if (modalFlowId) {
                 getFlowSnapshot(modalFlowId)
@@ -178,7 +159,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             }
         }, [modalFlowId]);
 
-        // Sync internal selection with parent prop
         const handleSelectionChange = useCallback(
             (nodeId: string | null) => {
                 setSelectedNodeId(nodeId);
@@ -189,7 +169,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [onNodeSelect]
         );
 
-        // Helper: Convert Screen Coordinates to World Coordinates
         const screenToWorld = useCallback(
             (clientX: number, clientY: number) => {
                 const rect = canvasRef.current?.getBoundingClientRect();
@@ -202,7 +181,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [viewport]
         );
 
-        // Expose methods to parent
         useImperativeHandle(
             ref,
             () => ({
@@ -293,8 +271,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
                     }
 
-                    // If no connection was created and the new node has outputs,
-                    // try to connect it to an existing node that needs input
                     let targetNode: NodeData | undefined;
                     let targetInputPortId: string | undefined;
                     let sourceOutputPortId: string | undefined;
@@ -302,12 +278,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     if (!newConnection && newDef.outputs.length > 0 && nodes.length > 0) {
                         const firstOutput = newDef.outputs[0];
 
-                        // Find an existing node with a compatible unconnected input
                         for (const existingNode of nodes) {
                             const existingDef = blockRegistry[existingNode.type];
                             if (!existingDef || existingDef.inputs.length === 0) continue;
 
-                            // Find a compatible input that is not already connected
                             const compatibleInput = existingDef.inputs.find(inp => {
                                 const isConnected = connections.some(
                                     c => c.targetNodeId === existingNode.id && c.targetPortId === inp.id
@@ -494,7 +468,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         })
                         .filter(n => !(n as NodeData & { disabled?: boolean }).disabled);
 
-                    // Execute all input nodes
                     for (const node of inputNodes) {
                         if (executeNodeRef.current) {
                             await executeNodeRef.current(node.id);
@@ -519,7 +492,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             ]
         );
 
-        // --- ENGINE LOGIC ---
         const propagateOutputs = useCallback((sourceNodeId: string, outputs: Record<string, DataPacket>) => {
             const relevantConnections = connectionsRef.current.filter(c => c.sourceNodeId === sourceNodeId);
             if (relevantConnections.length === 0) return;
@@ -569,7 +541,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     )
                 );
 
-                // Use ref to get current node to avoid dependency on nodes
                 const currentNode = nodesRef.current.find(n => n.id === nodeId);
                 if (!currentNode) return;
 
@@ -645,10 +616,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [propagateOutputs, readOnly, blockRegistry, t]
         );
 
-        // Update ref for use in useImperativeHandle
         executeNodeRef.current = executeNode;
 
-        // Reactive Trigger
         useEffect(() => {
             if (readOnly) return;
             nodes.forEach(node => {
@@ -671,7 +640,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             });
         }, [nodes, executeNode, readOnly, blockRegistry]);
 
-        // --- UI HANDLERS ---
         const handleConfigChange = (nodeId: string, key: string, value: unknown) => {
             if (readOnly) return;
             saveCheckpoint();
@@ -761,7 +729,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [readOnly, saveCheckpoint]
         );
 
-        // --- PAN & ZOOM HANDLERS ---
         const MIN_ZOOM = 0.1;
         const MAX_ZOOM = 5;
 
@@ -1016,7 +983,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             return { x: node.position.x + xOffset, y: node.position.y + yOffset };
         };
 
-        // --- SHORTCUTS EFFECT ---
         useEffect(() => {
             const handleKeyDown = (e: KeyboardEvent) => {
                 if (readOnly) return;

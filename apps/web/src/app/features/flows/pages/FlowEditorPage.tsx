@@ -12,10 +12,8 @@ import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 export const FlowEditorPage = () => {
     const canvasRef = useRef<WorkflowCanvasRef>(null);
 
-    // Store state
     const { blockRegistry: _blockRegistry, isBlocksLoaded: _isBlocksLoaded } = useFlowsStore();
 
-    // Hooks
     const { loadBlocks } = useBlocks();
     const {
         currentFlowId,
@@ -32,7 +30,6 @@ export const FlowEditorPage = () => {
         toggleAutoSave,
     } = useFlows();
 
-    // Local state
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('Initializing FlowMosaic Engine...');
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -40,7 +37,6 @@ export const FlowEditorPage = () => {
     const autoSaveTimerRef = useRef<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Helper to update URL state without reload
     const updateUrl = useCallback((flowId: string | null, nodeId?: string | null) => {
         try {
             let path = '/';
@@ -51,12 +47,11 @@ export const FlowEditorPage = () => {
             if (window.location.pathname + window.location.hash !== url) {
                 window.history.pushState({ flowId, nodeId }, '', url);
             }
-        } catch (_e) {
-            // ignore
+        } catch {
+            /* noop */
         }
     }, []);
 
-    // Boot sequence - run only once on mount
     const bootedRef = useRef(false);
     useEffect(() => {
         if (bootedRef.current) return;
@@ -100,10 +95,8 @@ export const FlowEditorPage = () => {
         };
 
         boot();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Auto save logic
     const triggerAutoSave = useCallback(() => {
         if (!isAutoSaveEnabled) return;
 
@@ -119,7 +112,6 @@ export const FlowEditorPage = () => {
         }, 2000);
     }, [isAutoSaveEnabled, saveCurrentFlow]);
 
-    // Event handlers
     const showNotification = (message: string, type: 'success' | 'error') => {
         setNotification({ message, type });
         setTimeout(() => setNotification(null), 3000);
@@ -257,8 +249,6 @@ export const FlowEditorPage = () => {
             }
         };
         reader.readAsText(file);
-
-        // Reset input value to allow re-importing the same file
         e.target.value = '';
     };
 
@@ -280,7 +270,6 @@ export const FlowEditorPage = () => {
         showNotification('Execution stopped', 'success');
     };
 
-    // Loading screen
     if (!isAppReady) {
         return (
             <div className="flex h-screen bg-background text-foreground font-sans items-center justify-center flex-col gap-4">
@@ -330,7 +319,6 @@ export const FlowEditorPage = () => {
                 onShare={handleShare}
             />
 
-            {/* Hidden file input for JSON import */}
             <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFileChange} />
 
             <div className="flex flex-1 relative overflow-hidden">

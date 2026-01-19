@@ -1,4 +1,3 @@
-// Re-export types from the API package
 export type {
     BlockDefinition,
     BlockView,
@@ -12,7 +11,6 @@ export type {
     ProcessBody,
     ProcessResult,
     WorkflowState,
-    // New types from PR #1
     EdgeData,
     NodeConfigItem,
     NodeDataPacketItem,
@@ -21,10 +19,6 @@ export type {
     NodeStatus,
     ConfigOption,
 } from '@lemoncloud/eureka-flows-api';
-
-// ============================================================================
-// Flow Types
-// ============================================================================
 
 /**
  * FlowStereo - stereotype of flow model
@@ -64,10 +58,6 @@ export interface FlowView extends Partial<FlowModel> {}
  * FlowBody - body for flow creation/update
  */
 export interface FlowBody extends Partial<FlowView> {}
-
-// ============================================================================
-// Edge Types
-// ============================================================================
 
 /**
  * EdgeStereo - stereotype of edge (connection)
@@ -112,10 +102,6 @@ export interface EdgeView extends Partial<EdgeModel> {}
  * EdgeBody - body for edge creation/update
  */
 export interface EdgeBody extends Partial<EdgeView> {}
-
-// ============================================================================
-// Node Types (Extended)
-// ============================================================================
 
 /**
  * NodeStereo - stereotype of node
@@ -210,10 +196,6 @@ export interface NodeBody extends Partial<NodeView> {
     blockId: string;
 }
 
-// ============================================================================
-// Execution Types
-// ============================================================================
-
 /**
  * InputOverrideItem - input override item for execution
  */
@@ -248,10 +230,6 @@ export interface StopFlowParams {
     nodeId?: string;
 }
 
-// ============================================================================
-// Snapshot Types
-// ============================================================================
-
 /**
  * SnapShotResult - result of flow snapshot
  */
@@ -259,10 +237,6 @@ export interface SnapShotResult extends FlowModel {
     nodes: NodeView[];
     edges: EdgeView[];
 }
-
-// ============================================================================
-// API Response Types
-// ============================================================================
 
 /**
  * ApiListResult - generic list result from API
@@ -273,10 +247,6 @@ export interface ApiListResult<T> {
     page?: number;
     limit?: number;
 }
-
-// ============================================================================
-// Error Types
-// ============================================================================
 
 /**
  * API error codes

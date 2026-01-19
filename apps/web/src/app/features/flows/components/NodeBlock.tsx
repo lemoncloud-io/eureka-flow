@@ -9,7 +9,6 @@ import { cn } from '@flows/lib/utils';
 
 import type { ConfigField, FlowMeta, NodeData, PortDefinition } from '@flows/flows';
 
-// --- Types ---
 type ConfigValue = string | number | boolean | string[] | null;
 
 type NodeStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'ERROR';
@@ -21,7 +20,6 @@ interface StatusVisual {
     textColor: string;
 }
 
-// --- Grouped Props Types ---
 export interface NodePortHandlers {
     onPortMouseDown: (
         nodeId: string,
@@ -54,7 +52,6 @@ export interface NodeHighlightState {
     highlightedPortIds?: string[];
 }
 
-// --- Status Visual Factory ---
 const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisual> => ({
     RUNNING: {
         border: isSelected
@@ -105,8 +102,6 @@ const DISABLED_VISUAL: StatusVisual = {
     icon: <Ban className="w-3 h-3 text-muted-foreground" />,
     textColor: 'text-muted-foreground',
 };
-
-// --- Sub-Components ---
 
 interface PortItemProps {
     port: PortDefinition;
@@ -183,7 +178,6 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
     );
 };
 
-// 2. Config Field Renderer
 interface ConfigControlProps {
     field: ConfigField;
     value: ConfigValue;
@@ -336,8 +330,6 @@ const ConfigControl: React.FC<ConfigControlProps> = ({ field, value, nodeId, onC
     }
 };
 
-// 3. Visualization Components
-
 const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
     const { t } = useTranslation(['nodes']);
     const lastInput = node.inputData['in'];
@@ -443,8 +435,6 @@ const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
     'input-text': InputTextVisualization,
     'input-image': InputImageVisualization,
 };
-
-// --- Main Component ---
 
 interface NodeBlockProps {
     node: NodeData;

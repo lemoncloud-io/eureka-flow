@@ -19,7 +19,6 @@ import {
 
 import { LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 
-// --- Grouped Props Types ---
 export interface FlowInfoProps {
     flowName: string;
     onNameChange: (name: string) => void;
@@ -62,7 +61,6 @@ interface HeaderProps {
     onShare: () => void;
 }
 
-// --- Internal Components ---
 const IconButton = ({
     onClick,
     icon,
@@ -88,7 +86,6 @@ const IconButton = ({
 
 const Separator = () => <div className="h-5 w-px bg-border mx-2" />;
 
-// --- Flow Name Input ---
 const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
     const { t } = useTranslation(['flows']);
     const [nameInput, setNameInput] = useState(flowName);
@@ -124,7 +121,6 @@ const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
     );
 };
 
-// --- Save Status ---
 const SaveStatus: React.FC<Pick<SaveStateProps, 'isSaving' | 'lastSavedAt'>> = ({ isSaving, lastSavedAt }) => {
     const { t } = useTranslation(['common']);
 
@@ -146,7 +142,6 @@ const SaveStatus: React.FC<Pick<SaveStateProps, 'isSaving' | 'lastSavedAt'>> = (
     );
 };
 
-// --- File Actions Toolbar ---
 const FileActionsToolbar: React.FC<FileActionsProps> = ({ onNew, onLoad, onSave, onExport, onImport }) => {
     const { t } = useTranslation(['flows']);
 
@@ -165,7 +160,6 @@ const FileActionsToolbar: React.FC<FileActionsProps> = ({ onNew, onLoad, onSave,
     );
 };
 
-// --- Edit Actions Toolbar ---
 const EditActionsToolbar: React.FC<EditActionsProps> = ({ onUndo, onRedo, onAutoLayout, onClear }) => {
     const { t } = useTranslation(['flows']);
 
@@ -201,7 +195,6 @@ const EditActionsToolbar: React.FC<EditActionsProps> = ({ onUndo, onRedo, onAuto
     );
 };
 
-// --- Execution Buttons ---
 const ExecutionButtons: React.FC<ExecutionActionsProps> = ({ onRunAll, onStopAll, isRunning }) => {
     const { t } = useTranslation(['flows']);
 
@@ -228,7 +221,6 @@ const ExecutionButtons: React.FC<ExecutionActionsProps> = ({ onRunAll, onStopAll
     );
 };
 
-// --- Auto Save Toggle ---
 const AutoSaveToggle: React.FC<Pick<SaveStateProps, 'isAutoSaveEnabled' | 'onToggleAutoSave'>> = ({
     isAutoSaveEnabled,
     onToggleAutoSave,
@@ -257,7 +249,6 @@ const AutoSaveToggle: React.FC<Pick<SaveStateProps, 'isAutoSaveEnabled' | 'onTog
     );
 };
 
-// --- Main Component ---
 export const Header: React.FC<HeaderProps> = ({
     flowInfo,
     fileActions,
@@ -270,7 +261,6 @@ export const Header: React.FC<HeaderProps> = ({
 
     return (
         <div className="h-14 bg-header border-b border-border flex items-center justify-between px-4 z-30 shadow-sm shrink-0 transition-colors">
-            {/* Left: Logo & File Info */}
             <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 select-none">
                     <Hexagon className="w-6 h-6 text-primary" />
@@ -286,7 +276,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <SaveStatus isSaving={saveState.isSaving} lastSavedAt={saveState.lastSavedAt} />
             </div>
 
-            {/* Middle: Actions Toolbar */}
             <div className="flex items-center gap-1">
                 <FileActionsToolbar {...fileActions} />
                 <Separator />
@@ -295,7 +284,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <ExecutionButtons {...executionActions} />
             </div>
 
-            {/* Right: Theme, Language, Auto Save & Share */}
             <div className="flex items-center gap-2">
                 <ThemeToggle />
                 <LanguageSwitcher />
