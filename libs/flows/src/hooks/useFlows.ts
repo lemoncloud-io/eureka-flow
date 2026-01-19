@@ -1,9 +1,10 @@
 import { useCallback, useRef } from 'react';
 
-import { fetchBlockLogs, listFlows, loadDesign, loadFlow, saveFlow } from '../api';
+import { createFlow, deleteFlow, fetchBlockLogs, getFlow, getFlowSnapshot, listFlows, updateFlow } from '../api';
 import { useFlowsStore } from '../stores/useFlowsStore';
 
-import type { LogEntry, WorkflowState } from '../api';
+import type { FlowBody, FlowView, SnapShotResult } from '../types';
+import type { LogEntry } from '@lemoncloud/eureka-flows-api';
 
 /**
  * Hook for managing workflows/flows
@@ -17,6 +18,8 @@ export const useFlows = () => {
         isSaving,
         lastSavedAt,
         isAutoSaveEnabled,
+        executionStatus,
+        activeRunId,
         setCurrentFlowId,
         setFlowName,
         setFlows,
@@ -29,9 +32,9 @@ export const useFlows = () => {
     const autoSaveTimerRef = useRef<number | null>(null);
 
     /**
-     * Load all available flows
+     * Load all available flows from API
      */
-    const loadFlowsList = useCallback(async () => {
+    const loadFlowsList = useCallback(async (): Promise<FlowView[]> => {
         try {
             const flowsList = await listFlows();
             setFlows(flowsList);
@@ -46,19 +49,24 @@ export const useFlows = () => {
      * Load a specific flow by ID
      */
     const loadFlowById = useCallback(
-        async (id?: string) => {
+        async (id?: string): Promise<SnapShotResult | null> => {
             setLoading(true);
             try {
-                const flow = await loadFlow(id);
-                if (id) {
-                    setCurrentFlowId(id);
+                if (!id) {
                     const flowsList = await listFlows();
-                    const meta = flowsList.find(f => f.id === id);
-                    if (meta) {
-                        setFlowName(meta.name);
+                    if (flowsList.length > 0 && flowsList[0].id) {
+                        id = flowsList[0].id;
+                    } else {
+                        return null;
                     }
                 }
-                return flow;
+
+                const snapshot = await getFlowSnapshot(id);
+                setCurrentFlowId(id);
+                if (snapshot.name) {
+                    setFlowName(snapshot.name);
+                }
+                return snapshot;
             } catch (error) {
                 console.error('Failed to load flow:', error);
                 throw error;
@@ -70,14 +78,14 @@ export const useFlows = () => {
     );
 
     /**
-     * Load flow design by ID
+     * Load flow design (snapshot) by ID
      */
     const loadFlowDesign = useCallback(
-        async (id: string) => {
+        async (id: string): Promise<SnapShotResult> => {
             setLoading(true);
             try {
-                const design = await loadDesign(id);
-                return design;
+                const snapshot = await getFlowSnapshot(id);
+                return snapshot;
             } catch (error) {
                 console.error('Failed to load design:', error);
                 throw error;
@@ -89,22 +97,36 @@ export const useFlows = () => {
     );
 
     /**
-     * Save current flow
+     * Get flow metadata by ID
+     */
+    const getFlowById = useCallback(async (id: string): Promise<FlowView> => {
+        return getFlow(id);
+    }, []);
+
+    /**
+     * Save current flow (create or update)
      */
     const saveCurrentFlow = useCallback(
-        async (state: WorkflowState, silent = false) => {
+        async (body: FlowBody, silent = false): Promise<{ success: boolean; id: string }> => {
             if (!silent) setLoading(true);
             else setSaving(true);
 
             try {
-                const result = await saveFlow(state, flowName);
-                if (result.success) {
-                    setLastSavedAt(new Date());
-                    if (result.id !== currentFlowId) {
+                let result: FlowView;
+
+                if (currentFlowId) {
+                    // Update existing flow
+                    result = await updateFlow(currentFlowId, { ...body, name: flowName });
+                } else {
+                    // Create new flow
+                    result = await createFlow({ ...body, name: flowName });
+                    if (result.id) {
                         setCurrentFlowId(result.id);
                     }
                 }
-                return result;
+
+                setLastSavedAt(new Date());
+                return { success: true, id: result.id || '' };
             } catch (error) {
                 console.error('Failed to save flow:', error);
                 return { success: false, id: '' };
@@ -114,6 +136,53 @@ export const useFlows = () => {
             }
         },
         [flowName, currentFlowId, setLoading, setSaving, setLastSavedAt, setCurrentFlowId]
+    );
+
+    /**
+     * Create a new flow
+     */
+    const createNewFlowRemote = useCallback(
+        async (name: string, body?: FlowBody): Promise<FlowView> => {
+            setLoading(true);
+            try {
+                const result = await createFlow({ name, ...body });
+                if (result.id) {
+                    setCurrentFlowId(result.id);
+                    setFlowName(name);
+                }
+                await loadFlowsList();
+                return result;
+            } catch (error) {
+                console.error('Failed to create flow:', error);
+                throw error;
+            } finally {
+                setLoading(false);
+            }
+        },
+        [setLoading, setCurrentFlowId, setFlowName, loadFlowsList]
+    );
+
+    /**
+     * Delete a flow
+     */
+    const deleteFlowById = useCallback(
+        async (id: string): Promise<void> => {
+            setLoading(true);
+            try {
+                await deleteFlow(id);
+                if (currentFlowId === id) {
+                    setCurrentFlowId(null);
+                    setFlowName('Untitled Workflow');
+                }
+                await loadFlowsList();
+            } catch (error) {
+                console.error('Failed to delete flow:', error);
+                throw error;
+            } finally {
+                setLoading(false);
+            }
+        },
+        [currentFlowId, setLoading, setCurrentFlowId, setFlowName, loadFlowsList]
     );
 
     /**
@@ -135,7 +204,7 @@ export const useFlows = () => {
     );
 
     /**
-     * Create a new flow
+     * Create a new flow (local state only, for UI)
      */
     const createNewFlow = useCallback(
         (newId: string) => {
@@ -147,7 +216,7 @@ export const useFlows = () => {
     );
 
     /**
-     * Fetch logs for a block
+     * Fetch logs for a block/node
      */
     const getBlockLogs = useCallback(async (nodeId: string): Promise<LogEntry[]> => {
         return fetchBlockLogs(nodeId);
@@ -162,16 +231,27 @@ export const useFlows = () => {
         isSaving,
         lastSavedAt,
         isAutoSaveEnabled,
+        executionStatus,
+        activeRunId,
 
-        // Actions
+        // Actions - List & Load
         loadFlowsList,
         loadFlowById,
         loadFlowDesign,
+        getFlowById,
+
+        // Actions - CRUD
         saveCurrentFlow,
-        triggerAutoSave,
+        createNewFlowRemote,
+        deleteFlowById,
+
+        // Actions - Local State
         createNewFlow,
-        getBlockLogs,
         setFlowName,
         toggleAutoSave,
+        triggerAutoSave,
+
+        // Actions - Logs
+        getBlockLogs,
     };
 };

@@ -1,9 +1,8 @@
-import axios from 'axios';
-
-import { API_URL } from '@flows/web-core';
+import { api, withRetry } from '@flows/web-core';
 
 import { createPacket, loadFlow } from './flows';
 
+import type { WorkflowState } from '../types';
 import type {
     BlockDefinition,
     BlockView,
@@ -11,20 +10,10 @@ import type {
     ListResult,
     ProcessBody,
     ProcessResult,
-    WorkflowState,
 } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[blocks-api]');
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Create axios instance for API calls
-const apiClient = axios.create({
-    baseURL: API_URL,
-    timeout: 30000,
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
 
 /**
  * Execute headless workflow for component blocks
@@ -57,7 +46,7 @@ export const executeHeadlessWorkflow = async (
     return null;
 };
 
-// Mocked Block Definitions
+// Mocked Block Definitions (fallback when API is unavailable)
 const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
     {
         type: 'input-text',
@@ -224,7 +213,12 @@ const MOCKED_BLOCK_DEFINITIONS: BlockDefinition[] = [
             const subFlowState = await loadFlow(config.selectedFlowId);
             onProgress?.(30);
             if (!subFlowState) throw new Error('Failed to load sub-flow');
-            const result = await executeHeadlessWorkflow(subFlowState, inputs['in']);
+            // Convert SnapShotResult to WorkflowState format
+            const workflowState: WorkflowState = {
+                nodes: subFlowState.nodes as any[],
+                edges: subFlowState.edges as any[],
+            };
+            const result = await executeHeadlessWorkflow(workflowState, inputs['in']);
             onProgress?.(100);
             if (!result) throw new Error('Sub-flow produced no output');
             return { out: result };
@@ -262,7 +256,7 @@ const createExecuteFunction = (block: BlockDefinition): BlockDefinition['execute
 
         onProgress?.(10);
         const body: ProcessBody = { inputs, config };
-        const result = await apiClient.post<ProcessResult>(ep, body);
+        const result = await api.post<ProcessResult>(ep, body);
         _log(`> Received output from block[${id}]`);
         onProgress?.(100);
 
@@ -275,12 +269,18 @@ const createExecuteFunction = (block: BlockDefinition): BlockDefinition['execute
 
 /**
  * Fetch all available block definitions
+ * GET /blocks/0/list?cores=1
  */
 export const listBlocks = async (): Promise<BlockDefinition[]> => {
+    _log('> listBlocks()');
     await delay(500);
 
     try {
-        const response = await apiClient.get<ListResult<BlockView>>('/blocks/0/list?cores=1');
+        const response = await withRetry(
+            () => api.get<ListResult<BlockView>>('/blocks/0/list?cores=1'),
+            3,
+            'listBlocks'
+        );
         const list = response.data?.list
             ?.map(item => item?.$definition)
             .filter((def): def is BlockDefinition => !!def?.label)

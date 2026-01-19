@@ -1,144 +1,161 @@
-import type {
-    BlockDefinition,
-    BlockView,
-    DataPacket,
-    ListResult,
-    LogEntry,
-    ProcessBody,
-    ProcessResult,
-    WorkflowState,
-} from '@lemoncloud/eureka-flows-api';
+import { api, withRetry } from '@flows/web-core';
 
-const STORAGE_PREFIX = 'flow_mosaic_';
-const INDEX_KEY = 'flow_mosaic_index';
+import type { ApiListResult, FlowBody, FlowView, InputOverrideItem, SnapShotResult } from '../types';
+import type { BlockDefinition, DataPacket, LogEntry } from '@lemoncloud/eureka-flows-api';
+
 const _log = console.log.bind(console, '[flows-api]');
 
-// Type for Flow Metadata
-export interface FlowMeta {
-    id: string;
-    name: string;
-    updatedAt: number;
-}
+// ============================================================================
+// Flow CRUD API
+// ============================================================================
 
-// Helpers
-export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'): DataPacket => ({
-    value,
-    type,
-    timestamp: Date.now(),
-});
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Default Demo Workflow
-const DEFAULT_FLOW: WorkflowState = {
-    nodes: [
-        {
-            id: 'node-1',
-            type: 'input-text',
-            position: { x: 100, y: 150 },
-            config: { text: 'Hello Component!' },
-            status: 'IDLE',
-            inputData: {},
-            outputData: {},
-        },
-        {
-            id: 'node-2',
-            type: 'text-transform',
-            position: { x: 450, y: 150 },
-            config: { mode: 'uppercase' },
-            status: 'IDLE',
-            inputData: {},
-            outputData: {},
-        },
-    ],
-    connections: [
-        {
-            id: 'conn-1',
-            sourceNodeId: 'node-1',
-            sourcePortId: 'out',
-            targetNodeId: 'node-2',
-            targetPortId: 'in',
-        },
-    ],
+/**
+ * List all flows
+ * GET /flows
+ */
+export const listFlows = async (): Promise<FlowView[]> => {
+    _log('> listFlows()');
+    const response = await withRetry(() => api.get<ApiListResult<FlowView>>('/flows'), 3, 'listFlows');
+    return response.data.list || [];
 };
 
 /**
- * List all saved flows
+ * Get flow by ID
+ * GET /flows/:id
  */
-export const listFlows = async (): Promise<FlowMeta[]> => {
-    try {
-        const indexStr = localStorage.getItem(INDEX_KEY);
-        return indexStr ? JSON.parse(indexStr) : [];
-    } catch (e) {
-        return [];
+export const getFlow = async (id: string): Promise<FlowView> => {
+    _log(`> getFlow(${id})`);
+    const response = await api.get<FlowView>(`/flows/${id}`);
+    return response.data;
+};
+
+/**
+ * Get flow snapshot (complete state with nodes and edges)
+ * GET /flows/:id/snapshot
+ */
+export const getFlowSnapshot = async (id: string): Promise<SnapShotResult> => {
+    _log(`> getFlowSnapshot(${id})`);
+    const response = await withRetry(() => api.get<SnapShotResult>(`/flows/${id}/snapshot`), 3, 'getFlowSnapshot');
+    return response.data;
+};
+
+/**
+ * Create new flow
+ * POST /flows/0
+ */
+export const createFlow = async (body: FlowBody): Promise<FlowView> => {
+    _log('> createFlow()', body);
+    const response = await api.post<FlowView>('/flows/0', body);
+    return response.data;
+};
+
+/**
+ * Update existing flow
+ * POST /flows/:id
+ */
+export const updateFlow = async (id: string, body: FlowBody): Promise<FlowView> => {
+    _log(`> updateFlow(${id})`, body);
+    const response = await api.post<FlowView>(`/flows/${id}`, body);
+    return response.data;
+};
+
+/**
+ * Delete flow
+ * DELETE /flows/:id
+ */
+export const deleteFlow = async (id: string): Promise<void> => {
+    _log(`> deleteFlow(${id})`);
+    await api.delete(`/flows/${id}`);
+};
+
+// ============================================================================
+// Flow Execution API
+// ============================================================================
+
+/**
+ * Run flow execution starting from a specific node
+ * POST /flows/:flowId/run?nodeId=xxx&propagate=true
+ */
+export const runFlow = async (
+    flowId: string,
+    nodeId: string,
+    options?: {
+        propagate?: boolean;
+        inputOverrides?: InputOverrideItem[];
     }
+): Promise<FlowView> => {
+    _log(`> runFlow(${flowId}, ${nodeId})`, options);
+    const propagate = options?.propagate ?? true;
+    const response = await api.post<FlowView>(`/flows/${flowId}/run?nodeId=${nodeId}&propagate=${propagate}`, {
+        inputOverrides: options?.inputOverrides,
+    });
+    return response.data;
 };
 
 /**
- * Load a flow by ID or return the default flow
+ * Stop flow execution
+ * POST /flows/:flowId/stop
  */
-export const loadFlow = async (id?: string): Promise<WorkflowState> => {
-    await delay(300);
+export const stopFlow = async (flowId: string, nodeId?: string): Promise<FlowView> => {
+    _log(`> stopFlow(${flowId}, ${nodeId ?? 'all'})`);
+    const params = nodeId ? `?nodeId=${nodeId}` : '';
+    const response = await api.post<FlowView>(`/flows/${flowId}/stop${params}`);
+    return response.data;
+};
 
+// ============================================================================
+// Legacy API (for backward compatibility during migration)
+// ============================================================================
+
+/**
+ * @deprecated Use getFlowSnapshot instead
+ * Load flow by ID - legacy function that returns WorkflowState format
+ */
+export const loadFlow = async (id?: string): Promise<SnapShotResult | null> => {
+    _log(`> loadFlow(${id ?? 'default'})`);
     if (!id) {
-        const list = await listFlows();
-        if (list.length > 0) {
-            id = list[0].id;
-        } else {
-            return JSON.parse(JSON.stringify(DEFAULT_FLOW));
+        const flows = await listFlows();
+        if (flows.length > 0 && flows[0].id) {
+            return getFlowSnapshot(flows[0].id);
         }
+        return null;
     }
-
-    try {
-        const stored = localStorage.getItem(STORAGE_PREFIX + id);
-        if (stored) {
-            return JSON.parse(stored);
-        }
-    } catch (e) {
-        console.error('Failed to load', e);
-    }
-
-    return JSON.parse(JSON.stringify(DEFAULT_FLOW));
+    return getFlowSnapshot(id);
 };
 
 /**
+ * @deprecated Use getFlowSnapshot instead
  * Load flow design (alias for loadFlow)
  */
-export const loadDesign = async (id?: string): Promise<WorkflowState> => {
+export const loadDesign = async (id?: string): Promise<SnapShotResult | null> => {
     return loadFlow(id);
 };
 
 /**
- * Save a flow with a name
+ * @deprecated Use createFlow or updateFlow instead
+ * Save flow with a name
  */
-export const saveFlow = async (
-    state: WorkflowState,
-    name: string
-): Promise<{ success: boolean; id: string }> => {
-    await delay(300);
+export const saveFlow = async (_state: unknown, name: string): Promise<{ success: boolean; id: string }> => {
+    _log(`> saveFlow(${name}) - deprecated, use createFlow/updateFlow`);
     try {
-        const list = await listFlows();
-        const existing = list.find(f => f.name === name);
-        const id = existing ? existing.id : Math.random().toString(36).slice(2, 11);
+        const flows = await listFlows();
+        const existing = flows.find(f => f.name === name);
 
-        localStorage.setItem(STORAGE_PREFIX + id, JSON.stringify(state));
-
-        if (!existing) {
-            const newMeta: FlowMeta = { id, name, updatedAt: Date.now() };
-            localStorage.setItem(INDEX_KEY, JSON.stringify([...list, newMeta]));
+        if (existing?.id) {
+            await updateFlow(existing.id, { name });
+            return { success: true, id: existing.id };
         } else {
-            const updatedList = list.map(f => (f.id === id ? { ...f, updatedAt: Date.now() } : f));
-            localStorage.setItem(INDEX_KEY, JSON.stringify(updatedList));
+            const created = await createFlow({ name });
+            return { success: true, id: created.id || '' };
         }
-
-        return { success: true, id };
     } catch (e) {
-        console.error('Failed to save', e);
+        console.error('Failed to save flow:', e);
         return { success: false, id: '' };
     }
 };
 
 /**
+ * @deprecated No longer needed with remote API
  * Reset flow to default
  */
 export const resetFlow = async (): Promise<boolean> => {
@@ -146,11 +163,16 @@ export const resetFlow = async (): Promise<boolean> => {
 };
 
 /**
- * Fetch execution logs for a block
+ * Fetch execution logs for a node
+ * TODO: Implement actual API call when endpoint is available
  */
 export const fetchBlockLogs = async (nodeId: string): Promise<LogEntry[]> => {
-    await delay(500);
+    _log(`> fetchBlockLogs(${nodeId})`);
+    // TODO: Replace with actual API call
+    // const response = await api.get<ApiListResult<LogEntry>>(`/nodes/${nodeId}/logs`);
+    // return response.data.list || [];
 
+    // Temporary mock data
     const now = Date.now();
     const randomLogs: LogEntry[] = [];
     const count = Math.floor(Math.random() * 10) + 5;
@@ -176,5 +198,19 @@ export const fetchBlockLogs = async (nodeId: string): Promise<LogEntry[]> => {
     return randomLogs.reverse();
 };
 
-// Re-export types
-export type { BlockDefinition, BlockView, DataPacket, ListResult, LogEntry, ProcessBody, ProcessResult, WorkflowState };
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Create a DataPacket
+ */
+export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'): DataPacket => ({
+    value,
+    type,
+    timestamp: Date.now(),
+});
+
+// Re-export types for convenience
+export type { BlockDefinition, DataPacket, LogEntry };
+export type { FlowView, FlowBody, SnapShotResult, InputOverrideItem } from '../types';
