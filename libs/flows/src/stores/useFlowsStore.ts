@@ -1,8 +1,15 @@
 import { create } from 'zustand';
 
-import type { FlowExecutionStatus, FlowView } from '../types';
+import type { FlowView } from '../types';
 import type { BlockDefinition } from '@lemoncloud/eureka-flows-api';
 
+/**
+ * FlowsStore - manages flow metadata and block registry
+ *
+ * NOTE: Execution state is managed at the NODE level, not flow level.
+ * Each node has its own `status`, `executionStats`, `errorMessage`.
+ * See useCanvasStore for node-level state management.
+ */
 interface FlowsState {
     // Block Registry
     blockRegistry: Record<string, BlockDefinition>;
@@ -12,10 +19,6 @@ interface FlowsState {
     currentFlowId: string | null;
     flowName: string;
     flows: FlowView[];
-
-    // Execution State (NEW)
-    executionStatus: FlowExecutionStatus;
-    activeRunId: string | null;
 
     // Loading States
     isLoading: boolean;
@@ -36,12 +39,6 @@ interface FlowsState {
     setLastSavedAt: (date: Date | null) => void;
     setAutoSaveEnabled: (enabled: boolean) => void;
     toggleAutoSave: () => void;
-
-    // Execution Actions (NEW)
-    setExecutionStatus: (status: FlowExecutionStatus) => void;
-    setActiveRunId: (runId: string | null) => void;
-    startExecution: (runId: string) => void;
-    stopExecution: () => void;
 }
 
 export const useFlowsStore = create<FlowsState>((set, _get) => ({
@@ -51,8 +48,6 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     currentFlowId: null,
     flowName: 'Untitled Workflow',
     flows: [],
-    executionStatus: 'idle',
-    activeRunId: null,
     isLoading: false,
     isSaving: false,
     lastSavedAt: null,
@@ -84,23 +79,6 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     setAutoSaveEnabled: enabled => set({ isAutoSaveEnabled: enabled }),
 
     toggleAutoSave: () => set(state => ({ isAutoSaveEnabled: !state.isAutoSaveEnabled })),
-
-    // Execution Actions
-    setExecutionStatus: status => set({ executionStatus: status }),
-
-    setActiveRunId: runId => set({ activeRunId: runId }),
-
-    startExecution: runId =>
-        set({
-            executionStatus: 'running',
-            activeRunId: runId,
-        }),
-
-    stopExecution: () =>
-        set({
-            executionStatus: 'idle',
-            activeRunId: null,
-        }),
 }));
 
 // Selector hooks for better performance
@@ -113,5 +91,3 @@ export const useIsFlowLoading = () => useFlowsStore(state => state.isLoading);
 export const useIsSaving = () => useFlowsStore(state => state.isSaving);
 export const useLastSavedAt = () => useFlowsStore(state => state.lastSavedAt);
 export const useIsAutoSaveEnabled = () => useFlowsStore(state => state.isAutoSaveEnabled);
-export const useExecutionStatus = () => useFlowsStore(state => state.executionStatus);
-export const useActiveRunId = () => useFlowsStore(state => state.activeRunId);

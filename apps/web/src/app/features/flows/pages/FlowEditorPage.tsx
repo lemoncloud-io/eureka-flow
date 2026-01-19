@@ -56,8 +56,12 @@ export const FlowEditorPage = () => {
         }
     }, []);
 
-    // Boot sequence
+    // Boot sequence - run only once on mount
+    const bootedRef = useRef(false);
     useEffect(() => {
+        if (bootedRef.current) return;
+        bootedRef.current = true;
+
         const boot = async () => {
             try {
                 setLoadingText('Loading Block Registry...');
@@ -96,7 +100,8 @@ export const FlowEditorPage = () => {
         };
 
         boot();
-    }, [loadBlocks, loadFlowById, createNewFlow, updateUrl]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Auto save logic
     const triggerAutoSave = useCallback(() => {

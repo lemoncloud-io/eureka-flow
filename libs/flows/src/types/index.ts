@@ -37,21 +37,18 @@ export type FlowStereo = '' | '#' | '#template';
 export type FlowState = 'draft' | 'active' | 'archived';
 
 /**
- * FlowExecutionStatus - runtime execution status of flow
- */
-export type FlowExecutionStatus = 'idle' | 'running' | 'completed' | 'error';
-
-/**
  * FlowModel - flow model for CRUD operations
+ *
+ * NOTE: Execution state (running/completed/error) is managed at NODE level,
+ * not flow level. Each node has its own `status` field.
+ * Flow only stores lifecycle state (draft/active/archived).
  */
 export interface FlowModel {
     id?: string;
     stereo?: FlowStereo;
     name?: string;
     state?: FlowState;
-    executionStatus?: FlowExecutionStatus;
     description?: string;
-    activeRunId?: string;
     seq?: number;
     meta?: unknown;
     createdAt?: string;
@@ -147,6 +144,10 @@ export interface DataPacketItem {
 
 /**
  * NodeModel - extended node model for backend
+ *
+ * Execution state is managed at node level:
+ * - status: IDLE → RUNNING → COMPLETED/ERROR
+ * - autoExecutionEnabled: auto-trigger on inputData change
  */
 export interface NodeModel {
     id?: string;
@@ -178,6 +179,11 @@ export interface NodeModel {
     runId?: string;
     lastGoodOutput$$?: DataPacketItem[];
     disabled?: boolean;
+    /**
+     * If true, node auto-executes when inputData.timestamp changes
+     * This enables reactive chain execution
+     */
+    autoExecutionEnabled?: boolean;
     createdAt?: string;
     updatedAt?: string;
 }

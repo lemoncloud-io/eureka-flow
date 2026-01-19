@@ -1,165 +1,162 @@
 import { useCallback, useRef } from 'react';
 
-import { createFlow, deleteFlow, fetchBlockLogs, getFlow, getFlowSnapshot, listFlows, updateFlow } from '../api';
+import { fetchBlockLogs } from '../api';
+import {
+    useCreateFlowMutation,
+    useDeleteFlowMutation,
+    useFlowQuery,
+    useFlowSnapshotQuery,
+    useFlowsListQuery,
+    useUpdateFlowMutation,
+} from './queries';
 import { useFlowsStore } from '../stores/useFlowsStore';
 
-import type { FlowBody, FlowView, SnapShotResult } from '../types';
+import type { FlowBody, SnapShotResult } from '../types';
 import type { LogEntry } from '@lemoncloud/eureka-flows-api';
 
 /**
  * Hook for managing workflows/flows
+ *
+ * Uses TanStack Query for server state management.
+ * Zustand store is used only for UI state (currentFlowId, flowName, autoSave settings).
+ *
+ * NOTE: Execution state is managed at the NODE level via useExecution hook.
+ * This hook only manages flow metadata (name, list, save/load).
  */
 export const useFlows = () => {
     const {
         currentFlowId,
         flowName,
-        flows,
-        isLoading,
-        isSaving,
-        lastSavedAt,
         isAutoSaveEnabled,
-        executionStatus,
-        activeRunId,
         setCurrentFlowId,
         setFlowName,
-        setFlows,
-        setLoading,
-        setSaving,
         setLastSavedAt,
         toggleAutoSave,
     } = useFlowsStore();
 
     const autoSaveTimerRef = useRef<number | null>(null);
 
+    // TanStack Query hooks
+    const flowsListQuery = useFlowsListQuery();
+    const flowQuery = useFlowQuery(currentFlowId);
+    const flowSnapshotQuery = useFlowSnapshotQuery(currentFlowId);
+
+    // TanStack Mutations
+    const createFlowMutation = useCreateFlowMutation();
+    const updateFlowMutation = useUpdateFlowMutation();
+    const deleteFlowMutation = useDeleteFlowMutation();
+
     /**
-     * Load all available flows from API
+     * Load all available flows from API (refetch)
      */
-    const loadFlowsList = useCallback(async (): Promise<FlowView[]> => {
-        try {
-            const flowsList = await listFlows();
-            setFlows(flowsList);
-            return flowsList;
-        } catch (error) {
-            console.error('Failed to load flows list:', error);
-            return [];
-        }
-    }, [setFlows]);
+    const loadFlowsList = useCallback(async () => {
+        const result = await flowsListQuery.refetch();
+        return result.data ?? [];
+    }, [flowsListQuery]);
 
     /**
      * Load a specific flow by ID
      */
     const loadFlowById = useCallback(
         async (id?: string): Promise<SnapShotResult | null> => {
-            setLoading(true);
-            try {
-                if (!id) {
-                    const flowsList = await listFlows();
-                    if (flowsList.length > 0 && flowsList[0].id) {
-                        id = flowsList[0].id;
-                    } else {
-                        return null;
-                    }
+            if (!id) {
+                // Get first flow from list
+                const listResult = await flowsListQuery.refetch();
+                const flows = listResult.data ?? [];
+                if (flows.length > 0 && flows[0].id) {
+                    id = flows[0].id;
+                } else {
+                    return null;
                 }
-
-                const snapshot = await getFlowSnapshot(id);
-                setCurrentFlowId(id);
-                if (snapshot.name) {
-                    setFlowName(snapshot.name);
-                }
-                return snapshot;
-            } catch (error) {
-                console.error('Failed to load flow:', error);
-                throw error;
-            } finally {
-                setLoading(false);
             }
+
+            setCurrentFlowId(id);
+            const result = await flowSnapshotQuery.refetch();
+            if (result.data?.name) {
+                setFlowName(result.data.name);
+            }
+            return result.data ?? null;
         },
-        [setLoading, setCurrentFlowId, setFlowName]
+        [flowsListQuery, flowSnapshotQuery, setCurrentFlowId, setFlowName]
     );
 
     /**
      * Load flow design (snapshot) by ID
+     * Note: For a different ID than currentFlowId, use useFlowSnapshotQuery directly
      */
     const loadFlowDesign = useCallback(
-        async (id: string): Promise<SnapShotResult> => {
-            setLoading(true);
-            try {
-                const snapshot = await getFlowSnapshot(id);
-                return snapshot;
-            } catch (error) {
-                console.error('Failed to load design:', error);
-                throw error;
-            } finally {
-                setLoading(false);
+        async (id: string): Promise<SnapShotResult | null> => {
+            if (id === currentFlowId) {
+                const result = await flowSnapshotQuery.refetch();
+                return result.data ?? null;
             }
+            // For different ID, set it as current and refetch
+            setCurrentFlowId(id);
+            const result = await flowSnapshotQuery.refetch();
+            return result.data ?? null;
         },
-        [setLoading]
+        [currentFlowId, flowSnapshotQuery, setCurrentFlowId]
     );
 
     /**
      * Get flow metadata by ID
      */
-    const getFlowById = useCallback(async (id: string): Promise<FlowView> => {
-        return getFlow(id);
-    }, []);
+    const getFlowById = useCallback(
+        async (id: string) => {
+            if (id === currentFlowId && flowQuery.data) {
+                return flowQuery.data;
+            }
+            // For different ID, refetch
+            const result = await flowQuery.refetch();
+            return result.data;
+        },
+        [currentFlowId, flowQuery]
+    );
 
     /**
      * Save current flow (create or update)
      */
     const saveCurrentFlow = useCallback(
-        async (body: FlowBody, silent = false): Promise<{ success: boolean; id: string }> => {
-            if (!silent) setLoading(true);
-            else setSaving(true);
-
+        async (body: FlowBody, _silent = false): Promise<{ success: boolean; id: string }> => {
             try {
-                let result: FlowView;
-
                 if (currentFlowId) {
                     // Update existing flow
-                    result = await updateFlow(currentFlowId, { ...body, name: flowName });
+                    const result = await updateFlowMutation.mutateAsync({
+                        id: currentFlowId,
+                        body: { ...body, name: flowName },
+                    });
+                    setLastSavedAt(new Date());
+                    return { success: true, id: result.id || '' };
                 } else {
                     // Create new flow
-                    result = await createFlow({ ...body, name: flowName });
+                    const result = await createFlowMutation.mutateAsync({ ...body, name: flowName });
                     if (result.id) {
                         setCurrentFlowId(result.id);
                     }
+                    setLastSavedAt(new Date());
+                    return { success: true, id: result.id || '' };
                 }
-
-                setLastSavedAt(new Date());
-                return { success: true, id: result.id || '' };
             } catch (error) {
                 console.error('Failed to save flow:', error);
                 return { success: false, id: '' };
-            } finally {
-                if (!silent) setLoading(false);
-                else setTimeout(() => setSaving(false), 500);
             }
         },
-        [flowName, currentFlowId, setLoading, setSaving, setLastSavedAt, setCurrentFlowId]
+        [flowName, currentFlowId, updateFlowMutation, createFlowMutation, setLastSavedAt, setCurrentFlowId]
     );
 
     /**
      * Create a new flow
      */
     const createNewFlowRemote = useCallback(
-        async (name: string, body?: FlowBody): Promise<FlowView> => {
-            setLoading(true);
-            try {
-                const result = await createFlow({ name, ...body });
-                if (result.id) {
-                    setCurrentFlowId(result.id);
-                    setFlowName(name);
-                }
-                await loadFlowsList();
-                return result;
-            } catch (error) {
-                console.error('Failed to create flow:', error);
-                throw error;
-            } finally {
-                setLoading(false);
+        async (name: string, body?: FlowBody) => {
+            const result = await createFlowMutation.mutateAsync({ name, ...body });
+            if (result.id) {
+                setCurrentFlowId(result.id);
+                setFlowName(name);
             }
+            return result;
         },
-        [setLoading, setCurrentFlowId, setFlowName, loadFlowsList]
+        [createFlowMutation, setCurrentFlowId, setFlowName]
     );
 
     /**
@@ -167,22 +164,13 @@ export const useFlows = () => {
      */
     const deleteFlowById = useCallback(
         async (id: string): Promise<void> => {
-            setLoading(true);
-            try {
-                await deleteFlow(id);
-                if (currentFlowId === id) {
-                    setCurrentFlowId(null);
-                    setFlowName('Untitled Workflow');
-                }
-                await loadFlowsList();
-            } catch (error) {
-                console.error('Failed to delete flow:', error);
-                throw error;
-            } finally {
-                setLoading(false);
+            await deleteFlowMutation.mutateAsync(id);
+            if (currentFlowId === id) {
+                setCurrentFlowId(null);
+                setFlowName('Untitled Workflow');
             }
         },
-        [currentFlowId, setLoading, setCurrentFlowId, setFlowName, loadFlowsList]
+        [currentFlowId, deleteFlowMutation, setCurrentFlowId, setFlowName]
     );
 
     /**
@@ -222,17 +210,27 @@ export const useFlows = () => {
         return fetchBlockLogs(nodeId);
     }, []);
 
+    // Derive loading/saving states from TanStack Query
+    const isLoading =
+        flowsListQuery.isLoading || flowQuery.isLoading || flowSnapshotQuery.isLoading || flowSnapshotQuery.isFetching;
+
+    const isSaving = createFlowMutation.isPending || updateFlowMutation.isPending;
+
+    // Get lastSavedAt from store (set after successful save)
+    const { lastSavedAt } = useFlowsStore();
+
     return {
-        // State
+        // State (derived from TanStack Query)
         currentFlowId,
         flowName,
-        flows,
+        flows: flowsListQuery.data ?? [],
         isLoading,
         isSaving,
         lastSavedAt,
         isAutoSaveEnabled,
-        executionStatus,
-        activeRunId,
+
+        // Query data
+        flowSnapshot: flowSnapshotQuery.data,
 
         // Actions - List & Load
         loadFlowsList,
@@ -253,5 +251,9 @@ export const useFlows = () => {
 
         // Actions - Logs
         getBlockLogs,
+
+        // Query states for advanced usage
+        flowsListQuery,
+        flowSnapshotQuery,
     };
 };

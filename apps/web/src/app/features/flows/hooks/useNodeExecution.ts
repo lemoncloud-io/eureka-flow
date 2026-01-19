@@ -22,13 +22,19 @@ interface UseNodeExecutionReturn {
 export const useNodeExecution = (options: UseNodeExecutionOptions): UseNodeExecutionReturn => {
     const { readOnly = false, blockRegistry, nodes, connections, setNodes, onError } = options;
 
+    // Use refs to avoid recreating callbacks when nodes/connections change
+    const nodesRef = useRef(nodes);
+    const connectionsRef = useRef(connections);
+    nodesRef.current = nodes;
+    connectionsRef.current = connections;
+
     const nodeInputHashesRef = useRef<Map<string, string>>(new Map());
     const isExecutingRef = useRef(false);
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const propagateOutputs = useCallback(
         (sourceNodeId: string, outputs: Record<string, DataPacket>) => {
-            const relevantConnections = connections.filter(c => c.sourceNodeId === sourceNodeId);
+            const relevantConnections = connectionsRef.current.filter(c => c.sourceNodeId === sourceNodeId);
             if (relevantConnections.length === 0) return;
 
             setNodes(prevNodes => {
@@ -57,7 +63,7 @@ export const useNodeExecution = (options: UseNodeExecutionOptions): UseNodeExecu
                 return hasChanges ? nextNodes : prevNodes;
             });
         },
-        [connections, setNodes]
+        [setNodes]
     );
 
     const executeNode = useCallback(
@@ -83,7 +89,7 @@ export const useNodeExecution = (options: UseNodeExecutionOptions): UseNodeExecu
                 )
             );
 
-            const currentNode = nodes.find(n => n.id === nodeId);
+            const currentNode = nodesRef.current.find(n => n.id === nodeId);
             if (!currentNode) return;
 
             const inputs = manualOverrideInputs || currentNode.inputData;
@@ -166,7 +172,7 @@ export const useNodeExecution = (options: UseNodeExecutionOptions): UseNodeExecu
                 onError?.(nodeId, errorMessage);
             }
         },
-        [readOnly, nodes, blockRegistry, setNodes, propagateOutputs, onError]
+        [readOnly, blockRegistry, setNodes, propagateOutputs, onError]
     );
 
     const executeAllFromStart = useCallback(async () => {
@@ -176,7 +182,7 @@ export const useNodeExecution = (options: UseNodeExecutionOptions): UseNodeExecu
         abortControllerRef.current = new AbortController();
 
         // Find start nodes (nodes with no inputs or input nodes)
-        const startNodes = nodes.filter(node => {
+        const startNodes = nodesRef.current.filter(node => {
             const def = blockRegistry[node.type];
             if (!def) return false;
             return def.inputs.length === 0;
@@ -199,7 +205,7 @@ export const useNodeExecution = (options: UseNodeExecutionOptions): UseNodeExecu
         }
 
         isExecutingRef.current = false;
-    }, [readOnly, nodes, blockRegistry, setNodes, executeNode]);
+    }, [readOnly, blockRegistry, setNodes, executeNode]);
 
     const stopExecution = useCallback(() => {
         abortControllerRef.current?.abort();
