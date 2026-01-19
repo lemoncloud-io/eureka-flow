@@ -38,10 +38,8 @@ interface CanvasState {
     // Core Data
     nodes: NodeData[];
     connections: Connection[];
-    /** @new edges - primary field for edge data (same as connections but clearer naming) */
-    edges: EdgeView[];
 
-    // Flow Context (NEW)
+    // Flow Context
     flowId: string | null;
 
     // Clipboard
@@ -70,7 +68,6 @@ interface CanvasState {
     // Actions - Core Data
     setNodes: (nodes: NodeData[] | ((prev: NodeData[]) => NodeData[])) => void;
     setConnections: (connections: Connection[] | ((prev: Connection[]) => Connection[])) => void;
-    setEdges: (edges: EdgeView[] | ((prev: EdgeView[]) => EdgeView[])) => void;
     setFlowId: (flowId: string | null) => void;
     setClipboard: (node: NodeData | null) => void;
 
@@ -108,12 +105,9 @@ interface CanvasState {
     deleteNode: (nodeId: string) => void;
 
     // Connection Actions
+    addConnection: (connection: Connection) => void;
+    updateConnection: (connectionId: string, updates: Partial<Connection>) => void;
     deleteConnection: (connectionId: string) => void;
-
-    // Edge Actions (NEW)
-    addEdge: (edge: EdgeView) => void;
-    updateEdge: (edgeId: string, updates: Partial<EdgeView>) => void;
-    deleteEdge: (edgeId: string) => void;
 }
 
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
@@ -122,7 +116,6 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
     // Initial State
     nodes: [],
     connections: [],
-    edges: [],
     flowId: null,
     clipboard: null,
     viewport: DEFAULT_VIEWPORT,
@@ -145,11 +138,6 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
     setConnections: connections =>
         set(state => ({
             connections: typeof connections === 'function' ? connections(state.connections) : connections,
-        })),
-
-    setEdges: edges =>
-        set(state => ({
-            edges: typeof edges === 'function' ? edges(state.edges) : edges,
         })),
 
     setFlowId: flowId => set({ flowId }),
@@ -193,19 +181,10 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
     loadWorkflow: (workflowState, flowId) => {
         // Support both old (connections) and new (edges) format
         const connections = workflowState.connections || workflowState.edges || [];
-        const edges: EdgeView[] = (workflowState.edges || workflowState.connections || []).map(e => ({
-            id: e.id,
-            sourceNodeId: e.sourceNodeId,
-            sourcePortId: e.sourcePortId,
-            targetNodeId: e.targetNodeId,
-            targetPortId: e.targetPortId,
-            label: e.label,
-        }));
 
         set({
             nodes: workflowState.nodes,
             connections: connections as Connection[],
-            edges,
             flowId: flowId || null,
             selectedNodeId: null,
             selectedConnectionId: null,
@@ -216,7 +195,6 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
         set({
             nodes: [],
             connections: [],
-            edges: [],
             flowId: null,
             selectedNodeId: null,
             selectedConnectionId: null,
@@ -226,7 +204,6 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
         set({
             nodes: [],
             connections: [],
-            edges: [],
             flowId: null,
             viewport: DEFAULT_VIEWPORT,
             selectedNodeId: null,
@@ -251,65 +228,30 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
         set(state => ({
             nodes: state.nodes.filter(n => n.id !== nodeId),
             connections: state.connections.filter(c => c.sourceNodeId !== nodeId && c.targetNodeId !== nodeId),
-            edges: state.edges.filter(e => e.sourceNodeId !== nodeId && e.targetNodeId !== nodeId),
             selectedNodeId: state.selectedNodeId === nodeId ? null : state.selectedNodeId,
         })),
 
     // Connection Actions
+    addConnection: connection =>
+        set(state => ({
+            connections: [...state.connections, connection],
+        })),
+
+    updateConnection: (connectionId, updates) =>
+        set(state => ({
+            connections: state.connections.map(c => (c.id === connectionId ? { ...c, ...updates } : c)),
+        })),
+
     deleteConnection: connectionId =>
         set(state => ({
             connections: state.connections.filter(c => c.id !== connectionId),
-            edges: state.edges.filter(e => e.id !== connectionId),
             selectedConnectionId: state.selectedConnectionId === connectionId ? null : state.selectedConnectionId,
-        })),
-
-    // Edge Actions
-    addEdge: edge =>
-        set(state => ({
-            edges: [...state.edges, edge],
-            // Also add to connections for backward compatibility
-            connections: [
-                ...state.connections,
-                {
-                    id: edge.id || '',
-                    sourceNodeId: edge.sourceNodeId || '',
-                    sourcePortId: edge.sourcePortId || '',
-                    targetNodeId: edge.targetNodeId || '',
-                    targetPortId: edge.targetPortId || '',
-                    label: edge.label,
-                },
-            ],
-        })),
-
-    updateEdge: (edgeId, updates) =>
-        set(state => ({
-            edges: state.edges.map(e => (e.id === edgeId ? { ...e, ...updates } : e)),
-            connections: state.connections.map(c =>
-                c.id === edgeId
-                    ? {
-                          ...c,
-                          ...(updates.sourceNodeId && { sourceNodeId: updates.sourceNodeId }),
-                          ...(updates.sourcePortId && { sourcePortId: updates.sourcePortId }),
-                          ...(updates.targetNodeId && { targetNodeId: updates.targetNodeId }),
-                          ...(updates.targetPortId && { targetPortId: updates.targetPortId }),
-                          ...(updates.label !== undefined && { label: updates.label }),
-                      }
-                    : c
-            ),
-        })),
-
-    deleteEdge: edgeId =>
-        set(state => ({
-            edges: state.edges.filter(e => e.id !== edgeId),
-            connections: state.connections.filter(c => c.id !== edgeId),
-            selectedConnectionId: state.selectedConnectionId === edgeId ? null : state.selectedConnectionId,
         })),
 }));
 
 // Selector hooks for better performance
 export const useCanvasNodes = () => useCanvasStore(state => state.nodes);
 export const useCanvasConnections = () => useCanvasStore(state => state.connections);
-export const useCanvasEdges = () => useCanvasStore(state => state.edges);
 export const useCanvasFlowId = () => useCanvasStore(state => state.flowId);
 export const useCanvasViewport = () => useCanvasStore(state => state.viewport);
 export const useCanvasSelectedNodeId = () => useCanvasStore(state => state.selectedNodeId);
@@ -317,3 +259,18 @@ export const useCanvasSelectedConnectionId = () => useCanvasStore(state => state
 export const useCanvasClipboard = () => useCanvasStore(state => state.clipboard);
 export const useCanvasDragState = () => useCanvasStore(state => state.dragState);
 export const useCanvasConnectionDraft = () => useCanvasStore(state => state.connectionDraft);
+
+/**
+ * Selector to get connections as EdgeView format (for API compatibility)
+ */
+export const useCanvasEdges = (): EdgeView[] =>
+    useCanvasStore(state =>
+        state.connections.map(c => ({
+            id: c.id,
+            sourceNodeId: c.sourceNodeId,
+            sourcePortId: c.sourcePortId,
+            targetNodeId: c.targetNodeId,
+            targetPortId: c.targetPortId,
+            label: c.label,
+        }))
+    );

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ScrollText, X } from 'lucide-react';
 
-import { fetchBlockLogs, loadFlow, useBlockRegistry } from '@flows/flows';
+import { fetchBlockLogs, getFlowSnapshot, useBlockRegistry } from '@flows/flows';
 
 import { ConnectionLine } from './ConnectionLine';
 import { DetailPanel } from './DetailPanel';
@@ -287,7 +287,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         // Load Sub-Flow for Modal
         useEffect(() => {
             if (modalFlowId) {
-                loadFlow(modalFlowId).then(setModalFlowData);
+                getFlowSnapshot(modalFlowId)
+                    .then(setModalFlowData)
+                    .catch(() => setModalFlowData(null));
             } else {
                 setModalFlowData(null);
             }

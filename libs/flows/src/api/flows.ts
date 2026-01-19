@@ -51,11 +51,11 @@ export const createFlow = async (body: FlowBody): Promise<FlowView> => {
 
 /**
  * Update existing flow
- * POST /flows/:id
+ * PUT /flows/:id
  */
 export const updateFlow = async (id: string, body: FlowBody): Promise<FlowView> => {
     _log(`> updateFlow(${id})`, body);
-    const response = await api.post<FlowView>(`/flows/${id}`, body);
+    const response = await api.put<FlowView>(`/flows/${id}`, body);
     return response.data;
 };
 
@@ -104,63 +104,8 @@ export const stopFlow = async (flowId: string, nodeId?: string): Promise<FlowVie
 };
 
 // ============================================================================
-// Legacy API (for backward compatibility during migration)
+// Block Logs API
 // ============================================================================
-
-/**
- * @deprecated Use getFlowSnapshot instead
- * Load flow by ID - legacy function that returns WorkflowState format
- */
-export const loadFlow = async (id?: string): Promise<SnapShotResult | null> => {
-    _log(`> loadFlow(${id ?? 'default'})`);
-    if (!id) {
-        const flows = await listFlows();
-        if (flows.length > 0 && flows[0].id) {
-            return getFlowSnapshot(flows[0].id);
-        }
-        return null;
-    }
-    return getFlowSnapshot(id);
-};
-
-/**
- * @deprecated Use getFlowSnapshot instead
- * Load flow design (alias for loadFlow)
- */
-export const loadDesign = async (id?: string): Promise<SnapShotResult | null> => {
-    return loadFlow(id);
-};
-
-/**
- * @deprecated Use createFlow or updateFlow instead
- * Save flow with a name
- */
-export const saveFlow = async (_state: unknown, name: string): Promise<{ success: boolean; id: string }> => {
-    _log(`> saveFlow(${name}) - deprecated, use createFlow/updateFlow`);
-    try {
-        const flows = await listFlows();
-        const existing = flows.find(f => f.name === name);
-
-        if (existing?.id) {
-            await updateFlow(existing.id, { name });
-            return { success: true, id: existing.id };
-        } else {
-            const created = await createFlow({ name });
-            return { success: true, id: created.id || '' };
-        }
-    } catch (e) {
-        console.error('Failed to save flow:', e);
-        return { success: false, id: '' };
-    }
-};
-
-/**
- * @deprecated No longer needed with remote API
- * Reset flow to default
- */
-export const resetFlow = async (): Promise<boolean> => {
-    return true;
-};
 
 /**
  * Fetch execution logs for a node
@@ -168,34 +113,10 @@ export const resetFlow = async (): Promise<boolean> => {
  */
 export const fetchBlockLogs = async (nodeId: string): Promise<LogEntry[]> => {
     _log(`> fetchBlockLogs(${nodeId})`);
-    // TODO: Replace with actual API call
+    // TODO: Replace with actual API call when endpoint is available
     // const response = await api.get<ApiListResult<LogEntry>>(`/nodes/${nodeId}/logs`);
     // return response.data.list || [];
-
-    // Temporary mock data
-    const now = Date.now();
-    const randomLogs: LogEntry[] = [];
-    const count = Math.floor(Math.random() * 10) + 5;
-
-    for (let i = 0; i < count; i++) {
-        const timeOffset = (count - i) * 1000 * 60;
-        const isError = Math.random() > 0.8;
-        const isWarn = Math.random() > 0.7;
-
-        randomLogs.push({
-            id: Math.random().toString(36).slice(2, 11),
-            timestamp: new Date(now - timeOffset).toISOString(),
-            type: i === 0 ? 'INIT' : 'EXECUTION',
-            level: isError ? 'ERROR' : isWarn ? 'WARN' : 'INFO',
-            message: isError
-                ? `Failed to process input data at index ${i}`
-                : isWarn
-                  ? `High latency detected during step ${i}`
-                  : `Successfully processed chunk ${i}`,
-        });
-    }
-
-    return randomLogs.reverse();
+    return [];
 };
 
 // ============================================================================

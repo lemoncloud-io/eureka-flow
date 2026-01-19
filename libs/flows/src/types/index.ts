@@ -267,3 +267,81 @@ export interface ApiListResult<T> {
     page?: number;
     limit?: number;
 }
+
+// ============================================================================
+// Error Types
+// ============================================================================
+
+/**
+ * API error codes
+ */
+export type ApiErrorCode =
+    | 'NETWORK_ERROR'
+    | 'UNAUTHORIZED'
+    | 'FORBIDDEN'
+    | 'NOT_FOUND'
+    | 'VALIDATION_ERROR'
+    | 'SERVER_ERROR'
+    | 'TIMEOUT'
+    | 'UNKNOWN';
+
+/**
+ * Structured API error
+ */
+export interface ApiError {
+    code: ApiErrorCode;
+    message: string;
+    status?: number;
+    details?: Record<string, unknown>;
+}
+
+/**
+ * Flow-specific error codes
+ */
+export type FlowErrorCode =
+    | 'FLOW_NOT_FOUND'
+    | 'NODE_NOT_FOUND'
+    | 'EDGE_NOT_FOUND'
+    | 'EXECUTION_FAILED'
+    | 'EXECUTION_TIMEOUT'
+    | 'INVALID_CONNECTION'
+    | 'CIRCULAR_DEPENDENCY';
+
+/**
+ * Flow execution error
+ */
+export interface FlowExecutionError {
+    code: FlowErrorCode;
+    message: string;
+    nodeId?: string;
+    flowId?: string;
+    details?: Record<string, unknown>;
+}
+
+/**
+ * Type guard for ApiError
+ */
+export const isApiError = (error: unknown): error is ApiError => {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        'message' in error &&
+        typeof (error as ApiError).code === 'string' &&
+        typeof (error as ApiError).message === 'string'
+    );
+};
+
+/**
+ * Type guard for FlowExecutionError
+ */
+export const isFlowExecutionError = (error: unknown): error is FlowExecutionError => {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        'message' in error &&
+        typeof (error as FlowExecutionError).code === 'string' &&
+        typeof (error as FlowExecutionError).message === 'string'
+    );
+};
