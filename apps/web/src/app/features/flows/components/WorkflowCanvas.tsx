@@ -319,10 +319,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     handleSelectionChange(newNode.id);
                     setSelectedConnectionId(null);
                 },
-                getWorkflow: () => ({ nodes, connections }),
+                getWorkflow: () => ({ nodes, edges: connections }),
                 loadWorkflow: (state: WorkflowState) => {
-                    setNodes(state.nodes);
-                    setConnections(state.connections);
+                    setNodes(state.nodes ?? []);
+                    // Support both 'edges' (API format) and 'connections' (legacy)
+                    setConnections(state.edges ?? state.connections ?? []);
                     pastRef.current = [];
                     futureRef.current = [];
                     handleSelectionChange(null);

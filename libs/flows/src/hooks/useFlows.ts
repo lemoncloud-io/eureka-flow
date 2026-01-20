@@ -123,7 +123,6 @@ export const useFlows = () => {
      * 2. Save metadata only via PUT /flows/:id (legacy)
      *
      * NOTE: Accepts both 'edges' and 'connections' keys for backwards compatibility.
-     * The UI (WorkflowCanvas) uses 'connections', but API expects 'edges'.
      */
     const saveCurrentFlow = useCallback(
         async (

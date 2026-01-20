@@ -11,7 +11,7 @@ const _log = console.log.bind(console, '[flows-api]');
 
 /**
  * Mock snapshot data for development/testing
- * Uses NodeData format (frontend) with connections instead of edges
+ * Uses WorkflowState format: { nodes, edges }
  */
 const MOCK_SNAPSHOT = {
     id: 'mock-flow-1',
@@ -49,17 +49,16 @@ const MOCK_SNAPSHOT = {
             customLabel: 'Console Log',
         },
     ],
-    edges: [],
-    connections: [
+    edges: [
         {
-            id: 'conn-1',
+            id: 'edge-1',
             sourceNodeId: 'node-1',
             sourcePortId: 'out',
             targetNodeId: 'node-2',
             targetPortId: 'in',
         },
         {
-            id: 'conn-2',
+            id: 'edge-2',
             sourceNodeId: 'node-2',
             sourcePortId: 'out',
             targetNodeId: 'node-3',
@@ -120,17 +119,15 @@ export const getFlowSnapshot = async (id: string): Promise<SnapShotResult> => {
         return {
             ...MOCK_SNAPSHOT,
             id,
-            nodes: MOCK_SNAPSHOT.nodes,
-            edges: MOCK_SNAPSHOT.connections,
         } as SnapShotResult;
     }
 };
 
 /**
- * Save flow snapshot (complete state with nodes and connections)
+ * Save flow snapshot (complete state with nodes and edges)
  * POST /flows/:id/save
  *
- * Saves the full workflow state including all nodes and connections.
+ * Saves the full workflow state including all nodes and edges.
  * Returns the saved snapshot result.
  */
 export const saveFlowSnapshot = async (id: string, body: SaveSnapshotBody): Promise<SnapShotResult> => {

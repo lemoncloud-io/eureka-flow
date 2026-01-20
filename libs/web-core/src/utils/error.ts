@@ -1,6 +1,7 @@
 export enum ErrorType {
     AUTHENTICATION = 'authentication', // 403 - requires logout
     NETWORK = 'network', // Network connection issue - retry
+    CONNECTION_REFUSED = 'connection_refused', // Server not running - no retry
     SERVER = 'server', // 5xx - retry
     CLIENT = 'client', // 4xx (except 403) - fail immediately
     UNKNOWN = 'unknown', // Other
@@ -39,6 +40,16 @@ export const classifyError = (error: any): ErrorClassification => {
         };
     }
 
+    // Connection refused = server not running, don't retry
+    if (isConnectionRefused(error)) {
+        return {
+            type: ErrorType.CONNECTION_REFUSED,
+            shouldRetry: false,
+            shouldLogout: false,
+            message: 'Server is not available',
+        };
+    }
+
     if (isNetworkError(error)) {
         return {
             type: ErrorType.NETWORK,
@@ -74,21 +85,45 @@ export const classifyError = (error: any): ErrorClassification => {
     };
 };
 
+/**
+ * Check if error is connection refused (server not running)
+ * These errors should NOT be retried as the server is simply unavailable
+ */
+const isConnectionRefused = (error: any): boolean => {
+    const code = error?.code;
+    const message = error?.message || '';
+
+    // Browser/Axios error codes
+    if (code === 'ERR_CONNECTION_REFUSED' || code === 'ECONNREFUSED') {
+        return true;
+    }
+    // Axios wraps connection errors with ERR_NETWORK but the underlying error has details
+    if (code === 'ERR_NETWORK' && message.includes('Network Error')) {
+        // Check if it's specifically a connection refused
+        const cause = error?.cause;
+        if (cause?.code === 'ECONNREFUSED' || cause?.code === 'ERR_CONNECTION_REFUSED') {
+            return true;
+        }
+        // In browser, connection refused often shows as generic "Network Error"
+        // with no status code (server never responded)
+        if (!error?.response && !error?.status) {
+            return true;
+        }
+    }
+    return false;
+};
+
 const isNetworkError = (error: any): boolean => {
-    // Axios network error
-    if (error?.code === 'ERR_NETWORK' || error?.code === 'ERR_INTERNET_DISCONNECTED') {
+    // Skip if it's connection refused (handled separately)
+    if (isConnectionRefused(error)) {
+        return false;
+    }
+    // Axios network error (transient issues like DNS, etc.)
+    if (error?.code === 'ERR_INTERNET_DISCONNECTED') {
         return true;
     }
-    // Network connection failure
-    if (error?.message?.includes('Network Error') || error?.message?.includes('fetch')) {
-        return true;
-    }
-    // Timeout
+    // Timeout - worth retrying
     if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
-        return true;
-    }
-    // Connection refused
-    if (error?.code === 'ECONNREFUSED') {
         return true;
     }
 
@@ -132,7 +167,6 @@ export const handleAuthError = (error: any, shouldLogout: boolean, message?: str
     console.error(message || 'Authentication error:', error);
     const errorMessage = extractErrorMessage(error);
 
-    console.log('213', shouldLogout);
     if (shouldLogout) {
         alert(`Authentication error: ${errorMessage}`);
         window.location.href = '/auth/logout';
