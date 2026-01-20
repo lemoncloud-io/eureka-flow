@@ -1,6 +1,6 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { ApiListResult, FlowBody, FlowView, InputOverrideItem, SnapShotResult } from '../types';
+import type { ApiListResult, FlowBody, FlowView, InputOverrideItem, SaveSnapshotBody, SnapShotResult } from '../types';
 import type { BlockDefinition, DataPacket, LogEntry } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[flows-api]');
@@ -122,6 +122,24 @@ export const getFlowSnapshot = async (id: string): Promise<SnapShotResult> => {
             nodes: MOCK_SNAPSHOT.nodes,
             edges: MOCK_SNAPSHOT.connections,
         } as SnapShotResult;
+    }
+};
+
+/**
+ * Save flow snapshot (complete state with nodes and connections)
+ * POST /flows/:id/save
+ *
+ * Saves the full workflow state including all nodes and connections.
+ * Returns the saved snapshot result.
+ */
+export const saveFlowSnapshot = async (id: string, body: SaveSnapshotBody): Promise<SnapShotResult> => {
+    _log(`> saveFlowSnapshot(${id})`, { nodeCount: body.nodes.length, connectionCount: body.connections.length });
+    try {
+        const response = await api.post<SnapShotResult>(`/flows/${id}/save`, body);
+        return response.data;
+    } catch (err) {
+        _log('> saveFlowSnapshot error:', err);
+        throw err;
     }
 };
 

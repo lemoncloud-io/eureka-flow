@@ -1,9 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { flowsKeys } from './keys';
-import { createFlow, deleteFlow, getFlow, getFlowSnapshot, listFlows, runFlow, stopFlow, updateFlow } from '../../api';
+import {
+    createFlow,
+    deleteFlow,
+    getFlow,
+    getFlowSnapshot,
+    listFlows,
+    runFlow,
+    saveFlowSnapshot,
+    stopFlow,
+    updateFlow,
+} from '../../api';
 
-import type { FlowBody, FlowView, InputOverrideItem, SnapShotResult } from '../../types';
+import type { FlowBody, FlowView, InputOverrideItem, SaveSnapshotBody, SnapShotResult } from '../../types';
 
 /**
  * Query hook for listing all flows
@@ -84,6 +94,21 @@ export const useDeleteFlowMutation = () => {
 };
 
 /**
+ * Mutation hook for saving flow snapshot (full workflow state)
+ * POST /flows/:id/save
+ */
+export const useSaveFlowSnapshotMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, body }: { id: string; body: SaveSnapshotBody }) => saveFlowSnapshot(id, body),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: flowsKeys.snapshot(variables.id) });
+        },
+    });
+};
+
+/**
  * Mutation hook for running a flow
  */
 export const useRunFlowMutation = () => {
@@ -121,4 +146,4 @@ export const useStopFlowMutation = () => {
 };
 
 // Re-export types for convenience
-export type { FlowView, FlowBody, SnapShotResult };
+export type { FlowView, FlowBody, SaveSnapshotBody, SnapShotResult };

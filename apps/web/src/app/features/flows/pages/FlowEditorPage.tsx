@@ -107,7 +107,7 @@ export const FlowEditorPage = () => {
         autoSaveTimerRef.current = window.setTimeout(() => {
             if (canvasRef.current) {
                 const data = canvasRef.current.getWorkflow();
-                saveCurrentFlow(data, true);
+                saveCurrentFlow(data);
             }
         }, 2000);
     }, [isAutoSaveEnabled, saveCurrentFlow]);
@@ -176,7 +176,7 @@ export const FlowEditorPage = () => {
     const handleShare = async () => {
         if (canvasRef.current) {
             const data = canvasRef.current.getWorkflow();
-            await saveCurrentFlow(data, true);
+            await saveCurrentFlow(data);
         }
 
         try {

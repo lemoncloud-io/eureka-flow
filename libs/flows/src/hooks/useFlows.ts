@@ -7,11 +7,12 @@ import {
     useFlowQuery,
     useFlowSnapshotQuery,
     useFlowsListQuery,
+    useSaveFlowSnapshotMutation,
     useUpdateFlowMutation,
 } from './queries';
 import { useFlowsStore } from '../stores/useFlowsStore';
 
-import type { FlowBody, SnapShotResult } from '../types';
+import type { FlowBody, SaveSnapshotBody, SnapShotResult } from '../types';
 import type { LogEntry } from '@lemoncloud/eureka-flows-api';
 
 /**
@@ -45,6 +46,7 @@ export const useFlows = () => {
     const createFlowMutation = useCreateFlowMutation();
     const updateFlowMutation = useUpdateFlowMutation();
     const deleteFlowMutation = useDeleteFlowMutation();
+    const saveSnapshotMutation = useSaveFlowSnapshotMutation();
 
     /**
      * Load all available flows from API (refetch)
@@ -115,23 +117,45 @@ export const useFlows = () => {
 
     /**
      * Save current flow (create or update)
+     *
+     * Supports two modes:
+     * 1. Save full workflow (nodes + connections) via POST /flows/:id/save
+     * 2. Save metadata only via PUT /flows/:id (legacy)
      */
     const saveCurrentFlow = useCallback(
-        async (body: FlowBody, _silent = false): Promise<{ success: boolean; id: string }> => {
+        async (body: FlowBody & Partial<SaveSnapshotBody>): Promise<{ success: boolean; id: string }> => {
             try {
+                const { nodes, connections, ...metadataBody } = body;
+                const hasWorkflowData = nodes && connections;
+
                 if (currentFlowId) {
-                    // Update existing flow
-                    const result = await updateFlowMutation.mutateAsync({
-                        id: currentFlowId,
-                        body: { ...body, name: flowName },
-                    });
+                    // Save full workflow if nodes and connections are provided
+                    if (hasWorkflowData) {
+                        await saveSnapshotMutation.mutateAsync({
+                            id: currentFlowId,
+                            body: { nodes, connections },
+                        });
+                    } else {
+                        // Update metadata only (legacy mode)
+                        await updateFlowMutation.mutateAsync({
+                            id: currentFlowId,
+                            body: { ...metadataBody, name: flowName },
+                        });
+                    }
                     setLastSavedAt(new Date());
-                    return { success: true, id: result.id || '' };
+                    return { success: true, id: currentFlowId };
                 } else {
-                    // Create new flow
-                    const result = await createFlowMutation.mutateAsync({ ...body, name: flowName });
+                    // Create new flow first, then save snapshot
+                    const result = await createFlowMutation.mutateAsync({ ...metadataBody, name: flowName });
                     if (result.id) {
                         setCurrentFlowId(result.id);
+                        // Save workflow data if provided
+                        if (hasWorkflowData) {
+                            await saveSnapshotMutation.mutateAsync({
+                                id: result.id,
+                                body: { nodes, connections },
+                            });
+                        }
                     }
                     setLastSavedAt(new Date());
                     return { success: true, id: result.id || '' };
@@ -141,7 +165,15 @@ export const useFlows = () => {
                 return { success: false, id: '' };
             }
         },
-        [flowName, currentFlowId, updateFlowMutation, createFlowMutation, setLastSavedAt, setCurrentFlowId]
+        [
+            flowName,
+            currentFlowId,
+            updateFlowMutation,
+            createFlowMutation,
+            saveSnapshotMutation,
+            setLastSavedAt,
+            setCurrentFlowId,
+        ]
     );
 
     /**
@@ -214,7 +246,7 @@ export const useFlows = () => {
     const isLoading =
         flowsListQuery.isLoading || flowQuery.isLoading || flowSnapshotQuery.isLoading || flowSnapshotQuery.isFetching;
 
-    const isSaving = createFlowMutation.isPending || updateFlowMutation.isPending;
+    const isSaving = createFlowMutation.isPending || updateFlowMutation.isPending || saveSnapshotMutation.isPending;
 
     // Get lastSavedAt from store (set after successful save)
     const { lastSavedAt } = useFlowsStore();

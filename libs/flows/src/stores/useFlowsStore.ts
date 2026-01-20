@@ -16,8 +16,6 @@ interface FlowsState {
     currentFlowId: string | null;
     flowName: string;
     flows: FlowView[];
-    isLoading: boolean;
-    isSaving: boolean;
     lastSavedAt: Date | null;
     isAutoSaveEnabled: boolean;
 
@@ -26,8 +24,6 @@ interface FlowsState {
     setCurrentFlowId: (id: string | null) => void;
     setFlowName: (name: string) => void;
     setFlows: (flows: FlowView[]) => void;
-    setLoading: (loading: boolean) => void;
-    setSaving: (saving: boolean) => void;
     setLastSavedAt: (date: Date | null) => void;
     setAutoSaveEnabled: (enabled: boolean) => void;
     toggleAutoSave: () => void;
@@ -39,8 +35,6 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     currentFlowId: null,
     flowName: 'Untitled Workflow',
     flows: [],
-    isLoading: false,
-    isSaving: false,
     lastSavedAt: null,
     isAutoSaveEnabled: false,
 
@@ -60,10 +54,6 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
 
     setFlows: flows => set({ flows }),
 
-    setLoading: loading => set({ isLoading: loading }),
-
-    setSaving: saving => set({ isSaving: saving }),
-
     setLastSavedAt: date => set({ lastSavedAt: date }),
 
     setAutoSaveEnabled: enabled => set({ isAutoSaveEnabled: enabled }),
@@ -76,7 +66,5 @@ export const useIsBlocksLoaded = () => useFlowsStore(state => state.isBlocksLoad
 export const useCurrentFlowId = () => useFlowsStore(state => state.currentFlowId);
 export const useFlowName = () => useFlowsStore(state => state.flowName);
 export const useFlowsList = () => useFlowsStore(state => state.flows);
-export const useIsFlowLoading = () => useFlowsStore(state => state.isLoading);
-export const useIsSaving = () => useFlowsStore(state => state.isSaving);
 export const useLastSavedAt = () => useFlowsStore(state => state.lastSavedAt);
 export const useIsAutoSaveEnabled = () => useFlowsStore(state => state.isAutoSaveEnabled);

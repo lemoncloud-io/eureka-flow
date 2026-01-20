@@ -239,6 +239,15 @@ export interface SnapShotResult extends FlowModel {
 }
 
 /**
+ * SaveSnapshotBody - body for saving flow snapshot
+ * Supports both 'connections' and 'edges' keys for flexibility
+ */
+export interface SaveSnapshotBody {
+    nodes: NodeView[];
+    connections: EdgeView[];
+}
+
+/**
  * ApiListResult - generic list result from API
  */
 export interface ApiListResult<T> {
