@@ -119,21 +119,28 @@ export const useFlows = () => {
      * Save current flow (create or update)
      *
      * Supports two modes:
-     * 1. Save full workflow (nodes + connections) via POST /flows/:id/save
+     * 1. Save full workflow (nodes + edges) via POST /flows/:id/save
      * 2. Save metadata only via PUT /flows/:id (legacy)
+     *
+     * NOTE: Accepts both 'edges' and 'connections' keys for backwards compatibility.
+     * The UI (WorkflowCanvas) uses 'connections', but API expects 'edges'.
      */
     const saveCurrentFlow = useCallback(
-        async (body: FlowBody & Partial<SaveSnapshotBody>): Promise<{ success: boolean; id: string }> => {
+        async (
+            body: FlowBody & Partial<SaveSnapshotBody> & { connections?: SaveSnapshotBody['edges'] }
+        ): Promise<{ success: boolean; id: string }> => {
             try {
-                const { nodes, connections, ...metadataBody } = body;
-                const hasWorkflowData = nodes && connections;
+                // Support both 'edges' (API format) and 'connections' (UI format)
+                const { nodes, edges, connections, ...metadataBody } = body;
+                const edgesData = edges ?? connections;
+                const hasWorkflowData = nodes && edgesData;
 
                 if (currentFlowId) {
-                    // Save full workflow if nodes and connections are provided
+                    // Save full workflow if nodes and edges are provided
                     if (hasWorkflowData) {
                         await saveSnapshotMutation.mutateAsync({
                             id: currentFlowId,
-                            body: { nodes, connections },
+                            body: { nodes, edges: edgesData },
                         });
                     } else {
                         // Update metadata only (legacy mode)
@@ -153,7 +160,7 @@ export const useFlows = () => {
                         if (hasWorkflowData) {
                             await saveSnapshotMutation.mutateAsync({
                                 id: result.id,
-                                body: { nodes, connections },
+                                body: { nodes, edges: edgesData },
                             });
                         }
                     }

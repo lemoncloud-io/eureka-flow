@@ -103,15 +103,16 @@ export const getFlow = async (id: string): Promise<FlowView> => {
 };
 
 /**
- * Get flow snapshot (complete state with nodes and edges)
- * GET /flows/:id/snapshot
+ * Load flow snapshot (complete state with nodes and edges)
+ * GET /flows/:id/load
  *
+ * Returns WorkflowState format: { ...flowView, nodes, edges }
  * Falls back to mock data if API is unavailable
  */
 export const getFlowSnapshot = async (id: string): Promise<SnapShotResult> => {
     _log(`> getFlowSnapshot(${id})`);
     try {
-        const response = await withRetry(() => api.get<SnapShotResult>(`/flows/${id}/snapshot`), 3, 'getFlowSnapshot');
+        const response = await withRetry(() => api.get<SnapShotResult>(`/flows/${id}/load`), 3, 'getFlowSnapshot');
         return response.data;
     } catch (err) {
         _log('> getFlowSnapshot error, returning mock data:', err);
@@ -133,7 +134,7 @@ export const getFlowSnapshot = async (id: string): Promise<SnapShotResult> => {
  * Returns the saved snapshot result.
  */
 export const saveFlowSnapshot = async (id: string, body: SaveSnapshotBody): Promise<SnapShotResult> => {
-    _log(`> saveFlowSnapshot(${id})`, { nodeCount: body.nodes.length, connectionCount: body.connections.length });
+    _log(`> saveFlowSnapshot(${id})`, { nodeCount: body.nodes.length, edgeCount: body.edges.length });
     try {
         const response = await api.post<SnapShotResult>(`/flows/${id}/save`, body);
         return response.data;

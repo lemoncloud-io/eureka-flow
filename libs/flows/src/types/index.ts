@@ -240,11 +240,11 @@ export interface SnapShotResult extends FlowModel {
 
 /**
  * SaveSnapshotBody - body for saving flow snapshot
- * Supports both 'connections' and 'edges' keys for flexibility
+ * Uses 'edges' key to match backend API
  */
 export interface SaveSnapshotBody {
     nodes: NodeView[];
-    connections: EdgeView[];
+    edges: EdgeView[];
 }
 
 /**
