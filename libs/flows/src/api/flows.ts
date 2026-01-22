@@ -94,6 +94,10 @@ export const listFlows = async (): Promise<FlowView[]> => {
  * GET /flows/:id
  */
 export const getFlow = async (id: string): Promise<FlowView> => {
+    if (!id) {
+        _log('> getFlow() - skipped (no id)');
+        return { id: MOCK_SNAPSHOT.id, name: MOCK_SNAPSHOT.name, state: MOCK_SNAPSHOT.state };
+    }
     _log(`> getFlow(${id})`);
     try {
         const response = await api.get<FlowView>(`/flows/${id}`);
@@ -112,6 +116,13 @@ export const getFlow = async (id: string): Promise<FlowView> => {
  * Falls back to mock data if API is unavailable
  */
 export const getFlowSnapshot = async (id: string): Promise<SnapShotResult> => {
+    if (!id) {
+        _log('> getFlowSnapshot() - skipped (no id)');
+        return {
+            ...MOCK_SNAPSHOT,
+            id: 'mock-flow-1',
+        } as SnapShotResult;
+    }
     _log(`> getFlowSnapshot(${id})`);
     try {
         const response = await withRetry(() => api.get<SnapShotResult>(`/flows/${id}/load`), 3, 'getFlowSnapshot');
