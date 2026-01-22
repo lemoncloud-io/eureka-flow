@@ -27,6 +27,7 @@ const MOCK_SNAPSHOT = {
             inputData: {},
             outputData: {},
             customLabel: 'Text Input',
+            disabled: false,
         },
         {
             id: 'node-2',
@@ -37,6 +38,7 @@ const MOCK_SNAPSHOT = {
             inputData: {},
             outputData: {},
             customLabel: 'Text Transform',
+            disabled: false,
         },
         {
             id: 'node-3',
@@ -47,6 +49,7 @@ const MOCK_SNAPSHOT = {
             inputData: {},
             outputData: {},
             customLabel: 'Console Log',
+            disabled: false,
         },
     ],
     edges: [

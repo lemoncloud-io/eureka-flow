@@ -7,6 +7,7 @@ import {
     deleteNode,
     getNode,
     listNodes,
+    runNode,
     updateNode,
     updateNodeConfig,
     updateNodeLabel,
@@ -172,6 +173,35 @@ export const useUpdateNodeLabelMutation = () => {
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: nodesKeys.detail(variables.id) });
             if (variables.flowId) {
+                queryClient.invalidateQueries({ queryKey: flowsKeys.snapshot(variables.flowId) });
+            }
+        },
+    });
+};
+
+/**
+ * Mutation hook for running a node
+ *
+ * Executes the node's processor with current inputs and config.
+ * Optionally runs async via SQS queue.
+ */
+export const useRunNodeMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            nodeId,
+            async: isAsync,
+            flowId: _flowId,
+        }: {
+            nodeId: string;
+            async?: boolean;
+            flowId?: string;
+        }) => runNode(nodeId, { async: isAsync }),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: nodesKeys.detail(variables.nodeId) });
+            if (variables.flowId) {
+                queryClient.invalidateQueries({ queryKey: nodesKeys.listByFlow(variables.flowId) });
                 queryClient.invalidateQueries({ queryKey: flowsKeys.snapshot(variables.flowId) });
             }
         },

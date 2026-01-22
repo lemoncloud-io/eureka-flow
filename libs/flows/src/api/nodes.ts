@@ -113,6 +113,33 @@ export const toggleNodeDisabled = async (id: string, disabled: boolean): Promise
 };
 
 // ============================================================================
+// Node Execution API
+// ============================================================================
+
+/**
+ * Run node execution
+ * POST /nodes/:nodeId/run
+ *
+ * Executes the node's processor with current inputs and config.
+ * Supports async execution via SQS queue.
+ *
+ * @param nodeId - Node ID to execute
+ * @param options - Execution options
+ * @param options.async - If true, queues execution and returns immediately
+ */
+export const runNode = async (nodeId: string, options?: { async?: boolean }): Promise<NodeView> => {
+    _log(`> runNode(${nodeId})`, options);
+    try {
+        const params = options?.async ? '?async' : '';
+        const response = await api.post<NodeView>(`/nodes/${nodeId}/run${params}`);
+        return response.data;
+    } catch (err) {
+        _log('> runNode error:', err);
+        throw err;
+    }
+};
+
+// ============================================================================
 // Batch Operations
 // ============================================================================
 
