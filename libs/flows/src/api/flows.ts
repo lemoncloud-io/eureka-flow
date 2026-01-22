@@ -1,14 +1,6 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type {
-    ApiListResult,
-    FlowBody,
-    FlowView,
-    InputOverrideItem,
-    LoadFlowResult,
-    SaveFlowBody,
-    SaveFlowView,
-} from '../types';
+import type { ApiListResult, FlowBody, FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView } from '../types';
 import type { BlockDefinition, DataPacket, LogEntry } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[flows-api]');
@@ -218,55 +210,6 @@ export const deleteFlow = async (id: string): Promise<void> => {
 };
 
 // ============================================================================
-// Flow Execution API
-// ============================================================================
-
-/**
- * Run flow execution starting from a specific node
- * POST /nodes/:nodeId/run
- *
- * @deprecated Use `runNode` from nodes.ts instead.
- * This function is kept for backwards compatibility.
- *
- * Note: Execution API moved from /flows to /nodes.
- * - propagate option is no longer supported (handled by backend)
- * - inputOverrides are not supported in new API
- */
-export const runFlow = async (
-    flowId: string,
-    nodeId: string,
-    options?: {
-        propagate?: boolean;
-        inputOverrides?: InputOverrideItem[];
-    }
-): Promise<FlowView> => {
-    _log(`> runFlow(${flowId}, ${nodeId}) [DEPRECATED - use runNode]`, options);
-    try {
-        // Note: New API uses /nodes/:nodeId/run instead of /flows/:flowId/run
-        const response = await api.post<FlowView>(`/nodes/${nodeId}/run`);
-        return { id: flowId, ...response.data };
-    } catch (err) {
-        _log('> runFlow error, returning mock:', err);
-        return { id: flowId, executionStatus: 'running', activeRunId: `run-${Date.now()}` };
-    }
-};
-
-/**
- * Stop flow execution
- *
- * @deprecated This endpoint is not yet implemented in backend.
- * Currently returns mock data.
- *
- * TODO: Implement when backend adds stop endpoint
- */
-export const stopFlow = async (flowId: string, nodeId?: string): Promise<FlowView> => {
-    _log(`> stopFlow(${flowId}, ${nodeId ?? 'all'}) [NOT IMPLEMENTED]`);
-    // TODO: Backend does not have stop endpoint yet
-    // Return mock data for now
-    return { id: flowId, executionStatus: 'idle', activeRunId: undefined };
-};
-
-// ============================================================================
 // Block Logs API
 // ============================================================================
 
@@ -297,4 +240,4 @@ export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'):
 
 // Re-export types for convenience
 export type { BlockDefinition, DataPacket, LogEntry };
-export type { FlowView, FlowBody, InputOverrideItem, LoadFlowResult, SaveFlowBody, SaveFlowView } from '../types';
+export type { FlowView, FlowBody, LoadFlowResult, SaveFlowBody, SaveFlowView } from '../types';

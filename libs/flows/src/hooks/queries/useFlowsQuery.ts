@@ -1,19 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { flowsKeys } from './keys';
-import {
-    createFlow,
-    deleteFlow,
-    getFlow,
-    listFlows,
-    loadFlow,
-    runFlow,
-    saveFlow,
-    stopFlow,
-    updateFlow,
-} from '../../api';
+import { createFlow, deleteFlow, getFlow, listFlows, loadFlow, saveFlow, updateFlow } from '../../api';
 
-import type { FlowBody, FlowView, InputOverrideItem, LoadFlowResult, SaveFlowBody, SaveFlowView } from '../../types';
+import type { FlowBody, FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView } from '../../types';
 
 /**
  * Query hook for listing all flows
@@ -105,43 +95,6 @@ export const useSaveFlowMutation = () => {
         mutationFn: ({ id, body }: { id: string; body: SaveFlowBody }) => saveFlow(id, body),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: flowsKeys.snapshot(variables.id) });
-        },
-    });
-};
-
-/**
- * Mutation hook for running a flow
- */
-export const useRunFlowMutation = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: ({
-            flowId,
-            nodeId,
-            options,
-        }: {
-            flowId: string;
-            nodeId: string;
-            options?: { propagate?: boolean; inputOverrides?: InputOverrideItem[] };
-        }) => runFlow(flowId, nodeId, options),
-        onSuccess: (_data, variables) => {
-            // Invalidate snapshot to refresh node states
-            queryClient.invalidateQueries({ queryKey: flowsKeys.snapshot(variables.flowId) });
-        },
-    });
-};
-
-/**
- * Mutation hook for stopping a flow
- */
-export const useStopFlowMutation = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: ({ flowId, nodeId }: { flowId: string; nodeId?: string }) => stopFlow(flowId, nodeId),
-        onSuccess: (_data, variables) => {
-            queryClient.invalidateQueries({ queryKey: flowsKeys.snapshot(variables.flowId) });
         },
     });
 };

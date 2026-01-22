@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { runFlow as apiRunFlow, stopFlow as apiStopFlow } from '../api';
+import { runNode } from '../api';
 import { useCanvasStore } from '../stores/useCanvasStore';
 
-import type { FlowView, InputOverrideItem } from '../types';
+import type { NodeView } from '../types';
 import type { DataPacket, NodeData } from '@lemoncloud/eureka-flows-api';
 
 /**
@@ -15,7 +15,7 @@ import type { DataPacket, NodeData } from '@lemoncloud/eureka-flows-api';
  * - inputData.timestamp change triggers auto-execution
  */
 export const useExecution = () => {
-    const { flowId, nodes, connections, setNodes } = useCanvasStore();
+    const { nodes, connections, setNodes } = useCanvasStore();
     const prevInputTimestampsRef = useRef<Record<string, Record<string, number>>>({});
 
     /**
@@ -89,10 +89,8 @@ export const useExecution = () => {
             );
 
             try {
-                // If we have a flowId, call the API
-                if (flowId) {
-                    await apiRunFlow(flowId, nodeId, { propagate: false });
-                }
+                // Call the node execution API
+                await runNode(nodeId);
 
                 // Mark as COMPLETED
                 setNodes(prev =>
@@ -131,25 +129,18 @@ export const useExecution = () => {
                 );
             }
         },
-        [flowId, nodes, setNodes, propagateOutputToDownstream]
+        [nodes, setNodes, propagateOutputToDownstream]
     );
 
     /**
-     * Run flow execution starting from a specific node
+     * Run node execution
+     * POST /nodes/:nodeId/run
+     *
+     * @param nodeId - Node ID to execute
+     * @param options.async - If true, queues execution via SQS and returns immediately
      */
-    const runFlow = useCallback(
-        async (
-            nodeId: string,
-            options?: {
-                propagate?: boolean;
-                inputOverrides?: InputOverrideItem[];
-            }
-        ): Promise<FlowView | null> => {
-            if (!flowId) {
-                console.error('No flow ID set');
-                return null;
-            }
-
+    const runNodeExecution = useCallback(
+        async (nodeId: string, options?: { async?: boolean }): Promise<NodeView | null> => {
             const node = nodes.find(n => n.id === nodeId);
             if (!node) {
                 console.error('Node not found:', nodeId);
@@ -176,11 +167,11 @@ export const useExecution = () => {
                     )
                 );
 
-                // Call API
-                const result = await apiRunFlow(flowId, nodeId, options);
+                // Call API: POST /nodes/:nodeId/run
+                const result = await runNode(nodeId, options);
                 return result;
             } catch (error) {
-                console.error('Failed to run flow:', error);
+                console.error('Failed to run node:', error);
 
                 // Update node status to ERROR
                 setNodes(prev =>
@@ -198,45 +189,34 @@ export const useExecution = () => {
                 return null;
             }
         },
-        [flowId, nodes, setNodes]
+        [nodes, setNodes]
     );
 
     /**
-     * Stop flow execution
+     * Stop execution (local state only)
+     *
+     * Note: Backend stop endpoint not yet implemented.
+     * This only resets local UI state.
      */
-    const stopFlowExecution = useCallback(
-        async (nodeId?: string): Promise<FlowView | null> => {
-            if (!flowId) {
-                console.error('No flow ID set');
-                return null;
-            }
-
-            try {
-                const result = await apiStopFlow(flowId, nodeId);
-
-                // Reset running nodes to IDLE
-                setNodes(prev =>
-                    prev.map(n => (n.status === 'RUNNING' ? { ...n, status: 'IDLE', executionStats: undefined } : n))
-                );
-
-                return result;
-            } catch (error) {
-                console.error('Failed to stop flow:', error);
-                return null;
-            }
+    const stopExecution = useCallback(
+        (nodeId?: string): void => {
+            setNodes(prev =>
+                prev.map(n => {
+                    if (nodeId && n.id !== nodeId) return n;
+                    if (n.status === 'RUNNING') {
+                        return { ...n, status: 'IDLE', executionStats: undefined };
+                    }
+                    return n;
+                })
+            );
         },
-        [flowId, setNodes]
+        [setNodes]
     );
 
     /**
      * Run all entry point nodes (nodes without input connections)
      */
     const runAll = useCallback(async (): Promise<void> => {
-        if (!flowId) {
-            console.error('No flow ID set');
-            return;
-        }
-
         // Find entry point nodes (no incoming connections)
         const nodesWithIncoming = new Set(connections.map(c => c.targetNodeId));
         const entryNodes = nodes.filter(n => !n.disabled && !nodesWithIncoming.has(n.id));
@@ -248,16 +228,16 @@ export const useExecution = () => {
 
         // Run each entry node (propagation will handle the rest via reactive triggers)
         for (const node of entryNodes) {
-            await runFlow(node.id, { propagate: true });
+            await runNodeExecution(node.id);
         }
-    }, [flowId, nodes, connections, runFlow]);
+    }, [nodes, connections, runNodeExecution]);
 
     /**
-     * Stop all running nodes
+     * Stop all running nodes (local state only)
      */
-    const stopAll = useCallback(async (): Promise<void> => {
-        await stopFlowExecution();
-    }, [stopFlowExecution]);
+    const stopAll = useCallback((): void => {
+        stopExecution();
+    }, [stopExecution]);
 
     /**
      * Check if a specific node is running
@@ -326,8 +306,8 @@ export const useExecution = () => {
         isRunning: isAnyNodeRunning(),
 
         // Actions
-        runFlow,
-        stopFlowExecution,
+        runNodeExecution,
+        stopExecution,
         runAll,
         stopAll,
         executeNode,

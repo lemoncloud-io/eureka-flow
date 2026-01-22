@@ -16,7 +16,7 @@ import {
     useVersionCheck,
 } from '@flows/shared';
 import { ThemeProvider } from '@flows/theme';
-import { reportError, useWebCoreStore } from '@flows/web-core';
+import { ENV, reportError, useWebCoreStore } from '@flows/web-core';
 
 import i18n from '../i18n';
 
@@ -45,6 +45,7 @@ interface ProvidersProps {
 /**
  * API Key gate component
  * Blocks app content until a valid API key is provided
+ * Skipped in local environment
  */
 const ApiKeyGate = ({ children }: { children: ReactNode }) => {
     const { apiKey, setApiKey, initializeApiKey } = useWebCoreStore();
@@ -52,6 +53,11 @@ const ApiKeyGate = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         initializeApiKey();
     }, [initializeApiKey]);
+
+    // Skip API key check in local environment
+    if (ENV === 'local') {
+        return children;
+    }
 
     if (!apiKey) {
         return <ApiKeyDialog open={true} onSubmit={setApiKey} />;

@@ -35,7 +35,12 @@
         "value": "Value",
         "chooseFile": "Choose File",
         "selectWorkflow": "-- Select Workflow --",
-        "openWorkflowDesign": "Open Workflow Design"
+        "openWorkflowDesign": "Open Workflow Design",
+        "clickToEdit": "Click to edit",
+        "clickToAddText": "Click to add text...",
+        "enterText": "Enter text...",
+        "clickToUpload": "Click to upload image",
+        "removeImage": "Remove"
     },
     "errors": {
         "executionFailed": "Execution Failed",

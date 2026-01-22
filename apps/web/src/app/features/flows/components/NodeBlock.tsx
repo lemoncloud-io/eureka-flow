@@ -13,6 +13,9 @@ type ConfigValue = string | number | boolean | string[] | null;
 
 type NodeStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'ERROR';
 
+/** Node types that support inline editing (skip config modal on double-click) */
+const INLINE_EDITABLE_NODE_TYPES = ['input-text', 'input-image'] as const;
+
 interface StatusVisual {
     border: string;
     header: string;
@@ -368,30 +371,109 @@ const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
     );
 };
 
-const InputImageVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
+interface EditableVisualizationProps {
+    node: NodeData;
+    onConfigChange: (key: string, value: ConfigValue) => void;
+}
+
+const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
     const img = node.config.imageData as string | undefined;
-    const [dims, setDims] = useState<string | null>(null);
+    const fileInputId = `inline-image-${node.id}`;
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = evt => onConfigChange('imageData', evt.target?.result as string);
+            reader.readAsDataURL(file);
+        }
+    };
 
     return (
-        <div className="mt-2 rounded border border-border overflow-hidden bg-foreground/60 flex justify-center items-center h-20 relative">
-            {img ? (
-                <>
-                    <img
-                        src={img}
-                        className="h-full w-full object-cover"
-                        alt="Input"
-                        onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
-                    />
-                    {dims && (
-                        <div className="absolute bottom-1 right-1 bg-foreground/80 text-[9px] text-background px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm pointer-events-none">
-                            {dims}
-                        </div>
-                    )}
-                </>
-            ) : (
-                <span className="text-[9px] text-background/60 italic">{t('visualization.noImage')}</span>
+        <div className="mt-2" onMouseDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+            <input type="file" accept="image/*" className="hidden" id={fileInputId} onChange={handleImageUpload} />
+            <label
+                htmlFor={fileInputId}
+                className="block rounded border border-border overflow-hidden bg-foreground/60 h-20 cursor-pointer hover:border-primary transition-colors"
+                title={t('visualization.clickToUpload')}
+            >
+                {img ? (
+                    <img src={img} className="h-full w-full object-cover" alt="Input" />
+                ) : (
+                    <div className="h-full flex items-center justify-center">
+                        <span className="text-[9px] text-background/60 italic">{t('visualization.clickToUpload')}</span>
+                    </div>
+                )}
+            </label>
+            {img && (
+                <button
+                    onClick={e => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onConfigChange('imageData', '');
+                    }}
+                    className="mt-1 w-full text-[9px] py-1 bg-destructive/20 text-destructive rounded hover:bg-destructive/40 transition-colors flex items-center justify-center gap-1"
+                >
+                    <X className="w-3 h-3" />
+                    {t('visualization.removeImage')}
+                </button>
             )}
+        </div>
+    );
+};
+
+const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
+    const { t } = useTranslation(['nodes']);
+    const [isEditing, setIsEditing] = useState(false);
+    const text = (node.config.text as string) || '';
+
+    if (isEditing) {
+        return (
+            <div className="mt-2" onMouseDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+                <textarea
+                    autoFocus
+                    className="w-full p-2 bg-background border border-primary rounded text-xs resize-none font-mono focus:outline-none"
+                    value={text}
+                    onChange={e => onConfigChange('text', e.target.value)}
+                    onBlur={() => setIsEditing(false)}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            setIsEditing(false);
+                        }
+                        if (e.key === 'Escape') {
+                            setIsEditing(false);
+                        }
+                        e.stopPropagation();
+                    }}
+                    rows={3}
+                    placeholder={t('visualization.enterText')}
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div
+            className="mt-2 p-2 bg-background rounded border border-border hover:border-primary cursor-text transition-colors"
+            onClick={e => {
+                e.stopPropagation();
+                setIsEditing(true);
+            }}
+            onDoubleClick={e => e.stopPropagation()}
+            title={t('visualization.clickToEdit')}
+        >
+            <div className="text-[9px] text-muted-foreground mb-0.5 uppercase tracking-wider font-semibold">
+                {t('visualization.value')}
+            </div>
+            <div className="text-xs text-foreground/80 truncate font-mono" title={text}>
+                {text ? (
+                    `"${text}"`
+                ) : (
+                    <span className="text-muted-foreground italic">{t('visualization.clickToAddText')}</span>
+                )}
+            </div>
         </div>
     );
 };
@@ -414,26 +496,9 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
     );
 };
 
-const InputTextVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
-    const { t } = useTranslation(['nodes']);
-    const text = node.config.text as string | undefined;
-    return (
-        <div className="mt-2 p-2 bg-background rounded border border-border group relative">
-            <div className="text-[9px] text-muted-foreground mb-0.5 uppercase tracking-wider font-semibold">
-                {t('visualization.value')}
-            </div>
-            <div className="text-xs text-foreground/80 italic truncate font-mono" title={text}>
-                {text ? `"${text}"` : <span className="text-muted-foreground">{t('visualization.empty')}</span>}
-            </div>
-        </div>
-    );
-};
-
 const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
     'debug-log': DebugLogVisualization,
     preview: PreviewVisualization,
-    'input-text': InputTextVisualization,
-    'input-image': InputImageVisualization,
 };
 
 interface NodeBlockProps {
@@ -624,6 +689,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 onMouseDown={onMouseDown}
                 onDoubleClick={e => {
                     e.stopPropagation();
+                    // Skip config modal for nodes with inline editing
+                    if (INLINE_EDITABLE_NODE_TYPES.includes(node.type as (typeof INLINE_EDITABLE_NODE_TYPES)[number]))
+                        {return;}
                     setShowConfig(true);
                 }}
             >
@@ -843,6 +911,12 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             </button>
                         )}
 
+                        {node.type === 'input-text' && (
+                            <InputTextVisualizationEditable node={node} onConfigChange={onConfigChange} />
+                        )}
+                        {node.type === 'input-image' && (
+                            <InputImageVisualizationEditable node={node} onConfigChange={onConfigChange} />
+                        )}
                         {VISUALIZATION_COMPONENTS[node.type] &&
                             React.createElement(VISUALIZATION_COMPONENTS[node.type], { node })}
                     </div>
