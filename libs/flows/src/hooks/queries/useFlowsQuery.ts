@@ -5,15 +5,15 @@ import {
     createFlow,
     deleteFlow,
     getFlow,
-    getFlowSnapshot,
     listFlows,
+    loadFlow,
     runFlow,
-    saveFlowSnapshot,
+    saveFlow,
     stopFlow,
     updateFlow,
 } from '../../api';
 
-import type { FlowBody, FlowView, InputOverrideItem, SaveSnapshotBody, SnapShotResult } from '../../types';
+import type { FlowBody, FlowView, InputOverrideItem, LoadFlowResult, SaveFlowBody, SaveFlowView } from '../../types';
 
 /**
  * Query hook for listing all flows
@@ -37,12 +37,13 @@ export const useFlowQuery = (flowId: string | null) => {
 };
 
 /**
- * Query hook for getting flow snapshot (full design with nodes and edges)
+ * Query hook for loading flow (full design with nodes and edges)
+ * GET /flows/:id/load
  */
-export const useFlowSnapshotQuery = (flowId: string | null) => {
+export const useLoadFlowQuery = (flowId: string | null) => {
     return useQuery({
         queryKey: flowsKeys.snapshot(flowId ?? ''),
-        queryFn: () => getFlowSnapshot(flowId!),
+        queryFn: () => loadFlow(flowId!),
         enabled: !!flowId,
     });
 };
@@ -94,14 +95,14 @@ export const useDeleteFlowMutation = () => {
 };
 
 /**
- * Mutation hook for saving flow snapshot (full workflow state)
+ * Mutation hook for saving flow (full workflow state)
  * POST /flows/:id/save
  */
-export const useSaveFlowSnapshotMutation = () => {
+export const useSaveFlowMutation = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, body }: { id: string; body: SaveSnapshotBody }) => saveFlowSnapshot(id, body),
+        mutationFn: ({ id, body }: { id: string; body: SaveFlowBody }) => saveFlow(id, body),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: flowsKeys.snapshot(variables.id) });
         },
@@ -146,4 +147,4 @@ export const useStopFlowMutation = () => {
 };
 
 // Re-export types for convenience
-export type { FlowView, FlowBody, SaveSnapshotBody, SnapShotResult };
+export type { FlowView, FlowBody, LoadFlowResult, SaveFlowBody, SaveFlowView };

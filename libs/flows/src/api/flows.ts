@@ -1,6 +1,14 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { ApiListResult, FlowBody, FlowView, InputOverrideItem, SaveSnapshotBody, SnapShotResult } from '../types';
+import type {
+    ApiListResult,
+    FlowBody,
+    FlowView,
+    InputOverrideItem,
+    LoadFlowResult,
+    SaveFlowBody,
+    SaveFlowView,
+} from '../types';
 import type { BlockDefinition, DataPacket, LogEntry } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[flows-api]');
@@ -14,11 +22,11 @@ const _log = console.log.bind(console, '[flows-api]');
  * Uses WorkflowState format: { nodes, edges }
  *
  * NodeData format:
- * - config: Record<string, any> (object format)
+ * - config: Record<string, string> (object format)
  * - inputData/outputData: Record<string, DataPacket> (object format)
  * - status: 'IDLE' | 'WAITING' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR'
  */
-const MOCK_SNAPSHOT: SnapShotResult = {
+const MOCK_SNAPSHOT: LoadFlowResult = {
     id: 'mock-flow-1',
     name: 'Sample Workflow',
     state: 'active',
@@ -117,28 +125,28 @@ export const getFlow = async (id: string): Promise<FlowView> => {
  * Load flow snapshot (complete state with nodes and edges)
  * GET /flows/:id/load
  *
- * Returns WorkflowState format: { ...flowView, nodes, edges }
+ * @see eureka-flows-api #0.26.111
+ * Returns SaveFlowBody format: { ...flowView, nodes: NodeData[], edges: EdgeData[] }
  * Falls back to mock data if API is unavailable
  */
-export const getFlowSnapshot = async (id: string): Promise<SnapShotResult> => {
+export const loadFlow = async (id: string): Promise<LoadFlowResult> => {
     if (!id) {
-        _log('> getFlowSnapshot() - skipped (no id)');
+        _log('> loadFlow() - skipped (no id)');
         return {
             ...MOCK_SNAPSHOT,
             id: 'mock-flow-1',
-        } as SnapShotResult;
+        };
     }
-    _log(`> getFlowSnapshot(${id})`);
+    _log(`> loadFlow(${id})`);
     try {
-        const response = await withRetry(() => api.get<SnapShotResult>(`/flows/${id}/load`), 3, 'getFlowSnapshot');
+        const response = await withRetry(() => api.get<LoadFlowResult>(`/flows/${id}/load`), 3, 'loadFlow');
         return response.data;
     } catch (err) {
-        _log('> getFlowSnapshot error, returning mock data:', err);
-        // Return mock data with proper structure for frontend consumption
+        _log('> loadFlow error, returning mock data:', err);
         return {
             ...MOCK_SNAPSHOT,
             id,
-        } as SnapShotResult;
+        };
     }
 };
 
@@ -146,16 +154,20 @@ export const getFlowSnapshot = async (id: string): Promise<SnapShotResult> => {
  * Save flow snapshot (complete state with nodes and edges)
  * POST /flows/:id/save
  *
+ * @see eureka-flows-api #0.26.111
+ * Body: SaveFlowBody { nodes: NodeData[], edges: EdgeData[] }
+ * Response: SaveFlowView { nodes$$, edges$$, ports$$ }
+ *
  * Saves the full workflow state including all nodes and edges.
- * Returns the saved snapshot result.
+ * Returns the saved result with $$ suffix format.
  */
-export const saveFlowSnapshot = async (id: string, body: SaveSnapshotBody): Promise<SnapShotResult> => {
-    _log(`> saveFlowSnapshot(${id})`, { nodeCount: body.nodes.length, edgeCount: body.edges.length });
+export const saveFlow = async (id: string, body: SaveFlowBody): Promise<SaveFlowView> => {
+    _log(`> saveFlow(${id})`, { nodeCount: body.nodes.length, edgeCount: body.edges?.length ?? 0 });
     try {
-        const response = await api.post<SnapShotResult>(`/flows/${id}/save`, body);
+        const response = await api.post<SaveFlowView>(`/flows/${id}/save`, body);
         return response.data;
     } catch (err) {
-        _log('> saveFlowSnapshot error:', err);
+        _log('> saveFlow error:', err);
         throw err;
     }
 };
@@ -285,4 +297,4 @@ export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'):
 
 // Re-export types for convenience
 export type { BlockDefinition, DataPacket, LogEntry };
-export type { FlowView, FlowBody, SnapShotResult, InputOverrideItem } from '../types';
+export type { FlowView, FlowBody, InputOverrideItem, LoadFlowResult, SaveFlowBody, SaveFlowView } from '../types';

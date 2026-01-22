@@ -235,24 +235,41 @@ export interface StopFlowParams {
 }
 
 /**
- * SnapShotResult - result of flow snapshot
+ * SaveFlowBody - body for saving flow snapshot
+ * Extends WorkflowState format: { nodes: NodeData[], edges: EdgeData[] }
+ *
+ * @see eureka-flows-api POST /flows/:id/save
+ */
+export interface SaveFlowBody {
+    nodes: NodeData[];
+    edges: EdgeData[];
+    /** @deprecated Use edges instead */
+    connections?: EdgeData[];
+}
+
+/**
+ * SaveFlowView - response from save flow snapshot
+ * Backend returns array format with $$ suffix
+ *
+ * @see eureka-flows-api POST /flows/:id/save response
+ */
+export interface SaveFlowView extends FlowView {
+    nodes$$: NodeView[];
+    edges$$: EdgeView[];
+    ports$$: NodeView[];
+}
+
+/**
+ * LoadFlowResult - result of loading flow snapshot
+ * GET /flows/:id/load returns SaveFlowBody format
  *
  * Uses NodeData/EdgeData from API package to match backend response format.
  * - NodeData: uses object format for config, inputData, outputData
  * - EdgeData: connection data between nodes
  */
-export interface SnapShotResult extends FlowModel {
+export interface LoadFlowResult extends FlowModel {
     nodes: NodeData[];
     edges: EdgeData[];
-}
-
-/**
- * SaveSnapshotBody - body for saving flow snapshot
- * Uses 'edges' key to match backend API
- */
-export interface SaveSnapshotBody {
-    nodes: NodeView[];
-    edges: EdgeView[];
 }
 
 /**

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { X } from 'lucide-react';
 
-import { getFlowSnapshot, useBlockRegistry } from '@flows/flows';
+import { loadFlow, useBlockRegistry } from '@flows/flows';
 
 import { ConnectionLine } from './ConnectionLine';
 import { DetailPanel } from './DetailPanel';
@@ -151,7 +151,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         useEffect(() => {
             if (modalFlowId) {
-                getFlowSnapshot(modalFlowId)
+                loadFlow(modalFlowId)
                     .then(setModalFlowData)
                     .catch(() => setModalFlowData(null));
             } else {

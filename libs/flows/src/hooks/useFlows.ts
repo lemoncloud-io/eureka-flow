@@ -5,14 +5,14 @@ import {
     useCreateFlowMutation,
     useDeleteFlowMutation,
     useFlowQuery,
-    useFlowSnapshotQuery,
     useFlowsListQuery,
-    useSaveFlowSnapshotMutation,
+    useLoadFlowQuery,
+    useSaveFlowMutation,
     useUpdateFlowMutation,
 } from './queries';
 import { useFlowsStore } from '../stores/useFlowsStore';
 
-import type { FlowBody, SaveSnapshotBody, SnapShotResult } from '../types';
+import type { FlowBody, LoadFlowResult, SaveFlowBody } from '../types';
 import type { LogEntry } from '@lemoncloud/eureka-flows-api';
 
 /**
@@ -40,13 +40,13 @@ export const useFlows = () => {
     // TanStack Query hooks
     const flowsListQuery = useFlowsListQuery();
     const flowQuery = useFlowQuery(currentFlowId);
-    const flowSnapshotQuery = useFlowSnapshotQuery(currentFlowId);
+    const loadFlowQuery = useLoadFlowQuery(currentFlowId);
 
     // TanStack Mutations
     const createFlowMutation = useCreateFlowMutation();
     const updateFlowMutation = useUpdateFlowMutation();
     const deleteFlowMutation = useDeleteFlowMutation();
-    const saveSnapshotMutation = useSaveFlowSnapshotMutation();
+    const saveFlowMutation = useSaveFlowMutation();
 
     /**
      * Load all available flows from API (refetch)
@@ -60,7 +60,7 @@ export const useFlows = () => {
      * Load a specific flow by ID
      */
     const loadFlowById = useCallback(
-        async (id?: string): Promise<SnapShotResult | null> => {
+        async (id?: string): Promise<LoadFlowResult | null> => {
             if (!id) {
                 // Get first flow from list
                 const listResult = await flowsListQuery.refetch();
@@ -73,31 +73,31 @@ export const useFlows = () => {
             }
 
             setCurrentFlowId(id);
-            const result = await flowSnapshotQuery.refetch();
+            const result = await loadFlowQuery.refetch();
             if (result.data?.name) {
                 setFlowName(result.data.name);
             }
             return result.data ?? null;
         },
-        [flowsListQuery, flowSnapshotQuery, setCurrentFlowId, setFlowName]
+        [flowsListQuery, loadFlowQuery, setCurrentFlowId, setFlowName]
     );
 
     /**
      * Load flow design (snapshot) by ID
-     * Note: For a different ID than currentFlowId, use useFlowSnapshotQuery directly
+     * Note: For a different ID than currentFlowId, use useLoadFlowQuery directly
      */
     const loadFlowDesign = useCallback(
-        async (id: string): Promise<SnapShotResult | null> => {
+        async (id: string): Promise<LoadFlowResult | null> => {
             if (id === currentFlowId) {
-                const result = await flowSnapshotQuery.refetch();
+                const result = await loadFlowQuery.refetch();
                 return result.data ?? null;
             }
             // For different ID, set it as current and refetch
             setCurrentFlowId(id);
-            const result = await flowSnapshotQuery.refetch();
+            const result = await loadFlowQuery.refetch();
             return result.data ?? null;
         },
-        [currentFlowId, flowSnapshotQuery, setCurrentFlowId]
+        [currentFlowId, loadFlowQuery, setCurrentFlowId]
     );
 
     /**
@@ -126,7 +126,7 @@ export const useFlows = () => {
      */
     const saveCurrentFlow = useCallback(
         async (
-            body: FlowBody & Partial<SaveSnapshotBody> & { connections?: SaveSnapshotBody['edges'] }
+            body: FlowBody & Partial<SaveFlowBody> & { connections?: SaveFlowBody['edges'] }
         ): Promise<{ success: boolean; id: string }> => {
             try {
                 // Support both 'edges' (API format) and 'connections' (UI format)
@@ -137,7 +137,7 @@ export const useFlows = () => {
                 if (currentFlowId) {
                     // Save full workflow if nodes and edges are provided
                     if (hasWorkflowData) {
-                        await saveSnapshotMutation.mutateAsync({
+                        await saveFlowMutation.mutateAsync({
                             id: currentFlowId,
                             body: { nodes, edges: edgesData },
                         });
@@ -157,7 +157,7 @@ export const useFlows = () => {
                         setCurrentFlowId(result.id);
                         // Save workflow data if provided
                         if (hasWorkflowData) {
-                            await saveSnapshotMutation.mutateAsync({
+                            await saveFlowMutation.mutateAsync({
                                 id: result.id,
                                 body: { nodes, edges: edgesData },
                             });
@@ -176,7 +176,7 @@ export const useFlows = () => {
             currentFlowId,
             updateFlowMutation,
             createFlowMutation,
-            saveSnapshotMutation,
+            saveFlowMutation,
             setLastSavedAt,
             setCurrentFlowId,
         ]
@@ -250,9 +250,9 @@ export const useFlows = () => {
 
     // Derive loading/saving states from TanStack Query
     const isLoading =
-        flowsListQuery.isLoading || flowQuery.isLoading || flowSnapshotQuery.isLoading || flowSnapshotQuery.isFetching;
+        flowsListQuery.isLoading || flowQuery.isLoading || loadFlowQuery.isLoading || loadFlowQuery.isFetching;
 
-    const isSaving = createFlowMutation.isPending || updateFlowMutation.isPending || saveSnapshotMutation.isPending;
+    const isSaving = createFlowMutation.isPending || updateFlowMutation.isPending || saveFlowMutation.isPending;
 
     // Get lastSavedAt from store (set after successful save)
     const { lastSavedAt } = useFlowsStore();
@@ -268,7 +268,7 @@ export const useFlows = () => {
         isAutoSaveEnabled,
 
         // Query data
-        flowSnapshot: flowSnapshotQuery.data,
+        flowSnapshot: loadFlowQuery.data,
 
         // Actions - List & Load
         loadFlowsList,
@@ -292,6 +292,6 @@ export const useFlows = () => {
 
         // Query states for advanced usage
         flowsListQuery,
-        flowSnapshotQuery,
+        loadFlowQuery,
     };
 };
