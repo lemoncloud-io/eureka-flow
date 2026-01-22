@@ -161,12 +161,14 @@ export const createFlow = async (body: FlowBody): Promise<FlowView> => {
 
 /**
  * Update existing flow
- * PUT /flows/:id
+ * POST /flows/:id
+ *
+ * Note: Backend uses POST for both create and update
  */
 export const updateFlow = async (id: string, body: FlowBody): Promise<FlowView> => {
     _log(`> updateFlow(${id})`, body);
     try {
-        const response = await api.put<FlowView>(`/flows/${id}`, body);
+        const response = await api.post<FlowView>(`/flows/${id}`, body);
         return response.data;
     } catch (err) {
         _log('> updateFlow error, returning mock:', err);
@@ -193,7 +195,14 @@ export const deleteFlow = async (id: string): Promise<void> => {
 
 /**
  * Run flow execution starting from a specific node
- * POST /flows/:flowId/run?nodeId=xxx&propagate=true
+ * POST /nodes/:nodeId/run
+ *
+ * @deprecated Use `runNode` from nodes.ts instead.
+ * This function is kept for backwards compatibility.
+ *
+ * Note: Execution API moved from /flows to /nodes.
+ * - propagate option is no longer supported (handled by backend)
+ * - inputOverrides are not supported in new API
  */
 export const runFlow = async (
     flowId: string,
@@ -203,13 +212,11 @@ export const runFlow = async (
         inputOverrides?: InputOverrideItem[];
     }
 ): Promise<FlowView> => {
-    _log(`> runFlow(${flowId}, ${nodeId})`, options);
+    _log(`> runFlow(${flowId}, ${nodeId}) [DEPRECATED - use runNode]`, options);
     try {
-        const propagate = options?.propagate ?? true;
-        const response = await api.post<FlowView>(`/flows/${flowId}/run?nodeId=${nodeId}&propagate=${propagate}`, {
-            inputOverrides: options?.inputOverrides,
-        });
-        return response.data;
+        // Note: New API uses /nodes/:nodeId/run instead of /flows/:flowId/run
+        const response = await api.post<FlowView>(`/nodes/${nodeId}/run`);
+        return { id: flowId, ...response.data };
     } catch (err) {
         _log('> runFlow error, returning mock:', err);
         return { id: flowId, executionStatus: 'running', activeRunId: `run-${Date.now()}` };
@@ -218,18 +225,17 @@ export const runFlow = async (
 
 /**
  * Stop flow execution
- * POST /flows/:flowId/stop
+ *
+ * @deprecated This endpoint is not yet implemented in backend.
+ * Currently returns mock data.
+ *
+ * TODO: Implement when backend adds stop endpoint
  */
 export const stopFlow = async (flowId: string, nodeId?: string): Promise<FlowView> => {
-    _log(`> stopFlow(${flowId}, ${nodeId ?? 'all'})`);
-    try {
-        const params = nodeId ? `?nodeId=${nodeId}` : '';
-        const response = await api.post<FlowView>(`/flows/${flowId}/stop${params}`);
-        return response.data;
-    } catch (err) {
-        _log('> stopFlow error, returning mock:', err);
-        return { id: flowId, executionStatus: 'idle', activeRunId: undefined };
-    }
+    _log(`> stopFlow(${flowId}, ${nodeId ?? 'all'}) [NOT IMPLEMENTED]`);
+    // TODO: Backend does not have stop endpoint yet
+    // Return mock data for now
+    return { id: flowId, executionStatus: 'idle', activeRunId: undefined };
 };
 
 // ============================================================================
