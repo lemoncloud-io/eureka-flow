@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+import { clearStoredApiKey, getStoredApiKey, setStoredApiKey } from '../utils/apiKey';
+
 export interface UserProfile {
     id: string;
     name: string;
@@ -16,6 +18,7 @@ export interface WebCoreState {
     error: Error | null;
     profile: UserProfile | null;
     userName: string;
+    apiKey: string | null;
 }
 
 export interface WebCoreStore extends WebCoreState {
@@ -25,6 +28,9 @@ export interface WebCoreStore extends WebCoreState {
     setProfile: (profile: UserProfile) => void;
     updateProfile: (user: UserView) => void;
     registerLogoutCallback: (callback: () => void) => () => void;
+    setApiKey: (key: string) => void;
+    clearApiKey: () => void;
+    initializeApiKey: () => void;
 }
 
 const initialState: Pick<WebCoreStore, keyof WebCoreState> = {
@@ -33,6 +39,7 @@ const initialState: Pick<WebCoreStore, keyof WebCoreState> = {
     error: null,
     profile: null,
     userName: '',
+    apiKey: null,
 };
 
 export const useWebCoreStore = create<WebCoreStore>()(set => {
@@ -82,6 +89,21 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
             return () => {
                 logoutCallbacks.delete(callback);
             };
+        },
+
+        setApiKey: (key: string) => {
+            setStoredApiKey(key);
+            set({ apiKey: key });
+        },
+
+        clearApiKey: () => {
+            clearStoredApiKey();
+            set({ apiKey: null });
+        },
+
+        initializeApiKey: () => {
+            const storedKey = getStoredApiKey();
+            set({ apiKey: storedKey });
         },
     };
 });

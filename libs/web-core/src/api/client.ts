@@ -1,9 +1,10 @@
 import axios from 'axios';
 
 import { API_URL } from '../core';
+import { useWebCoreStore } from '../stores/useWebCoreStore';
 import { classifyError, handleAuthError } from '../utils/error';
 
-import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 /**
  * Centralized Axios instance for all API calls
@@ -17,18 +18,17 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 /**
- * Request interceptor: Add auth headers if needed
+ * Request interceptor: Add x-api-key header
  */
 apiClient.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-        // TODO: Add authentication token when auth is implemented
-        // const token = getAuthToken();
-        // if (token) {
-        //     config.headers.Authorization = `Bearer ${token}`;
-        // }
+        const apiKey = useWebCoreStore.getState().apiKey;
+        if (apiKey) {
+            config.headers['x-api-key'] = apiKey;
+        }
         return config;
     },
-    error => Promise.reject(error)
+    (error: unknown) => Promise.reject(error)
 );
 
 /**
@@ -36,7 +36,14 @@ apiClient.interceptors.request.use(
  */
 apiClient.interceptors.response.use(
     (response: AxiosResponse) => response,
-    error => {
+    (error: AxiosError) => {
+        const status = error.response?.status;
+
+        // Clear API key on 403 (unauthorized/forbidden)
+        if (status === 403) {
+            useWebCoreStore.getState().clearApiKey();
+        }
+
         const classification = classifyError(error);
 
         if (classification.shouldLogout) {

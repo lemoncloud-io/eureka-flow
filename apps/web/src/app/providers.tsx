@@ -1,4 +1,4 @@
-import { Suspense, useCallback } from 'react';
+import { Suspense, useCallback, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { HelmetProvider } from 'react-helmet-async';
 import { I18nextProvider } from 'react-i18next';
@@ -7,9 +7,16 @@ import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toaster } from 'sonner';
 
-import { ErrorFallback, GlobalLoader, LoadingFallback, VersionUpdateBanner, useVersionCheck } from '@flows/shared';
+import {
+    ApiKeyDialog,
+    ErrorFallback,
+    GlobalLoader,
+    LoadingFallback,
+    VersionUpdateBanner,
+    useVersionCheck,
+} from '@flows/shared';
 import { ThemeProvider } from '@flows/theme';
-import { reportError } from '@flows/web-core';
+import { reportError, useWebCoreStore } from '@flows/web-core';
 
 import i18n from '../i18n';
 
@@ -34,6 +41,24 @@ const queryClient = new QueryClient({
 interface ProvidersProps {
     children: ReactNode;
 }
+
+/**
+ * API Key gate component
+ * Blocks app content until a valid API key is provided
+ */
+const ApiKeyGate = ({ children }: { children: ReactNode }) => {
+    const { apiKey, setApiKey, initializeApiKey } = useWebCoreStore();
+
+    useEffect(() => {
+        initializeApiKey();
+    }, [initializeApiKey]);
+
+    if (!apiKey) {
+        return <ApiKeyDialog open={true} onSubmit={setApiKey} />;
+    }
+
+    return children;
+};
 
 /**
  * App content with version check banner
@@ -73,7 +98,9 @@ export const Providers = ({ children }: ProvidersProps) => {
                     <HelmetProvider>
                         <QueryClientProvider client={queryClient}>
                             <ThemeProvider defaultTheme="dark" storageKey="flows-theme">
-                                <AppContent>{children}</AppContent>
+                                <ApiKeyGate>
+                                    <AppContent>{children}</AppContent>
+                                </ApiKeyGate>
                             </ThemeProvider>
                             {import.meta.env.DEV && <ReactQueryDevtools />}
                         </QueryClientProvider>
