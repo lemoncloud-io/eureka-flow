@@ -22,6 +22,8 @@ export type {
     WorkflowState,
 } from '@lemoncloud/eureka-flows-api';
 
+import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+
 /**
  * FlowStereo - stereotype of flow model
  */
@@ -234,10 +236,14 @@ export interface StopFlowParams {
 
 /**
  * SnapShotResult - result of flow snapshot
+ *
+ * Uses NodeData/EdgeData from API package to match backend response format.
+ * - NodeData: uses object format for config, inputData, outputData
+ * - EdgeData: connection data between nodes
  */
 export interface SnapShotResult extends FlowModel {
-    nodes: NodeView[];
-    edges: EdgeView[];
+    nodes: NodeData[];
+    edges: EdgeData[];
 }
 
 /**

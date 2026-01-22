@@ -12,18 +12,23 @@ const _log = console.log.bind(console, '[flows-api]');
 /**
  * Mock snapshot data for development/testing
  * Uses WorkflowState format: { nodes, edges }
+ *
+ * NodeData format:
+ * - config: Record<string, any> (object format)
+ * - inputData/outputData: Record<string, DataPacket> (object format)
+ * - status: 'IDLE' | 'WAITING' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR'
  */
-const MOCK_SNAPSHOT = {
+const MOCK_SNAPSHOT: SnapShotResult = {
     id: 'mock-flow-1',
     name: 'Sample Workflow',
-    state: 'active' as const,
+    state: 'active',
     nodes: [
         {
             id: 'node-1',
             type: 'input-text',
             position: { x: 100, y: 150 },
             config: { text: 'Hello World' },
-            status: 'IDLE' as const,
+            status: 'IDLE',
             inputData: {},
             outputData: {},
             customLabel: 'Text Input',
@@ -34,7 +39,7 @@ const MOCK_SNAPSHOT = {
             type: 'text-transform',
             position: { x: 400, y: 150 },
             config: { mode: 'uppercase' },
-            status: 'IDLE' as const,
+            status: 'IDLE',
             inputData: {},
             outputData: {},
             customLabel: 'Text Transform',
@@ -45,7 +50,7 @@ const MOCK_SNAPSHOT = {
             type: 'debug-log',
             position: { x: 700, y: 150 },
             config: { prefix: 'Output:' },
-            status: 'IDLE' as const,
+            status: 'IDLE',
             inputData: {},
             outputData: {},
             customLabel: 'Console Log',

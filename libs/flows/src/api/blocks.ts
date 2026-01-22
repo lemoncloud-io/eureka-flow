@@ -25,7 +25,7 @@ export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'):
 
 /**
  * Factory to create execute function for BlockDefinition from API
- * Only used for blocks that have backend processors (e.g., title-generator)
+ * Only used for blocks that have backend processors (e.g., blog-title-generator, single-image-generator)
  */
 const createExecuteFunction = (block: BlockDefinition): BlockDefinition['execute'] => {
     return async (inputs, config, onProgress) => {
@@ -49,8 +49,13 @@ const createExecuteFunction = (block: BlockDefinition): BlockDefinition['execute
 /**
  * Block types that have backend processors and should use API execution
  * Other blocks will use their mock execute functions (client-side processing)
+ *
+ * These types must match the processor.type values registered in the backend:
+ * - blog-title-generator: AI Blog Title Generator (Gemini API)
+ * - blog-tags-generator: AI Blog Tags Generator (Gemini API)
+ * - single-image-generator: AI Single Image Generator (Gemini API)
  */
-const BACKEND_PROCESSOR_TYPES = ['title-generator'];
+const BACKEND_PROCESSOR_TYPES = ['blog-title-generator', 'blog-tags-generator', 'single-image-generator'];
 
 /**
  * Fetch all available block definitions
