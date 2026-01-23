@@ -4,17 +4,21 @@ import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogT
 
 interface ApiKeyDialogProps {
     open: boolean;
-    onSubmit: (key: string) => void;
+    onSubmit: (key: string) => Promise<boolean>;
+    error?: string | null;
 }
 
-export const ApiKeyDialog = ({ open, onSubmit }: ApiKeyDialogProps) => {
+export const ApiKeyDialog = ({ open, onSubmit, error }: ApiKeyDialogProps) => {
     const [apiKey, setApiKey] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (apiKey.trim()) {
-            onSubmit(apiKey.trim());
-        }
+        if (!apiKey.trim() || isLoading) return;
+
+        setIsLoading(true);
+        await onSubmit(apiKey.trim());
+        setIsLoading(false);
     };
 
     return (
@@ -31,9 +35,11 @@ export const ApiKeyDialog = ({ open, onSubmit }: ApiKeyDialogProps) => {
                         value={apiKey}
                         onChange={e => setApiKey(e.target.value)}
                         autoFocus
+                        disabled={isLoading}
                     />
-                    <Button type="submit" disabled={!apiKey.trim()}>
-                        Save
+                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    <Button type="submit" disabled={!apiKey.trim() || isLoading}>
+                        {isLoading ? 'Validating...' : 'Save'}
                     </Button>
                 </form>
             </DialogContent>

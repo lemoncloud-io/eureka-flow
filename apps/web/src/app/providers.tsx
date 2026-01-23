@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { HelmetProvider } from 'react-helmet-async';
 import { I18nextProvider } from 'react-i18next';
@@ -16,7 +16,7 @@ import {
     useVersionCheck,
 } from '@flows/shared';
 import { ThemeProvider } from '@flows/theme';
-import { ENV, reportError, useWebCoreStore } from '@flows/web-core';
+import { reportError, useWebCoreStore, validateApiKey } from '@flows/web-core';
 
 import i18n from '../i18n';
 
@@ -45,22 +45,28 @@ interface ProvidersProps {
 /**
  * API Key gate component
  * Blocks app content until a valid API key is provided
- * Skipped in local environment
  */
 const ApiKeyGate = ({ children }: { children: ReactNode }) => {
     const { apiKey, setApiKey, initializeApiKey } = useWebCoreStore();
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         initializeApiKey();
     }, [initializeApiKey]);
 
-    // Skip API key check in local environment
-    if (ENV === 'local') {
-        return children;
-    }
+    const handleApiKeySubmit = async (key: string): Promise<boolean> => {
+        setError(null);
+        const isValid = await validateApiKey(key);
+        if (isValid) {
+            setApiKey(key);
+            return true;
+        }
+        setError('Invalid API key. Please try again.');
+        return false;
+    };
 
     if (!apiKey) {
-        return <ApiKeyDialog open={true} onSubmit={setApiKey} />;
+        return <ApiKeyDialog open={true} onSubmit={handleApiKeySubmit} error={error} />;
     }
 
     return children;
