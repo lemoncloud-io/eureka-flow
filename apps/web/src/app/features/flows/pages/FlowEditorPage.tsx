@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useBlocks, useFlows, useFlowsStore } from '@flows/flows';
+import { useBlocks, useFlows } from '@flows/flows';
 
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
@@ -10,8 +10,6 @@ import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 
 export const FlowEditorPage = () => {
     const canvasRef = useRef<WorkflowCanvasRef>(null);
-
-    const { blockRegistry: _blockRegistry, isBlocksLoaded: _isBlocksLoaded } = useFlowsStore();
 
     const { loadBlocks } = useBlocks();
     const {

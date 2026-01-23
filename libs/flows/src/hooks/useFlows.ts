@@ -1,36 +1,13 @@
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 
-import { createFlow, fetchBlockLogs, loadFlow } from '../api';
-import { useCreateFlowMutation, useLoadFlowQuery, useSaveFlowMutation } from './queries';
+import { useQueryClient } from '@tanstack/react-query';
+
+import { createFlow, loadFlow } from '../api';
+import { flowsKeys, useCreateFlowMutation, useLoadFlowQuery, useSaveFlowMutation } from './queries';
 import { useFlowsStore } from '../stores/useFlowsStore';
+import { flowStorage } from '../utils/flowStorage';
 
 import type { LoadFlowResult, SaveFlowBody } from '../types';
-import type { LogEntry } from '@lemoncloud/eureka-flows-api';
-
-// LocalStorage key for persisting current flow ID
-const FLOW_ID_STORAGE_KEY = 'flows-current-flow-id';
-
-/**
- * Get saved flow ID from localStorage
- */
-const getSavedFlowId = (): string | null => {
-    try {
-        return localStorage.getItem(FLOW_ID_STORAGE_KEY);
-    } catch {
-        return null;
-    }
-};
-
-/**
- * Save flow ID to localStorage
- */
-const saveFlowIdToStorage = (flowId: string): void => {
-    try {
-        localStorage.setItem(FLOW_ID_STORAGE_KEY, flowId);
-    } catch {
-        console.warn('Failed to save flow ID to localStorage');
-    }
-};
 
 /**
  * Hook for managing workflows/flows
@@ -45,6 +22,7 @@ const saveFlowIdToStorage = (flowId: string): void => {
  * This hook only manages flow metadata (name, save/load).
  */
 export const useFlows = () => {
+    const queryClient = useQueryClient();
     const {
         currentFlowId,
         flowName,
@@ -54,8 +32,6 @@ export const useFlows = () => {
         setLastSavedAt,
         toggleAutoSave,
     } = useFlowsStore();
-
-    const autoSaveTimerRef = useRef<number | null>(null);
 
     // TanStack Query hooks
     const loadFlowQuery = useLoadFlowQuery(currentFlowId);
@@ -76,13 +52,16 @@ export const useFlows = () => {
         isNew: boolean;
     }> => {
         // Check localStorage for saved flow ID
-        const savedFlowId = getSavedFlowId();
+        const savedFlowId = flowStorage.getFlowId();
 
         if (savedFlowId) {
             console.log('[useFlows] Found saved flow ID:', savedFlowId);
             try {
-                // Try to load existing flow
-                const flowData = await loadFlow(savedFlowId);
+                // Use queryClient.fetchQuery for caching benefit
+                const flowData = await queryClient.fetchQuery({
+                    queryKey: flowsKeys.snapshot(savedFlowId),
+                    queryFn: () => loadFlow(savedFlowId),
+                });
                 setCurrentFlowId(savedFlowId);
                 if (flowData.name) {
                     setFlowName(flowData.name);
@@ -102,7 +81,7 @@ export const useFlows = () => {
 
             if (newFlowId) {
                 setCurrentFlowId(newFlowId);
-                saveFlowIdToStorage(newFlowId);
+                flowStorage.setFlowId(newFlowId);
                 setFlowName('Untitled Workflow');
                 return { flowId: newFlowId, flowData: null, isNew: true };
             }
@@ -110,12 +89,12 @@ export const useFlows = () => {
             console.error('[useFlows] Failed to create new flow:', err);
         }
 
-        // Fallback: use a local ID (won't persist to server until save)
+        // Fallback: use a local ID (offline mode - will sync on first save)
         const fallbackId = `local-${Date.now()}`;
         setCurrentFlowId(fallbackId);
         setFlowName('Untitled Workflow');
         return { flowId: fallbackId, flowData: null, isNew: true };
-    }, [setCurrentFlowId, setFlowName]);
+    }, [queryClient, setCurrentFlowId, setFlowName]);
 
     /**
      * Load a specific flow by ID
@@ -130,10 +109,14 @@ export const useFlows = () => {
 
             console.log('[useFlows] Loading flow:', id);
             setCurrentFlowId(id);
-            saveFlowIdToStorage(id);
+            flowStorage.setFlowId(id);
 
             try {
-                const flowData = await loadFlow(id);
+                // Use queryClient.fetchQuery for caching benefit
+                const flowData = await queryClient.fetchQuery({
+                    queryKey: flowsKeys.snapshot(id),
+                    queryFn: () => loadFlow(id),
+                });
                 if (flowData.name) {
                     setFlowName(flowData.name);
                 }
@@ -143,7 +126,7 @@ export const useFlows = () => {
                 return null;
             }
         },
-        [setCurrentFlowId, setFlowName]
+        [queryClient, setCurrentFlowId, setFlowName]
     );
 
     /**
@@ -173,7 +156,7 @@ export const useFlows = () => {
 
                     if (flowId) {
                         setCurrentFlowId(flowId);
-                        saveFlowIdToStorage(flowId);
+                        flowStorage.setFlowId(flowId);
                     }
                 } else {
                     // Save to existing flow
@@ -202,7 +185,7 @@ export const useFlows = () => {
 
             if (newFlowId) {
                 setCurrentFlowId(newFlowId);
-                saveFlowIdToStorage(newFlowId);
+                flowStorage.setFlowId(newFlowId);
                 setFlowName('Untitled Workflow');
                 setLastSavedAt(null);
                 return newFlowId;
@@ -213,31 +196,6 @@ export const useFlows = () => {
             return null;
         }
     }, [createFlowMutation, setCurrentFlowId, setFlowName, setLastSavedAt]);
-
-    /**
-     * Trigger auto-save with debounce
-     */
-    const triggerAutoSave = useCallback(
-        (saveCallback: () => Promise<void>) => {
-            if (!isAutoSaveEnabled) return;
-
-            if (autoSaveTimerRef.current) {
-                window.clearTimeout(autoSaveTimerRef.current);
-            }
-
-            autoSaveTimerRef.current = window.setTimeout(() => {
-                saveCallback();
-            }, 2000);
-        },
-        [isAutoSaveEnabled]
-    );
-
-    /**
-     * Fetch logs for a block/node
-     */
-    const getBlockLogs = useCallback(async (nodeId: string): Promise<LogEntry[]> => {
-        return fetchBlockLogs(nodeId);
-    }, []);
 
     // Derive loading/saving states from TanStack Query
     const isLoading = loadFlowQuery.isLoading || loadFlowQuery.isFetching;
@@ -269,16 +227,5 @@ export const useFlows = () => {
         // Actions - Local State
         setFlowName,
         toggleAutoSave,
-        triggerAutoSave,
-
-        // Actions - Logs
-        getBlockLogs,
-
-        // Query states for advanced usage
-        loadFlowQuery,
-
-        // Storage helpers
-        getSavedFlowId,
-        saveFlowIdToStorage,
     };
 };
