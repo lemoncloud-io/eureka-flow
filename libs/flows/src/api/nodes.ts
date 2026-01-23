@@ -1,6 +1,6 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { ApiListResult, NodeBody, NodeView, Position } from '../types';
+import type { ApiListResult, NodeBody, NodeView, Position, doPostRunBody } from '../types';
 
 const _log = console.log.bind(console, '[nodes-api]');
 
@@ -123,15 +123,22 @@ export const toggleNodeDisabled = async (id: string, disabled: boolean): Promise
  * Executes the node's processor with current inputs and config.
  * Supports async execution via SQS queue.
  *
+ * @see eureka-flows-api #0.26.114
  * @param nodeId - Node ID to execute
+ * @param body - Request body containing config
+ * @param body.config$ - Node config as Record<string, string>
  * @param options - Execution options
  * @param options.async - If true, queues execution and returns immediately
  */
-export const runNode = async (nodeId: string, options?: { async?: boolean }): Promise<NodeView> => {
-    _log(`> runNode(${nodeId})`, options);
+export const runNode = async (
+    nodeId: string,
+    body?: doPostRunBody,
+    options?: { async?: boolean }
+): Promise<NodeView> => {
+    _log(`> runNode(${nodeId})`, { body, options });
     try {
         const params = options?.async ? '?async' : '';
-        const response = await api.post<NodeView>(`/nodes/${nodeId}/run${params}`);
+        const response = await api.post<NodeView>(`/nodes/${nodeId}/run${params}`, body || {});
         return response.data;
     } catch (err) {
         _log('> runNode error:', err);

@@ -8,6 +8,7 @@ export type {
     Connection,
     DataPacket,
     DataType,
+    doPostRunBody,
     EdgeData,
     ExecutionStats,
     ListResult,

@@ -4,8 +4,15 @@ import { requiresBackendProcessing, runNode } from '../api';
 import { useCanvasStore } from '../stores/useCanvasStore';
 import { useFlowsStore } from '../stores/useFlowsStore';
 
-import type { NodeView } from '../types';
+import type { NodeView, doPostRunBody } from '../types';
 import type { DataPacket, NodeData } from '@lemoncloud/eureka-flows-api';
+
+/**
+ * Convert node config (Record<string, string>) to doPostRunBody format
+ */
+const buildRunNodeBody = (config: Record<string, string> | undefined): doPostRunBody => {
+    return { config$: config };
+};
 
 /**
  * Hook for managing flow execution
@@ -135,9 +142,10 @@ export const useExecution = () => {
                         )
                     );
                 } else {
-                    // Backend execution: call API
+                    // Backend execution: call API with config
                     console.log(`[useExecution] Backend execution: ${blockType}`);
-                    await runNode(nodeId);
+                    const body = buildRunNodeBody(node.config);
+                    await runNode(nodeId, body);
 
                     // Mark as COMPLETED (backend updates node state)
                     setNodes(prev =>
@@ -218,8 +226,9 @@ export const useExecution = () => {
                     )
                 );
 
-                // Call API: POST /nodes/:nodeId/run
-                const result = await runNode(nodeId, options);
+                // Call API: POST /nodes/:nodeId/run with config
+                const body = buildRunNodeBody(node.config);
+                const result = await runNode(nodeId, body, options);
                 return result;
             } catch (error) {
                 console.error('Failed to run node:', error);
