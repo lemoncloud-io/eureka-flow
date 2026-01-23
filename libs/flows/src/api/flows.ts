@@ -1,6 +1,6 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { ApiListResult, FlowBody, FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView } from '../types';
+import type { LoadFlowResult, SaveFlowBody, SaveFlowView } from '../types';
 import type { BlockDefinition, DataPacket, LogEntry } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[flows-api]');
@@ -79,39 +79,12 @@ const MOCK_SNAPSHOT: LoadFlowResult = {
 // Flow CRUD API
 // ============================================================================
 
-/**
- * List all flows
- * GET /flows
- */
-export const listFlows = async (): Promise<FlowView[]> => {
-    _log('> listFlows()');
-    try {
-        const response = await withRetry(() => api.get<ApiListResult<FlowView>>('/flows'), 3, 'listFlows');
-        return response.data.list || [];
-    } catch (err) {
-        _log('> listFlows error, returning mock:', err);
-        return [{ id: MOCK_SNAPSHOT.id, name: MOCK_SNAPSHOT.name, state: MOCK_SNAPSHOT.state }];
-    }
-};
-
-/**
- * Get flow by ID
- * GET /flows/:id
- */
-export const getFlow = async (id: string): Promise<FlowView> => {
-    if (!id) {
-        _log('> getFlow() - skipped (no id)');
-        return { id: MOCK_SNAPSHOT.id, name: MOCK_SNAPSHOT.name, state: MOCK_SNAPSHOT.state };
-    }
-    _log(`> getFlow(${id})`);
-    try {
-        const response = await api.get<FlowView>(`/flows/${id}`);
-        return response.data;
-    } catch (err) {
-        _log('> getFlow error, returning mock:', err);
-        return { id: MOCK_SNAPSHOT.id, name: MOCK_SNAPSHOT.name, state: MOCK_SNAPSHOT.state };
-    }
-};
+// NOTE: The backend only supports these APIs:
+// - POST /flows/:id/save (create with id='0', or update with existing id)
+// - GET /flows/:id/load (load flow snapshot)
+// - POST /nodes/:id/run (execute node)
+//
+// listFlows and getFlow are NOT supported by the backend.
 
 /**
  * Load flow snapshot (complete state with nodes and edges)
@@ -165,48 +138,19 @@ export const saveFlow = async (id: string, body: SaveFlowBody): Promise<SaveFlow
 };
 
 /**
- * Create new flow
- * POST /flows/0
- */
-export const createFlow = async (body: FlowBody): Promise<FlowView> => {
-    _log('> createFlow()', body);
-    try {
-        const response = await api.post<FlowView>('/flows/0', body);
-        return response.data;
-    } catch (err) {
-        _log('> createFlow error, returning mock:', err);
-        return { id: `mock-${Date.now()}`, name: body.name || 'New Flow', state: 'draft' };
-    }
-};
-
-/**
- * Update existing flow
- * POST /flows/:id
+ * Create new flow via POST /flows/0/save
+ * This is the only way to create a new flow in the backend.
  *
- * Note: Backend uses POST for both create and update
+ * @param body - Initial flow state (nodes, edges)
+ * @returns SaveFlowView with the new flow ID from server
  */
-export const updateFlow = async (id: string, body: FlowBody): Promise<FlowView> => {
-    _log(`> updateFlow(${id})`, body);
-    try {
-        const response = await api.post<FlowView>(`/flows/${id}`, body);
-        return response.data;
-    } catch (err) {
-        _log('> updateFlow error, returning mock:', err);
-        return { id, ...body };
-    }
-};
-
-/**
- * Delete flow
- * DELETE /flows/:id
- */
-export const deleteFlow = async (id: string): Promise<void> => {
-    _log(`> deleteFlow(${id})`);
-    try {
-        await api.delete(`/flows/${id}`);
-    } catch (err) {
-        _log('> deleteFlow error (ignored):', err);
-    }
+export const createFlow = async (body?: Partial<SaveFlowBody>): Promise<SaveFlowView> => {
+    _log('> createFlow() via POST /flows/0/save');
+    const saveBody: SaveFlowBody = {
+        nodes: body?.nodes ?? [],
+        edges: body?.edges ?? [],
+    };
+    return saveFlow('0', saveBody);
 };
 
 // ============================================================================

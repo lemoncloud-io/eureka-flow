@@ -1,30 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { flowsKeys } from './keys';
-import { createFlow, deleteFlow, getFlow, listFlows, loadFlow, saveFlow, updateFlow } from '../../api';
+import { createFlow, loadFlow, saveFlow } from '../../api';
 
-import type { FlowBody, FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView } from '../../types';
+import type { LoadFlowResult, SaveFlowBody, SaveFlowView } from '../../types';
 
-/**
- * Query hook for listing all flows
- */
-export const useFlowsListQuery = () => {
-    return useQuery({
-        queryKey: flowsKeys.lists(),
-        queryFn: listFlows,
-    });
-};
-
-/**
- * Query hook for getting a single flow by ID
- */
-export const useFlowQuery = (flowId: string | null) => {
-    return useQuery({
-        queryKey: flowsKeys.detail(flowId ?? ''),
-        queryFn: () => getFlow(flowId!),
-        enabled: !!flowId,
-    });
-};
+// NOTE: useFlowsListQuery and useFlowQuery are removed because
+// the backend does not support GET /flows or GET /flows/:id endpoints.
+// Only POST /flows/:id/save and GET /flows/:id/load are supported.
 
 /**
  * Query hook for loading flow (full design with nodes and edges)
@@ -39,48 +22,12 @@ export const useLoadFlowQuery = (flowId: string | null) => {
 };
 
 /**
- * Mutation hook for creating a new flow
+ * Mutation hook for creating a new flow via POST /flows/0/save
+ * Returns SaveFlowView which includes the server-generated flow ID
  */
 export const useCreateFlowMutation = () => {
-    const queryClient = useQueryClient();
-
     return useMutation({
-        mutationFn: (body: FlowBody) => createFlow(body),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: flowsKeys.lists() });
-        },
-    });
-};
-
-/**
- * Mutation hook for updating a flow
- */
-export const useUpdateFlowMutation = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: ({ id, body }: { id: string; body: FlowBody }) => updateFlow(id, body),
-        onSuccess: (_data, variables) => {
-            queryClient.invalidateQueries({ queryKey: flowsKeys.detail(variables.id) });
-            queryClient.invalidateQueries({ queryKey: flowsKeys.snapshot(variables.id) });
-            queryClient.invalidateQueries({ queryKey: flowsKeys.lists() });
-        },
-    });
-};
-
-/**
- * Mutation hook for deleting a flow
- */
-export const useDeleteFlowMutation = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: (id: string) => deleteFlow(id),
-        onSuccess: (_data, id) => {
-            queryClient.invalidateQueries({ queryKey: flowsKeys.detail(id) });
-            queryClient.invalidateQueries({ queryKey: flowsKeys.snapshot(id) });
-            queryClient.invalidateQueries({ queryKey: flowsKeys.lists() });
-        },
+        mutationFn: (body?: Partial<SaveFlowBody>) => createFlow(body),
     });
 };
 
@@ -100,4 +47,4 @@ export const useSaveFlowMutation = () => {
 };
 
 // Re-export types for convenience
-export type { FlowView, FlowBody, LoadFlowResult, SaveFlowBody, SaveFlowView };
+export type { LoadFlowResult, SaveFlowBody, SaveFlowView };

@@ -5,7 +5,6 @@ import { useBlocks, useFlows, useFlowsStore } from '@flows/flows';
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
-import { generateId } from '../utils';
 
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 
@@ -22,8 +21,8 @@ export const FlowEditorPage = () => {
         isSaving,
         lastSavedAt,
         isAutoSaveEnabled,
+        initializeFlow,
         loadFlowById,
-        loadFlowsList,
         saveCurrentFlow,
         createNewFlow,
         setFlowName,
@@ -59,30 +58,45 @@ export const FlowEditorPage = () => {
 
         const boot = async () => {
             try {
+                // 1. Load block registry first
                 setLoadingText('Loading Block Registry...');
                 await loadBlocks();
 
+                // 2. Check URL for flow ID
                 const pathParts = window.location.pathname.split('/');
                 const flowIdFromUrl = pathParts.length > 2 && pathParts[1] === 'flows' ? pathParts[2] : null;
                 const nodeIdFromHash = window.location.hash.replace('#', '') || null;
 
-                setLoadingText(flowIdFromUrl ? `Loading Flow ${flowIdFromUrl}...` : 'Loading Default Flow...');
+                let loadedId: string | null = null;
+                let initialFlow = null;
 
-                let loadedId = flowIdFromUrl;
-                const initialFlow = await loadFlowById(flowIdFromUrl || undefined);
+                if (flowIdFromUrl) {
+                    // URL has flow ID - load that specific flow
+                    setLoadingText(`Loading Flow ${flowIdFromUrl}...`);
+                    initialFlow = await loadFlowById(flowIdFromUrl);
+                    loadedId = flowIdFromUrl;
+                } else {
+                    // No URL flow ID - initialize from localStorage or create new
+                    setLoadingText('Initializing Flow...');
+                    const result = await initializeFlow();
+                    loadedId = result.flowId;
+                    initialFlow = result.flowData;
 
-                if (!flowIdFromUrl) {
-                    loadedId = generateId();
-                    createNewFlow(loadedId);
+                    if (result.isNew) {
+                        setLoadingText('Created new flow');
+                    }
                 }
 
                 setIsAppReady(true);
 
                 setTimeout(() => {
-                    if (canvasRef.current && initialFlow) {
-                        canvasRef.current.loadWorkflow(initialFlow);
-                        updateUrl(loadedId, nodeIdFromHash);
-
+                    if (canvasRef.current) {
+                        if (initialFlow) {
+                            canvasRef.current.loadWorkflow(initialFlow);
+                        }
+                        if (loadedId) {
+                            updateUrl(loadedId, nodeIdFromHash);
+                        }
                         if (nodeIdFromHash) {
                             canvasRef.current.selectNode(nodeIdFromHash);
                         }
@@ -132,37 +146,33 @@ export const FlowEditorPage = () => {
     };
 
     const handleLoad = async () => {
-        const flows = await loadFlowsList();
-        if (flows.length === 0) {
-            showNotification('No saved flows found', 'error');
-            return;
-        }
+        // Backend doesn't support listing flows
+        // User can enter a flow ID directly
+        const flowId = prompt('Enter flow ID to load:');
 
-        const flowListStr = flows.map((f, i) => `${i + 1}. ${f.name} (ID: ${f.id})`).join('\n');
-        const selection = prompt(`Enter number to load:\n${flowListStr}`);
-
-        if (selection) {
-            const index = parseInt(selection) - 1;
-            if (flows[index]) {
-                const flowId = flows[index].id;
-                const data = await loadFlowById(flowId);
-                if (canvasRef.current && data) {
-                    canvasRef.current.loadWorkflow(data);
-                    updateUrl(flowId, null);
-                    showNotification(`Loaded "${flows[index].name}"`, 'success');
-                }
+        if (flowId && flowId.trim()) {
+            const data = await loadFlowById(flowId.trim());
+            if (canvasRef.current && data) {
+                canvasRef.current.loadWorkflow(data);
+                updateUrl(flowId.trim(), null);
+                showNotification(`Loaded flow: ${flowId.trim()}`, 'success');
+            } else {
+                showNotification('Failed to load flow', 'error');
             }
         }
     };
 
-    const handleNew = () => {
+    const handleNew = async () => {
         if (!canvasRef.current) return;
         if (window.confirm('Create new flow? Unsaved changes will be lost.')) {
             canvasRef.current.newWorkflow();
-            const newId = generateId();
-            createNewFlow(newId);
-            updateUrl(newId, null);
-            showNotification('New flow created', 'success');
+            const newId = await createNewFlow();
+            if (newId) {
+                updateUrl(newId, null);
+                showNotification('New flow created', 'success');
+            } else {
+                showNotification('Failed to create new flow', 'error');
+            }
         }
     };
 

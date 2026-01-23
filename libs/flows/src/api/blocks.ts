@@ -25,7 +25,12 @@ export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'):
  * - blog-tags-generator: AI Blog Tags Generator (Gemini API)
  * - single-image-generator: AI Single Image Generator (Gemini API)
  */
-export const BACKEND_PROCESSOR_TYPES = ['blog-title-generator', 'blog-tags-generator', 'single-image-generator'];
+export const BACKEND_PROCESSOR_TYPES = [
+    'blog-title-generator',
+    'blog-tags-generator',
+    'single-image-generator',
+    'title-generator', // Title Generator uses backend AI processing
+];
 
 /**
  * Check if a block type requires backend processing
