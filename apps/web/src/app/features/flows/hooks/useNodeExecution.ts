@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 
+import { requiresBackendProcessing, runNode } from '@flows/flows';
+
 import type { BlockDefinition, Connection, DataPacket, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
 
 interface UseNodeExecutionOptions {
@@ -122,7 +124,46 @@ export const useNodeExecution = (options: UseNodeExecutionOptions): UseNodeExecu
             };
 
             try {
-                const results = await nodeDef.execute(inputs, currentNode.config, onProgress);
+                let results: Record<string, DataPacket>;
+
+                // Check if block requires backend processing
+                if (requiresBackendProcessing(currentNode.type)) {
+                    // Backend execution: POST /nodes/:id/run
+                    console.log(`[useNodeExecution] Backend execution: ${currentNode.type}`);
+                    const nodeResult = await runNode(nodeId);
+
+                    // Extract outputData from API response
+                    // Backend returns NodeView with outputData$$ (array format) or outputData (object format)
+                    if (nodeResult.outputData$$) {
+                        // Convert array format to object format
+                        type OutputDataItem = {
+                            portId: string;
+                            packet: { value: unknown; type: string; timestamp?: number };
+                        };
+                        results = nodeResult.outputData$$.reduce<Record<string, DataPacket>>(
+                            (acc: Record<string, DataPacket>, item: OutputDataItem) => {
+                                acc[item.portId] = {
+                                    value: item.packet.value,
+                                    type: item.packet.type as 'text' | 'image' | 'number',
+                                    timestamp: item.packet.timestamp || Date.now(),
+                                };
+                                return acc;
+                            },
+                            {}
+                        );
+                    } else {
+                        results = {};
+                    }
+                } else if (nodeDef.execute) {
+                    // Frontend execution: call block.execute() directly
+                    console.log(`[useNodeExecution] Frontend execution: ${currentNode.type}`);
+                    results = await nodeDef.execute(inputs, currentNode.config, onProgress);
+                } else {
+                    // No execute function available
+                    console.warn(`[useNodeExecution] No execute function for: ${currentNode.type}`);
+                    results = {};
+                }
+
                 const endTime = Date.now();
                 const duration = endTime - startTime;
 

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { runNode } from '../api';
+import { requiresBackendProcessing, runNode } from '../api';
 import { useCanvasStore } from '../stores/useCanvasStore';
+import { useFlowsStore } from '../stores/useFlowsStore';
 
 import type { NodeView } from '../types';
 import type { DataPacket, NodeData } from '@lemoncloud/eureka-flows-api';
@@ -16,6 +17,7 @@ import type { DataPacket, NodeData } from '@lemoncloud/eureka-flows-api';
  */
 export const useExecution = () => {
     const { nodes, connections, setNodes } = useCanvasStore();
+    const blockRegistry = useFlowsStore(state => state.blockRegistry);
     const prevInputTimestampsRef = useRef<Record<string, Record<string, number>>>({});
 
     /**
@@ -68,11 +70,18 @@ export const useExecution = () => {
 
     /**
      * Run a single node
+     *
+     * Execution strategy:
+     * - Frontend-only blocks: Execute locally using block.execute()
+     * - Backend-required blocks: Call POST /nodes/:id/run API
      */
     const executeNode = useCallback(
         async (nodeId: string): Promise<void> => {
             const node = nodes.find(n => n.id === nodeId);
             if (!node || node.disabled) return;
+
+            const blockType = node.type;
+            const blockDef = blockType ? blockRegistry[blockType] : null;
 
             // Set node status to RUNNING
             setNodes(prev =>
@@ -89,30 +98,72 @@ export const useExecution = () => {
             );
 
             try {
-                // Call the node execution API
-                await runNode(nodeId);
+                let outputData: Record<string, DataPacket> | undefined;
 
-                // Mark as COMPLETED
-                setNodes(prev =>
-                    prev.map(n =>
-                        n.id === nodeId
-                            ? {
-                                  ...n,
-                                  status: 'COMPLETED',
-                                  executionStats: {
-                                      ...n.executionStats,
-                                      duration: Date.now() - (n.executionStats?.startTime || Date.now()),
-                                      progress: 100,
-                                  },
-                              }
-                            : n
-                    )
-                );
+                // Check if block can be executed on frontend
+                const canExecuteLocally = blockDef?.execute && !requiresBackendProcessing(blockType || '');
+
+                if (canExecuteLocally && blockDef?.execute) {
+                    // Frontend execution: call block.execute() directly
+                    console.log(`[useExecution] Frontend execution: ${blockType}`);
+
+                    const onProgress = (progress: number) => {
+                        setNodes(prev =>
+                            prev.map(n =>
+                                n.id === nodeId ? { ...n, executionStats: { ...n.executionStats, progress } } : n
+                            )
+                        );
+                    };
+
+                    outputData = await blockDef.execute(node.inputData || {}, node.config || {}, onProgress);
+
+                    // Update node with output data
+                    setNodes(prev =>
+                        prev.map(n =>
+                            n.id === nodeId
+                                ? {
+                                      ...n,
+                                      status: 'COMPLETED' as const,
+                                      outputData: outputData || {},
+                                      executionStats: {
+                                          ...n.executionStats,
+                                          duration: Date.now() - (n.executionStats?.startTime || Date.now()),
+                                          progress: 100,
+                                      },
+                                  }
+                                : n
+                        )
+                    );
+                } else {
+                    // Backend execution: call API
+                    console.log(`[useExecution] Backend execution: ${blockType}`);
+                    await runNode(nodeId);
+
+                    // Mark as COMPLETED (backend updates node state)
+                    setNodes(prev =>
+                        prev.map(n =>
+                            n.id === nodeId
+                                ? {
+                                      ...n,
+                                      status: 'COMPLETED',
+                                      executionStats: {
+                                          ...n.executionStats,
+                                          duration: Date.now() - (n.executionStats?.startTime || Date.now()),
+                                          progress: 100,
+                                      },
+                                  }
+                                : n
+                        )
+                    );
+
+                    // Get output from updated node for propagation
+                    const updatedNode = nodes.find(n => n.id === nodeId);
+                    outputData = updatedNode?.outputData;
+                }
 
                 // Propagate output to downstream nodes
-                const updatedNode = nodes.find(n => n.id === nodeId);
-                if (updatedNode?.outputData) {
-                    propagateOutputToDownstream(nodeId, updatedNode.outputData);
+                if (outputData) {
+                    propagateOutputToDownstream(nodeId, outputData);
                 }
             } catch (error) {
                 // Mark as ERROR
@@ -129,7 +180,7 @@ export const useExecution = () => {
                 );
             }
         },
-        [nodes, setNodes, propagateOutputToDownstream]
+        [nodes, setNodes, blockRegistry, propagateOutputToDownstream]
     );
 
     /**

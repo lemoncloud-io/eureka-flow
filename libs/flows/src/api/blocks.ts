@@ -2,14 +2,7 @@ import { api, withRetry } from '@flows/web-core';
 
 import { MOCKED_BLOCK_DEFINITIONS } from './mock-blocks';
 
-import type {
-    BlockDefinition,
-    BlockView,
-    DataPacket,
-    ListResult,
-    ProcessBody,
-    ProcessResult,
-} from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinition, BlockView, DataPacket, ListResult } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[blocks-api]');
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -24,29 +17,6 @@ export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'):
 });
 
 /**
- * Factory to create execute function for BlockDefinition from API
- * Only used for blocks that have backend processors (e.g., blog-title-generator, single-image-generator)
- */
-const createExecuteFunction = (block: BlockDefinition): BlockDefinition['execute'] => {
-    return async (inputs, config, onProgress) => {
-        const id = block.id || block.type;
-        const ep = `/blocks/${id}/process`;
-        _log(`> Executing block[${id}] via API`);
-
-        onProgress?.(10);
-        const body: ProcessBody = { inputs, config };
-        const result = await api.post<ProcessResult>(ep, body);
-        _log(`> Received output from block[${id}]`);
-        onProgress?.(100);
-
-        return Object.entries(result.data.$output).reduce<Record<string, DataPacket>>((acc, [key, val]) => {
-            acc[key] = createPacket(val?.value, val?.type || ('text' as 'text' | 'image' | 'number'));
-            return acc;
-        }, {});
-    };
-};
-
-/**
  * Block types that have backend processors and should use API execution
  * Other blocks will use their mock execute functions (client-side processing)
  *
@@ -55,7 +25,14 @@ const createExecuteFunction = (block: BlockDefinition): BlockDefinition['execute
  * - blog-tags-generator: AI Blog Tags Generator (Gemini API)
  * - single-image-generator: AI Single Image Generator (Gemini API)
  */
-const BACKEND_PROCESSOR_TYPES = ['blog-title-generator', 'blog-tags-generator', 'single-image-generator'];
+export const BACKEND_PROCESSOR_TYPES = ['blog-title-generator', 'blog-tags-generator', 'single-image-generator'];
+
+/**
+ * Check if a block type requires backend processing
+ */
+export const requiresBackendProcessing = (blockType: string): boolean => {
+    return BACKEND_PROCESSOR_TYPES.includes(blockType);
+};
 
 /**
  * Fetch all available block definitions
@@ -80,20 +57,21 @@ export const listBlocks = async (): Promise<BlockDefinition[]> => {
         if (!list?.length) return MOCKED_BLOCK_DEFINITIONS;
 
         // Merge with mocked definitions
-        // - For blocks with backend processors: use API execute function
-        // - For blocks with mock execute: preserve the mock execute function (client-side processing)
+        // - Backend blocks (BACKEND_PROCESSOR_TYPES): No execute function needed (uses POST /nodes/:id/run)
+        // - Frontend blocks: Use mock execute function for client-side processing
         return list.reduce<BlockDefinition[]>(
             (acc, apiBlock) => {
                 const idx = acc.findIndex(m => m.type === apiBlock.type);
                 const mockBlock = idx >= 0 ? acc[idx] : null;
 
-                // Determine which execute function to use
-                const hasBackendProcessor = BACKEND_PROCESSOR_TYPES.includes(apiBlock.type);
-                const execute = hasBackendProcessor ? createExecuteFunction(apiBlock) : mockBlock?.execute; // Use mock's execute for client-side blocks
+                // For frontend blocks, use mock's execute function
+                // For backend blocks, execute is undefined (handled by runNode API)
+                const isBackendBlock = BACKEND_PROCESSOR_TYPES.includes(apiBlock.type);
+                const execute = isBackendBlock ? undefined : mockBlock?.execute;
 
                 const mergedBlock = {
                     ...apiBlock,
-                    execute: execute || createExecuteFunction(apiBlock), // Fallback to API if no mock
+                    execute,
                 };
 
                 if (idx >= 0) {
