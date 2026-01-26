@@ -521,7 +521,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 },
                 stopAll: () => {
                     batchRunCountRef.current = 0;
-                    setNodes(prev => prev.map(n => (n.status === 'running' ? { ...n, status: 'idle' as const } : n)));
+                    setNodes(prev => prev.map(n => (n.status === 'RUNNING' ? { ...n, status: 'IDLE' } : n)));
                 },
             }),
             [
