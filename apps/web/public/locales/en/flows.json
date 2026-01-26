@@ -27,7 +27,8 @@
         "expandSidebar": "Expand Sidebar",
         "collapseSidebar": "Collapse Sidebar",
         "searchBlocks": "Search blocks...",
-        "noResults": "No blocks found"
+        "noResults": "No blocks found",
+        "clickToAdd": "Click to add to canvas"
     },
     "canvas": {
         "executionLogs": "Execution Logs",

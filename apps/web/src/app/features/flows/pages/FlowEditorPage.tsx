@@ -383,7 +383,21 @@ export const FlowEditorPage = () => {
     }
 
     return (
-        <div className="flex flex-col h-screen bg-background text-foreground font-sans overflow-hidden animate-in fade-in duration-500">
+        <div className="relative h-screen bg-canvas text-foreground font-sans overflow-hidden animate-in fade-in duration-500">
+            {/* Hidden file input */}
+            <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFileChange} />
+
+            {/* Full-screen Canvas */}
+            <div className="absolute inset-0">
+                <WorkflowCanvas
+                    ref={canvasRef}
+                    onNodeSelect={handleSelectionChange}
+                    onChange={handleCanvasChange}
+                    onBeforeBackendRun={handleBeforeBackendRun}
+                />
+            </div>
+
+            {/* Floating Header */}
             <Header
                 flowInfo={{
                     flowName,
@@ -422,41 +436,31 @@ export const FlowEditorPage = () => {
                 onShare={handleShare}
             />
 
-            <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFileChange} />
+            {/* Floating Sidebar */}
+            <Sidebar onAddNode={handleAddNode} isLoading={isLoading} />
 
-            <div className="flex flex-1 relative overflow-hidden">
-                <Sidebar onAddNode={handleAddNode} isLoading={isLoading} />
-
-                <div className="flex-1 relative h-full">
-                    <WorkflowCanvas
-                        ref={canvasRef}
-                        onNodeSelect={handleSelectionChange}
-                        onChange={handleCanvasChange}
-                        onBeforeBackendRun={handleBeforeBackendRun}
-                    />
-
-                    {notification && (
-                        <div
-                            className={`absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded shadow-lg text-sm font-semibold animate-in slide-in-from-top-2 fade-in z-50 ${
-                                notification.type === 'success'
-                                    ? 'bg-success text-success-foreground'
-                                    : 'bg-destructive text-destructive-foreground'
-                            }`}
-                        >
-                            {notification.message}
-                        </div>
-                    )}
-
-                    {isLoading && (
-                        <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-sm">
-                            <div className="flex flex-col items-center">
-                                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-2"></div>
-                                <span className="text-sm font-semibold text-foreground">Processing...</span>
-                            </div>
-                        </div>
-                    )}
+            {/* Notification Toast */}
+            {notification && (
+                <div
+                    className={`absolute top-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full shadow-lg text-sm font-medium animate-in slide-in-from-top-2 fade-in z-50 backdrop-blur-sm ${
+                        notification.type === 'success'
+                            ? 'bg-success/90 text-success-foreground'
+                            : 'bg-destructive/90 text-destructive-foreground'
+                    }`}
+                >
+                    {notification.message}
                 </div>
-            </div>
+            )}
+
+            {/* Loading Overlay */}
+            {isLoading && (
+                <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-sm">
+                    <div className="flex flex-col items-center bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl p-6 shadow-floating">
+                        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-3"></div>
+                        <span className="text-sm font-medium text-foreground">Processing...</span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

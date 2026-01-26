@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Maximize, Minus, Plus, RotateCcw } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
-import { Button } from '@flows/ui-kit';
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@flows/ui-kit';
 
 interface ZoomControlsProps {
     zoom: number;
@@ -20,37 +20,83 @@ export const ZoomControls = ({ zoom, onZoomIn, onZoomOut, onFitToScreen, onReset
     return (
         <div
             className={cn(
-                'flex items-center gap-1 bg-popover/90 backdrop-blur-sm border border-border rounded-lg p-1 shadow-lg',
+                'flex items-center gap-1 px-2 py-1.5 rounded-full',
+                'bg-glass-bg backdrop-blur-[24px] border border-glass-border',
+                'shadow-floating',
                 className
             )}
         >
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onZoomOut} title={t('canvas.zoomOut')}>
-                <Minus className="h-4 w-4" />
-            </Button>
+            <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full hover:bg-accent/50"
+                            onClick={onZoomOut}
+                        >
+                            <Minus className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                        {t('canvas.zoomOut')}
+                    </TooltipContent>
+                </Tooltip>
 
-            <div className="min-w-[60px] text-center text-xs font-mono text-muted-foreground select-none">
-                {Math.round(zoom * 100)}%
-            </div>
+                <div className="min-w-[52px] text-center text-xs font-mono text-muted-foreground select-none px-1">
+                    {Math.round(zoom * 100)}%
+                </div>
 
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onZoomIn} title={t('canvas.zoomIn')}>
-                <Plus className="h-4 w-4" />
-            </Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full hover:bg-accent/50"
+                            onClick={onZoomIn}
+                        >
+                            <Plus className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                        {t('canvas.zoomIn')}
+                    </TooltipContent>
+                </Tooltip>
 
-            <div className="w-px h-6 bg-border mx-1" />
+                <div className="w-px h-5 bg-glass-border mx-1" />
 
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={onFitToScreen}
-                title={t('canvas.fitToScreen')}
-            >
-                <Maximize className="h-4 w-4" />
-            </Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full hover:bg-accent/50"
+                            onClick={onFitToScreen}
+                        >
+                            <Maximize className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                        {t('canvas.fitToScreen')}
+                    </TooltipContent>
+                </Tooltip>
 
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onReset} title={t('canvas.resetView')}>
-                <RotateCcw className="h-4 w-4" />
-            </Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full hover:bg-accent/50"
+                            onClick={onReset}
+                        >
+                            <RotateCcw className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                        {t('canvas.resetView')}
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         </div>
     );
 };

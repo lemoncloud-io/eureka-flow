@@ -66,6 +66,22 @@
         --port-empty: 220 9% 85%;
         --port-filled-input: 142 76% 36%;
         --port-filled-output: 217 91% 60%;
+
+        /* Glassmorphism Tokens - Light Mode */
+        --glass-bg: 0 0% 100% / 0.8;
+        --glass-border: 220 13% 91%;
+        --glass-blur: 24px;
+
+        /* Port Type Colors - Light Mode */
+        --port-type-text: 217 91% 60%;
+        --port-type-image: 271 81% 56%;
+        --port-type-number: 142 71% 45%;
+        --port-type-any: 220 9% 46%;
+
+        /* Enhanced Shadow Tokens - Light Mode */
+        --shadow-node: 0 10px 22px -5px rgb(0 0 0 / 0.1);
+        --shadow-node-selected: 0 10px 22px -5px rgb(59 130 246 / 0.25);
+        --shadow-floating: 0 4px 10px -1px rgb(0 0 0 / 0.05);
     }
 
     .dark {
@@ -118,18 +134,34 @@
         --surface: 222 47% 11%;
         --surface-elevated: 217 33% 17%;
         --surface-overlay: 217 33% 15%;
-        --canvas-bg: 222 47% 8%;
-        --node-bg: 217 33% 17%;
-        --node-border: 217 33% 25%;
-        --node-header: 222 47% 13%;
-        --sidebar-bg: 222 47% 11%;
-        --header-bg: 222 47% 11%;
-        --toolbar-bg: 217 33% 17%;
+        --canvas-bg: 240 6% 4%;
+        --node-bg: 240 6% 7%;
+        --node-border: 240 4% 16%;
+        --node-header: 240 6% 9%;
+        --sidebar-bg: 240 6% 4%;
+        --header-bg: 240 6% 4%;
+        --toolbar-bg: 240 6% 7%;
         --connection-line: 217 91% 55%;
         --connection-active: 142 76% 50%;
         --port-empty: 217 33% 30%;
         --port-filled-input: 142 76% 50%;
         --port-filled-output: 217 91% 65%;
+
+        /* Glassmorphism Tokens - Dark Mode */
+        --glass-bg: 240 6% 4% / 0.6;
+        --glass-border: 240 4% 14%;
+        --glass-blur: 24px;
+
+        /* Port Type Colors - Dark Mode */
+        --port-type-text: 217 91% 60%;
+        --port-type-image: 271 81% 56%;
+        --port-type-number: 142 71% 45%;
+        --port-type-any: 215 20% 65%;
+
+        /* Enhanced Shadow Tokens - Dark Mode */
+        --shadow-node: 0 10px 22px -5px rgb(0 0 0 / 0.5);
+        --shadow-node-selected: 0 10px 22px -5px rgb(168 85 247 / 0.25);
+        --shadow-floating: 0 4px 10px -1px rgb(0 0 0 / 0.3);
     }
 }
 

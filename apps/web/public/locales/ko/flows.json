@@ -27,7 +27,8 @@
         "expandSidebar": "사이드바 펼치기",
         "collapseSidebar": "사이드바 접기",
         "searchBlocks": "블록 검색...",
-        "noResults": "검색 결과 없음"
+        "noResults": "검색 결과 없음",
+        "clickToAdd": "클릭하여 캔버스에 추가"
     },
     "canvas": {
         "executionLogs": "실행 로그",

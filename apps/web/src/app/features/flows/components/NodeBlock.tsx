@@ -53,35 +53,31 @@ export interface NodeHighlightState {
 
 const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisual> => ({
     RUNNING: {
-        border: isSelected
-            ? 'border-status-running ring-1 ring-status-running/30 shadow-lg'
-            : 'border-status-running shadow-md',
+        border: isSelected ? 'border-status-running/70 shadow-node-selected' : 'border-status-running/50 shadow-node',
         header: 'bg-node-header',
         icon: (
-            <div className="absolute inset-0 border-2 border-status-running border-t-transparent rounded-full animate-spin"></div>
+            <div className="absolute inset-0 border-[1.5px] border-status-running border-t-transparent rounded-full animate-spin"></div>
         ),
         textColor: 'text-foreground',
     },
     COMPLETED: {
         border: isSelected
-            ? 'border-status-completed ring-1 ring-status-completed/30 shadow-lg'
-            : 'border-status-completed shadow-md',
+            ? 'border-status-completed/70 shadow-node-selected'
+            : 'border-status-completed/50 shadow-node',
         header: 'bg-node-header',
         icon: <div className="text-status-completed font-bold text-[10px]">✓</div>,
         textColor: 'text-foreground',
     },
     ERROR: {
-        border: isSelected
-            ? 'border-status-error ring-1 ring-status-error/30 shadow-lg'
-            : 'border-status-error shadow-md',
+        border: isSelected ? 'border-status-error/70 shadow-node-selected' : 'border-status-error/50 shadow-node',
         header: 'bg-node-header',
         icon: <div className="text-status-error font-bold text-[10px]">!</div>,
         textColor: 'text-foreground',
     },
     IDLE: {
         border: isSelected
-            ? 'border-primary ring-1 ring-primary/30 shadow-lg'
-            : 'border-node-border hover:border-muted-foreground',
+            ? 'border-primary/60 shadow-node-selected'
+            : 'border-node-border/60 hover:border-muted-foreground/50 shadow-node',
         header: 'bg-node-header',
         icon: null,
         textColor: 'text-foreground',
@@ -89,14 +85,14 @@ const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisu
 });
 
 const HIGHLIGHTED_VISUAL: StatusVisual = {
-    border: 'border-accent shadow-lg shadow-accent/20',
+    border: 'border-accent/60 shadow-node-selected',
     header: 'bg-node-header',
     icon: null,
     textColor: 'text-accent',
 };
 
 const DISABLED_VISUAL: StatusVisual = {
-    border: 'border-muted-foreground/30 opacity-50',
+    border: 'border-muted-foreground/20 opacity-60 shadow-none',
     header: 'bg-muted/50',
     icon: <Ban className="w-3 h-3 text-muted-foreground" />,
     textColor: 'text-muted-foreground',
@@ -120,19 +116,19 @@ interface PortItemProps {
 
 const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHighlighted, onMouseDown, onMouseUp }) => {
     const portClasses = cn(
-        'w-3 h-3 rounded-full border cursor-crosshair transition-all duration-200',
+        'w-3.5 h-3.5 rounded-full border-2 cursor-crosshair transition-all duration-200',
         type === 'input' ? 'mr-2' : 'ml-2',
-        isHighlighted && 'scale-150 border-yellow-400 bg-yellow-400 ring-2 ring-yellow-400/50',
-        !isHighlighted && 'border-muted-foreground hover:scale-125',
+        isHighlighted && 'scale-150 border-amber-300 bg-amber-400 ring-2 ring-amber-400/50',
+        !isHighlighted && 'hover:scale-125',
         hasData &&
             !isHighlighted &&
             type === 'input' &&
-            'bg-port-input shadow-[0_0_8px_rgba(34,197,94,0.6)] border-green-300',
+            'bg-port-input border-green-300 shadow-[0_0_8px_rgba(34,197,94,0.5)]',
         hasData &&
             !isHighlighted &&
             type === 'output' &&
-            'bg-port-output shadow-[0_0_8px_rgba(59,130,246,0.6)] border-blue-300',
-        !hasData && !isHighlighted && 'bg-port-empty hover:border-foreground'
+            'bg-port-output border-blue-300 shadow-[0_0_8px_rgba(59,130,246,0.5)]',
+        !hasData && !isHighlighted && 'bg-port-empty border-muted-foreground/50 hover:border-foreground'
     );
 
     return (
@@ -466,14 +462,22 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
     return (
         <div
-            className={`absolute w-60 bg-node-bg/95 backdrop-blur-sm rounded-lg border-2 transition-colors duration-300 ${visuals.border}`}
+            className={cn(
+                'absolute w-[280px] bg-node-bg rounded-xl border transition-all duration-300',
+                visuals.border
+            )}
             style={{ left: node.position.x, top: node.position.y }}
             onMouseDown={onMouseDown}
             onDoubleClick={e => e.stopPropagation()}
         >
             {/* Header */}
             <div
-                className={`${visuals.header} p-2 rounded-t-md flex justify-between items-center border-b border-border/50 cursor-move h-10 box-border transition-colors duration-300`}
+                className={cn(
+                    visuals.header,
+                    'px-3 py-2 rounded-t-[10px] flex justify-between items-center',
+                    'border-b border-node-border/50 cursor-move h-11 box-border',
+                    'transition-colors duration-300'
+                )}
             >
                 {isEditingLabel ? (
                     <div
