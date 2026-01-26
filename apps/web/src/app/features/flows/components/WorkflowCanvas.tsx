@@ -34,12 +34,14 @@ interface WorkflowCanvasProps {
     initialData?: WorkflowState;
     onNodeSelect?: (nodeId: string | null) => void;
     onChange?: () => void;
+    /** Called before running a node that requires backend processing. Should save the flow. */
+    onBeforeBackendRun?: () => Promise<void>;
 }
 
 const GRID_SIZE = 20;
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
-    ({ readOnly, initialData, onNodeSelect, onChange }, ref) => {
+    ({ readOnly, initialData, onNodeSelect, onChange, onBeforeBackendRun }, ref) => {
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
 
@@ -110,6 +112,20 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             futureRef.current = [];
         }, [nodes, connections, readOnly]);
 
+        /** Initialize input hashes to prevent auto-execution on load */
+        const initializeInputHashes = useCallback(
+            (loadedNodes: NodeData[]) => {
+                loadedNodes.forEach(node => {
+                    const def = blockRegistry[node.type];
+                    if (def && def.inputs.length > 0) {
+                        const hash = def.inputs.map(p => node.inputData?.[p.id]?.timestamp).join('|');
+                        nodeInputHashesRef.current.set(node.id, hash);
+                    }
+                });
+            },
+            [blockRegistry]
+        );
+
         const undo = useCallback(() => {
             if (readOnly || pastRef.current.length === 0) return;
 
@@ -142,12 +158,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         useEffect(() => {
             if (initialData) {
-                setNodes(initialData.nodes);
-                setConnections(initialData.connections);
+                const loadedNodes = initialData.nodes ?? [];
+                setNodes(loadedNodes);
+                setConnections(initialData.connections ?? []);
                 pastRef.current = [];
                 futureRef.current = [];
+
+                initializeInputHashes(loadedNodes);
             }
-        }, [initialData]);
+        }, [initialData, blockRegistry, initializeInputHashes]);
 
         useEffect(() => {
             if (modalFlowId) {
@@ -321,13 +340,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 },
                 getWorkflow: () => ({ nodes, edges: connections }),
                 loadWorkflow: (state: WorkflowState) => {
-                    setNodes(state.nodes ?? []);
+                    const loadedNodes = state.nodes ?? [];
+                    setNodes(loadedNodes);
                     // Support both 'edges' (API format) and 'connections' (legacy)
                     setConnections(state.edges ?? state.connections ?? []);
                     pastRef.current = [];
                     futureRef.current = [];
                     handleSelectionChange(null);
                     setSelectedConnectionId(null);
+                    initializeInputHashes(loadedNodes);
                 },
                 clearWorkflow: () => {
                     if (readOnly) return;
@@ -581,8 +602,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     // Check if block requires backend processing
                     if (requiresBackendProcessing(currentNode.type)) {
                         // Backend execution: POST /nodes/:id/run
-                        console.log(`[WorkflowCanvas] Backend execution: ${currentNode.type}`);
-                        const nodeResult = await runNode(nodeId);
+
+                        // Save flow first to ensure node exists on server
+                        if (onBeforeBackendRun) {
+                            await onBeforeBackendRun();
+                        }
+
+                        const nodeResult = await runNode(nodeId, { config$: currentNode.config });
 
                         // Extract outputData from API response
                         if (nodeResult.outputData$$) {
@@ -606,7 +632,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
                     } else if (nodeDef.execute) {
                         // Frontend execution: call block.execute() directly
-                        console.log(`[WorkflowCanvas] Frontend execution: ${currentNode.type}`);
                         results = await nodeDef.execute(inputs, currentNode.config, onProgress);
                     } else {
                         // No execute function available
@@ -651,7 +676,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [propagateOutputs, readOnly, blockRegistry, t]
+            [propagateOutputs, readOnly, blockRegistry, t, onBeforeBackendRun]
         );
 
         executeNodeRef.current = executeNode;

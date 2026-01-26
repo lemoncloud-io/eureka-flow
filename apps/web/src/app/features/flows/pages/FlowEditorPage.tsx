@@ -215,6 +215,12 @@ export const FlowEditorPage = () => {
         triggerAutoSave();
     };
 
+    const handleBeforeBackendRun = useCallback(async () => {
+        if (!canvasRef.current) return;
+        const data = canvasRef.current.getWorkflow();
+        await saveCurrentFlow(data);
+    }, [saveCurrentFlow]);
+
     const handleExport = () => {
         if (!canvasRef.current) return;
 
@@ -337,6 +343,7 @@ export const FlowEditorPage = () => {
                         ref={canvasRef}
                         onNodeSelect={handleSelectionChange}
                         onChange={handleCanvasChange}
+                        onBeforeBackendRun={handleBeforeBackendRun}
                     />
 
                     {notification && (
