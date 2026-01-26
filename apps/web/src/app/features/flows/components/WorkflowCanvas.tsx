@@ -689,6 +689,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 if (def.inputs.length === 0) return;
                 if (node.status === 'RUNNING') return;
                 if (node.autoExecutionEnabled === false) return;
+                // Skip auto-execution for backend nodes - require manual trigger to save flow first
+                if (requiresBackendProcessing(node.type)) return;
 
                 const hasInputs = def.inputs.every(p => node.inputData[p.id]);
                 if (hasInputs) {
