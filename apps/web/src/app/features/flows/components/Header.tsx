@@ -19,6 +19,8 @@ import {
 
 import { LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 
+import type { SaveStatus } from '@flows/flows';
+
 export interface FlowInfoProps {
     flowName: string;
     onNameChange: (name: string) => void;
@@ -50,6 +52,9 @@ export interface SaveStateProps {
     lastSavedAt: Date | null;
     isAutoSaveEnabled: boolean;
     onToggleAutoSave: () => void;
+    saveStatus?: SaveStatus;
+    saveError?: Error | null;
+    onRetrySave?: () => void;
 }
 
 interface HeaderProps {
@@ -121,25 +126,57 @@ const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
     );
 };
 
-const SaveStatus: React.FC<Pick<SaveStateProps, 'isSaving' | 'lastSavedAt'>> = ({ isSaving, lastSavedAt }) => {
+const SaveStatusIndicator: React.FC<
+    Pick<SaveStateProps, 'lastSavedAt' | 'saveStatus' | 'saveError' | 'onRetrySave'>
+> = ({ lastSavedAt, saveStatus = 'idle', saveError, onRetrySave }) => {
     const { t } = useTranslation(['common']);
 
-    return (
-        <div className="text-[10px] text-muted-foreground flex items-center gap-2">
-            {isSaving ? (
-                <span className="text-warning flex items-center gap-1">
-                    <span className="block w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
-                    {t('status.saving')}
-                </span>
-            ) : lastSavedAt ? (
-                <span>
-                    {t('status.saved')} {lastSavedAt.toLocaleTimeString()}
-                </span>
-            ) : (
-                <span>{t('status.unsaved')}</span>
-            )}
-        </div>
-    );
+    // Saving state - subtle blue dot with animation
+    if (saveStatus === 'saving') {
+        return (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1.5 transition-opacity">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                {t('status.saving')}
+            </span>
+        );
+    }
+
+    // Error state - red indicator with retry option
+    if (saveStatus === 'error') {
+        const errorMessage = saveError?.message || t('status.saveFailed', 'Save failed');
+        return (
+            <button
+                onClick={onRetrySave}
+                className="text-[10px] text-destructive flex items-center gap-1.5 hover:text-destructive/80 transition-colors"
+                title={errorMessage}
+                aria-label={`${errorMessage}. ${t('status.retry', 'Retry')}`}
+            >
+                <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
+                {t('status.saveFailed', 'Save failed')} · {t('status.retry', 'Retry')}
+            </button>
+        );
+    }
+
+    // Success state - brief green checkmark (auto-fades to idle)
+    if (saveStatus === 'success') {
+        return (
+            <span className="text-[10px] text-success flex items-center gap-1.5 animate-in fade-in duration-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                {t('status.saved')}
+            </span>
+        );
+    }
+
+    // Idle state - show last saved time or unsaved
+    if (lastSavedAt) {
+        return (
+            <span className="text-[10px] text-muted-foreground">
+                {t('status.saved')} {lastSavedAt.toLocaleTimeString()}
+            </span>
+        );
+    }
+
+    return <span className="text-[10px] text-muted-foreground">{t('status.unsaved')}</span>;
 };
 
 const FileActionsToolbar: React.FC<FileActionsProps> = ({ onNew, onLoad, onSave, onExport, onImport }) => {
@@ -273,7 +310,12 @@ export const Header: React.FC<HeaderProps> = ({
                     <FlowNameInput {...flowInfo} />
                 </div>
 
-                <SaveStatus isSaving={saveState.isSaving} lastSavedAt={saveState.lastSavedAt} />
+                <SaveStatusIndicator
+                    lastSavedAt={saveState.lastSavedAt}
+                    saveStatus={saveState.saveStatus}
+                    saveError={saveState.saveError}
+                    onRetrySave={saveState.onRetrySave}
+                />
             </div>
 
             <div className="flex items-center gap-1">

@@ -3,6 +3,8 @@ import { create } from 'zustand';
 import type { FlowView } from '../types';
 import type { BlockDefinition } from '@lemoncloud/eureka-flows-api';
 
+export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
+
 /**
  * FlowsStore - manages flow metadata and block registry
  *
@@ -18,6 +20,8 @@ interface FlowsState {
     flows: FlowView[];
     lastSavedAt: Date | null;
     isAutoSaveEnabled: boolean;
+    saveStatus: SaveStatus;
+    saveError: Error | null;
 
     setBlockRegistry: (blocks: BlockDefinition[]) => void;
     setBlocksLoaded: (loaded: boolean) => void;
@@ -27,6 +31,8 @@ interface FlowsState {
     setLastSavedAt: (date: Date | null) => void;
     setAutoSaveEnabled: (enabled: boolean) => void;
     toggleAutoSave: () => void;
+    setSaveStatus: (status: SaveStatus) => void;
+    setSaveError: (error: Error | null) => void;
 }
 
 export const useFlowsStore = create<FlowsState>((set, _get) => ({
@@ -37,6 +43,8 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     flows: [],
     lastSavedAt: null,
     isAutoSaveEnabled: false,
+    saveStatus: 'idle',
+    saveError: null,
 
     setBlockRegistry: blocks => {
         const registry = blocks.reduce<Record<string, BlockDefinition>>((acc, block) => {
@@ -59,6 +67,10 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     setAutoSaveEnabled: enabled => set({ isAutoSaveEnabled: enabled }),
 
     toggleAutoSave: () => set(state => ({ isAutoSaveEnabled: !state.isAutoSaveEnabled })),
+
+    setSaveStatus: status => set({ saveStatus: status }),
+
+    setSaveError: error => set({ saveError: error }),
 }));
 
 export const useBlockRegistry = () => useFlowsStore(state => state.blockRegistry);
@@ -68,3 +80,5 @@ export const useFlowName = () => useFlowsStore(state => state.flowName);
 export const useFlowsList = () => useFlowsStore(state => state.flows);
 export const useLastSavedAt = () => useFlowsStore(state => state.lastSavedAt);
 export const useIsAutoSaveEnabled = () => useFlowsStore(state => state.isAutoSaveEnabled);
+export const useSaveStatus = () => useFlowsStore(state => state.saveStatus);
+export const useSaveError = () => useFlowsStore(state => state.saveError);

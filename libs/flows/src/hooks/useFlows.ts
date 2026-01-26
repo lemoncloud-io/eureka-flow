@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -7,6 +7,7 @@ import { flowsKeys, useCreateFlowMutation, useLoadFlowQuery, useSaveFlowMutation
 import { useFlowsStore } from '../stores/useFlowsStore';
 import { flowStorage } from '../utils/flowStorage';
 
+import type { SaveStatus } from '../stores/useFlowsStore';
 import type { LoadFlowResult, SaveFlowBody } from '../types';
 
 /**
@@ -23,15 +24,31 @@ import type { LoadFlowResult, SaveFlowBody } from '../types';
  */
 export const useFlows = () => {
     const queryClient = useQueryClient();
+    const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastSaveBodyRef = useRef<SaveFlowBody | null>(null);
     const {
         currentFlowId,
         flowName,
         isAutoSaveEnabled,
+        lastSavedAt,
+        saveStatus,
+        saveError,
         setCurrentFlowId,
         setFlowName,
         setLastSavedAt,
         toggleAutoSave,
+        setSaveStatus,
+        setSaveError,
     } = useFlowsStore();
+
+    // Cleanup timeout on unmount to prevent memory leaks
+    useEffect(() => {
+        return () => {
+            if (successTimeoutRef.current) {
+                clearTimeout(successTimeoutRef.current);
+            }
+        };
+    }, []);
 
     // TanStack Query hooks
     const loadFlowQuery = useLoadFlowQuery(currentFlowId);
@@ -130,21 +147,53 @@ export const useFlows = () => {
     );
 
     /**
+     * Helper to update save status with auto-reset for success state
+     */
+    const updateSaveStatus = useCallback(
+        (status: SaveStatus, error?: Error) => {
+            // Clear any pending success timeout
+            if (successTimeoutRef.current) {
+                clearTimeout(successTimeoutRef.current);
+                successTimeoutRef.current = null;
+            }
+
+            setSaveStatus(status);
+            setSaveError(error ?? null);
+
+            // Auto-reset success status to idle after 2 seconds
+            if (status === 'success') {
+                successTimeoutRef.current = setTimeout(() => {
+                    setSaveStatus('idle');
+                    successTimeoutRef.current = null;
+                }, 2000);
+            }
+        },
+        [setSaveStatus, setSaveError]
+    );
+
+    /**
      * Save current flow
      * POST /flows/:id/save
      *
      * If no currentFlowId, creates new flow first via POST /flows/0/save
+     * Uses optimistic updates for seamless UX - no blocking loader shown
      */
     const saveCurrentFlow = useCallback(
         async (
             body: Partial<SaveFlowBody> & { connections?: SaveFlowBody['edges'] }
         ): Promise<{ success: boolean; id: string }> => {
+            // Set saving status (subtle indicator, not blocking)
+            updateSaveStatus('saving');
+
             try {
                 // Support both 'edges' (API format) and 'connections' (UI format)
                 const { nodes = [], edges, connections } = body;
                 const edgesData = edges ?? connections ?? [];
 
                 const saveBody: SaveFlowBody = { nodes, edges: edgesData };
+
+                // Store for retry on failure
+                lastSaveBodyRef.current = saveBody;
 
                 let flowId = currentFlowId;
 
@@ -159,20 +208,34 @@ export const useFlows = () => {
                         flowStorage.setFlowId(flowId);
                     }
                 } else {
-                    // Save to existing flow
+                    // Save to existing flow (uses optimistic update)
                     console.log('[useFlows] Saving to existing flow:', flowId);
                     await saveFlowMutation.mutateAsync({ id: flowId, body: saveBody });
                 }
 
                 setLastSavedAt(new Date());
+                updateSaveStatus('success');
                 return { success: true, id: flowId || '' };
             } catch (error) {
                 console.error('[useFlows] Failed to save flow:', error);
+                updateSaveStatus('error', error instanceof Error ? error : new Error('Failed to save flow'));
                 return { success: false, id: '' };
             }
         },
-        [currentFlowId, createFlowMutation, saveFlowMutation, setLastSavedAt, setCurrentFlowId]
+        [currentFlowId, createFlowMutation, saveFlowMutation, setLastSavedAt, setCurrentFlowId, updateSaveStatus]
     );
+
+    /**
+     * Retry the last failed save operation
+     */
+    const retrySave = useCallback(async () => {
+        if (!lastSaveBodyRef.current) {
+            updateSaveStatus('idle');
+            return { success: false, id: '' };
+        }
+        // Retry with stored save body
+        return saveCurrentFlow(lastSaveBodyRef.current);
+    }, [saveCurrentFlow, updateSaveStatus]);
 
     /**
      * Create a new flow (local state + server)
@@ -197,12 +260,13 @@ export const useFlows = () => {
         }
     }, [createFlowMutation, setCurrentFlowId, setFlowName, setLastSavedAt]);
 
-    // Derive loading/saving states from TanStack Query
+    // Derive loading state from TanStack Query (only for initial load)
     const isLoading = loadFlowQuery.isLoading || loadFlowQuery.isFetching;
-    const isSaving = createFlowMutation.isPending || saveFlowMutation.isPending;
 
-    // Get lastSavedAt from store (set after successful save)
-    const { lastSavedAt } = useFlowsStore();
+    // isSaving is now derived from saveStatus for backward compatibility
+    const isSaving = saveStatus === 'saving';
+
+    // lastSavedAt is already destructured from useFlowsStore at line 28
 
     return {
         // State
@@ -212,6 +276,8 @@ export const useFlows = () => {
         isSaving,
         lastSavedAt,
         isAutoSaveEnabled,
+        saveStatus,
+        saveError,
 
         // Query data
         flowSnapshot: loadFlowQuery.data,
@@ -223,6 +289,7 @@ export const useFlows = () => {
         // Actions - Save & Create
         saveCurrentFlow,
         createNewFlow,
+        retrySave,
 
         // Actions - Local State
         setFlowName,

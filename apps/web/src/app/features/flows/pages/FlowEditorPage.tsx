@@ -19,10 +19,13 @@ export const FlowEditorPage = () => {
         isSaving,
         lastSavedAt,
         isAutoSaveEnabled,
+        saveStatus,
+        saveError,
         initializeFlow,
         loadFlowById,
         saveCurrentFlow,
         createNewFlow,
+        retrySave,
         setFlowName,
         toggleAutoSave,
     } = useFlows();
@@ -329,6 +332,9 @@ export const FlowEditorPage = () => {
                     lastSavedAt,
                     isAutoSaveEnabled,
                     onToggleAutoSave: toggleAutoSave,
+                    saveStatus,
+                    saveError,
+                    onRetrySave: retrySave,
                 }}
                 onShare={handleShare}
             />

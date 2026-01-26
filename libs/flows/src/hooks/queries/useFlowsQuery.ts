@@ -34,15 +34,46 @@ export const useCreateFlowMutation = () => {
 /**
  * Mutation hook for saving flow (full workflow state)
  * POST /flows/:id/save
+ *
+ * Uses optimistic updates for seamless UX:
+ * - Immediately updates cache on mutate
+ * - Rolls back on error
+ * - No invalidateQueries to avoid unnecessary refetch
  */
 export const useSaveFlowMutation = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: ({ id, body }: { id: string; body: SaveFlowBody }) => saveFlow(id, body),
-        onSuccess: (_data, variables) => {
-            queryClient.invalidateQueries({ queryKey: flowsKeys.snapshot(variables.id) });
+        onMutate: async ({ id, body }) => {
+            // Cancel any outgoing refetches to prevent overwriting optimistic update
+            await queryClient.cancelQueries({ queryKey: flowsKeys.snapshot(id) });
+
+            // Snapshot the previous value for rollback
+            const previousData = queryClient.getQueryData<LoadFlowResult>(flowsKeys.snapshot(id));
+
+            // Optimistically update the cache
+            if (previousData) {
+                queryClient.setQueryData<LoadFlowResult>(flowsKeys.snapshot(id), old => ({
+                    ...old!,
+                    nodes: body.nodes,
+                    edges: body.edges,
+                }));
+            }
+
+            // Return context for rollback
+            return { previousData };
         },
+        onError: (_error, { id }, context) => {
+            // Rollback to previous data on error
+            if (context?.previousData) {
+                queryClient.setQueryData(flowsKeys.snapshot(id), context.previousData);
+            }
+        },
+        // No onSuccess/onSettled invalidateQueries - optimistic update is sufficient
+        // This prevents unnecessary refetch after save
+        retry: 2,
+        retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000),
     });
 };
 
