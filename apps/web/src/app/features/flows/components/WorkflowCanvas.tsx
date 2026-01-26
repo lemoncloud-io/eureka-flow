@@ -61,6 +61,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const dragStartSnapshotRef = useRef<WorkflowState | null>(null);
         const nodeInputHashesRef = useRef<Map<string, string>>(new Map());
         const executeNodeRef = useRef<(nodeId: string) => Promise<void>>();
+        /** Counter for batch run operations. When > 0, skip individual saves (already saved by runAll) */
+        const batchRunCountRef = useRef(0);
 
         const nodesRef = useRef(nodes);
         const connectionsRef = useRef(connections);
@@ -489,6 +491,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     setViewport({ x: 20, y: 20, zoom: 1 });
                 },
                 runAll: async () => {
+                    // Find root nodes: no incoming connections OR no input ports defined
                     const inputNodes = nodes
                         .filter(n => {
                             const hasIncoming = connections.some(c => c.targetNodeId === n.id);
@@ -497,13 +500,27 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         })
                         .filter(n => !(n as NodeData & { disabled?: boolean }).disabled);
 
-                    for (const node of inputNodes) {
-                        if (executeNodeRef.current) {
-                            await executeNodeRef.current(node.id);
+                    // Enable batch mode to skip individual saves
+                    batchRunCountRef.current++;
+
+                    try {
+                        // Save flow once before executing all nodes
+                        if (onBeforeBackendRun) {
+                            await onBeforeBackendRun();
                         }
+
+                        // Execute all input nodes
+                        for (const node of inputNodes) {
+                            if (executeNodeRef.current) {
+                                await executeNodeRef.current(node.id);
+                            }
+                        }
+                    } finally {
+                        batchRunCountRef.current--;
                     }
                 },
                 stopAll: () => {
+                    batchRunCountRef.current = 0;
                     setNodes(prev => prev.map(n => (n.status === 'running' ? { ...n, status: 'idle' as const } : n)));
                 },
             }),
@@ -518,6 +535,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 selectedNodeId,
                 handleSelectionChange,
                 blockRegistry,
+                onBeforeBackendRun,
             ]
         );
 
@@ -611,7 +629,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         // Backend execution: POST /nodes/:id/run
 
                         // Save flow first to ensure node exists on server
-                        if (onBeforeBackendRun) {
+                        // Skip if in batch run mode (already saved by runAll)
+                        if (batchRunCountRef.current === 0 && onBeforeBackendRun) {
                             await onBeforeBackendRun();
                         }
 
@@ -641,8 +660,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         // Frontend execution: call block.execute() directly
                         results = await nodeDef.execute(inputs, currentNode.config, onProgress);
                     } else {
-                        // No execute function available
-                        console.warn(`[WorkflowCanvas] No execute function for: ${currentNode.type}`);
+                        // No execute function available - pass through without error
                         results = {};
                     }
 
@@ -696,8 +714,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 if (def.inputs.length === 0) return;
                 if (node.status === 'RUNNING') return;
                 if (node.autoExecutionEnabled === false) return;
-                // Skip auto-execution for backend nodes - require manual trigger to save flow first
-                if (requiresBackendProcessing(node.type)) return;
 
                 const hasInputs = def.inputs.every(p => node.inputData[p.id]);
                 if (hasInputs) {
