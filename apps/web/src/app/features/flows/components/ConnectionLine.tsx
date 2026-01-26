@@ -75,7 +75,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
                 strokeWidth={strokeWidth}
                 strokeOpacity={opacity}
                 strokeLinecap="round"
-                className={isActive && !isHovered && !isSelected ? 'animate-pulse' : 'transition-all duration-200'}
+                className={isActive && !isHovered && !isSelected ? 'animate-pulse' : 'transition-colors duration-200'}
             />
 
             {/* Invisible Hit Area (Wide stroke for easier hovering/clicking) */}

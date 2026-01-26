@@ -466,7 +466,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
     return (
         <div
-            className={`absolute w-60 bg-node-bg/95 backdrop-blur-sm rounded-lg border-2 transition-all duration-300 ${visuals.border}`}
+            className={`absolute w-60 bg-node-bg/95 backdrop-blur-sm rounded-lg border-2 transition-colors duration-300 ${visuals.border}`}
             style={{ left: node.position.x, top: node.position.y }}
             onMouseDown={onMouseDown}
             onDoubleClick={e => e.stopPropagation()}
