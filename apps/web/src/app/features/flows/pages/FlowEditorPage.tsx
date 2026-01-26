@@ -8,6 +8,10 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 
+/** Serialize workflow state for change detection comparison */
+const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
+    JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
+
 export const FlowEditorPage = () => {
     const canvasRef = useRef<WorkflowCanvasRef>(null);
 
@@ -97,10 +101,7 @@ export const FlowEditorPage = () => {
                         if (initialFlow) {
                             canvasRef.current.loadWorkflow(initialFlow);
                             // Store initial state to prevent unnecessary auto-saves
-                            lastSavedStateRef.current = JSON.stringify({
-                                nodes: initialFlow.nodes,
-                                connections: initialFlow.connections ?? initialFlow.edges,
-                            });
+                            lastSavedStateRef.current = serializeWorkflowState(initialFlow);
                         }
                         if (loadedId) {
                             updateUrl(loadedId, nodeIdFromHash);
@@ -129,7 +130,7 @@ export const FlowEditorPage = () => {
         autoSaveTimerRef.current = window.setTimeout(() => {
             if (canvasRef.current) {
                 const data = canvasRef.current.getWorkflow();
-                const currentState = JSON.stringify({ nodes: data.nodes, connections: data.connections });
+                const currentState = serializeWorkflowState(data);
 
                 // Only save if there are actual changes
                 if (currentState !== lastSavedStateRef.current) {
@@ -151,7 +152,7 @@ export const FlowEditorPage = () => {
         const result = await saveCurrentFlow(data);
         if (result.success) {
             // Update saved state to prevent unnecessary auto-saves
-            lastSavedStateRef.current = JSON.stringify({ nodes: data.nodes, connections: data.connections });
+            lastSavedStateRef.current = serializeWorkflowState(data);
             showNotification(`Saved as "${flowName}"`, 'success');
             if (result.id !== currentFlowId) {
                 updateUrl(result.id, window.location.hash.replace('#', ''));
@@ -171,10 +172,7 @@ export const FlowEditorPage = () => {
             if (canvasRef.current && data) {
                 canvasRef.current.loadWorkflow(data);
                 // Update saved state reference
-                lastSavedStateRef.current = JSON.stringify({
-                    nodes: data.nodes,
-                    connections: data.connections ?? data.edges,
-                });
+                lastSavedStateRef.current = serializeWorkflowState(data);
                 updateUrl(flowId.trim(), null);
                 showNotification(`Loaded flow: ${flowId.trim()}`, 'success');
             } else {
@@ -188,7 +186,7 @@ export const FlowEditorPage = () => {
         if (window.confirm('Create new flow? Unsaved changes will be lost.')) {
             canvasRef.current.newWorkflow();
             // Reset saved state for new flow
-            lastSavedStateRef.current = JSON.stringify({ nodes: [], connections: [] });
+            lastSavedStateRef.current = serializeWorkflowState({ nodes: [], connections: [] });
             const newId = await createNewFlow();
             if (newId) {
                 updateUrl(newId, null);
@@ -245,7 +243,7 @@ export const FlowEditorPage = () => {
         const data = canvasRef.current.getWorkflow();
         const result = await saveCurrentFlow(data);
         if (result.success) {
-            lastSavedStateRef.current = JSON.stringify({ nodes: data.nodes, connections: data.connections });
+            lastSavedStateRef.current = serializeWorkflowState(data);
         }
     }, [saveCurrentFlow]);
 
