@@ -272,6 +272,12 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
     const [isEditing, setIsEditing] = useState(false);
     const text = (node.config.text as string) || '';
 
+    const textDisplay = useMemo(() => {
+        if (!text) return null;
+        const lines = text.split('\n');
+        return { firstLine: lines[0], extraLines: lines.length - 1 };
+    }, [text]);
+
     if (isEditing) {
         return (
             <div className="mt-2" onMouseDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
@@ -311,9 +317,14 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
             <div className="text-[9px] text-muted-foreground mb-0.5 uppercase tracking-wider font-semibold">
                 {t('visualization.value')}
             </div>
-            <div className="text-xs text-foreground/80 truncate font-mono" title={text}>
-                {text ? (
-                    `"${text}"`
+            <div className="text-xs text-foreground/80 font-mono flex items-center gap-1" title={text}>
+                {textDisplay ? (
+                    <>
+                        <span className="truncate">"{textDisplay.firstLine}"</span>
+                        {textDisplay.extraLines > 0 && (
+                            <span className="text-muted-foreground text-[9px] shrink-0">+{textDisplay.extraLines}</span>
+                        )}
+                    </>
                 ) : (
                     <span className="text-muted-foreground italic">{t('visualization.clickToAddText')}</span>
                 )}
@@ -412,6 +423,12 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
         if (isHighlighted) return HIGHLIGHTED_VISUAL;
         return statusVisuals[node.status as NodeStatus] || statusVisuals.IDLE;
     }, [isDisabled, isHighlighted, statusVisuals, node.status]);
+
+    const descriptionDisplay = useMemo(() => {
+        const text = node.description || definition?.description || '';
+        const lines = text.split('\n');
+        return { full: text, firstLine: lines[0], extraLines: lines.length - 1 };
+    }, [node.description, definition?.description]);
 
     const duration = node.status === 'RUNNING' ? elapsedTime : node.executionStats?.duration;
     const displayDuration =
@@ -595,9 +612,12 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             <div className="p-3 pb-6">
                 <p
                     className="text-[10px] text-muted-foreground mb-3 h-3 overflow-hidden text-ellipsis whitespace-nowrap cursor-help"
-                    title={node.description || definition.description}
+                    title={descriptionDisplay.full}
                 >
-                    {node.description || definition.description}
+                    {descriptionDisplay.firstLine}
+                    {descriptionDisplay.extraLines > 0 && (
+                        <span className="text-muted-foreground/60 ml-1">+{descriptionDisplay.extraLines} lines</span>
+                    )}
                 </p>
                 {/* Ports */}
                 <div className="flex justify-between gap-4 mb-2">

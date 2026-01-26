@@ -130,8 +130,8 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             return <ImagePreview src={packet.value} t={t} />;
         }
         return (
-            <div className="bg-muted/50 p-2 rounded border border-border text-xs font-mono text-info break-all max-h-24 overflow-y-auto">
-                {typeof packet.value === 'object' ? JSON.stringify(packet.value) : String(packet.value)}
+            <div className="bg-muted/50 p-2 rounded border border-border text-xs font-mono text-info break-words max-h-24 overflow-y-auto whitespace-pre-wrap">
+                {typeof packet.value === 'object' ? JSON.stringify(packet.value, null, 2) : String(packet.value)}
             </div>
         );
     };
@@ -143,13 +143,23 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
         switch (field.type) {
             case 'text':
+                return (
+                    <textarea
+                        className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs text-foreground focus:border-primary outline-none transition-colors resize-y min-h-[60px]"
+                        value={value || ''}
+                        onChange={e => handleChange(e.target.value)}
+                        onKeyDown={e => e.stopPropagation()}
+                        placeholder={field.placeholder}
+                    />
+                );
             case 'number':
                 return (
                     <input
-                        type={field.type}
+                        type="number"
                         className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs text-foreground focus:border-primary outline-none transition-colors"
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
+                        onKeyDown={e => e.stopPropagation()}
                         placeholder={field.placeholder}
                     />
                 );
