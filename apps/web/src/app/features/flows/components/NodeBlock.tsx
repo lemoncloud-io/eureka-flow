@@ -235,7 +235,12 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
     };
 
     return (
-        <div className="mt-2" onMouseDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+        <div
+            className="mt-2"
+            onMouseDown={e => e.stopPropagation()}
+            onDoubleClick={e => e.stopPropagation()}
+            onWheel={e => e.stopPropagation()}
+        >
             <input type="file" accept="image/*" className="hidden" id={fileInputId} onChange={handleImageUpload} />
             <label
                 htmlFor={fileInputId}
@@ -280,7 +285,12 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
 
     if (isEditing) {
         return (
-            <div className="mt-2" onMouseDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+            <div
+                className="mt-2"
+                onMouseDown={e => e.stopPropagation()}
+                onDoubleClick={e => e.stopPropagation()}
+                onWheel={e => e.stopPropagation()}
+            >
                 <textarea
                     autoFocus
                     className="w-full p-2 bg-background border border-primary rounded text-xs resize-none font-mono focus:outline-none"
@@ -312,6 +322,7 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
                 setIsEditing(true);
             }}
             onDoubleClick={e => e.stopPropagation()}
+            onWheel={e => e.stopPropagation()}
             title={t('visualization.clickToEdit')}
         >
             <div className="text-[9px] text-muted-foreground mb-0.5 uppercase tracking-wider font-semibold">
@@ -337,7 +348,10 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
     const { t } = useTranslation(['nodes']);
     const lastInput = node.inputData['in']?.value;
     return (
-        <div className="mt-2 p-2 bg-foreground rounded border border-border text-background font-mono text-[10px] break-all max-h-24 overflow-y-auto">
+        <div
+            className="mt-2 p-2 bg-foreground rounded border border-border text-background font-mono text-[10px] break-all max-h-24 overflow-y-auto"
+            onWheel={e => e.stopPropagation()}
+        >
             {lastInput !== undefined ? (
                 typeof lastInput === 'object' ? (
                     JSON.stringify(lastInput, null, 2)

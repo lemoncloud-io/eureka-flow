@@ -130,7 +130,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             return <ImagePreview src={packet.value} t={t} />;
         }
         return (
-            <div className="bg-muted/50 p-2 rounded border border-border text-xs font-mono text-info break-words max-h-24 overflow-y-auto whitespace-pre-wrap">
+            <div
+                className="bg-muted/50 p-2 rounded border border-border text-xs font-mono text-info break-words max-h-24 overflow-y-auto whitespace-pre-wrap"
+                onWheel={e => e.stopPropagation()}
+            >
                 {typeof packet.value === 'object' ? JSON.stringify(packet.value, null, 2) : String(packet.value)}
             </div>
         );
@@ -340,13 +343,16 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         <div className="flex items-center gap-2 mb-1 text-destructive text-xs font-bold">
                             <AlertTriangle className="w-3.5 h-3.5" /> {t('flows:detailPanel.errorDetails')}
                         </div>
-                        <div className="text-[10px] font-mono text-destructive bg-black/40 p-2 rounded border border-destructive/30 break-all max-h-32 overflow-y-auto">
+                        <div
+                            className="text-[10px] font-mono text-destructive bg-black/40 p-2 rounded border border-destructive/30 break-all max-h-32 overflow-y-auto"
+                            onWheel={e => e.stopPropagation()}
+                        >
                             {selectedNode.errorMessage || t('flows:detailPanel.unknownError')}
                         </div>
                     </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                <div className="flex-1 overflow-y-auto p-4 space-y-6" onWheel={e => e.stopPropagation()}>
                     {/* Description Section */}
                     <div>
                         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">

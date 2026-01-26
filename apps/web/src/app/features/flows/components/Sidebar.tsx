@@ -246,6 +246,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
             <div
                 className={`flex-1 overflow-y-auto ${isCollapsed ? 'p-2 space-y-2' : 'p-4 space-y-1'}`}
                 onScroll={() => setHoveredNode(null)}
+                onWheel={e => e.stopPropagation()}
             >
                 {/* No Results Message */}
                 {searchQuery &&

@@ -72,7 +72,10 @@ export const LogModal: React.FC<LogModalProps> = ({ nodeId, onClose }) => {
                         {t('canvas.refresh')}
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-background/30">
+                <div
+                    className="flex-1 overflow-y-auto p-2 space-y-1 bg-background/30"
+                    onWheel={e => e.stopPropagation()}
+                >
                     {loading ? (
                         <div className="flex justify-center items-center h-full text-muted-foreground text-xs">
                             {t('canvas.loading')}
