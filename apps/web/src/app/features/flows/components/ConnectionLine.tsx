@@ -36,7 +36,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
     const getStrokeClass = () => {
         if (isHovered || isSelected) return 'stroke-amber-400';
         if (isActive) return 'stroke-connection-active';
-        return 'stroke-muted-foreground/40';
+        return 'stroke-muted-foreground/30';
     };
 
     const strokeWidth = isHovered || isSelected ? 2.5 : 2;

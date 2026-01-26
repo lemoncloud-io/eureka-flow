@@ -53,7 +53,7 @@ export interface NodeHighlightState {
 
 const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisual> => ({
     RUNNING: {
-        border: isSelected ? 'border-status-running/70 shadow-node-selected' : 'border-status-running/50 shadow-node',
+        border: isSelected ? 'border-status-running/60 shadow-node-selected' : 'border-status-running/40 shadow-node',
         header: 'bg-node-header',
         icon: (
             <div className="absolute inset-0 border-[1.5px] border-status-running border-t-transparent rounded-full animate-spin"></div>
@@ -62,22 +62,22 @@ const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisu
     },
     COMPLETED: {
         border: isSelected
-            ? 'border-status-completed/70 shadow-node-selected'
-            : 'border-status-completed/50 shadow-node',
+            ? 'border-status-completed/60 shadow-node-selected'
+            : 'border-status-completed/40 shadow-node',
         header: 'bg-node-header',
         icon: <div className="text-status-completed font-bold text-[10px]">✓</div>,
         textColor: 'text-foreground',
     },
     ERROR: {
-        border: isSelected ? 'border-status-error/70 shadow-node-selected' : 'border-status-error/50 shadow-node',
+        border: isSelected ? 'border-status-error/60 shadow-node-selected' : 'border-status-error/40 shadow-node',
         header: 'bg-node-header',
         icon: <div className="text-status-error font-bold text-[10px]">!</div>,
         textColor: 'text-foreground',
     },
     IDLE: {
         border: isSelected
-            ? 'border-primary/60 shadow-node-selected'
-            : 'border-node-border/60 hover:border-muted-foreground/50 shadow-node',
+            ? 'border-primary/50 shadow-node-selected'
+            : 'border-node-border/30 hover:border-muted-foreground/40 shadow-node',
         header: 'bg-node-header',
         icon: null,
         textColor: 'text-foreground',
@@ -85,15 +85,15 @@ const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisu
 });
 
 const HIGHLIGHTED_VISUAL: StatusVisual = {
-    border: 'border-accent/60 shadow-node-selected',
+    border: 'border-accent/50 shadow-node-selected',
     header: 'bg-node-header',
     icon: null,
     textColor: 'text-accent',
 };
 
 const DISABLED_VISUAL: StatusVisual = {
-    border: 'border-muted-foreground/20 opacity-60 shadow-none',
-    header: 'bg-muted/50',
+    border: 'border-muted-foreground/15 opacity-50 shadow-none',
+    header: 'bg-muted/30',
     icon: <Ban className="w-3 h-3 text-muted-foreground" />,
     textColor: 'text-muted-foreground',
 };
