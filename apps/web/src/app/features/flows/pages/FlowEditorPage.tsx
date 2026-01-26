@@ -12,6 +12,12 @@ import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
 
+/** Check if element is an input that should prevent keyboard shortcuts */
+const isInputElement = (target: EventTarget | null): boolean => {
+    if (!target || !(target instanceof HTMLElement)) return false;
+    return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
+};
+
 export const FlowEditorPage = () => {
     const canvasRef = useRef<WorkflowCanvasRef>(null);
 
@@ -311,6 +317,76 @@ export const FlowEditorPage = () => {
         canvasRef.current.stopAll();
         showNotification('Execution stopped', 'success');
     };
+
+    // Store handlers in refs to avoid useEffect dependency issues
+    const handlersRef = useRef({
+        save: handleSave,
+        load: handleLoad,
+        new: handleNew,
+        export: handleExport,
+        showNotification,
+    });
+    handlersRef.current = {
+        save: handleSave,
+        load: handleLoad,
+        new: handleNew,
+        export: handleExport,
+        showNotification,
+    };
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (isInputElement(e.target)) return;
+
+            const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+            if (!isCtrlOrCmd) return;
+
+            const key = e.key.toLowerCase();
+
+            if (key === 's') {
+                e.preventDefault();
+                handlersRef.current.save();
+            } else if (key === 'o') {
+                e.preventDefault();
+                handlersRef.current.load();
+            } else if (key === 'n') {
+                e.preventDefault();
+                handlersRef.current.new();
+            } else if (key === 'e') {
+                e.preventDefault();
+                handlersRef.current.export();
+            } else if (key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                canvasRef.current?.undo();
+            } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+                e.preventDefault();
+                canvasRef.current?.redo();
+            } else if (key === 'l') {
+                e.preventDefault();
+                canvasRef.current?.autoLayout();
+                handlersRef.current.showNotification('Auto-layout applied', 'success');
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    // Unsaved changes warning on page unload
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (!canvasRef.current) return;
+            const currentState = serializeWorkflowState(canvasRef.current.getWorkflow());
+            if (currentState !== lastSavedStateRef.current) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, []);
 
     if (!isAppReady) {
         return (
