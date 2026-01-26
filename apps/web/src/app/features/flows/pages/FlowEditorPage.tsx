@@ -8,11 +8,9 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 
-/** Serialize workflow state for change detection comparison */
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
 
-/** Check if element is an input that should prevent keyboard shortcuts */
 const isInputElement = (target: EventTarget | null): boolean => {
     if (!target || !(target instanceof HTMLElement)) return false;
     return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
@@ -46,7 +44,6 @@ export const FlowEditorPage = () => {
     const [isRunning, setIsRunning] = useState(false);
     const autoSaveTimerRef = useRef<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    /** JSON-serialized { nodes, connections } for change detection in auto-save */
     const lastSavedStateRef = useRef<string | null>(null);
 
     const updateUrl = useCallback((flowId: string | null, nodeId?: string | null) => {
@@ -60,7 +57,7 @@ export const FlowEditorPage = () => {
                 window.history.pushState({ flowId, nodeId }, '', url);
             }
         } catch {
-            /* noop */
+            // ignore
         }
     }, []);
 
@@ -71,11 +68,9 @@ export const FlowEditorPage = () => {
 
         const boot = async () => {
             try {
-                // 1. Load block registry first
                 setLoadingText('Loading Block Registry...');
                 await loadBlocks();
 
-                // 2. Check URL for flow ID
                 const pathParts = window.location.pathname.split('/');
                 const flowIdFromUrl = pathParts.length > 2 && pathParts[1] === 'flows' ? pathParts[2] : null;
                 const nodeIdFromHash = window.location.hash.replace('#', '') || null;
@@ -84,12 +79,10 @@ export const FlowEditorPage = () => {
                 let initialFlow = null;
 
                 if (flowIdFromUrl) {
-                    // URL has flow ID - load that specific flow
                     setLoadingText(`Loading Flow ${flowIdFromUrl}...`);
                     initialFlow = await loadFlowById(flowIdFromUrl);
                     loadedId = flowIdFromUrl;
                 } else {
-                    // No URL flow ID - initialize from localStorage or create new
                     setLoadingText('Initializing Flow...');
                     const result = await initializeFlow();
                     loadedId = result.flowId;
@@ -106,7 +99,6 @@ export const FlowEditorPage = () => {
                     if (canvasRef.current) {
                         if (initialFlow) {
                             canvasRef.current.loadWorkflow(initialFlow);
-                            // Store initial state to prevent unnecessary auto-saves
                             lastSavedStateRef.current = serializeWorkflowState(initialFlow);
                         }
                         if (loadedId) {
@@ -138,7 +130,6 @@ export const FlowEditorPage = () => {
                 const data = canvasRef.current.getWorkflow();
                 const currentState = serializeWorkflowState(data);
 
-                // Only save if there are actual changes
                 if (currentState !== lastSavedStateRef.current) {
                     saveCurrentFlow(data);
                     lastSavedStateRef.current = currentState;
@@ -157,7 +148,6 @@ export const FlowEditorPage = () => {
         const data = canvasRef.current.getWorkflow();
         const result = await saveCurrentFlow(data);
         if (result.success) {
-            // Update saved state to prevent unnecessary auto-saves
             lastSavedStateRef.current = serializeWorkflowState(data);
             showNotification(`Saved as "${flowName}"`, 'success');
             if (result.id !== currentFlowId) {
@@ -169,15 +159,12 @@ export const FlowEditorPage = () => {
     };
 
     const handleLoad = async () => {
-        // Backend doesn't support listing flows
-        // User can enter a flow ID directly
         const flowId = prompt('Enter flow ID to load:');
 
         if (flowId && flowId.trim()) {
             const data = await loadFlowById(flowId.trim());
             if (canvasRef.current && data) {
                 canvasRef.current.loadWorkflow(data);
-                // Update saved state reference
                 lastSavedStateRef.current = serializeWorkflowState(data);
                 updateUrl(flowId.trim(), null);
                 showNotification(`Loaded flow: ${flowId.trim()}`, 'success');
@@ -191,7 +178,6 @@ export const FlowEditorPage = () => {
         if (!canvasRef.current) return;
         if (window.confirm('Create new flow? Unsaved changes will be lost.')) {
             canvasRef.current.newWorkflow();
-            // Reset saved state for new flow
             lastSavedStateRef.current = serializeWorkflowState({ nodes: [], connections: [] });
             const newId = await createNewFlow();
             if (newId) {
@@ -286,7 +272,6 @@ export const FlowEditorPage = () => {
                 const json = JSON.parse(event.target?.result as string);
                 if (canvasRef.current && json.nodes && json.connections) {
                     canvasRef.current.loadWorkflow(json);
-                    // Mark as unsaved (imported file hasn't been saved to server yet)
                     lastSavedStateRef.current = null;
                     showNotification('Workflow imported successfully', 'success');
                 } else {
@@ -318,7 +303,6 @@ export const FlowEditorPage = () => {
         showNotification('Execution stopped', 'success');
     };
 
-    // Store handlers in refs to avoid useEffect dependency issues
     const handlersRef = useRef({
         save: handleSave,
         load: handleLoad,
@@ -334,7 +318,6 @@ export const FlowEditorPage = () => {
         showNotification,
     };
 
-    // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (isInputElement(e.target)) return;
@@ -373,7 +356,6 @@ export const FlowEditorPage = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // Unsaved changes warning on page unload
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             if (!canvasRef.current) return;
