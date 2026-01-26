@@ -547,8 +547,12 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                     e.stopPropagation();
                                     setShowMenu(false);
                                 }}
+                                onWheel={e => e.stopPropagation()}
                             />
-                            <div className="absolute right-0 top-7 w-36 bg-popover border border-border rounded shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100">
+                            <div
+                                className="absolute right-0 top-7 w-36 bg-popover border border-border rounded shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100"
+                                onWheel={e => e.stopPropagation()}
+                            >
                                 <button
                                     onClick={e => {
                                         e.stopPropagation();
