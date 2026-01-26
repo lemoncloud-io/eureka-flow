@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+import { flowStorage } from '../utils/flowStorage';
+
 import type { FlowView } from '../types';
 import type { BlockDefinition } from '@lemoncloud/eureka-flows-api';
 
@@ -42,7 +44,7 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     flowName: 'Untitled Workflow',
     flows: [],
     lastSavedAt: null,
-    isAutoSaveEnabled: false,
+    isAutoSaveEnabled: flowStorage.getAutoSaveEnabled(),
     saveStatus: 'idle',
     saveError: null,
 
@@ -64,9 +66,17 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
 
     setLastSavedAt: date => set({ lastSavedAt: date }),
 
-    setAutoSaveEnabled: enabled => set({ isAutoSaveEnabled: enabled }),
+    setAutoSaveEnabled: enabled => {
+        flowStorage.setAutoSaveEnabled(enabled);
+        set({ isAutoSaveEnabled: enabled });
+    },
 
-    toggleAutoSave: () => set(state => ({ isAutoSaveEnabled: !state.isAutoSaveEnabled })),
+    toggleAutoSave: () =>
+        set(state => {
+            const newValue = !state.isAutoSaveEnabled;
+            flowStorage.setAutoSaveEnabled(newValue);
+            return { isAutoSaveEnabled: newValue };
+        }),
 
     setSaveStatus: status => set({ saveStatus: status }),
 

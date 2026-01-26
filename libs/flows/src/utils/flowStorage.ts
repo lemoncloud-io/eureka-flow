@@ -5,6 +5,7 @@
  */
 
 const FLOW_ID_STORAGE_KEY = 'flows-current-flow-id';
+const AUTO_SAVE_STORAGE_KEY = 'flows-auto-save-enabled';
 
 export const flowStorage = {
     /**
@@ -37,6 +38,29 @@ export const flowStorage = {
             localStorage.removeItem(FLOW_ID_STORAGE_KEY);
         } catch {
             // Silently ignore - non-critical operation
+        }
+    },
+
+    /**
+     * Get auto-save enabled state from localStorage
+     */
+    getAutoSaveEnabled: (): boolean => {
+        try {
+            const value = localStorage.getItem(AUTO_SAVE_STORAGE_KEY);
+            return value === 'true';
+        } catch {
+            return false;
+        }
+    },
+
+    /**
+     * Save auto-save enabled state to localStorage
+     */
+    setAutoSaveEnabled: (enabled: boolean): void => {
+        try {
+            localStorage.setItem(AUTO_SAVE_STORAGE_KEY, String(enabled));
+        } catch {
+            console.warn('[flowStorage] Failed to save auto-save setting');
         }
     },
 };

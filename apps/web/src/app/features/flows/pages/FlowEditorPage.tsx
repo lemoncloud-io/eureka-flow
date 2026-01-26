@@ -36,6 +36,8 @@ export const FlowEditorPage = () => {
     const [isRunning, setIsRunning] = useState(false);
     const autoSaveTimerRef = useRef<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    /** JSON-serialized { nodes, connections } for change detection in auto-save */
+    const lastSavedStateRef = useRef<string | null>(null);
 
     const updateUrl = useCallback((flowId: string | null, nodeId?: string | null) => {
         try {
@@ -94,6 +96,11 @@ export const FlowEditorPage = () => {
                     if (canvasRef.current) {
                         if (initialFlow) {
                             canvasRef.current.loadWorkflow(initialFlow);
+                            // Store initial state to prevent unnecessary auto-saves
+                            lastSavedStateRef.current = JSON.stringify({
+                                nodes: initialFlow.nodes,
+                                connections: initialFlow.connections ?? initialFlow.edges,
+                            });
                         }
                         if (loadedId) {
                             updateUrl(loadedId, nodeIdFromHash);
@@ -122,7 +129,13 @@ export const FlowEditorPage = () => {
         autoSaveTimerRef.current = window.setTimeout(() => {
             if (canvasRef.current) {
                 const data = canvasRef.current.getWorkflow();
-                saveCurrentFlow(data);
+                const currentState = JSON.stringify({ nodes: data.nodes, connections: data.connections });
+
+                // Only save if there are actual changes
+                if (currentState !== lastSavedStateRef.current) {
+                    saveCurrentFlow(data);
+                    lastSavedStateRef.current = currentState;
+                }
             }
         }, 2000);
     }, [isAutoSaveEnabled, saveCurrentFlow]);
@@ -137,6 +150,8 @@ export const FlowEditorPage = () => {
         const data = canvasRef.current.getWorkflow();
         const result = await saveCurrentFlow(data);
         if (result.success) {
+            // Update saved state to prevent unnecessary auto-saves
+            lastSavedStateRef.current = JSON.stringify({ nodes: data.nodes, connections: data.connections });
             showNotification(`Saved as "${flowName}"`, 'success');
             if (result.id !== currentFlowId) {
                 updateUrl(result.id, window.location.hash.replace('#', ''));
@@ -155,6 +170,11 @@ export const FlowEditorPage = () => {
             const data = await loadFlowById(flowId.trim());
             if (canvasRef.current && data) {
                 canvasRef.current.loadWorkflow(data);
+                // Update saved state reference
+                lastSavedStateRef.current = JSON.stringify({
+                    nodes: data.nodes,
+                    connections: data.connections ?? data.edges,
+                });
                 updateUrl(flowId.trim(), null);
                 showNotification(`Loaded flow: ${flowId.trim()}`, 'success');
             } else {
@@ -167,6 +187,8 @@ export const FlowEditorPage = () => {
         if (!canvasRef.current) return;
         if (window.confirm('Create new flow? Unsaved changes will be lost.')) {
             canvasRef.current.newWorkflow();
+            // Reset saved state for new flow
+            lastSavedStateRef.current = JSON.stringify({ nodes: [], connections: [] });
             const newId = await createNewFlow();
             if (newId) {
                 updateUrl(newId, null);
@@ -221,7 +243,10 @@ export const FlowEditorPage = () => {
     const handleBeforeBackendRun = useCallback(async () => {
         if (!canvasRef.current) return;
         const data = canvasRef.current.getWorkflow();
-        await saveCurrentFlow(data);
+        const result = await saveCurrentFlow(data);
+        if (result.success) {
+            lastSavedStateRef.current = JSON.stringify({ nodes: data.nodes, connections: data.connections });
+        }
     }, [saveCurrentFlow]);
 
     const handleExport = () => {
@@ -257,6 +282,8 @@ export const FlowEditorPage = () => {
                 const json = JSON.parse(event.target?.result as string);
                 if (canvasRef.current && json.nodes && json.connections) {
                     canvasRef.current.loadWorkflow(json);
+                    // Mark as unsaved (imported file hasn't been saved to server yet)
+                    lastSavedStateRef.current = null;
                     showNotification('Workflow imported successfully', 'success');
                 } else {
                     showNotification('Invalid workflow file', 'error');

@@ -131,11 +131,14 @@ const SaveStatusIndicator: React.FC<
 > = ({ lastSavedAt, saveStatus = 'idle', saveError, onRetrySave }) => {
     const { t } = useTranslation(['common']);
 
+    // Fixed width container to prevent layout shift
+    const containerClass = 'w-[120px] text-[10px] flex items-center gap-1.5';
+
     // Saving state - subtle blue dot with animation
     if (saveStatus === 'saving') {
         return (
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1.5 transition-opacity">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+            <span className={`${containerClass} text-muted-foreground`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
                 {t('status.saving')}
             </span>
         );
@@ -147,12 +150,14 @@ const SaveStatusIndicator: React.FC<
         return (
             <button
                 onClick={onRetrySave}
-                className="text-[10px] text-destructive flex items-center gap-1.5 hover:text-destructive/80 transition-colors"
+                className={`${containerClass} text-destructive hover:text-destructive/80 transition-colors`}
                 title={errorMessage}
                 aria-label={`${errorMessage}. ${t('status.retry', 'Retry')}`}
             >
-                <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-                {t('status.saveFailed', 'Save failed')} · {t('status.retry', 'Retry')}
+                <span className="w-1.5 h-1.5 rounded-full bg-destructive shrink-0" />
+                <span className="truncate">
+                    {t('status.saveFailed', 'Save failed')} · {t('status.retry', 'Retry')}
+                </span>
             </button>
         );
     }
@@ -160,8 +165,8 @@ const SaveStatusIndicator: React.FC<
     // Success state - brief green checkmark (auto-fades to idle)
     if (saveStatus === 'success') {
         return (
-            <span className="text-[10px] text-success flex items-center gap-1.5 animate-in fade-in duration-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-success" />
+            <span className={`${containerClass} text-success animate-in fade-in duration-200`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
                 {t('status.saved')}
             </span>
         );
@@ -170,13 +175,13 @@ const SaveStatusIndicator: React.FC<
     // Idle state - show last saved time or unsaved
     if (lastSavedAt) {
         return (
-            <span className="text-[10px] text-muted-foreground">
+            <span className={`${containerClass} text-muted-foreground`}>
                 {t('status.saved')} {lastSavedAt.toLocaleTimeString()}
             </span>
         );
     }
 
-    return <span className="text-[10px] text-muted-foreground">{t('status.unsaved')}</span>;
+    return <span className={`${containerClass} text-muted-foreground`}>{t('status.unsaved')}</span>;
 };
 
 const FileActionsToolbar: React.FC<FileActionsProps> = ({ onNew, onLoad, onSave, onExport, onImport }) => {
