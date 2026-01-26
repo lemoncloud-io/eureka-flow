@@ -1,16 +1,58 @@
 import { useCallback } from 'react';
 
 import { useCanvasStore } from '../stores';
+import { useFlowsStore } from '../stores/useFlowsStore';
 
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinition, NodeData } from '@lemoncloud/eureka-flows-api';
 
-// Layout constants
-const LAYOUT_CONFIG = {
+/** Layout configuration for auto-layout algorithm */
+export const LAYOUT_CONFIG = {
+    /** Horizontal spacing between levels (columns) */
     LEVEL_WIDTH: 300,
-    ROW_HEIGHT: 200,
+    /** Minimum vertical gap between nodes */
+    MIN_GAP: 30,
+    /** Default node height when definition is unavailable */
+    DEFAULT_HEIGHT: 180,
+    /** Initial X position */
     START_X: 50,
+    /** Initial Y position */
     START_Y: 50,
 } as const;
+
+/** Node height estimation constants */
+const NODE_HEIGHT = {
+    /** Base: header(40) + description(20) + border(10) + padding(40) */
+    BASE: 110,
+    /** Height per port row */
+    PORT_ROW: 26,
+    /** Extra height for input nodes (Run button + visualization) */
+    INPUT_NODE: 100,
+    /** Extra height for debug-log nodes (visualization area) */
+    DEBUG_LOG: 120,
+    /** Extra height for preview nodes (image area) */
+    PREVIEW: 100,
+    /** Extra height for error state (error message box) */
+    ERROR: 70,
+} as const;
+
+/**
+ * Estimate node height based on node type and port count.
+ * Avoids DOM measurement timing issues while providing accurate spacing.
+ */
+export const estimateNodeHeight = (node: NodeData, definition: BlockDefinition | undefined): number => {
+    if (!definition) return LAYOUT_CONFIG.DEFAULT_HEIGHT;
+
+    const portCount = Math.max(definition.inputs.length, definition.outputs.length);
+    const portsHeight = portCount * NODE_HEIGHT.PORT_ROW;
+
+    let extraHeight = 0;
+    if (node.type.startsWith('input-')) extraHeight += NODE_HEIGHT.INPUT_NODE;
+    if (node.type === 'debug-log') extraHeight += NODE_HEIGHT.DEBUG_LOG;
+    if (node.type === 'preview') extraHeight += NODE_HEIGHT.PREVIEW;
+    if (node.status === 'ERROR') extraHeight += NODE_HEIGHT.ERROR;
+
+    return NODE_HEIGHT.BASE + portsHeight + extraHeight;
+};
 
 interface UseCanvasLayoutOptions {
     readOnly?: boolean;
@@ -25,6 +67,7 @@ interface UseCanvasLayoutOptions {
  */
 export const useCanvasLayout = ({ readOnly, onBeforeLayout }: UseCanvasLayoutOptions = {}) => {
     const { nodes, connections, setNodes, setViewport } = useCanvasStore();
+    const { blockRegistry } = useFlowsStore();
 
     /**
      * Auto-arrange nodes using topological sort
@@ -138,10 +181,11 @@ export const useCanvasLayout = ({ readOnly, onBeforeLayout }: UseCanvasLayoutOpt
                 return avgA - avgB;
             });
 
-            // Position each node in the group
-            group.forEach((node, idx) => {
+            // Position each node in the group with dynamic height-based spacing
+            let currentY = LAYOUT_CONFIG.START_Y;
+            group.forEach(node => {
                 const x = LAYOUT_CONFIG.START_X + level * LAYOUT_CONFIG.LEVEL_WIDTH;
-                const y = LAYOUT_CONFIG.START_Y + idx * LAYOUT_CONFIG.ROW_HEIGHT;
+                const y = currentY;
 
                 nodeYPositions[node.id] = y;
 
@@ -152,13 +196,17 @@ export const useCanvasLayout = ({ readOnly, onBeforeLayout }: UseCanvasLayoutOpt
                         position: { x, y },
                     };
                 }
+
+                // Advance Y by estimated node height + gap
+                const nodeHeight = estimateNodeHeight(node, blockRegistry[node.type]);
+                currentY += nodeHeight + LAYOUT_CONFIG.MIN_GAP;
             });
         });
 
         // Apply new positions and reset viewport
         setNodes(positionedNodes);
         setViewport({ x: 20, y: 20, zoom: 1 });
-    }, [readOnly, nodes, connections, onBeforeLayout, setNodes, setViewport]);
+    }, [readOnly, nodes, connections, onBeforeLayout, setNodes, setViewport, blockRegistry]);
 
     return {
         autoLayout,

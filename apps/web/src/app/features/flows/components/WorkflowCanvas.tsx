@@ -3,7 +3,14 @@ import { useTranslation } from 'react-i18next';
 
 import { X } from 'lucide-react';
 
-import { loadFlow, requiresBackendProcessing, runNode, useBlockRegistry } from '@flows/flows';
+import {
+    LAYOUT_CONFIG,
+    estimateNodeHeight,
+    loadFlow,
+    requiresBackendProcessing,
+    runNode,
+    useBlockRegistry,
+} from '@flows/flows';
 
 import { ConnectionLine } from './ConnectionLine';
 import { DetailPanel } from './DetailPanel';
@@ -431,11 +438,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
                     });
 
-                    const LEVEL_WIDTH = 300;
-                    const ROW_HEIGHT = 200;
-                    const START_X = 50;
-                    const START_Y = 50;
-
                     const levelGroups: Record<number, NodeData[]> = {};
                     nodes.forEach(n => {
                         const l = levels[n.id] || 0;
@@ -464,9 +466,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             return avgA - avgB;
                         });
 
-                        group.forEach((node, idx) => {
-                            const x = START_X + level * LEVEL_WIDTH;
-                            const y = START_Y + idx * ROW_HEIGHT;
+                        // Position each node with dynamic height-based spacing
+                        let currentY = LAYOUT_CONFIG.START_Y;
+                        group.forEach(node => {
+                            const x = LAYOUT_CONFIG.START_X + level * LAYOUT_CONFIG.LEVEL_WIDTH;
+                            const y = currentY;
                             nodeYPositions[node.id] = y;
                             const nodeIndex = positionedNodes.findIndex(n => n.id === node.id);
                             if (nodeIndex !== -1) {
@@ -475,6 +479,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     position: { x, y },
                                 };
                             }
+                            // Advance Y by estimated node height + gap
+                            const nodeHeight = estimateNodeHeight(node, blockRegistry[node.type]);
+                            currentY += nodeHeight + LAYOUT_CONFIG.MIN_GAP;
                         });
                     });
 
