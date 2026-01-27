@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Ban, Copy, MoreVertical, Pencil, Play, RefreshCw, ScrollText, X, Zap } from 'lucide-react';
 
-import { useBlockRegistry } from '@flows/flows';
+import { compressImageIfNeeded, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { S3Image } from './S3Image';
@@ -222,11 +222,17 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
     const img = node.config.imageData as string | undefined;
     const fileInputId = `inline-image-${node.id}`;
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = evt => onConfigChange('imageData', evt.target?.result as string);
+            reader.onload = async evt => {
+                const dataUrl = evt.target?.result as string;
+                if (dataUrl) {
+                    const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
+                    onConfigChange('imageData', compressed);
+                }
+            };
             reader.readAsDataURL(file);
         }
     };

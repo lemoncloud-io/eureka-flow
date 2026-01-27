@@ -16,7 +16,7 @@ import {
     Zap,
 } from 'lucide-react';
 
-import { useBlockRegistry } from '@flows/flows';
+import { compressImageIfNeeded, useBlockRegistry } from '@flows/flows';
 
 import { S3Image } from './S3Image';
 
@@ -226,8 +226,14 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                         const file = e.target.files?.[0];
                                         if (file) {
                                             const reader = new FileReader();
-                                            reader.onload = evt =>
-                                                evt.target?.result && handleChange(evt.target.result);
+                                            reader.onload = async evt => {
+                                                const dataUrl = evt.target?.result as string;
+                                                if (dataUrl) {
+                                                    const { dataUrl: compressed } =
+                                                        await compressImageIfNeeded(dataUrl);
+                                                    handleChange(compressed);
+                                                }
+                                            };
                                             reader.readAsDataURL(file);
                                         }
                                     }}
