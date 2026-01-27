@@ -174,10 +174,10 @@ const getRelativeTime = (date: Date, t: (key: string, options?: Record<string, u
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
 
-    if (seconds < 10) return t('time.justNow', '방금');
-    if (seconds < 60) return t('time.secondsAgo', { count: seconds, defaultValue: '{{count}}초 전' });
-    if (minutes < 60) return t('time.minutesAgo', { count: minutes, defaultValue: '{{count}}분 전' });
-    if (hours < 24) return t('time.hoursAgo', { count: hours, defaultValue: '{{count}}시간 전' });
+    if (seconds < 10) return t('time.justNow');
+    if (seconds < 60) return t('time.secondsAgo', { count: seconds });
+    if (minutes < 60) return t('time.minutesAgo', { count: minutes });
+    if (hours < 24) return t('time.hoursAgo', { count: hours });
     return date.toLocaleDateString();
 };
 

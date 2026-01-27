@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useBlocks, useFlows } from '@flows/flows';
 
@@ -17,6 +18,7 @@ const isInputElement = (target: EventTarget | null): boolean => {
 };
 
 export const FlowEditorPage = () => {
+    const { t } = useTranslation('flows');
     const canvasRef = useRef<WorkflowCanvasRef>(null);
 
     const { loadBlocks } = useBlocks();
@@ -39,7 +41,7 @@ export const FlowEditorPage = () => {
     } = useFlows();
 
     const [isAppReady, setIsAppReady] = useState(false);
-    const [loadingText, setLoadingText] = useState('Initializing FlowMosaic Engine...');
+    const [loadingText, setLoadingText] = useState('');
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const autoSaveTimerRef = useRef<number | null>(null);
@@ -67,8 +69,9 @@ export const FlowEditorPage = () => {
         bootedRef.current = true;
 
         const boot = async () => {
+            setLoadingText(t('flowEditor.initializingEngine'));
             try {
-                setLoadingText('Loading Block Registry...');
+                setLoadingText(t('flowEditor.loadingBlockRegistry'));
                 await loadBlocks();
 
                 const pathParts = window.location.pathname.split('/');
@@ -79,17 +82,17 @@ export const FlowEditorPage = () => {
                 let initialFlow = null;
 
                 if (flowIdFromUrl) {
-                    setLoadingText(`Loading Flow ${flowIdFromUrl}...`);
+                    setLoadingText(t('flowEditor.loadingFlow', { flowId: flowIdFromUrl }));
                     initialFlow = await loadFlowById(flowIdFromUrl);
                     loadedId = flowIdFromUrl;
                 } else {
-                    setLoadingText('Initializing Flow...');
+                    setLoadingText(t('flowEditor.initializingFlow'));
                     const result = await initializeFlow();
                     loadedId = result.flowId;
                     initialFlow = result.flowData;
 
                     if (result.isNew) {
-                        setLoadingText('Created new flow');
+                        setLoadingText(t('flowEditor.createdNewFlow'));
                     }
                 }
 
@@ -110,7 +113,7 @@ export const FlowEditorPage = () => {
                     }
                 }, 0);
             } catch (e) {
-                setLoadingText('Error loading application. Please refresh.');
+                setLoadingText(t('flowEditor.errorLoadingApp'));
                 console.error(e);
             }
         };
@@ -149,17 +152,17 @@ export const FlowEditorPage = () => {
         const result = await saveCurrentFlow(data);
         if (result.success) {
             lastSavedStateRef.current = serializeWorkflowState(data);
-            showNotification(`Saved as "${flowName}"`, 'success');
+            showNotification(t('flowEditor.savedAs', { flowName }), 'success');
             if (result.id !== currentFlowId) {
                 updateUrl(result.id, window.location.hash.replace('#', ''));
             }
         } else {
-            showNotification('Failed to save workflow', 'error');
+            showNotification(t('flowEditor.failedToSaveWorkflow'), 'error');
         }
     };
 
     const handleLoad = async () => {
-        const flowId = prompt('Enter flow ID to load:');
+        const flowId = prompt(t('flowEditor.enterFlowId'));
 
         if (flowId && flowId.trim()) {
             const data = await loadFlowById(flowId.trim());
@@ -167,24 +170,24 @@ export const FlowEditorPage = () => {
                 canvasRef.current.loadWorkflow(data);
                 lastSavedStateRef.current = serializeWorkflowState(data);
                 updateUrl(flowId.trim(), null);
-                showNotification(`Loaded flow: ${flowId.trim()}`, 'success');
+                showNotification(t('flowEditor.loadedFlow', { flowId: flowId.trim() }), 'success');
             } else {
-                showNotification('Failed to load flow', 'error');
+                showNotification(t('flowEditor.failedToLoadFlow'), 'error');
             }
         }
     };
 
     const handleNew = async () => {
         if (!canvasRef.current) return;
-        if (window.confirm('Create new flow? Unsaved changes will be lost.')) {
+        if (window.confirm(t('flowEditor.confirmNewFlow'))) {
             canvasRef.current.newWorkflow();
             lastSavedStateRef.current = serializeWorkflowState({ nodes: [], connections: [] });
             const newId = await createNewFlow();
             if (newId) {
                 updateUrl(newId, null);
-                showNotification('New flow created', 'success');
+                showNotification(t('flowEditor.newFlowCreated'), 'success');
             } else {
-                showNotification('Failed to create new flow', 'error');
+                showNotification(t('flowEditor.failedToCreateFlow'), 'error');
             }
         }
     };
@@ -202,17 +205,17 @@ export const FlowEditorPage = () => {
 
         try {
             await navigator.clipboard.writeText(window.location.href);
-            showNotification('Link copied to clipboard!', 'success');
+            showNotification(t('flowEditor.linkCopied'), 'success');
         } catch (_err) {
-            showNotification('Failed to copy link', 'error');
+            showNotification(t('flowEditor.failedToCopyLink'), 'error');
         }
     };
 
     const handleClear = () => {
         if (!canvasRef.current) return;
-        if (window.confirm('Clear the canvas?')) {
+        if (window.confirm(t('flowEditor.confirmClearCanvas'))) {
             canvasRef.current.clearWorkflow();
-            showNotification('Canvas cleared', 'success');
+            showNotification(t('flowEditor.canvasCleared'), 'success');
         }
     };
 
@@ -253,7 +256,7 @@ export const FlowEditorPage = () => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        showNotification('Exported to JSON', 'success');
+        showNotification(t('flowEditor.exportedToJson'), 'success');
     };
 
     const handleImport = () => {
@@ -271,12 +274,12 @@ export const FlowEditorPage = () => {
                 if (canvasRef.current && json.nodes && json.connections) {
                     canvasRef.current.loadWorkflow(json);
                     lastSavedStateRef.current = null;
-                    showNotification('Workflow imported successfully', 'success');
+                    showNotification(t('flowEditor.workflowImported'), 'success');
                 } else {
-                    showNotification('Invalid workflow file', 'error');
+                    showNotification(t('flowEditor.invalidWorkflowFile'), 'error');
                 }
             } catch (_err) {
-                showNotification('Failed to parse JSON file', 'error');
+                showNotification(t('flowEditor.failedToParseJson'), 'error');
             }
         };
         reader.readAsText(file);
@@ -286,7 +289,7 @@ export const FlowEditorPage = () => {
     const handleRunAll = async () => {
         if (!canvasRef.current) return;
         setIsRunning(true);
-        showNotification('Running all nodes...', 'success');
+        showNotification(t('flowEditor.runningAllNodes'), 'success');
         try {
             await canvasRef.current.runAll();
         } finally {
@@ -298,7 +301,7 @@ export const FlowEditorPage = () => {
         if (!canvasRef.current) return;
         setIsRunning(false);
         canvasRef.current.stopAll();
-        showNotification('Execution stopped', 'success');
+        showNotification(t('flowEditor.executionStopped'), 'success');
     };
 
     const handlersRef = useRef({
@@ -346,7 +349,7 @@ export const FlowEditorPage = () => {
             } else if (key === 'l') {
                 e.preventDefault();
                 canvasRef.current?.autoLayout();
-                handlersRef.current.showNotification('Auto-layout applied', 'success');
+                handlersRef.current.showNotification(t('flowEditor.autoLayoutApplied'), 'success');
             }
         };
 
@@ -413,7 +416,7 @@ export const FlowEditorPage = () => {
                     onRedo: () => canvasRef.current?.redo(),
                     onAutoLayout: () => {
                         canvasRef.current?.autoLayout();
-                        showNotification('Auto-layout applied', 'success');
+                        showNotification(t('flowEditor.autoLayoutApplied'), 'success');
                     },
                     onClear: handleClear,
                     onSave: handleSave,
@@ -456,7 +459,7 @@ export const FlowEditorPage = () => {
                 <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-sm">
                     <div className="flex flex-col items-center bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl p-6 shadow-floating">
                         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-3"></div>
-                        <span className="text-sm font-medium text-foreground">Processing...</span>
+                        <span className="text-sm font-medium text-foreground">{t('flowEditor.processing')}</span>
                     </div>
                 </div>
             )}

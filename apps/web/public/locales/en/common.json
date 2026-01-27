@@ -19,6 +19,8 @@
         "saving": "Saving...",
         "saved": "Saved",
         "unsaved": "Unsaved",
+        "saveFailed": "Save failed",
+        "retry": "Retry",
         "loading": "Loading...",
         "running": "Running",
         "completed": "Completed",

@@ -19,6 +19,8 @@
         "saving": "저장 중...",
         "saved": "저장됨",
         "unsaved": "저장 안됨",
+        "saveFailed": "저장 실패",
+        "retry": "재시도",
         "loading": "로딩 중...",
         "running": "실행 중",
         "completed": "완료",
