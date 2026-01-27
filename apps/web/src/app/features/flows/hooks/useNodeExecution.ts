@@ -127,9 +127,9 @@ export const useNodeExecution = (options: UseNodeExecutionOptions): UseNodeExecu
                 let results: Record<string, DataPacket>;
 
                 // Check if block requires backend processing
-                if (requiresBackendProcessing(currentNode.type)) {
+                // Use nodeDef.type since loaded nodes may have blockId as currentNode.type
+                if (requiresBackendProcessing(nodeDef.type)) {
                     // Backend execution: POST /nodes/:id/run
-                    console.log(`[useNodeExecution] Backend execution: ${currentNode.type}`);
                     const nodeResult = await runNode(nodeId);
 
                     // Extract outputData from API response
@@ -156,11 +156,9 @@ export const useNodeExecution = (options: UseNodeExecutionOptions): UseNodeExecu
                     }
                 } else if (nodeDef.execute) {
                     // Frontend execution: call block.execute() directly
-                    console.log(`[useNodeExecution] Frontend execution: ${currentNode.type}`);
                     results = await nodeDef.execute(inputs, currentNode.config, onProgress);
                 } else {
-                    // No execute function available
-                    console.warn(`[useNodeExecution] No execute function for: ${currentNode.type}`);
+                    // No execute function available - this shouldn't happen for properly configured blocks
                     results = {};
                 }
 

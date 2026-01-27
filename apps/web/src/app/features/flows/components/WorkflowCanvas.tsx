@@ -625,7 +625,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     let results: Record<string, DataPacket>;
 
                     // Check if block requires backend processing
-                    if (requiresBackendProcessing(currentNode.type)) {
+                    // Use nodeDef.type since loaded nodes may have blockId as currentNode.type
+                    if (requiresBackendProcessing(nodeDef.type)) {
                         // Backend execution: POST /nodes/:id/run
 
                         // Save flow first to ensure node exists on server

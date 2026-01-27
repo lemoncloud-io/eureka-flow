@@ -108,11 +108,11 @@ export const useExecution = () => {
                 let outputData: Record<string, DataPacket> | undefined;
 
                 // Check if block can be executed on frontend
-                const canExecuteLocally = blockDef?.execute && !requiresBackendProcessing(blockType || '');
+                // Use blockDef.type since loaded nodes may have blockId as node.type
+                const canExecuteLocally = blockDef?.execute && !requiresBackendProcessing(blockDef?.type || '');
 
                 if (canExecuteLocally && blockDef?.execute) {
                     // Frontend execution: call block.execute() directly
-                    console.log(`[useExecution] Frontend execution: ${blockType}`);
 
                     const onProgress = (progress: number) => {
                         setNodes(prev =>
@@ -143,7 +143,6 @@ export const useExecution = () => {
                     );
                 } else {
                     // Backend execution: call API with config
-                    console.log(`[useExecution] Backend execution: ${blockType}`);
                     const body = buildRunNodeBody(node.config);
                     await runNode(nodeId, body);
 
@@ -351,7 +350,6 @@ export const useExecution = () => {
 
                 // If timestamp changed and is newer, trigger execution
                 if (currentTimestamp > prevTimestamp && prevTimestamp !== 0) {
-                    console.log(`[useExecution] Auto-triggering node ${node.id} due to input change`);
                     executeNode(node.id);
                 }
             });
