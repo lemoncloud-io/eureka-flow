@@ -298,7 +298,8 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         if (!def) return null;
 
         const isAuto = selectedNode.autoExecutionEnabled !== false;
-        const isComponent = selectedNode.type === 'workflow-component';
+        // Use def.type since loaded nodes may have blockId as type
+        const isComponent = def.type === 'workflow-component';
         const subFlowId = isComponent ? selectedNode.config.selectedFlowId : null;
 
         const configSchema =
