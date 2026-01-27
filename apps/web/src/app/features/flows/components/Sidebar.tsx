@@ -154,7 +154,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
     const [activeCategory, setActiveCategory] = useState<keyof typeof CATEGORY_CONFIG | null>(null);
 
     const blockGroups = useMemo(() => {
-        const blocks = Object.values(blockRegistry);
+        // Deduplicate: blockRegistry has dual indexing (by type and id)
+        // Only use entries where key === block.type to avoid duplicates
+        const blocks = Object.entries(blockRegistry)
+            .filter(([key, block]) => key === block.type)
+            .map(([, block]) => block);
 
         return {
             inputs: blocks.filter(b => b.type.startsWith('input-')),
