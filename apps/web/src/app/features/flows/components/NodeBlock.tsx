@@ -219,7 +219,8 @@ interface EditableVisualizationProps {
 
 const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
-    const img = node.config.imageData as string | undefined;
+    // Server uses 'image' key for input-image config
+    const img = node.config.image as string | undefined;
     const fileInputId = `inline-image-${node.id}`;
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -230,7 +231,7 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
                 const dataUrl = evt.target?.result as string;
                 if (dataUrl) {
                     const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
-                    onConfigChange('imageData', compressed);
+                    onConfigChange('image', compressed);
                 }
             };
             reader.readAsDataURL(file);
@@ -266,7 +267,7 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
                     onClick={e => {
                         e.stopPropagation();
                         e.preventDefault();
-                        onConfigChange('imageData', '');
+                        onConfigChange('image', '');
                     }}
                     className="mt-2 w-full text-[10px] py-1.5 bg-destructive/10 text-destructive/80 rounded-md hover:bg-destructive/20 transition-colors flex items-center justify-center gap-1"
                 >
@@ -281,7 +282,8 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
 const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
     const [isEditing, setIsEditing] = useState(false);
-    const text = (node.config.text as string) || '';
+    // Server uses 'value' key for input-text config
+    const text = (node.config.value as string) || '';
 
     const textDisplay = useMemo(() => {
         if (!text) return null;
@@ -301,7 +303,7 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
                     autoFocus
                     className="w-full p-2.5 bg-background/80 border border-primary/50 rounded-lg text-xs resize-none font-mono focus:outline-none focus:border-primary text-foreground"
                     value={text}
-                    onChange={e => onConfigChange('text', e.target.value)}
+                    onChange={e => onConfigChange('value', e.target.value)}
                     onBlur={() => setIsEditing(false)}
                     onKeyDown={e => {
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -378,8 +380,9 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
 };
 
 const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
-    'debug-log': DebugLogVisualization,
-    preview: PreviewVisualization,
+    // Server type names
+    'console-log': DebugLogVisualization,
+    'result-preview': PreviewVisualization,
 };
 
 interface NodeBlockProps {
@@ -689,7 +692,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
                 {/* Content Area */}
                 <div className="mt-2">
-                    {(node.type.startsWith('input-') || !isAuto) && (
+                    {/* Use definition.type for block type checks (node.type may be blockId like "1000006") */}
+                    {(definition?.type?.startsWith('input-') || !isAuto) && (
                         <button
                             onClick={onTrigger}
                             className={cn(
@@ -701,18 +705,19 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             onMouseDown={e => e.stopPropagation()}
                         >
                             <Play className="w-3 h-3" />
-                            {node.type.startsWith('input-') ? t('actions.run') : t('actions.forceRun')}
+                            {definition?.type?.startsWith('input-') ? t('actions.run') : t('actions.forceRun')}
                         </button>
                     )}
 
-                    {node.type === 'input-text' && (
+                    {definition?.type === 'input-text' && (
                         <InputTextVisualizationEditable node={node} onConfigChange={onConfigChange} />
                     )}
-                    {node.type === 'input-image' && (
+                    {definition?.type === 'input-image' && (
                         <InputImageVisualizationEditable node={node} onConfigChange={onConfigChange} />
                     )}
-                    {VISUALIZATION_COMPONENTS[node.type] &&
-                        React.createElement(VISUALIZATION_COMPONENTS[node.type], { node })}
+                    {definition?.type &&
+                        VISUALIZATION_COMPONENTS[definition.type] &&
+                        React.createElement(VISUALIZATION_COMPONENTS[definition.type], { node })}
                 </div>
 
                 {/* Error Message */}

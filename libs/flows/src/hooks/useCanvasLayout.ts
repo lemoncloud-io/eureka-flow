@@ -27,9 +27,9 @@ const NODE_HEIGHT = {
     PORT_ROW: 26,
     /** Extra height for input nodes (Run button + visualization) */
     INPUT_NODE: 100,
-    /** Extra height for debug-log nodes (visualization area) */
+    /** Extra height for console-log nodes (visualization area) */
     DEBUG_LOG: 120,
-    /** Extra height for preview nodes (image area) */
+    /** Extra height for result-preview nodes (image area) */
     PREVIEW: 100,
     /** Extra height for error state (error message box) */
     ERROR: 70,
@@ -46,9 +46,10 @@ export const estimateNodeHeight = (node: NodeData, definition: BlockDefinition |
     const portsHeight = portCount * NODE_HEIGHT.PORT_ROW;
 
     let extraHeight = 0;
-    if (node.type.startsWith('input-')) extraHeight += NODE_HEIGHT.INPUT_NODE;
-    if (node.type === 'debug-log') extraHeight += NODE_HEIGHT.DEBUG_LOG;
-    if (node.type === 'preview') extraHeight += NODE_HEIGHT.PREVIEW;
+    // Use definition.type since loaded nodes may have blockId as type
+    if (definition.type.startsWith('input-')) extraHeight += NODE_HEIGHT.INPUT_NODE;
+    if (definition.type === 'console-log') extraHeight += NODE_HEIGHT.DEBUG_LOG;
+    if (definition.type === 'result-preview') extraHeight += NODE_HEIGHT.PREVIEW;
     if (node.status === 'ERROR') extraHeight += NODE_HEIGHT.ERROR;
 
     return NODE_HEIGHT.BASE + portsHeight + extraHeight;

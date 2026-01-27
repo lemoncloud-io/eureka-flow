@@ -49,13 +49,13 @@ const CATEGORY_CONFIG = {
 const iconMap: Record<string, React.ElementType> = {
     'input-text': Type,
     'input-image': Image,
-    validation: Shield,
-    buffer: Timer,
+    validator: Shield,
+    delay: Timer,
     transform: RefreshCw,
     info: Ruler,
     'workflow-component': Package,
     preview: Eye,
-    'debug-log': Terminal,
+    log: Terminal,
     default: Puzzle,
 };
 
@@ -64,13 +64,14 @@ const getIcon = (type: string): React.ElementType => {
     if (type.startsWith('input-')) {
         return type.includes('text') ? iconMap['input-text'] : iconMap['input-image'];
     }
-    if (type.includes('validation')) return iconMap.validation;
-    if (type === 'buffer') return iconMap.buffer;
+    // Server types: length-validator, buffer-delay, text-transform, image-info, etc.
+    if (type.includes('validator')) return iconMap.validator;
+    if (type.includes('delay') || type.includes('buffer')) return iconMap.delay;
     if (type.includes('transform')) return iconMap.transform;
     if (type.includes('info')) return iconMap.info;
     if (type === 'workflow-component') return iconMap['workflow-component'];
-    if (type === 'preview') return iconMap.preview;
-    if (type === 'debug-log') return iconMap['debug-log'];
+    if (type.includes('preview')) return iconMap.preview;
+    if (type.includes('log') || type.includes('console')) return iconMap.log;
     return iconMap.default;
 };
 
@@ -157,8 +158,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
 
         return {
             inputs: blocks.filter(b => b.type.startsWith('input-')),
-            process: blocks.filter(b => !b.type.startsWith('input-') && !['preview', 'debug-log'].includes(b.type)),
-            outputs: blocks.filter(b => ['preview', 'debug-log'].includes(b.type)),
+            process: blocks.filter(
+                b => !b.type.startsWith('input-') && !['result-preview', 'console-log'].includes(b.type)
+            ),
+            outputs: blocks.filter(b => ['result-preview', 'console-log'].includes(b.type)),
         };
     }, [blockRegistry]);
 

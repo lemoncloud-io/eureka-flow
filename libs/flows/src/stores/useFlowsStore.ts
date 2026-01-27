@@ -50,7 +50,13 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
 
     setBlockRegistry: blocks => {
         const registry = blocks.reduce<Record<string, BlockDefinition>>((acc, block) => {
+            // Primary key: block.type (e.g., "input-text")
             acc[block.type] = block;
+            // Secondary key: block.id (e.g., "1000006") for backward compatibility
+            // Server load API returns blockId as type, so we need to index by id too
+            if (block.id && block.id !== block.type) {
+                acc[block.id] = block;
+            }
             return acc;
         }, {});
         set({ blockRegistry: registry });

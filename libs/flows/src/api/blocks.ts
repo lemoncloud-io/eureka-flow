@@ -1,6 +1,6 @@
 import { api, withRetry } from '@flows/web-core';
 
-import { MOCKED_BLOCK_DEFINITIONS } from './mock-blocks';
+import { EXECUTE_FUNCTIONS } from './execute-functions';
 
 import type { BlockDefinition, BlockView, DataPacket, ListResult } from '@lemoncloud/eureka-flows-api';
 
@@ -40,58 +40,39 @@ export const requiresBackendProcessing = (blockType: string): boolean => {
 };
 
 /**
- * Fetch all available block definitions
+ * Fetch all available block definitions from server
  * GET /blocks/0/list?cores=1
+ *
+ * Server response contains $definition for each block with:
+ * - id: block ID (e.g., "1000006")
+ * - type: block type (e.g., "input-text")
+ * - label, description, inputs, outputs, configSchema, etc.
  */
 export const listBlocks = async (): Promise<BlockDefinition[]> => {
     _log('> listBlocks()');
     await delay(500);
 
-    try {
-        const response = await withRetry(
-            () => api.get<ListResult<BlockView>>('/blocks/0/list?cores=1'),
-            3,
-            'listBlocks'
-        );
-        const list = response.data?.list
-            ?.map(item => item?.$definition)
-            .filter((def): def is BlockDefinition => !!def?.label);
+    const response = await withRetry(() => api.get<ListResult<BlockView>>('/blocks/0/list?cores=1'), 3, 'listBlocks');
 
-        _log('> API listBlocks?.len =', list?.length);
+    const list = response.data?.list
+        ?.map(item => item?.$definition)
+        .filter((def): def is BlockDefinition => !!def?.label);
 
-        if (!list?.length) return MOCKED_BLOCK_DEFINITIONS;
+    _log('> API listBlocks?.len =', list?.length);
 
-        // Merge with mocked definitions
-        // - Backend blocks (BACKEND_PROCESSOR_TYPES): No execute function needed (uses POST /nodes/:id/run)
-        // - Frontend blocks: Use mock execute function for client-side processing
-        return list.reduce<BlockDefinition[]>(
-            (acc, apiBlock) => {
-                const idx = acc.findIndex(m => m.type === apiBlock.type);
-                const mockBlock = idx >= 0 ? acc[idx] : null;
-
-                // For frontend blocks, use mock's execute function
-                // For backend blocks, execute is undefined (handled by runNode API)
-                const isBackendBlock = BACKEND_PROCESSOR_TYPES.includes(apiBlock.type);
-                const execute = isBackendBlock ? undefined : mockBlock?.execute;
-
-                const mergedBlock = {
-                    ...apiBlock,
-                    execute,
-                };
-
-                if (idx >= 0) {
-                    acc[idx] = mergedBlock;
-                } else {
-                    acc.push(mergedBlock);
-                }
-                return acc;
-            },
-            [...MOCKED_BLOCK_DEFINITIONS]
-        );
-    } catch (err) {
-        console.error('> API listBlocks error =', err);
-        return MOCKED_BLOCK_DEFINITIONS;
+    if (!list?.length) {
+        throw new Error('No block definitions returned from server');
     }
-};
 
-export { MOCKED_BLOCK_DEFINITIONS };
+    // Attach execute functions for client-side processing blocks
+    // Backend blocks (BACKEND_PROCESSOR_TYPES) use POST /nodes/:id/run instead
+    return list.map(block => {
+        const isBackendBlock = BACKEND_PROCESSOR_TYPES.includes(block.type);
+        const execute = isBackendBlock ? undefined : EXECUTE_FUNCTIONS[block.type];
+
+        return {
+            ...block,
+            execute,
+        };
+    });
+};
