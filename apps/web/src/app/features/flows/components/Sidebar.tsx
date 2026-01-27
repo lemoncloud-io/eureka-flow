@@ -46,6 +46,8 @@ const CATEGORY_CONFIG = {
     },
 } as const;
 
+const CATEGORIES = Object.keys(CATEGORY_CONFIG) as Array<keyof typeof CATEGORY_CONFIG>;
+
 const iconMap: Record<string, React.ElementType> = {
     'input-text': Type,
     'input-image': Image,
@@ -59,19 +61,18 @@ const iconMap: Record<string, React.ElementType> = {
     default: Puzzle,
 };
 
-const getIcon = (type: string): React.ElementType => {
-    type = type ?? '';
-    if (type.startsWith('input-')) {
-        return type.includes('text') ? iconMap['input-text'] : iconMap['input-image'];
+const getIcon = (blockType: string): React.ElementType => {
+    if (blockType.startsWith('input-')) {
+        return blockType.includes('text') ? iconMap['input-text'] : iconMap['input-image'];
     }
     // Server types: length-validator, buffer-delay, text-transform, image-info, etc.
-    if (type.includes('validator')) return iconMap.validator;
-    if (type.includes('delay') || type.includes('buffer')) return iconMap.delay;
-    if (type.includes('transform')) return iconMap.transform;
-    if (type.includes('info')) return iconMap.info;
-    if (type === 'workflow-component') return iconMap['workflow-component'];
-    if (type.includes('preview')) return iconMap.preview;
-    if (type.includes('log') || type.includes('console')) return iconMap.log;
+    if (blockType.includes('validator')) return iconMap.validator;
+    if (blockType.includes('delay') || blockType.includes('buffer')) return iconMap.delay;
+    if (blockType.includes('transform')) return iconMap.transform;
+    if (blockType.includes('info')) return iconMap.info;
+    if (blockType === 'workflow-component') return iconMap['workflow-component'];
+    if (blockType.includes('preview')) return iconMap.preview;
+    if (blockType.includes('log') || blockType.includes('console')) return iconMap.log;
     return iconMap.default;
 };
 
@@ -189,7 +190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
                         'shadow-floating'
                     )}
                 >
-                    {(Object.keys(CATEGORY_CONFIG) as Array<keyof typeof CATEGORY_CONFIG>).map(category => (
+                    {CATEGORIES.map(category => (
                         <CategoryButton
                             key={category}
                             category={category}

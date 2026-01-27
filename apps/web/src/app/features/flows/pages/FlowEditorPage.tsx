@@ -18,7 +18,7 @@ const isInputElement = (target: EventTarget | null): boolean => {
 };
 
 export const FlowEditorPage = () => {
-    const { t } = useTranslation('flows');
+    const { t } = useTranslation(['flows']);
     const canvasRef = useRef<WorkflowCanvasRef>(null);
 
     const { loadBlocks } = useBlocks();

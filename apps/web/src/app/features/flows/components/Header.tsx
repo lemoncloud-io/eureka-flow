@@ -36,6 +36,7 @@ import {
 } from '@flows/ui-kit';
 
 import type { SaveStatus } from '@flows/flows';
+import type { TFunction } from 'i18next';
 
 export interface FlowInfoProps {
     flowName: string;
@@ -167,7 +168,7 @@ const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
     );
 };
 
-const getRelativeTime = (date: Date, t: (key: string, options?: Record<string, unknown>) => string): string => {
+const getRelativeTime = (date: Date, t: TFunction<'common'>): string => {
     const now = Date.now();
     const diff = now - date.getTime();
     const seconds = Math.floor(diff / 1000);
@@ -206,7 +207,7 @@ const SaveStatusIndicator: React.FC<
     }
 
     if (saveStatus === 'error') {
-        const errorMessage = saveError?.message || t('status.saveFailed', 'Save failed');
+        const errorMessage = saveError?.message || t('status.saveFailed');
         return (
             <button
                 onClick={onRetrySave}
@@ -214,7 +215,7 @@ const SaveStatusIndicator: React.FC<
                 title={errorMessage}
             >
                 <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-                {t('status.retry', 'Retry')}
+                {t('status.retry')}
             </button>
         );
     }
@@ -253,19 +254,19 @@ const SaveButton: React.FC<{
                 return {
                     icon: <Save className="w-4 h-4 animate-pulse" />,
                     className: 'text-blue-500',
-                    tooltip: t('header.saving', 'Saving...'),
+                    tooltip: t('header.saving'),
                 };
             case 'success':
                 return {
                     icon: <Save className="w-4 h-4" />,
                     className: 'text-success',
-                    tooltip: t('header.saved', 'Saved'),
+                    tooltip: t('header.saved'),
                 };
             case 'error':
                 return {
                     icon: <Save className="w-4 h-4" />,
                     className: 'text-destructive',
-                    tooltip: t('header.saveFailed', 'Save failed'),
+                    tooltip: t('header.saveFailed'),
                 };
             default:
                 return {
