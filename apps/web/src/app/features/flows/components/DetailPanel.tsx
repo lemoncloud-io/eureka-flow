@@ -292,7 +292,6 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         }
     };
 
-    // --- View: Node Selection ---
     if (selectedNode) {
         const def = blockRegistry[selectedNode.type];
         if (!def) return null;
@@ -584,7 +583,6 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         );
     }
 
-    // --- View: Connection Selection ---
     if (selectedConnection) {
         const sourceNode = nodes.find(n => n.id === selectedConnection.sourceNodeId);
         const targetNode = nodes.find(n => n.id === selectedConnection.targetNodeId);

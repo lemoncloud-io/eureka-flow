@@ -5,10 +5,6 @@ import type { BlockDefinition, DataPacket, LogEntry } from '@lemoncloud/eureka-f
 
 const _log = console.log.bind(console, '[flows-api]');
 
-// ============================================================================
-// Flow CRUD API
-// ============================================================================
-
 // NOTE: The backend only supports these APIs:
 // - POST /flows/:id/save (create with id='0', or update with existing id)
 // - GET /flows/:id/load (load flow snapshot)
@@ -80,30 +76,11 @@ export const updateFlowMetadata = async (id: string, body: UpdateFlowBody): Prom
     return response.data;
 };
 
-// ============================================================================
-// Block Logs API
-// ============================================================================
-
-/**
- * Fetch execution logs for a node
- * @param nodeId - Node ID to fetch logs for
- * @returns Array of log entries (empty until backend endpoint is implemented)
- */
 export const fetchBlockLogs = async (nodeId: string): Promise<LogEntry[]> => {
     _log(`> fetchBlockLogs(${nodeId})`);
-    // TODO: Implement when backend endpoint is available
-    // const response = await api.get<{ list: LogEntry[] }>(`/nodes/${nodeId}/logs`);
-    // return response.data.list || [];
     return [];
 };
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Create a DataPacket
- */
 export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'): DataPacket => ({
     value,
     type,

@@ -60,7 +60,6 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
         }
     }, [nodes, connections, onChange, readOnly]);
 
-    // --- Selection Management ---
     const handleSelectionChange = useCallback(
         (nodeId: string | null) => {
             setSelectedNodeId(nodeId);
@@ -69,7 +68,6 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
         [onNodeSelect, setSelectedNodeId]
     );
 
-    // --- Node Operations ---
     const deleteNode = useCallback(
         (id: string) => {
             if (readOnly) return;
@@ -123,7 +121,6 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
         [readOnly, history, setNodes]
     );
 
-    // --- Connection Operations ---
     const deleteConnection = useCallback(
         (id: string) => {
             if (readOnly) return;
@@ -134,7 +131,6 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
         [readOnly, history, setConnections, setSelectedConnectionId]
     );
 
-    // --- Output Propagation ---
     const propagateOutputs = useCallback(
         (sourceNodeId: string, outputs: Record<string, DataPacket>) => {
             const relevantConnections = connections.filter(c => c.sourceNodeId === sourceNodeId);
@@ -169,7 +165,6 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
         [connections, setNodes]
     );
 
-    // --- Node Execution (Local) ---
     const executeNode = useCallback(
         async (nodeId: string, manualOverrideInputs?: Record<string, DataPacket>) => {
             if (readOnly) return;
@@ -263,7 +258,6 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
         [nodes, propagateOutputs, readOnly, blockRegistry, setNodes, t]
     );
 
-    // --- Reactive Trigger ---
     useEffect(() => {
         if (readOnly) return;
 
@@ -287,7 +281,6 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
         });
     }, [nodes, executeNode, readOnly, blockRegistry]);
 
-    // --- Config & Label Handlers ---
     const handleConfigChange = useCallback(
         (nodeId: string, key: string, value: unknown) => {
             if (readOnly) return;
@@ -326,7 +319,6 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
         [readOnly, history, setNodes]
     );
 
-    // --- Run All / Stop All ---
     const runAll = useCallback(() => {
         const inputNodeIds = nodes
             .filter(n => {

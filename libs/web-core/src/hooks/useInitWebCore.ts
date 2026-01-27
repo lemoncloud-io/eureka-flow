@@ -21,7 +21,6 @@ export const useInitWebCore = () => {
                 setLocalInitState('completed');
             } catch (error) {
                 console.error('❌ WebCore initialization failed:', error);
-                // TODO: error fallback
                 setLocalInitState('completed');
             }
         };

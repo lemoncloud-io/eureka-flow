@@ -4,10 +4,6 @@ import type { ApiListResult, NodeBody, NodeView, Position, S3ImageInfo, doPostRu
 
 const _log = console.log.bind(console, '[nodes-api]');
 
-// ============================================================================
-// Node CRUD API
-// ============================================================================
-
 /**
  * List nodes by flow ID
  * POST /nodes/0/list
@@ -68,53 +64,30 @@ export const deleteNode = async (id: string): Promise<void> => {
     await api.delete(`/nodes/${id}`);
 };
 
-// ============================================================================
-// Node Position & Config Updates
-// ============================================================================
-
-/**
- * Update node position
- */
 export const updateNodePosition = async (id: string, position: Position): Promise<NodeView> => {
     _log(`> updateNodePosition(${id})`, position);
     return updateNode(id, { position });
 };
 
-/**
- * Update node config
- */
 export const updateNodeConfig = async (id: string, config: Array<{ key: string; val: string }>): Promise<NodeView> => {
     _log(`> updateNodeConfig(${id})`, config);
     return updateNode(id, { config$$: config });
 };
 
-/**
- * Update node status
- */
 export const updateNodeStatus = async (id: string, status: string, errorMessage?: string): Promise<NodeView> => {
     _log(`> updateNodeStatus(${id}, ${status})`);
     return updateNode(id, { status, errorMessage });
 };
 
-/**
- * Update node custom label
- */
 export const updateNodeLabel = async (id: string, customLabel: string): Promise<NodeView> => {
     _log(`> updateNodeLabel(${id}, ${customLabel})`);
     return updateNode(id, { customLabel });
 };
 
-/**
- * Toggle node disabled state
- */
 export const toggleNodeDisabled = async (id: string, disabled: boolean): Promise<NodeView> => {
     _log(`> toggleNodeDisabled(${id}, ${disabled})`);
     return updateNode(id, { disabled });
 };
-
-// ============================================================================
-// Node Execution API
-// ============================================================================
 
 /**
  * Run node execution
@@ -146,39 +119,22 @@ export const runNode = async (
     }
 };
 
-// ============================================================================
-// Batch Operations
-// ============================================================================
-
-/**
- * Create multiple nodes at once
- */
 export const createNodes = async (nodes: NodeBody[]): Promise<NodeView[]> => {
     _log(`> createNodes(${nodes.length})`);
     const results = await Promise.all(nodes.map(node => createNode(node)));
     return results;
 };
 
-/**
- * Delete multiple nodes at once
- */
 export const deleteNodes = async (ids: string[]): Promise<void> => {
     _log(`> deleteNodes(${ids.length})`);
     await Promise.all(ids.map(id => deleteNode(id)));
 };
 
-/**
- * Update multiple node positions at once (for drag operations)
- */
 export const updateNodePositions = async (updates: Array<{ id: string; position: Position }>): Promise<NodeView[]> => {
     _log(`> updateNodePositions(${updates.length})`);
     const results = await Promise.all(updates.map(({ id, position }) => updateNodePosition(id, position)));
     return results;
 };
-
-// ============================================================================
-// Image API (S3 Storage)
-// ============================================================================
 
 /**
  * Get image from S3 URL

@@ -3,7 +3,6 @@ import { create } from 'zustand';
 import type { EdgeView } from '../types';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
-// --- Types ---
 export interface Viewport {
     x: number;
     y: number;
@@ -33,7 +32,6 @@ export interface Tooltip {
     type: string;
 }
 
-// --- State Interface ---
 interface CanvasState {
     // Core Data
     nodes: NodeData[];
