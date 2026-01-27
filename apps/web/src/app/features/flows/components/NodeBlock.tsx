@@ -41,7 +41,6 @@ export interface NodeActions {
     onTrigger: () => void;
     onToggleDisabled?: () => void;
     onDuplicate?: () => void;
-    onViewComponent?: (flowId: string) => void;
     onViewLogs: () => void;
 }
 
@@ -118,17 +117,17 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
     const portClasses = cn(
         'w-3.5 h-3.5 rounded-full border-2 cursor-crosshair transition-all duration-200',
         type === 'input' ? 'mr-2' : 'ml-2',
-        isHighlighted && 'scale-150 border-amber-300 bg-amber-400 ring-2 ring-amber-400/50',
+        isHighlighted && 'scale-150 border-primary bg-primary ring-2 ring-primary/40',
         !isHighlighted && 'hover:scale-125',
         hasData &&
             !isHighlighted &&
             type === 'input' &&
-            'bg-port-input border-green-300 shadow-[0_0_8px_rgba(34,197,94,0.5)]',
+            'bg-success/80 border-success shadow-[0_0_6px_rgba(34,197,94,0.4)]',
         hasData &&
             !isHighlighted &&
             type === 'output' &&
-            'bg-port-output border-blue-300 shadow-[0_0_8px_rgba(59,130,246,0.5)]',
-        !hasData && !isHighlighted && 'bg-port-empty border-muted-foreground/50 hover:border-foreground'
+            'bg-primary/80 border-primary shadow-[0_0_6px_rgba(139,92,246,0.4)]',
+        !hasData && !isHighlighted && 'bg-port-empty border-muted-foreground/40 hover:border-muted-foreground'
     );
 
     return (
@@ -151,7 +150,7 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
             <span
                 className={cn(
                     'text-[10px] uppercase tracking-wider font-semibold select-none transition-colors',
-                    isHighlighted ? 'text-yellow-400' : 'text-muted-foreground'
+                    isHighlighted ? 'text-primary' : 'text-muted-foreground'
                 )}
             >
                 {port.label}
@@ -509,7 +508,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             {visuals.icon}
                         </div>
                         <div className="flex flex-col overflow-hidden">
-                            <span className={`font-bold text-sm truncate ${visuals.textColor}`}>
+                            <span className={cn('font-bold text-sm truncate', visuals.textColor)}>
                                 {node.customLabel || definition.label}
                             </span>
                             {node.customLabel && (
@@ -528,7 +527,10 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             e.stopPropagation();
                             onToggleAuto();
                         }}
-                        className={`w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors ${isAuto ? 'text-yellow-400' : 'text-muted-foreground'}`}
+                        className={cn(
+                            'w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors',
+                            isAuto ? 'text-primary' : 'text-muted-foreground'
+                        )}
                         title={isAuto ? t('autoExecution.on') : t('autoExecution.off')}
                     >
                         {isAuto ? <Zap className="w-3.5 h-3.5" /> : <span className="text-xs font-mono">M</span>}
@@ -676,11 +678,12 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     {(node.type.startsWith('input-') || !isAuto) && (
                         <button
                             onClick={onTrigger}
-                            className={`mt-2 w-full text-xs py-1.5 rounded transition-colors flex items-center justify-center gap-1 font-semibold ${
+                            className={cn(
+                                'mt-2 w-full text-xs py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 font-medium',
                                 !isAuto && definition.inputs.every(p => node.inputData[p.id])
-                                    ? 'bg-amber-600 dark:bg-amber-700 hover:bg-amber-500 dark:hover:bg-amber-600 text-amber-100 border border-amber-500'
-                                    : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                            }`}
+                                    ? 'bg-warning/90 hover:bg-warning text-warning-foreground'
+                                    : 'bg-primary/90 hover:bg-primary text-primary-foreground'
+                            )}
                             onMouseDown={e => e.stopPropagation()}
                         >
                             <Play className="w-3 h-3" />{' '}

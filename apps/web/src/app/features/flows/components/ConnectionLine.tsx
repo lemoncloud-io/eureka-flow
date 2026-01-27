@@ -34,9 +34,9 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
     const isInteractive = !!onMouseEnter || !!onMouseMove || !!onMouseLeave;
 
     const getStrokeClass = () => {
-        if (isHovered || isSelected) return 'stroke-amber-400';
+        if (isHovered || isSelected) return 'stroke-primary';
         if (isActive) return 'stroke-connection-active';
-        return 'stroke-muted-foreground/30';
+        return 'stroke-muted-foreground/40';
     };
 
     const strokeWidth = isHovered || isSelected ? 2.5 : 2;

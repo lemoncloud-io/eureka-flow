@@ -7,6 +7,7 @@ import {
     FolderOpen,
     LayoutGrid,
     Link,
+    Menu,
     Play,
     Redo2,
     Save,
@@ -14,11 +15,18 @@ import {
     Trash2,
     Undo2,
     Upload,
+    Workflow,
 } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import {
     Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuShortcut,
+    DropdownMenuTrigger,
     LanguageSwitcher,
     ThemeToggle,
     Tooltip,
@@ -56,7 +64,6 @@ export interface ExecutionActionsProps {
 }
 
 export interface SaveStateProps {
-    isSaving: boolean;
     lastSavedAt: Date | null;
     isAutoSaveEnabled: boolean;
     onToggleAutoSave: () => void;
@@ -92,13 +99,11 @@ const IconButton = ({
     icon,
     tooltip,
     shortcut,
-    danger = false,
 }: {
     onClick: () => void;
     icon: React.ReactNode;
     tooltip: string;
     shortcut?: string;
-    danger?: boolean;
 }) => (
     <TooltipProvider delayDuration={300}>
         <Tooltip>
@@ -107,9 +112,7 @@ const IconButton = ({
                     onClick={onClick}
                     className={cn(
                         'flex items-center justify-center w-8 h-8 rounded-full transition-all duration-150',
-                        danger
-                            ? 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                        'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                     )}
                 >
                     {icon}
@@ -122,8 +125,6 @@ const IconButton = ({
         </Tooltip>
     </TooltipProvider>
 );
-
-const Divider = () => <div className="h-5 w-px bg-glass-border mx-1" />;
 
 const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
     const { t } = useTranslation(['flows']);
@@ -215,51 +216,6 @@ const SaveStatusIndicator: React.FC<
     return <span className={cn(baseClass, 'text-muted-foreground')}>{t('status.unsaved')}</span>;
 };
 
-const AutoSaveToggle: React.FC<Pick<SaveStateProps, 'isAutoSaveEnabled' | 'onToggleAutoSave'>> = ({
-    isAutoSaveEnabled,
-    onToggleAutoSave,
-}) => {
-    const { t } = useTranslation(['flows']);
-
-    return (
-        <TooltipProvider delayDuration={300}>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <button
-                        onClick={onToggleAutoSave}
-                        className="flex items-center gap-2 px-2 py-1 rounded-full hover:bg-accent/50 transition-colors"
-                    >
-                        <div
-                            className={cn(
-                                'w-7 h-4 rounded-full p-0.5 transition-colors relative',
-                                isAutoSaveEnabled ? 'bg-success' : 'bg-muted-foreground/30'
-                            )}
-                        >
-                            <div
-                                className={cn(
-                                    'w-3 h-3 bg-white rounded-full shadow-sm transition-transform absolute top-0.5',
-                                    isAutoSaveEnabled ? 'left-[calc(100%-14px)]' : 'left-0.5'
-                                )}
-                            />
-                        </div>
-                        <span
-                            className={cn(
-                                'text-[10px] font-medium uppercase tracking-wider',
-                                isAutoSaveEnabled ? 'text-success' : 'text-muted-foreground'
-                            )}
-                        >
-                            Auto
-                        </span>
-                    </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                    {t('header.toggleAutoSave')}
-                </TooltipContent>
-            </Tooltip>
-        </TooltipProvider>
-    );
-};
-
 export const Header: React.FC<HeaderProps> = ({
     flowInfo,
     fileActions,
@@ -272,10 +228,13 @@ export const Header: React.FC<HeaderProps> = ({
 
     return (
         <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
-            <div className="flex items-center justify-between px-4 py-3">
-                {/* Left Section - Title + Save Status */}
+            <div className="flex items-center justify-between px-8 py-3">
+                {/* Left Section - Logo + Title + Save Status */}
                 <div className="pointer-events-auto flex items-center gap-3">
-                    <GlassPill>
+                    <GlassPill className="gap-2 pl-3">
+                        <Workflow className="w-5 h-5 text-primary" />
+                        <span className="text-sm font-semibold text-foreground">FlowMosaic</span>
+                        <div className="w-px h-5 bg-glass-border" />
                         <FlowNameInput {...flowInfo} />
                         <SaveStatusIndicator
                             lastSavedAt={saveState.lastSavedAt}
@@ -286,41 +245,12 @@ export const Header: React.FC<HeaderProps> = ({
                     </GlassPill>
                 </div>
 
-                {/* Center Section - Edit Tools */}
-                <div className="pointer-events-auto flex items-center gap-2">
-                    <GlassPill>
-                        <IconButton
-                            onClick={fileActions.onNew}
-                            icon={<FileText className="w-4 h-4" />}
-                            tooltip={t('header.newFlow')}
-                            shortcut="⌘N"
-                        />
-                        <IconButton
-                            onClick={fileActions.onLoad}
-                            icon={<FolderOpen className="w-4 h-4" />}
-                            tooltip={t('header.openFlow')}
-                            shortcut="⌘O"
-                        />
-                        <IconButton
-                            onClick={fileActions.onSave}
-                            icon={<Save className="w-4 h-4" />}
-                            tooltip={t('header.saveFlow')}
-                            shortcut="⌘S"
-                        />
-                        <Divider />
-                        <IconButton
-                            onClick={fileActions.onExport}
-                            icon={<Download className="w-4 h-4" />}
-                            tooltip={t('header.exportJson')}
-                            shortcut="⌘E"
-                        />
-                        <IconButton
-                            onClick={fileActions.onImport}
-                            icon={<Upload className="w-4 h-4" />}
-                            tooltip={t('header.importJson')}
-                        />
-                    </GlassPill>
+                {/* Center Section - Empty for clean look */}
+                <div className="flex-1" />
 
+                {/* Right Section - Actions */}
+                <div className="pointer-events-auto flex items-center gap-2">
+                    {/* Undo/Redo */}
                     <GlassPill>
                         <IconButton
                             onClick={editActions.onUndo}
@@ -336,59 +266,125 @@ export const Header: React.FC<HeaderProps> = ({
                         />
                     </GlassPill>
 
-                    <GlassPill>
-                        <IconButton
-                            onClick={editActions.onAutoLayout}
-                            icon={<LayoutGrid className="w-4 h-4" />}
-                            tooltip={t('header.autoLayout')}
-                            shortcut="⌘L"
-                        />
-                        <IconButton
-                            onClick={editActions.onClear}
-                            icon={<Trash2 className="w-4 h-4" />}
-                            tooltip={t('header.clearCanvas')}
-                            danger
-                        />
-                    </GlassPill>
-                </div>
-
-                {/* Right Section - Run + Share + Settings */}
-                <div className="pointer-events-auto flex items-center gap-3">
-                    <GlassPill className="gap-2">
-                        <AutoSaveToggle
-                            isAutoSaveEnabled={saveState.isAutoSaveEnabled}
-                            onToggleAutoSave={saveState.onToggleAutoSave}
-                        />
-                        <Divider />
-                        <ThemeToggle />
-                        <LanguageSwitcher />
-                    </GlassPill>
-
+                    {/* Run Button */}
                     {executionActions.isRunning ? (
                         <Button
                             onClick={executionActions.onStopAll}
                             variant="destructive"
                             size="sm"
-                            className="rounded-full px-4 shadow-lg"
+                            className="rounded-full px-4 h-8 text-xs shadow-lg"
                         >
-                            <Square className="w-3.5 h-3.5 mr-1.5" />
+                            <Square className="w-3 h-3 mr-1" />
                             {t('header.stopAll')}
                         </Button>
                     ) : (
                         <Button
                             onClick={executionActions.onRunAll}
                             size="sm"
-                            className="rounded-full px-4 bg-success hover:bg-success/90 text-success-foreground shadow-lg"
+                            className="rounded-full px-4 h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
                         >
-                            <Play className="w-3.5 h-3.5 mr-1.5" />
+                            <Play className="w-3 h-3 mr-1" />
                             {t('header.runAll')}
                         </Button>
                     )}
 
-                    <Button onClick={onShare} size="sm" className="rounded-full px-4 shadow-lg">
-                        <Link className="w-3.5 h-3.5 mr-1.5" />
+                    {/* Share Button */}
+                    <Button
+                        onClick={onShare}
+                        variant="secondary"
+                        size="sm"
+                        className="rounded-full px-4 h-8 text-xs shadow-lg"
+                    >
+                        <Link className="w-3 h-3 mr-1" />
                         {t('header.share')}
                     </Button>
+
+                    {/* Menu Dropdown */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                className={cn(
+                                    'flex items-center justify-center w-9 h-9 rounded-full',
+                                    'bg-glass-bg backdrop-blur-[24px] border border-glass-border',
+                                    'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                                    'shadow-floating transition-all duration-150'
+                                )}
+                            >
+                                <Menu className="w-4 h-4" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            {/* File Actions */}
+                            <DropdownMenuItem onClick={fileActions.onNew}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                {t('header.newFlow')}
+                                <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={fileActions.onLoad}>
+                                <FolderOpen className="w-4 h-4 mr-2" />
+                                {t('header.openFlow')}
+                                <DropdownMenuShortcut>⌘O</DropdownMenuShortcut>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={fileActions.onSave}>
+                                <Save className="w-4 h-4 mr-2" />
+                                {t('header.saveFlow')}
+                                <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
+                            <DropdownMenuItem onClick={fileActions.onExport}>
+                                <Download className="w-4 h-4 mr-2" />
+                                {t('header.exportJson')}
+                                <DropdownMenuShortcut>⌘E</DropdownMenuShortcut>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={fileActions.onImport}>
+                                <Upload className="w-4 h-4 mr-2" />
+                                {t('header.importJson')}
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
+                            {/* Edit Actions */}
+                            <DropdownMenuItem onClick={editActions.onAutoLayout}>
+                                <LayoutGrid className="w-4 h-4 mr-2" />
+                                {t('header.autoLayout')}
+                                <DropdownMenuShortcut>⌘L</DropdownMenuShortcut>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={editActions.onClear} className="text-destructive">
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                {t('header.clearCanvas')}
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
+                            {/* Settings */}
+                            <div className="flex items-center justify-between px-2 py-1.5">
+                                <span className="text-sm">{t('header.autoSave')}</span>
+                                <button
+                                    onClick={saveState.onToggleAutoSave}
+                                    className={cn(
+                                        'w-8 h-5 rounded-full p-0.5 transition-colors relative',
+                                        saveState.isAutoSaveEnabled ? 'bg-success' : 'bg-muted-foreground/30'
+                                    )}
+                                >
+                                    <div
+                                        className={cn(
+                                            'w-4 h-4 bg-white rounded-full shadow-sm transition-transform absolute top-0.5',
+                                            saveState.isAutoSaveEnabled ? 'left-[calc(100%-18px)]' : 'left-0.5'
+                                        )}
+                                    />
+                                </button>
+                            </div>
+
+                            <DropdownMenuSeparator />
+
+                            <div className="flex items-center justify-between px-2 py-1.5">
+                                <ThemeToggle />
+                                <LanguageSwitcher />
+                            </div>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
         </div>

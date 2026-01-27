@@ -29,20 +29,20 @@ const CATEGORY_CONFIG = {
     inputs: {
         icon: FileInput,
         label: 'sidebar.inputs',
-        color: 'text-blue-400',
-        hoverBg: 'hover:bg-blue-500/10',
+        color: 'text-primary',
+        hoverBg: 'hover:bg-primary/10',
     },
     process: {
         icon: RefreshCw,
         label: 'sidebar.process',
-        color: 'text-purple-400',
-        hoverBg: 'hover:bg-purple-500/10',
+        color: 'text-muted-foreground',
+        hoverBg: 'hover:bg-accent',
     },
     outputs: {
         icon: Eye,
         label: 'sidebar.output',
-        color: 'text-green-400',
-        hoverBg: 'hover:bg-green-500/10',
+        color: 'text-success',
+        hoverBg: 'hover:bg-success/10',
     },
 } as const;
 

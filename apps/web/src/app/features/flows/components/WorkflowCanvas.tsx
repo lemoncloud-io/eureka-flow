@@ -1342,7 +1342,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             onZoomOut={handleZoomOut}
                             onFitToScreen={handleFitToScreen}
                             onReset={handleResetView}
-                            className="absolute bottom-4 right-4 z-20"
+                            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20"
                         />
                     )}
 
