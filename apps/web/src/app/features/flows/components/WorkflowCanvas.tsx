@@ -1193,57 +1193,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
                         }}
                     >
-                        {/* Nodes rendered first (below connections) */}
-                        <div className={`pointer-events-auto ${readOnly ? 'pointer-events-none' : ''}`}>
-                            {nodes.map(node => {
-                                const isConnected =
-                                    activeConnection &&
-                                    (activeConnection.sourceNodeId === node.id ||
-                                        activeConnection.targetNodeId === node.id);
-
-                                const highlightedPorts: string[] = [];
-                                if (activeConnection?.sourceNodeId === node.id) {
-                                    highlightedPorts.push(activeConnection.sourcePortId);
-                                }
-                                if (activeConnection?.targetNodeId === node.id) {
-                                    highlightedPorts.push(activeConnection.targetPortId);
-                                }
-
-                                return (
-                                    <div key={node.id}>
-                                        <NodeBlock
-                                            node={node}
-                                            highlightState={{
-                                                isSelected: selectedNodeId === node.id,
-                                                isHighlighted: !!isConnected,
-                                                highlightedPortIds: highlightedPorts,
-                                            }}
-                                            portHandlers={{
-                                                onPortMouseDown: handlePortMouseDown,
-                                                onPortMouseUp: handlePortMouseUp,
-                                            }}
-                                            configHandlers={{
-                                                onConfigChange: (k, v) => handleConfigChange(node.id, k, v),
-                                                onLabelChange: label => handleLabelChange(node.id, label),
-                                                onToggleAuto: () => handleToggleAuto(node.id),
-                                            }}
-                                            actions={{
-                                                onDelete: () => deleteNode(node.id),
-                                                onTrigger: () => executeNode(node.id),
-                                                onToggleDisabled: () => toggleNodeDisabled(node.id),
-                                                onDuplicate: () => duplicateNode(node.id),
-                                                onViewComponent: id => setModalFlowId(id),
-                                                onViewLogs: () => setLogViewerNodeId(node.id),
-                                            }}
-                                            onMouseDown={e => handleNodeMouseDown(e, node.id)}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* SVG connections rendered last (above nodes) with high z-index */}
-                        <svg className="absolute overflow-visible top-0 left-0 w-full h-full pointer-events-none z-50">
+                        {/* SVG connections rendered first (below nodes) */}
+                        <svg className="absolute overflow-visible top-0 left-0 w-full h-full">
                             {connections.map(conn => {
                                 const start = getPortPosition(conn.sourceNodeId, conn.sourcePortId, 'output');
                                 const end = getPortPosition(conn.targetNodeId, conn.targetPortId, 'input');
@@ -1311,9 +1262,58 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     x2={connectionDraft.mouseX}
                                     y2={connectionDraft.mouseY}
                                     isActive={true}
+                                    isDraft={true}
                                 />
                             )}
                         </svg>
+
+                        {/* Nodes rendered after SVG (above connections) */}
+                        <div className={`pointer-events-auto ${readOnly ? 'pointer-events-none' : ''}`}>
+                            {nodes.map(node => {
+                                const isConnected =
+                                    activeConnection &&
+                                    (activeConnection.sourceNodeId === node.id ||
+                                        activeConnection.targetNodeId === node.id);
+
+                                const highlightedPorts: string[] = [];
+                                if (activeConnection?.sourceNodeId === node.id) {
+                                    highlightedPorts.push(activeConnection.sourcePortId);
+                                }
+                                if (activeConnection?.targetNodeId === node.id) {
+                                    highlightedPorts.push(activeConnection.targetPortId);
+                                }
+
+                                return (
+                                    <div key={node.id}>
+                                        <NodeBlock
+                                            node={node}
+                                            highlightState={{
+                                                isSelected: selectedNodeId === node.id,
+                                                isHighlighted: !!isConnected,
+                                                highlightedPortIds: highlightedPorts,
+                                            }}
+                                            portHandlers={{
+                                                onPortMouseDown: handlePortMouseDown,
+                                                onPortMouseUp: handlePortMouseUp,
+                                            }}
+                                            configHandlers={{
+                                                onConfigChange: (k, v) => handleConfigChange(node.id, k, v),
+                                                onLabelChange: label => handleLabelChange(node.id, label),
+                                                onToggleAuto: () => handleToggleAuto(node.id),
+                                            }}
+                                            actions={{
+                                                onDelete: () => deleteNode(node.id),
+                                                onTrigger: () => executeNode(node.id),
+                                                onToggleDisabled: () => toggleNodeDisabled(node.id),
+                                                onDuplicate: () => duplicateNode(node.id),
+                                                onViewLogs: () => setLogViewerNodeId(node.id),
+                                            }}
+                                            onMouseDown={e => handleNodeMouseDown(e, node.id)}
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {tooltip && (

@@ -10,6 +10,7 @@ interface ConnectionLineProps {
     isActive: boolean;
     isSelected?: boolean;
     isHovered?: boolean;
+    isDraft?: boolean;
     onMouseEnter?: (e: React.MouseEvent) => void;
     onMouseMove?: (e: React.MouseEvent) => void;
     onMouseLeave?: () => void;
@@ -24,6 +25,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
     isActive,
     isSelected,
     isHovered,
+    isDraft,
     onMouseEnter,
     onMouseMove,
     onMouseLeave,
@@ -34,20 +36,20 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
     const isInteractive = !!onMouseEnter || !!onMouseMove || !!onMouseLeave;
 
     const getStrokeClass = () => {
+        if (isDraft) return 'stroke-primary/70';
         if (isHovered || isSelected) return 'stroke-primary';
-        // Simple gray color for all connections
         return 'stroke-muted-foreground/50';
     };
 
-    const strokeWidth = isHovered || isSelected ? 2.5 : 1.5;
+    const strokeWidth = isHovered || isSelected ? 2.5 : isDraft ? 2 : 1.5;
 
     return (
         <g>
-            {/* Main Line */}
+            {/* Main Line - no transition for draft to prevent lag */}
             <path
                 d={path}
                 fill="none"
-                className={`${getStrokeClass()} transition-all duration-200`}
+                className={`${getStrokeClass()} ${isDraft ? '' : 'transition-colors duration-150'}`}
                 strokeWidth={strokeWidth}
                 strokeLinecap="round"
             />
