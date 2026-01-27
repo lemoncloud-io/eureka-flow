@@ -1,6 +1,6 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { ApiListResult, NodeBody, NodeView, Position, doPostRunBody } from '../types';
+import type { ApiListResult, NodeBody, NodeView, Position, S3ImageInfo, doPostRunBody } from '../types';
 
 const _log = console.log.bind(console, '[nodes-api]');
 
@@ -176,5 +176,59 @@ export const updateNodePositions = async (updates: Array<{ id: string; position:
     return results;
 };
 
+// ============================================================================
+// Image API (S3 Storage)
+// ============================================================================
+
+/**
+ * Get image from S3 URL
+ * GET /nodes/0/image?s3Url=...
+ *
+ * Fetches image binary from S3 via proxy endpoint.
+ * Returns base64 data URL for direct use in <img> src.
+ *
+ * @see eureka-flows-api v0.26.126
+ * @param s3Url - S3 reference (s3://bucket/key)
+ * @returns Data URL (data:image/...;base64,...)
+ */
+export const getImageFromS3 = async (s3Url: string): Promise<string> => {
+    if (!s3Url || !s3Url.startsWith('s3://')) {
+        throw new Error('Invalid S3 URL');
+    }
+    _log(`> getImageFromS3(${s3Url})`);
+
+    const response = await api.get<{ body: string; headers: { 'Content-Type': string } }>('/nodes/0/image', {
+        params: { s3Url },
+    });
+
+    const contentType = response.data.headers?.['Content-Type'] || 'image/png';
+    const base64Body = response.data.body;
+
+    return `data:${contentType};base64,${base64Body}`;
+};
+
+/**
+ * Get S3 image info (metadata only)
+ * GET /nodes/0/image-info?s3Url=...
+ *
+ * Returns parsed S3 URL information without fetching the image.
+ *
+ * @see eureka-flows-api v0.26.126
+ * @param s3Url - S3 reference (s3://bucket/key)
+ * @returns S3ImageInfo with parsed URL data
+ */
+export const getImageInfo = async (s3Url: string): Promise<S3ImageInfo> => {
+    if (!s3Url || !s3Url.startsWith('s3://')) {
+        throw new Error('Invalid S3 URL');
+    }
+    _log(`> getImageInfo(${s3Url})`);
+
+    const response = await api.get<S3ImageInfo>('/nodes/0/image-info', {
+        params: { s3Url },
+    });
+
+    return response.data;
+};
+
 // Re-export types
-export type { NodeView, NodeBody, Position } from '../types';
+export type { NodeView, NodeBody, Position, S3ImageInfo } from '../types';

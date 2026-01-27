@@ -55,6 +55,7 @@ export interface EditActionsProps {
     onRedo: () => void;
     onAutoLayout: () => void;
     onClear: () => void;
+    onSave: () => void;
 }
 
 export interface ExecutionActionsProps {
@@ -166,12 +167,34 @@ const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
     );
 };
 
+const getRelativeTime = (date: Date, t: (key: string, options?: Record<string, unknown>) => string): string => {
+    const now = Date.now();
+    const diff = now - date.getTime();
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    if (seconds < 10) return t('time.justNow', '방금');
+    if (seconds < 60) return t('time.secondsAgo', { count: seconds, defaultValue: '{{count}}초 전' });
+    if (minutes < 60) return t('time.minutesAgo', { count: minutes, defaultValue: '{{count}}분 전' });
+    if (hours < 24) return t('time.hoursAgo', { count: hours, defaultValue: '{{count}}시간 전' });
+    return date.toLocaleDateString();
+};
+
 const SaveStatusIndicator: React.FC<
     Pick<SaveStateProps, 'lastSavedAt' | 'saveStatus' | 'saveError' | 'onRetrySave'>
 > = ({ lastSavedAt, saveStatus = 'idle', saveError, onRetrySave }) => {
     const { t } = useTranslation(['common']);
+    const [, forceUpdate] = useState(0);
 
-    const baseClass = 'w-[72px] text-[10px] flex items-center justify-end gap-1.5';
+    // Update relative time every 10 seconds
+    useEffect(() => {
+        if (!lastSavedAt || saveStatus !== 'idle') return;
+        const interval = setInterval(() => forceUpdate(n => n + 1), 10000);
+        return () => clearInterval(interval);
+    }, [lastSavedAt, saveStatus]);
+
+    const baseClass = 'text-[10px] flex items-center justify-end gap-1.5 pr-2';
 
     if (saveStatus === 'saving') {
         return (
@@ -206,14 +229,77 @@ const SaveStatusIndicator: React.FC<
     }
 
     if (lastSavedAt) {
+        const relativeTime = getRelativeTime(lastSavedAt, t);
         return (
-            <span className={cn(baseClass, 'text-muted-foreground')}>
-                {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            <span className={cn(baseClass, 'text-muted-foreground')} title={lastSavedAt.toLocaleString()}>
+                <span className="w-1.5 h-1.5 rounded-full bg-success/60" />
+                {relativeTime}
             </span>
         );
     }
 
     return <span className={cn(baseClass, 'text-muted-foreground')}>{t('status.unsaved')}</span>;
+};
+
+const SaveButton: React.FC<{
+    onClick: () => void;
+    saveStatus?: SaveStatus;
+}> = ({ onClick, saveStatus = 'idle' }) => {
+    const { t } = useTranslation(['flows']);
+
+    const getButtonState = () => {
+        switch (saveStatus) {
+            case 'saving':
+                return {
+                    icon: <Save className="w-4 h-4 animate-pulse" />,
+                    className: 'text-blue-500',
+                    tooltip: t('header.saving', 'Saving...'),
+                };
+            case 'success':
+                return {
+                    icon: <Save className="w-4 h-4" />,
+                    className: 'text-success',
+                    tooltip: t('header.saved', 'Saved'),
+                };
+            case 'error':
+                return {
+                    icon: <Save className="w-4 h-4" />,
+                    className: 'text-destructive',
+                    tooltip: t('header.saveFailed', 'Save failed'),
+                };
+            default:
+                return {
+                    icon: <Save className="w-4 h-4" />,
+                    className: 'text-muted-foreground hover:text-foreground',
+                    tooltip: t('header.saveFlow'),
+                };
+        }
+    };
+
+    const { icon, className, tooltip } = getButtonState();
+
+    return (
+        <TooltipProvider delayDuration={300}>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <button
+                        onClick={onClick}
+                        className={cn(
+                            'flex items-center justify-center w-8 h-8 rounded-full transition-all duration-150',
+                            'hover:bg-accent/50',
+                            className
+                        )}
+                    >
+                        {icon}
+                    </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                    {tooltip}
+                    <span className="ml-2 text-muted-foreground font-mono">⌘S</span>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
 };
 
 export const Header: React.FC<HeaderProps> = ({
@@ -228,13 +314,13 @@ export const Header: React.FC<HeaderProps> = ({
 
     return (
         <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
-            <div className="flex items-center justify-between px-8 py-3">
+            <div className="flex items-center justify-between px-6 py-3">
                 {/* Left Section - Logo + Title + Save Status */}
                 <div className="pointer-events-auto flex items-center gap-3">
-                    <GlassPill className="gap-2 pl-3">
+                    <GlassPill className="gap-3 pl-3">
                         <Workflow className="w-5 h-5 text-primary" />
                         <span className="text-sm font-semibold text-foreground">FlowMosaic</span>
-                        <div className="w-px h-5 bg-glass-border" />
+                        <div className="w-px h-5 bg-glass-border mx-1" />
                         <FlowNameInput {...flowInfo} />
                         <SaveStatusIndicator
                             lastSavedAt={saveState.lastSavedAt}
@@ -250,8 +336,10 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {/* Right Section - Actions */}
                 <div className="pointer-events-auto flex items-center gap-2">
-                    {/* Undo/Redo */}
+                    {/* Save + Undo/Redo + Auto Layout */}
                     <GlassPill>
+                        <SaveButton onClick={editActions.onSave} saveStatus={saveState.saveStatus} />
+                        <div className="w-px h-4 bg-glass-border" />
                         <IconButton
                             onClick={editActions.onUndo}
                             icon={<Undo2 className="w-4 h-4" />}
@@ -263,6 +351,13 @@ export const Header: React.FC<HeaderProps> = ({
                             icon={<Redo2 className="w-4 h-4" />}
                             tooltip={t('header.redo')}
                             shortcut="⌘⇧Z"
+                        />
+                        <div className="w-px h-4 bg-glass-border" />
+                        <IconButton
+                            onClick={editActions.onAutoLayout}
+                            icon={<LayoutGrid className="w-4 h-4" />}
+                            tooltip={t('header.autoLayout')}
+                            shortcut="⌘L"
                         />
                     </GlassPill>
 

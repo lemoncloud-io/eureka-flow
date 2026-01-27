@@ -356,3 +356,59 @@ export const isFlowExecutionError = (error: unknown): error is FlowExecutionErro
         typeof (error as FlowExecutionError).message === 'string'
     );
 };
+
+// ============================================================================
+// Flow Metadata API Types (v0.26.126)
+// ============================================================================
+
+/**
+ * UpdateFlowBody - body for updating flow metadata
+ * POST /flows/:id
+ *
+ * @see eureka-flows-api v0.26.126
+ */
+export interface UpdateFlowBody {
+    name?: string;
+}
+
+// ============================================================================
+// Image API Types (v0.26.126)
+// ============================================================================
+
+/**
+ * S3ImageInfo - parsed S3 URL information
+ * GET /nodes/0/image-info response
+ *
+ * @see eureka-flows-api v0.26.126
+ */
+export interface S3ImageInfo {
+    s3Url: string;
+    parsed: {
+        bucket: string;
+        key: string;
+        md5: string;
+        sizeKb: number;
+        ext: string;
+        prefix?: string;
+    };
+    allowed: boolean;
+}
+
+/**
+ * BinaryImageResponse - response from image proxy endpoint
+ * GET /nodes/0/image response
+ *
+ * @see eureka-flows-api v0.26.126
+ */
+export interface BinaryImageResponse {
+    $binary: true;
+    statusCode: number;
+    headers: {
+        'Content-Type': string;
+        'Content-Length': string;
+        'Cache-Control': string;
+        ETag: string;
+    };
+    body: string; // base64 encoded
+    isBase64Encoded: true;
+}

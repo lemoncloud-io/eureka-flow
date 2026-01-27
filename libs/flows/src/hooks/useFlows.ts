@@ -3,7 +3,13 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { createFlow, loadFlow } from '../api';
-import { flowsKeys, useCreateFlowMutation, useLoadFlowQuery, useSaveFlowMutation } from './queries';
+import {
+    flowsKeys,
+    useCreateFlowMutation,
+    useLoadFlowQuery,
+    useSaveFlowMutation,
+    useUpdateFlowMutation,
+} from './queries';
 import { useFlowsStore } from '../stores/useFlowsStore';
 import { flowStorage } from '../utils/flowStorage';
 
@@ -56,6 +62,7 @@ export const useFlows = () => {
     // TanStack Mutations
     const createFlowMutation = useCreateFlowMutation();
     const saveFlowMutation = useSaveFlowMutation();
+    const updateFlowMutation = useUpdateFlowMutation();
 
     /**
      * Initialize flow - load from localStorage or create new
@@ -260,6 +267,37 @@ export const useFlows = () => {
         }
     }, [createFlowMutation, setCurrentFlowId, setFlowName, setLastSavedAt]);
 
+    /**
+     * Update flow name (metadata only)
+     * POST /flows/:id
+     *
+     * @see eureka-flows-api v0.26.126
+     */
+    const updateFlowName = useCallback(
+        async (name: string): Promise<boolean> => {
+            if (!currentFlowId || currentFlowId.startsWith('local-')) {
+                // Just update local state if no server flow exists
+                setFlowName(name);
+                return true;
+            }
+
+            updateSaveStatus('saving');
+
+            try {
+                await updateFlowMutation.mutateAsync({ id: currentFlowId, body: { name } });
+                setFlowName(name);
+                setLastSavedAt(new Date());
+                updateSaveStatus('success');
+                return true;
+            } catch (error) {
+                console.error('[useFlows] Failed to update flow name:', error);
+                updateSaveStatus('error', error instanceof Error ? error : new Error('Failed to update name'));
+                return false;
+            }
+        },
+        [currentFlowId, updateFlowMutation, setFlowName, setLastSavedAt, updateSaveStatus]
+    );
+
     // Derive loading state from TanStack Query (only for initial load)
     const isLoading = loadFlowQuery.isLoading || loadFlowQuery.isFetching;
 
@@ -294,5 +332,9 @@ export const useFlows = () => {
         // Actions - Local State
         setFlowName,
         toggleAutoSave,
+
+        // Actions - Metadata
+        updateFlowName,
+        isUpdatingName: updateFlowMutation.isPending,
     };
 };

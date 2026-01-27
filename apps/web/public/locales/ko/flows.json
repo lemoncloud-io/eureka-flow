@@ -15,7 +15,10 @@
         "untitledWorkflow": "제목 없는 워크플로우",
         "toggleAutoSave": "자동 저장 토글",
         "runAll": "전체 실행",
-        "stopAll": "중지"
+        "stopAll": "중지",
+        "saving": "저장 중...",
+        "saved": "저장됨",
+        "saveFailed": "저장 실패"
     },
     "sidebar": {
         "library": "라이브러리",

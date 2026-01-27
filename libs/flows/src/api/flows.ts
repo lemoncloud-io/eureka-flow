@@ -1,6 +1,6 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { LoadFlowResult, SaveFlowBody, SaveFlowView } from '../types';
+import type { FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../types';
 import type { BlockDefinition, DataPacket, LogEntry } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[flows-api]');
@@ -62,6 +62,24 @@ export const createFlow = async (body?: Partial<SaveFlowBody>): Promise<SaveFlow
     return saveFlow('0', saveBody);
 };
 
+/**
+ * Update flow metadata (name, etc.)
+ * POST /flows/:id
+ *
+ * @see eureka-flows-api v0.26.126
+ * @param id - Flow ID to update
+ * @param body - UpdateFlowBody { name?: string }
+ * @returns FlowView with updated metadata
+ */
+export const updateFlowMetadata = async (id: string, body: UpdateFlowBody): Promise<FlowView> => {
+    if (!id) {
+        throw new Error('Flow ID is required');
+    }
+    _log(`> updateFlowMetadata(${id})`, body);
+    const response = await api.post<FlowView>(`/flows/${id}`, body);
+    return response.data;
+};
+
 // ============================================================================
 // Block Logs API
 // ============================================================================
@@ -94,4 +112,4 @@ export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'):
 
 // Re-export types for convenience
 export type { BlockDefinition, DataPacket, LogEntry };
-export type { FlowView, FlowBody, LoadFlowResult, SaveFlowBody, SaveFlowView } from '../types';
+export type { FlowView, FlowBody, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../types';

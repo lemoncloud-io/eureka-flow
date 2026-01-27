@@ -18,6 +18,8 @@ import {
 
 import { useBlockRegistry } from '@flows/flows';
 
+import { S3Image } from './S3Image';
+
 import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@flows/flows';
 
 interface DetailPanelProps {
@@ -56,7 +58,7 @@ const ImagePreview = ({ src, t }: { src: string; t: (key: string) => string }) =
     return (
         <div className="mt-1 relative group">
             <div className="h-32 w-full bg-black/40 rounded border border-border overflow-hidden flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]">
-                <img
+                <S3Image
                     src={src}
                     alt="Data"
                     className="max-h-full max-w-full object-contain"
@@ -201,7 +203,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     <div className="flex flex-col gap-2">
                         {value && (
                             <div className="w-full h-32 bg-background rounded border border-border flex items-center justify-center overflow-hidden relative group">
-                                <img src={value} alt="Preview" className="max-w-full max-h-full object-contain" />
+                                <S3Image src={value} alt="Preview" className="max-w-full max-h-full object-contain" />
                                 <button
                                     onClick={() => handleChange('')}
                                     className="absolute top-1 right-1 bg-destructive/80 hover:bg-destructive text-destructive-foreground rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity"

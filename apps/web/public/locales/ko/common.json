@@ -25,6 +25,12 @@
         "error": "오류",
         "idle": "대기"
     },
+    "time": {
+        "justNow": "방금",
+        "secondsAgo": "{{count}}초 전",
+        "minutesAgo": "{{count}}분 전",
+        "hoursAgo": "{{count}}시간 전"
+    },
     "theme": {
         "light": "라이트",
         "dark": "다크",

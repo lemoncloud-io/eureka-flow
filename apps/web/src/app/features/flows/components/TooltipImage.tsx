@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import { S3Image } from './S3Image';
+
 interface TooltipImageProps {
     src: string;
     altText: string;
@@ -10,7 +12,7 @@ export const TooltipImage = ({ src, altText }: TooltipImageProps) => {
 
     return (
         <div className="relative inline-block">
-            <img
+            <S3Image
                 src={src}
                 alt={altText}
                 className="max-w-[140px] max-h-[140px] rounded border border-border bg-background/50 block"

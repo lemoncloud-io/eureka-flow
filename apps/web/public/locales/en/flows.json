@@ -15,7 +15,10 @@
         "untitledWorkflow": "Untitled Workflow",
         "toggleAutoSave": "Toggle Auto Save",
         "runAll": "Run All",
-        "stopAll": "Stop"
+        "stopAll": "Stop",
+        "saving": "Saving...",
+        "saved": "Saved",
+        "saveFailed": "Save failed"
     },
     "sidebar": {
         "library": "Library",

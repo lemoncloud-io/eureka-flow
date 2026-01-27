@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { flowsKeys } from './keys';
-import { createFlow, loadFlow, saveFlow } from '../../api';
+import { createFlow, loadFlow, saveFlow, updateFlowMetadata } from '../../api';
 
-import type { LoadFlowResult, SaveFlowBody, SaveFlowView } from '../../types';
+import type { FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../../types';
 
 // NOTE: useFlowsListQuery and useFlowQuery are removed because
 // the backend does not support GET /flows or GET /flows/:id endpoints.
@@ -77,5 +77,29 @@ export const useSaveFlowMutation = () => {
     });
 };
 
+/**
+ * Mutation hook for updating flow metadata (name, etc.)
+ * POST /flows/:id
+ *
+ * @see eureka-flows-api v0.26.126
+ */
+export const useUpdateFlowMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, body }: { id: string; body: UpdateFlowBody }) => updateFlowMetadata(id, body),
+        onSuccess: (data, { id }) => {
+            // Update the flow snapshot cache with new metadata
+            queryClient.setQueryData<LoadFlowResult>(flowsKeys.snapshot(id), old => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    name: data.name ?? old.name,
+                };
+            });
+        },
+    });
+};
+
 // Re-export types for convenience
-export type { LoadFlowResult, SaveFlowBody, SaveFlowView };
+export type { FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody };

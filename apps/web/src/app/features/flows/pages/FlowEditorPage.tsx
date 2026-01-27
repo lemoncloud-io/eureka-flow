@@ -34,8 +34,8 @@ export const FlowEditorPage = () => {
         saveCurrentFlow,
         createNewFlow,
         retrySave,
-        setFlowName,
         toggleAutoSave,
+        updateFlowName,
     } = useFlows();
 
     const [isAppReady, setIsAppReady] = useState(false);
@@ -189,11 +189,9 @@ export const FlowEditorPage = () => {
         }
     };
 
-    const handleNameChange = (newName: string) => {
-        setFlowName(newName);
-        if (isAutoSaveEnabled) {
-            triggerAutoSave();
-        }
+    const handleNameChange = async (newName: string) => {
+        // Update flow name on server via POST /flows/:id
+        await updateFlowName(newName);
     };
 
     const handleShare = async () => {
@@ -418,6 +416,7 @@ export const FlowEditorPage = () => {
                         showNotification('Auto-layout applied', 'success');
                     },
                     onClear: handleClear,
+                    onSave: handleSave,
                 }}
                 executionActions={{
                     onRunAll: handleRunAll,

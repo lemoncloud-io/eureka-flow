@@ -23,23 +23,24 @@ export const ApiKeyDialog = ({ open, onSubmit, error }: ApiKeyDialogProps) => {
 
     return (
         <Dialog open={open}>
-            <DialogContent className="sm:max-w-md" onPointerDownOutside={e => e.preventDefault()}>
-                <DialogHeader>
-                    <DialogTitle>API Key Required</DialogTitle>
-                    <DialogDescription>Please enter your API key to continue.</DialogDescription>
+            <DialogContent className="sm:max-w-sm p-5" onPointerDownOutside={e => e.preventDefault()}>
+                <DialogHeader className="space-y-1">
+                    <DialogTitle className="text-base">API Key</DialogTitle>
+                    <DialogDescription className="text-xs">Enter your API key to continue.</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <form onSubmit={handleSubmit} className="flex flex-col gap-3 mt-2">
                     <Input
                         type="text"
-                        placeholder="Enter your API key"
+                        placeholder="API key"
                         value={apiKey}
                         onChange={e => setApiKey(e.target.value)}
                         autoFocus
                         disabled={isLoading}
+                        className="h-9 text-sm"
                     />
-                    {error && <p className="text-sm text-destructive">{error}</p>}
-                    <Button type="submit" disabled={!apiKey.trim() || isLoading}>
-                        {isLoading ? 'Validating...' : 'Save'}
+                    {error && <p className="text-xs text-destructive">{error}</p>}
+                    <Button type="submit" size="sm" className="text-xs" disabled={!apiKey.trim() || isLoading}>
+                        {isLoading ? 'Validating...' : 'Continue'}
                     </Button>
                 </form>
             </DialogContent>

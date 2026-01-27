@@ -6,6 +6,8 @@ import { Ban, Copy, MoreVertical, Pencil, Play, RefreshCw, ScrollText, X, Zap } 
 import { useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
+import { S3Image } from './S3Image';
+
 import type { NodeData, PortDefinition } from '@flows/flows';
 
 type ConfigValue = string | number | boolean | string[] | null;
@@ -189,7 +191,7 @@ const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
         <div className="mt-2 p-1 bg-background rounded border border-border flex justify-center items-center min-h-[40px] relative">
             {lastInput.type === 'image' ? (
                 <>
-                    <img
+                    <S3Image
                         src={lastInput.value as string}
                         className="max-w-full max-h-32 rounded"
                         alt="Preview"
@@ -243,7 +245,7 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
                 title={t('visualization.clickToUpload')}
             >
                 {img ? (
-                    <img src={img} className="h-full w-full object-cover" alt="Input" />
+                    <S3Image src={img} className="h-full w-full object-cover" alt="Input" />
                 ) : (
                     <div className="h-full flex items-center justify-center">
                         <span className="text-[9px] text-background/60 italic">{t('visualization.clickToUpload')}</span>

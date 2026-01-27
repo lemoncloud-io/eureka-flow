@@ -25,6 +25,12 @@
         "error": "Error",
         "idle": "Idle"
     },
+    "time": {
+        "justNow": "Just now",
+        "secondsAgo": "{{count}}s ago",
+        "minutesAgo": "{{count}}m ago",
+        "hoursAgo": "{{count}}h ago"
+    },
     "theme": {
         "light": "Light",
         "dark": "Dark",
