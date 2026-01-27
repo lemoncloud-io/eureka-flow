@@ -206,7 +206,7 @@ export const FlowEditorPage = () => {
         try {
             await navigator.clipboard.writeText(window.location.href);
             showNotification(t('flowEditor.linkCopied'), 'success');
-        } catch (_err) {
+        } catch {
             showNotification(t('flowEditor.failedToCopyLink'), 'error');
         }
     };
@@ -278,7 +278,7 @@ export const FlowEditorPage = () => {
                 } else {
                     showNotification(t('flowEditor.invalidWorkflowFile'), 'error');
                 }
-            } catch (_err) {
+            } catch {
                 showNotification(t('flowEditor.failedToParseJson'), 'error');
             }
         };

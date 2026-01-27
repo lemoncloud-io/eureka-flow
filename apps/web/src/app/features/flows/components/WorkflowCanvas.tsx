@@ -637,6 +637,25 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         const nodeResult = await runNode(nodeId, { config$: currentNode.config });
 
+                        // Check if backend returned an error status
+                        if (nodeResult.status === 'ERROR') {
+                            const duration = Date.now() - startTime;
+                            setNodes(prev =>
+                                prev.map(n =>
+                                    n.id === nodeId
+                                        ? {
+                                              ...n,
+                                              status: 'ERROR',
+                                              errorMessage:
+                                                  nodeResult.errorMessage || t('flows:detailPanel.unknownError'),
+                                              executionStats: { startTime, duration, progress: 0 },
+                                          }
+                                        : n
+                                )
+                            );
+                            return;
+                        }
+
                         // Extract outputData from API response
                         if (nodeResult.outputData$$) {
                             type OutputDataItem = {

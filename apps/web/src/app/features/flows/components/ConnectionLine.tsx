@@ -38,6 +38,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
     const getStrokeClass = () => {
         if (isDraft) return 'stroke-primary/70';
         if (isHovered || isSelected) return 'stroke-primary';
+        if (isActive) return 'stroke-muted-foreground/70';
         return 'stroke-muted-foreground/50';
     };
 
