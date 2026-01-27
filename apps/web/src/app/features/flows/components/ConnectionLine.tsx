@@ -35,11 +35,11 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
 
     const getStrokeClass = () => {
         if (isHovered || isSelected) return 'stroke-primary';
-        if (isActive) return 'stroke-connection-active';
-        return 'stroke-muted-foreground/40';
+        // Simple gray color for all connections
+        return 'stroke-muted-foreground/50';
     };
 
-    const strokeWidth = isHovered || isSelected ? 2.5 : 2;
+    const strokeWidth = isHovered || isSelected ? 2.5 : 1.5;
 
     return (
         <g>

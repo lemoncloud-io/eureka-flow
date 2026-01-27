@@ -46,27 +46,27 @@ export interface NodeHighlightState {
 }
 
 const getStatusBorderColor = (status: NodeStatus, isSelected: boolean): string => {
+    // Selected: show colored border
     if (isSelected) {
         switch (status) {
             case 'RUNNING':
-                return 'border-status-running/70';
+                return 'border-status-running';
             case 'COMPLETED':
-                return 'border-status-completed/70';
+                return 'border-status-completed';
             case 'ERROR':
-                return 'border-status-error/70';
+                return 'border-status-error';
             default:
-                return 'border-primary/60';
+                return 'border-primary';
         }
     }
+    // Not selected: gray border only (status colors subtle)
     switch (status) {
         case 'RUNNING':
-            return 'border-status-running/50';
-        case 'COMPLETED':
-            return 'border-status-completed/50';
+            return 'border-muted-foreground/30';
         case 'ERROR':
-            return 'border-status-error/50';
+            return 'border-destructive/30';
         default:
-            return 'border-node-border/40 hover:border-muted-foreground/50';
+            return 'border-muted-foreground/20';
     }
 };
 
@@ -88,28 +88,37 @@ interface PortItemProps {
 
 const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHighlighted, onMouseDown, onMouseUp }) => {
     const getPortTypeColor = (portType: string, hasData: boolean, portDirection: 'input' | 'output') => {
-        if (!hasData) return 'bg-port-empty border-muted-foreground/30';
-
+        // Always show color based on port type, brighter when has data
         if (portDirection === 'input') {
-            return 'bg-port-input border-port-input shadow-[0_0_8px_rgba(34,197,94,0.5)]';
+            return hasData
+                ? 'bg-port-input border-port-input shadow-[0_0_6px_rgba(34,197,94,0.4)]'
+                : 'bg-port-input/50 border-port-input/50';
         }
 
         switch (portType.toLowerCase()) {
             case 'image':
-                return 'bg-port-image border-port-image shadow-[0_0_8px_rgba(168,85,247,0.5)]';
+                return hasData
+                    ? 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]'
+                    : 'bg-port-image/50 border-port-image/50';
             case 'text':
             case 'string':
-                return 'bg-port-text border-port-text shadow-[0_0_8px_rgba(139,92,246,0.5)]';
+                return hasData
+                    ? 'bg-port-text border-port-text shadow-[0_0_6px_rgba(139,92,246,0.4)]'
+                    : 'bg-port-text/50 border-port-text/50';
             case 'number':
-                return 'bg-port-number border-port-number shadow-[0_0_8px_rgba(34,197,94,0.5)]';
+                return hasData
+                    ? 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]'
+                    : 'bg-port-number/50 border-port-number/50';
             default:
-                return 'bg-port-output border-port-output shadow-[0_0_8px_rgba(139,92,246,0.5)]';
+                return hasData
+                    ? 'bg-port-output border-port-output shadow-[0_0_6px_rgba(139,92,246,0.4)]'
+                    : 'bg-port-output/50 border-port-output/50';
         }
     };
 
     const portClasses = cn(
-        'w-4 h-4 rounded-full border-2 cursor-crosshair transition-all duration-200',
-        type === 'input' ? '-ml-2 mr-2' : 'ml-2 -mr-2',
+        'w-3 h-3 rounded-full border-2 cursor-crosshair transition-all duration-200',
+        type === 'input' ? '-ml-1.5 mr-1.5' : 'ml-1.5 -mr-1.5',
         isHighlighted && 'scale-150 border-primary bg-primary ring-4 ring-primary/30 z-20',
         !isHighlighted && 'hover:scale-125 hover:ring-2 hover:ring-white/20',
         !isHighlighted && getPortTypeColor(port.type, hasData, type)
