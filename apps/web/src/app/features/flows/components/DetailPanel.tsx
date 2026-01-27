@@ -6,8 +6,9 @@ import {
     ArrowDown,
     ArrowDownToLine,
     ArrowUpFromLine,
+    ChevronDown,
+    ChevronRight,
     FileText,
-    Package,
     Play,
     ScrollText,
     Settings,
@@ -56,30 +57,30 @@ const ImagePreview = ({ src, t }: { src: string; t: (key: string) => string }) =
     };
 
     return (
-        <div className="mt-1 relative group">
-            <div className="h-32 w-full bg-black/40 rounded border border-border overflow-hidden flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]">
+        <div className="mt-1.5 relative group">
+            <div className="h-28 w-full bg-black/30 rounded-lg border border-border overflow-hidden flex items-center justify-center">
                 <S3Image
                     src={src}
                     alt="Data"
                     className="max-h-full max-w-full object-contain"
-                    onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
+                    onLoad={e => setDims(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight}`)}
                 />
             </div>
 
-            <div className="absolute bottom-1 right-1 flex gap-1 pointer-events-none">
+            <div className="absolute bottom-1.5 right-1.5 flex gap-1 pointer-events-none">
                 {dims && (
-                    <div className="bg-black/70 text-[9px] px-1.5 py-0.5 rounded text-white backdrop-blur-md border border-border font-mono shadow-sm">
+                    <div className="bg-black/70 text-[9px] px-1.5 py-0.5 rounded text-white/90 backdrop-blur-sm font-mono">
                         {dims}
                     </div>
                 )}
-                <div className="bg-blue-900/80 text-[9px] px-1.5 py-0.5 rounded text-blue-100 backdrop-blur-md border border-blue-700/50 font-bold shadow-sm">
+                <div className="bg-port-image/80 text-[9px] px-1.5 py-0.5 rounded text-white font-semibold backdrop-blur-sm">
                     {t('flows:detailPanel.img')}
                 </div>
             </div>
 
             <button
                 onClick={handleDownload}
-                className="absolute top-1 right-1 w-6 h-6 flex items-center justify-center bg-muted/90 hover:bg-primary text-foreground hover:text-primary-foreground rounded border border-border shadow-md opacity-0 group-hover:opacity-100 transition-all transform scale-90 group-hover:scale-100"
+                className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-black/60 hover:bg-primary text-white rounded-md border border-white/10 opacity-0 group-hover:opacity-100 transition-all"
                 title={t('flows:detailPanel.downloadImage')}
             >
                 <svg
@@ -97,6 +98,44 @@ const ImagePreview = ({ src, t }: { src: string; t: (key: string) => string }) =
                     <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
             </button>
+        </div>
+    );
+};
+
+interface CollapsibleSectionProps {
+    title: string;
+    icon: React.ReactNode;
+    iconColor?: string;
+    defaultOpen?: boolean;
+    children: React.ReactNode;
+}
+
+const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
+    title,
+    icon,
+    iconColor = 'text-muted-foreground',
+    defaultOpen = true,
+    children,
+}) => {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+
+    return (
+        <div className="border border-border/50 rounded-lg overflow-hidden bg-muted/20">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full px-3 py-2 flex items-center gap-2 hover:bg-muted/30 transition-colors"
+            >
+                <span className={iconColor}>{icon}</span>
+                <span className="text-xs font-semibold text-foreground/90 uppercase tracking-wider flex-1 text-left">
+                    {title}
+                </span>
+                {isOpen ? (
+                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                ) : (
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                )}
+            </button>
+            {isOpen && <div className="px-3 pb-3">{children}</div>}
         </div>
     );
 };
@@ -125,7 +164,11 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
     const renderDataPreview = (packet?: DataPacket) => {
         if (!packet) {
-            return <span className="text-muted-foreground italic text-xs">{t('flows:detailPanel.emptyWaiting')}</span>;
+            return (
+                <span className="text-muted-foreground/60 italic text-[11px]">
+                    {t('flows:detailPanel.emptyWaiting')}
+                </span>
+            );
         }
 
         if (packet.type === 'image') {
@@ -133,7 +176,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         }
         return (
             <div
-                className="bg-muted/50 p-2 rounded border border-border text-xs font-mono text-info break-words max-h-24 overflow-y-auto whitespace-pre-wrap"
+                className="bg-black/20 p-2 rounded-md border border-border/50 text-[11px] font-mono text-foreground/80 break-words max-h-20 overflow-y-auto mt-1.5"
                 onWheel={e => e.stopPropagation()}
             >
                 {typeof packet.value === 'object' ? JSON.stringify(packet.value, null, 2) : String(packet.value)}
@@ -150,7 +193,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             case 'text':
                 return (
                     <textarea
-                        className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs text-foreground focus:border-primary outline-none transition-colors resize-y min-h-[60px]"
+                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors resize-y min-h-[56px] font-mono"
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
@@ -161,7 +204,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 return (
                     <input
                         type="number"
-                        className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs text-foreground focus:border-primary outline-none transition-colors"
+                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors font-mono"
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
@@ -170,16 +213,16 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 );
             case 'boolean':
                 return (
-                    <div className="flex items-center gap-2 mt-1">
-                        <div
+                    <div className="flex items-center gap-2.5 mt-1">
+                        <button
                             onClick={() => handleChange(!value)}
-                            className={`w-8 h-4 rounded-full p-0.5 cursor-pointer transition-colors ${value ? 'bg-primary' : 'bg-muted'}`}
+                            className={`w-9 h-5 rounded-full p-0.5 transition-colors relative ${value ? 'bg-primary' : 'bg-muted'}`}
                         >
                             <div
-                                className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${value ? 'translate-x-4' : 'translate-x-0'}`}
+                                className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${value ? 'translate-x-4' : 'translate-x-0'}`}
                             />
-                        </div>
-                        <span className="text-xs text-muted-foreground">
+                        </button>
+                        <span className={`text-xs ${value ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
                             {value ? t('flows:detailPanel.true') : t('flows:detailPanel.false')}
                         </span>
                     </div>
@@ -187,7 +230,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             case 'select':
                 return (
                     <select
-                        className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs text-foreground focus:border-primary outline-none"
+                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors"
                         value={value}
                         onChange={e => handleChange(e.target.value)}
                     >
@@ -202,49 +245,45 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 return (
                     <div className="flex flex-col gap-2">
                         {value && (
-                            <div className="w-full h-32 bg-background rounded border border-border flex items-center justify-center overflow-hidden relative group">
+                            <div className="w-full h-28 bg-black/30 rounded-lg border border-border flex items-center justify-center overflow-hidden relative group">
                                 <S3Image src={value} alt="Preview" className="max-w-full max-h-full object-contain" />
                                 <button
                                     onClick={() => handleChange('')}
-                                    className="absolute top-1 right-1 bg-destructive/80 hover:bg-destructive text-destructive-foreground rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute top-1.5 right-1.5 bg-destructive/80 hover:bg-destructive text-white rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                                     title={t('flows:detailPanel.removeImage')}
                                 >
                                     <X className="w-3 h-3" />
                                 </button>
                             </div>
                         )}
-                        <div className="flex gap-2 items-center">
-                            <label className="flex-1 cursor-pointer bg-secondary hover:bg-secondary/80 border border-border text-secondary-foreground text-xs py-1.5 px-3 rounded text-center transition-colors">
-                                <span>
-                                    {value ? t('flows:detailPanel.changeFile') : t('flows:detailPanel.uploadFile')}
-                                </span>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={e => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                            const reader = new FileReader();
-                                            reader.onload = async evt => {
-                                                const dataUrl = evt.target?.result as string;
-                                                if (dataUrl) {
-                                                    const { dataUrl: compressed } =
-                                                        await compressImageIfNeeded(dataUrl);
-                                                    handleChange(compressed);
-                                                }
-                                            };
-                                            reader.readAsDataURL(file);
-                                        }
-                                    }}
-                                />
-                            </label>
-                        </div>
+                        <label className="cursor-pointer bg-muted/50 hover:bg-muted border border-border/60 text-foreground/80 text-xs py-2 px-3 rounded-md text-center transition-colors">
+                            <span>{value ? t('flows:detailPanel.changeFile') : t('flows:detailPanel.uploadFile')}</span>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async e => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        const reader = new FileReader();
+                                        reader.onload = async evt => {
+                                            if (evt.target?.result) {
+                                                const { dataUrl } = await compressImageIfNeeded(
+                                                    evt.target.result as string
+                                                );
+                                                handleChange(dataUrl);
+                                            }
+                                        };
+                                        reader.readAsDataURL(file);
+                                    }
+                                }}
+                            />
+                        </label>
                     </div>
                 );
             case 'workflow-selector':
                 return (
-                    <div className="text-xs text-muted-foreground italic p-1 border border-dashed border-border rounded text-center">
+                    <div className="text-xs text-muted-foreground/70 italic p-2 border border-dashed border-border/50 rounded-md text-center bg-muted/20">
                         {t('flows:detailPanel.useNodeSettings')}
                     </div>
                 );
@@ -273,86 +312,80 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
         return (
             <div
-                className="fixed top-20 right-4 bottom-4 w-80 flex flex-col bg-popover/95 backdrop-blur-md border border-border rounded-lg shadow-2xl overflow-hidden animate-in slide-in-from-right-4 duration-200 z-50"
+                className="fixed top-20 right-4 bottom-4 w-80 flex flex-col bg-glass-bg backdrop-blur-[20px] border border-glass-border rounded-xl shadow-floating overflow-hidden animate-in slide-in-from-right-4 duration-200 z-50"
                 onMouseDown={e => e.stopPropagation()}
                 onDoubleClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="p-4 border-b border-border bg-surface-elevated flex-shrink-0">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Package className="w-5 h-5 text-muted-foreground" />
-                        <input
-                            type="text"
-                            value={selectedNode.customLabel || def.label}
-                            onChange={e => onLabelChange(selectedNode.id, e.target.value)}
-                            className="bg-transparent font-bold text-sm text-foreground focus:bg-black/20 outline-none rounded px-1 -ml-1 flex-1 border border-transparent focus:border-primary"
-                            placeholder={t('flows:detailPanel.nodeLabel')}
-                        />
+                <div className="p-3 border-b border-border/50 bg-surface-elevated/50 flex-shrink-0">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                                <Settings className="w-4 h-4 text-primary" />
+                            </div>
+                            <input
+                                type="text"
+                                value={selectedNode.customLabel || def.label}
+                                onChange={e => onLabelChange(selectedNode.id, e.target.value)}
+                                className="bg-transparent font-semibold text-sm text-foreground focus:bg-muted/30 outline-none rounded px-1.5 py-0.5 -ml-1 flex-1 min-w-0 border border-transparent focus:border-primary/40 transition-colors"
+                                placeholder={t('flows:detailPanel.nodeLabel')}
+                            />
+                        </div>
                         <button
                             onClick={onClose}
-                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            className="text-muted-foreground/60 hover:text-foreground w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted/50 transition-colors"
                         >
                             <X className="w-4 h-4" />
                         </button>
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                                <span
-                                    className="font-mono bg-black/30 px-1 rounded border border-border"
-                                    title={t('flows:detailPanel.nodeType')}
-                                >
-                                    {def.type}
-                                </span>
-                                <span className="font-mono text-muted-foreground/60 select-all" title="Node ID">
-                                    #{selectedNode.id}
-                                </span>
-                                <span
-                                    className={`px-1.5 py-0.5 rounded border font-semibold ${
-                                        selectedNode.status === 'ERROR'
-                                            ? 'border-destructive text-destructive bg-destructive/20'
-                                            : selectedNode.status === 'RUNNING'
-                                              ? 'border-yellow-500 text-yellow-500 dark:text-yellow-400 bg-yellow-500/20'
-                                              : selectedNode.status === 'COMPLETED'
-                                                ? 'border-green-500 text-green-500 dark:text-green-400 bg-green-500/20'
-                                                : 'border-border text-muted-foreground bg-muted'
-                                    }`}
-                                >
-                                    {selectedNode.status}
-                                </span>
-                            </div>
-
-                            <button
-                                onClick={() => onViewLogs(selectedNode.id)}
-                                className="flex items-center gap-1 hover:text-primary transition-colors"
-                                title={t('flows:detailPanel.viewExecutionLogs')}
-                            >
-                                <ScrollText className="w-3 h-3" /> {t('flows:detailPanel.logs')}
-                            </button>
-                        </div>
-
-                        {isComponent && subFlowId && (
-                            <div className="flex items-center gap-2 text-[10px] bg-indigo-100 dark:bg-indigo-900/30 px-2 py-1.5 rounded border border-indigo-300 dark:border-indigo-500/30">
-                                <span className="uppercase font-bold text-indigo-700 dark:text-indigo-300 opacity-70 tracking-wider">
-                                    {t('flows:detailPanel.subFlowId')}
-                                </span>
-                                <span className="font-mono text-indigo-900 dark:text-indigo-200 select-all">
-                                    {subFlowId}
-                                </span>
-                            </div>
-                        )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                            className="text-[10px] font-mono bg-muted/50 px-1.5 py-0.5 rounded border border-border/50 text-muted-foreground"
+                            title={t('flows:detailPanel.nodeType')}
+                        >
+                            {def.type}
+                        </span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                                selectedNode.status === 'ERROR'
+                                    ? 'bg-destructive/20 text-destructive border border-destructive/30'
+                                    : selectedNode.status === 'RUNNING'
+                                      ? 'bg-status-running/20 text-status-running border border-status-running/30'
+                                      : selectedNode.status === 'COMPLETED'
+                                        ? 'bg-status-completed/20 text-status-completed border border-status-completed/30'
+                                        : 'bg-muted/50 text-muted-foreground border border-border/50'
+                            }`}
+                        >
+                            {selectedNode.status}
+                        </span>
+                        <button
+                            onClick={() => onViewLogs(selectedNode.id)}
+                            className="ml-auto text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                            title={t('flows:detailPanel.viewExecutionLogs')}
+                        >
+                            <ScrollText className="w-3 h-3" /> {t('flows:detailPanel.logs')}
+                        </button>
                     </div>
+
+                    {isComponent && subFlowId && (
+                        <div className="mt-2 flex items-center gap-2 text-[10px] bg-primary/10 px-2 py-1.5 rounded-md border border-primary/20">
+                            <span className="uppercase font-semibold text-primary/70 tracking-wider">
+                                {t('flows:detailPanel.subFlowId')}
+                            </span>
+                            <span className="font-mono text-primary select-all">{subFlowId}</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Error Display */}
                 {selectedNode.status === 'ERROR' && (
-                    <div className="p-3 bg-destructive/20 border-b border-destructive/50 flex-shrink-0">
-                        <div className="flex items-center gap-2 mb-1 text-destructive text-xs font-bold">
+                    <div className="px-3 py-2 bg-destructive/10 border-b border-destructive/20 flex-shrink-0">
+                        <div className="flex items-center gap-2 mb-1 text-destructive text-xs font-semibold">
                             <AlertTriangle className="w-3.5 h-3.5" /> {t('flows:detailPanel.errorDetails')}
                         </div>
                         <div
-                            className="text-[10px] font-mono text-destructive bg-black/40 p-2 rounded border border-destructive/30 break-all max-h-32 overflow-y-auto"
+                            className="text-[10px] font-mono text-destructive/80 bg-black/20 p-2 rounded-md border border-destructive/20 break-all max-h-24 overflow-y-auto"
                             onWheel={e => e.stopPropagation()}
                         >
                             {selectedNode.errorMessage || t('flows:detailPanel.unknownError')}
@@ -360,60 +393,59 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     </div>
                 )}
 
-                <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-6" onWheel={e => e.stopPropagation()}>
+                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3" onWheel={e => e.stopPropagation()}>
                     {/* Description Section */}
-                    <div>
-                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
-                            <FileText className="w-3.5 h-3.5" /> {t('flows:detailPanel.description')}
-                        </h3>
+                    <CollapsibleSection
+                        title={t('flows:detailPanel.description')}
+                        icon={<FileText className="w-3.5 h-3.5" />}
+                        defaultOpen={false}
+                    >
                         <textarea
-                            className="w-full bg-background border border-border rounded p-2 text-xs text-foreground focus:border-primary outline-none resize-none h-16 transition-colors"
+                            className="w-full bg-background/60 border border-border/50 rounded-md p-2 text-xs text-foreground focus:border-primary/50 outline-none resize-none h-14 transition-colors mt-2"
                             value={selectedNode.description || ''}
                             onChange={e => onDescriptionChange(selectedNode.id, e.target.value)}
                             placeholder={t('flows:detailPanel.descriptionPlaceholder')}
                         />
-                    </div>
+                    </CollapsibleSection>
 
                     {/* Configuration Section */}
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-xs font-semibold text-primary uppercase tracking-wider flex items-center gap-2">
-                                <Settings className="w-3.5 h-3.5" /> {t('flows:detailPanel.configuration')}
-                            </h3>
-
-                            <div
-                                className="flex items-center gap-2 cursor-pointer group"
+                    <CollapsibleSection
+                        title={t('flows:detailPanel.configuration')}
+                        icon={<Settings className="w-3.5 h-3.5" />}
+                        iconColor="text-primary"
+                    >
+                        <div className="flex items-center justify-between py-2 border-b border-border/30 mb-3">
+                            <span className="text-[11px] text-muted-foreground font-medium">
+                                {t('flows:detailPanel.auto')}
+                            </span>
+                            <button
                                 onClick={() => onToggleAuto(selectedNode.id)}
+                                className="flex items-center gap-2"
                                 title={
                                     isAuto
                                         ? t('flows:detailPanel.autoRunEnabled')
                                         : t('flows:detailPanel.autoRunDisabled')
                                 }
                             >
-                                <span
-                                    className={`text-[9px] font-semibold ${isAuto ? 'text-green-500 dark:text-green-400' : 'text-muted-foreground'}`}
-                                >
-                                    {t('flows:detailPanel.auto')}
-                                </span>
                                 <div
-                                    className={`w-6 h-3 rounded-full p-0.5 transition-colors relative ${isAuto ? 'bg-green-600/80' : 'bg-muted'}`}
+                                    className={`w-8 h-4 rounded-full p-0.5 transition-colors ${isAuto ? 'bg-status-completed' : 'bg-muted'}`}
                                 >
                                     <div
-                                        className={`w-2 h-2 bg-white rounded-full shadow-sm transition-transform absolute top-0.5 ${isAuto ? 'left-[calc(100%-10px)]' : 'left-0.5'}`}
+                                        className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${isAuto ? 'translate-x-4' : 'translate-x-0'}`}
                                     />
                                 </div>
-                            </div>
+                            </button>
                         </div>
 
-                        <div className="space-y-3 bg-muted/30 p-3 rounded border border-border">
+                        <div className="space-y-3">
                             {configSchema.length === 0 ? (
-                                <div className="text-xs text-muted-foreground italic text-center">
+                                <div className="text-xs text-muted-foreground/60 italic text-center py-2">
                                     {t('flows:detailPanel.noSettings')}
                                 </div>
                             ) : (
                                 configSchema.map(field => (
                                     <div key={field.key}>
-                                        <label className="text-[10px] text-muted-foreground font-semibold mb-1 block">
+                                        <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
                                             {field.label}
                                         </label>
                                         {renderConfigInput(selectedNode, field, def)}
@@ -421,16 +453,17 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 ))
                             )}
                         </div>
-                    </div>
+                    </CollapsibleSection>
 
                     {/* Inputs Section */}
-                    <div>
-                        <h3 className="text-xs font-semibold text-success uppercase tracking-wider mb-2 flex items-center gap-2">
-                            <ArrowDownToLine className="w-3.5 h-3.5" /> {t('flows:detailPanel.inputs')}
-                        </h3>
-                        <div className="space-y-3">
+                    <CollapsibleSection
+                        title={t('flows:detailPanel.inputs')}
+                        icon={<ArrowDownToLine className="w-3.5 h-3.5" />}
+                        iconColor="text-status-completed"
+                    >
+                        <div className="space-y-2 mt-2">
                             {def.inputs.length === 0 ? (
-                                <div className="text-xs text-muted-foreground italic">
+                                <div className="text-xs text-muted-foreground/60 italic text-center py-2">
                                     {t('flows:detailPanel.noInputsRequired')}
                                 </div>
                             ) : (
@@ -442,25 +475,25 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                     return (
                                         <div
                                             key={input.id}
-                                            className="bg-muted/30 p-2 rounded border border-border relative"
+                                            className="bg-black/10 p-2 rounded-md border border-border/30"
                                         >
                                             <div className="flex justify-between items-center mb-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-foreground">
+                                                    <span className="text-[11px] font-semibold text-foreground">
                                                         {input.label}
                                                     </span>
                                                     {incomingConn && (
                                                         <button
                                                             onClick={() => onSelectConnection(incomingConn.id)}
-                                                            className="text-[9px] bg-muted hover:bg-warning hover:text-warning-foreground text-muted-foreground px-1.5 rounded transition-colors flex items-center gap-1 border border-border"
+                                                            className="text-[9px] bg-warning/20 hover:bg-warning/30 text-warning px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors"
                                                             title={t('flows:detailPanel.goToConnection')}
                                                         >
-                                                            <Zap className="w-2.5 h-2.5" />{' '}
+                                                            <Zap className="w-2.5 h-2.5" />
                                                             {t('flows:detailPanel.link')}
                                                         </button>
                                                     )}
                                                 </div>
-                                                <span className="text-[9px] text-muted-foreground uppercase border border-border px-1 rounded">
+                                                <span className="text-[9px] text-muted-foreground/60 uppercase font-mono bg-muted/30 px-1.5 py-0.5 rounded">
                                                     {input.type}
                                                 </span>
                                             </div>
@@ -470,16 +503,17 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 })
                             )}
                         </div>
-                    </div>
+                    </CollapsibleSection>
 
                     {/* Outputs Section */}
-                    <div>
-                        <h3 className="text-xs font-semibold text-purple-500 dark:text-purple-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                            <ArrowUpFromLine className="w-3.5 h-3.5" /> {t('flows:detailPanel.outputs')}
-                        </h3>
-                        <div className="space-y-3">
+                    <CollapsibleSection
+                        title={t('flows:detailPanel.outputs')}
+                        icon={<ArrowUpFromLine className="w-3.5 h-3.5" />}
+                        iconColor="text-primary"
+                    >
+                        <div className="space-y-2 mt-2">
                             {def.outputs.length === 0 ? (
-                                <div className="text-xs text-muted-foreground italic">
+                                <div className="text-xs text-muted-foreground/60 italic text-center py-2">
                                     {t('flows:detailPanel.noOutputs')}
                                 </div>
                             ) : (
@@ -489,10 +523,13 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                     );
 
                                     return (
-                                        <div key={output.id} className="bg-muted/30 p-2 rounded border border-border">
+                                        <div
+                                            key={output.id}
+                                            className="bg-black/10 p-2 rounded-md border border-border/30"
+                                        >
                                             <div className="flex justify-between items-center mb-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-foreground">
+                                                    <span className="text-[11px] font-semibold text-foreground">
                                                         {output.label}
                                                     </span>
                                                     {outgoingConns.length > 0 && (
@@ -501,10 +538,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                                 <button
                                                                     key={c.id}
                                                                     onClick={() => onSelectConnection(c.id)}
-                                                                    className="text-[9px] bg-muted hover:bg-warning hover:text-warning-foreground text-muted-foreground px-1.5 rounded transition-colors flex items-center gap-1 border border-border"
+                                                                    className="text-[9px] bg-warning/20 hover:bg-warning/30 text-warning px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors"
                                                                     title={`${t('flows:detailPanel.goToConnection')} ${i + 1}`}
                                                                 >
-                                                                    <Zap className="w-2.5 h-2.5" />{' '}
+                                                                    <Zap className="w-2.5 h-2.5" />
                                                                     {outgoingConns.length > 1
                                                                         ? `#${i + 1}`
                                                                         : t('flows:detailPanel.link')}
@@ -513,7 +550,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                         </div>
                                                     )}
                                                 </div>
-                                                <span className="text-[9px] text-muted-foreground uppercase border border-border px-1 rounded">
+                                                <span className="text-[9px] text-muted-foreground/60 uppercase font-mono bg-muted/30 px-1.5 py-0.5 rounded">
                                                     {output.type}
                                                 </span>
                                             </div>
@@ -523,20 +560,20 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 })
                             )}
                         </div>
-                    </div>
+                    </CollapsibleSection>
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-3 border-t border-border bg-muted/50 flex gap-2 flex-shrink-0">
+                <div className="p-3 border-t border-border/50 bg-surface-elevated/30 flex gap-2 flex-shrink-0">
                     <button
                         onClick={() => onTriggerNode(selectedNode.id)}
-                        className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-2 rounded font-semibold transition-colors flex items-center justify-center gap-1"
+                        className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
                     >
-                        <Play className="w-3 h-3" /> {t('flows:detailPanel.runBlock')}
+                        <Play className="w-3.5 h-3.5" /> {t('flows:detailPanel.runBlock')}
                     </button>
                     <button
                         onClick={() => onDeleteNode(selectedNode.id)}
-                        className="px-3 bg-destructive/40 border border-destructive hover:bg-destructive/60 text-destructive text-xs rounded transition-colors flex items-center justify-center"
+                        className="px-3 bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs rounded-lg transition-colors flex items-center justify-center"
                         title={t('common:actions.delete')}
                     >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -561,69 +598,79 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
         return (
             <div
-                className="fixed top-20 right-4 bottom-4 w-72 flex flex-col bg-popover/95 backdrop-blur-md border border-border rounded-lg shadow-2xl overflow-hidden animate-in slide-in-from-right-4 duration-200 z-50"
+                className="fixed top-20 right-4 bottom-4 w-72 flex flex-col bg-glass-bg backdrop-blur-[20px] border border-glass-border rounded-xl shadow-floating overflow-hidden animate-in slide-in-from-right-4 duration-200 z-50"
                 onMouseDown={e => e.stopPropagation()}
                 onDoubleClick={e => e.stopPropagation()}
             >
-                <div className="p-3 border-b border-border flex items-center justify-between bg-surface-elevated flex-shrink-0">
-                    <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-warning" /> {t('flows:detailPanel.connection')}
-                    </h2>
-                    <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+                <div className="p-3 border-b border-border/50 flex items-center justify-between bg-surface-elevated/50 flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
+                            <Zap className="w-4 h-4 text-warning" />
+                        </div>
+                        <h2 className="text-sm font-semibold text-foreground">{t('flows:detailPanel.connection')}</h2>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="text-muted-foreground/60 hover:text-foreground w-7 h-7 flex items-center justify-center rounded-md hover:bg-muted/50 transition-colors"
+                    >
                         <X className="w-4 h-4" />
                     </button>
                 </div>
 
-                <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-6">
-                    <div className="flex flex-col items-center gap-2 relative">
+                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
+                    <div className="flex flex-col items-center gap-2">
                         {/* Source */}
                         <div
-                            className="w-full bg-muted hover:bg-accent hover:border-primary cursor-pointer p-2 rounded border border-border flex flex-col items-center text-center transition-all group"
+                            className="w-full bg-muted/30 hover:bg-primary/10 hover:border-primary/40 cursor-pointer p-3 rounded-lg border border-border/50 flex flex-col items-center text-center transition-all group"
                             onClick={() => sourceNode && onSelectNode(sourceNode.id)}
                             title={t('flows:detailPanel.goToSourceNode')}
                         >
-                            <div className="text-[10px] text-muted-foreground uppercase group-hover:text-primary">
+                            <div className="text-[9px] text-muted-foreground/60 uppercase tracking-wider mb-1">
                                 {t('flows:detailPanel.from')}
                             </div>
-                            <div className="font-bold text-xs text-primary group-hover:text-foreground">
+                            <div className="font-semibold text-sm text-primary group-hover:text-foreground transition-colors">
                                 {sourceDef?.label || t('flows:detailPanel.unknown')}
                             </div>
-                            <div className="text-[9px] text-muted-foreground font-mono mt-0.5">{sourcePort?.label}</div>
+                            <div className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 bg-muted/50 px-2 py-0.5 rounded">
+                                {sourcePort?.label}
+                            </div>
                         </div>
 
-                        <ArrowDown className="w-4 h-4 text-muted-foreground" />
+                        <ArrowDown className="w-4 h-4 text-muted-foreground/50" />
 
                         {/* Payload */}
-                        <div className="w-full bg-black/40 p-2 rounded border border-dashed border-border relative">
-                            <div className="text-[9px] text-center text-muted-foreground mb-1 uppercase tracking-wider">
+                        <div className="w-full bg-black/20 p-3 rounded-lg border border-dashed border-border/50">
+                            <div className="text-[9px] text-center text-muted-foreground/60 mb-2 uppercase tracking-wider">
                                 {t('flows:detailPanel.payload')}
                             </div>
                             {renderDataPreview(packet)}
                         </div>
 
-                        <ArrowDown className="w-4 h-4 text-muted-foreground" />
+                        <ArrowDown className="w-4 h-4 text-muted-foreground/50" />
 
                         {/* Target */}
                         <div
-                            className="w-full bg-muted hover:bg-accent hover:border-green-500 cursor-pointer p-2 rounded border border-border flex flex-col items-center text-center transition-all group"
+                            className="w-full bg-muted/30 hover:bg-status-completed/10 hover:border-status-completed/40 cursor-pointer p-3 rounded-lg border border-border/50 flex flex-col items-center text-center transition-all group"
                             onClick={() => targetNode && onSelectNode(targetNode.id)}
                             title={t('flows:detailPanel.goToTargetNode')}
                         >
-                            <div className="text-[10px] text-muted-foreground uppercase group-hover:text-green-500 dark:group-hover:text-green-400">
+                            <div className="text-[9px] text-muted-foreground/60 uppercase tracking-wider mb-1">
                                 {t('flows:detailPanel.to')}
                             </div>
-                            <div className="font-bold text-xs text-green-500 dark:text-green-400 group-hover:text-foreground">
+                            <div className="font-semibold text-sm text-status-completed group-hover:text-foreground transition-colors">
                                 {targetDef?.label || t('flows:detailPanel.unknown')}
                             </div>
-                            <div className="text-[9px] text-muted-foreground font-mono mt-0.5">{targetPort?.label}</div>
+                            <div className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 bg-muted/50 px-2 py-0.5 rounded">
+                                {targetPort?.label}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="p-3 border-t border-border bg-muted/50 flex-shrink-0">
+                <div className="p-3 border-t border-border/50 bg-surface-elevated/30 flex-shrink-0">
                     <button
                         onClick={() => onDeleteConnection(selectedConnection.id)}
-                        className="w-full bg-destructive/40 border border-destructive hover:bg-destructive/60 text-destructive text-xs py-2 rounded font-semibold transition-colors flex items-center justify-center gap-2"
+                        className="w-full bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
                     >
                         <Trash2 className="w-3.5 h-3.5" /> {t('flows:detailPanel.deleteConnection')}
                     </button>

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Ban, Copy, MoreVertical, Pencil, Play, RefreshCw, ScrollText, X, Zap } from 'lucide-react';
+import { Ban, Check, Copy, Loader2, MoreVertical, Pencil, Play, RefreshCw, ScrollText, X, Zap } from 'lucide-react';
 
 import { compressImageIfNeeded, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -13,13 +13,6 @@ import type { NodeData, PortDefinition } from '@flows/flows';
 type ConfigValue = string | number | boolean | string[] | null;
 
 type NodeStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'ERROR';
-
-interface StatusVisual {
-    border: string;
-    header: string;
-    icon: React.ReactNode;
-    textColor: string;
-}
 
 export interface NodePortHandlers {
     onPortMouseDown: (
@@ -52,51 +45,29 @@ export interface NodeHighlightState {
     highlightedPortIds?: string[];
 }
 
-const createStatusVisuals = (isSelected: boolean): Record<NodeStatus, StatusVisual> => ({
-    RUNNING: {
-        border: isSelected ? 'border-status-running/60 shadow-node-selected' : 'border-status-running/40 shadow-node',
-        header: 'bg-node-header',
-        icon: (
-            <div className="absolute inset-0 border-[1.5px] border-status-running border-t-transparent rounded-full animate-spin"></div>
-        ),
-        textColor: 'text-foreground',
-    },
-    COMPLETED: {
-        border: isSelected
-            ? 'border-status-completed/60 shadow-node-selected'
-            : 'border-status-completed/40 shadow-node',
-        header: 'bg-node-header',
-        icon: <div className="text-status-completed font-bold text-[10px]">✓</div>,
-        textColor: 'text-foreground',
-    },
-    ERROR: {
-        border: isSelected ? 'border-status-error/60 shadow-node-selected' : 'border-status-error/40 shadow-node',
-        header: 'bg-node-header',
-        icon: <div className="text-status-error font-bold text-[10px]">!</div>,
-        textColor: 'text-foreground',
-    },
-    IDLE: {
-        border: isSelected
-            ? 'border-primary/50 shadow-node-selected'
-            : 'border-node-border/30 hover:border-muted-foreground/40 shadow-node',
-        header: 'bg-node-header',
-        icon: null,
-        textColor: 'text-foreground',
-    },
-});
-
-const HIGHLIGHTED_VISUAL: StatusVisual = {
-    border: 'border-accent/50 shadow-node-selected',
-    header: 'bg-node-header',
-    icon: null,
-    textColor: 'text-accent',
-};
-
-const DISABLED_VISUAL: StatusVisual = {
-    border: 'border-muted-foreground/15 opacity-50 shadow-none',
-    header: 'bg-muted/30',
-    icon: <Ban className="w-3 h-3 text-muted-foreground" />,
-    textColor: 'text-muted-foreground',
+const getStatusBorderColor = (status: NodeStatus, isSelected: boolean): string => {
+    if (isSelected) {
+        switch (status) {
+            case 'RUNNING':
+                return 'border-status-running/70';
+            case 'COMPLETED':
+                return 'border-status-completed/70';
+            case 'ERROR':
+                return 'border-status-error/70';
+            default:
+                return 'border-primary/60';
+        }
+    }
+    switch (status) {
+        case 'RUNNING':
+            return 'border-status-running/50';
+        case 'COMPLETED':
+            return 'border-status-completed/50';
+        case 'ERROR':
+            return 'border-status-error/50';
+        default:
+            return 'border-node-border/40 hover:border-muted-foreground/50';
+    }
 };
 
 interface PortItemProps {
@@ -116,25 +87,37 @@ interface PortItemProps {
 }
 
 const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHighlighted, onMouseDown, onMouseUp }) => {
+    const getPortTypeColor = (portType: string, hasData: boolean, portDirection: 'input' | 'output') => {
+        if (!hasData) return 'bg-port-empty border-muted-foreground/30';
+
+        if (portDirection === 'input') {
+            return 'bg-port-input border-port-input shadow-[0_0_8px_rgba(34,197,94,0.5)]';
+        }
+
+        switch (portType.toLowerCase()) {
+            case 'image':
+                return 'bg-port-image border-port-image shadow-[0_0_8px_rgba(168,85,247,0.5)]';
+            case 'text':
+            case 'string':
+                return 'bg-port-text border-port-text shadow-[0_0_8px_rgba(139,92,246,0.5)]';
+            case 'number':
+                return 'bg-port-number border-port-number shadow-[0_0_8px_rgba(34,197,94,0.5)]';
+            default:
+                return 'bg-port-output border-port-output shadow-[0_0_8px_rgba(139,92,246,0.5)]';
+        }
+    };
+
     const portClasses = cn(
-        'w-3.5 h-3.5 rounded-full border-2 cursor-crosshair transition-all duration-200',
-        type === 'input' ? 'mr-2' : 'ml-2',
-        isHighlighted && 'scale-150 border-primary bg-primary ring-2 ring-primary/40',
-        !isHighlighted && 'hover:scale-125',
-        hasData &&
-            !isHighlighted &&
-            type === 'input' &&
-            'bg-success/80 border-success shadow-[0_0_6px_rgba(34,197,94,0.4)]',
-        hasData &&
-            !isHighlighted &&
-            type === 'output' &&
-            'bg-primary/80 border-primary shadow-[0_0_6px_rgba(139,92,246,0.4)]',
-        !hasData && !isHighlighted && 'bg-port-empty border-muted-foreground/40 hover:border-muted-foreground'
+        'w-4 h-4 rounded-full border-2 cursor-crosshair transition-all duration-200',
+        type === 'input' ? '-ml-2 mr-2' : 'ml-2 -mr-2',
+        isHighlighted && 'scale-150 border-primary bg-primary ring-4 ring-primary/30 z-20',
+        !isHighlighted && 'hover:scale-125 hover:ring-2 hover:ring-white/20',
+        !isHighlighted && getPortTypeColor(port.type, hasData, type)
     );
 
     return (
         <div
-            className={cn('flex items-center h-6 relative group', type === 'output' ? 'justify-end' : 'justify-start')}
+            className={cn('flex items-center h-7 relative group', type === 'output' ? 'justify-end' : 'justify-start')}
             onMouseUp={e => {
                 e.stopPropagation();
                 onMouseUp(nodeId, port.id, type, port.type);
@@ -151,8 +134,8 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
             )}
             <span
                 className={cn(
-                    'text-[10px] uppercase tracking-wider font-semibold select-none transition-colors',
-                    isHighlighted ? 'text-primary' : 'text-muted-foreground'
+                    'text-[10px] uppercase tracking-wider font-medium select-none transition-colors',
+                    isHighlighted ? 'text-primary font-semibold' : 'text-muted-foreground/80'
                 )}
             >
                 {port.label}
@@ -167,8 +150,13 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
                 />
             )}
 
-            <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-[9px] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-200 delay-100">
-                {port.type}
+            <div
+                className={cn(
+                    'absolute left-1/2 -translate-x-1/2 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-150',
+                    type === 'input' ? '-top-8' : '-top-8'
+                )}
+            >
+                <span className="font-semibold">{port.type}</span>
             </div>
         </div>
     );
@@ -181,31 +169,34 @@ const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
 
     if (!lastInput) {
         return (
-            <div className="mt-2 text-xs text-background/60 italic text-center py-4 bg-foreground/60 rounded border border-border">
+            <div className="mt-3 text-[10px] text-muted-foreground/60 italic text-center py-6 bg-muted/30 rounded-lg border border-dashed border-border">
                 {t('visualization.waitingForData')}
             </div>
         );
     }
 
     return (
-        <div className="mt-2 p-1 bg-background rounded border border-border flex justify-center items-center min-h-[40px] relative">
+        <div className="mt-3 rounded-lg border border-border overflow-hidden bg-black/20 relative">
             {lastInput.type === 'image' ? (
                 <>
-                    <S3Image
-                        src={lastInput.value as string}
-                        className="max-w-full max-h-32 rounded"
-                        alt="Preview"
-                        onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
-                    />
+                    <div className="flex justify-center items-center p-2 min-h-[80px]">
+                        <S3Image
+                            src={lastInput.value as string}
+                            className="max-w-full max-h-32 rounded object-contain"
+                            alt="Preview"
+                            onLoad={e => setDims(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight}`)}
+                        />
+                    </div>
                     {dims && (
-                        <div className="absolute bottom-1 right-1 bg-foreground/80 text-[9px] text-background px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm pointer-events-none">
+                        <div className="absolute bottom-1 right-1 bg-black/70 text-[9px] text-white/90 px-1.5 py-0.5 rounded backdrop-blur-sm font-mono">
                             {dims}
                         </div>
                     )}
                 </>
             ) : (
-                <div className="text-xs p-2 text-foreground break-words w-full text-center">
-                    {String(lastInput.value)}
+                <div className="text-xs p-3 text-foreground/80 break-words text-center font-mono">
+                    {String(lastInput.value).slice(0, 100)}
+                    {String(lastInput.value).length > 100 && '...'}
                 </div>
             )}
         </div>
@@ -239,7 +230,7 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
 
     return (
         <div
-            className="mt-2"
+            className="mt-3"
             onMouseDown={e => e.stopPropagation()}
             onDoubleClick={e => e.stopPropagation()}
             onWheel={e => e.stopPropagation()}
@@ -247,14 +238,17 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
             <input type="file" accept="image/*" className="hidden" id={fileInputId} onChange={handleImageUpload} />
             <label
                 htmlFor={fileInputId}
-                className="block rounded border border-border overflow-hidden bg-foreground/60 h-20 cursor-pointer hover:border-primary transition-colors"
+                className="block rounded-lg border border-dashed border-border overflow-hidden bg-black/20 h-24 cursor-pointer hover:border-primary/60 hover:bg-black/30 transition-all group"
                 title={t('visualization.clickToUpload')}
             >
                 {img ? (
                     <S3Image src={img} className="h-full w-full object-cover" alt="Input" />
                 ) : (
-                    <div className="h-full flex items-center justify-center">
-                        <span className="text-[9px] text-background/60 italic">{t('visualization.clickToUpload')}</span>
+                    <div className="h-full flex flex-col items-center justify-center gap-1">
+                        <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                            <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground/70">{t('visualization.clickToUpload')}</span>
                     </div>
                 )}
             </label>
@@ -265,7 +259,7 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
                         e.preventDefault();
                         onConfigChange('imageData', '');
                     }}
-                    className="mt-1 w-full text-[9px] py-1 bg-destructive/20 text-destructive rounded hover:bg-destructive/40 transition-colors flex items-center justify-center gap-1"
+                    className="mt-2 w-full text-[10px] py-1.5 bg-destructive/10 text-destructive/80 rounded-md hover:bg-destructive/20 transition-colors flex items-center justify-center gap-1"
                 >
                     <X className="w-3 h-3" />
                     {t('visualization.removeImage')}
@@ -289,14 +283,14 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
     if (isEditing) {
         return (
             <div
-                className="mt-2"
+                className="mt-3"
                 onMouseDown={e => e.stopPropagation()}
                 onDoubleClick={e => e.stopPropagation()}
                 onWheel={e => e.stopPropagation()}
             >
                 <textarea
                     autoFocus
-                    className="w-full p-2 bg-background border border-primary rounded text-xs resize-none font-mono focus:outline-none"
+                    className="w-full p-2.5 bg-background/80 border border-primary/50 rounded-lg text-xs resize-none font-mono focus:outline-none focus:border-primary text-foreground"
                     value={text}
                     onChange={e => onConfigChange('text', e.target.value)}
                     onBlur={() => setIsEditing(false)}
@@ -319,7 +313,7 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
 
     return (
         <div
-            className="mt-2 p-2 bg-background rounded border border-border hover:border-primary cursor-text transition-colors"
+            className="mt-3 p-2.5 bg-muted/30 rounded-lg border border-border hover:border-primary/40 cursor-text transition-all group"
             onClick={e => {
                 e.stopPropagation();
                 setIsEditing(true);
@@ -328,19 +322,25 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
             onWheel={e => e.stopPropagation()}
             title={t('visualization.clickToEdit')}
         >
-            <div className="text-[9px] text-muted-foreground mb-0.5 uppercase tracking-wider font-semibold">
+            <div className="text-[9px] text-muted-foreground/60 mb-1 uppercase tracking-wider font-medium flex items-center gap-1">
+                <Pencil className="w-2.5 h-2.5" />
                 {t('visualization.value')}
             </div>
-            <div className="text-xs text-foreground/80 font-mono flex items-center gap-1" title={text}>
+            <div
+                className="text-xs text-foreground/70 font-mono flex items-center gap-1 group-hover:text-foreground/90 transition-colors"
+                title={text}
+            >
                 {textDisplay ? (
                     <>
                         <span className="truncate">"{textDisplay.firstLine}"</span>
                         {textDisplay.extraLines > 0 && (
-                            <span className="text-muted-foreground text-[9px] shrink-0">+{textDisplay.extraLines}</span>
+                            <span className="text-muted-foreground/50 text-[9px] shrink-0 bg-muted/50 px-1 rounded">
+                                +{textDisplay.extraLines}
+                            </span>
                         )}
                     </>
                 ) : (
-                    <span className="text-muted-foreground italic">{t('visualization.clickToAddText')}</span>
+                    <span className="text-muted-foreground/50 italic">{t('visualization.clickToAddText')}</span>
                 )}
             </div>
         </div>
@@ -352,17 +352,17 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
     const lastInput = node.inputData['in']?.value;
     return (
         <div
-            className="mt-2 p-2 bg-foreground rounded border border-border text-background font-mono text-[10px] break-all max-h-24 overflow-y-auto"
+            className="mt-3 p-2.5 bg-black/30 rounded-lg border border-border text-foreground/80 font-mono text-[10px] break-all max-h-28 overflow-y-auto"
             onWheel={e => e.stopPropagation()}
         >
             {lastInput !== undefined ? (
                 typeof lastInput === 'object' ? (
-                    JSON.stringify(lastInput, null, 2)
+                    <pre className="whitespace-pre-wrap">{JSON.stringify(lastInput, null, 2)}</pre>
                 ) : (
                     String(lastInput)
                 )
             ) : (
-                <span className="text-background/50 italic">{t('visualization.waitingForData')}</span>
+                <span className="text-muted-foreground/50 italic">{t('visualization.waitingForData')}</span>
             )}
         </div>
     );
@@ -403,7 +403,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const isDisabled = (node as NodeData & { disabled?: boolean }).disabled === true;
 
     const [showMenu, setShowMenu] = useState(false);
-
     const [isEditingLabel, setIsEditingLabel] = useState(false);
     const [tempLabel, setTempLabel] = useState(node.customLabel || '');
     const labelInputRef = useRef<HTMLInputElement>(null);
@@ -433,20 +432,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
         return () => clearInterval(interval);
     }, [node.status, node.executionStats?.startTime]);
 
-    const statusVisuals = useMemo(() => createStatusVisuals(isSelected), [isSelected]);
-
-    const visuals = useMemo((): StatusVisual => {
-        if (isDisabled) return DISABLED_VISUAL;
-        if (isHighlighted) return HIGHLIGHTED_VISUAL;
-        return statusVisuals[node.status as NodeStatus] || statusVisuals.IDLE;
-    }, [isDisabled, isHighlighted, statusVisuals, node.status]);
-
-    const descriptionDisplay = useMemo(() => {
-        const text = node.description || definition?.description || '';
-        const lines = text.split('\n');
-        return { full: text, firstLine: lines[0], extraLines: lines.length - 1 };
-    }, [node.description, definition?.description]);
-
     const duration = node.status === 'RUNNING' ? elapsedTime : node.executionStats?.duration;
     const displayDuration =
         duration != null ? (duration > 1000 ? `${(duration / 1000).toFixed(2)}s` : `${duration}ms`) : null;
@@ -467,11 +452,27 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
         e.stopPropagation();
     };
 
+    const StatusIcon = () => {
+        if (isDisabled) return <Ban className="w-3 h-3 text-muted-foreground" />;
+        switch (node.status) {
+            case 'RUNNING':
+                return <Loader2 className="w-3 h-3 text-status-running animate-spin" />;
+            case 'COMPLETED':
+                return <Check className="w-3 h-3 text-status-completed" />;
+            case 'ERROR':
+                return <span className="text-status-error font-bold text-[10px]">!</span>;
+            default:
+                return null;
+        }
+    };
+
     return (
         <div
             className={cn(
-                'absolute w-[280px] bg-node-bg rounded-xl border transition-all duration-300',
-                visuals.border
+                'absolute w-[260px] bg-node-bg rounded-xl border-[1.5px] transition-all duration-200 overflow-hidden',
+                isDisabled && 'opacity-50',
+                isSelected ? 'shadow-node-selected' : 'shadow-node',
+                isHighlighted ? 'border-accent/60' : getStatusBorderColor(node.status as NodeStatus, isSelected)
             )}
             style={{ left: node.position.x, top: node.position.y }}
             onMouseDown={onMouseDown}
@@ -480,10 +481,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             {/* Header */}
             <div
                 className={cn(
-                    visuals.header,
-                    'px-3 py-2 rounded-t-[10px] flex justify-between items-center',
-                    'border-b border-node-border/50 cursor-move h-11 box-border',
-                    'transition-colors duration-300'
+                    'pl-4 pr-2 py-2 flex justify-between items-center cursor-move',
+                    'border-b border-node-border/30 bg-node-header/50',
+                    'transition-colors duration-200'
                 )}
             >
                 {isEditingLabel ? (
@@ -499,28 +499,28 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             onChange={e => setTempLabel(e.target.value)}
                             onBlur={commitLabel}
                             onKeyDown={handleLabelKeyDown}
-                            className="w-full bg-background/80 text-foreground text-xs px-1 py-0.5 rounded border border-primary outline-none"
+                            className="w-full bg-background/90 text-foreground text-xs px-2 py-1 rounded border border-primary/50 outline-none focus:border-primary"
                             placeholder={t('flows:detailPanel.labelPlaceholder')}
                         />
                     </div>
                 ) : (
                     <div
-                        className="flex items-center overflow-hidden"
+                        className="flex items-center gap-2 overflow-hidden flex-1 min-w-0"
                         onDoubleClick={e => {
                             e.stopPropagation();
                             setIsEditingLabel(true);
                         }}
                         title={t('config.doubleClickRename')}
                     >
-                        <div className="w-3 h-3 mr-1 relative flex items-center justify-center shrink-0">
-                            {visuals.icon}
+                        <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                            <StatusIcon />
                         </div>
-                        <div className="flex flex-col overflow-hidden">
-                            <span className={cn('font-bold text-sm truncate', visuals.textColor)}>
+                        <div className="flex flex-col overflow-hidden min-w-0">
+                            <span className="font-semibold text-[13px] text-foreground truncate leading-tight">
                                 {node.customLabel || definition.label}
                             </span>
                             {node.customLabel && (
-                                <span className="text-[9px] text-muted-foreground truncate -mt-0.5 font-mono opacity-80">
+                                <span className="text-[9px] text-muted-foreground/70 truncate font-mono leading-tight">
                                     {definition.label}
                                 </span>
                             )}
@@ -528,20 +528,22 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     </div>
                 )}
 
-                {/* Actions */}
-                <div className="flex items-center gap-1 relative shrink-0">
+                {/* Compact Actions */}
+                <div className="flex items-center gap-0.5 shrink-0">
                     <button
                         onClick={e => {
                             e.stopPropagation();
                             onToggleAuto();
                         }}
                         className={cn(
-                            'w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors',
-                            isAuto ? 'text-primary' : 'text-muted-foreground'
+                            'w-6 h-6 flex items-center justify-center rounded-md transition-all',
+                            isAuto
+                                ? 'text-primary hover:bg-primary/10'
+                                : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50'
                         )}
                         title={isAuto ? t('autoExecution.on') : t('autoExecution.off')}
                     >
-                        {isAuto ? <Zap className="w-3.5 h-3.5" /> : <span className="text-xs font-mono">M</span>}
+                        {isAuto ? <Zap className="w-3.5 h-3.5" /> : <span className="text-[10px] font-mono">M</span>}
                     </button>
 
                     <button
@@ -549,10 +551,11 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             e.stopPropagation();
                             setShowMenu(!showMenu);
                         }}
-                        className="text-muted-foreground hover:text-foreground w-6 h-6 flex items-center justify-center rounded hover:bg-white/10"
+                        className="text-muted-foreground/60 hover:text-foreground w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted/50 transition-all"
                     >
                         <MoreVertical className="w-3.5 h-3.5" />
                     </button>
+
                     {showMenu && (
                         <>
                             <div
@@ -564,7 +567,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 onWheel={e => e.stopPropagation()}
                             />
                             <div
-                                className="absolute right-0 top-7 w-36 bg-popover border border-border rounded shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100"
+                                className="absolute right-0 top-8 w-36 bg-popover/95 backdrop-blur-md border border-border rounded-lg shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100"
                                 onWheel={e => e.stopPropagation()}
                             >
                                 <button
@@ -573,7 +576,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                         setShowMenu(false);
                                         setIsEditingLabel(true);
                                     }}
-                                    className="text-left px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                                    className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
                                 >
                                     <Pencil className="w-3 h-3" /> {t('contextMenu.rename')}
                                 </button>
@@ -584,7 +587,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                             setShowMenu(false);
                                             onDuplicate();
                                         }}
-                                        className="text-left px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                                        className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
                                     >
                                         <Copy className="w-3 h-3" /> {t('contextMenu.duplicate')}
                                     </button>
@@ -596,7 +599,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                             setShowMenu(false);
                                             onToggleDisabled();
                                         }}
-                                        className="text-left px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                                        className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
                                     >
                                         <Ban className="w-3 h-3" />{' '}
                                         {isDisabled ? t('contextMenu.enable') : t('contextMenu.disable')}
@@ -609,31 +612,32 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                             setShowMenu(false);
                                             onTrigger();
                                         }}
-                                        className="text-left px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                                        className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
                                     >
                                         <RefreshCw className="w-3 h-3" /> {t('contextMenu.retry')}
                                     </button>
                                 )}
-                                <div className="border-t border-border my-1" />
+                                <div className="border-t border-border/50 my-1" />
                                 <button
                                     onClick={e => {
                                         e.stopPropagation();
                                         setShowMenu(false);
                                         onViewLogs();
                                     }}
-                                    className="text-left px-3 py-2 text-xs text-foreground hover:bg-accent flex items-center gap-2"
+                                    className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
                                 >
                                     <ScrollText className="w-3 h-3" /> {t('contextMenu.viewLogs')}
                                 </button>
                             </div>
                         </>
                     )}
+
                     <button
                         onClick={e => {
                             e.stopPropagation();
                             onDelete();
                         }}
-                        className="text-muted-foreground hover:text-destructive w-6 h-6 flex items-center justify-center rounded hover:bg-white/10"
+                        className="text-muted-foreground/60 hover:text-destructive w-6 h-6 flex items-center justify-center rounded-md hover:bg-destructive/10 transition-all"
                     >
                         <X className="w-3.5 h-3.5" />
                     </button>
@@ -641,19 +645,10 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             </div>
 
             {/* Body */}
-            <div className="p-3 pb-6">
-                <p
-                    className="text-[10px] text-muted-foreground mb-3 h-3 overflow-hidden text-ellipsis whitespace-nowrap cursor-help"
-                    title={descriptionDisplay.full}
-                >
-                    {descriptionDisplay.firstLine}
-                    {descriptionDisplay.extraLines > 0 && (
-                        <span className="text-muted-foreground/60 ml-1">+{descriptionDisplay.extraLines} lines</span>
-                    )}
-                </p>
+            <div className="px-3 py-3">
                 {/* Ports */}
-                <div className="flex justify-between gap-4 mb-2">
-                    <div className="flex flex-col gap-1 min-w-[40%]">
+                <div className="flex justify-between gap-2">
+                    <div className="flex flex-col gap-0.5 min-w-[45%]">
                         {definition.inputs.map(p => (
                             <PortItem
                                 key={p.id}
@@ -667,7 +662,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             />
                         ))}
                     </div>
-                    <div className="flex flex-col gap-1 items-end min-w-[40%]">
+                    <div className="flex flex-col gap-0.5 items-end min-w-[45%]">
                         {definition.outputs.map(p => (
                             <PortItem
                                 key={p.id}
@@ -682,19 +677,21 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         ))}
                     </div>
                 </div>
-                <div className="border-t border-border/50 mt-1 pt-1">
+
+                {/* Content Area */}
+                <div className="mt-2">
                     {(node.type.startsWith('input-') || !isAuto) && (
                         <button
                             onClick={onTrigger}
                             className={cn(
-                                'mt-2 w-full text-xs py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 font-medium',
+                                'w-full text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
                                 !isAuto && definition.inputs.every(p => node.inputData[p.id])
-                                    ? 'bg-warning/90 hover:bg-warning text-warning-foreground'
-                                    : 'bg-primary/90 hover:bg-primary text-primary-foreground'
+                                    ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
+                                    : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
                             )}
                             onMouseDown={e => e.stopPropagation()}
                         >
-                            <Play className="w-3 h-3" />{' '}
+                            <Play className="w-3 h-3" />
                             {node.type.startsWith('input-') ? t('actions.run') : t('actions.forceRun')}
                         </button>
                     )}
@@ -708,32 +705,31 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     {VISUALIZATION_COMPONENTS[node.type] &&
                         React.createElement(VISUALIZATION_COMPONENTS[node.type], { node })}
                 </div>
+
+                {/* Error Message */}
                 {node.status === 'ERROR' && (
-                    <div className="mt-2 text-destructive text-[10px] bg-destructive/10 p-2 rounded border border-destructive/30 flex items-start gap-1 animate-in fade-in slide-in-from-top-1">
-                        <span className="font-bold">{t('flows:nodeBlock.error')}</span>{' '}
-                        {node.errorMessage || t('errors.executionFailed')}
+                    <div className="mt-3 text-destructive text-[10px] bg-destructive/10 p-2 rounded-lg border border-destructive/20 flex items-start gap-1.5">
+                        <span className="font-semibold shrink-0">{t('flows:nodeBlock.error')}</span>
+                        <span className="opacity-80">{node.errorMessage || t('errors.executionFailed')}</span>
                     </div>
                 )}
             </div>
 
-            {/* Footer Stats */}
-            {(node.status === 'RUNNING' || node.status === 'COMPLETED' || node.status === 'ERROR') && (
-                <>
-                    {node.status === 'RUNNING' && (
-                        <div className="absolute bottom-0 left-0 w-full h-1 bg-muted rounded-b-md overflow-hidden">
-                            <div
-                                className="h-full bg-primary transition-all duration-300 ease-out"
-                                style={{ width: `${node.executionStats?.progress || 0}%` }}
-                            />
-                        </div>
-                    )}
+            {/* Progress Bar */}
+            {node.status === 'RUNNING' && (
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-muted/50 overflow-hidden">
+                    <div
+                        className="h-full bg-status-running transition-all duration-200 ease-out"
+                        style={{ width: `${node.executionStats?.progress || 5}%` }}
+                    />
+                </div>
+            )}
 
-                    {displayDuration && (
-                        <div className="absolute bottom-2 right-2 bg-foreground/80 backdrop-blur-md text-[9px] text-background px-1.5 py-0.5 rounded font-mono shadow-sm pointer-events-none z-10">
-                            {displayDuration}
-                        </div>
-                    )}
-                </>
+            {/* Duration Badge */}
+            {displayDuration && (
+                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-[9px] text-white/90 px-1.5 py-0.5 rounded font-mono pointer-events-none">
+                    {displayDuration}
+                </div>
             )}
         </div>
     );

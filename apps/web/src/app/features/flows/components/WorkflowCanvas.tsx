@@ -1066,8 +1066,14 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     ? def.inputs.findIndex(p => p.id === portId)
                     : def.outputs.findIndex(p => p.id === portId);
             const safeIndex = portIndex !== -1 ? portIndex : 0;
-            const yOffset = 87 + safeIndex * 32;
-            const xOffset = type === 'input' ? 14 : 210;
+            // Node width: 260px
+            // Header: ~44px, body padding-top: 12px, port row: h-7 (28px), gap: 2px
+            // First port center: 44 + 12 + 14 = 70px
+            const yOffset = 70 + safeIndex * 30;
+            // Ports extend outside node edges
+            // Input port center: ~0px (left edge)
+            // Output port center: ~260px (right edge)
+            const xOffset = type === 'input' ? 0 : 260;
             return { x: node.position.x + xOffset, y: node.position.y + yOffset };
         };
 

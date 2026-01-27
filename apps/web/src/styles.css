@@ -78,6 +78,11 @@
         --port-type-number: 150 70% 40%;
         --port-type-any: 240 5% 50%;
 
+        /* Node Category Colors - Light Mode */
+        --node-cat-input: 150 70% 45%;
+        --node-cat-process: 250 80% 60%;
+        --node-cat-output: 210 90% 55%;
+
         /* Enhanced Shadow Tokens - Light Mode */
         --shadow-node: 0 8px 24px -4px rgb(0 0 0 / 0.08);
         --shadow-node-selected: 0 8px 24px -4px rgb(139 92 246 / 0.2);
@@ -158,6 +163,11 @@
         --port-type-image: 280 60% 55%;
         --port-type-number: 150 55% 45%;
         --port-type-any: 240 5% 60%;
+
+        /* Node Category Colors - Dark Mode */
+        --node-cat-input: 150 55% 45%;
+        --node-cat-process: 250 65% 58%;
+        --node-cat-output: 210 75% 55%;
 
         /* Enhanced Shadow Tokens - Dark Mode */
         --shadow-node: 0 8px 24px -4px rgb(0 0 0 / 0.6);
