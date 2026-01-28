@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { useBlocks, useFlows } from '@flows/flows';
 import { parseExecutionStats, useInitFlowSocket } from '@flows/socket';
 
 import { Header } from '../components/Header';
@@ -43,22 +43,16 @@ export const FlowEditorPage = () => {
         updateFlowName,
     } = useFlows();
 
-    const updateNodeData = useCanvasStore(state => state.updateNodeData);
-
     // Handle node status updates from WebSocket
-    const handleNodeUpdate = useCallback(
-        (message: FlowNodeMessage) => {
-            console.log('[FlowEditorPage] Node update received:', message);
-            const { nodeId, status, errorMessage, executionStats } = message;
+    const handleNodeUpdate = useCallback((message: FlowNodeMessage) => {
+        const { nodeId, status, errorMessage, executionStats } = message;
 
-            updateNodeData(nodeId, {
-                status,
-                errorMessage: errorMessage || undefined,
-                executionStats: parseExecutionStats(executionStats),
-            });
-        },
-        [updateNodeData]
-    );
+        canvasRef.current?.updateNode(nodeId, {
+            status,
+            errorMessage: errorMessage || undefined,
+            executionStats: parseExecutionStats(executionStats),
+        });
+    }, []);
 
     // Initialize WebSocket connection when channelId is available
     const {

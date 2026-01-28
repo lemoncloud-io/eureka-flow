@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-disable -- Web Worker environment: no module imports, uses self.postMessage */
 /**
  * WebSocket Web Worker for Flow Execution Updates
  *

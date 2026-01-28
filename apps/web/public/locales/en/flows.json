@@ -22,7 +22,11 @@
         "socketConnecting": "Connecting",
         "socketReconnecting": "Reconnecting",
         "socketError": "Connection Failed",
-        "socketReconnect": "Retry"
+        "socketReconnect": "Retry",
+        "socketLive": "Live",
+        "socketOffline": "Offline",
+        "socketClickToRetry": "Click to retry",
+        "socketClickToConnect": "Click to connect"
     },
     "sidebar": {
         "library": "Library",

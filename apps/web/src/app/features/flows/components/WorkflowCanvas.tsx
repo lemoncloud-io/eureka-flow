@@ -33,6 +33,8 @@ export interface WorkflowCanvasRef {
     autoLayout: () => void;
     selectNode: (nodeId: string | null) => void;
     runAll: () => Promise<void>;
+    /** Update node data (used for socket status updates) */
+    updateNode: (nodeId: string, updates: Partial<NodeData>) => void;
     stopAll: () => void;
 }
 
@@ -72,6 +74,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         /** Queue for pending node executions to ensure sequential processing */
         const executionQueueRef = useRef<Set<string>>(new Set());
         const isProcessingQueueRef = useRef(false);
+        /** Track currently executing nodes to prevent concurrent execution of the same node */
+        const executingNodesRef = useRef<Set<string>>(new Set());
 
         const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
         const [isPanning, setIsPanning] = useState(false);
@@ -355,6 +359,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 loadWorkflow: (state: WorkflowState) => {
                     executionQueueRef.current.clear();
                     isProcessingQueueRef.current = false;
+                    executingNodesRef.current.clear();
                     const loadedNodes = state.nodes ?? [];
                     setNodes(loadedNodes);
                     // Support both 'edges' (API format) and 'connections' (legacy)
@@ -370,6 +375,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     saveCheckpoint();
                     executionQueueRef.current.clear();
                     isProcessingQueueRef.current = false;
+                    executingNodesRef.current.clear();
                     setNodes([]);
                     setConnections([]);
                     handleSelectionChange(null);
@@ -378,6 +384,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     if (readOnly) return;
                     executionQueueRef.current.clear();
                     isProcessingQueueRef.current = false;
+                    executingNodesRef.current.clear();
                     nodeInputHashesRef.current.clear();
                     setNodes([]);
                     setConnections([]);
@@ -539,7 +546,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     batchRunCountRef.current = 0;
                     executionQueueRef.current.clear();
                     isProcessingQueueRef.current = false;
+                    executingNodesRef.current.clear();
                     setNodes(prev => prev.map(n => (n.status === 'RUNNING' ? { ...n, status: 'IDLE' } : n)));
+                },
+                updateNode: (nodeId: string, updates: Partial<NodeData>) => {
+                    setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, ...updates } : n)));
                 },
             }),
             [
@@ -612,7 +623,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     executionQueueRef.current.delete(nodeId);
 
                     const node = nodesRef.current.find(n => n.id === nodeId);
-                    if (!node || node.status === 'RUNNING') continue;
+                    if (!node) continue;
 
                     const def = blockRegistry[node.type];
                     if (!def) continue;
@@ -625,9 +636,17 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const lastHash = nodeInputHashesRef.current.get(nodeId);
 
                     if (currentInputHash !== lastHash) {
+                        // Skip if this node is already executing
+                        if (executingNodesRef.current.has(nodeId)) continue;
+
                         nodeInputHashesRef.current.set(nodeId, currentInputHash);
                         if (executeNodeRef.current) {
-                            await executeNodeRef.current(nodeId);
+                            executingNodesRef.current.add(nodeId);
+                            try {
+                                await executeNodeRef.current(nodeId);
+                            } finally {
+                                executingNodesRef.current.delete(nodeId);
+                            }
                         }
                     }
                 }
@@ -773,7 +792,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                                 const hasAllInputs = downstreamDef.inputs.every(p => downstreamNode.inputData[p.id]);
 
-                                if (hasAllInputs && downstreamNode.status !== 'RUNNING') {
+                                if (hasAllInputs) {
                                     executionQueueRef.current.add(downstreamId);
                                     processExecutionQueue();
                                 }

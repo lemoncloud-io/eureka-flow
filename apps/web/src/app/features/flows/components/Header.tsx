@@ -136,9 +136,8 @@ const ToolbarButton: React.FC<{
     icon: React.ReactNode;
     tooltip: string;
     shortcut?: string;
-    active?: boolean;
     variant?: 'default' | 'success' | 'warning' | 'error';
-}> = ({ onClick, icon, tooltip, shortcut, active, variant = 'default' }) => {
+}> = ({ onClick, icon, tooltip, shortcut, variant = 'default' }) => {
     const variantStyles = {
         default: 'text-muted-foreground hover:text-foreground',
         success: 'text-emerald-500',
@@ -155,8 +154,7 @@ const ToolbarButton: React.FC<{
                         className={cn(
                             'flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-150',
                             'hover:bg-accent/60',
-                            variantStyles[variant],
-                            active && 'bg-accent/40'
+                            variantStyles[variant]
                         )}
                     >
                         {icon}
@@ -233,7 +231,7 @@ const SocketDot: React.FC<SocketStateProps> = ({
 
     const getConfig = () => {
         if (isConnected) {
-            return { color: 'bg-sky-500', animate: true, tooltip: 'Live', clickable: false };
+            return { color: 'bg-sky-500', animate: true, tooltip: t('header.socketLive'), clickable: false };
         }
         if (connectionStatus === 'connecting') {
             return { color: 'bg-sky-400', animate: true, tooltip: t('header.socketConnecting'), clickable: false };
@@ -250,11 +248,16 @@ const SocketDot: React.FC<SocketStateProps> = ({
             return {
                 color: 'bg-red-500',
                 animate: false,
-                tooltip: `${t('header.socketError')} - Click to retry`,
+                tooltip: `${t('header.socketError')} - ${t('header.socketClickToRetry')}`,
                 clickable: true,
             };
         }
-        return { color: 'bg-zinc-400', animate: false, tooltip: 'Offline - Click to connect', clickable: true };
+        return {
+            color: 'bg-zinc-400',
+            animate: false,
+            tooltip: `${t('header.socketOffline')} - ${t('header.socketClickToConnect')}`,
+            clickable: true,
+        };
     };
 
     const config = getConfig();

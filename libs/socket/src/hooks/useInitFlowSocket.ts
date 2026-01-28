@@ -127,7 +127,6 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
     }, [id, setId]);
 
     useEffect(() => {
-        console.log('[useInitFlowSocket] connectionStatus changed:', connectionStatus);
         setConnectionStatus(connectionStatus);
     }, [connectionStatus, setConnectionStatus]);
 
@@ -143,7 +142,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         }
     }, [lastMessage, broadcastMessage, onNodeUpdate]);
 
-    // Cleanup on unmount
+    // Cleanup on unmount - intentionally empty deps for mount/unmount only
     useEffect(() => {
         return () => {
             disconnect();
@@ -151,7 +150,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         };
     }, []);
 
-    // Reconnect when channelId changes
+    // Reconnect when channelId changes - intentionally excludes connect/disconnect to avoid loops
     useEffect(() => {
         if (channelId && apiKey) {
             void connect();

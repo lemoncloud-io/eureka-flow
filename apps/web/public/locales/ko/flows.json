@@ -22,7 +22,11 @@
         "socketConnecting": "연결 중",
         "socketReconnecting": "재연결 중",
         "socketError": "연결 실패",
-        "socketReconnect": "재시도"
+        "socketReconnect": "재시도",
+        "socketLive": "실시간",
+        "socketOffline": "오프라인",
+        "socketClickToRetry": "클릭하여 재시도",
+        "socketClickToConnect": "클릭하여 연결"
     },
     "sidebar": {
         "library": "라이브러리",
