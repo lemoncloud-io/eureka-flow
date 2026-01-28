@@ -1411,6 +1411,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 onViewLogs: () => setLogViewerNodeId(node.id),
                                             }}
                                             onMouseDown={e => handleNodeMouseDown(e, node.id)}
+                                            isDragging={dragState?.nodeId === node.id}
                                         />
                                     </div>
                                 );

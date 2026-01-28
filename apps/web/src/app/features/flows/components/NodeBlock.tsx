@@ -391,6 +391,8 @@ interface NodeBlockProps {
     configHandlers: NodeConfigHandlers;
     actions: NodeActions;
     onMouseDown: (e: React.MouseEvent) => void;
+    /** When true, disables CSS transitions for instant position updates during drag */
+    isDragging?: boolean;
 }
 
 export const NodeBlock: React.FC<NodeBlockProps> = ({
@@ -400,6 +402,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     configHandlers,
     actions,
     onMouseDown,
+    isDragging = false,
 }) => {
     const { t } = useTranslation(['nodes', 'flows']);
     const blockRegistry = useBlockRegistry();
@@ -480,7 +483,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     return (
         <div
             className={cn(
-                'absolute w-[260px] bg-node-bg rounded-xl border-[1.5px] transition-all duration-200 overflow-hidden',
+                'absolute w-[260px] bg-node-bg rounded-xl border-[1.5px] overflow-hidden',
+                // Disable transitions during drag for instant position sync with edges
+                !isDragging && 'transition-all duration-200',
                 isDisabled && 'opacity-50',
                 isSelected ? 'shadow-node-selected' : 'shadow-node',
                 isHighlighted ? 'border-accent/60' : getStatusBorderColor(node.status as NodeStatus, isSelected)
