@@ -2,337 +2,254 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
-    ChevronLeft,
     ChevronRight,
     Eye,
+    FileInput,
     Image,
     Package,
     Puzzle,
     RefreshCw,
     Ruler,
-    Search,
     Shield,
     Terminal,
     Timer,
     Type,
-    X,
 } from 'lucide-react';
 
 import { useBlockRegistry } from '@flows/flows';
+import { cn } from '@flows/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@flows/ui-kit';
 
 interface SidebarProps {
     onAddNode: (type: string) => void;
     isLoading?: boolean;
 }
 
-const iconMap: Record<string, React.ReactNode> = {
-    'input-text': <Type className="w-4 h-4" />,
-    'input-image': <Image className="w-4 h-4" />,
-    validation: <Shield className="w-4 h-4" />,
-    buffer: <Timer className="w-4 h-4" />,
-    transform: <RefreshCw className="w-4 h-4" />,
-    info: <Ruler className="w-4 h-4" />,
-    'workflow-component': <Package className="w-4 h-4" />,
-    preview: <Eye className="w-4 h-4" />,
-    'debug-log': <Terminal className="w-4 h-4" />,
-    default: <Puzzle className="w-4 h-4" />,
+const CATEGORY_CONFIG = {
+    inputs: {
+        icon: FileInput,
+        label: 'sidebar.inputs',
+        color: 'text-primary',
+        hoverBg: 'hover:bg-primary/10',
+    },
+    process: {
+        icon: RefreshCw,
+        label: 'sidebar.process',
+        color: 'text-muted-foreground',
+        hoverBg: 'hover:bg-accent',
+    },
+    outputs: {
+        icon: Eye,
+        label: 'sidebar.output',
+        color: 'text-success',
+        hoverBg: 'hover:bg-success/10',
+    },
+} as const;
+
+const CATEGORIES = Object.keys(CATEGORY_CONFIG) as Array<keyof typeof CATEGORY_CONFIG>;
+
+const iconMap: Record<string, React.ElementType> = {
+    'input-text': Type,
+    'input-image': Image,
+    validator: Shield,
+    delay: Timer,
+    transform: RefreshCw,
+    info: Ruler,
+    'workflow-component': Package,
+    preview: Eye,
+    log: Terminal,
+    default: Puzzle,
 };
 
-const NodeButton = ({
-    type,
-    icon,
-    label,
-    isCollapsed,
-    disabled,
-    onAddNode,
-    onHover,
-    onLeave,
-    colorClass = 'bg-card border-border hover:bg-accent',
-}: {
+const getIcon = (blockType: string): React.ElementType => {
+    if (blockType.startsWith('input-')) {
+        return blockType.includes('text') ? iconMap['input-text'] : iconMap['input-image'];
+    }
+    // Server types: length-validator, buffer-delay, text-transform, image-info, etc.
+    if (blockType.includes('validator')) return iconMap.validator;
+    if (blockType.includes('delay') || blockType.includes('buffer')) return iconMap.delay;
+    if (blockType.includes('transform')) return iconMap.transform;
+    if (blockType.includes('info')) return iconMap.info;
+    if (blockType === 'workflow-component') return iconMap['workflow-component'];
+    if (blockType.includes('preview')) return iconMap.preview;
+    if (blockType.includes('log') || blockType.includes('console')) return iconMap.log;
+    return iconMap.default;
+};
+
+interface CategoryButtonProps {
+    category: keyof typeof CATEGORY_CONFIG;
+    isActive: boolean;
+    onClick: () => void;
+}
+
+const CategoryButton: React.FC<CategoryButtonProps> = ({ category, isActive, onClick }) => {
+    const { t } = useTranslation(['flows']);
+    const config = CATEGORY_CONFIG[category];
+    const Icon = config.icon;
+
+    return (
+        <TooltipProvider delayDuration={0}>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <button
+                        onClick={onClick}
+                        className={cn(
+                            'w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-150',
+                            config.hoverBg,
+                            isActive
+                                ? `bg-glass-bg ${config.color} shadow-md`
+                                : 'text-muted-foreground hover:text-foreground'
+                        )}
+                    >
+                        <Icon className="w-5 h-5" />
+                    </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs font-medium">
+                    {t(config.label)}
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
+};
+
+interface BlockItemProps {
     type: string;
-    icon: React.ReactNode;
     label: string;
-    isCollapsed: boolean;
+    description: string;
+    onAdd: () => void;
     disabled?: boolean;
-    onAddNode: (type: string) => void;
-    onHover: (type: string, top: number) => void;
-    onLeave: () => void;
-    colorClass?: string;
-}) => (
-    <button
-        onClick={() => onAddNode(type)}
-        onMouseEnter={e => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            onHover(type, rect.top);
-        }}
-        onMouseLeave={onLeave}
-        disabled={disabled}
-        className={`
-            w-full p-2 rounded border text-sm transition-colors flex items-center
-            ${colorClass}
-            ${isCollapsed ? 'justify-center' : 'justify-start gap-2'}
-            disabled:opacity-50 disabled:cursor-not-allowed
-            relative group
-        `}
-    >
-        <span className="text-muted-foreground">{icon}</span>
-        {!isCollapsed && <span className="text-foreground">{label}</span>}
-    </button>
-);
+}
+
+const BlockItem: React.FC<BlockItemProps> = ({ type, label, description, onAdd, disabled }) => {
+    const Icon = getIcon(type);
+
+    return (
+        <button
+            onClick={onAdd}
+            disabled={disabled}
+            className={cn(
+                'w-full p-3 rounded-lg border border-glass-border bg-glass-bg backdrop-blur-sm',
+                'text-left transition-all duration-150',
+                'hover:bg-accent/50 hover:border-accent',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                'group'
+            )}
+        >
+            <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center shrink-0 group-hover:bg-accent/30 transition-colors">
+                    <Icon className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-foreground truncate">{label}</div>
+                    <div className="text-[10px] text-muted-foreground truncate">{description}</div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+        </button>
+    );
+};
 
 export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
     const { t } = useTranslation(['flows']);
     const blockRegistry = useBlockRegistry();
-    const [isCollapsed, setIsCollapsed] = useState(false);
-    const [hoveredNode, setHoveredNode] = useState<{ type: string; top: number } | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
-
-    const SectionHeader = ({ title }: { title: string }) =>
-        !isCollapsed ? (
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 mt-4 first:mt-0 px-1">
-                {title}
-            </h3>
-        ) : (
-            <div className="h-px bg-border my-2 mx-1" />
-        );
-
-    const handleHover = (type: string, top: number) => setHoveredNode({ type, top });
-    const handleLeave = () => setHoveredNode(null);
-
-    const getIcon = (type: string): React.ReactNode => {
-        type = type ?? '';
-        if (type.startsWith('input-')) {
-            return type.includes('text') ? iconMap['input-text'] : iconMap['input-image'];
-        }
-        if (type.includes('validation')) return iconMap.validation;
-        if (type === 'buffer') return iconMap.buffer;
-        if (type.includes('transform')) return iconMap.transform;
-        if (type.includes('info')) return iconMap.info;
-        if (type === 'workflow-component') return iconMap['workflow-component'];
-        if (type === 'preview') return iconMap.preview;
-        if (type === 'debug-log') return iconMap['debug-log'];
-        return iconMap.default;
-    };
+    const [activeCategory, setActiveCategory] = useState<keyof typeof CATEGORY_CONFIG | null>(null);
 
     const blockGroups = useMemo(() => {
-        const blocks = Object.values(blockRegistry);
-        const query = searchQuery.toLowerCase().trim();
-
-        const filterBySearch = (b: (typeof blocks)[number]) => {
-            if (!query) return true;
-            return (
-                b.type.toLowerCase().includes(query) ||
-                b.label.toLowerCase().includes(query) ||
-                b.description.toLowerCase().includes(query)
-            );
-        };
+        // Deduplicate: blockRegistry has dual indexing (by type and id)
+        // Only use entries where key === block.type to avoid duplicates
+        const blocks = Object.entries(blockRegistry)
+            .filter(([key, block]) => key === block.type)
+            .map(([, block]) => block);
 
         return {
-            inputs: blocks.filter(b => b.type.startsWith('input-') && filterBySearch(b)),
+            inputs: blocks.filter(b => b.type.startsWith('input-')),
             process: blocks.filter(
-                b => !b.type.startsWith('input-') && !['preview', 'debug-log'].includes(b.type) && filterBySearch(b)
+                b => !b.type.startsWith('input-') && !['result-preview', 'console-log'].includes(b.type)
             ),
-            outputs: blocks.filter(b => ['preview', 'debug-log'].includes(b.type) && filterBySearch(b)),
+            outputs: blocks.filter(b => ['result-preview', 'console-log'].includes(b.type)),
         };
-    }, [blockRegistry, searchQuery]);
+    }, [blockRegistry]);
 
-    const renderTooltip = () => {
-        if (!hoveredNode) return null;
-        const def = blockRegistry[hoveredNode.type];
-        if (!def) return null;
+    const handleCategoryClick = (category: keyof typeof CATEGORY_CONFIG) => {
+        setActiveCategory(activeCategory === category ? null : category);
+    };
 
-        const leftPos = isCollapsed ? '4.5rem' : '15.5rem';
-
-        return (
-            <div
-                className="fixed z-50 bg-popover border border-border rounded-lg shadow-2xl p-4 w-64 pointer-events-none animate-in fade-in slide-in-from-left-2 duration-200"
-                style={{
-                    top: hoveredNode.top,
-                    left: leftPos,
-                }}
-            >
-                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border">
-                    <span className="font-bold text-foreground text-sm">{def.label}</span>
-                    <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded border border-border font-mono">
-                        {def.type}
-                    </span>
-                </div>
-
-                <p className="text-xs text-muted-foreground mb-3 leading-relaxed">{def.description}</p>
-
-                {(def.inputs.length > 0 || def.outputs.length > 0) && (
-                    <div className="space-y-2">
-                        {def.inputs.length > 0 && (
-                            <div className="flex gap-1 flex-wrap">
-                                <span className="text-[9px] text-muted-foreground uppercase font-bold mr-1">In:</span>
-                                {def.inputs.map(i => (
-                                    <span
-                                        key={i.id}
-                                        className="text-[9px] bg-muted text-info px-1.5 rounded border border-border"
-                                    >
-                                        {i.label} <span className="opacity-50">({i.type})</span>
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                        {def.outputs.length > 0 && (
-                            <div className="flex gap-1 flex-wrap">
-                                <span className="text-[9px] text-muted-foreground uppercase font-bold mr-1">Out:</span>
-                                {def.outputs.map(o => (
-                                    <span
-                                        key={o.id}
-                                        className="text-[9px] bg-muted text-success px-1.5 rounded border border-border"
-                                    >
-                                        {o.label} <span className="opacity-50">({o.type})</span>
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        );
+    const handleAddNode = (type: string) => {
+        onAddNode(type);
+        setActiveCategory(null);
     };
 
     return (
-        <div
-            className={`
-            relative bg-sidebar border-r border-border flex flex-col h-full z-20 shadow-lg
-            transition-all duration-300 ease-in-out shrink-0
-            ${isCollapsed ? 'w-16' : 'w-60'}
-        `}
-        >
-            {/* Toggle Button */}
-            <button
-                onClick={() => setIsCollapsed(!isCollapsed)}
-                className="absolute -right-3 top-4 bg-card border border-border rounded-full w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent z-50 shadow-md transition-colors"
-                title={isCollapsed ? t('sidebar.expandSidebar') : t('sidebar.collapseSidebar')}
-            >
-                {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
-            </button>
-
-            {/* Header */}
-            <div className="p-4 border-b border-border flex items-center justify-center">
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                    {isCollapsed ? t('sidebar.libraryShort') : t('sidebar.library')}
-                </span>
-            </div>
-
-            {/* Search */}
-            {!isCollapsed && (
-                <div className="p-3 border-b border-border">
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            placeholder={t('sidebar.searchBlocks')}
-                            className="w-full pl-8 pr-8 py-1.5 text-xs bg-background border border-border rounded focus:border-primary focus:outline-none text-foreground placeholder:text-muted-foreground"
-                        />
-                        {searchQuery && (
-                            <button
-                                onClick={() => setSearchQuery('')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                            >
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Node Library */}
-            <div
-                className={`flex-1 overflow-y-auto ${isCollapsed ? 'p-2 space-y-2' : 'p-4 space-y-1'}`}
-                onScroll={() => setHoveredNode(null)}
-            >
-                {/* No Results Message */}
-                {searchQuery &&
-                    blockGroups.inputs.length === 0 &&
-                    blockGroups.process.length === 0 &&
-                    blockGroups.outputs.length === 0 && (
-                        <div className="text-center py-8 text-muted-foreground text-sm">{t('sidebar.noResults')}</div>
+        <>
+            {/* Icon Bar */}
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20 pointer-events-auto">
+                <div
+                    className={cn(
+                        'flex flex-col gap-2 p-2 rounded-2xl',
+                        'bg-glass-bg backdrop-blur-[24px] border border-glass-border',
+                        'shadow-floating'
                     )}
-
-                {blockGroups.inputs.length > 0 && (
-                    <div>
-                        <SectionHeader title={t('sidebar.inputs')} />
-                        <div className="space-y-2">
-                            {blockGroups.inputs.map(b => (
-                                <NodeButton
-                                    key={b.type}
-                                    type={b.type}
-                                    icon={getIcon(b.icon ?? b.type)}
-                                    label={b.label}
-                                    isCollapsed={isCollapsed}
-                                    disabled={isLoading}
-                                    onAddNode={onAddNode}
-                                    onHover={handleHover}
-                                    onLeave={handleLeave}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {blockGroups.process.length > 0 && (
-                    <div>
-                        <SectionHeader title={t('sidebar.process')} />
-                        <div className="space-y-2">
-                            {blockGroups.process.map(b => (
-                                <NodeButton
-                                    key={b.type}
-                                    type={b.type}
-                                    icon={getIcon(b?.icon ?? b.type)}
-                                    label={b.label}
-                                    isCollapsed={isCollapsed}
-                                    disabled={isLoading}
-                                    onAddNode={onAddNode}
-                                    onHover={handleHover}
-                                    onLeave={handleLeave}
-                                    colorClass={
-                                        b.type === 'workflow-component'
-                                            ? 'bg-indigo-100 dark:bg-indigo-900/50 hover:bg-indigo-200 dark:hover:bg-indigo-900/80 border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-100'
-                                            : undefined
-                                    }
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {blockGroups.outputs.length > 0 && (
-                    <div>
-                        <SectionHeader title={t('sidebar.output')} />
-                        <div className="space-y-2">
-                            {blockGroups.outputs.map(b => (
-                                <NodeButton
-                                    key={b.type}
-                                    type={b.type}
-                                    icon={getIcon(b?.icon ?? b.type)}
-                                    label={b.label}
-                                    isCollapsed={isCollapsed}
-                                    disabled={isLoading}
-                                    onAddNode={onAddNode}
-                                    onHover={handleHover}
-                                    onLeave={handleLeave}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
+                >
+                    {CATEGORIES.map(category => (
+                        <CategoryButton
+                            key={category}
+                            category={category}
+                            isActive={activeCategory === category}
+                            onClick={() => handleCategoryClick(category)}
+                        />
+                    ))}
+                </div>
             </div>
 
-            {/* Footer */}
-            {!isCollapsed && (
-                <div className="p-4 border-t border-border text-[10px] text-muted-foreground text-center">
-                    {t('sidebar.dragHint')}
-                </div>
-            )}
+            {/* Expanded Panel */}
+            {activeCategory && (
+                <>
+                    {/* Backdrop */}
+                    <div className="fixed inset-0 z-15" onClick={() => setActiveCategory(null)} />
 
-            {/* Tooltip */}
-            {renderTooltip()}
-        </div>
+                    {/* Panel */}
+                    <div
+                        className={cn(
+                            'absolute left-20 top-1/2 -translate-y-1/2 z-20 w-64',
+                            'bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl',
+                            'shadow-lg p-3 pointer-events-auto',
+                            'animate-in fade-in slide-in-from-left-2 duration-200'
+                        )}
+                    >
+                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-glass-border">
+                            {React.createElement(CATEGORY_CONFIG[activeCategory].icon, {
+                                className: cn('w-4 h-4', CATEGORY_CONFIG[activeCategory].color),
+                            })}
+                            <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                                {t(CATEGORY_CONFIG[activeCategory].label)}
+                            </span>
+                        </div>
+
+                        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                            {blockGroups[activeCategory].length === 0 ? (
+                                <div className="text-center py-4 text-muted-foreground text-xs">
+                                    {t('sidebar.noResults')}
+                                </div>
+                            ) : (
+                                blockGroups[activeCategory].map(block => (
+                                    <BlockItem
+                                        key={block.type}
+                                        type={block.type}
+                                        label={block.label}
+                                        description={block.description}
+                                        onAdd={() => handleAddNode(block.type)}
+                                        disabled={isLoading}
+                                    />
+                                ))
+                            )}
+                        </div>
+
+                        <div className="mt-3 pt-2 border-t border-glass-border text-[10px] text-muted-foreground text-center">
+                            {t('sidebar.clickToAdd')}
+                        </div>
+                    </div>
+                </>
+            )}
+        </>
     );
 };

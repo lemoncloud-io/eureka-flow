@@ -1,27 +1,27 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
-import { ScrollText, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
-import { fetchBlockLogs, loadFlow, useBlockRegistry } from '@flows/flows';
+import {
+    LAYOUT_CONFIG,
+    estimateNodeHeight,
+    loadFlow,
+    requiresBackendProcessing,
+    runNode,
+    useBlockRegistry,
+} from '@flows/flows';
 
 import { ConnectionLine } from './ConnectionLine';
 import { DetailPanel } from './DetailPanel';
+import { LogModal } from './LogModal';
 import { NodeBlock } from './NodeBlock';
+import { TooltipImage } from './TooltipImage';
 import { ZoomControls } from './ZoomControls';
 import { generateId, isValidConnection } from '../utils';
 
-import type {
-    Connection,
-    DataPacket,
-    LogEntry,
-    NodeData,
-    PortDefinition,
-    WorkflowState,
-} from '@lemoncloud/eureka-flows-api';
+import type { Connection, DataPacket, NodeData, PortDefinition, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
-// Define Ref Interface
 export interface WorkflowCanvasRef {
     addNode: (type: string) => void;
     getWorkflow: () => WorkflowState;
@@ -32,7 +32,7 @@ export interface WorkflowCanvasRef {
     redo: () => void;
     autoLayout: () => void;
     selectNode: (nodeId: string | null) => void;
-    runAll: () => void;
+    runAll: () => Promise<void>;
     stopAll: () => void;
 }
 
@@ -40,156 +40,43 @@ interface WorkflowCanvasProps {
     readOnly?: boolean;
     initialData?: WorkflowState;
     onNodeSelect?: (nodeId: string | null) => void;
-    onChange?: () => void; // New prop for Auto Save
+    onChange?: () => void;
+    /** Called before running a node that requires backend processing. Should save the flow. */
+    onBeforeBackendRun?: () => Promise<void>;
 }
 
 const GRID_SIZE = 20;
 
-// --- Helper Components ---
-
-const TooltipImage = ({ src, altText }: { src: string; altText: string }) => {
-    const [dims, setDims] = useState<string | null>(null);
-    return (
-        <div className="relative inline-block">
-            <img
-                src={src}
-                alt={altText}
-                className="max-w-[140px] max-h-[140px] rounded border border-border bg-background/50 block"
-                onLoad={e => setDims(`${e.currentTarget.naturalWidth}x${e.currentTarget.naturalHeight}`)}
-            />
-            {dims && (
-                <div className="absolute bottom-1 right-1 bg-popover/80 text-[9px] text-foreground px-1.5 py-0.5 rounded backdrop-blur-md border border-border/10 font-mono shadow-sm">
-                    {dims}
-                </div>
-            )}
-        </div>
-    );
-};
-
-// --- Log Modal Component (Centralized) ---
-const LogModal = ({ nodeId, onClose }: { nodeId: string; onClose: () => void }) => {
-    const { t } = useTranslation(['flows']);
-    const [logs, setLogs] = useState<LogEntry[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [filter, setFilter] = useState('');
-
-    useEffect(() => {
-        setLoading(true);
-        fetchBlockLogs(nodeId).then(data => {
-            setLogs(data);
-            setLoading(false);
-        });
-    }, [nodeId]);
-
-    const filteredLogs = logs.filter(l => l.message.toLowerCase().includes(filter.toLowerCase()));
-
-    return createPortal(
-        <div
-            className="fixed inset-0 z-[110] flex items-center justify-center bg-background/60 backdrop-blur-sm"
-            onMouseDown={e => e.stopPropagation()}
-        >
-            <div className="bg-popover border border-border rounded-lg shadow-2xl w-[600px] max-w-[95vw] h-[500px] flex flex-col animate-in fade-in zoom-in-95 duration-200 font-mono">
-                <div className="flex items-center justify-between p-3 border-b border-border bg-muted">
-                    <div className="flex items-center gap-2">
-                        <ScrollText className="w-5 h-5 text-muted-foreground" />
-                        <div>
-                            <h3 className="text-sm font-bold text-foreground">{t('canvas.executionLogs')}</h3>
-                            <p className="text-[10px] text-muted-foreground">
-                                {t('canvas.nodeId')}: {nodeId}
-                            </p>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
-                <div className="p-2 border-b border-border bg-muted/50 flex gap-2">
-                    <input
-                        type="text"
-                        placeholder={t('canvas.filterLogs')}
-                        className="flex-1 bg-background border border-border rounded px-2 py-1 text-xs text-foreground focus:border-primary outline-none"
-                        value={filter}
-                        onChange={e => setFilter(e.target.value)}
-                    />
-                    <button
-                        onClick={() => {
-                            setLoading(true);
-                            fetchBlockLogs(nodeId).then(data => {
-                                setLogs(data);
-                                setLoading(false);
-                            });
-                        }}
-                        className="px-3 bg-muted hover:bg-accent border border-border rounded text-xs text-muted-foreground"
-                    >
-                        {t('canvas.refresh')}
-                    </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-background/30">
-                    {loading ? (
-                        <div className="flex justify-center items-center h-full text-muted-foreground text-xs">
-                            {t('canvas.loading')}
-                        </div>
-                    ) : filteredLogs.length === 0 ? (
-                        <div className="text-center text-muted-foreground text-xs py-10 italic">
-                            {t('canvas.noLogs')}
-                        </div>
-                    ) : (
-                        filteredLogs.map(log => (
-                            <div
-                                key={log.id}
-                                className="text-[11px] flex gap-2 p-1.5 hover:bg-accent/50 rounded border-b border-border/50 last:border-0"
-                            >
-                                <div className="text-muted-foreground w-24 shrink-0 font-mono">
-                                    {new Date(log.timestamp).toLocaleTimeString()}
-                                </div>
-                                <div
-                                    className={`w-14 shrink-0 font-bold ${log.level === 'ERROR' ? 'text-destructive' : log.level === 'WARN' ? 'text-warning' : 'text-primary'}`}
-                                >
-                                    {log.level}
-                                </div>
-                                <div className="text-foreground flex-1 break-all">{log.message}</div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
-        </div>,
-        document.body
-    );
-};
-
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
-    ({ readOnly, initialData, onNodeSelect, onChange }, ref) => {
+    ({ readOnly, initialData, onNodeSelect, onChange, onBeforeBackendRun }, ref) => {
         const { t } = useTranslation(['flows', 'nodes']);
-        // --- BLOCK REGISTRY FROM STORE ---
         const blockRegistry = useBlockRegistry();
 
-        // --- STATE ---
         const [nodes, setNodes] = useState<NodeData[]>([]);
         const [connections, setConnections] = useState<Connection[]>([]);
-
-        // Clipboard
         const [clipboard, setClipboard] = useState<NodeData | null>(null);
 
-        // History State
         const pastRef = useRef<WorkflowState[]>([]);
         const futureRef = useRef<WorkflowState[]>([]);
         const dragStartSnapshotRef = useRef<WorkflowState | null>(null);
-
-        // Input hash tracking for reactive execution (prevents re-execution with same inputs)
         const nodeInputHashesRef = useRef<Map<string, string>>(new Map());
+        const executeNodeRef = useRef<(nodeId: string) => Promise<void>>();
+        /** Counter for batch run operations. When > 0, skip individual saves (already saved by runAll) */
+        const batchRunCountRef = useRef(0);
 
-        // Viewport State (Zoom & Pan)
+        const nodesRef = useRef(nodes);
+        const connectionsRef = useRef(connections);
+        nodesRef.current = nodes;
+        connectionsRef.current = connections;
+
         const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
         const [isPanning, setIsPanning] = useState(false);
         const lastMousePosRef = useRef({ x: 0, y: 0 });
 
-        // UI Interaction State
         const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
         const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
         const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
 
-        // Modal States
         const [logViewerNodeId, setLogViewerNodeId] = useState<string | null>(null);
 
         const [dragState, setDragState] = useState<{
@@ -201,11 +88,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         } | null>(null);
         const [tooltip, setTooltip] = useState<{ x: number; y: number; content: unknown; type: string } | null>(null);
 
-        // Component Modal State
         const [modalFlowId, setModalFlowId] = useState<string | null>(null);
         const [modalFlowData, setModalFlowData] = useState<WorkflowState | null>(null);
 
-        // Connection Creation State
         const [connectionDraft, setConnectionDraft] = useState<{
             sourceNodeId: string;
             sourcePortId: string;
@@ -216,7 +101,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         const canvasRef = useRef<HTMLDivElement>(null);
 
-        // --- CHANGE DETECTION FOR AUTO SAVE ---
         const isMounted = useRef(false);
         useEffect(() => {
             if (isMounted.current) {
@@ -228,28 +112,37 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             }
         }, [nodes, connections, onChange, readOnly]);
 
-        // --- HISTORY MANAGEMENT ---
         const saveCheckpoint = useCallback(() => {
             if (readOnly) return;
-            // Push current state to past
             pastRef.current.push({
-                nodes: JSON.parse(JSON.stringify(nodes)), // Deep copy to prevent reference issues
+                nodes: JSON.parse(JSON.stringify(nodes)),
                 connections: [...connections],
             });
-            // Clear future because we branched off
             futureRef.current = [];
         }, [nodes, connections, readOnly]);
+
+        /** Initialize input hashes to prevent auto-execution on load */
+        const initializeInputHashes = useCallback(
+            (loadedNodes: NodeData[]) => {
+                loadedNodes.forEach(node => {
+                    const def = blockRegistry[node.type];
+                    if (def && def.inputs.length > 0) {
+                        const hash = def.inputs.map(p => node.inputData?.[p.id]?.timestamp).join('|');
+                        nodeInputHashesRef.current.set(node.id, hash);
+                    }
+                });
+            },
+            [blockRegistry]
+        );
 
         const undo = useCallback(() => {
             if (readOnly || pastRef.current.length === 0) return;
 
-            // Save current state to future
             futureRef.current.push({
                 nodes: JSON.parse(JSON.stringify(nodes)),
                 connections: [...connections],
             });
 
-            // Pop from past
             const previous = pastRef.current.pop();
             if (previous) {
                 setNodes(previous.nodes);
@@ -260,13 +153,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const redo = useCallback(() => {
             if (readOnly || futureRef.current.length === 0) return;
 
-            // Save current state to past
             pastRef.current.push({
                 nodes: JSON.parse(JSON.stringify(nodes)),
                 connections: [...connections],
             });
 
-            // Pop from future
             const next = futureRef.current.pop();
             if (next) {
                 setNodes(next.nodes);
@@ -274,26 +165,28 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             }
         }, [nodes, connections, readOnly]);
 
-        // Load Initial Data
         useEffect(() => {
             if (initialData) {
-                setNodes(initialData.nodes);
-                setConnections(initialData.connections);
+                const loadedNodes = initialData.nodes ?? [];
+                setNodes(loadedNodes);
+                setConnections(initialData.connections ?? []);
                 pastRef.current = [];
                 futureRef.current = [];
-            }
-        }, [initialData]);
 
-        // Load Sub-Flow for Modal
+                initializeInputHashes(loadedNodes);
+            }
+        }, [initialData, blockRegistry, initializeInputHashes]);
+
         useEffect(() => {
             if (modalFlowId) {
-                loadFlow(modalFlowId).then(setModalFlowData);
+                loadFlow(modalFlowId)
+                    .then(setModalFlowData)
+                    .catch(() => setModalFlowData(null));
             } else {
                 setModalFlowData(null);
             }
         }, [modalFlowId]);
 
-        // Sync internal selection with parent prop
         const handleSelectionChange = useCallback(
             (nodeId: string | null) => {
                 setSelectedNodeId(nodeId);
@@ -304,7 +197,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [onNodeSelect]
         );
 
-        // Helper: Convert Screen (Mouse) Coordinates to World (Canvas) Coordinates
         const screenToWorld = useCallback(
             (clientX: number, clientY: number) => {
                 const rect = canvasRef.current?.getBoundingClientRect();
@@ -317,18 +209,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [viewport]
         );
 
-        // Expose methods to parent
         useImperativeHandle(
             ref,
             () => ({
                 addNode: (type: string) => {
                     if (readOnly) return;
-                    saveCheckpoint(); // Save before adding
+                    saveCheckpoint();
 
                     const newDef = blockRegistry[type];
                     if (!newDef) return;
 
-                    // --- Auto Connect Logic ---
                     let sourceNode: NodeData | undefined;
                     let sourcePortId: string | undefined;
                     let targetPortId: string | undefined;
@@ -366,7 +256,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
                     }
 
-                    // --- Position ---
                     let startX = 0;
                     let startY = 0;
 
@@ -381,17 +270,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         startY = centerY - 50 + (Math.random() * 40 - 20);
                     }
 
-                    // Snap
                     const snappedX = Math.round(startX / GRID_SIZE) * GRID_SIZE;
                     const snappedY = Math.round(startY / GRID_SIZE) * GRID_SIZE;
 
                     const newNode: NodeData = {
                         id: generateId(),
                         type,
-                        position: {
-                            x: snappedX,
-                            y: snappedY,
-                        },
+                        position: { x: snappedX, y: snappedY },
                         config: { ...blockRegistry[type].defaultConfig },
                         status: 'IDLE',
                         inputData: {},
@@ -399,7 +284,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         autoExecutionEnabled: true,
                     };
 
-                    // --- Connect ---
                     let newConnection: Connection | null = null;
                     if (sourceNode && sourcePortId && targetPortId) {
                         newConnection = {
@@ -415,7 +299,46 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
                     }
 
-                    // --- Update State ---
+                    let targetNode: NodeData | undefined;
+                    let targetInputPortId: string | undefined;
+                    let sourceOutputPortId: string | undefined;
+
+                    if (!newConnection && newDef.outputs.length > 0 && nodes.length > 0) {
+                        const firstOutput = newDef.outputs[0];
+
+                        for (const existingNode of nodes) {
+                            const existingDef = blockRegistry[existingNode.type];
+                            if (!existingDef || existingDef.inputs.length === 0) continue;
+
+                            const compatibleInput = existingDef.inputs.find(inp => {
+                                const isConnected = connections.some(
+                                    c => c.targetNodeId === existingNode.id && c.targetPortId === inp.id
+                                );
+                                if (isConnected) return false;
+                                return (
+                                    inp.type === firstOutput.type || inp.type === 'any' || firstOutput.type === 'any'
+                                );
+                            });
+
+                            if (compatibleInput) {
+                                targetNode = existingNode;
+                                targetInputPortId = compatibleInput.id;
+                                sourceOutputPortId = firstOutput.id;
+                                break;
+                            }
+                        }
+
+                        if (targetNode && targetInputPortId && sourceOutputPortId) {
+                            newConnection = {
+                                id: generateId(),
+                                sourceNodeId: newNode.id,
+                                sourcePortId: sourceOutputPortId,
+                                targetNodeId: targetNode.id,
+                                targetPortId: targetInputPortId,
+                            };
+                        }
+                    }
+
                     setNodes(prev => [...prev, newNode]);
                     if (newConnection) {
                         setConnections(prev => [...prev, newConnection!]);
@@ -424,14 +347,17 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     handleSelectionChange(newNode.id);
                     setSelectedConnectionId(null);
                 },
-                getWorkflow: () => ({ nodes, connections }),
+                getWorkflow: () => ({ nodes, edges: connections }),
                 loadWorkflow: (state: WorkflowState) => {
-                    setNodes(state.nodes);
-                    setConnections(state.connections);
+                    const loadedNodes = state.nodes ?? [];
+                    setNodes(loadedNodes);
+                    // Support both 'edges' (API format) and 'connections' (legacy)
+                    setConnections(state.edges ?? state.connections ?? []);
                     pastRef.current = [];
                     futureRef.current = [];
                     handleSelectionChange(null);
                     setSelectedConnectionId(null);
+                    initializeInputHashes(loadedNodes);
                 },
                 clearWorkflow: () => {
                     if (readOnly) return;
@@ -460,7 +386,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     if (nodes.length === 0) return;
                     saveCheckpoint();
 
-                    // Simple Layered Layout
                     const adj: Record<string, string[]> = {};
                     const inDegree: Record<string, number> = {};
                     const incomingEdges: Record<string, string[]> = {};
@@ -515,11 +440,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
                     });
 
-                    const LEVEL_WIDTH = 300;
-                    const ROW_HEIGHT = 200;
-                    const START_X = 50;
-                    const START_Y = 50;
-
                     const levelGroups: Record<number, NodeData[]> = {};
                     nodes.forEach(n => {
                         const l = levels[n.id] || 0;
@@ -548,9 +468,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             return avgA - avgB;
                         });
 
-                        group.forEach((node, idx) => {
-                            const x = START_X + level * LEVEL_WIDTH;
-                            const y = START_Y + idx * ROW_HEIGHT;
+                        // Position each node with dynamic height-based spacing
+                        let currentY = LAYOUT_CONFIG.START_Y;
+                        group.forEach(node => {
+                            const x = LAYOUT_CONFIG.START_X + level * LAYOUT_CONFIG.LEVEL_WIDTH;
+                            const y = currentY;
                             nodeYPositions[node.id] = y;
                             const nodeIndex = positionedNodes.findIndex(n => n.id === node.id);
                             if (nodeIndex !== -1) {
@@ -559,31 +481,47 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     position: { x, y },
                                 };
                             }
+                            // Advance Y by estimated node height + gap
+                            const nodeHeight = estimateNodeHeight(node, blockRegistry[node.type]);
+                            currentY += nodeHeight + LAYOUT_CONFIG.MIN_GAP;
                         });
                     });
 
                     setNodes(positionedNodes);
                     setViewport({ x: 20, y: 20, zoom: 1 });
                 },
-                runAll: () => {
-                    // Trigger execution on all input nodes (nodes without incoming connections)
-                    const inputNodeIds = nodes
+                runAll: async () => {
+                    // Find root nodes: no incoming connections OR no input ports defined
+                    const inputNodes = nodes
                         .filter(n => {
                             const hasIncoming = connections.some(c => c.targetNodeId === n.id);
                             const def = blockRegistry[n.type];
                             return !hasIncoming || (def && def.inputs.length === 0);
                         })
-                        .filter(n => !(n as NodeData & { disabled?: boolean }).disabled)
-                        .map(n => n.id);
+                        .filter(n => !(n as NodeData & { disabled?: boolean }).disabled);
 
-                    // Set all input nodes to 'running' status
-                    setNodes(prev =>
-                        prev.map(n => (inputNodeIds.includes(n.id) ? { ...n, status: 'running' as const } : n))
-                    );
+                    // Enable batch mode to skip individual saves
+                    batchRunCountRef.current++;
+
+                    try {
+                        // Save flow once before executing all nodes
+                        if (onBeforeBackendRun) {
+                            await onBeforeBackendRun();
+                        }
+
+                        // Execute all input nodes
+                        for (const node of inputNodes) {
+                            if (executeNodeRef.current) {
+                                await executeNodeRef.current(node.id);
+                            }
+                        }
+                    } finally {
+                        batchRunCountRef.current--;
+                    }
                 },
                 stopAll: () => {
-                    // Reset all nodes to idle status
-                    setNodes(prev => prev.map(n => (n.status === 'running' ? { ...n, status: 'idle' as const } : n)));
+                    batchRunCountRef.current = 0;
+                    setNodes(prev => prev.map(n => (n.status === 'RUNNING' ? { ...n, status: 'IDLE' } : n)));
                 },
             }),
             [
@@ -597,43 +535,40 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 selectedNodeId,
                 handleSelectionChange,
                 blockRegistry,
+                onBeforeBackendRun,
             ]
         );
 
-        // --- ENGINE LOGIC ---
-        const propagateOutputs = useCallback(
-            (sourceNodeId: string, outputs: Record<string, DataPacket>) => {
-                const relevantConnections = connections.filter(c => c.sourceNodeId === sourceNodeId);
-                if (relevantConnections.length === 0) return;
+        const propagateOutputs = useCallback((sourceNodeId: string, outputs: Record<string, DataPacket>) => {
+            const relevantConnections = connectionsRef.current.filter(c => c.sourceNodeId === sourceNodeId);
+            if (relevantConnections.length === 0) return;
 
-                setNodes(prevNodes => {
-                    let hasChanges = false;
-                    const nextNodes = prevNodes.map(node => {
-                        const incoming = relevantConnections.filter(c => c.targetNodeId === node.id);
-                        if (incoming.length === 0) return node;
+            setNodes(prevNodes => {
+                let hasChanges = false;
+                const nextNodes = prevNodes.map(node => {
+                    const incoming = relevantConnections.filter(c => c.targetNodeId === node.id);
+                    if (incoming.length === 0) return node;
 
-                        const newInputData = { ...node.inputData };
-                        let nodeChanged = false;
+                    const newInputData = { ...node.inputData };
+                    let nodeChanged = false;
 
-                        incoming.forEach(conn => {
-                            const packet = outputs[conn.sourcePortId];
-                            if (packet) {
-                                newInputData[conn.targetPortId] = packet;
-                                nodeChanged = true;
-                            }
-                        });
-
-                        if (nodeChanged) {
-                            hasChanges = true;
-                            return { ...node, inputData: newInputData };
+                    incoming.forEach(conn => {
+                        const packet = outputs[conn.sourcePortId];
+                        if (packet) {
+                            newInputData[conn.targetPortId] = packet;
+                            nodeChanged = true;
                         }
-                        return node;
                     });
-                    return hasChanges ? nextNodes : prevNodes;
+
+                    if (nodeChanged) {
+                        hasChanges = true;
+                        return { ...node, inputData: newInputData };
+                    }
+                    return node;
                 });
-            },
-            [connections]
-        );
+                return hasChanges ? nextNodes : prevNodes;
+            });
+        }, []);
 
         const executeNode = useCallback(
             async (nodeId: string, manualOverrideInputs?: Record<string, DataPacket>) => {
@@ -647,17 +582,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                   ...n,
                                   status: 'RUNNING',
                                   errorMessage: undefined,
-                                  executionStats: {
-                                      startTime,
-                                      progress: 0,
-                                      duration: 0,
-                                  },
+                                  executionStats: { startTime, progress: 0, duration: 0 },
                               }
                             : n
                     )
                 );
 
-                const currentNode = nodes.find(n => n.id === nodeId);
+                const currentNode = nodesRef.current.find(n => n.id === nodeId);
                 if (!currentNode) return;
 
                 const inputs = manualOverrideInputs || currentNode.inputData;
@@ -691,11 +622,70 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 };
 
                 try {
-                    const results = await nodeDef.execute(inputs, currentNode.config, onProgress);
-                    const endTime = Date.now();
-                    const duration = endTime - startTime;
+                    let results: Record<string, DataPacket>;
 
-                    // Store input hash to prevent re-execution with same inputs
+                    // Check if block requires backend processing
+                    // Use nodeDef.type since loaded nodes may have blockId as currentNode.type
+                    if (requiresBackendProcessing(nodeDef.type)) {
+                        // Backend execution: POST /nodes/:id/run
+
+                        // Save flow first to ensure node exists on server
+                        // Skip if in batch run mode (already saved by runAll)
+                        if (batchRunCountRef.current === 0 && onBeforeBackendRun) {
+                            await onBeforeBackendRun();
+                        }
+
+                        const nodeResult = await runNode(nodeId, { config$: currentNode.config });
+
+                        // Check if backend returned an error status
+                        if (nodeResult.status === 'ERROR') {
+                            const duration = Date.now() - startTime;
+                            setNodes(prev =>
+                                prev.map(n =>
+                                    n.id === nodeId
+                                        ? {
+                                              ...n,
+                                              status: 'ERROR',
+                                              errorMessage:
+                                                  nodeResult.errorMessage || t('flows:detailPanel.unknownError'),
+                                              executionStats: { startTime, duration, progress: 0 },
+                                          }
+                                        : n
+                                )
+                            );
+                            return;
+                        }
+
+                        // Extract outputData from API response
+                        if (nodeResult.outputData$$) {
+                            type OutputDataItem = {
+                                portId: string;
+                                packet: { value: unknown; type: string; timestamp?: number };
+                            };
+                            results = nodeResult.outputData$$.reduce<Record<string, DataPacket>>(
+                                (acc: Record<string, DataPacket>, item: OutputDataItem) => {
+                                    acc[item.portId] = {
+                                        value: item.packet.value,
+                                        type: item.packet.type as 'text' | 'image' | 'number',
+                                        timestamp: item.packet.timestamp || Date.now(),
+                                    };
+                                    return acc;
+                                },
+                                {}
+                            );
+                        } else {
+                            results = {};
+                        }
+                    } else if (nodeDef.execute) {
+                        // Frontend execution: call block.execute() directly
+                        results = await nodeDef.execute(inputs, currentNode.config, onProgress);
+                    } else {
+                        // No execute function available - pass through without error
+                        results = {};
+                    }
+
+                    const duration = Date.now() - startTime;
+
                     const hash = nodeDef.inputs.map((p: PortDefinition) => inputs[p.id]?.timestamp).join('|');
                     nodeInputHashesRef.current.set(nodeId, hash);
 
@@ -706,11 +696,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                       ...n,
                                       status: 'COMPLETED',
                                       outputData: results,
-                                      executionStats: {
-                                          startTime,
-                                          duration,
-                                          progress: 100,
-                                      },
+                                      executionStats: { startTime, duration, progress: 100 },
                                   }
                                 : n
                         )
@@ -718,8 +704,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                     propagateOutputs(nodeId, results);
                 } catch (e: unknown) {
-                    const endTime = Date.now();
-                    const duration = endTime - startTime;
+                    const duration = Date.now() - startTime;
                     const errorMessage = e instanceof Error ? e.message : t('flows:detailPanel.unknownError');
 
                     setNodes(prev =>
@@ -729,33 +714,28 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                       ...n,
                                       status: 'ERROR',
                                       errorMessage,
-                                      executionStats: {
-                                          startTime,
-                                          duration,
-                                          progress: 0,
-                                      },
+                                      executionStats: { startTime, duration, progress: 0 },
                                   }
                                 : n
                         )
                     );
                 }
             },
-            [nodes, propagateOutputs, readOnly, blockRegistry]
+            [propagateOutputs, readOnly, blockRegistry, t, onBeforeBackendRun]
         );
 
-        // Reactive Trigger
+        executeNodeRef.current = executeNode;
+
         useEffect(() => {
             if (readOnly) return;
             nodes.forEach(node => {
                 const def = blockRegistry[node.type];
                 if (!def) return;
-
                 if (def.inputs.length === 0) return;
                 if (node.status === 'RUNNING') return;
                 if (node.autoExecutionEnabled === false) return;
 
                 const hasInputs = def.inputs.every(p => node.inputData[p.id]);
-
                 if (hasInputs) {
                     const currentInputHash = def.inputs.map(p => node.inputData[p.id]?.timestamp).join('|');
                     const lastHash = nodeInputHashesRef.current.get(node.id);
@@ -768,7 +748,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             });
         }, [nodes, executeNode, readOnly, blockRegistry]);
 
-        // --- UI HANDLERS ---
         const handleConfigChange = (nodeId: string, key: string, value: unknown) => {
             if (readOnly) return;
             saveCheckpoint();
@@ -858,7 +837,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [readOnly, saveCheckpoint]
         );
 
-        // --- PAN & ZOOM HANDLERS ---
         const MIN_ZOOM = 0.1;
         const MAX_ZOOM = 5;
 
@@ -881,17 +859,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         };
 
         const handleZoomIn = useCallback(() => {
-            setViewport(prev => ({
-                ...prev,
-                zoom: Math.min(prev.zoom * 1.2, MAX_ZOOM),
-            }));
+            setViewport(prev => ({ ...prev, zoom: Math.min(prev.zoom * 1.2, MAX_ZOOM) }));
         }, []);
 
         const handleZoomOut = useCallback(() => {
-            setViewport(prev => ({
-                ...prev,
-                zoom: Math.max(prev.zoom / 1.2, MIN_ZOOM),
-            }));
+            setViewport(prev => ({ ...prev, zoom: Math.max(prev.zoom / 1.2, MIN_ZOOM) }));
         }, []);
 
         const handleFitToScreen = useCallback(() => {
@@ -903,10 +875,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             const NODE_HEIGHT = 150;
             const PADDING = 50;
 
-            let minX = Infinity;
-            let minY = Infinity;
-            let maxX = -Infinity;
-            let maxY = -Infinity;
+            let minX = Infinity,
+                minY = Infinity,
+                maxX = -Infinity,
+                maxY = -Infinity;
 
             nodes.forEach(node => {
                 minX = Math.min(minX, node.position.x);
@@ -917,7 +889,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             const contentWidth = maxX - minX;
             const contentHeight = maxY - minY;
-
             const availableWidth = rect.width - PADDING * 2;
             const availableHeight = rect.height - PADDING * 2;
 
@@ -947,7 +918,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             }
         };
 
-        const handleDoubleClick = (_e: React.MouseEvent) => {
+        const handleDoubleClick = () => {
             handleSelectionChange(null);
             setSelectedConnectionId(null);
         };
@@ -992,25 +963,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             if (dragState && !readOnly) {
                 const screenDx = e.clientX - dragState.startX;
                 const screenDy = e.clientY - dragState.startY;
-
                 const dx = screenDx / viewport.zoom;
                 const dy = screenDy / viewport.zoom;
 
                 const rawX = dragState.initialX + dx;
                 const rawY = dragState.initialY + dy;
-
                 const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
                 const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
 
                 setNodes(prev =>
-                    prev.map(n =>
-                        n.id === dragState.nodeId
-                            ? {
-                                  ...n,
-                                  position: { x: snappedX, y: snappedY },
-                              }
-                            : n
-                    )
+                    prev.map(n => (n.id === dragState.nodeId ? { ...n, position: { x: snappedX, y: snappedY } } : n))
                 );
             }
 
@@ -1124,12 +1086,14 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     ? def.inputs.findIndex(p => p.id === portId)
                     : def.outputs.findIndex(p => p.id === portId);
             const safeIndex = portIndex !== -1 ? portIndex : 0;
-            const yOffset = 87 + safeIndex * 32;
-            const xOffset = type === 'input' ? 14 : 210;
+            // Node width: 260px, port size: 12px (w-3), port radius: 6px
+            // Header ~44px, body padding-top 12px, port row h-7 (28px) center at 14px
+            const yOffset = 69 + safeIndex * 28;
+            // Connect at port edge: slightly inside circle for clean visual connection
+            const xOffset = type === 'input' ? 8 : 252;
             return { x: node.position.x + xOffset, y: node.position.y + yOffset };
         };
 
-        // --- SHORTCUTS EFFECT ---
         useEffect(() => {
             const handleKeyDown = (e: KeyboardEvent) => {
                 if (readOnly) return;
@@ -1149,8 +1113,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 if (isCtrlOrCmd && e.key.toLowerCase() === 'v') {
                     if (clipboard) {
                         saveCheckpoint();
-                        let x = 100;
-                        let y = 100;
+                        let x = 100,
+                            y = 100;
                         if (canvasRef.current) {
                             const rect = canvasRef.current.getBoundingClientRect();
                             x = (rect.width / 2 - viewport.x) / viewport.zoom - 100;
@@ -1249,6 +1213,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
                         }}
                     >
+                        {/* SVG connections rendered first (below nodes) */}
                         <svg className="absolute overflow-visible top-0 left-0 w-full h-full">
                             {connections.map(conn => {
                                 const start = getPortPosition(conn.sourceNodeId, conn.sourcePortId, 'output');
@@ -1276,7 +1241,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     }
                                 };
 
-                                const handleClick = (_e: React.MouseEvent) => {
+                                const handleClick = () => {
                                     setSelectedConnectionId(conn.id);
                                     handleSelectionChange(null);
                                 };
@@ -1317,10 +1282,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     x2={connectionDraft.mouseX}
                                     y2={connectionDraft.mouseY}
                                     isActive={true}
+                                    isDraft={true}
                                 />
                             )}
                         </svg>
 
+                        {/* Nodes rendered after SVG (above connections) */}
                         <div className={`pointer-events-auto ${readOnly ? 'pointer-events-none' : ''}`}>
                             {nodes.map(node => {
                                 const isConnected =
@@ -1340,21 +1307,28 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     <div key={node.id}>
                                         <NodeBlock
                                             node={node}
-                                            isSelected={selectedNodeId === node.id}
-                                            isHighlighted={!!isConnected}
-                                            highlightedPortIds={highlightedPorts}
+                                            highlightState={{
+                                                isSelected: selectedNodeId === node.id,
+                                                isHighlighted: !!isConnected,
+                                                highlightedPortIds: highlightedPorts,
+                                            }}
+                                            portHandlers={{
+                                                onPortMouseDown: handlePortMouseDown,
+                                                onPortMouseUp: handlePortMouseUp,
+                                            }}
+                                            configHandlers={{
+                                                onConfigChange: (k, v) => handleConfigChange(node.id, k, v),
+                                                onLabelChange: label => handleLabelChange(node.id, label),
+                                                onToggleAuto: () => handleToggleAuto(node.id),
+                                            }}
+                                            actions={{
+                                                onDelete: () => deleteNode(node.id),
+                                                onTrigger: () => executeNode(node.id),
+                                                onToggleDisabled: () => toggleNodeDisabled(node.id),
+                                                onDuplicate: () => duplicateNode(node.id),
+                                                onViewLogs: () => setLogViewerNodeId(node.id),
+                                            }}
                                             onMouseDown={e => handleNodeMouseDown(e, node.id)}
-                                            onPortMouseDown={handlePortMouseDown}
-                                            onPortMouseUp={handlePortMouseUp}
-                                            onConfigChange={(k, v) => handleConfigChange(node.id, k, v)}
-                                            onLabelChange={label => handleLabelChange(node.id, label)}
-                                            onDelete={() => deleteNode(node.id)}
-                                            onTrigger={() => executeNode(node.id)}
-                                            onToggleAuto={() => handleToggleAuto(node.id)}
-                                            onToggleDisabled={() => toggleNodeDisabled(node.id)}
-                                            onDuplicate={() => duplicateNode(node.id)}
-                                            onViewComponent={id => setModalFlowId(id)}
-                                            onViewLogs={() => setLogViewerNodeId(node.id)}
                                         />
                                     </div>
                                 );
@@ -1371,7 +1345,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 {tooltip.type}
                             </div>
                             {tooltip.type === 'image' ? (
-                                <TooltipImage src={tooltip.content} altText={t('flows:nodeBlock.previewAlt')} />
+                                <TooltipImage
+                                    src={tooltip.content as string}
+                                    altText={t('flows:nodeBlock.previewAlt')}
+                                />
                             ) : (
                                 <div className="text-xs text-foreground max-w-[200px] break-all">
                                     {typeof tooltip.content === 'object'
@@ -1390,7 +1367,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             onZoomOut={handleZoomOut}
                             onFitToScreen={handleFitToScreen}
                             onReset={handleResetView}
-                            className="absolute bottom-4 right-4 z-20"
+                            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20"
                         />
                     )}
 

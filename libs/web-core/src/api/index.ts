@@ -1,5 +1,8 @@
 import { API_URL, ENV } from '../core';
 
+// Re-export API client
+export * from './client';
+
 /**
  * Base API configuration
  */

@@ -15,7 +15,10 @@
         "untitledWorkflow": "Untitled Workflow",
         "toggleAutoSave": "Toggle Auto Save",
         "runAll": "Run All",
-        "stopAll": "Stop"
+        "stopAll": "Stop",
+        "saving": "Saving...",
+        "saved": "Saved",
+        "saveFailed": "Save failed"
     },
     "sidebar": {
         "library": "Library",
@@ -27,7 +30,8 @@
         "expandSidebar": "Expand Sidebar",
         "collapseSidebar": "Collapse Sidebar",
         "searchBlocks": "Search blocks...",
-        "noResults": "No blocks found"
+        "noResults": "No blocks found",
+        "clickToAdd": "Click to add to canvas"
     },
     "canvas": {
         "executionLogs": "Execution Logs",
@@ -88,11 +92,39 @@
         "viewExecutionLogs": "View Execution Logs",
         "subFlowId": "Sub-Flow ID",
         "unknown": "Unknown",
-        "labelPlaceholder": "Label..."
+        "labelPlaceholder": "Label...",
+        "image": "Image",
+        "value": "Value",
+        "clickToUpload": "Click to upload",
+        "enterText": "Enter text..."
     },
     "flowEditor": {
         "initializingEngine": "Initializing FlowMosaic Engine...",
-        "processing": "Processing..."
+        "loadingBlockRegistry": "Loading Block Registry...",
+        "loadingFlow": "Loading Flow {{flowId}}...",
+        "initializingFlow": "Initializing Flow...",
+        "createdNewFlow": "Created new flow",
+        "errorLoadingApp": "Error loading application. Please refresh.",
+        "processing": "Processing...",
+        "enterFlowId": "Enter flow ID to load:",
+        "loadedFlow": "Loaded flow: {{flowId}}",
+        "failedToLoadFlow": "Failed to load flow",
+        "confirmNewFlow": "Create new flow? Unsaved changes will be lost.",
+        "newFlowCreated": "New flow created",
+        "failedToCreateFlow": "Failed to create new flow",
+        "linkCopied": "Link copied to clipboard!",
+        "failedToCopyLink": "Failed to copy link",
+        "confirmClearCanvas": "Clear the canvas?",
+        "canvasCleared": "Canvas cleared",
+        "autoLayoutApplied": "Auto-layout applied",
+        "exportedToJson": "Exported to JSON",
+        "workflowImported": "Workflow imported successfully",
+        "invalidWorkflowFile": "Invalid workflow file",
+        "failedToParseJson": "Failed to parse JSON file",
+        "runningAllNodes": "Running all nodes...",
+        "executionStopped": "Execution stopped",
+        "savedAs": "Saved as \"{{flowName}}\"",
+        "failedToSaveWorkflow": "Failed to save workflow"
     },
     "nodeBlock": {
         "inputAlt": "Input",

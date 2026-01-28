@@ -1,177 +1,338 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
-import { fetchBlockLogs, listFlows, loadDesign, loadFlow, saveFlow } from '../api';
+import { useQueryClient } from '@tanstack/react-query';
+
+import { createFlow, loadFlow } from '../api';
+import {
+    flowsKeys,
+    useCreateFlowMutation,
+    useLoadFlowQuery,
+    useSaveFlowMutation,
+    useUpdateFlowMutation,
+} from './queries';
 import { useFlowsStore } from '../stores/useFlowsStore';
+import { flowStorage } from '../utils/flowStorage';
 
-import type { LogEntry, WorkflowState } from '../api';
+import type { SaveStatus } from '../stores/useFlowsStore';
+import type { LoadFlowResult, SaveFlowBody } from '../types';
 
 /**
  * Hook for managing workflows/flows
+ *
+ * Backend API support:
+ * - POST /flows/:id/save (create with id='0', update with existing id)
+ * - GET /flows/:id/load (load flow snapshot)
+ *
+ * Flow ID is persisted in localStorage for session continuity.
+ * This hook manages flow metadata (name, save/load).
  */
 export const useFlows = () => {
+    const queryClient = useQueryClient();
+    const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastSaveBodyRef = useRef<SaveFlowBody | null>(null);
     const {
         currentFlowId,
         flowName,
-        flows,
-        isLoading,
-        isSaving,
-        lastSavedAt,
         isAutoSaveEnabled,
+        lastSavedAt,
+        saveStatus,
+        saveError,
         setCurrentFlowId,
         setFlowName,
-        setFlows,
-        setLoading,
-        setSaving,
         setLastSavedAt,
         toggleAutoSave,
+        setSaveStatus,
+        setSaveError,
     } = useFlowsStore();
 
-    const autoSaveTimerRef = useRef<number | null>(null);
+    // Cleanup timeout on unmount to prevent memory leaks
+    useEffect(() => {
+        return () => {
+            if (successTimeoutRef.current) {
+                clearTimeout(successTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    // TanStack Query hooks
+    const loadFlowQuery = useLoadFlowQuery(currentFlowId);
+
+    // TanStack Mutations
+    const createFlowMutation = useCreateFlowMutation();
+    const saveFlowMutation = useSaveFlowMutation();
+    const updateFlowMutation = useUpdateFlowMutation();
 
     /**
-     * Load all available flows
+     * Initialize flow - load from localStorage or create new
+     * This should be called during app boot.
+     *
+     * @returns LoadFlowResult if flow loaded, null if new flow created
      */
-    const loadFlowsList = useCallback(async () => {
-        try {
-            const flowsList = await listFlows();
-            setFlows(flowsList);
-            return flowsList;
-        } catch (error) {
-            console.error('Failed to load flows list:', error);
-            return [];
+    const initializeFlow = useCallback(async (): Promise<{
+        flowId: string;
+        flowData: LoadFlowResult | null;
+        isNew: boolean;
+    }> => {
+        // Check localStorage for saved flow ID
+        const savedFlowId = flowStorage.getFlowId();
+
+        if (savedFlowId) {
+            console.log('[useFlows] Found saved flow ID:', savedFlowId);
+            try {
+                // Use queryClient.fetchQuery for caching benefit
+                const flowData = await queryClient.fetchQuery({
+                    queryKey: flowsKeys.snapshot(savedFlowId),
+                    queryFn: () => loadFlow(savedFlowId),
+                });
+                setCurrentFlowId(savedFlowId);
+                if (flowData.name) {
+                    setFlowName(flowData.name);
+                }
+                return { flowId: savedFlowId, flowData, isNew: false };
+            } catch (err) {
+                console.warn('[useFlows] Failed to load saved flow, creating new:', err);
+                // Fall through to create new flow
+            }
         }
-    }, [setFlows]);
+
+        // No saved flow or failed to load - create new flow
+        console.log('[useFlows] Creating new flow via POST /flows/0/save');
+        try {
+            const result = await createFlow({ nodes: [], edges: [] });
+            const newFlowId = result.id;
+
+            if (newFlowId) {
+                setCurrentFlowId(newFlowId);
+                flowStorage.setFlowId(newFlowId);
+                setFlowName('Untitled Workflow');
+                return { flowId: newFlowId, flowData: null, isNew: true };
+            }
+        } catch (err) {
+            console.error('[useFlows] Failed to create new flow:', err);
+        }
+
+        // Fallback: use a local ID (offline mode - will sync on first save)
+        const fallbackId = `local-${Date.now()}`;
+        setCurrentFlowId(fallbackId);
+        setFlowName('Untitled Workflow');
+        return { flowId: fallbackId, flowData: null, isNew: true };
+    }, [queryClient, setCurrentFlowId, setFlowName]);
 
     /**
      * Load a specific flow by ID
+     * GET /flows/:id/load
      */
     const loadFlowById = useCallback(
-        async (id?: string) => {
-            setLoading(true);
+        async (id: string): Promise<LoadFlowResult | null> => {
+            if (!id) {
+                console.warn('[useFlows] loadFlowById called without ID');
+                return null;
+            }
+
+            console.log('[useFlows] Loading flow:', id);
+            setCurrentFlowId(id);
+            flowStorage.setFlowId(id);
+
             try {
-                const flow = await loadFlow(id);
-                if (id) {
-                    setCurrentFlowId(id);
-                    const flowsList = await listFlows();
-                    const meta = flowsList.find(f => f.id === id);
-                    if (meta) {
-                        setFlowName(meta.name);
-                    }
+                // Use queryClient.fetchQuery for caching benefit
+                const flowData = await queryClient.fetchQuery({
+                    queryKey: flowsKeys.snapshot(id),
+                    queryFn: () => loadFlow(id),
+                });
+                if (flowData.name) {
+                    setFlowName(flowData.name);
                 }
-                return flow;
-            } catch (error) {
-                console.error('Failed to load flow:', error);
-                throw error;
-            } finally {
-                setLoading(false);
+                return flowData;
+            } catch (err) {
+                console.error('[useFlows] Failed to load flow:', err);
+                return null;
             }
         },
-        [setLoading, setCurrentFlowId, setFlowName]
+        [queryClient, setCurrentFlowId, setFlowName]
     );
 
     /**
-     * Load flow design by ID
+     * Helper to update save status with auto-reset for success state
      */
-    const loadFlowDesign = useCallback(
-        async (id: string) => {
-            setLoading(true);
-            try {
-                const design = await loadDesign(id);
-                return design;
-            } catch (error) {
-                console.error('Failed to load design:', error);
-                throw error;
-            } finally {
-                setLoading(false);
+    const updateSaveStatus = useCallback(
+        (status: SaveStatus, error?: Error) => {
+            // Clear any pending success timeout
+            if (successTimeoutRef.current) {
+                clearTimeout(successTimeoutRef.current);
+                successTimeoutRef.current = null;
+            }
+
+            setSaveStatus(status);
+            setSaveError(error ?? null);
+
+            // Auto-reset success status to idle after 2 seconds
+            if (status === 'success') {
+                successTimeoutRef.current = setTimeout(() => {
+                    setSaveStatus('idle');
+                    successTimeoutRef.current = null;
+                }, 2000);
             }
         },
-        [setLoading]
+        [setSaveStatus, setSaveError]
     );
 
     /**
      * Save current flow
+     * POST /flows/:id/save
+     *
+     * If no currentFlowId, creates new flow first via POST /flows/0/save
+     * Uses optimistic updates for seamless UX - no blocking loader shown
      */
     const saveCurrentFlow = useCallback(
-        async (state: WorkflowState, silent = false) => {
-            if (!silent) setLoading(true);
-            else setSaving(true);
+        async (
+            body: Partial<SaveFlowBody> & { connections?: SaveFlowBody['edges'] }
+        ): Promise<{ success: boolean; id: string }> => {
+            // Set saving status (subtle indicator, not blocking)
+            updateSaveStatus('saving');
 
             try {
-                const result = await saveFlow(state, flowName);
-                if (result.success) {
-                    setLastSavedAt(new Date());
-                    if (result.id !== currentFlowId) {
-                        setCurrentFlowId(result.id);
+                // Support both 'edges' (API format) and 'connections' (UI format)
+                const { nodes = [], edges, connections } = body;
+                const edgesData = edges ?? connections ?? [];
+
+                const saveBody: SaveFlowBody = { nodes, edges: edgesData };
+
+                // Store for retry on failure
+                lastSaveBodyRef.current = saveBody;
+
+                let flowId = currentFlowId;
+
+                // If no current flow ID, create new flow
+                if (!flowId || flowId.startsWith('local-')) {
+                    console.log('[useFlows] Creating new flow via POST /flows/0/save');
+                    const result = await createFlowMutation.mutateAsync(saveBody);
+                    flowId = result.id;
+
+                    if (flowId) {
+                        setCurrentFlowId(flowId);
+                        flowStorage.setFlowId(flowId);
                     }
+                } else {
+                    // Save to existing flow (uses optimistic update)
+                    console.log('[useFlows] Saving to existing flow:', flowId);
+                    await saveFlowMutation.mutateAsync({ id: flowId, body: saveBody });
                 }
-                return result;
+
+                setLastSavedAt(new Date());
+                updateSaveStatus('success');
+                return { success: true, id: flowId || '' };
             } catch (error) {
-                console.error('Failed to save flow:', error);
+                console.error('[useFlows] Failed to save flow:', error);
+                updateSaveStatus('error', error instanceof Error ? error : new Error('Failed to save flow'));
                 return { success: false, id: '' };
-            } finally {
-                if (!silent) setLoading(false);
-                else setTimeout(() => setSaving(false), 500);
             }
         },
-        [flowName, currentFlowId, setLoading, setSaving, setLastSavedAt, setCurrentFlowId]
+        [currentFlowId, createFlowMutation, saveFlowMutation, setLastSavedAt, setCurrentFlowId, updateSaveStatus]
     );
 
     /**
-     * Trigger auto-save with debounce
+     * Retry the last failed save operation
      */
-    const triggerAutoSave = useCallback(
-        (saveCallback: () => Promise<void>) => {
-            if (!isAutoSaveEnabled) return;
+    const retrySave = useCallback(async () => {
+        if (!lastSaveBodyRef.current) {
+            updateSaveStatus('idle');
+            return { success: false, id: '' };
+        }
+        // Retry with stored save body
+        return saveCurrentFlow(lastSaveBodyRef.current);
+    }, [saveCurrentFlow, updateSaveStatus]);
 
-            if (autoSaveTimerRef.current) {
-                window.clearTimeout(autoSaveTimerRef.current);
+    /**
+     * Create a new flow (local state + server)
+     */
+    const createNewFlow = useCallback(async (): Promise<string | null> => {
+        try {
+            console.log('[useFlows] Creating new flow');
+            const result = await createFlowMutation.mutateAsync({ nodes: [], edges: [] });
+            const newFlowId = result.id;
+
+            if (newFlowId) {
+                setCurrentFlowId(newFlowId);
+                flowStorage.setFlowId(newFlowId);
+                setFlowName('Untitled Workflow');
+                setLastSavedAt(null);
+                return newFlowId;
+            }
+            return null;
+        } catch (error) {
+            console.error('[useFlows] Failed to create new flow:', error);
+            return null;
+        }
+    }, [createFlowMutation, setCurrentFlowId, setFlowName, setLastSavedAt]);
+
+    /**
+     * Update flow name (metadata only)
+     * POST /flows/:id
+     *
+     * @see eureka-flows-api v0.26.126
+     */
+    const updateFlowName = useCallback(
+        async (name: string): Promise<boolean> => {
+            if (!currentFlowId || currentFlowId.startsWith('local-')) {
+                // Just update local state if no server flow exists
+                setFlowName(name);
+                return true;
             }
 
-            autoSaveTimerRef.current = window.setTimeout(() => {
-                saveCallback();
-            }, 2000);
+            updateSaveStatus('saving');
+
+            try {
+                await updateFlowMutation.mutateAsync({ id: currentFlowId, body: { name } });
+                setFlowName(name);
+                setLastSavedAt(new Date());
+                updateSaveStatus('success');
+                return true;
+            } catch (error) {
+                console.error('[useFlows] Failed to update flow name:', error);
+                updateSaveStatus('error', error instanceof Error ? error : new Error('Failed to update name'));
+                return false;
+            }
         },
-        [isAutoSaveEnabled]
+        [currentFlowId, updateFlowMutation, setFlowName, setLastSavedAt, updateSaveStatus]
     );
 
-    /**
-     * Create a new flow
-     */
-    const createNewFlow = useCallback(
-        (newId: string) => {
-            setCurrentFlowId(newId);
-            setFlowName('Untitled Workflow');
-            setLastSavedAt(null);
-        },
-        [setCurrentFlowId, setFlowName, setLastSavedAt]
-    );
+    // Derive loading state from TanStack Query (only for initial load)
+    const isLoading = loadFlowQuery.isLoading || loadFlowQuery.isFetching;
 
-    /**
-     * Fetch logs for a block
-     */
-    const getBlockLogs = useCallback(async (nodeId: string): Promise<LogEntry[]> => {
-        return fetchBlockLogs(nodeId);
-    }, []);
+    // isSaving is now derived from saveStatus for backward compatibility
+    const isSaving = saveStatus === 'saving';
+
+    // lastSavedAt is already destructured from useFlowsStore at line 28
 
     return {
         // State
         currentFlowId,
         flowName,
-        flows,
         isLoading,
         isSaving,
         lastSavedAt,
         isAutoSaveEnabled,
+        saveStatus,
+        saveError,
 
-        // Actions
-        loadFlowsList,
+        // Query data
+        flowSnapshot: loadFlowQuery.data,
+
+        // Actions - Initialize & Load
+        initializeFlow,
         loadFlowById,
-        loadFlowDesign,
+
+        // Actions - Save & Create
         saveCurrentFlow,
-        triggerAutoSave,
         createNewFlow,
-        getBlockLogs,
+        retrySave,
+
+        // Actions - Local State
         setFlowName,
         toggleAutoSave,
+
+        // Actions - Metadata
+        updateFlowName,
+        isUpdatingName: updateFlowMutation.isPending,
     };
 };

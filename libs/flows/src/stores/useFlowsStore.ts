@@ -1,54 +1,62 @@
 import { create } from 'zustand';
 
-import type { BlockDefinition, FlowMeta } from '../api';
+import { flowStorage } from '../utils/flowStorage';
 
+import type { FlowView } from '../types';
+import type { BlockDefinition } from '@lemoncloud/eureka-flows-api';
+
+export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
+
+/**
+ * FlowsStore - manages flow metadata and block registry
+ *
+ * NOTE: Execution state is managed at the NODE level, not flow level.
+ * Each node has its own `status`, `executionStats`, `errorMessage`.
+ * See useCanvasStore for node-level state management.
+ */
 interface FlowsState {
-    // Block Registry
     blockRegistry: Record<string, BlockDefinition>;
     isBlocksLoaded: boolean;
-
-    // Current Flow
     currentFlowId: string | null;
     flowName: string;
-    flows: FlowMeta[];
-
-    // Loading States
-    isLoading: boolean;
-    isSaving: boolean;
+    flows: FlowView[];
     lastSavedAt: Date | null;
-
-    // Auto Save
     isAutoSaveEnabled: boolean;
+    saveStatus: SaveStatus;
+    saveError: Error | null;
 
-    // Actions
     setBlockRegistry: (blocks: BlockDefinition[]) => void;
     setBlocksLoaded: (loaded: boolean) => void;
     setCurrentFlowId: (id: string | null) => void;
     setFlowName: (name: string) => void;
-    setFlows: (flows: FlowMeta[]) => void;
-    setLoading: (loading: boolean) => void;
-    setSaving: (saving: boolean) => void;
+    setFlows: (flows: FlowView[]) => void;
     setLastSavedAt: (date: Date | null) => void;
     setAutoSaveEnabled: (enabled: boolean) => void;
     toggleAutoSave: () => void;
+    setSaveStatus: (status: SaveStatus) => void;
+    setSaveError: (error: Error | null) => void;
 }
 
-export const useFlowsStore = create<FlowsState>((set, get) => ({
-    // Initial State
+export const useFlowsStore = create<FlowsState>((set, _get) => ({
     blockRegistry: {},
     isBlocksLoaded: false,
     currentFlowId: null,
     flowName: 'Untitled Workflow',
     flows: [],
-    isLoading: false,
-    isSaving: false,
     lastSavedAt: null,
-    isAutoSaveEnabled: false,
+    isAutoSaveEnabled: flowStorage.getAutoSaveEnabled(),
+    saveStatus: 'idle',
+    saveError: null,
 
-    // Actions
     setBlockRegistry: blocks => {
         const registry = blocks.reduce<Record<string, BlockDefinition>>((acc, block) => {
+            // Primary key: block.type (e.g., "input-text")
             acc[block.type] = block;
+            // Secondary key: block.id (e.g., "1000006") for backward compatibility
+            // Server load API returns blockId as type, so we need to index by id too
+            if (block.id && block.id !== block.type) {
+                acc[block.id] = block;
+            }
             return acc;
         }, {});
         set({ blockRegistry: registry });
@@ -62,24 +70,31 @@ export const useFlowsStore = create<FlowsState>((set, get) => ({
 
     setFlows: flows => set({ flows }),
 
-    setLoading: loading => set({ isLoading: loading }),
-
-    setSaving: saving => set({ isSaving: saving }),
-
     setLastSavedAt: date => set({ lastSavedAt: date }),
 
-    setAutoSaveEnabled: enabled => set({ isAutoSaveEnabled: enabled }),
+    setAutoSaveEnabled: enabled => {
+        flowStorage.setAutoSaveEnabled(enabled);
+        set({ isAutoSaveEnabled: enabled });
+    },
 
-    toggleAutoSave: () => set(state => ({ isAutoSaveEnabled: !state.isAutoSaveEnabled })),
+    toggleAutoSave: () =>
+        set(state => {
+            const newValue = !state.isAutoSaveEnabled;
+            flowStorage.setAutoSaveEnabled(newValue);
+            return { isAutoSaveEnabled: newValue };
+        }),
+
+    setSaveStatus: status => set({ saveStatus: status }),
+
+    setSaveError: error => set({ saveError: error }),
 }));
 
-// Selector hooks for better performance
 export const useBlockRegistry = () => useFlowsStore(state => state.blockRegistry);
 export const useIsBlocksLoaded = () => useFlowsStore(state => state.isBlocksLoaded);
 export const useCurrentFlowId = () => useFlowsStore(state => state.currentFlowId);
 export const useFlowName = () => useFlowsStore(state => state.flowName);
 export const useFlowsList = () => useFlowsStore(state => state.flows);
-export const useIsFlowLoading = () => useFlowsStore(state => state.isLoading);
-export const useIsSaving = () => useFlowsStore(state => state.isSaving);
 export const useLastSavedAt = () => useFlowsStore(state => state.lastSavedAt);
 export const useIsAutoSaveEnabled = () => useFlowsStore(state => state.isAutoSaveEnabled);
+export const useSaveStatus = () => useFlowsStore(state => state.saveStatus);
+export const useSaveError = () => useFlowsStore(state => state.saveError);

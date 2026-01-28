@@ -103,7 +103,29 @@ module.exports = {
                     empty: 'hsl(var(--port-empty))',
                     input: 'hsl(var(--port-filled-input))',
                     output: 'hsl(var(--port-filled-output))',
+                    text: 'hsl(var(--port-type-text))',
+                    image: 'hsl(var(--port-type-image))',
+                    number: 'hsl(var(--port-type-number))',
+                    any: 'hsl(var(--port-type-any))',
                 },
+                'node-cat': {
+                    input: 'hsl(var(--node-cat-input))',
+                    process: 'hsl(var(--node-cat-process))',
+                    output: 'hsl(var(--node-cat-output))',
+                },
+                /* Glassmorphism */
+                glass: {
+                    bg: 'hsl(var(--glass-bg))',
+                    border: 'hsl(var(--glass-border))',
+                },
+            },
+            boxShadow: {
+                node: 'var(--shadow-node)',
+                'node-selected': 'var(--shadow-node-selected)',
+                floating: 'var(--shadow-floating)',
+            },
+            backdropBlur: {
+                glass: 'var(--glass-blur)',
             },
             borderRadius: {
                 lg: 'var(--radius)',

@@ -19,11 +19,19 @@
         "saving": "저장 중...",
         "saved": "저장됨",
         "unsaved": "저장 안됨",
+        "saveFailed": "저장 실패",
+        "retry": "재시도",
         "loading": "로딩 중...",
         "running": "실행 중",
         "completed": "완료",
         "error": "오류",
         "idle": "대기"
+    },
+    "time": {
+        "justNow": "방금",
+        "secondsAgo": "{{count}}초 전",
+        "minutesAgo": "{{count}}분 전",
+        "hoursAgo": "{{count}}시간 전"
     },
     "theme": {
         "light": "라이트",
