@@ -1133,7 +1133,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         };
                         return [...filtered, newConn];
                     });
-                    if (sourceNode.outputData[connectionDraft.sourcePortId]) {
+                    const packet = sourceNode.outputData[connectionDraft.sourcePortId];
+                    if (packet) {
+                        // Prevent auto-execution: pre-set hash before updating inputData
+                        const targetDef = blockRegistry[targetNode.type];
+                        if (targetDef) {
+                            const newInputData = { ...targetNode.inputData, [targetPortId]: packet };
+                            const hash = targetDef.inputs.map(p => newInputData[p.id]?.timestamp).join('|');
+                            nodeInputHashesRef.current.set(targetNodeId, hash);
+                        }
+
                         setNodes(prev =>
                             prev.map(n =>
                                 n.id === targetNodeId
@@ -1141,7 +1150,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                           ...n,
                                           inputData: {
                                               ...n.inputData,
-                                              [targetPortId]: sourceNode.outputData[connectionDraft.sourcePortId],
+                                              [targetPortId]: packet,
                                           },
                                       }
                                     : n
@@ -1151,6 +1160,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 }
             }
             setConnectionDraft(null);
+            handleSelectionChange(null);
         };
 
         const getPortPosition = (nodeId: string, portId: string, type: 'input' | 'output') => {
