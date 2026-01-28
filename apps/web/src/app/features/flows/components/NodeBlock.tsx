@@ -246,34 +246,40 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
             onWheel={e => e.stopPropagation()}
         >
             <input type="file" accept="image/*" className="hidden" id={fileInputId} onChange={handleImageUpload} />
-            <label
-                htmlFor={fileInputId}
-                className="block rounded-lg border border-dashed border-border overflow-hidden bg-black/20 h-24 cursor-pointer hover:border-primary/60 hover:bg-black/30 transition-all group"
-                title={t('visualization.clickToUpload')}
-            >
-                {img ? (
-                    <S3Image src={img} className="h-full w-full object-cover" alt="Input" />
-                ) : (
+            {img ? (
+                <div className="relative group rounded-lg border border-border overflow-hidden bg-black/20 h-24">
+                    <label
+                        htmlFor={fileInputId}
+                        className="block h-full cursor-pointer"
+                        title={t('visualization.clickToUpload')}
+                    >
+                        <S3Image src={img} className="h-full w-full object-cover" alt="Input" />
+                    </label>
+                    <button
+                        onClick={e => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onConfigChange('imageData', '');
+                        }}
+                        className="absolute top-1.5 right-1.5 p-1 bg-black/60 hover:bg-black/80 text-white rounded-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title={t('visualization.removeImage')}
+                    >
+                        <X className="w-3 h-3" />
+                    </button>
+                </div>
+            ) : (
+                <label
+                    htmlFor={fileInputId}
+                    className="block rounded-lg border border-dashed border-border overflow-hidden bg-black/20 h-24 cursor-pointer hover:border-primary/60 hover:bg-black/30 transition-all group"
+                    title={t('visualization.clickToUpload')}
+                >
                     <div className="h-full flex flex-col items-center justify-center gap-1">
                         <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                             <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
                         </div>
                         <span className="text-[10px] text-muted-foreground/70">{t('visualization.clickToUpload')}</span>
                     </div>
-                )}
-            </label>
-            {img && (
-                <button
-                    onClick={e => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        onConfigChange('imageData', '');
-                    }}
-                    className="mt-2 w-full text-[10px] py-1.5 bg-destructive/10 text-destructive/80 rounded-md hover:bg-destructive/20 transition-colors flex items-center justify-center gap-1"
-                >
-                    <X className="w-3 h-3" />
-                    {t('visualization.removeImage')}
-                </button>
+                </label>
             )}
         </div>
     );
