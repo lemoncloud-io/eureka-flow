@@ -271,7 +271,7 @@ export const FlowEditorPage = () => {
         reader.onload = event => {
             try {
                 const json = JSON.parse(event.target?.result as string);
-                if (canvasRef.current && json.nodes && json.connections) {
+                if (canvasRef.current && json.nodes && (json.edges || json.connections)) {
                     canvasRef.current.loadWorkflow(json);
                     lastSavedStateRef.current = null;
                     showNotification(t('flowEditor.workflowImported'), 'success');
