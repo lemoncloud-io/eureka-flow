@@ -220,7 +220,7 @@ interface EditableVisualizationProps {
 const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
     // Server uses 'image' key for input-image config
-    const img = node.config.image as string | undefined;
+    const img = node.config.imageData as string | undefined;
     const fileInputId = `inline-image-${node.id}`;
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,7 +231,7 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
                 const dataUrl = evt.target?.result as string;
                 if (dataUrl) {
                     const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
-                    onConfigChange('image', compressed);
+                    onConfigChange('imageData', compressed);
                 }
             };
             reader.readAsDataURL(file);
@@ -267,7 +267,7 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
                     onClick={e => {
                         e.stopPropagation();
                         e.preventDefault();
-                        onConfigChange('image', '');
+                        onConfigChange('imageData', '');
                     }}
                     className="mt-2 w-full text-[10px] py-1.5 bg-destructive/10 text-destructive/80 rounded-md hover:bg-destructive/20 transition-colors flex items-center justify-center gap-1"
                 >
@@ -283,7 +283,7 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
     const { t } = useTranslation(['nodes']);
     const [isEditing, setIsEditing] = useState(false);
     // Server uses 'value' key for input-text config
-    const text = (node.config.value as string) || '';
+    const text = (node.config.text as string) || '';
 
     const textDisplay = useMemo(() => {
         if (!text) return null;
@@ -303,7 +303,7 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
                     autoFocus
                     className="w-full p-2.5 bg-background/80 border border-primary/50 rounded-lg text-xs resize-none font-mono focus:outline-none focus:border-primary text-foreground"
                     value={text}
-                    onChange={e => onConfigChange('value', e.target.value)}
+                    onChange={e => onConfigChange('text', e.target.value)}
                     onBlur={() => setIsEditing(false)}
                     onKeyDown={e => {
                         if (e.key === 'Enter' && !e.shiftKey) {

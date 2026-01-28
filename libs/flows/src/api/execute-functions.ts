@@ -21,17 +21,17 @@ type ExecuteFunction = NonNullable<BlockDefinition['execute']>;
  * Config keys must match server's configSchema keys
  */
 export const EXECUTE_FUNCTIONS: Record<string, ExecuteFunction> = {
-    // Server type: input-text, config key: value
+    // Server type: input-text, config key: text
     'input-text': async (_inputs, config, onProgress) => {
         onProgress?.(100);
-        return { out: createPacket(config.value, 'text') };
+        return { out: createPacket(config.text, 'text') };
     },
 
-    // Server type: input-image, config key: image
+    // Server type: input-image, config key: imageData
     'input-image': async (_inputs, config, onProgress) => {
-        if (!config.image) throw new Error('No image data provided');
+        if (!config.imageData) throw new Error('No image data provided');
         onProgress?.(100);
-        return { out: createPacket(config.image, 'image') };
+        return { out: createPacket(config.imageData, 'image') };
     },
 
     // Server type: buffer-delay, config key: delayMs

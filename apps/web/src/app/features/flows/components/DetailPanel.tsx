@@ -17,7 +17,7 @@ import {
     Zap,
 } from 'lucide-react';
 
-import { compressImageIfNeeded, useBlockRegistry } from '@flows/flows';
+import { compressImageIfNeeded, downloadImage, useBlockRegistry, useS3Image } from '@flows/flows';
 
 import { S3Image } from './S3Image';
 
@@ -45,15 +45,11 @@ type ConfigControlType = 'text' | 'number' | 'boolean' | 'select' | 'file' | 'wo
 
 const ImagePreview = ({ src, t }: { src: string; t: (key: string) => string }) => {
     const [dims, setDims] = useState<string | null>(null);
+    const { src: resolvedSrc, isLoading } = useS3Image(src);
 
     const handleDownload = (e: React.MouseEvent) => {
         e.stopPropagation();
-        const link = document.createElement('a');
-        link.href = src;
-        link.download = `image-${Date.now()}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        if (resolvedSrc) downloadImage(resolvedSrc);
     };
 
     return (
@@ -80,7 +76,8 @@ const ImagePreview = ({ src, t }: { src: string; t: (key: string) => string }) =
 
             <button
                 onClick={handleDownload}
-                className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-black/60 hover:bg-primary text-white rounded-md border border-white/10 opacity-0 group-hover:opacity-100 transition-all"
+                disabled={isLoading || !resolvedSrc}
+                className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-black/60 hover:bg-primary text-white rounded-md border border-white/10 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black/60"
                 title={t('flows:detailPanel.downloadImage')}
             >
                 <svg
@@ -98,6 +95,187 @@ const ImagePreview = ({ src, t }: { src: string; t: (key: string) => string }) =
                     <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
             </button>
+        </div>
+    );
+};
+
+const FileImagePreview = ({ src, onRemove, t }: { src: string; onRemove: () => void; t: (key: string) => string }) => {
+    const { src: resolvedSrc, isLoading } = useS3Image(src);
+
+    const handleDownload = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (resolvedSrc) downloadImage(resolvedSrc);
+    };
+
+    return (
+        <div className="w-full h-28 bg-black/30 rounded-lg border border-border flex items-center justify-center overflow-hidden relative group">
+            <S3Image src={src} alt="Preview" className="max-w-full max-h-full object-contain" />
+            <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                    onClick={handleDownload}
+                    disabled={isLoading || !resolvedSrc}
+                    className="bg-black/60 hover:bg-primary text-white rounded-md p-1 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={t('flows:detailPanel.downloadImage')}
+                >
+                    <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    >
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                </button>
+                <button
+                    onClick={onRemove}
+                    className="bg-destructive/80 hover:bg-destructive text-white rounded-md p-1"
+                    title={t('flows:detailPanel.removeImage')}
+                >
+                    <X className="w-3 h-3" />
+                </button>
+            </div>
+        </div>
+    );
+};
+
+interface InputImageConfigProps {
+    node: NodeData;
+    onConfigChange: (key: string, value: unknown) => void;
+    t: (key: string) => string;
+}
+
+const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChange, t }) => {
+    const img = node.config.imageData as string | undefined;
+    const { src: resolvedSrc, isLoading } = useS3Image(img || '');
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = async evt => {
+                const dataUrl = evt.target?.result as string;
+                if (dataUrl) {
+                    const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
+                    onConfigChange('imageData', compressed);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleDownload = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (resolvedSrc) downloadImage(resolvedSrc);
+    };
+
+    const fileInputId = `detail-image-${node.id}`;
+
+    return (
+        <div>
+            <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
+                {t('flows:detailPanel.image')}
+            </label>
+            <input type="file" accept="image/*" className="hidden" id={fileInputId} onChange={handleImageUpload} />
+            {img ? (
+                <div className="w-full h-28 bg-black/30 rounded-lg border border-border flex items-center justify-center overflow-hidden relative group">
+                    <S3Image src={img} alt="Preview" className="max-w-full max-h-full object-contain" />
+                    <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                            onClick={handleDownload}
+                            disabled={isLoading || !resolvedSrc}
+                            className="bg-black/60 hover:bg-primary text-white rounded-md p-1 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={t('flows:detailPanel.downloadImage')}
+                        >
+                            <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                        </button>
+                        <label
+                            htmlFor={fileInputId}
+                            className="bg-black/60 hover:bg-primary text-white rounded-md p-1 border border-white/10 cursor-pointer"
+                            title={t('flows:detailPanel.changeFile')}
+                        >
+                            <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                            </svg>
+                        </label>
+                        <button
+                            onClick={() => onConfigChange('imageData', '')}
+                            className="bg-destructive/80 hover:bg-destructive text-white rounded-md p-1"
+                            title={t('flows:detailPanel.removeImage')}
+                        >
+                            <X className="w-3 h-3" />
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <label
+                    htmlFor={fileInputId}
+                    className="block rounded-lg border border-dashed border-border overflow-hidden bg-black/20 h-24 cursor-pointer hover:border-primary/60 hover:bg-black/30 transition-all group"
+                >
+                    <div className="h-full flex flex-col items-center justify-center gap-1">
+                        <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                            <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground/70">
+                            {t('flows:detailPanel.clickToUpload')}
+                        </span>
+                    </div>
+                </label>
+            )}
+        </div>
+    );
+};
+
+interface InputTextConfigProps {
+    node: NodeData;
+    onConfigChange: (key: string, value: unknown) => void;
+}
+
+const InputTextConfig: React.FC<InputTextConfigProps> = ({ node, onConfigChange }) => {
+    const { t } = useTranslation(['flows']);
+    const text = (node.config.text as string) || '';
+
+    return (
+        <div>
+            <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
+                {t('flows:detailPanel.value')}
+            </label>
+            <textarea
+                className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors resize-y min-h-[80px] font-mono"
+                value={text}
+                onChange={e => onConfigChange('text', e.target.value)}
+                onKeyDown={e => e.stopPropagation()}
+                placeholder={t('flows:detailPanel.enterText')}
+            />
         </div>
     );
 };
@@ -244,18 +422,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             case 'file':
                 return (
                     <div className="flex flex-col gap-2">
-                        {value && (
-                            <div className="w-full h-28 bg-black/30 rounded-lg border border-border flex items-center justify-center overflow-hidden relative group">
-                                <S3Image src={value} alt="Preview" className="max-w-full max-h-full object-contain" />
-                                <button
-                                    onClick={() => handleChange('')}
-                                    className="absolute top-1.5 right-1.5 bg-destructive/80 hover:bg-destructive text-white rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    title={t('flows:detailPanel.removeImage')}
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </div>
-                        )}
+                        {value && <FileImagePreview src={value} onRemove={() => handleChange('')} t={t} />}
                         <label className="cursor-pointer bg-muted/50 hover:bg-muted border border-border/60 text-foreground/80 text-xs py-2 px-3 rounded-md text-center transition-colors">
                             <span>{value ? t('flows:detailPanel.changeFile') : t('flows:detailPanel.uploadFile')}</span>
                             <input
@@ -438,19 +605,41 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         </div>
 
                         <div className="space-y-3">
-                            {configSchema.length === 0 ? (
-                                <div className="text-xs text-muted-foreground/60 italic text-center py-2">
-                                    {t('flows:detailPanel.noSettings')}
-                                </div>
-                            ) : (
-                                configSchema.map(field => (
-                                    <div key={field.key}>
-                                        <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
-                                            {field.label}
-                                        </label>
-                                        {renderConfigInput(selectedNode, field, def)}
-                                    </div>
-                                ))
+                            {/* Special UI for input-image */}
+                            {def.type === 'input-image' && (
+                                <InputImageConfig
+                                    node={selectedNode}
+                                    onConfigChange={(key, value) => onConfigChange(selectedNode.id, key, value)}
+                                    t={t}
+                                />
+                            )}
+
+                            {/* Special UI for input-text */}
+                            {def.type === 'input-text' && (
+                                <InputTextConfig
+                                    node={selectedNode}
+                                    onConfigChange={(key, value) => onConfigChange(selectedNode.id, key, value)}
+                                />
+                            )}
+
+                            {/* Generic config for other node types */}
+                            {def.type !== 'input-image' && def.type !== 'input-text' && (
+                                <>
+                                    {configSchema.length === 0 ? (
+                                        <div className="text-xs text-muted-foreground/60 italic text-center py-2">
+                                            {t('flows:detailPanel.noSettings')}
+                                        </div>
+                                    ) : (
+                                        configSchema.map(field => (
+                                            <div key={field.key}>
+                                                <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
+                                                    {field.label}
+                                                </label>
+                                                {renderConfigInput(selectedNode, field, def)}
+                                            </div>
+                                        ))
+                                    )}
+                                </>
                             )}
                         </div>
                     </CollapsibleSection>

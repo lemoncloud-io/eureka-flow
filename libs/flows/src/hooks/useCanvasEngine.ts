@@ -19,7 +19,6 @@ interface UseCanvasEngineOptions {
  * Main canvas orchestration hook
  *
  * Combines history, layout, and provides node/connection operations.
- * For execution logic, see useExecution hook.
  */
 export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasEngineOptions) => {
     const { t } = useTranslation(['flows', 'nodes']);

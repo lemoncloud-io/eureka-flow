@@ -119,23 +119,6 @@ export const runNode = async (
     }
 };
 
-export const createNodes = async (nodes: NodeBody[]): Promise<NodeView[]> => {
-    _log(`> createNodes(${nodes.length})`);
-    const results = await Promise.all(nodes.map(node => createNode(node)));
-    return results;
-};
-
-export const deleteNodes = async (ids: string[]): Promise<void> => {
-    _log(`> deleteNodes(${ids.length})`);
-    await Promise.all(ids.map(id => deleteNode(id)));
-};
-
-export const updateNodePositions = async (updates: Array<{ id: string; position: Position }>): Promise<NodeView[]> => {
-    _log(`> updateNodePositions(${updates.length})`);
-    const results = await Promise.all(updates.map(({ id, position }) => updateNodePosition(id, position)));
-    return results;
-};
-
 /**
  * Get image from S3 URL
  * GET /nodes/0/image?s3Url=...

@@ -1,6 +1,6 @@
 /**
  * Error type-specific translation keys
- * Used by ErrorFallback and RouterErrorFallback components
+ * Used by ErrorFallback component
  * Components should use these keys with t() function from react-i18next
  */
 export const ERROR_MESSAGE_KEYS = {

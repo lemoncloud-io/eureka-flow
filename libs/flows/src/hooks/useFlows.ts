@@ -24,9 +24,7 @@ import type { LoadFlowResult, SaveFlowBody } from '../types';
  * - GET /flows/:id/load (load flow snapshot)
  *
  * Flow ID is persisted in localStorage for session continuity.
- *
- * NOTE: Execution state is managed at the NODE level via useExecution hook.
- * This hook only manages flow metadata (name, save/load).
+ * This hook manages flow metadata (name, save/load).
  */
 export const useFlows = () => {
     const queryClient = useQueryClient();

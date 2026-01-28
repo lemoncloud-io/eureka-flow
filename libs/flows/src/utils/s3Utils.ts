@@ -76,3 +76,17 @@ export const clearS3ImageCache = (): void => {
 export const getS3ImageCacheSize = (): number => {
     return imageCache.size;
 };
+
+/**
+ * Download an image from a data URL
+ * @param dataUrl - Data URL or resolved image URL
+ * @param filename - Optional filename (defaults to image-{timestamp}.png)
+ */
+export const downloadImage = (dataUrl: string, filename?: string): void => {
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = filename || `image-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
