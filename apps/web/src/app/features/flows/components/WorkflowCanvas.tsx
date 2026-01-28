@@ -69,6 +69,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         nodesRef.current = nodes;
         connectionsRef.current = connections;
 
+        /** Queue for pending node executions to ensure sequential processing */
+        const executionQueueRef = useRef<Set<string>>(new Set());
+        const isProcessingQueueRef = useRef(false);
+
         const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
         const [isPanning, setIsPanning] = useState(false);
         const lastMousePosRef = useRef({ x: 0, y: 0 });
@@ -349,6 +353,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 },
                 getWorkflow: () => ({ nodes, edges: connections }),
                 loadWorkflow: (state: WorkflowState) => {
+                    executionQueueRef.current.clear();
+                    isProcessingQueueRef.current = false;
                     const loadedNodes = state.nodes ?? [];
                     setNodes(loadedNodes);
                     // Support both 'edges' (API format) and 'connections' (legacy)
@@ -362,12 +368,17 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 clearWorkflow: () => {
                     if (readOnly) return;
                     saveCheckpoint();
+                    executionQueueRef.current.clear();
+                    isProcessingQueueRef.current = false;
                     setNodes([]);
                     setConnections([]);
                     handleSelectionChange(null);
                 },
                 newWorkflow: () => {
                     if (readOnly) return;
+                    executionQueueRef.current.clear();
+                    isProcessingQueueRef.current = false;
+                    nodeInputHashesRef.current.clear();
                     setNodes([]);
                     setConnections([]);
                     pastRef.current = [];
@@ -515,12 +526,28 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 await executeNodeRef.current(node.id);
                             }
                         }
+
+                        // Wait for all downstream nodes to complete execution
+                        // setTimeout(0) callbacks queue downstream nodes, so we need to wait
+                        await new Promise<void>(resolve => {
+                            const checkQueue = () => {
+                                if (executionQueueRef.current.size === 0 && !isProcessingQueueRef.current) {
+                                    resolve();
+                                } else {
+                                    setTimeout(checkQueue, 50);
+                                }
+                            };
+                            // Initial delay to allow setTimeout(0) callbacks to fire
+                            setTimeout(checkQueue, 10);
+                        });
                     } finally {
                         batchRunCountRef.current--;
                     }
                 },
                 stopAll: () => {
                     batchRunCountRef.current = 0;
+                    executionQueueRef.current.clear();
+                    isProcessingQueueRef.current = false;
                     setNodes(prev => prev.map(n => (n.status === 'RUNNING' ? { ...n, status: 'IDLE' } : n)));
                 },
             }),
@@ -539,9 +566,23 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             ]
         );
 
-        const propagateOutputs = useCallback((sourceNodeId: string, outputs: Record<string, DataPacket>) => {
+        /**
+         * Propagate outputs from a source node to connected downstream nodes.
+         * Returns the list of downstream node IDs that will receive data.
+         */
+        const propagateOutputs = useCallback((sourceNodeId: string, outputs: Record<string, DataPacket>): string[] => {
             const relevantConnections = connectionsRef.current.filter(c => c.sourceNodeId === sourceNodeId);
-            if (relevantConnections.length === 0) return;
+            if (relevantConnections.length === 0) return [];
+
+            // Pre-calculate which nodes will be updated based on connections and available outputs
+            const updatedNodeIds: string[] = [];
+            relevantConnections.forEach(conn => {
+                if (outputs[conn.sourcePortId]) {
+                    if (!updatedNodeIds.includes(conn.targetNodeId)) {
+                        updatedNodeIds.push(conn.targetNodeId);
+                    }
+                }
+            });
 
             setNodes(prevNodes => {
                 let hasChanges = false;
@@ -568,7 +609,50 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 });
                 return hasChanges ? nextNodes : prevNodes;
             });
+
+            return updatedNodeIds;
         }, []);
+
+        /**
+         * Process the execution queue sequentially.
+         * This ensures downstream nodes are executed in order after their inputs are propagated.
+         */
+        const processExecutionQueue = useCallback(async () => {
+            if (isProcessingQueueRef.current) return;
+            if (executionQueueRef.current.size === 0) return;
+
+            isProcessingQueueRef.current = true;
+
+            try {
+                while (executionQueueRef.current.size > 0) {
+                    const nodeId = executionQueueRef.current.values().next().value;
+                    if (!nodeId) break;
+                    executionQueueRef.current.delete(nodeId);
+
+                    const node = nodesRef.current.find(n => n.id === nodeId);
+                    if (!node || node.status === 'RUNNING') continue;
+
+                    const def = blockRegistry[node.type];
+                    if (!def) continue;
+
+                    // Check if all inputs are still available and hash has changed
+                    const hasAllInputs = def.inputs.every(p => node.inputData[p.id]);
+                    if (!hasAllInputs) continue;
+
+                    const currentInputHash = def.inputs.map(p => node.inputData[p.id]?.timestamp).join('|');
+                    const lastHash = nodeInputHashesRef.current.get(nodeId);
+
+                    if (currentInputHash !== lastHash) {
+                        nodeInputHashesRef.current.set(nodeId, currentInputHash);
+                        if (executeNodeRef.current) {
+                            await executeNodeRef.current(nodeId);
+                        }
+                    }
+                }
+            } finally {
+                isProcessingQueueRef.current = false;
+            }
+        }, [blockRegistry]);
 
         const executeNode = useCallback(
             async (nodeId: string, manualOverrideInputs?: Record<string, DataPacket>) => {
@@ -702,7 +786,32 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         )
                     );
 
-                    propagateOutputs(nodeId, results);
+                    const downstreamNodeIds = propagateOutputs(nodeId, results);
+
+                    // Queue downstream nodes for execution if they have all required inputs
+                    if (downstreamNodeIds.length > 0) {
+                        // Use setTimeout to ensure state is updated before checking inputs
+                        setTimeout(() => {
+                            downstreamNodeIds.forEach(downstreamId => {
+                                const downstreamNode = nodesRef.current.find(n => n.id === downstreamId);
+                                if (!downstreamNode) return;
+
+                                const downstreamDef = blockRegistry[downstreamNode.type];
+                                if (!downstreamDef) return;
+
+                                // Skip if auto-execution is disabled
+                                if (downstreamNode.autoExecutionEnabled === false) return;
+
+                                // Check if all inputs are available
+                                const hasAllInputs = downstreamDef.inputs.every(p => downstreamNode.inputData[p.id]);
+
+                                if (hasAllInputs && downstreamNode.status !== 'RUNNING') {
+                                    executionQueueRef.current.add(downstreamId);
+                                    processExecutionQueue();
+                                }
+                            });
+                        }, 0);
+                    }
                 } catch (e: unknown) {
                     const duration = Date.now() - startTime;
                     const errorMessage = e instanceof Error ? e.message : t('flows:detailPanel.unknownError');
@@ -721,11 +830,14 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [propagateOutputs, readOnly, blockRegistry, t, onBeforeBackendRun]
+            [propagateOutputs, processExecutionQueue, readOnly, blockRegistry, t, onBeforeBackendRun]
         );
 
         executeNodeRef.current = executeNode;
 
+        // Auto-execution effect for nodes that receive inputs from external sources
+        // (e.g., initial load, config changes). Downstream cascade execution is handled
+        // by processExecutionQueue triggered from executeNode.
         useEffect(() => {
             if (readOnly) return;
             nodes.forEach(node => {
