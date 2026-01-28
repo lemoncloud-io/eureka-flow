@@ -92,7 +92,11 @@
         "viewExecutionLogs": "View Execution Logs",
         "subFlowId": "Sub-Flow ID",
         "unknown": "Unknown",
-        "labelPlaceholder": "Label..."
+        "labelPlaceholder": "Label...",
+        "image": "Image",
+        "value": "Value",
+        "clickToUpload": "Click to upload",
+        "enterText": "Enter text..."
     },
     "flowEditor": {
         "initializingEngine": "Initializing FlowMosaic Engine...",
