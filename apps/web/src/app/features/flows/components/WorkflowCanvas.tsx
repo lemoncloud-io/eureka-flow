@@ -479,7 +479,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             return avgA - avgB;
                         });
 
-                        // Position each node with dynamic height-based spacing
                         let currentY = LAYOUT_CONFIG.START_Y;
                         group.forEach(node => {
                             const x = LAYOUT_CONFIG.START_X + level * LAYOUT_CONFIG.LEVEL_WIDTH;
@@ -492,7 +491,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     position: { x, y },
                                 };
                             }
-                            // Advance Y by estimated node height + gap
                             const nodeHeight = estimateNodeHeight(node, blockRegistry[node.type]);
                             currentY += nodeHeight + LAYOUT_CONFIG.MIN_GAP;
                         });
@@ -502,7 +500,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     setViewport({ x: 20, y: 20, zoom: 1 });
                 },
                 runAll: async () => {
-                    // Find root nodes: no incoming connections OR no input ports defined
                     const inputNodes = nodes
                         .filter(n => {
                             const hasIncoming = connections.some(c => c.targetNodeId === n.id);
@@ -511,24 +508,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         })
                         .filter(n => !(n as NodeData & { disabled?: boolean }).disabled);
 
-                    // Enable batch mode to skip individual saves
                     batchRunCountRef.current++;
 
                     try {
-                        // Save flow once before executing all nodes
                         if (onBeforeBackendRun) {
                             await onBeforeBackendRun();
                         }
 
-                        // Execute all input nodes
                         for (const node of inputNodes) {
                             if (executeNodeRef.current) {
                                 await executeNodeRef.current(node.id);
                             }
                         }
 
-                        // Wait for all downstream nodes to complete execution
-                        // setTimeout(0) callbacks queue downstream nodes, so we need to wait
                         await new Promise<void>(resolve => {
                             const checkQueue = () => {
                                 if (executionQueueRef.current.size === 0 && !isProcessingQueueRef.current) {
@@ -537,7 +529,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     setTimeout(checkQueue, 50);
                                 }
                             };
-                            // Initial delay to allow setTimeout(0) callbacks to fire
                             setTimeout(checkQueue, 10);
                         });
                     } finally {
@@ -566,15 +557,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             ]
         );
 
-        /**
-         * Propagate outputs from a source node to connected downstream nodes.
-         * Returns the list of downstream node IDs that will receive data.
-         */
         const propagateOutputs = useCallback((sourceNodeId: string, outputs: Record<string, DataPacket>): string[] => {
             const relevantConnections = connectionsRef.current.filter(c => c.sourceNodeId === sourceNodeId);
             if (relevantConnections.length === 0) return [];
 
-            // Pre-calculate which nodes will be updated based on connections and available outputs
             const updatedNodeIds: string[] = [];
             relevantConnections.forEach(conn => {
                 if (outputs[conn.sourcePortId]) {
@@ -613,10 +599,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             return updatedNodeIds;
         }, []);
 
-        /**
-         * Process the execution queue sequentially.
-         * This ensures downstream nodes are executed in order after their inputs are propagated.
-         */
         const processExecutionQueue = useCallback(async () => {
             if (isProcessingQueueRef.current) return;
             if (executionQueueRef.current.size === 0) return;
@@ -708,20 +690,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 try {
                     let results: Record<string, DataPacket>;
 
-                    // Check if block requires backend processing
-                    // Use nodeDef.type since loaded nodes may have blockId as currentNode.type
                     if (requiresBackendProcessing(nodeDef.type)) {
-                        // Backend execution: POST /nodes/:id/run
-
-                        // Save flow first to ensure node exists on server
-                        // Skip if in batch run mode (already saved by runAll)
                         if (batchRunCountRef.current === 0 && onBeforeBackendRun) {
                             await onBeforeBackendRun();
                         }
 
                         const nodeResult = await runNode(nodeId, { config$: currentNode.config });
 
-                        // Check if backend returned an error status
                         if (nodeResult.status === 'ERROR') {
                             const duration = Date.now() - startTime;
                             setNodes(prev =>
@@ -740,7 +715,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             return;
                         }
 
-                        // Extract outputData from API response
                         if (nodeResult.outputData$$) {
                             type OutputDataItem = {
                                 portId: string;
@@ -761,10 +735,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             results = {};
                         }
                     } else if (nodeDef.execute) {
-                        // Frontend execution: call block.execute() directly
                         results = await nodeDef.execute(inputs, currentNode.config, onProgress);
                     } else {
-                        // No execute function available - pass through without error
                         results = {};
                     }
 
@@ -788,9 +760,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                     const downstreamNodeIds = propagateOutputs(nodeId, results);
 
-                    // Queue downstream nodes for execution if they have all required inputs
                     if (downstreamNodeIds.length > 0) {
-                        // Use setTimeout to ensure state is updated before checking inputs
                         setTimeout(() => {
                             downstreamNodeIds.forEach(downstreamId => {
                                 const downstreamNode = nodesRef.current.find(n => n.id === downstreamId);
@@ -799,10 +769,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 const downstreamDef = blockRegistry[downstreamNode.type];
                                 if (!downstreamDef) return;
 
-                                // Skip if auto-execution is disabled
                                 if (downstreamNode.autoExecutionEnabled === false) return;
 
-                                // Check if all inputs are available
                                 const hasAllInputs = downstreamDef.inputs.every(p => downstreamNode.inputData[p.id]);
 
                                 if (hasAllInputs && downstreamNode.status !== 'RUNNING') {
@@ -835,9 +803,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         executeNodeRef.current = executeNode;
 
-        // Auto-execution effect for nodes that receive inputs from external sources
-        // (e.g., initial load, config changes). Downstream cascade execution is handled
-        // by processExecutionQueue triggered from executeNode.
         useEffect(() => {
             if (readOnly) return;
             nodes.forEach(node => {
@@ -1198,10 +1163,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     ? def.inputs.findIndex(p => p.id === portId)
                     : def.outputs.findIndex(p => p.id === portId);
             const safeIndex = portIndex !== -1 ? portIndex : 0;
-            // Node width: 260px, port size: 12px (w-3), port radius: 6px
-            // Header ~44px, body padding-top 12px, port row h-7 (28px) center at 14px
             const yOffset = 69 + safeIndex * 28;
-            // Connect at port edge: slightly inside circle for clean visual connection
             const xOffset = type === 'input' ? 8 : 252;
             return { x: node.position.x + xOffset, y: node.position.y + yOffset };
         };
@@ -1325,7 +1287,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
                         }}
                     >
-                        {/* SVG connections rendered first (below nodes) */}
                         <svg className="absolute overflow-visible top-0 left-0 w-full h-full">
                             {connections.map(conn => {
                                 const start = getPortPosition(conn.sourceNodeId, conn.sourcePortId, 'output');
@@ -1399,7 +1360,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             )}
                         </svg>
 
-                        {/* Nodes rendered after SVG (above connections) */}
                         <div className={`pointer-events-auto ${readOnly ? 'pointer-events-none' : ''}`}>
                             {nodes.map(node => {
                                 const isConnected =
