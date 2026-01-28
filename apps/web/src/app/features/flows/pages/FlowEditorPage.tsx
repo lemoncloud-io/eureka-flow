@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useBlocks, useFlows } from '@flows/flows';
+import { useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { parseExecutionStats, useInitFlowSocket } from '@flows/socket';
 
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
+import type { FlowNodeMessage } from '@flows/socket';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -31,6 +33,7 @@ export const FlowEditorPage = () => {
         isAutoSaveEnabled,
         saveStatus,
         saveError,
+        channelId,
         initializeFlow,
         loadFlowById,
         saveCurrentFlow,
@@ -39,6 +42,35 @@ export const FlowEditorPage = () => {
         toggleAutoSave,
         updateFlowName,
     } = useFlows();
+
+    const updateNodeData = useCanvasStore(state => state.updateNodeData);
+
+    // Handle node status updates from WebSocket
+    const handleNodeUpdate = useCallback(
+        (message: FlowNodeMessage) => {
+            console.log('[FlowEditorPage] Node update received:', message);
+            const { nodeId, status, errorMessage, executionStats } = message;
+
+            updateNodeData(nodeId, {
+                status,
+                errorMessage: errorMessage || undefined,
+                executionStats: parseExecutionStats(executionStats),
+            });
+        },
+        [updateNodeData]
+    );
+
+    // Initialize WebSocket connection when channelId is available
+    const {
+        isConnected: isSocketConnected,
+        connectionStatus: socketStatus,
+        reconnect: socketReconnect,
+        reconnectAttempts,
+        maxReconnectReached,
+    } = useInitFlowSocket({
+        channelId,
+        onNodeUpdate: handleNodeUpdate,
+    });
 
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('');
@@ -435,6 +467,17 @@ export const FlowEditorPage = () => {
                     saveError,
                     onRetrySave: retrySave,
                 }}
+                socketState={
+                    channelId
+                        ? {
+                              isConnected: isSocketConnected,
+                              connectionStatus: socketStatus,
+                              reconnectAttempts,
+                              maxReconnectReached,
+                              onReconnect: socketReconnect,
+                          }
+                        : undefined
+                }
                 onShare={handleShare}
             />
 

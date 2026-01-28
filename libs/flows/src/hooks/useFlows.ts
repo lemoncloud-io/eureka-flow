@@ -37,12 +37,14 @@ export const useFlows = () => {
         lastSavedAt,
         saveStatus,
         saveError,
+        channelId,
         setCurrentFlowId,
         setFlowName,
         setLastSavedAt,
         toggleAutoSave,
         setSaveStatus,
         setSaveError,
+        setChannelId,
     } = useFlowsStore();
 
     // Cleanup timeout on unmount to prevent memory leaks
@@ -88,6 +90,9 @@ export const useFlows = () => {
                 if (flowData.name) {
                     setFlowName(flowData.name);
                 }
+                if (flowData.channelId) {
+                    setChannelId(flowData.channelId);
+                }
                 return { flowId: savedFlowId, flowData, isNew: false };
             } catch (err) {
                 console.warn('[useFlows] Failed to load saved flow, creating new:', err);
@@ -116,7 +121,7 @@ export const useFlows = () => {
         setCurrentFlowId(fallbackId);
         setFlowName('Untitled Workflow');
         return { flowId: fallbackId, flowData: null, isNew: true };
-    }, [queryClient, setCurrentFlowId, setFlowName]);
+    }, [queryClient, setCurrentFlowId, setFlowName, setChannelId]);
 
     /**
      * Load a specific flow by ID
@@ -142,13 +147,16 @@ export const useFlows = () => {
                 if (flowData.name) {
                     setFlowName(flowData.name);
                 }
+                if (flowData.channelId) {
+                    setChannelId(flowData.channelId);
+                }
                 return flowData;
             } catch (err) {
                 console.error('[useFlows] Failed to load flow:', err);
                 return null;
             }
         },
-        [queryClient, setCurrentFlowId, setFlowName]
+        [queryClient, setCurrentFlowId, setFlowName, setChannelId]
     );
 
     /**
@@ -256,6 +264,7 @@ export const useFlows = () => {
                 flowStorage.setFlowId(newFlowId);
                 setFlowName('Untitled Workflow');
                 setLastSavedAt(null);
+                setChannelId(null);
                 return newFlowId;
             }
             return null;
@@ -263,7 +272,7 @@ export const useFlows = () => {
             console.error('[useFlows] Failed to create new flow:', error);
             return null;
         }
-    }, [createFlowMutation, setCurrentFlowId, setFlowName, setLastSavedAt]);
+    }, [createFlowMutation, setCurrentFlowId, setFlowName, setLastSavedAt, setChannelId]);
 
     /**
      * Update flow name (metadata only)
@@ -314,6 +323,8 @@ export const useFlows = () => {
         isAutoSaveEnabled,
         saveStatus,
         saveError,
+        /** WebSocket channel ID for real-time node status updates */
+        channelId,
 
         // Query data
         flowSnapshot: loadFlowQuery.data,

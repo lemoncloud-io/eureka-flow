@@ -18,7 +18,11 @@
         "stopAll": "중지",
         "saving": "저장 중...",
         "saved": "저장됨",
-        "saveFailed": "저장 실패"
+        "saveFailed": "저장 실패",
+        "socketConnecting": "연결 중",
+        "socketReconnecting": "재연결 중",
+        "socketError": "연결 실패",
+        "socketReconnect": "재시도"
     },
     "sidebar": {
         "library": "라이브러리",

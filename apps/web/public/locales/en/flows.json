@@ -18,7 +18,11 @@
         "stopAll": "Stop",
         "saving": "Saving...",
         "saved": "Saved",
-        "saveFailed": "Save failed"
+        "saveFailed": "Save failed",
+        "socketConnecting": "Connecting",
+        "socketReconnecting": "Reconnecting",
+        "socketError": "Connection Failed",
+        "socketReconnect": "Retry"
     },
     "sidebar": {
         "library": "Library",

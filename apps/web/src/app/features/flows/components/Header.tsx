@@ -65,6 +65,14 @@ export interface ExecutionActionsProps {
     isRunning: boolean;
 }
 
+export interface SocketStateProps {
+    isConnected: boolean;
+    connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
+    reconnectAttempts: number;
+    maxReconnectReached: boolean;
+    onReconnect: () => void;
+}
+
 export interface SaveStateProps {
     lastSavedAt: Date | null;
     isAutoSaveEnabled: boolean;
@@ -80,6 +88,7 @@ interface HeaderProps {
     editActions: EditActionsProps;
     executionActions: ExecutionActionsProps;
     saveState: SaveStateProps;
+    socketState?: SocketStateProps;
     onShare: () => void;
 }
 
@@ -242,6 +251,82 @@ const SaveStatusIndicator: React.FC<
     return <span className={cn(baseClass, 'text-muted-foreground')}>{t('status.unsaved')}</span>;
 };
 
+const SocketIndicator: React.FC<SocketStateProps> = ({
+    isConnected,
+    connectionStatus,
+    reconnectAttempts,
+    maxReconnectReached,
+    onReconnect,
+}) => {
+    const { t } = useTranslation(['flows']);
+
+    const getStatusConfig = () => {
+        if (isConnected) {
+            return {
+                dotClass: 'bg-green-500',
+                textClass: 'text-green-600',
+                label: 'Live',
+                showReconnect: false,
+                animate: true,
+            };
+        }
+        if (connectionStatus === 'connecting') {
+            return {
+                dotClass: 'bg-blue-500',
+                textClass: 'text-blue-600',
+                label: t('header.socketConnecting'),
+                showReconnect: false,
+                animate: true,
+            };
+        }
+        if (connectionStatus === 'reconnecting') {
+            return {
+                dotClass: 'bg-yellow-500',
+                textClass: 'text-yellow-600',
+                label: `${t('header.socketReconnecting')} (${reconnectAttempts})`,
+                showReconnect: false,
+                animate: true,
+            };
+        }
+        if (connectionStatus === 'error' || maxReconnectReached) {
+            return {
+                dotClass: 'bg-red-500',
+                textClass: 'text-red-600',
+                label: t('header.socketError'),
+                showReconnect: true,
+                animate: false,
+            };
+        }
+        return {
+            dotClass: 'bg-muted-foreground',
+            textClass: 'text-muted-foreground',
+            label: 'Offline',
+            showReconnect: true,
+            animate: false,
+        };
+    };
+
+    const config = getStatusConfig();
+
+    return (
+        <div className="flex items-center gap-1.5">
+            <div
+                className={cn('h-2 w-2 rounded-full', config.dotClass, config.animate && 'animate-pulse')}
+                title={connectionStatus}
+            />
+            <span className={cn('text-xs font-medium', config.textClass)}>{config.label}</span>
+            {config.showReconnect && (
+                <button
+                    onClick={onReconnect}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium"
+                >
+                    {t('header.socketReconnect')}
+                </button>
+            )}
+        </div>
+    );
+};
+
 const SaveButton: React.FC<{
     onClick: () => void;
     saveStatus?: SaveStatus;
@@ -309,6 +394,7 @@ export const Header: React.FC<HeaderProps> = ({
     editActions,
     executionActions,
     saveState,
+    socketState,
     onShare,
 }) => {
     const { t } = useTranslation(['flows']);
@@ -361,6 +447,13 @@ export const Header: React.FC<HeaderProps> = ({
                             shortcut="⌘L"
                         />
                     </GlassPill>
+
+                    {/* Socket Status */}
+                    {socketState && (
+                        <GlassPill className="px-3">
+                            <SocketIndicator {...socketState} />
+                        </GlassPill>
+                    )}
 
                     {/* Run Button */}
                     {executionActions.isRunning ? (
