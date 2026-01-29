@@ -20,7 +20,7 @@ export const clearStoredApiKey = (): void => {
  */
 export const validateApiKey = async (key: string): Promise<boolean> => {
     try {
-        const response = await fetch(`${API_URL}/0/session`, {
+        const response = await fetch(`${API_URL}/_apis/0/session`, {
             method: 'GET',
             headers: {
                 'x-api-key': key,
