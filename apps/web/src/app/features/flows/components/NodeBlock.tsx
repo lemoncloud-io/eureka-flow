@@ -118,29 +118,35 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
 
     const portClasses = cn(
         'w-3 h-3 rounded-full border-2 cursor-crosshair transition-all duration-200',
-        type === 'input' ? '-ml-1.5 mr-1.5' : 'ml-1.5 -mr-1.5',
         isHighlighted && 'scale-150 border-primary bg-primary ring-4 ring-primary/30 z-20',
         !isHighlighted && 'hover:scale-125 hover:ring-2 hover:ring-white/20',
         !isHighlighted && getPortTypeColor(port.type, hasData, type)
     );
 
-    return (
+    const portCircle = (
         <div
-            className={cn('flex items-center h-7 relative group', type === 'output' ? 'justify-end' : 'justify-start')}
+            className={cn('relative', type === 'input' ? '-ml-1.5 mr-1.5' : 'ml-1.5 -mr-1.5')}
+            onMouseDown={e => {
+                e.stopPropagation();
+                onMouseDown(nodeId, port.id, type, port.type, e);
+            }}
             onMouseUp={e => {
                 e.stopPropagation();
                 onMouseUp(nodeId, port.id, type, port.type);
             }}
         >
-            {type === 'input' && (
-                <div
-                    className={portClasses}
-                    onMouseDown={e => {
-                        e.stopPropagation();
-                        onMouseDown(nodeId, port.id, type, port.type, e);
-                    }}
-                />
-            )}
+            {/* Extended hit area - transparent 24x24px */}
+            <div className="absolute -inset-1.5 cursor-crosshair" />
+            {/* Visual port circle */}
+            <div className={portClasses} />
+        </div>
+    );
+
+    return (
+        <div
+            className={cn('flex items-center h-7 relative group', type === 'output' ? 'justify-end' : 'justify-start')}
+        >
+            {type === 'input' && portCircle}
             <span
                 className={cn(
                     'text-[10px] uppercase tracking-wider font-medium select-none transition-colors',
@@ -149,22 +155,9 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
             >
                 {port.label}
             </span>
-            {type === 'output' && (
-                <div
-                    className={portClasses}
-                    onMouseDown={e => {
-                        e.stopPropagation();
-                        onMouseDown(nodeId, port.id, type, port.type, e);
-                    }}
-                />
-            )}
+            {type === 'output' && portCircle}
 
-            <div
-                className={cn(
-                    'absolute left-1/2 -translate-x-1/2 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-150',
-                    type === 'input' ? '-top-8' : '-top-8'
-                )}
-            >
+            <div className="absolute left-1/2 -translate-x-1/2 -top-8 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-150">
                 <span className="font-semibold">{port.type}</span>
             </div>
         </div>
@@ -398,6 +391,7 @@ interface NodeBlockProps {
     configHandlers: NodeConfigHandlers;
     actions: NodeActions;
     onMouseDown: (e: React.MouseEvent) => void;
+    isDragging?: boolean;
 }
 
 export const NodeBlock: React.FC<NodeBlockProps> = ({
@@ -407,6 +401,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     configHandlers,
     actions,
     onMouseDown,
+    isDragging = false,
 }) => {
     const { t } = useTranslation(['nodes', 'flows']);
     const blockRegistry = useBlockRegistry();
@@ -487,7 +482,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     return (
         <div
             className={cn(
-                'absolute w-[260px] bg-node-bg rounded-xl border-[1.5px] transition-all duration-200 overflow-hidden',
+                'absolute w-[260px] bg-node-bg rounded-xl border-[1.5px] overflow-hidden',
+                !isDragging && 'transition-all duration-200',
                 isDisabled && 'opacity-50',
                 isSelected ? 'shadow-node-selected' : 'shadow-node',
                 isHighlighted ? 'border-accent/60' : getStatusBorderColor(node.status as NodeStatus, isSelected)

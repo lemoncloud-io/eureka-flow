@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useBlocks, useFlows } from '@flows/flows';
+import { parseExecutionStats, useInitFlowSocket } from '@flows/socket';
 
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
+import type { FlowNodeMessage } from '@flows/socket';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -31,6 +33,7 @@ export const FlowEditorPage = () => {
         isAutoSaveEnabled,
         saveStatus,
         saveError,
+        channelId,
         initializeFlow,
         loadFlowById,
         saveCurrentFlow,
@@ -39,6 +42,29 @@ export const FlowEditorPage = () => {
         toggleAutoSave,
         updateFlowName,
     } = useFlows();
+
+    // Handle node status updates from WebSocket
+    const handleNodeUpdate = useCallback((message: FlowNodeMessage) => {
+        const { nodeId, status, errorMessage, executionStats } = message;
+
+        canvasRef.current?.updateNode(nodeId, {
+            status,
+            errorMessage: errorMessage || undefined,
+            executionStats: parseExecutionStats(executionStats),
+        });
+    }, []);
+
+    // Initialize WebSocket connection when channelId is available
+    const {
+        isConnected: isSocketConnected,
+        connectionStatus: socketStatus,
+        reconnect: socketReconnect,
+        reconnectAttempts,
+        maxReconnectReached,
+    } = useInitFlowSocket({
+        channelId,
+        onNodeUpdate: handleNodeUpdate,
+    });
 
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('');
@@ -271,7 +297,7 @@ export const FlowEditorPage = () => {
         reader.onload = event => {
             try {
                 const json = JSON.parse(event.target?.result as string);
-                if (canvasRef.current && json.nodes && json.connections) {
+                if (canvasRef.current && json.nodes && (json.edges || json.connections)) {
                     canvasRef.current.loadWorkflow(json);
                     lastSavedStateRef.current = null;
                     showNotification(t('flowEditor.workflowImported'), 'success');
@@ -435,6 +461,17 @@ export const FlowEditorPage = () => {
                     saveError,
                     onRetrySave: retrySave,
                 }}
+                socketState={
+                    channelId
+                        ? {
+                              isConnected: isSocketConnected,
+                              connectionStatus: socketStatus,
+                              reconnectAttempts,
+                              maxReconnectReached,
+                              onReconnect: socketReconnect,
+                          }
+                        : undefined
+                }
                 onShare={handleShare}
             />
 

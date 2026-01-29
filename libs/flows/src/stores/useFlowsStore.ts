@@ -24,6 +24,8 @@ interface FlowsState {
     isAutoSaveEnabled: boolean;
     saveStatus: SaveStatus;
     saveError: Error | null;
+    /** WebSocket channel ID for real-time node status updates */
+    channelId: string | null;
 
     setBlockRegistry: (blocks: BlockDefinition[]) => void;
     setBlocksLoaded: (loaded: boolean) => void;
@@ -35,6 +37,7 @@ interface FlowsState {
     toggleAutoSave: () => void;
     setSaveStatus: (status: SaveStatus) => void;
     setSaveError: (error: Error | null) => void;
+    setChannelId: (channelId: string | null) => void;
 }
 
 export const useFlowsStore = create<FlowsState>((set, _get) => ({
@@ -47,6 +50,7 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     isAutoSaveEnabled: flowStorage.getAutoSaveEnabled(),
     saveStatus: 'idle',
     saveError: null,
+    channelId: null,
 
     setBlockRegistry: blocks => {
         const registry = blocks.reduce<Record<string, BlockDefinition>>((acc, block) => {
@@ -87,6 +91,8 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     setSaveStatus: status => set({ saveStatus: status }),
 
     setSaveError: error => set({ saveError: error }),
+
+    setChannelId: channelId => set({ channelId }),
 }));
 
 export const useBlockRegistry = () => useFlowsStore(state => state.blockRegistry);
@@ -98,3 +104,4 @@ export const useLastSavedAt = () => useFlowsStore(state => state.lastSavedAt);
 export const useIsAutoSaveEnabled = () => useFlowsStore(state => state.isAutoSaveEnabled);
 export const useSaveStatus = () => useFlowsStore(state => state.saveStatus);
 export const useSaveError = () => useFlowsStore(state => state.saveError);
+export const useChannelId = () => useFlowsStore(state => state.channelId);

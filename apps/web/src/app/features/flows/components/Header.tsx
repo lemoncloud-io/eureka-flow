@@ -36,7 +36,6 @@ import {
 } from '@flows/ui-kit';
 
 import type { SaveStatus } from '@flows/flows';
-import type { TFunction } from 'i18next';
 
 export interface FlowInfoProps {
     flowName: string;
@@ -65,6 +64,14 @@ export interface ExecutionActionsProps {
     isRunning: boolean;
 }
 
+export interface SocketStateProps {
+    isConnected: boolean;
+    connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
+    reconnectAttempts: number;
+    maxReconnectReached: boolean;
+    onReconnect: () => void;
+}
+
 export interface SaveStateProps {
     lastSavedAt: Date | null;
     isAutoSaveEnabled: boolean;
@@ -80,53 +87,9 @@ interface HeaderProps {
     editActions: EditActionsProps;
     executionActions: ExecutionActionsProps;
     saveState: SaveStateProps;
+    socketState?: SocketStateProps;
     onShare: () => void;
 }
-
-const GlassPill = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div
-        className={cn(
-            'flex items-center gap-1 px-2 py-1.5 rounded-full',
-            'bg-glass-bg backdrop-blur-[24px] border border-glass-border',
-            'shadow-floating transition-all duration-200',
-            className
-        )}
-    >
-        {children}
-    </div>
-);
-
-const IconButton = ({
-    onClick,
-    icon,
-    tooltip,
-    shortcut,
-}: {
-    onClick: () => void;
-    icon: React.ReactNode;
-    tooltip: string;
-    shortcut?: string;
-}) => (
-    <TooltipProvider delayDuration={300}>
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <button
-                    onClick={onClick}
-                    className={cn(
-                        'flex items-center justify-center w-8 h-8 rounded-full transition-all duration-150',
-                        'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-                    )}
-                >
-                    {icon}
-                </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">
-                {tooltip}
-                {shortcut && <span className="ml-2 text-muted-foreground font-mono">{shortcut}</span>}
-            </TooltipContent>
-        </Tooltip>
-    </TooltipProvider>
-);
 
 const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
     const { t } = useTranslation(['flows']);
@@ -158,17 +121,55 @@ const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             className={cn(
-                'bg-transparent border border-transparent rounded-md px-2 py-1',
-                'text-sm font-semibold text-foreground outline-none w-44',
-                'hover:border-glass-border focus:border-primary',
-                'transition-all duration-150'
+                'bg-transparent border-none rounded px-1 py-0.5',
+                'text-sm font-medium text-foreground outline-none',
+                'hover:bg-accent/30 focus:bg-accent/50',
+                'transition-colors duration-150 min-w-[120px] max-w-[200px]'
             )}
             placeholder={t('header.untitledWorkflow')}
         />
     );
 };
 
-const getRelativeTime = (date: Date, t: TFunction<'common'>): string => {
+const ToolbarButton: React.FC<{
+    onClick: () => void;
+    icon: React.ReactNode;
+    tooltip: string;
+    shortcut?: string;
+    variant?: 'default' | 'success' | 'warning' | 'error';
+}> = ({ onClick, icon, tooltip, shortcut, variant = 'default' }) => {
+    const variantStyles = {
+        default: 'text-muted-foreground hover:text-foreground',
+        success: 'text-emerald-500',
+        warning: 'text-amber-500',
+        error: 'text-red-500',
+    };
+
+    return (
+        <TooltipProvider delayDuration={300}>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <button
+                        onClick={onClick}
+                        className={cn(
+                            'flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-150',
+                            'hover:bg-accent/60',
+                            variantStyles[variant]
+                        )}
+                    >
+                        {icon}
+                    </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                    {tooltip}
+                    {shortcut && <span className="ml-2 text-muted-foreground font-mono">{shortcut}</span>}
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
+};
+
+const getRelativeTime = (date: Date, t: (key: string, options?: { count: number }) => string): string => {
     const now = Date.now();
     const diff = now - date.getTime();
     const seconds = Math.floor(diff / 1000);
@@ -182,9 +183,10 @@ const getRelativeTime = (date: Date, t: TFunction<'common'>): string => {
     return date.toLocaleDateString();
 };
 
-const SaveStatusIndicator: React.FC<
-    Pick<SaveStateProps, 'lastSavedAt' | 'saveStatus' | 'saveError' | 'onRetrySave'>
-> = ({ lastSavedAt, saveStatus = 'idle', saveError, onRetrySave }) => {
+const SaveStatusBadge: React.FC<{
+    saveStatus?: SaveStatus;
+    lastSavedAt: Date | null;
+}> = ({ saveStatus, lastSavedAt }) => {
     const { t } = useTranslation(['common']);
     const [, forceUpdate] = useState(0);
 
@@ -195,108 +197,91 @@ const SaveStatusIndicator: React.FC<
         return () => clearInterval(interval);
     }, [lastSavedAt, saveStatus]);
 
-    const baseClass = 'text-[10px] flex items-center justify-end gap-1.5 pr-2';
-
     if (saveStatus === 'saving') {
-        return (
-            <span className={cn(baseClass, 'text-muted-foreground')}>
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                {t('status.saving')}
-            </span>
-        );
+        return <span className="text-[11px] text-blue-500 font-medium animate-pulse">{t('status.saving')}</span>;
     }
 
     if (saveStatus === 'error') {
-        const errorMessage = saveError?.message || t('status.saveFailed');
-        return (
-            <button
-                onClick={onRetrySave}
-                className={cn(baseClass, 'text-destructive hover:text-destructive/80 transition-colors')}
-                title={errorMessage}
-            >
-                <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-                {t('status.retry')}
-            </button>
-        );
+        return <span className="text-[11px] text-red-500 font-medium">{t('status.saveFailed')}</span>;
     }
 
     if (saveStatus === 'success') {
-        return (
-            <span className={cn(baseClass, 'text-success animate-in fade-in duration-200')}>
-                <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                {t('status.saved')}
-            </span>
-        );
+        return <span className="text-[11px] text-emerald-500 font-medium">{t('status.saved')}</span>;
     }
 
     if (lastSavedAt) {
-        const relativeTime = getRelativeTime(lastSavedAt, t);
         return (
-            <span className={cn(baseClass, 'text-muted-foreground')} title={lastSavedAt.toLocaleString()}>
-                <span className="w-1.5 h-1.5 rounded-full bg-success/60" />
-                {relativeTime}
+            <span className="text-[11px] text-muted-foreground" title={lastSavedAt.toLocaleString()}>
+                {getRelativeTime(lastSavedAt, t)}
             </span>
         );
     }
 
-    return <span className={cn(baseClass, 'text-muted-foreground')}>{t('status.unsaved')}</span>;
+    return <span className="text-[11px] text-muted-foreground">{t('status.unsaved')}</span>;
 };
 
-const SaveButton: React.FC<{
-    onClick: () => void;
-    saveStatus?: SaveStatus;
-}> = ({ onClick, saveStatus = 'idle' }) => {
+const SocketDot: React.FC<SocketStateProps> = ({
+    isConnected,
+    connectionStatus,
+    reconnectAttempts,
+    maxReconnectReached,
+    onReconnect,
+}) => {
     const { t } = useTranslation(['flows']);
 
-    const getButtonState = () => {
-        switch (saveStatus) {
-            case 'saving':
-                return {
-                    icon: <Save className="w-4 h-4 animate-pulse" />,
-                    className: 'text-blue-500',
-                    tooltip: t('header.saving'),
-                };
-            case 'success':
-                return {
-                    icon: <Save className="w-4 h-4" />,
-                    className: 'text-success',
-                    tooltip: t('header.saved'),
-                };
-            case 'error':
-                return {
-                    icon: <Save className="w-4 h-4" />,
-                    className: 'text-destructive',
-                    tooltip: t('header.saveFailed'),
-                };
-            default:
-                return {
-                    icon: <Save className="w-4 h-4" />,
-                    className: 'text-muted-foreground hover:text-foreground',
-                    tooltip: t('header.saveFlow'),
-                };
+    const getConfig = () => {
+        if (isConnected) {
+            return { color: 'bg-sky-500', animate: true, tooltip: t('header.socketLive'), clickable: false };
         }
+        if (connectionStatus === 'connecting') {
+            return { color: 'bg-sky-400', animate: true, tooltip: t('header.socketConnecting'), clickable: false };
+        }
+        if (connectionStatus === 'reconnecting') {
+            return {
+                color: 'bg-amber-500',
+                animate: true,
+                tooltip: `${t('header.socketReconnecting')} (${reconnectAttempts})`,
+                clickable: false,
+            };
+        }
+        if (connectionStatus === 'error' || maxReconnectReached) {
+            return {
+                color: 'bg-red-500',
+                animate: false,
+                tooltip: `${t('header.socketError')} - ${t('header.socketClickToRetry')}`,
+                clickable: true,
+            };
+        }
+        return {
+            color: 'bg-zinc-400',
+            animate: false,
+            tooltip: `${t('header.socketOffline')} - ${t('header.socketClickToConnect')}`,
+            clickable: true,
+        };
     };
 
-    const { icon, className, tooltip } = getButtonState();
+    const config = getConfig();
+
+    const dot = (
+        <div
+            className={cn(
+                'w-2 h-2 rounded-full transition-colors',
+                config.color,
+                config.animate && 'animate-pulse',
+                config.clickable && 'cursor-pointer hover:scale-125'
+            )}
+            onClick={config.clickable ? onReconnect : undefined}
+        />
+    );
 
     return (
         <TooltipProvider delayDuration={300}>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <button
-                        onClick={onClick}
-                        className={cn(
-                            'flex items-center justify-center w-8 h-8 rounded-full transition-all duration-150',
-                            'hover:bg-accent/50',
-                            className
-                        )}
-                    >
-                        {icon}
-                    </button>
+                    <div className="flex items-center justify-center w-8 h-8">{dot}</div>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
-                    {tooltip}
-                    <span className="ml-2 text-muted-foreground font-mono">⌘S</span>
+                    {config.tooltip}
                 </TooltipContent>
             </Tooltip>
         </TooltipProvider>
@@ -309,108 +294,113 @@ export const Header: React.FC<HeaderProps> = ({
     editActions,
     executionActions,
     saveState,
+    socketState,
     onShare,
 }) => {
     const { t } = useTranslation(['flows']);
 
+    const getSaveButtonVariant = (): 'default' | 'success' | 'warning' | 'error' => {
+        if (saveState.saveStatus === 'saving') return 'warning';
+        if (saveState.saveStatus === 'error') return 'error';
+        if (saveState.saveStatus === 'success') return 'success';
+        return 'default';
+    };
+
     return (
         <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
-            <div className="flex items-center justify-between px-6 py-3">
-                {/* Left Section - Logo + Title + Save Status */}
-                <div className="pointer-events-auto flex items-center gap-3">
-                    <GlassPill className="gap-3 pl-3">
-                        <Workflow className="w-5 h-5 text-primary" />
+            <div className="flex items-center justify-between px-4 py-3">
+                {/* Left: Brand + Flow Info */}
+                <div className="pointer-events-auto">
+                    <div
+                        className={cn(
+                            'flex items-center gap-2 h-10 px-3 rounded-xl',
+                            'bg-background/80 backdrop-blur-xl border border-border/50',
+                            'shadow-sm'
+                        )}
+                    >
+                        <Workflow className="w-5 h-5 text-primary flex-shrink-0" />
                         <span className="text-sm font-semibold text-foreground">FlowMosaic</span>
-                        <div className="w-px h-5 bg-glass-border mx-1" />
+                        <div className="w-px h-4 bg-border/60" />
                         <FlowNameInput {...flowInfo} />
-                        <SaveStatusIndicator
-                            lastSavedAt={saveState.lastSavedAt}
-                            saveStatus={saveState.saveStatus}
-                            saveError={saveState.saveError}
-                            onRetrySave={saveState.onRetrySave}
-                        />
-                    </GlassPill>
+                        <SaveStatusBadge saveStatus={saveState.saveStatus} lastSavedAt={saveState.lastSavedAt} />
+                    </div>
                 </div>
 
-                {/* Center Section - Empty for clean look */}
-                <div className="flex-1" />
-
-                {/* Right Section - Actions */}
+                {/* Right: Toolbar */}
                 <div className="pointer-events-auto flex items-center gap-2">
-                    {/* Save + Undo/Redo + Auto Layout */}
-                    <GlassPill>
-                        <SaveButton onClick={editActions.onSave} saveStatus={saveState.saveStatus} />
-                        <div className="w-px h-4 bg-glass-border" />
-                        <IconButton
+                    {/* Edit Tools */}
+                    <div
+                        className={cn(
+                            'flex items-center h-10 px-1 rounded-xl',
+                            'bg-background/80 backdrop-blur-xl border border-border/50',
+                            'shadow-sm'
+                        )}
+                    >
+                        <ToolbarButton
+                            onClick={editActions.onSave}
+                            icon={<Save className="w-4 h-4" />}
+                            tooltip={t('header.saveFlow')}
+                            shortcut="⌘S"
+                            variant={getSaveButtonVariant()}
+                        />
+                        <ToolbarButton
                             onClick={editActions.onUndo}
                             icon={<Undo2 className="w-4 h-4" />}
                             tooltip={t('header.undo')}
                             shortcut="⌘Z"
                         />
-                        <IconButton
+                        <ToolbarButton
                             onClick={editActions.onRedo}
                             icon={<Redo2 className="w-4 h-4" />}
                             tooltip={t('header.redo')}
                             shortcut="⌘⇧Z"
                         />
-                        <div className="w-px h-4 bg-glass-border" />
-                        <IconButton
+                        <ToolbarButton
                             onClick={editActions.onAutoLayout}
                             icon={<LayoutGrid className="w-4 h-4" />}
                             tooltip={t('header.autoLayout')}
                             shortcut="⌘L"
                         />
-                    </GlassPill>
+                        {socketState && <SocketDot {...socketState} />}
+                    </div>
 
-                    {/* Run Button */}
+                    {/* Primary Actions */}
                     {executionActions.isRunning ? (
                         <Button
                             onClick={executionActions.onStopAll}
                             variant="destructive"
                             size="sm"
-                            className="rounded-full px-4 h-8 text-xs shadow-lg"
+                            className="h-10 px-4 rounded-xl text-xs font-medium shadow-sm"
                         >
-                            <Square className="w-3 h-3 mr-1" />
+                            <Square className="w-3.5 h-3.5 mr-1.5" />
                             {t('header.stopAll')}
                         </Button>
                     ) : (
                         <Button
                             onClick={executionActions.onRunAll}
                             size="sm"
-                            className="rounded-full px-4 h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
+                            className="h-10 px-4 rounded-xl text-xs font-medium bg-primary hover:bg-primary/90 shadow-sm"
                         >
-                            <Play className="w-3 h-3 mr-1" />
+                            <Play className="w-3.5 h-3.5 mr-1.5" />
                             {t('header.runAll')}
                         </Button>
                     )}
 
-                    {/* Share Button */}
-                    <Button
-                        onClick={onShare}
-                        variant="secondary"
-                        size="sm"
-                        className="rounded-full px-4 h-8 text-xs shadow-lg"
-                    >
-                        <Link className="w-3 h-3 mr-1" />
-                        {t('header.share')}
-                    </Button>
-
-                    {/* Menu Dropdown */}
+                    {/* Menu */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button
                                 className={cn(
-                                    'flex items-center justify-center w-9 h-9 rounded-full',
-                                    'bg-glass-bg backdrop-blur-[24px] border border-glass-border',
-                                    'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                                    'shadow-floating transition-all duration-150'
+                                    'flex items-center justify-center w-10 h-10 rounded-xl',
+                                    'bg-background/80 backdrop-blur-xl border border-border/50',
+                                    'text-muted-foreground hover:text-foreground',
+                                    'shadow-sm transition-colors duration-150'
                                 )}
                             >
                                 <Menu className="w-4 h-4" />
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
-                            {/* File Actions */}
                             <DropdownMenuItem onClick={fileActions.onNew}>
                                 <FileText className="w-4 h-4 mr-2" />
                                 {t('header.newFlow')}
@@ -438,10 +428,13 @@ export const Header: React.FC<HeaderProps> = ({
                                 <Upload className="w-4 h-4 mr-2" />
                                 {t('header.importJson')}
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onShare}>
+                                <Link className="w-4 h-4 mr-2" />
+                                {t('header.share')}
+                            </DropdownMenuItem>
 
                             <DropdownMenuSeparator />
 
-                            {/* Edit Actions */}
                             <DropdownMenuItem onClick={editActions.onAutoLayout}>
                                 <LayoutGrid className="w-4 h-4 mr-2" />
                                 {t('header.autoLayout')}
@@ -454,20 +447,19 @@ export const Header: React.FC<HeaderProps> = ({
 
                             <DropdownMenuSeparator />
 
-                            {/* Settings */}
                             <div className="flex items-center justify-between px-2 py-1.5">
                                 <span className="text-sm">{t('header.autoSave')}</span>
                                 <button
                                     onClick={saveState.onToggleAutoSave}
                                     className={cn(
-                                        'w-8 h-5 rounded-full p-0.5 transition-colors relative',
-                                        saveState.isAutoSaveEnabled ? 'bg-success' : 'bg-muted-foreground/30'
+                                        'w-9 h-5 rounded-full p-0.5 transition-colors relative',
+                                        saveState.isAutoSaveEnabled ? 'bg-primary' : 'bg-muted'
                                     )}
                                 >
                                     <div
                                         className={cn(
                                             'w-4 h-4 bg-white rounded-full shadow-sm transition-transform absolute top-0.5',
-                                            saveState.isAutoSaveEnabled ? 'left-[calc(100%-18px)]' : 'left-0.5'
+                                            saveState.isAutoSaveEnabled ? 'translate-x-4' : 'translate-x-0.5'
                                         )}
                                     />
                                 </button>

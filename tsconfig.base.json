@@ -27,6 +27,7 @@
             "@flows/flows": ["libs/flows/src/index.ts"],
             "@flows/lib/utils": ["libs/ui-kit/src/utils/index.ts"],
             "@flows/shared": ["libs/shared/src/index.ts"],
+            "@flows/socket": ["libs/socket/src/index.ts"],
             "@flows/theme": ["libs/theme/src/index.ts"],
             "@flows/ui-kit": ["libs/ui-kit/src/index.ts"],
             "@flows/ui-kit/*": ["libs/ui-kit/src/*"],

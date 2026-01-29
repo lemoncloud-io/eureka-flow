@@ -22,6 +22,9 @@
         },
         {
             "path": "./libs/flows"
+        },
+        {
+            "path": "./libs/socket"
         }
     ]
 }

@@ -267,10 +267,13 @@ export interface SaveFlowView extends FlowView {
  * Uses NodeData/EdgeData from API package to match backend response format.
  * - NodeData: uses object format for config, inputData, outputData
  * - EdgeData: connection data between nodes
+ * - channelId: WebSocket channel for real-time updates
  */
 export interface LoadFlowResult extends FlowModel {
     nodes: NodeData[];
     edges: EdgeData[];
+    /** WebSocket channel ID for real-time node status updates */
+    channelId?: string;
 }
 
 /**
