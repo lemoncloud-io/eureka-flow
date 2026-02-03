@@ -160,7 +160,7 @@ const ToolbarButton: React.FC<{
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
                     {tooltip}
-                    {shortcut && <span className="ml-2 text-muted-foreground font-mono">{shortcut}</span>}
+                    {shortcut && <span className="ml-2 text-primary-foreground/70 font-mono">{shortcut}</span>}
                 </TooltipContent>
             </Tooltip>
         </TooltipProvider>
