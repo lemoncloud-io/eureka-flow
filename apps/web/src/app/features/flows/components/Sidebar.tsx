@@ -2,10 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
+    ChevronDown,
     ChevronRight,
     Eye,
     FileInput,
     Image,
+    LayoutGrid,
     Package,
     Puzzle,
     RefreshCw,
@@ -18,7 +20,15 @@ import {
 
 import { useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@flows/ui-kit';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@flows/ui-kit';
 
 interface SidebarProps {
     onAddNode: (type: string) => void;
@@ -30,19 +40,16 @@ const CATEGORY_CONFIG = {
         icon: FileInput,
         label: 'sidebar.inputs',
         color: 'text-primary',
-        hoverBg: 'hover:bg-primary/10',
     },
     process: {
         icon: RefreshCw,
         label: 'sidebar.process',
         color: 'text-muted-foreground',
-        hoverBg: 'hover:bg-accent',
     },
     outputs: {
         icon: Eye,
         label: 'sidebar.output',
         color: 'text-success',
-        hoverBg: 'hover:bg-success/10',
     },
 } as const;
 
@@ -74,42 +81,6 @@ const getIcon = (blockType: string): React.ElementType => {
     if (blockType.includes('preview')) return iconMap.preview;
     if (blockType.includes('log') || blockType.includes('console')) return iconMap.log;
     return iconMap.default;
-};
-
-interface CategoryButtonProps {
-    category: keyof typeof CATEGORY_CONFIG;
-    isActive: boolean;
-    onClick: () => void;
-}
-
-const CategoryButton: React.FC<CategoryButtonProps> = ({ category, isActive, onClick }) => {
-    const { t } = useTranslation(['flows']);
-    const config = CATEGORY_CONFIG[category];
-    const Icon = config.icon;
-
-    return (
-        <TooltipProvider delayDuration={0}>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <button
-                        onClick={onClick}
-                        className={cn(
-                            'w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-150',
-                            config.hoverBg,
-                            isActive
-                                ? `bg-glass-bg ${config.color} shadow-md`
-                                : 'text-muted-foreground hover:text-foreground'
-                        )}
-                    >
-                        <Icon className="w-5 h-5" />
-                    </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="text-xs font-medium">
-                    {t(config.label)}
-                </TooltipContent>
-            </Tooltip>
-        </TooltipProvider>
-    );
 };
 
 interface BlockItemProps {
@@ -149,10 +120,13 @@ const BlockItem: React.FC<BlockItemProps> = ({ type, label, description, onAdd, 
     );
 };
 
+type CategoryKey = keyof typeof CATEGORY_CONFIG;
+
 export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
     const { t } = useTranslation(['flows']);
     const blockRegistry = useBlockRegistry();
-    const [activeCategory, setActiveCategory] = useState<keyof typeof CATEGORY_CONFIG | null>(null);
+    const [isOpen, setIsOpen] = useState(false);
+    const [expandedCategories, setExpandedCategories] = useState<Set<CategoryKey>>(new Set(CATEGORIES));
 
     const blockGroups = useMemo(() => {
         // Deduplicate: blockRegistry has dual indexing (by type and id)
@@ -170,18 +144,40 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
         };
     }, [blockRegistry]);
 
-    const handleCategoryClick = (category: keyof typeof CATEGORY_CONFIG) => {
-        setActiveCategory(activeCategory === category ? null : category);
+    const handleTogglePanel = () => {
+        if (isOpen) {
+            setIsOpen(false);
+        } else {
+            setIsOpen(true);
+            // Open with all categories expanded
+            setExpandedCategories(new Set(CATEGORIES));
+        }
+    };
+
+    const handleCategoryToggle = (category: CategoryKey) => {
+        setExpandedCategories(prev => {
+            const next = new Set(prev);
+            if (next.has(category)) {
+                next.delete(category);
+            } else {
+                next.add(category);
+            }
+            return next;
+        });
     };
 
     const handleAddNode = (type: string) => {
         onAddNode(type);
-        setActiveCategory(null);
+        setIsOpen(false);
+    };
+
+    const handleClose = () => {
+        setIsOpen(false);
     };
 
     return (
         <>
-            {/* Icon Bar */}
+            {/* Single Library Button */}
             <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20 pointer-events-auto">
                 <div
                     className={cn(
@@ -190,22 +186,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
                         'shadow-floating'
                     )}
                 >
-                    {CATEGORIES.map(category => (
-                        <CategoryButton
-                            key={category}
-                            category={category}
-                            isActive={activeCategory === category}
-                            onClick={() => handleCategoryClick(category)}
-                        />
-                    ))}
+                    <TooltipProvider delayDuration={0}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    onClick={handleTogglePanel}
+                                    className={cn(
+                                        'w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-150',
+                                        'hover:bg-accent',
+                                        isOpen
+                                            ? 'bg-glass-bg text-primary shadow-md'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    )}
+                                >
+                                    <LayoutGrid className="w-4 h-4" />
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="text-xs font-medium">
+                                {t('sidebar.library')}
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                 </div>
             </div>
 
             {/* Expanded Panel */}
-            {activeCategory && (
+            {isOpen && (
                 <>
                     {/* Backdrop */}
-                    <div className="fixed inset-0 z-15" onClick={() => setActiveCategory(null)} />
+                    <div className="fixed inset-0 z-15" onClick={handleClose} />
 
                     {/* Panel */}
                     <div
@@ -216,32 +225,63 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
                             'animate-in fade-in slide-in-from-left-2 duration-200'
                         )}
                     >
-                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-glass-border">
-                            {React.createElement(CATEGORY_CONFIG[activeCategory].icon, {
-                                className: cn('w-4 h-4', CATEGORY_CONFIG[activeCategory].color),
-                            })}
-                            <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
-                                {t(CATEGORY_CONFIG[activeCategory].label)}
-                            </span>
-                        </div>
+                        <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+                            {CATEGORIES.map(category => {
+                                const config = CATEGORY_CONFIG[category];
+                                const Icon = config.icon;
+                                const blocks = blockGroups[category];
+                                const isExpanded = expandedCategories.has(category);
 
-                        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                            {blockGroups[activeCategory].length === 0 ? (
-                                <div className="text-center py-4 text-muted-foreground text-xs">
-                                    {t('sidebar.noResults')}
-                                </div>
-                            ) : (
-                                blockGroups[activeCategory].map(block => (
-                                    <BlockItem
-                                        key={block.type}
-                                        type={block.type}
-                                        label={block.label}
-                                        description={block.description}
-                                        onAdd={() => handleAddNode(block.type)}
-                                        disabled={isLoading}
-                                    />
-                                ))
-                            )}
+                                return (
+                                    <Collapsible
+                                        key={category}
+                                        open={isExpanded}
+                                        onOpenChange={() => handleCategoryToggle(category)}
+                                    >
+                                        <CollapsibleTrigger
+                                            className={cn(
+                                                'flex items-center gap-2 w-full p-2 rounded-lg',
+                                                'hover:bg-accent/50 transition-colors',
+                                                isExpanded && 'bg-accent/30'
+                                            )}
+                                        >
+                                            <Icon className={cn('w-4 h-4', config.color)} />
+                                            <span className="text-xs font-semibold text-foreground uppercase tracking-wider flex-1 text-left">
+                                                {t(config.label)}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground mr-1">
+                                                {blocks.length}
+                                            </span>
+                                            <ChevronDown
+                                                className={cn(
+                                                    'w-4 h-4 text-muted-foreground transition-transform duration-200',
+                                                    isExpanded && 'rotate-180'
+                                                )}
+                                            />
+                                        </CollapsibleTrigger>
+                                        <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
+                                            <div className="space-y-2 pt-2 pl-2">
+                                                {blocks.length === 0 ? (
+                                                    <div className="text-center py-2 text-muted-foreground text-xs">
+                                                        {t('sidebar.noResults')}
+                                                    </div>
+                                                ) : (
+                                                    blocks.map(block => (
+                                                        <BlockItem
+                                                            key={block.type}
+                                                            type={block.type}
+                                                            label={block.label}
+                                                            description={block.description}
+                                                            onAdd={() => handleAddNode(block.type)}
+                                                            disabled={isLoading}
+                                                        />
+                                                    ))
+                                                )}
+                                            </div>
+                                        </CollapsibleContent>
+                                    </Collapsible>
+                                );
+                            })}
                         </div>
 
                         <div className="mt-3 pt-2 border-t border-glass-border text-[10px] text-muted-foreground text-center">

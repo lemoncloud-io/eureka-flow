@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import {
     Download,
     FileText,
-    FolderOpen,
     LayoutGrid,
     Link,
     Menu,
@@ -44,7 +43,6 @@ export interface FlowInfoProps {
 
 export interface FileActionsProps {
     onNew: () => void;
-    onLoad: () => void;
     onSave: () => void;
     onExport: () => void;
     onImport: () => void;
@@ -162,7 +160,7 @@ const ToolbarButton: React.FC<{
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
                     {tooltip}
-                    {shortcut && <span className="ml-2 text-muted-foreground font-mono">{shortcut}</span>}
+                    {shortcut && <span className="ml-2 text-primary-foreground/70 font-mono">{shortcut}</span>}
                 </TooltipContent>
             </Tooltip>
         </TooltipProvider>
@@ -405,11 +403,6 @@ export const Header: React.FC<HeaderProps> = ({
                                 <FileText className="w-4 h-4 mr-2" />
                                 {t('header.newFlow')}
                                 <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={fileActions.onLoad}>
-                                <FolderOpen className="w-4 h-4 mr-2" />
-                                {t('header.openFlow')}
-                                <DropdownMenuShortcut>⌘O</DropdownMenuShortcut>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={fileActions.onSave}>
                                 <Save className="w-4 h-4 mr-2" />
