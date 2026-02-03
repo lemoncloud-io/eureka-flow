@@ -187,22 +187,6 @@ export const FlowEditorPage = () => {
         }
     };
 
-    const handleLoad = async () => {
-        const flowId = prompt(t('flowEditor.enterFlowId'));
-
-        if (flowId && flowId.trim()) {
-            const data = await loadFlowById(flowId.trim());
-            if (canvasRef.current && data) {
-                canvasRef.current.loadWorkflow(data);
-                lastSavedStateRef.current = serializeWorkflowState(data);
-                updateUrl(flowId.trim(), null);
-                showNotification(t('flowEditor.loadedFlow', { flowId: flowId.trim() }), 'success');
-            } else {
-                showNotification(t('flowEditor.failedToLoadFlow'), 'error');
-            }
-        }
-    };
-
     const handleNew = async () => {
         if (!canvasRef.current) return;
         if (window.confirm(t('flowEditor.confirmNewFlow'))) {
@@ -332,14 +316,12 @@ export const FlowEditorPage = () => {
 
     const handlersRef = useRef({
         save: handleSave,
-        load: handleLoad,
         new: handleNew,
         export: handleExport,
         showNotification,
     });
     handlersRef.current = {
         save: handleSave,
-        load: handleLoad,
         new: handleNew,
         export: handleExport,
         showNotification,
@@ -357,9 +339,6 @@ export const FlowEditorPage = () => {
             if (key === 's') {
                 e.preventDefault();
                 handlersRef.current.save();
-            } else if (key === 'o') {
-                e.preventDefault();
-                handlersRef.current.load();
             } else if (key === 'n') {
                 e.preventDefault();
                 handlersRef.current.new();
@@ -432,7 +411,6 @@ export const FlowEditorPage = () => {
                 }}
                 fileActions={{
                     onNew: handleNew,
-                    onLoad: handleLoad,
                     onSave: handleSave,
                     onExport: handleExport,
                     onImport: handleImport,
