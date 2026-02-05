@@ -45,26 +45,26 @@ export interface NodeHighlightState {
     highlightedPortIds?: string[];
 }
 
-const getStatusBorderColor = (status: NodeStatus, isSelected: boolean): string => {
-    // Selected: show colored border
+const getStatusStyles = (status: NodeStatus, isSelected: boolean): string => {
+    // Selected: show colored border with glow effect
     if (isSelected) {
         switch (status) {
             case 'RUNNING':
-                return 'border-status-running';
+                return 'border-status-running shadow-[0_0_20px_rgba(234,179,8,0.3)]';
             case 'COMPLETED':
-                return 'border-status-completed';
+                return 'border-status-completed shadow-[0_0_20px_rgba(34,197,94,0.25)]';
             case 'ERROR':
-                return 'border-status-error';
+                return 'border-status-error shadow-[0_0_20px_rgba(239,68,68,0.3)] animate-pulse-error';
             default:
-                return 'border-primary';
+                return 'border-primary shadow-[0_0_20px_rgba(139,92,246,0.25)]';
         }
     }
-    // Not selected: gray border only (status colors subtle)
+    // Not selected: status-based styling
     switch (status) {
         case 'RUNNING':
-            return 'border-muted-foreground/30';
+            return 'border-status-running/50 shadow-[0_0_12px_rgba(234,179,8,0.2)]';
         case 'ERROR':
-            return 'border-destructive/30';
+            return 'border-destructive/50 animate-pulse-error';
         default:
             return 'border-muted-foreground/20';
     }
@@ -466,14 +466,18 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     };
 
     const StatusIcon = () => {
-        if (isDisabled) return <Ban className="w-3 h-3 text-muted-foreground" />;
+        if (isDisabled) return <Ban className="w-4 h-4 text-muted-foreground" />;
         switch (node.status) {
             case 'RUNNING':
-                return <Loader2 className="w-3 h-3 text-status-running animate-spin" />;
+                return <Loader2 className="w-4 h-4 text-status-running animate-spin" />;
             case 'COMPLETED':
-                return <Check className="w-3 h-3 text-status-completed" />;
+                return <Check className="w-4 h-4 text-status-completed" />;
             case 'ERROR':
-                return <span className="text-status-error font-bold text-[10px]">!</span>;
+                return (
+                    <div className="w-4 h-4 rounded-full bg-destructive/20 flex items-center justify-center">
+                        <span className="text-destructive font-bold text-[10px]">!</span>
+                    </div>
+                );
             default:
                 return null;
         }
@@ -485,8 +489,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 'absolute w-[260px] bg-node-bg rounded-xl border-[1.5px] overflow-hidden',
                 !isDragging && 'transition-all duration-200',
                 isDisabled && 'opacity-50',
-                isSelected ? 'shadow-node-selected' : 'shadow-node',
-                isHighlighted ? 'border-accent/60' : getStatusBorderColor(node.status as NodeStatus, isSelected)
+                !isSelected && !isHighlighted && node.status === 'IDLE' && 'shadow-node',
+                isHighlighted ? 'border-accent/60' : getStatusStyles(node.status as NodeStatus, isSelected)
             )}
             style={{ left: node.position.x, top: node.position.y }}
             onMouseDown={onMouseDown}
@@ -733,11 +737,13 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
             {/* Progress Bar */}
             {node.status === 'RUNNING' && (
-                <div className="absolute bottom-0 left-0 w-full h-1 bg-muted/50 overflow-hidden">
+                <div className="absolute bottom-0 left-0 w-full h-1.5 bg-muted/50 overflow-hidden">
                     <div
-                        className="h-full bg-status-running transition-all duration-200 ease-out"
+                        className="h-full bg-status-running transition-all duration-200 ease-out animate-progress-pulse"
                         style={{ width: `${node.executionStats?.progress || 5}%` }}
                     />
+                    {/* Animated shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
                 </div>
             )}
 

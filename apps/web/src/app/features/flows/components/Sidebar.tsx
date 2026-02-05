@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -12,10 +12,12 @@ import {
     Puzzle,
     RefreshCw,
     Ruler,
+    Search,
     Shield,
     Terminal,
     Timer,
     Type,
+    X,
 } from 'lucide-react';
 
 import { useBlockRegistry } from '@flows/flows';
@@ -33,6 +35,10 @@ import {
 interface SidebarProps {
     onAddNode: (type: string) => void;
     isLoading?: boolean;
+}
+
+export interface SidebarRef {
+    open: () => void;
 }
 
 const CATEGORY_CONFIG = {
@@ -122,11 +128,21 @@ const BlockItem: React.FC<BlockItemProps> = ({ type, label, description, onAdd, 
 
 type CategoryKey = keyof typeof CATEGORY_CONFIG;
 
-export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
+export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoading }, ref) => {
     const { t } = useTranslation(['flows']);
     const blockRegistry = useBlockRegistry();
     const [isOpen, setIsOpen] = useState(false);
     const [expandedCategories, setExpandedCategories] = useState<Set<CategoryKey>>(new Set(CATEGORIES));
+    const [searchQuery, setSearchQuery] = useState('');
+    const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+    useImperativeHandle(ref, () => ({
+        open: () => {
+            setIsOpen(true);
+            setExpandedCategories(new Set(CATEGORIES));
+            setTimeout(() => searchInputRef.current?.focus(), 100);
+        },
+    }));
 
     const blockGroups = useMemo(() => {
         // Deduplicate: blockRegistry has dual indexing (by type and id)
@@ -135,22 +151,36 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
             .filter(([key, block]) => key === block.type)
             .map(([, block]) => block);
 
+        // Filter by search query
+        const query = searchQuery.toLowerCase().trim();
+        const filteredBlocks = query
+            ? blocks.filter(
+                  b =>
+                      b.label.toLowerCase().includes(query) ||
+                      b.description.toLowerCase().includes(query) ||
+                      b.type.toLowerCase().includes(query)
+              )
+            : blocks;
+
         return {
-            inputs: blocks.filter(b => b.type.startsWith('input-')),
-            process: blocks.filter(
+            inputs: filteredBlocks.filter(b => b.type.startsWith('input-')),
+            process: filteredBlocks.filter(
                 b => !b.type.startsWith('input-') && !['result-preview', 'console-log'].includes(b.type)
             ),
-            outputs: blocks.filter(b => ['result-preview', 'console-log'].includes(b.type)),
+            outputs: filteredBlocks.filter(b => ['result-preview', 'console-log'].includes(b.type)),
         };
-    }, [blockRegistry]);
+    }, [blockRegistry, searchQuery]);
 
     const handleTogglePanel = () => {
         if (isOpen) {
             setIsOpen(false);
+            setSearchQuery('');
         } else {
             setIsOpen(true);
             // Open with all categories expanded
             setExpandedCategories(new Set(CATEGORIES));
+            // Focus search input after panel opens
+            setTimeout(() => searchInputRef.current?.focus(), 100);
         }
     };
 
@@ -173,7 +203,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
 
     const handleClose = () => {
         setIsOpen(false);
+        setSearchQuery('');
     };
+
+    const totalResults = blockGroups.inputs.length + blockGroups.process.length + blockGroups.outputs.length;
 
     return (
         <>
@@ -225,7 +258,43 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
                             'animate-in fade-in slide-in-from-left-2 duration-200'
                         )}
                     >
-                        <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+                        {/* Search Input */}
+                        <div className="relative mb-3">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                placeholder={t('sidebar.searchPlaceholder')}
+                                className={cn(
+                                    'w-full pl-9 pr-8 py-2 text-sm rounded-lg',
+                                    'bg-background/50 border border-border',
+                                    'placeholder:text-muted-foreground/60',
+                                    'focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50',
+                                    'transition-all'
+                                )}
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Search Results Count */}
+                        {searchQuery && (
+                            <div className="text-[10px] text-muted-foreground mb-2 px-1">
+                                {totalResults === 0
+                                    ? t('sidebar.noResults')
+                                    : t('sidebar.resultsCount', { count: totalResults })}
+                            </div>
+                        )}
+
+                        <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
                             {CATEGORIES.map(category => {
                                 const config = CATEGORY_CONFIG[category];
                                 const Icon = config.icon;
@@ -292,4 +361,4 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddNode, isLoading }) => {
             )}
         </>
     );
-};
+});

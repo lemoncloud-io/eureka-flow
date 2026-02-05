@@ -38,7 +38,9 @@
         "expandSidebar": "Expand Sidebar",
         "collapseSidebar": "Collapse Sidebar",
         "searchBlocks": "Search blocks...",
+        "searchPlaceholder": "Search nodes...",
         "noResults": "No blocks found",
+        "resultsCount": "{{count}} results",
         "clickToAdd": "Click to add to canvas"
     },
     "canvas": {
@@ -55,7 +57,13 @@
         "zoomIn": "Zoom In",
         "zoomOut": "Zoom Out",
         "fitToScreen": "Fit to Screen",
-        "resetView": "Reset View"
+        "resetView": "Reset View",
+        "emptyState": {
+            "title": "Start Building Your Workflow",
+            "description": "Add your first node from the library to get started. Connect nodes to create powerful automation flows.",
+            "addFirstNode": "Add First Node",
+            "keyboardHint": "Tip: Press Space to quick search nodes"
+        }
     },
     "detailPanel": {
         "configuration": "Configuration",

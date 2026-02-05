@@ -1,7 +1,7 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { X } from 'lucide-react';
+import { MousePointerClick, Plus, X } from 'lucide-react';
 
 import {
     LAYOUT_CONFIG,
@@ -12,6 +12,7 @@ import {
     useBlockRegistry,
     useNodeSync,
 } from '@flows/flows';
+import { cn } from '@flows/lib/utils';
 
 import { ConnectionLine } from './ConnectionLine';
 import { DetailPanel } from './DetailPanel';
@@ -48,12 +49,62 @@ interface WorkflowCanvasProps {
     onChange?: () => void;
     /** Called before running a node that requires backend processing. Should save the flow. */
     onBeforeBackendRun?: () => Promise<void>;
+    /** Called when user clicks "Add Node" from empty state */
+    onOpenLibrary?: () => void;
 }
 
 const GRID_SIZE = 20;
 
+interface EmptyStateProps {
+    onOpenLibrary: () => void;
+}
+
+const EmptyState: React.FC<EmptyStateProps> = ({ onOpenLibrary }) => {
+    const { t } = useTranslation(['flows']);
+
+    return (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-5">
+            <div className="flex flex-col items-center gap-6 text-center max-w-md px-8">
+                {/* Icon */}
+                <div className="relative">
+                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
+                        <Plus className="w-10 h-10 text-primary/60" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-lg bg-accent flex items-center justify-center border border-accent-foreground/20 animate-bounce">
+                        <MousePointerClick className="w-4 h-4 text-accent-foreground" />
+                    </div>
+                </div>
+
+                {/* Text */}
+                <div className="space-y-2">
+                    <h3 className="text-lg font-semibold text-foreground">{t('canvas.emptyState.title')}</h3>
+                    <p className="text-sm text-muted-foreground">{t('canvas.emptyState.description')}</p>
+                </div>
+
+                {/* CTA Button */}
+                <button
+                    onClick={onOpenLibrary}
+                    className={cn(
+                        'pointer-events-auto px-6 py-3 rounded-xl',
+                        'bg-primary text-primary-foreground font-medium',
+                        'hover:bg-primary/90 transition-all',
+                        'shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30',
+                        'flex items-center gap-2'
+                    )}
+                >
+                    <Plus className="w-4 h-4" />
+                    {t('canvas.emptyState.addFirstNode')}
+                </button>
+
+                {/* Keyboard hint */}
+                <p className="text-xs text-muted-foreground/60">{t('canvas.emptyState.keyboardHint')}</p>
+            </div>
+        </div>
+    );
+};
+
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
-    ({ readOnly, initialData, flowId, onNodeSelect, onChange, onBeforeBackendRun }, ref) => {
+    ({ readOnly, initialData, flowId, onNodeSelect, onChange, onBeforeBackendRun, onOpenLibrary }, ref) => {
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
         const { syncNodeUpdate, createNodeOnBackend } = useNodeSync({ flowId: flowId ?? null });
@@ -1352,15 +1403,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     onMouseDown={handleCanvasMouseDown}
                     tabIndex={0}
                 >
+                    {/* Background Grid - always visible with subtle opacity */}
                     <div
                         className="absolute inset-0 pointer-events-none transition-opacity duration-300 ease-in-out z-0"
                         style={{
-                            opacity: dragState ? 0.3 : 0,
-                            backgroundImage: 'radial-gradient(hsl(var(--muted-foreground) / 0.4) 1px, transparent 1px)',
+                            opacity: dragState ? 0.4 : 0.15,
+                            backgroundImage: 'radial-gradient(hsl(var(--muted-foreground) / 0.5) 1px, transparent 1px)',
                             backgroundSize: `${GRID_SIZE * viewport.zoom}px ${GRID_SIZE * viewport.zoom}px`,
                             backgroundPosition: `${viewport.x}px ${viewport.y}px`,
                         }}
                     />
+
+                    {/* Empty State */}
+                    {nodes.length === 0 && !readOnly && onOpenLibrary && <EmptyState onOpenLibrary={onOpenLibrary} />}
 
                     <div
                         className="absolute origin-top-left w-full h-full pointer-events-none z-10"

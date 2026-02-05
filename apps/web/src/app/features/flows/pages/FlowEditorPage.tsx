@@ -8,6 +8,7 @@ import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
+import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { FlowNodeMessage } from '@flows/socket';
 
@@ -22,6 +23,7 @@ const isInputElement = (target: EventTarget | null): boolean => {
 export const FlowEditorPage = () => {
     const { t } = useTranslation(['flows']);
     const canvasRef = useRef<WorkflowCanvasRef>(null);
+    const sidebarRef = useRef<SidebarRef>(null);
 
     const { loadBlocks } = useBlocks();
     const {
@@ -73,6 +75,10 @@ export const FlowEditorPage = () => {
     const autoSaveTimerRef = useRef<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const lastSavedStateRef = useRef<string | null>(null);
+
+    const handleOpenLibrary = useCallback(() => {
+        sidebarRef.current?.open();
+    }, []);
 
     const updateUrl = useCallback((flowId: string | null, nodeId?: string | null) => {
         try {
@@ -401,6 +407,7 @@ export const FlowEditorPage = () => {
                     onNodeSelect={handleSelectionChange}
                     onChange={handleCanvasChange}
                     onBeforeBackendRun={handleBeforeBackendRun}
+                    onOpenLibrary={handleOpenLibrary}
                 />
             </div>
 
@@ -455,7 +462,7 @@ export const FlowEditorPage = () => {
             />
 
             {/* Floating Sidebar */}
-            <Sidebar onAddNode={handleAddNode} isLoading={isLoading} />
+            <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} />
 
             {/* Notification Toast */}
             {notification && (
