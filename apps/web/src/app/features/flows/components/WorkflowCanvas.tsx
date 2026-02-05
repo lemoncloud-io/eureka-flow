@@ -709,7 +709,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 try {
                     let results: Record<string, DataPacket>;
 
-                    if (requiresBackendProcessing(nodeDef.type)) {
+                    // Check if this block requires backend processing
+                    // Uses isFrontend flag from server, with fallback to legacy type check
+                    if (requiresBackendProcessing(nodeDef)) {
                         if (batchRunCountRef.current === 0 && onBeforeBackendRun) {
                             await onBeforeBackendRun();
                         }

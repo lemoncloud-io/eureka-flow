@@ -23,7 +23,46 @@ export type {
     WorkflowState,
 } from '@lemoncloud/eureka-flows-api';
 
-import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinition, DataPacket, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+
+// ============================================================================
+// Block Definition Extension (isFrontend support)
+// ============================================================================
+
+/**
+ * BlockDefinitionWithFrontend - extends BlockDefinition with isFrontend flag
+ *
+ * This type extends the API package's BlockDefinition to include the `isFrontend`
+ * flag from the server response. When the API package is updated, this can be removed.
+ *
+ * @see /blocks/0/list API response
+ *
+ * Execution logic:
+ * - `isFrontend: true` → Execute on client (use `execute` function)
+ * - `isFrontend: false` → Execute on server (call POST /nodes/:id/run)
+ * - `isFrontend: undefined` → Fallback to legacy BACKEND_PROCESSOR_TYPES check
+ */
+export interface BlockDefinitionWithFrontend extends BlockDefinition {
+    /**
+     * Indicates whether this block should be executed on the frontend (client-side)
+     * or requires backend processing (server-side).
+     *
+     * - `true`: Client-side execution using the `execute` function
+     * - `false`: Server-side execution via POST /nodes/:id/run API
+     * - `undefined`: Use legacy fallback (BACKEND_PROCESSOR_TYPES check)
+     */
+    isFrontend?: boolean;
+
+    /**
+     * The function that runs when the block triggers (client-side only)
+     * This is attached by the frontend when `isFrontend: true`
+     */
+    execute?: (
+        inputs: Record<string, DataPacket>,
+        config: Record<string, unknown>,
+        onProgress?: (progress: number) => void
+    ) => Promise<Record<string, DataPacket>>;
+}
 
 /**
  * FlowStereo - stereotype of flow model
