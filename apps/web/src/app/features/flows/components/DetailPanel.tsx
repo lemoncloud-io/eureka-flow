@@ -151,7 +151,7 @@ interface InputImageConfigProps {
 }
 
 const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChange, t }) => {
-    const img = node.config.imageData as string | undefined;
+    const img = node.config?.imageData as string | undefined;
     const { src: resolvedSrc, isLoading } = useS3Image(img || '');
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -262,7 +262,7 @@ interface InputTextConfigProps {
 
 const InputTextConfig: React.FC<InputTextConfigProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['flows']);
-    const text = (node.config.text as string) || '';
+    const text = (node.config?.text as string) || '';
 
     return (
         <div>
@@ -363,7 +363,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     };
 
     const renderConfigInput = (node: NodeData, field: ConfigField, definition: BlockDefinition) => {
-        const value = node.config[field.key] ?? definition.defaultConfig[field.key];
+        const value = node.config?.[field.key] ?? definition.defaultConfig[field.key];
 
         const handleChange = (val: unknown) => onConfigChange(node.id, field.key, val);
 
@@ -466,7 +466,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         const isAuto = selectedNode.autoExecutionEnabled !== false;
         // Use def.type since loaded nodes may have blockId as type
         const isComponent = def.type === 'workflow-component';
-        const subFlowId = isComponent ? selectedNode.config.selectedFlowId : null;
+        const subFlowId = isComponent ? selectedNode.config?.selectedFlowId : null;
 
         const configSchema =
             def.configSchema ||

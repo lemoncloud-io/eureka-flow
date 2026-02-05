@@ -270,19 +270,21 @@
     animation: progress-pulse 1s ease-in-out infinite;
 }
 
-/* Port compatible highlight animation */
+/* Port compatible highlight animation - slow and gentle */
 @keyframes port-glow {
     0%,
     100% {
-        box-shadow: 0 0 4px 2px rgba(34, 197, 94, 0.4);
+        box-shadow: 0 0 4px 1px hsl(var(--success) / 0.3);
+        transform: scale(1.15);
     }
     50% {
-        box-shadow: 0 0 8px 4px rgba(34, 197, 94, 0.6);
+        box-shadow: 0 0 8px 2px hsl(var(--success) / 0.5);
+        transform: scale(1.25);
     }
 }
 
 .animate-port-glow {
-    animation: port-glow 1s ease-in-out infinite;
+    animation: port-glow 2s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

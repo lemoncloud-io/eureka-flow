@@ -1,7 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Ban, Check, Copy, Loader2, MoreVertical, Pencil, Play, RefreshCw, ScrollText, X, Zap } from 'lucide-react';
+import {
+    Ban,
+    Check,
+    Copy,
+    Hash,
+    Image,
+    Loader2,
+    MoreVertical,
+    Pencil,
+    Play,
+    RefreshCw,
+    ScrollText,
+    Sparkles,
+    Type,
+    X,
+    Zap,
+} from 'lucide-react';
 
 import { compressImageIfNeeded, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -39,10 +55,18 @@ export interface NodeActions {
     onViewLogs: () => void;
 }
 
+export interface ConnectionDraftInfo {
+    sourceNodeId: string;
+    sourcePortId: string;
+    sourceType: string;
+}
+
 export interface NodeHighlightState {
     isSelected: boolean;
     isHighlighted?: boolean;
     highlightedPortIds?: string[];
+    /** Active connection being dragged - used for port compatibility feedback */
+    connectionDraft?: ConnectionDraftInfo | null;
 }
 
 const getStatusStyles = (status: NodeStatus, isSelected: boolean): string => {
@@ -70,12 +94,67 @@ const getStatusStyles = (status: NodeStatus, isSelected: boolean): string => {
     }
 };
 
+/** Get icon component for port type */
+const getPortTypeIcon = (portType: string): React.ElementType | null => {
+    switch (portType.toLowerCase()) {
+        case 'text':
+        case 'string':
+            return Type;
+        case 'image':
+            return Image;
+        case 'number':
+            return Hash;
+        case 'any':
+            return Sparkles;
+        default:
+            return null;
+    }
+};
+
+/** Check if two port types are compatible for connection */
+const arePortTypesCompatible = (sourceType: string, targetType: string): boolean => {
+    if (sourceType === 'any' || targetType === 'any') return true;
+    return sourceType.toLowerCase() === targetType.toLowerCase();
+};
+
+/** Get Tailwind classes for port type coloring */
+const getPortTypeColor = (portType: string, hasData: boolean, portDirection: 'input' | 'output'): string => {
+    // Always show color based on port type, brighter when has data
+    if (portDirection === 'input') {
+        return hasData
+            ? 'bg-port-input border-port-input shadow-[0_0_6px_rgba(34,197,94,0.4)]'
+            : 'bg-port-input/50 border-port-input/50';
+    }
+
+    switch (portType.toLowerCase()) {
+        case 'image':
+            return hasData
+                ? 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]'
+                : 'bg-port-image/50 border-port-image/50';
+        case 'text':
+        case 'string':
+            return hasData
+                ? 'bg-port-text border-port-text shadow-[0_0_6px_rgba(139,92,246,0.4)]'
+                : 'bg-port-text/50 border-port-text/50';
+        case 'number':
+            return hasData
+                ? 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]'
+                : 'bg-port-number/50 border-port-number/50';
+        default:
+            return hasData
+                ? 'bg-port-output border-port-output shadow-[0_0_6px_rgba(139,92,246,0.4)]'
+                : 'bg-port-output/50 border-port-output/50';
+    }
+};
+
 interface PortItemProps {
     port: PortDefinition;
     type: 'input' | 'output';
     nodeId: string;
     hasData: boolean;
     isHighlighted: boolean;
+    /** Connection being dragged - for compatibility feedback */
+    connectionDraft?: ConnectionDraftInfo | null;
     onMouseDown: (
         nodeId: string,
         portId: string,
@@ -86,42 +165,47 @@ interface PortItemProps {
     onMouseUp: (nodeId: string, portId: string, type: 'input' | 'output', portType: string) => void;
 }
 
-const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHighlighted, onMouseDown, onMouseUp }) => {
-    const getPortTypeColor = (portType: string, hasData: boolean, portDirection: 'input' | 'output') => {
-        // Always show color based on port type, brighter when has data
-        if (portDirection === 'input') {
-            return hasData
-                ? 'bg-port-input border-port-input shadow-[0_0_6px_rgba(34,197,94,0.4)]'
-                : 'bg-port-input/50 border-port-input/50';
-        }
+const PortItem: React.FC<PortItemProps> = ({
+    port,
+    type,
+    nodeId,
+    hasData,
+    isHighlighted,
+    connectionDraft,
+    onMouseDown,
+    onMouseUp,
+}) => {
+    // Determine if this input port is a valid drop target for the current connection draft
+    const isDraggingConnection = !!connectionDraft;
+    const isInputPort = type === 'input';
+    const isSourceNode = connectionDraft?.sourceNodeId === nodeId;
 
-        switch (portType.toLowerCase()) {
-            case 'image':
-                return hasData
-                    ? 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]'
-                    : 'bg-port-image/50 border-port-image/50';
-            case 'text':
-            case 'string':
-                return hasData
-                    ? 'bg-port-text border-port-text shadow-[0_0_6px_rgba(139,92,246,0.4)]'
-                    : 'bg-port-text/50 border-port-text/50';
-            case 'number':
-                return hasData
-                    ? 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]'
-                    : 'bg-port-number/50 border-port-number/50';
-            default:
-                return hasData
-                    ? 'bg-port-output border-port-output shadow-[0_0_6px_rgba(139,92,246,0.4)]'
-                    : 'bg-port-output/50 border-port-output/50';
-        }
-    };
+    // Only input ports can be drop targets, and not on the same node
+    const isValidDropTarget =
+        isDraggingConnection &&
+        isInputPort &&
+        !isSourceNode &&
+        arePortTypesCompatible(connectionDraft.sourceType, port.type);
+
+    const isIncompatibleTarget = isDraggingConnection && isInputPort && !isSourceNode && !isValidDropTarget;
 
     const portClasses = cn(
-        'w-3 h-3 rounded-full border-2 cursor-crosshair transition-all duration-200',
+        'w-3 h-3 rounded-full border-2 transition-all duration-200',
+        // Highlighted state (selected connection)
         isHighlighted && 'scale-150 border-primary bg-primary ring-4 ring-primary/30 z-20',
-        !isHighlighted && 'hover:scale-125 hover:ring-2 hover:ring-white/20',
-        !isHighlighted && getPortTypeColor(port.type, hasData, type)
+        // Valid drop target - slow gentle glow (2s animation in styles.css)
+        !isHighlighted && isValidDropTarget && 'border-success bg-success z-20 animate-port-glow cursor-copy',
+        // Incompatible target - dimmed with not-allowed cursor
+        !isHighlighted && isIncompatibleTarget && 'opacity-30 cursor-not-allowed',
+        // Normal state
+        !isHighlighted &&
+            !isValidDropTarget &&
+            !isIncompatibleTarget &&
+            'cursor-crosshair hover:scale-125 hover:ring-2 hover:ring-white/20',
+        !isHighlighted && !isValidDropTarget && getPortTypeColor(port.type, hasData, type)
     );
+
+    const PortIcon = getPortTypeIcon(port.type);
 
     const portCircle = (
         <div
@@ -136,7 +220,9 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
             }}
         >
             {/* Extended hit area - transparent 24x24px */}
-            <div className="absolute -inset-1.5 cursor-crosshair" />
+            <div
+                className={cn('absolute -inset-1.5', isIncompatibleTarget ? 'cursor-not-allowed' : 'cursor-crosshair')}
+            />
             {/* Visual port circle */}
             <div className={portClasses} />
         </div>
@@ -147,17 +233,23 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
             className={cn('flex items-center h-7 relative group', type === 'output' ? 'justify-end' : 'justify-start')}
         >
             {type === 'input' && portCircle}
-            <span
+            <div
                 className={cn(
-                    'text-[10px] uppercase tracking-wider font-medium select-none transition-colors',
-                    isHighlighted ? 'text-primary font-semibold' : 'text-muted-foreground/80'
+                    'flex items-center gap-1 transition-all',
+                    isHighlighted && 'text-primary font-semibold',
+                    isValidDropTarget && 'text-success font-semibold',
+                    isIncompatibleTarget && 'opacity-30',
+                    !isHighlighted && !isValidDropTarget && !isIncompatibleTarget && 'text-muted-foreground/80'
                 )}
             >
-                {port.label}
-            </span>
+                {PortIcon && <PortIcon className="w-2.5 h-2.5" />}
+                <span className="text-[10px] uppercase tracking-wider font-medium select-none">{port.label}</span>
+            </div>
             {type === 'output' && portCircle}
 
-            <div className="absolute left-1/2 -translate-x-1/2 -top-8 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-150">
+            {/* Tooltip showing port type */}
+            <div className="absolute left-1/2 -translate-x-1/2 -top-8 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-150 flex items-center gap-1">
+                {PortIcon && <PortIcon className="w-2.5 h-2.5" />}
                 <span className="font-semibold">{port.type}</span>
             </div>
         </div>
@@ -213,7 +305,7 @@ interface EditableVisualizationProps {
 const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
     // Server uses 'image' key for input-image config
-    const img = node.config.imageData as string | undefined;
+    const img = node.config?.imageData as string | undefined;
     const fileInputId = `inline-image-${node.id}`;
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,7 +374,7 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
     const { t } = useTranslation(['nodes']);
     const [isEditing, setIsEditing] = useState(false);
     // Server uses 'value' key for input-text config
-    const text = (node.config.text as string) || '';
+    const text = (node.config?.text as string) || '';
 
     const textDisplay = useMemo(() => {
         if (!text) return null;
@@ -407,7 +499,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const blockRegistry = useBlockRegistry();
     const definition = blockRegistry[node.type];
 
-    const { isSelected, isHighlighted, highlightedPortIds = [] } = highlightState;
+    const { isSelected, isHighlighted, highlightedPortIds = [], connectionDraft } = highlightState;
     const { onPortMouseDown, onPortMouseUp } = portHandlers;
     const { onConfigChange, onLabelChange, onToggleAuto } = configHandlers;
     const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs } = actions;
@@ -435,9 +527,10 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
     useEffect(() => {
         let interval: number;
-        if (node.status === 'RUNNING' && node.executionStats?.startTime) {
+        const startTime = node.executionStats?.startTime;
+        if (node.status === 'RUNNING' && startTime) {
             interval = window.setInterval(() => {
-                setElapsedTime(Date.now() - node.executionStats!.startTime!);
+                setElapsedTime(Date.now() - startTime);
             }, 100);
         } else {
             setElapsedTime(null);
@@ -675,6 +768,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 nodeId={node.id}
                                 hasData={!!node.inputData[p.id]}
                                 isHighlighted={highlightedPortIds.includes(p.id)}
+                                connectionDraft={connectionDraft}
                                 onMouseDown={onPortMouseDown}
                                 onMouseUp={onPortMouseUp}
                             />
@@ -689,6 +783,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 nodeId={node.id}
                                 hasData={!!node.outputData[p.id]}
                                 isHighlighted={highlightedPortIds.includes(p.id)}
+                                connectionDraft={connectionDraft}
                                 onMouseDown={onPortMouseDown}
                                 onMouseUp={onPortMouseUp}
                             />

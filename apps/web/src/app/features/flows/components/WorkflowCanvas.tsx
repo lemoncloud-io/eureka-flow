@@ -404,7 +404,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                     setNodes(prev => [...prev, newNode]);
                     if (newConnection) {
-                        setConnections(prev => [...prev, newConnection!]);
+                        setConnections(prev => [...prev, newConnection]);
                     }
 
                     // Sync new node to backend
@@ -494,7 +494,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const tempInDegree = { ...inDegree };
 
                     while (queue.length > 0) {
-                        const u = queue.shift()!;
+                        const u = queue.shift();
+                        if (!u) break;
                         processed.add(u);
 
                         const neighbors = adj[u] || [];
@@ -802,7 +803,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             await onBeforeBackendRun();
                         }
 
-                        const nodeResult = await runNode(nodeId, { config$: currentNode.config });
+                        const nodeResult = await runNode(nodeId, { config$: currentNode.config || {} });
 
                         if (nodeResult.status === 'ERROR') {
                             const duration = Date.now() - startTime;
@@ -842,7 +843,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             results = {};
                         }
                     } else if (nodeDef.execute) {
-                        results = await nodeDef.execute(inputs, currentNode.config, onProgress);
+                        results = await nodeDef.execute(inputs, currentNode.config || {}, onProgress);
                     } else {
                         results = {};
                     }
@@ -938,10 +939,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             setNodes(prev => {
                 const node = prev.find(n => n.id === nodeId);
                 if (node) {
-                    const newConfig = { ...node.config, [key]: value };
+                    const newConfig = { ...(node.config || {}), [key]: value };
                     syncNodeUpdate(nodeId, { config: newConfig });
                 }
-                return prev.map(n => (n.id === nodeId ? { ...n, config: { ...n.config, [key]: value } } : n));
+                return prev.map(n => (n.id === nodeId ? { ...n, config: { ...(n.config || {}), [key]: value } } : n));
             });
         };
 
@@ -1009,7 +1010,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     inputData: {},
                     outputData: {},
                     errorMessage: undefined,
-                    config: JSON.parse(JSON.stringify(node.config)),
+                    config: node.config ? JSON.parse(JSON.stringify(node.config)) : {},
                     autoExecutionEnabled: node.autoExecutionEnabled ?? true,
                     customLabel: node.customLabel ? `${node.customLabel} (copy)` : undefined,
                 };
@@ -1339,7 +1340,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             inputData: {},
                             outputData: {},
                             errorMessage: undefined,
-                            config: JSON.parse(JSON.stringify(clipboard.config)),
+                            config: clipboard.config ? JSON.parse(JSON.stringify(clipboard.config)) : {},
                             autoExecutionEnabled: clipboard.autoExecutionEnabled ?? true,
                             customLabel: clipboard.customLabel,
                         };
@@ -1475,28 +1476,24 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     />
                                 );
                             })}
-                            {connectionDraft && (
-                                <ConnectionLine
-                                    x1={
-                                        getPortPosition(
-                                            connectionDraft.sourceNodeId,
-                                            connectionDraft.sourcePortId,
-                                            'output'
-                                        ).x
-                                    }
-                                    y1={
-                                        getPortPosition(
-                                            connectionDraft.sourceNodeId,
-                                            connectionDraft.sourcePortId,
-                                            'output'
-                                        ).y
-                                    }
-                                    x2={connectionDraft.mouseX}
-                                    y2={connectionDraft.mouseY}
-                                    isActive={true}
-                                    isDraft={true}
-                                />
-                            )}
+                            {connectionDraft &&
+                                (() => {
+                                    const draftStart = getPortPosition(
+                                        connectionDraft.sourceNodeId,
+                                        connectionDraft.sourcePortId,
+                                        'output'
+                                    );
+                                    return (
+                                        <ConnectionLine
+                                            x1={draftStart.x}
+                                            y1={draftStart.y}
+                                            x2={connectionDraft.mouseX}
+                                            y2={connectionDraft.mouseY}
+                                            isActive={true}
+                                            isDraft={true}
+                                        />
+                                    );
+                                })()}
                         </svg>
 
                         <div className={`pointer-events-auto ${readOnly ? 'pointer-events-none' : ''}`}>
@@ -1522,6 +1519,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 isSelected: selectedNodeId === node.id,
                                                 isHighlighted: !!isConnected,
                                                 highlightedPortIds: highlightedPorts,
+                                                connectionDraft: connectionDraft
+                                                    ? {
+                                                          sourceNodeId: connectionDraft.sourceNodeId,
+                                                          sourcePortId: connectionDraft.sourcePortId,
+                                                          sourceType: connectionDraft.sourceType,
+                                                      }
+                                                    : null,
                                             }}
                                             portHandlers={{
                                                 onPortMouseDown: handlePortMouseDown,
