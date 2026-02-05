@@ -203,7 +203,10 @@ export const useFlows = () => {
                 const { nodes = [], edges, connections } = body;
                 const edgesData = edges ?? connections ?? [];
 
-                const saveBody: SaveFlowBody = { nodes, edges: edgesData };
+                // Strip config from nodes - individual node updates handle config via PUT /nodes/:id
+                const slimNodes = nodes.map(({ config: _config, ...rest }) => rest) as NodeData[];
+
+                const saveBody: SaveFlowBody = { nodes: slimNodes, edges: edgesData };
 
                 // Store for retry on failure
                 lastSaveBodyRef.current = saveBody;
