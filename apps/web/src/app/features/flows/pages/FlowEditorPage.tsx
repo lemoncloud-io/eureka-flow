@@ -397,6 +397,7 @@ export const FlowEditorPage = () => {
             <div className="absolute inset-0">
                 <WorkflowCanvas
                     ref={canvasRef}
+                    flowId={currentFlowId}
                     onNodeSelect={handleSelectionChange}
                     onChange={handleCanvasChange}
                     onBeforeBackendRun={handleBeforeBackendRun}

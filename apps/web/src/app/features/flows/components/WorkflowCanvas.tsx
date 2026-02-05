@@ -10,6 +10,7 @@ import {
     requiresBackendProcessing,
     runNode,
     useBlockRegistry,
+    useNodeSync,
 } from '@flows/flows';
 
 import { ConnectionLine } from './ConnectionLine';
@@ -41,6 +42,8 @@ export interface WorkflowCanvasRef {
 interface WorkflowCanvasProps {
     readOnly?: boolean;
     initialData?: WorkflowState;
+    /** Flow ID for syncing node changes to backend */
+    flowId?: string | null;
     onNodeSelect?: (nodeId: string | null) => void;
     onChange?: () => void;
     /** Called before running a node that requires backend processing. Should save the flow. */
@@ -50,9 +53,10 @@ interface WorkflowCanvasProps {
 const GRID_SIZE = 20;
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
-    ({ readOnly, initialData, onNodeSelect, onChange, onBeforeBackendRun }, ref) => {
+    ({ readOnly, initialData, flowId, onNodeSelect, onChange, onBeforeBackendRun }, ref) => {
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
+        const { syncNodeUpdate, createNodeOnBackend } = useNodeSync({ flowId: flowId ?? null });
 
         const [nodes, setNodes] = useState<NodeData[]>([]);
         const [connections, setConnections] = useState<Connection[]>([]);
@@ -352,6 +356,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         setConnections(prev => [...prev, newConnection!]);
                     }
 
+                    // Sync new node to backend
+                    createNodeOnBackend(newNode);
+
                     handleSelectionChange(newNode.id);
                     setSelectedConnectionId(null);
                 },
@@ -565,6 +572,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 handleSelectionChange,
                 blockRegistry,
                 onBeforeBackendRun,
+                createNodeOnBackend,
             ]
         );
 
@@ -876,27 +884,39 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const handleConfigChange = (nodeId: string, key: string, value: unknown) => {
             if (readOnly) return;
             saveCheckpoint();
-            setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, config: { ...n.config, [key]: value } } : n)));
+            setNodes(prev => {
+                const node = prev.find(n => n.id === nodeId);
+                if (node) {
+                    const newConfig = { ...node.config, [key]: value };
+                    syncNodeUpdate(nodeId, { config: newConfig });
+                }
+                return prev.map(n => (n.id === nodeId ? { ...n, config: { ...n.config, [key]: value } } : n));
+            });
         };
 
         const handleLabelChange = (nodeId: string, label: string) => {
             if (readOnly) return;
             saveCheckpoint();
             setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, customLabel: label || undefined } : n)));
+            syncNodeUpdate(nodeId, { customLabel: label || undefined });
         };
 
         const handleDescriptionChange = (nodeId: string, description: string) => {
             if (readOnly) return;
             saveCheckpoint();
             setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, description: description || undefined } : n)));
+            syncNodeUpdate(nodeId, { description: description || undefined });
         };
 
         const handleToggleAuto = (nodeId: string) => {
             if (readOnly) return;
             saveCheckpoint();
+            const node = nodes.find(n => n.id === nodeId);
+            const newValue = node ? !node.autoExecutionEnabled : true;
             setNodes(prev =>
                 prev.map(n => (n.id === nodeId ? { ...n, autoExecutionEnabled: !n.autoExecutionEnabled } : n))
             );
+            syncNodeUpdate(nodeId, { autoExecutionEnabled: newValue });
         };
 
         const deleteNode = useCallback(
@@ -1122,6 +1142,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 ) {
                     pastRef.current.push(dragStartSnapshotRef.current);
                     futureRef.current = [];
+
+                    // Sync position to backend on drag end
+                    syncNodeUpdate(dragState.nodeId, { position: currentNode.position });
                 }
             }
 

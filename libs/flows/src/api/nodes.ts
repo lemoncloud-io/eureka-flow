@@ -47,11 +47,11 @@ export const createNode = async (body: NodeBody): Promise<NodeView> => {
 
 /**
  * Update existing node
- * POST /nodes/:id
+ * PUT /nodes/:id
  */
 export const updateNode = async (id: string, body: Partial<NodeView>): Promise<NodeView> => {
     _log(`> updateNode(${id})`, body);
-    const response = await api.post<NodeView>(`/nodes/${id}`, body);
+    const response = await api.put<NodeView>(`/nodes/${id}`, body);
     return response.data;
 };
 
