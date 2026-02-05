@@ -17,23 +17,13 @@ export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'):
     timestamp: Date.now(),
 });
 
-/**
- * Block types that have backend processors and should use API execution
- *
- * @deprecated This is a fallback for servers that don't provide isFrontend flag.
- * Once the server is updated to provide isFrontend, this list can be removed.
- *
- * These types must match the processor.type values registered in the backend:
- * - blog-title-generator: AI Blog Title Generator (Gemini API)
- * - blog-tags-generator: AI Blog Tags Generator (Gemini API)
- * - single-image-generator: AI Single Image Generator (Gemini API)
- */
+/** @deprecated Fallback for servers without isFrontend flag. Remove when server is updated. */
 const LEGACY_BACKEND_PROCESSOR_TYPES = [
     'blog-title-generator',
     'blog-tags-generator',
     'single-image-generator',
-    'title-generator', // Title Generator uses backend AI processing
-];
+    'title-generator',
+] as const;
 
 /**
  * Extended BlockView with isFrontend flag from server

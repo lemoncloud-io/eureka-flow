@@ -618,8 +618,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             try {
                 while (executionQueueRef.current.size > 0) {
-                    const nodeId = executionQueueRef.current.values().next().value;
-                    if (!nodeId) break;
+                    const nextValue = executionQueueRef.current.values().next();
+                    if (nextValue.done || !nextValue.value) break;
+                    const nodeId = nextValue.value;
                     executionQueueRef.current.delete(nodeId);
 
                     const node = nodesRef.current.find(n => n.id === nodeId);
@@ -684,6 +685,32 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         prev.map(n =>
                             n.id === nodeId
                                 ? { ...n, status: 'ERROR', errorMessage: t('nodes:errors.unknownBlockType') }
+                                : n
+                        )
+                    );
+                    return;
+                }
+
+                // Check for missing required inputs before execution
+                // Missing if: no data AND (has incoming connection OR explicitly required)
+                const incomingConnections = connectionsRef.current.filter(c => c.targetNodeId === nodeId);
+                const missingInputs = nodeDef.inputs.filter(inputPort => {
+                    if (inputs[inputPort.id]) return false; // Has data - not missing
+                    const hasConnection = incomingConnections.some(c => c.targetPortId === inputPort.id);
+                    return hasConnection || inputPort.required === true;
+                });
+
+                if (missingInputs.length > 0) {
+                    const missingLabels = missingInputs.map(p => p.label || p.id).join(', ');
+                    setNodes(prev =>
+                        prev.map(n =>
+                            n.id === nodeId
+                                ? {
+                                      ...n,
+                                      status: 'ERROR',
+                                      errorMessage: t('nodes:errors.missingInputs', { inputs: missingLabels }),
+                                      executionStats: { startTime, duration: 0, progress: 0 },
+                                  }
                                 : n
                         )
                     );
