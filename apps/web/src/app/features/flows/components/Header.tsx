@@ -306,30 +306,34 @@ export const Header: React.FC<HeaderProps> = ({
 
     return (
         <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
-            <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3">
                 {/* Left: Brand + Flow Info */}
                 <div className="pointer-events-auto">
                     <div
                         className={cn(
-                            'flex items-center gap-2 h-10 px-3 rounded-xl',
+                            'flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-2 sm:px-3 rounded-xl',
                             'bg-background/80 backdrop-blur-xl border border-border/50',
                             'shadow-sm'
                         )}
                     >
-                        <Workflow className="w-5 h-5 text-primary flex-shrink-0" />
-                        <span className="text-sm font-semibold text-foreground">FlowMosaic</span>
-                        <div className="w-px h-4 bg-border/60" />
+                        <Workflow className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
+                        <span className="text-xs sm:text-sm font-semibold text-foreground hidden sm:inline">
+                            FlowMosaic
+                        </span>
+                        <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
                         <FlowNameInput {...flowInfo} />
-                        <SaveStatusBadge saveStatus={saveState.saveStatus} lastSavedAt={saveState.lastSavedAt} />
+                        <span className="hidden md:inline">
+                            <SaveStatusBadge saveStatus={saveState.saveStatus} lastSavedAt={saveState.lastSavedAt} />
+                        </span>
                     </div>
                 </div>
 
                 {/* Right: Toolbar */}
-                <div className="pointer-events-auto flex items-center gap-2">
-                    {/* Edit Tools */}
+                <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
+                    {/* Edit Tools - hidden on mobile, shown on tablet+ */}
                     <div
                         className={cn(
-                            'flex items-center h-10 px-1 rounded-xl',
+                            'hidden sm:flex items-center h-9 sm:h-10 px-1 rounded-xl',
                             'bg-background/80 backdrop-blur-xl border border-border/50',
                             'shadow-sm'
                         )}
@@ -368,19 +372,19 @@ export const Header: React.FC<HeaderProps> = ({
                             onClick={executionActions.onStopAll}
                             variant="destructive"
                             size="sm"
-                            className="h-10 px-4 rounded-xl text-xs font-medium shadow-sm"
+                            className="h-9 sm:h-10 px-2.5 sm:px-4 rounded-xl text-xs font-medium shadow-sm"
                         >
-                            <Square className="w-3.5 h-3.5 mr-1.5" />
-                            {t('header.stopAll')}
+                            <Square className="w-3.5 h-3.5 sm:mr-1.5" />
+                            <span className="hidden sm:inline">{t('header.stopAll')}</span>
                         </Button>
                     ) : (
                         <Button
                             onClick={executionActions.onRunAll}
                             size="sm"
-                            className="h-10 px-4 rounded-xl text-xs font-medium bg-primary hover:bg-primary/90 shadow-sm"
+                            className="h-9 sm:h-10 px-2.5 sm:px-4 rounded-xl text-xs font-medium bg-primary hover:bg-primary/90 shadow-sm"
                         >
-                            <Play className="w-3.5 h-3.5 mr-1.5" />
-                            {t('header.runAll')}
+                            <Play className="w-3.5 h-3.5 sm:mr-1.5" />
+                            <span className="hidden sm:inline">{t('header.runAll')}</span>
                         </Button>
                     )}
 
@@ -389,7 +393,7 @@ export const Header: React.FC<HeaderProps> = ({
                         <DropdownMenuTrigger asChild>
                             <button
                                 className={cn(
-                                    'flex items-center justify-center w-10 h-10 rounded-xl',
+                                    'flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl',
                                     'bg-background/80 backdrop-blur-xl border border-border/50',
                                     'text-muted-foreground hover:text-foreground',
                                     'shadow-sm transition-colors duration-150'
@@ -411,6 +415,21 @@ export const Header: React.FC<HeaderProps> = ({
                             </DropdownMenuItem>
 
                             <DropdownMenuSeparator />
+
+                            {/* Edit actions - visible on mobile */}
+                            <div className="sm:hidden">
+                                <DropdownMenuItem onClick={editActions.onUndo}>
+                                    <Undo2 className="w-4 h-4 mr-2" />
+                                    {t('header.undo')}
+                                    <DropdownMenuShortcut>⌘Z</DropdownMenuShortcut>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={editActions.onRedo}>
+                                    <Redo2 className="w-4 h-4 mr-2" />
+                                    {t('header.redo')}
+                                    <DropdownMenuShortcut>⌘⇧Z</DropdownMenuShortcut>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                            </div>
 
                             <DropdownMenuItem onClick={fileActions.onExport}>
                                 <Download className="w-4 h-4 mr-2" />

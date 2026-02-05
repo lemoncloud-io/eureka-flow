@@ -111,7 +111,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         const [nodes, setNodes] = useState<NodeData[]>([]);
         const [connections, setConnections] = useState<Connection[]>([]);
-        const [clipboard, setClipboard] = useState<NodeData | null>(null);
+        const [clipboard, setClipboard] = useState<NodeData[]>([]);
 
         const pastRef = useRef<WorkflowState[]>([]);
         const futureRef = useRef<WorkflowState[]>([]);
@@ -136,9 +136,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const [isPanning, setIsPanning] = useState(false);
         const lastMousePosRef = useRef({ x: 0, y: 0 });
 
-        const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+        const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
         const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
         const [hoveredConnectionId, setHoveredConnectionId] = useState<string | null>(null);
+
+        // For single-node operations (detail panel, etc.), use the first selected node
+        const selectedNodeId = selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null;
 
         const [logViewerNodeId, setLogViewerNodeId] = useState<string | null>(null);
 
@@ -146,8 +149,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             nodeId: string;
             startX: number;
             startY: number;
-            initialX: number;
-            initialY: number;
+            /** Initial positions of all dragged nodes (for multi-select) */
+            initialPositions: Map<string, { x: number; y: number }>;
         } | null>(null);
         const [tooltip, setTooltip] = useState<{ x: number; y: number; content: unknown; type: string } | null>(null);
 
@@ -230,7 +233,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         useEffect(() => {
             if (initialData) {
-                const loadedNodes = initialData.nodes ?? [];
+                // Normalize nodes to ensure config is never undefined
+                const loadedNodes = (initialData.nodes ?? []).map(n => ({
+                    ...n,
+                    config: n.config ?? {},
+                }));
                 setNodes(loadedNodes);
                 setConnections(initialData.connections ?? []);
                 pastRef.current = [];
@@ -251,8 +258,37 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         }, [modalFlowId]);
 
         const handleSelectionChange = useCallback(
-            (nodeId: string | null) => {
-                setSelectedNodeId(nodeId);
+            (nodeId: string | null, options?: { addToSelection?: boolean; toggleSelection?: boolean }) => {
+                const { addToSelection = false, toggleSelection = false } = options || {};
+
+                setSelectedNodeIds(prev => {
+                    if (nodeId === null) {
+                        // Clear selection
+                        return new Set();
+                    }
+
+                    if (toggleSelection) {
+                        // Toggle: if selected, remove; if not, add
+                        const next = new Set(prev);
+                        if (next.has(nodeId)) {
+                            next.delete(nodeId);
+                        } else {
+                            next.add(nodeId);
+                        }
+                        return next;
+                    }
+
+                    if (addToSelection) {
+                        // Add to existing selection
+                        const next = new Set(prev);
+                        next.add(nodeId);
+                        return next;
+                    }
+
+                    // Replace selection with single node
+                    return new Set([nodeId]);
+                });
+
                 if (onNodeSelect) {
                     onNodeSelect(nodeId);
                 }
@@ -418,7 +454,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     executionQueueRef.current.clear();
                     isProcessingQueueRef.current = false;
                     executingNodesRef.current.clear();
-                    const loadedNodes = state.nodes ?? [];
+                    // Normalize nodes to ensure config is never undefined
+                    const loadedNodes = (state.nodes ?? []).map(n => ({
+                        ...n,
+                        config: n.config ?? {},
+                    }));
                     setNodes(loadedNodes);
                     // Support both 'edges' (API format) and 'connections' (legacy)
                     setConnections(state.edges ?? state.connections ?? []);
@@ -1123,8 +1163,20 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string) => {
             if (readOnly) return;
             e.stopPropagation();
-            handleSelectionChange(nodeId);
             setSelectedConnectionId(null);
+
+            const isMultiSelectKey = e.shiftKey || e.metaKey || e.ctrlKey;
+            const isAlreadySelected = selectedNodeIds.has(nodeId);
+
+            // Handle selection based on modifier keys
+            if (isMultiSelectKey) {
+                // Shift/Cmd/Ctrl + click: toggle selection
+                handleSelectionChange(nodeId, { toggleSelection: true });
+            } else if (!isAlreadySelected) {
+                // Regular click on unselected node: replace selection
+                handleSelectionChange(nodeId);
+            }
+            // If already selected without modifier, keep current selection for group drag
 
             const target = e.target as HTMLElement;
             if (
@@ -1139,12 +1191,24 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 connections: [...connections],
             };
 
+            // Determine which nodes will be dragged
+            const nodesToDrag =
+                isAlreadySelected || isMultiSelectKey ? new Set([...selectedNodeIds, nodeId]) : new Set([nodeId]);
+
+            // Store initial positions of all nodes to be dragged
+            const initialPositions = new Map<string, { x: number; y: number }>();
+            nodesToDrag.forEach(id => {
+                const node = nodes.find(n => n.id === id);
+                if (node) {
+                    initialPositions.set(id, { x: node.position.x, y: node.position.y });
+                }
+            });
+
             setDragState({
                 nodeId,
                 startX: e.clientX,
                 startY: e.clientY,
-                initialX: nodes.find(n => n.id === nodeId)?.position.x || 0,
-                initialY: nodes.find(n => n.id === nodeId)?.position.y || 0,
+                initialPositions,
             });
         };
 
@@ -1163,13 +1227,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 const dx = screenDx / viewport.zoom;
                 const dy = screenDy / viewport.zoom;
 
-                const rawX = dragState.initialX + dx;
-                const rawY = dragState.initialY + dy;
-                const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
-                const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
-
+                // Move all nodes that are being dragged
                 setNodes(prev =>
-                    prev.map(n => (n.id === dragState.nodeId ? { ...n, position: { x: snappedX, y: snappedY } } : n))
+                    prev.map(n => {
+                        const initialPos = dragState.initialPositions.get(n.id);
+                        if (!initialPos) return n;
+
+                        const rawX = initialPos.x + dx;
+                        const rawY = initialPos.y + dy;
+                        const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
+                        const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
+
+                        return { ...n, position: { x: snappedX, y: snappedY } };
+                    })
                 );
             }
 
@@ -1183,20 +1253,29 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             setIsPanning(false);
 
             if (dragState && dragStartSnapshotRef.current) {
-                const currentNode = nodes.find(n => n.id === dragState.nodeId);
-                const originalNode = dragStartSnapshotRef.current.nodes.find(n => n.id === dragState.nodeId);
+                // Check if any node was actually moved
+                let hasMoved = false;
+                const movedNodes: Array<{ id: string; position: { x: number; y: number } }> = [];
 
-                if (
-                    currentNode &&
-                    originalNode &&
-                    (currentNode.position.x !== originalNode.position.x ||
-                        currentNode.position.y !== originalNode.position.y)
-                ) {
+                dragState.initialPositions.forEach((initialPos, nodeId) => {
+                    const currentNode = nodes.find(n => n.id === nodeId);
+                    if (
+                        currentNode &&
+                        (currentNode.position.x !== initialPos.x || currentNode.position.y !== initialPos.y)
+                    ) {
+                        hasMoved = true;
+                        movedNodes.push({ id: nodeId, position: currentNode.position });
+                    }
+                });
+
+                if (hasMoved) {
                     pastRef.current.push(dragStartSnapshotRef.current);
                     futureRef.current = [];
 
-                    // Sync position to backend on drag end
-                    syncNodeUpdate(dragState.nodeId, { position: currentNode.position });
+                    // Sync all moved nodes to backend
+                    movedNodes.forEach(({ id, position }) => {
+                        syncNodeUpdate(id, { position });
+                    });
                 }
             }
 
@@ -1311,47 +1390,52 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 const isCtrlOrCmd = e.ctrlKey || e.metaKey;
 
                 if (isCtrlOrCmd && e.key.toLowerCase() === 'c') {
-                    if (selectedNodeId) {
-                        const node = nodes.find(n => n.id === selectedNodeId);
-                        if (node) setClipboard(node);
+                    if (selectedNodeIds.size > 0) {
+                        const nodesToCopy = nodes.filter(n => selectedNodeIds.has(n.id));
+                        if (nodesToCopy.length > 0) setClipboard(nodesToCopy);
                     }
                 }
 
                 if (isCtrlOrCmd && e.key.toLowerCase() === 'v') {
-                    if (clipboard) {
+                    if (clipboard.length > 0) {
                         saveCheckpoint();
-                        let x = 100,
-                            y = 100;
-                        if (canvasRef.current) {
-                            const rect = canvasRef.current.getBoundingClientRect();
-                            x = (rect.width / 2 - viewport.x) / viewport.zoom - 100;
-                            y = (rect.height / 2 - viewport.y) / viewport.zoom - 50;
-                            x += Math.random() * 40 - 20;
-                            y += Math.random() * 40 - 20;
-                        }
-                        const newNode: NodeData = {
-                            ...clipboard,
+
+                        // Calculate offset from original positions
+                        const offsetX = 40;
+                        const offsetY = 40;
+
+                        const newNodes: NodeData[] = clipboard.map(node => ({
+                            ...node,
                             id: generateId(),
                             position: {
-                                x: Math.round(x / GRID_SIZE) * GRID_SIZE,
-                                y: Math.round(y / GRID_SIZE) * GRID_SIZE,
+                                x: Math.round((node.position.x + offsetX) / GRID_SIZE) * GRID_SIZE,
+                                y: Math.round((node.position.y + offsetY) / GRID_SIZE) * GRID_SIZE,
                             },
                             status: 'IDLE',
                             inputData: {},
                             outputData: {},
                             errorMessage: undefined,
-                            config: clipboard.config ? JSON.parse(JSON.stringify(clipboard.config)) : {},
-                            autoExecutionEnabled: clipboard.autoExecutionEnabled ?? true,
-                            customLabel: clipboard.customLabel,
-                        };
-                        setNodes(prev => [...prev, newNode]);
-                        handleSelectionChange(newNode.id);
+                            config: node.config ? JSON.parse(JSON.stringify(node.config)) : {},
+                            autoExecutionEnabled: node.autoExecutionEnabled ?? true,
+                            customLabel: node.customLabel,
+                        }));
+
+                        setNodes(prev => [...prev, ...newNodes]);
+                        // Select all pasted nodes
+                        setSelectedNodeIds(new Set(newNodes.map(n => n.id)));
                     }
                 }
 
                 if (e.key === 'Delete' || e.key === 'Backspace') {
-                    if (selectedNodeId) {
-                        deleteNode(selectedNodeId);
+                    if (selectedNodeIds.size > 0) {
+                        // Delete all selected nodes
+                        saveCheckpoint();
+                        const idsToDelete = selectedNodeIds;
+                        setNodes(prev => prev.filter(n => !idsToDelete.has(n.id)));
+                        setConnections(prev =>
+                            prev.filter(c => !idsToDelete.has(c.sourceNodeId) && !idsToDelete.has(c.targetNodeId))
+                        );
+                        handleSelectionChange(null);
                     } else if (selectedConnectionId || hoveredConnectionId) {
                         const targetId = selectedConnectionId || hoveredConnectionId;
                         saveCheckpoint();
@@ -1372,14 +1456,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             return () => window.removeEventListener('keydown', handleKeyDown);
         }, [
             nodes,
-            selectedNodeId,
+            selectedNodeIds,
             selectedConnectionId,
             hoveredConnectionId,
             clipboard,
             readOnly,
             viewport,
             saveCheckpoint,
-            deleteNode,
             handleSelectionChange,
         ]);
 
@@ -1516,7 +1599,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                         <NodeBlock
                                             node={node}
                                             highlightState={{
-                                                isSelected: selectedNodeId === node.id,
+                                                isSelected: selectedNodeIds.has(node.id),
                                                 isHighlighted: !!isConnected,
                                                 highlightedPortIds: highlightedPorts,
                                                 connectionDraft: connectionDraft
@@ -1544,7 +1627,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 onViewLogs: () => setLogViewerNodeId(node.id),
                                             }}
                                             onMouseDown={e => handleNodeMouseDown(e, node.id)}
-                                            isDragging={dragState?.nodeId === node.id}
+                                            isDragging={dragState?.initialPositions.has(node.id) ?? false}
                                         />
                                     </div>
                                 );

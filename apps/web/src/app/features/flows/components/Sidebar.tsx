@@ -211,10 +211,10 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
     return (
         <>
             {/* Single Library Button */}
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20 pointer-events-auto">
+            <div className="absolute left-2 sm:left-4 bottom-4 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 z-20 pointer-events-auto">
                 <div
                     className={cn(
-                        'flex flex-col gap-2 p-2 rounded-2xl',
+                        'flex flex-col gap-2 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl',
                         'bg-glass-bg backdrop-blur-[24px] border border-glass-border',
                         'shadow-floating'
                     )}
@@ -225,7 +225,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                 <button
                                     onClick={handleTogglePanel}
                                     className={cn(
-                                        'w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-150',
+                                        'w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all duration-150',
                                         'hover:bg-accent',
                                         isOpen
                                             ? 'bg-glass-bg text-primary shadow-md'
@@ -235,7 +235,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                     <LayoutGrid className="w-4 h-4" />
                                 </button>
                             </TooltipTrigger>
-                            <TooltipContent side="right" className="text-xs font-medium">
+                            <TooltipContent side="right" className="text-xs font-medium hidden sm:block">
                                 {t('sidebar.library')}
                             </TooltipContent>
                         </Tooltip>
@@ -247,17 +247,26 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
             {isOpen && (
                 <>
                     {/* Backdrop */}
-                    <div className="fixed inset-0 z-15" onClick={handleClose} />
+                    <div className="fixed inset-0 z-15 bg-black/20 sm:bg-transparent" onClick={handleClose} />
 
-                    {/* Panel */}
+                    {/* Panel - Full screen on mobile, floating on tablet+ */}
                     <div
                         className={cn(
-                            'absolute left-20 top-1/2 -translate-y-1/2 z-20 w-64',
-                            'bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl',
+                            // Mobile: full-screen sheet from bottom
+                            'fixed inset-x-0 bottom-0 z-20 rounded-t-2xl',
+                            'max-h-[80vh] sm:max-h-none',
+                            // Tablet+: positioned floating panel
+                            'sm:absolute sm:inset-auto sm:left-20 sm:top-1/2 sm:-translate-y-1/2 sm:w-64 sm:rounded-2xl',
+                            'bg-glass-bg backdrop-blur-[24px] border border-glass-border',
                             'shadow-lg p-3 pointer-events-auto',
-                            'animate-in fade-in slide-in-from-left-2 duration-200'
+                            'animate-in fade-in slide-in-from-bottom-4 sm:slide-in-from-left-2 duration-200'
                         )}
                     >
+                        {/* Mobile drag handle indicator */}
+                        <div className="flex justify-center mb-2 sm:hidden">
+                            <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
+                        </div>
+
                         {/* Search Input */}
                         <div className="relative mb-3">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -294,7 +303,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                             </div>
                         )}
 
-                        <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                        <div className="space-y-2 max-h-[50vh] sm:max-h-[60vh] overflow-y-auto pr-1">
                             {CATEGORIES.map(category => {
                                 const config = CATEGORY_CONFIG[category];
                                 const Icon = config.icon;
@@ -362,3 +371,5 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
         </>
     );
 });
+
+Sidebar.displayName = 'Sidebar';

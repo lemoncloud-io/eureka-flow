@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 
 import { getBezierPath } from '../utils';
 
@@ -12,6 +12,8 @@ interface ConnectionLineProps {
     isHovered?: boolean;
     isDraft?: boolean;
     isFlowing?: boolean;
+    /** Show arrow at target end */
+    showArrow?: boolean;
     onMouseEnter?: (e: React.MouseEvent) => void;
     onMouseMove?: (e: React.MouseEvent) => void;
     onMouseLeave?: () => void;
@@ -28,14 +30,24 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
     isHovered,
     isDraft,
     isFlowing,
+    showArrow = true,
     onMouseEnter,
     onMouseMove,
     onMouseLeave,
     onClick,
 }) => {
+    const markerId = useId();
     const path = getBezierPath(x1, y1, x2, y2);
 
     const isInteractive = !!onMouseEnter || !!onMouseMove || !!onMouseLeave;
+
+    const getStrokeColor = () => {
+        if (isDraft) return 'hsl(var(--primary) / 0.7)';
+        if (isFlowing) return 'hsl(var(--primary))';
+        if (isHovered || isSelected) return 'hsl(var(--primary))';
+        if (isActive) return 'hsl(var(--muted-foreground) / 0.7)';
+        return 'hsl(var(--muted-foreground) / 0.5)';
+    };
 
     const getStrokeClass = () => {
         if (isDraft) return 'stroke-primary/70';
@@ -55,8 +67,27 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
           }
         : {};
 
+    const arrowMarkerId = `arrow-${markerId}`;
+
     return (
         <g>
+            {/* Arrow marker definition */}
+            {showArrow && !isDraft && (
+                <defs>
+                    <marker
+                        id={arrowMarkerId}
+                        markerWidth="6"
+                        markerHeight="6"
+                        refX="5"
+                        refY="3"
+                        orient="auto"
+                        markerUnits="strokeWidth"
+                    >
+                        <path d="M0,0 L0,6 L6,3 z" fill={getStrokeColor()} />
+                    </marker>
+                </defs>
+            )}
+
             {/* Main Line - no transition for draft to prevent lag */}
             <path
                 d={path}
@@ -65,6 +96,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
                 strokeWidth={strokeWidth}
                 strokeLinecap="round"
                 style={flowAnimationStyle}
+                markerEnd={showArrow && !isDraft ? `url(#${arrowMarkerId})` : undefined}
             />
 
             {/* Invisible Hit Area */}
