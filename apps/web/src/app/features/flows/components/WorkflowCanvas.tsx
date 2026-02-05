@@ -1373,8 +1373,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 const start = getPortPosition(conn.sourceNodeId, conn.sourcePortId, 'output');
                                 const end = getPortPosition(conn.targetNodeId, conn.targetPortId, 'input');
                                 const sourceNode = nodes.find(n => n.id === conn.sourceNodeId);
+                                const targetNode = nodes.find(n => n.id === conn.targetNodeId);
                                 const packet = sourceNode?.outputData[conn.sourcePortId];
                                 const isActive = !!packet;
+                                const isFlowing = sourceNode?.status === 'RUNNING' || targetNode?.status === 'RUNNING';
 
                                 const handleHover = (e: React.MouseEvent) => {
                                     setHoveredConnectionId(conn.id);
@@ -1410,6 +1412,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                         isActive={isActive}
                                         isSelected={selectedConnectionId === conn.id}
                                         isHovered={hoveredConnectionId === conn.id}
+                                        isFlowing={isFlowing}
                                         onMouseEnter={handleHover}
                                         onMouseMove={handleHover}
                                         onMouseLeave={handleLeave}

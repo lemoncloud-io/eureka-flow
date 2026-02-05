@@ -11,6 +11,7 @@ interface ConnectionLineProps {
     isSelected?: boolean;
     isHovered?: boolean;
     isDraft?: boolean;
+    isFlowing?: boolean;
     onMouseEnter?: (e: React.MouseEvent) => void;
     onMouseMove?: (e: React.MouseEvent) => void;
     onMouseLeave?: () => void;
@@ -26,6 +27,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
     isSelected,
     isHovered,
     isDraft,
+    isFlowing,
     onMouseEnter,
     onMouseMove,
     onMouseLeave,
@@ -37,12 +39,21 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
 
     const getStrokeClass = () => {
         if (isDraft) return 'stroke-primary/70';
+        if (isFlowing) return 'stroke-primary';
         if (isHovered || isSelected) return 'stroke-primary';
         if (isActive) return 'stroke-muted-foreground/70';
         return 'stroke-muted-foreground/50';
     };
 
-    const strokeWidth = isHovered || isSelected ? 2.5 : isDraft ? 2 : 1.5;
+    const strokeWidth = isFlowing ? 2 : isHovered || isSelected ? 2.5 : isDraft ? 2 : 1.5;
+
+    // Flow animation styles
+    const flowAnimationStyle: React.CSSProperties = isFlowing
+        ? {
+              strokeDasharray: '6 14',
+              animation: 'edge-flow 1s linear infinite',
+          }
+        : {};
 
     return (
         <g>
@@ -50,9 +61,10 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
             <path
                 d={path}
                 fill="none"
-                className={`${getStrokeClass()} ${isDraft ? '' : 'transition-colors duration-150'}`}
+                className={`${getStrokeClass()} ${isDraft || isFlowing ? '' : 'transition-colors duration-150'}`}
                 strokeWidth={strokeWidth}
                 strokeLinecap="round"
+                style={flowAnimationStyle}
             />
 
             {/* Invisible Hit Area */}

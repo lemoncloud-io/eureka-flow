@@ -216,6 +216,22 @@
     }
 }
 
+/* Edge flow animation for workflow execution */
+@keyframes edge-flow {
+    from {
+        stroke-dashoffset: 20;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-edge-flow {
+        animation: none !important;
+    }
+}
+
 .animate-in {
     animation-duration: 0.25s;
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
