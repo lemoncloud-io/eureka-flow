@@ -116,7 +116,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         endpoint: WS_ENDPOINT,
         tokenProvider,
         messageParser: parseWebSocketMessage,
-        enabled: !!channelId && !!apiKey,
+        enabled: !!apiKey,
         logPrefix: '[FlowSocket]',
         channels: channelId || undefined,
     });
@@ -152,7 +152,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
 
     // Reconnect when channelId changes - intentionally excludes connect/disconnect to avoid loops
     useEffect(() => {
-        if (channelId && apiKey) {
+        if (apiKey) {
             void connect();
         } else {
             disconnect();
