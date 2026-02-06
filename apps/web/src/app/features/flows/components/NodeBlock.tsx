@@ -191,8 +191,8 @@ const PortItem: React.FC<PortItemProps> = ({
 
     const portClasses = cn(
         'w-3 h-3 rounded-full border-2 transition-all duration-200',
-        // Highlighted state (selected connection)
-        isHighlighted && 'scale-150 border-primary bg-primary ring-4 ring-primary/30 z-20',
+        // Highlighted state (selected connection) - thicker border only, no ring
+        isHighlighted && 'scale-110 border-primary border-[3px] z-20',
         // Valid drop target - slow gentle glow (2s animation in styles.css)
         !isHighlighted && isValidDropTarget && 'border-success bg-success z-20 animate-port-glow cursor-copy',
         // Incompatible target - dimmed with not-allowed cursor
