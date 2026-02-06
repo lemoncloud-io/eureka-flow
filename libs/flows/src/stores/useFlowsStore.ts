@@ -50,7 +50,7 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     isAutoSaveEnabled: flowStorage.getAutoSaveEnabled(),
     saveStatus: 'idle',
     saveError: null,
-    channelId: null,
+    channelId: '0000',
 
     setBlockRegistry: blocks => {
         const registry = blocks.reduce<Record<string, BlockDefinition>>((acc, block) => {
