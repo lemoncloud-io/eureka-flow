@@ -168,11 +168,12 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
             const data = lastMessage.data;
 
             // Handle new format: flow update notification
+            // NOTE: Disabled - flow updates happen too frequently during save operations
+            // TODO: Re-enable when server-side debouncing is implemented
             if (isFlowUpdateMessage(data)) {
-                // Only process if it's for the current flow
-                if (currentFlowId && data.id === currentFlowId && onFlowUpdate) {
-                    onFlowUpdate(data.id);
-                }
+                // if (currentFlowId && data.id === currentFlowId && onFlowUpdate) {
+                //     onFlowUpdate(data.id);
+                // }
                 return;
             }
 
