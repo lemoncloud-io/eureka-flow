@@ -88,6 +88,8 @@ export interface UseInitFlowSocketOptions {
     channelId?: string | null;
     /** Current flow ID for filtering messages */
     currentFlowId?: string | null;
+    /** Last local update timestamp - messages with timestamp <= this are ignored (prevents self-echo) */
+    lastLocalUpdateTimestamp?: number | null;
     /** Callback when flow update notification is received (new format) */
     onFlowUpdate?: (flowId: string) => void;
     /** Callback when node update notification is received (new format) */
@@ -119,7 +121,7 @@ export interface UseInitFlowSocketOptions {
  * });
  */
 export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
-    const { channelId, currentFlowId, onFlowUpdate, onNodeReload, onNodeUpdate } = options;
+    const { channelId, currentFlowId, lastLocalUpdateTimestamp, onFlowUpdate, onNodeReload, onNodeUpdate } = options;
 
     const apiKey = useWebCoreStore(state => state.apiKey);
     const setId = useWebSocketStore(state => state.setId);
@@ -168,17 +170,24 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
             const data = lastMessage.data;
 
             // Handle new format: flow update notification
-            // NOTE: Disabled - flow updates happen too frequently during save operations
-            // TODO: Re-enable when server-side debouncing is implemented
             if (isFlowUpdateMessage(data)) {
-                // if (currentFlowId && data.id === currentFlowId && onFlowUpdate) {
-                //     onFlowUpdate(data.id);
-                // }
+                // Skip if message is older than our last local update (self-echo prevention)
+                if (lastLocalUpdateTimestamp && data.timestamp <= lastLocalUpdateTimestamp) {
+                    return;
+                }
+                // Only process if it's for the current flow
+                if (currentFlowId && data.id === currentFlowId && onFlowUpdate) {
+                    onFlowUpdate(data.id);
+                }
                 return;
             }
 
             // Handle new format: node update notification
             if (isNodeUpdateMessage(data)) {
+                // Skip if message is older than our last local update (self-echo prevention)
+                if (lastLocalUpdateTimestamp && data.timestamp <= lastLocalUpdateTimestamp) {
+                    return;
+                }
                 // Only process if it's for the current flow
                 if (currentFlowId && data.flowId === currentFlowId && onNodeReload) {
                     onNodeReload(data.id, data.flowId);
@@ -191,7 +200,15 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                 onNodeUpdate(data);
             }
         }
-    }, [lastMessage, broadcastMessage, currentFlowId, onFlowUpdate, onNodeReload, onNodeUpdate]);
+    }, [
+        lastMessage,
+        broadcastMessage,
+        currentFlowId,
+        lastLocalUpdateTimestamp,
+        onFlowUpdate,
+        onNodeReload,
+        onNodeUpdate,
+    ]);
 
     // Cleanup on unmount - intentionally empty deps for mount/unmount only
     useEffect(() => {

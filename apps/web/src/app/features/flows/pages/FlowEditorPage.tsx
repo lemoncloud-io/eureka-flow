@@ -104,6 +104,9 @@ export const FlowEditorPage = () => {
         }
     }, []);
 
+    // Track last local update to prevent self-echo from socket
+    const [lastLocalUpdateTimestamp, setLastLocalUpdateTimestamp] = useState<number | null>(null);
+
     // Initialize WebSocket connection when channelId is available
     const {
         isConnected: isSocketConnected,
@@ -114,6 +117,7 @@ export const FlowEditorPage = () => {
     } = useInitFlowSocket({
         channelId,
         currentFlowId,
+        lastLocalUpdateTimestamp,
         onFlowUpdate: handleFlowUpdate,
         onNodeReload: handleNodeUpdateNew,
         onNodeUpdate: handleNodeUpdate, // Legacy support
@@ -217,6 +221,7 @@ export const FlowEditorPage = () => {
                 const currentState = serializeWorkflowState(data);
 
                 if (currentState !== lastSavedStateRef.current) {
+                    setLastLocalUpdateTimestamp(Date.now()); // Mark save time to ignore self-echo
                     saveCurrentFlow(data);
                     lastSavedStateRef.current = currentState;
                 }
@@ -232,6 +237,7 @@ export const FlowEditorPage = () => {
     const handleSave = async () => {
         if (!canvasRef.current) return;
         const data = canvasRef.current.getWorkflow();
+        setLastLocalUpdateTimestamp(Date.now()); // Mark save time to ignore self-echo from socket
         const result = await saveCurrentFlow(data);
         if (result.success) {
             lastSavedStateRef.current = serializeWorkflowState(data);
@@ -267,6 +273,7 @@ export const FlowEditorPage = () => {
     const handleShare = async () => {
         if (canvasRef.current) {
             const data = canvasRef.current.getWorkflow();
+            setLastLocalUpdateTimestamp(Date.now());
             await saveCurrentFlow(data);
         }
 
@@ -301,6 +308,7 @@ export const FlowEditorPage = () => {
     const handleBeforeBackendRun = useCallback(async () => {
         if (!canvasRef.current) return;
         const data = canvasRef.current.getWorkflow();
+        setLastLocalUpdateTimestamp(Date.now());
         const result = await saveCurrentFlow(data);
         if (result.success) {
             lastSavedStateRef.current = serializeWorkflowState(data);
