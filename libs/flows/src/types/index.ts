@@ -42,6 +42,12 @@ import type { BlockDefinition, DataPacket, EdgeData, NodeData } from '@lemonclou
  * - `isFrontend: false` → Execute on server (call POST /nodes/:id/run)
  * - `isFrontend: undefined` → Fallback to legacy BACKEND_PROCESSOR_TYPES check
  */
+/**
+ * BlockStereo - stereotype of block for categorization
+ * Matches server's BlockStereo type
+ */
+export type BlockStereo = 'input' | 'process' | 'output';
+
 export interface BlockDefinitionWithFrontend extends BlockDefinition {
     /**
      * Indicates whether this block should be executed on the frontend (client-side)
@@ -52,6 +58,12 @@ export interface BlockDefinitionWithFrontend extends BlockDefinition {
      * - `undefined`: Use legacy fallback (BACKEND_PROCESSOR_TYPES check)
      */
     isFrontend?: boolean;
+
+    /**
+     * Block stereotype for categorization (input, process, output)
+     * Used by Sidebar for grouping blocks
+     */
+    stereo?: BlockStereo;
 
     /**
      * The function that runs when the block triggers (client-side only)

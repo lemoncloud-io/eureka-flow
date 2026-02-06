@@ -41,7 +41,9 @@
         "searchPlaceholder": "Search nodes...",
         "noResults": "No blocks found",
         "resultsCount": "{{count}} results",
-        "clickToAdd": "Click to add to canvas"
+        "clickToAdd": "Click to add to canvas",
+        "clientExecution": "Runs in browser (client-side)",
+        "portsInfo": "{{inputs}} inputs → {{outputs}} outputs"
     },
     "canvas": {
         "executionLogs": "Execution Logs",

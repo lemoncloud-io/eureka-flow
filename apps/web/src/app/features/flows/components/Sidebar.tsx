@@ -95,34 +95,75 @@ interface BlockItemProps {
     description: string;
     onAdd: () => void;
     disabled?: boolean;
+    inputCount?: number;
+    outputCount?: number;
+    isFrontend?: boolean;
 }
 
-const BlockItem: React.FC<BlockItemProps> = ({ type, label, description, onAdd, disabled }) => {
+const BlockItem: React.FC<BlockItemProps> = ({
+    type,
+    label,
+    description,
+    onAdd,
+    disabled,
+    inputCount = 0,
+    outputCount = 0,
+    isFrontend,
+}) => {
+    const { t } = useTranslation(['flows']);
     const Icon = getIcon(type);
 
     return (
-        <button
-            onClick={onAdd}
-            disabled={disabled}
-            className={cn(
-                'w-full p-3 rounded-lg border border-glass-border bg-glass-bg backdrop-blur-sm',
-                'text-left transition-all duration-150',
-                'hover:bg-accent/50 hover:border-accent',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-                'group'
-            )}
-        >
-            <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center shrink-0 group-hover:bg-accent/30 transition-colors">
-                    <Icon className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+        <TooltipProvider delayDuration={0}>
+            <button
+                onClick={onAdd}
+                disabled={disabled}
+                className={cn(
+                    'w-full p-3 rounded-lg border border-glass-border bg-glass-bg backdrop-blur-sm',
+                    'text-left transition-all duration-150',
+                    'hover:bg-accent/50 hover:border-accent',
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                    'group'
+                )}
+            >
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center shrink-0 group-hover:bg-accent/30 transition-colors">
+                        <Icon className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium text-foreground truncate">{label}</span>
+                            {isFrontend && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary shrink-0 cursor-help">
+                                            Client
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-xs">
+                                        {t('sidebar.clientExecution')}
+                                    </TooltipContent>
+                                </Tooltip>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground truncate flex-1">{description}</span>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="text-[9px] text-muted-foreground/70 shrink-0 cursor-help">
+                                        {inputCount}→{outputCount}
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs">
+                                    {t('sidebar.portsInfo', { inputs: inputCount, outputs: outputCount })}
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-foreground truncate">{label}</div>
-                    <div className="text-[10px] text-muted-foreground truncate">{description}</div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-        </button>
+            </button>
+        </TooltipProvider>
     );
 };
 
@@ -162,12 +203,17 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
               )
             : blocks;
 
+        // Group by stereo field from server, with fallback for legacy blocks
         return {
-            inputs: filteredBlocks.filter(b => b.type.startsWith('input-')),
+            inputs: filteredBlocks.filter(b => b.stereo === 'input' || (!b.stereo && b.type.startsWith('input-'))),
             process: filteredBlocks.filter(
-                b => !b.type.startsWith('input-') && !['result-preview', 'console-log'].includes(b.type)
+                b =>
+                    b.stereo === 'process' ||
+                    (!b.stereo && !b.type.startsWith('input-') && !['result-preview', 'console-log'].includes(b.type))
             ),
-            outputs: filteredBlocks.filter(b => ['result-preview', 'console-log'].includes(b.type)),
+            outputs: filteredBlocks.filter(
+                b => b.stereo === 'output' || (!b.stereo && ['result-preview', 'console-log'].includes(b.type))
+            ),
         };
     }, [blockRegistry, searchQuery]);
 
@@ -352,6 +398,9 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                             description={block.description}
                                                             onAdd={() => handleAddNode(block.type)}
                                                             disabled={isLoading}
+                                                            inputCount={block.inputs?.length}
+                                                            outputCount={block.outputs?.length}
+                                                            isFrontend={block.isFrontend}
                                                         />
                                                     ))
                                                 )}

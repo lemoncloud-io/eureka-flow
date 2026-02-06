@@ -2,7 +2,7 @@ import { api, withRetry } from '@flows/web-core';
 
 import { EXECUTE_FUNCTIONS } from './execute-functions';
 
-import type { BlockDefinitionWithFrontend } from '../types';
+import type { BlockDefinitionWithFrontend, BlockStereo } from '../types';
 import type { BlockView, DataPacket, ListResult } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[blocks-api]');
@@ -31,10 +31,15 @@ const LEGACY_BACKEND_PROCESSOR_TYPES = [
  * This type is intentionally kept local to this module as it represents
  * the raw API response shape. The public type `BlockDefinitionWithFrontend`
  * in types/index.ts is what consumers should use.
+ *
+ * Note: Server returns `isFrontend` as BoolFlag (0 | 1), not boolean.
+ * Conversion to boolean happens in listBlocks().
  */
 interface BlockViewWithFrontend extends BlockView {
-    /** Server-provided flag indicating frontend execution capability */
-    isFrontend?: boolean;
+    /** Server-provided flag indicating frontend execution capability (0 or 1) */
+    isFrontend?: 0 | 1;
+    /** Block stereotype for categorization (input, process, output) */
+    stereo?: BlockStereo;
 }
 
 /**
@@ -66,7 +71,7 @@ export const requiresBackendProcessing = (blockDef: BlockDefinitionWithFrontend)
  * - id: block ID (e.g., "1000006")
  * - type: block type (e.g., "input-text")
  * - label, description, inputs, outputs, configSchema, etc.
- * - isFrontend: boolean flag indicating execution location (new)
+ * - isFrontend: BoolFlag (0 | 1) indicating execution location, converted to boolean
  */
 export const listBlocks = async (): Promise<BlockDefinitionWithFrontend[]> => {
     _log('> listBlocks()');
@@ -93,7 +98,10 @@ export const listBlocks = async (): Promise<BlockDefinitionWithFrontend[]> => {
         .map((item): BlockDefinitionWithFrontend => {
             const definition = item.$definition;
             // Get isFrontend from the BlockView level (server response)
-            const isFrontend = item.isFrontend;
+            // Convert BoolFlag (0 | 1) to boolean for type safety
+            const isFrontend = item.isFrontend !== undefined ? Boolean(item.isFrontend) : undefined;
+            // Get stereo for block categorization
+            const stereo = item.stereo;
 
             // Build partial block def to reuse requiresBackendProcessing logic
             const blockDef: BlockDefinitionWithFrontend = { ...definition, isFrontend };
@@ -105,6 +113,7 @@ export const listBlocks = async (): Promise<BlockDefinitionWithFrontend[]> => {
             return {
                 ...definition,
                 isFrontend,
+                stereo,
                 execute,
             };
         });
