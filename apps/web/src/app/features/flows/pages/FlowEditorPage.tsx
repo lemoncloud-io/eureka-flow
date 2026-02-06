@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useBlocks, useFlows } from '@flows/flows';
+import { getNode, useBlocks, useFlows } from '@flows/flows';
 import { parseExecutionStats, useInitFlowSocket } from '@flows/socket';
 
 import { Header } from '../components/Header';
@@ -45,7 +45,37 @@ export const FlowEditorPage = () => {
         updateFlowName,
     } = useFlows();
 
-    // Handle node status updates from WebSocket
+    // Handle flow update notification from WebSocket (new format)
+    // Fetches entire flow from server and updates canvas
+    const handleFlowUpdate = useCallback(
+        async (flowId: string) => {
+            try {
+                const flowData = await loadFlowById(flowId);
+                if (canvasRef.current && flowData) {
+                    canvasRef.current.loadWorkflow(flowData);
+                    lastSavedStateRef.current = serializeWorkflowState(flowData);
+                }
+            } catch (error) {
+                console.error('[FlowEditor] Failed to reload flow:', error);
+            }
+        },
+        [loadFlowById]
+    );
+
+    // Handle node update notification from WebSocket (new format)
+    // Fetches single node from server and updates it in canvas
+    const handleNodeUpdateNew = useCallback(async (nodeId: string, _flowId: string) => {
+        try {
+            const nodeData = await getNode(nodeId);
+            if (canvasRef.current && nodeData) {
+                canvasRef.current.updateNodeFromServer(nodeId, nodeData);
+            }
+        } catch {
+            // Node reload failed - silent fail, user can refresh
+        }
+    }, []);
+
+    // Handle node status updates from WebSocket (legacy format with status field)
     const handleNodeUpdate = useCallback((message: FlowNodeMessage) => {
         const { nodeId, status, errorMessage, executionStats, outputData$$ } = message;
 
@@ -83,7 +113,10 @@ export const FlowEditorPage = () => {
         maxReconnectReached,
     } = useInitFlowSocket({
         channelId,
-        onNodeUpdate: handleNodeUpdate,
+        currentFlowId,
+        onFlowUpdate: handleFlowUpdate,
+        onNodeReload: handleNodeUpdateNew,
+        onNodeUpdate: handleNodeUpdate, // Legacy support
     });
 
     const [isAppReady, setIsAppReady] = useState(false);

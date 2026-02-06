@@ -37,6 +37,8 @@ export interface WorkflowCanvasRef {
     runAll: () => Promise<void>;
     /** Update node data (used for socket status updates) */
     updateNode: (nodeId: string, updates: Partial<NodeData>) => void;
+    /** Update node from server data (used for socket node update notifications) */
+    updateNodeFromServer: (nodeId: string, serverData: NodeData) => void;
     stopAll: () => void;
     /** Handle backend node completion: update outputData and trigger downstream execution */
     handleBackendNodeComplete: (nodeId: string, outputData: Record<string, DataPacket>) => void;
@@ -663,6 +665,27 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 },
                 updateNode: (nodeId: string, updates: Partial<NodeData>) => {
                     setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, ...updates } : n)));
+                },
+                updateNodeFromServer: (nodeId: string, serverData: NodeData) => {
+                    // Merge server data with existing node, preserving UI-specific fields
+                    setNodes(prev =>
+                        prev.map(n => {
+                            if (n.id !== nodeId) return n;
+                            return {
+                                ...n,
+                                // Update from server data
+                                config: serverData.config ?? n.config,
+                                inputData: serverData.inputData ?? n.inputData,
+                                outputData: serverData.outputData ?? n.outputData,
+                                status: serverData.status ?? n.status,
+                                errorMessage: serverData.errorMessage,
+                                executionStats: serverData.executionStats,
+                                // Preserve position if not provided by server
+                                x: serverData.x ?? n.x,
+                                y: serverData.y ?? n.y,
+                            };
+                        })
+                    );
                 },
                 handleBackendNodeComplete: (nodeId: string, outputData: Record<string, DataPacket>) => {
                     // Update node's outputData

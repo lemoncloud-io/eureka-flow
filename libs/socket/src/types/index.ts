@@ -69,12 +69,53 @@ export interface ExecutionStats {
 }
 
 /**
+ * Flow update notification from WebSocket
+ * When received, client should reload the flow via GET /flows/:id/load
+ *
+ * @example
+ * {
+ *   "type": "flow",
+ *   "id": "1000051",
+ *   "timestamp": 1770361729831
+ * }
+ */
+export interface FlowUpdateMessage {
+    type: 'flow';
+    id: string;
+    timestamp: number;
+}
+
+/**
+ * Node update notification from WebSocket
+ * When received, client should reload the node via GET /nodes/:id
+ *
+ * @example
+ * {
+ *   "type": "node",
+ *   "id": "isff9fs10",
+ *   "flowId": "1000036",
+ *   "timestamp": 1769582611407
+ * }
+ */
+export interface NodeUpdateMessage {
+    type: 'node';
+    id: string;
+    flowId: string;
+    timestamp: number;
+}
+
+/**
+ * Union type for socket data messages
+ */
+export type SocketDataMessage = FlowUpdateMessage | NodeUpdateMessage;
+
+/**
  * Raw WebSocket message wrapper from server
  */
 export interface RawSocketMessage {
     action: 'message' | 'info' | 'ping' | 'pong';
     ts?: string;
-    data?: FlowNodeMessage | unknown;
+    data?: SocketDataMessage | FlowNodeMessage | unknown;
     channel?: string;
 }
 

@@ -5,7 +5,7 @@ import { useWebCoreStore } from '@flows/web-core';
 import { useWebSocketWorker } from './useWebSocketWorker';
 import { useWebSocketStore } from '../stores/useWebSocketStore';
 
-import type { ExecutionStats, FlowNodeMessage, WebSocketMessage } from '../types';
+import type { ExecutionStats, FlowNodeMessage, FlowUpdateMessage, NodeUpdateMessage, WebSocketMessage } from '../types';
 
 const WS_ENDPOINT = import.meta.env.VITE_WS_ENDPOINT || '';
 
@@ -52,7 +52,7 @@ export const parseExecutionStats = (statsString?: string): ExecutionStats | unde
 };
 
 /**
- * Type guard for FlowNodeMessage
+ * Type guard for FlowNodeMessage (legacy format with nodeId and status)
  */
 export const isFlowNodeMessage = (data: unknown): data is FlowNodeMessage => {
     if (typeof data !== 'object' || data === null) return false;
@@ -60,10 +60,39 @@ export const isFlowNodeMessage = (data: unknown): data is FlowNodeMessage => {
     return msg['type'] === 'node' && typeof msg['nodeId'] === 'string';
 };
 
+/**
+ * Type guard for FlowUpdateMessage (new format)
+ */
+export const isFlowUpdateMessage = (data: unknown): data is FlowUpdateMessage => {
+    if (typeof data !== 'object' || data === null) return false;
+    const msg = data as Record<string, unknown>;
+    return msg['type'] === 'flow' && typeof msg['id'] === 'string' && !('nodeId' in msg);
+};
+
+/**
+ * Type guard for NodeUpdateMessage (new format)
+ */
+export const isNodeUpdateMessage = (data: unknown): data is NodeUpdateMessage => {
+    if (typeof data !== 'object' || data === null) return false;
+    const msg = data as Record<string, unknown>;
+    return (
+        msg['type'] === 'node' &&
+        typeof msg['id'] === 'string' &&
+        typeof msg['flowId'] === 'string' &&
+        !('nodeId' in msg)
+    );
+};
+
 export interface UseInitFlowSocketOptions {
     /** Channel ID to subscribe to (from flow load response) */
     channelId?: string | null;
-    /** Callback when node status update is received */
+    /** Current flow ID for filtering messages */
+    currentFlowId?: string | null;
+    /** Callback when flow update notification is received (new format) */
+    onFlowUpdate?: (flowId: string) => void;
+    /** Callback when node update notification is received (new format) */
+    onNodeReload?: (nodeId: string, flowId: string) => void;
+    /** @deprecated Callback when node status update is received (legacy format with status) */
     onNodeUpdate?: (message: FlowNodeMessage) => void;
 }
 
@@ -71,7 +100,8 @@ export interface UseInitFlowSocketOptions {
  * Flow-specific WebSocket initialization hook
  * - Connects to WebSocket with flow channel ID
  * - Broadcasts all messages to subscribers via store
- * - Provides node update callback for direct handling
+ * - Handles new message format: { type: 'flow'|'node', id, flowId?, timestamp }
+ * - Provides callbacks for flow and node update notifications
  *
  * @param options - Configuration options
  * @returns WebSocket control functions
@@ -79,17 +109,17 @@ export interface UseInitFlowSocketOptions {
  * @example
  * const { connect, disconnect, isConnected } = useInitFlowSocket({
  *   channelId: '1000011',
- *   onNodeUpdate: (message) => {
- *     updateNodeData(message.nodeId, {
- *       status: message.status,
- *       errorMessage: message.errorMessage,
- *       executionStats: parseExecutionStats(message.executionStats),
- *     });
+ *   currentFlowId: '1000011',
+ *   onFlowUpdate: (flowId) => {
+ *     // Reload entire flow: GET /flows/:id/load
+ *   },
+ *   onNodeReload: (nodeId, flowId) => {
+ *     // Reload node: GET /nodes/:id
  *   },
  * });
  */
 export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
-    const { channelId, onNodeUpdate } = options;
+    const { channelId, currentFlowId, onFlowUpdate, onNodeReload, onNodeUpdate } = options;
 
     const apiKey = useWebCoreStore(state => state.apiKey);
     const setId = useWebSocketStore(state => state.setId);
@@ -130,17 +160,37 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         setConnectionStatus(connectionStatus);
     }, [connectionStatus, setConnectionStatus]);
 
-    // Broadcast messages to all subscribers and handle node updates
+    // Broadcast messages to all subscribers and handle updates
     useEffect(() => {
         if (lastMessage) {
             broadcastMessage(lastMessage);
 
-            // Direct callback for node updates
-            if (onNodeUpdate && isFlowNodeMessage(lastMessage.data)) {
-                onNodeUpdate(lastMessage.data);
+            const data = lastMessage.data;
+
+            // Handle new format: flow update notification
+            if (isFlowUpdateMessage(data)) {
+                // Only process if it's for the current flow
+                if (currentFlowId && data.id === currentFlowId && onFlowUpdate) {
+                    onFlowUpdate(data.id);
+                }
+                return;
+            }
+
+            // Handle new format: node update notification
+            if (isNodeUpdateMessage(data)) {
+                // Only process if it's for the current flow
+                if (currentFlowId && data.flowId === currentFlowId && onNodeReload) {
+                    onNodeReload(data.id, data.flowId);
+                }
+                return;
+            }
+
+            // Handle legacy format: node status update with status field
+            if (onNodeUpdate && isFlowNodeMessage(data)) {
+                onNodeUpdate(data);
             }
         }
-    }, [lastMessage, broadcastMessage, onNodeUpdate]);
+    }, [lastMessage, broadcastMessage, currentFlowId, onFlowUpdate, onNodeReload, onNodeUpdate]);
 
     // Cleanup on unmount - intentionally empty deps for mount/unmount only
     useEffect(() => {
