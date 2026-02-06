@@ -169,23 +169,22 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
 
             const data = lastMessage.data;
 
+            // Self-echo prevention: ignore messages within 3 seconds of our last save
+            const DEBOUNCE_MS = 3000;
+            const now = Date.now();
+            const isRecentLocalUpdate = lastLocalUpdateTimestamp && now - lastLocalUpdateTimestamp < DEBOUNCE_MS;
+
             // Handle new format: flow update notification
+            // NOTE: Disabled - flow updates are too frequent and cause UI flicker
+            // Flow-level changes (node add/remove) trigger this, but we handle nodes individually
             if (isFlowUpdateMessage(data)) {
-                // Skip if message is older than our last local update (self-echo prevention)
-                if (lastLocalUpdateTimestamp && data.timestamp <= lastLocalUpdateTimestamp) {
-                    return;
-                }
-                // Only process if it's for the current flow
-                if (currentFlowId && data.id === currentFlowId && onFlowUpdate) {
-                    onFlowUpdate(data.id);
-                }
-                return;
+                return; // Skip flow reload entirely
             }
 
             // Handle new format: node update notification
             if (isNodeUpdateMessage(data)) {
-                // Skip if message is older than our last local update (self-echo prevention)
-                if (lastLocalUpdateTimestamp && data.timestamp <= lastLocalUpdateTimestamp) {
+                // Skip if we just saved (self-echo prevention)
+                if (isRecentLocalUpdate) {
                     return;
                 }
                 // Only process if it's for the current flow
