@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { useUpdateNodeMutation } from './queries/useNodesQuery';
+import { useUpsertNodeMutation } from './queries/useNodesQuery';
 
 import type { NodeView } from '../types';
 
@@ -32,6 +32,7 @@ interface UseNodeSyncReturn {
  * - Debounced updates (500ms) to prevent excessive API calls
  * - Per-node debounce timers (changes to different nodes don't interfere)
  * - Automatic cleanup on unmount
+ * - Uses unified upsert endpoint (POST /nodes/:id/upsert)
  *
  * Usage:
  * ```tsx
@@ -46,7 +47,7 @@ interface UseNodeSyncReturn {
  * ```
  */
 export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn => {
-    const updateMutation = useUpdateNodeMutation();
+    const upsertMutation = useUpsertNodeMutation();
 
     // Per-node debounce timers
     const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -65,9 +66,15 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
     /**
      * Sync node updates to backend with debouncing
      * Multiple rapid updates to the same node are merged and sent once
+     * Uses POST /nodes/:id/upsert endpoint
      */
     const syncNodeUpdate = useCallback(
         (nodeId: string, updates: Partial<NodeView>) => {
+            if (!flowId) {
+                console.warn('[useNodeSync] Cannot sync node: flowId is null');
+                return;
+            }
+
             // Merge with any pending updates for this node
             const existing = pendingUpdates.current.get(nodeId) || {};
             const merged = { ...existing, ...updates };
@@ -83,7 +90,7 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
             const timer = setTimeout(() => {
                 const finalUpdates = pendingUpdates.current.get(nodeId);
                 if (finalUpdates && Object.keys(finalUpdates).length > 0) {
-                    updateMutation.mutate({ id: nodeId, body: finalUpdates });
+                    upsertMutation.mutate({ id: nodeId, flowId, body: finalUpdates });
                     pendingUpdates.current.delete(nodeId);
                 }
                 debounceTimers.current.delete(nodeId);
@@ -91,12 +98,12 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
 
             debounceTimers.current.set(nodeId, timer);
         },
-        [updateMutation]
+        [upsertMutation, flowId]
     );
 
     /**
-     * Create a new node on backend via PUT (no debounce)
-     * PUT /nodes/:id - creates if not exists, updates if exists
+     * Create a new node on backend via upsert (no debounce)
+     * POST /nodes/:id/upsert - creates if not exists, updates if exists
      */
     const createNodeOnBackend = useCallback(
         (node: { id: string; type: string; position: { x: number; y: number }; config: Record<string, unknown> }) => {
@@ -107,20 +114,19 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
 
             const body: Partial<NodeView> = {
                 name: node.id,
-                flowId,
                 blockId: node.type,
                 position: node.position,
                 config: node.config,
             };
 
-            updateMutation.mutate({ id: node.id, body });
+            upsertMutation.mutate({ id: node.id, flowId, body });
         },
-        [flowId, updateMutation]
+        [flowId, upsertMutation]
     );
 
     return {
         syncNodeUpdate,
         createNodeOnBackend,
-        isPending: updateMutation.isPending,
+        isPending: upsertMutation.isPending,
     };
 };

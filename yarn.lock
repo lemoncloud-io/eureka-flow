@@ -1862,20 +1862,12 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@lemoncloud/eureka-flows-api@^0.26.126":
-  version "0.26.126"
-  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-flows-api/-/eureka-flows-api-0.26.126.tgz#c07ba6ca35679a34a16ce5e105fdac3b32e4954d"
-  integrity sha512-j2x07xc/8dcPTI9Y/w7Z6uACvcvYxs2uMQ7wMcYoQkUz2/4FP1Rs//DzuBKyoH5r7CYuiywwwtowRfr+EN1k0A==
+"@lemoncloud/eureka-flows-api@^0.26.129":
+  version "0.26.129"
+  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-flows-api/-/eureka-flows-api-0.26.129.tgz#f7ee537fe2eb362cb9c7c5c8509229ede0bfe819"
+  integrity sha512-hIElCoftzZTGBA69wvJfIFhBfErW5ODFEnbq1uSgRLNm2QBHQGEQqb4pjrwTKeJNMEyf3+8LZdWyRIIphXiczA==
   dependencies:
-    "@lemoncloud/eureka-sockets-api" "^0.25.1101"
     lemon-model "^1.1.1"
-
-"@lemoncloud/eureka-sockets-api@^0.25.1101":
-  version "0.25.1101"
-  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-sockets-api/-/eureka-sockets-api-0.25.1101.tgz#1473fe6ca377104d3b31d15d1ae8d50e83c39ae8"
-  integrity sha512-VfLHxAMoDrYfAtC8YOsyQ+IAsAJhUAz2RWF/JsDcJX/hTkCTlHUZXNK8Y0fWAyVptHWSCIvCF7z0GgS1xI1Gsw==
-  dependencies:
-    lemon-model "^1.0.5"
 
 "@lemoncloud/lemon-web-core@^1.5.0":
   version "1.5.3"
@@ -8766,7 +8758,7 @@ language-tags@^1.0.9:
   dependencies:
     language-subtag-registry "^0.3.20"
 
-lemon-model@^1.0.5, lemon-model@^1.1.1:
+lemon-model@^1.1.1:
   version "1.1.1"
   resolved "https://registry.npmjs.org/lemon-model/-/lemon-model-1.1.1.tgz"
   integrity sha512-idf2zPvYzUmz50F9wJik8f4vk+FeebgmzsHfpEtsv5nnWbdpaHM1sDMISmgqFPyv3X1cXvaRNyu4btdSIA03sQ==

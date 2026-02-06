@@ -300,6 +300,17 @@ export interface SaveFlowView extends FlowView {
 }
 
 /**
+ * UpsertNodeResult - response from node upsert endpoint
+ * POST /nodes/:id/upsert?flowId=<flowId>
+ *
+ * @see eureka-flows-api POST /nodes/:id/upsert response
+ */
+export interface UpsertNodeResult {
+    nodes$$: NodeView[];
+    ports$$: NodeView[];
+}
+
+/**
  * LoadFlowResult - result of loading flow snapshot
  * GET /flows/:id/load returns SaveFlowBody format
  *

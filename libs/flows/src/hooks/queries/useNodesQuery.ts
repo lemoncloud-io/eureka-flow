@@ -1,25 +1,30 @@
 import { useMutation } from '@tanstack/react-query';
 
-import { updateNode } from '../../api';
+import { upsertNode } from '../../api';
 
-import type { NodeView } from '../../types';
+import type { NodeView, UpsertNodeResult } from '../../types';
+import type { UseMutationResult } from '@tanstack/react-query';
+
+interface UpsertNodeVariables {
+    id: string;
+    flowId: string;
+    body: Partial<NodeView>;
+}
 
 /**
- * Mutation hook for updating/creating a node
- * PUT /nodes/:id
+ * Mutation hook for upserting a node (create or update)
+ * POST /nodes/:id/upsert?flowId=<flowId>
  *
- * Used for syncing node changes (config, label, description, position, etc.) to backend.
- * Also used for creating new nodes (upsert behavior).
- * Does not use optimistic updates - local state is source of truth.
+ * New unified endpoint for node operations.
+ * - id="0" with no body.id → create new node
+ * - id="0" with body.id → upsert by body.id
+ * - id=<nodeId> → upsert existing node
  */
-export const useUpdateNodeMutation = () => {
+export const useUpsertNodeMutation = (): UseMutationResult<UpsertNodeResult, Error, UpsertNodeVariables> => {
     return useMutation({
-        mutationFn: ({ id, body }: { id: string; body: Partial<NodeView> }) => updateNode(id, body),
-        onError: (error, { id }) => {
-            console.error(`[useUpdateNodeMutation] Failed to update node ${id}:`, error);
+        mutationFn: ({ id, flowId, body }: UpsertNodeVariables) => upsertNode(id, flowId, body),
+        onError: (error: Error, { id }) => {
+            console.error(`[useUpsertNodeMutation] Failed to upsert node ${id}:`, error);
         },
     });
 };
-
-// Re-export types
-export type { NodeView };
