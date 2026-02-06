@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -376,11 +376,8 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
     // Server uses 'value' key for input-text config
     const text = (node.config?.text as string) || '';
 
-    const textDisplay = useMemo(() => {
-        if (!text) return null;
-        const lines = text.split('\n');
-        return { firstLine: lines[0], extraLines: lines.length - 1 };
-    }, [text]);
+    const lines = text ? text.split('\n') : [];
+    const textDisplay = text ? { firstLine: lines[0], extraLines: lines.length - 1 } : null;
 
     if (isEditing) {
         return (
