@@ -52,6 +52,11 @@ export interface FlowNodeMessage {
     executionStats?: string;
     activeRunId?: string;
     timestamp: number;
+    /** Output data from backend execution */
+    outputData$$?: Array<{
+        portId: string;
+        packet: { value: unknown; type: string; timestamp?: number };
+    }>;
 }
 
 /**

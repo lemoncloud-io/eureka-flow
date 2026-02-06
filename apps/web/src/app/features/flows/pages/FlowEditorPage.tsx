@@ -47,13 +47,31 @@ export const FlowEditorPage = () => {
 
     // Handle node status updates from WebSocket
     const handleNodeUpdate = useCallback((message: FlowNodeMessage) => {
-        const { nodeId, status, errorMessage, executionStats } = message;
+        const { nodeId, status, errorMessage, executionStats, outputData$$ } = message;
 
+        // Update node status
         canvasRef.current?.updateNode(nodeId, {
             status,
             errorMessage: errorMessage || undefined,
             executionStats: parseExecutionStats(executionStats),
         });
+
+        // If backend node completed with output data, propagate to downstream nodes
+        if (status === 'COMPLETED' && outputData$$ && outputData$$.length > 0) {
+            const outputData = outputData$$.reduce(
+                (acc, item) => {
+                    acc[item.portId] = {
+                        value: item.packet.value,
+                        type: item.packet.type as 'text' | 'image' | 'number',
+                        timestamp: item.packet.timestamp || Date.now(),
+                    };
+                    return acc;
+                },
+                {} as Record<string, { value: unknown; type: 'text' | 'image' | 'number'; timestamp: number }>
+            );
+
+            canvasRef.current?.handleBackendNodeComplete(nodeId, outputData);
+        }
     }, []);
 
     // Initialize WebSocket connection when channelId is available
