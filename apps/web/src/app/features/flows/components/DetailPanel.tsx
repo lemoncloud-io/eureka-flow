@@ -437,11 +437,9 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         return (
             <div
                 className={cn(
-                    // Mobile: full-screen from right edge
                     'fixed inset-y-0 right-0 w-full sm:w-80',
-                    'sm:top-20 sm:right-4 sm:bottom-4 sm:inset-y-auto',
-                    'flex flex-col bg-glass-bg backdrop-blur-[20px] border-l sm:border border-glass-border',
-                    'sm:rounded-xl shadow-floating overflow-hidden',
+                    'flex flex-col bg-glass-bg backdrop-blur-[20px] border-l sm:border-l border-glass-border',
+                    'shadow-floating overflow-hidden',
                     'animate-in slide-in-from-right-4 duration-200 z-50'
                 )}
                 onMouseDown={e => e.stopPropagation()}
@@ -757,11 +755,9 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         return (
             <div
                 className={cn(
-                    // Mobile: full-screen from right edge
                     'fixed inset-y-0 right-0 w-full sm:w-72',
-                    'sm:top-20 sm:right-4 sm:bottom-4 sm:inset-y-auto',
-                    'flex flex-col bg-glass-bg backdrop-blur-[20px] border-l sm:border border-glass-border',
-                    'sm:rounded-xl shadow-floating overflow-hidden',
+                    'flex flex-col bg-glass-bg backdrop-blur-[20px] border-l sm:border-l border-glass-border',
+                    'shadow-floating overflow-hidden',
                     'animate-in slide-in-from-right-4 duration-200 z-50'
                 )}
                 onMouseDown={e => e.stopPropagation()}

@@ -1254,28 +1254,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             if (dragState && dragStartSnapshotRef.current) {
                 // Check if any node was actually moved
-                let hasMoved = false;
-                const movedNodes: Array<{ id: string; position: { x: number; y: number } }> = [];
-
-                dragState.initialPositions.forEach((initialPos, nodeId) => {
+                const hasMoved = Array.from(dragState.initialPositions.entries()).some(([nodeId, initialPos]) => {
                     const currentNode = nodes.find(n => n.id === nodeId);
-                    if (
+                    return (
                         currentNode &&
                         (currentNode.position.x !== initialPos.x || currentNode.position.y !== initialPos.y)
-                    ) {
-                        hasMoved = true;
-                        movedNodes.push({ id: nodeId, position: currentNode.position });
-                    }
+                    );
                 });
 
                 if (hasMoved) {
                     pastRef.current.push(dragStartSnapshotRef.current);
                     futureRef.current = [];
-
-                    // Sync all moved nodes to backend
-                    movedNodes.forEach(({ id, position }) => {
-                        syncNodeUpdate(id, { position });
-                    });
+                    // Position changes are saved via flow save, not individual node updates
                 }
             }
 
