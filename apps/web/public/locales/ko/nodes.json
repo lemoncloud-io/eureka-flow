@@ -44,7 +44,8 @@
     },
     "errors": {
         "executionFailed": "실행 실패",
-        "unknownBlockType": "알 수 없는 블록 타입"
+        "unknownBlockType": "알 수 없는 블록 타입",
+        "missingInputs": "필수 입력값 누락: {{inputs}}"
     },
     "ports": {
         "in": "입력",

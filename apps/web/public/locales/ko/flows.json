@@ -38,8 +38,12 @@
         "expandSidebar": "사이드바 펼치기",
         "collapseSidebar": "사이드바 접기",
         "searchBlocks": "블록 검색...",
+        "searchPlaceholder": "노드 검색...",
         "noResults": "검색 결과 없음",
-        "clickToAdd": "클릭하여 캔버스에 추가"
+        "resultsCount": "{{count}}개 결과",
+        "clickToAdd": "클릭하여 캔버스에 추가",
+        "clientExecution": "브라우저에서 실행 (클라이언트)",
+        "portsInfo": "입력 {{inputs}}개 → 출력 {{outputs}}개"
     },
     "canvas": {
         "executionLogs": "실행 로그",
@@ -55,7 +59,13 @@
         "zoomIn": "확대",
         "zoomOut": "축소",
         "fitToScreen": "화면에 맞추기",
-        "resetView": "보기 초기화"
+        "resetView": "보기 초기화",
+        "emptyState": {
+            "title": "워크플로우 만들기",
+            "description": "라이브러리에서 첫 번째 노드를 추가하여 시작하세요. 노드를 연결하여 강력한 자동화 플로우를 만들 수 있습니다.",
+            "addFirstNode": "첫 노드 추가",
+            "keyboardHint": "팁: Space를 눌러 노드를 빠르게 검색하세요"
+        }
     },
     "detailPanel": {
         "configuration": "설정",

@@ -8,16 +8,19 @@ import {
     ArrowUpFromLine,
     ChevronDown,
     ChevronRight,
+    Download,
     FileText,
     Play,
     ScrollText,
     Settings,
     Trash2,
+    Upload,
     X,
     Zap,
 } from 'lucide-react';
 
 import { compressImageIfNeeded, downloadImage, useBlockRegistry, useS3Image } from '@flows/flows';
+import { cn } from '@flows/lib/utils';
 
 import { S3Image } from './S3Image';
 
@@ -80,20 +83,7 @@ const ImagePreview = ({ src, t }: { src: string; t: (key: string) => string }) =
                 className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-black/60 hover:bg-primary text-white rounded-md border border-white/10 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black/60"
                 title={t('flows:detailPanel.downloadImage')}
             >
-                <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
+                <Download className="w-3 h-3" />
             </button>
         </div>
     );
@@ -117,20 +107,7 @@ const FileImagePreview = ({ src, onRemove, t }: { src: string; onRemove: () => v
                     className="bg-black/60 hover:bg-primary text-white rounded-md p-1 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                     title={t('flows:detailPanel.downloadImage')}
                 >
-                    <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
+                    <Download className="w-3 h-3" />
                 </button>
                 <button
                     onClick={onRemove}
@@ -151,7 +128,7 @@ interface InputImageConfigProps {
 }
 
 const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChange, t }) => {
-    const img = node.config.imageData as string | undefined;
+    const img = node.config?.imageData as string | undefined;
     const { src: resolvedSrc, isLoading } = useS3Image(img || '');
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,40 +169,14 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
                             className="bg-black/60 hover:bg-primary text-white rounded-md p-1 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                             title={t('flows:detailPanel.downloadImage')}
                         >
-                            <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="7 10 12 15 17 10" />
-                                <line x1="12" y1="15" x2="12" y2="3" />
-                            </svg>
+                            <Download className="w-3 h-3" />
                         </button>
                         <label
                             htmlFor={fileInputId}
                             className="bg-black/60 hover:bg-primary text-white rounded-md p-1 border border-white/10 cursor-pointer"
                             title={t('flows:detailPanel.changeFile')}
                         >
-                            <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="17 8 12 3 7 8" />
-                                <line x1="12" y1="3" x2="12" y2="15" />
-                            </svg>
+                            <Upload className="w-3 h-3" />
                         </label>
                         <button
                             onClick={() => onConfigChange('imageData', '')}
@@ -262,7 +213,7 @@ interface InputTextConfigProps {
 
 const InputTextConfig: React.FC<InputTextConfigProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['flows']);
-    const text = (node.config.text as string) || '';
+    const text = (node.config?.text as string) || '';
 
     return (
         <div>
@@ -363,7 +314,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     };
 
     const renderConfigInput = (node: NodeData, field: ConfigField, definition: BlockDefinition) => {
-        const value = node.config[field.key] ?? definition.defaultConfig[field.key];
+        const value = node.config?.[field.key] ?? definition.defaultConfig[field.key];
 
         const handleChange = (val: unknown) => onConfigChange(node.id, field.key, val);
 
@@ -394,13 +345,19 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     <div className="flex items-center gap-2.5 mt-1">
                         <button
                             onClick={() => handleChange(!value)}
-                            className={`w-9 h-5 rounded-full p-0.5 transition-colors relative ${value ? 'bg-primary' : 'bg-muted'}`}
+                            className={cn(
+                                'w-9 h-5 rounded-full p-0.5 transition-colors relative',
+                                value ? 'bg-primary' : 'bg-muted'
+                            )}
                         >
                             <div
-                                className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${value ? 'translate-x-4' : 'translate-x-0'}`}
+                                className={cn(
+                                    'w-4 h-4 bg-white rounded-full shadow-sm transition-transform',
+                                    value ? 'translate-x-4' : 'translate-x-0'
+                                )}
                             />
                         </button>
-                        <span className={`text-xs ${value ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                        <span className={cn('text-xs', value ? 'text-primary font-medium' : 'text-muted-foreground')}>
                             {value ? t('flows:detailPanel.true') : t('flows:detailPanel.false')}
                         </span>
                     </div>
@@ -466,7 +423,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         const isAuto = selectedNode.autoExecutionEnabled !== false;
         // Use def.type since loaded nodes may have blockId as type
         const isComponent = def.type === 'workflow-component';
-        const subFlowId = isComponent ? selectedNode.config.selectedFlowId : null;
+        const subFlowId = isComponent ? selectedNode.config?.selectedFlowId : null;
 
         const configSchema =
             def.configSchema ||
@@ -479,7 +436,12 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
         return (
             <div
-                className="fixed top-20 right-4 bottom-4 w-80 flex flex-col bg-glass-bg backdrop-blur-[20px] border border-glass-border rounded-xl shadow-floating overflow-hidden animate-in slide-in-from-right-4 duration-200 z-50"
+                className={cn(
+                    'fixed inset-y-0 right-0 w-full sm:w-80',
+                    'flex flex-col bg-glass-bg backdrop-blur-[20px] border-l sm:border-l border-glass-border',
+                    'shadow-floating overflow-hidden',
+                    'animate-in slide-in-from-right-4 duration-200 z-50'
+                )}
                 onMouseDown={e => e.stopPropagation()}
                 onDoubleClick={e => e.stopPropagation()}
             >
@@ -514,15 +476,17 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             {def.type}
                         </span>
                         <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                                selectedNode.status === 'ERROR'
-                                    ? 'bg-destructive/20 text-destructive border border-destructive/30'
-                                    : selectedNode.status === 'RUNNING'
-                                      ? 'bg-status-running/20 text-status-running border border-status-running/30'
-                                      : selectedNode.status === 'COMPLETED'
-                                        ? 'bg-status-completed/20 text-status-completed border border-status-completed/30'
-                                        : 'bg-muted/50 text-muted-foreground border border-border/50'
-                            }`}
+                            className={cn(
+                                'text-[10px] px-1.5 py-0.5 rounded font-semibold',
+                                selectedNode.status === 'ERROR' &&
+                                    'bg-destructive/20 text-destructive border border-destructive/30',
+                                selectedNode.status === 'RUNNING' &&
+                                    'bg-status-running/20 text-status-running border border-status-running/30',
+                                selectedNode.status === 'COMPLETED' &&
+                                    'bg-status-completed/20 text-status-completed border border-status-completed/30',
+                                selectedNode.status === 'IDLE' &&
+                                    'bg-muted/50 text-muted-foreground border border-border/50'
+                            )}
                         >
                             {selectedNode.status}
                         </span>
@@ -595,10 +559,16 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 }
                             >
                                 <div
-                                    className={`w-8 h-4 rounded-full p-0.5 transition-colors ${isAuto ? 'bg-status-completed' : 'bg-muted'}`}
+                                    className={cn(
+                                        'w-8 h-4 rounded-full p-0.5 transition-colors',
+                                        isAuto ? 'bg-status-completed' : 'bg-muted'
+                                    )}
                                 >
                                     <div
-                                        className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform ${isAuto ? 'translate-x-4' : 'translate-x-0'}`}
+                                        className={cn(
+                                            'w-3 h-3 bg-white rounded-full shadow-sm transition-transform',
+                                            isAuto ? 'translate-x-4' : 'translate-x-0'
+                                        )}
                                     />
                                 </div>
                             </button>
@@ -623,24 +593,22 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             )}
 
                             {/* Generic config for other node types */}
-                            {def.type !== 'input-image' && def.type !== 'input-text' && (
-                                <>
-                                    {configSchema.length === 0 ? (
-                                        <div className="text-xs text-muted-foreground/60 italic text-center py-2">
-                                            {t('flows:detailPanel.noSettings')}
+                            {def.type !== 'input-image' &&
+                                def.type !== 'input-text' &&
+                                (configSchema.length === 0 ? (
+                                    <div className="text-xs text-muted-foreground/60 italic text-center py-2">
+                                        {t('flows:detailPanel.noSettings')}
+                                    </div>
+                                ) : (
+                                    configSchema.map(field => (
+                                        <div key={field.key}>
+                                            <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
+                                                {field.label}
+                                            </label>
+                                            {renderConfigInput(selectedNode, field, def)}
                                         </div>
-                                    ) : (
-                                        configSchema.map(field => (
-                                            <div key={field.key}>
-                                                <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
-                                                    {field.label}
-                                                </label>
-                                                {renderConfigInput(selectedNode, field, def)}
-                                            </div>
-                                        ))
-                                    )}
-                                </>
-                            )}
+                                    ))
+                                ))}
                         </div>
                     </CollapsibleSection>
 
@@ -786,7 +754,12 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
         return (
             <div
-                className="fixed top-20 right-4 bottom-4 w-72 flex flex-col bg-glass-bg backdrop-blur-[20px] border border-glass-border rounded-xl shadow-floating overflow-hidden animate-in slide-in-from-right-4 duration-200 z-50"
+                className={cn(
+                    'fixed inset-y-0 right-0 w-full sm:w-72',
+                    'flex flex-col bg-glass-bg backdrop-blur-[20px] border-l sm:border-l border-glass-border',
+                    'shadow-floating overflow-hidden',
+                    'animate-in slide-in-from-right-4 duration-200 z-50'
+                )}
                 onMouseDown={e => e.stopPropagation()}
                 onDoubleClick={e => e.stopPropagation()}
             >

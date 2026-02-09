@@ -2,8 +2,7 @@ import { create } from 'zustand';
 
 import { flowStorage } from '../utils/flowStorage';
 
-import type { FlowView } from '../types';
-import type { BlockDefinition } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinitionWithFrontend, FlowView } from '../types';
 
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
@@ -15,7 +14,7 @@ export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
  * See useCanvasStore for node-level state management.
  */
 interface FlowsState {
-    blockRegistry: Record<string, BlockDefinition>;
+    blockRegistry: Record<string, BlockDefinitionWithFrontend>;
     isBlocksLoaded: boolean;
     currentFlowId: string | null;
     flowName: string;
@@ -27,7 +26,7 @@ interface FlowsState {
     /** WebSocket channel ID for real-time node status updates */
     channelId: string | null;
 
-    setBlockRegistry: (blocks: BlockDefinition[]) => void;
+    setBlockRegistry: (blocks: BlockDefinitionWithFrontend[]) => void;
     setBlocksLoaded: (loaded: boolean) => void;
     setCurrentFlowId: (id: string | null) => void;
     setFlowName: (name: string) => void;
@@ -40,7 +39,7 @@ interface FlowsState {
     setChannelId: (channelId: string | null) => void;
 }
 
-export const useFlowsStore = create<FlowsState>((set, _get) => ({
+export const useFlowsStore = create<FlowsState>(set => ({
     blockRegistry: {},
     isBlocksLoaded: false,
     currentFlowId: null,
@@ -53,7 +52,7 @@ export const useFlowsStore = create<FlowsState>((set, _get) => ({
     channelId: '0000',
 
     setBlockRegistry: blocks => {
-        const registry = blocks.reduce<Record<string, BlockDefinition>>((acc, block) => {
+        const registry = blocks.reduce<Record<string, BlockDefinitionWithFrontend>>((acc, block) => {
             // Primary key: block.type (e.g., "input-text")
             acc[block.type] = block;
             // Secondary key: block.id (e.g., "1000006") for backward compatibility

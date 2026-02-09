@@ -96,7 +96,7 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
                 inputData: {},
                 outputData: {},
                 errorMessage: undefined,
-                config: JSON.parse(JSON.stringify(node.config)),
+                config: node.config ? JSON.parse(JSON.stringify(node.config)) : {},
                 autoExecutionEnabled: node.autoExecutionEnabled ?? true,
                 customLabel: node.customLabel ? `${node.customLabel} (copy)` : undefined,
             };
@@ -216,7 +216,7 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
             };
 
             try {
-                const results = await nodeDef.execute(inputs, currentNode.config, onProgress);
+                const results = await nodeDef.execute(inputs, currentNode.config || {}, onProgress);
                 const duration = Date.now() - startTime;
 
                 const hash = nodeDef.inputs.map((p: PortDefinition) => inputs[p.id]?.timestamp).join('|');
@@ -284,7 +284,9 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
         (nodeId: string, key: string, value: unknown) => {
             if (readOnly) return;
             history.saveCheckpoint();
-            setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, config: { ...n.config, [key]: value } } : n)));
+            setNodes(prev =>
+                prev.map(n => (n.id === nodeId ? { ...n, config: { ...(n.config || {}), [key]: value } } : n))
+            );
         },
         [readOnly, history, setNodes]
     );

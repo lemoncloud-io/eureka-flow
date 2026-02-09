@@ -26,42 +26,51 @@ export interface WebSocketMessage {
 }
 
 /**
- * Flow node status update message from WebSocket
+ * Flow update notification from WebSocket
+ * When received, client should reload the flow via GET /flows/:id/load
+ *
+ * @example
+ * {
+ *   "type": "flow",
+ *   "id": "1000051",
+ *   "timestamp": 1770361729831
+ * }
+ */
+export interface FlowUpdateMessage {
+    type: 'flow';
+    id: string;
+    timestamp: number;
+}
+
+/**
+ * Node update notification from WebSocket
+ * When received, client should reload the node via GET /nodes/:id
  *
  * @example
  * {
  *   "type": "node",
  *   "id": "isff9fs10",
  *   "flowId": "1000036",
- *   "nodeId": "isff9fs10",
  *   "status": "COMPLETED",
- *   "errorMessage": "",
- *   "executionStats": "{\"startTime\":1769582605128,\"duration\":1009,\"progress\":100}",
- *   "activeRunId": "",
+ *   "prevStatus": "RUNNING",
  *   "timestamp": 1769582611407
  * }
  */
-export interface FlowNodeMessage {
+export interface NodeUpdateMessage {
     type: 'node';
     id: string;
     flowId: string;
-    nodeId: string;
-    status: 'IDLE' | 'RUNNING' | 'COMPLETED' | 'ERROR';
-    errorMessage?: string;
-    /** JSON string of ExecutionStats */
-    executionStats?: string;
-    activeRunId?: string;
     timestamp: number;
+    /** Current node status (IDLE, RUNNING, COMPLETED, ERROR, etc.) */
+    status?: string;
+    /** Previous node status for detecting status transitions */
+    prevStatus?: string;
 }
 
 /**
- * Parsed execution stats from FlowNodeMessage
+ * Union type for socket data messages
  */
-export interface ExecutionStats {
-    startTime?: number;
-    duration?: number;
-    progress?: number;
-}
+export type SocketDataMessage = FlowUpdateMessage | NodeUpdateMessage;
 
 /**
  * Raw WebSocket message wrapper from server
@@ -69,7 +78,7 @@ export interface ExecutionStats {
 export interface RawSocketMessage {
     action: 'message' | 'info' | 'ping' | 'pong';
     ts?: string;
-    data?: FlowNodeMessage | unknown;
+    data?: SocketDataMessage | unknown;
     channel?: string;
 }
 

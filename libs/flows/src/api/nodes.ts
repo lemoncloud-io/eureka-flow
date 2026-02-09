@@ -1,6 +1,6 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { ApiListResult, NodeBody, NodeView, Position, S3ImageInfo, doPostRunBody } from '../types';
+import type { ApiListResult, NodeBody, NodeView, S3ImageInfo, UpsertNodeResult, doPostRunBody } from '../types';
 
 const _log = console.log.bind(console, '[nodes-api]');
 
@@ -46,12 +46,21 @@ export const createNode = async (body: NodeBody): Promise<NodeView> => {
 };
 
 /**
- * Update existing node
- * POST /nodes/:id
+ * Upsert node (create or update)
+ * POST /nodes/:id/upsert?flowId=<flowId>
+ *
+ * - id="0" with no body.id → create new node
+ * - id="0" with body.id → upsert by body.id
+ * - id=<nodeId> → upsert existing node
+ *
+ * @param id - Node ID or "0" for auto-assign
+ * @param flowId - Flow ID (required)
+ * @param body - Node data to upsert
+ * @returns UpsertNodeResult with upserted nodes and ports
  */
-export const updateNode = async (id: string, body: Partial<NodeView>): Promise<NodeView> => {
-    _log(`> updateNode(${id})`, body);
-    const response = await api.post<NodeView>(`/nodes/${id}`, body);
+export const upsertNode = async (id: string, flowId: string, body: Partial<NodeView>): Promise<UpsertNodeResult> => {
+    _log(`> upsertNode(${id}, flowId=${flowId})`, body);
+    const response = await api.post<UpsertNodeResult>(`/nodes/${id}/upsert`, body, { params: { flowId } });
     return response.data;
 };
 
@@ -62,31 +71,6 @@ export const updateNode = async (id: string, body: Partial<NodeView>): Promise<N
 export const deleteNode = async (id: string): Promise<void> => {
     _log(`> deleteNode(${id})`);
     await api.delete(`/nodes/${id}`);
-};
-
-export const updateNodePosition = async (id: string, position: Position): Promise<NodeView> => {
-    _log(`> updateNodePosition(${id})`, position);
-    return updateNode(id, { position });
-};
-
-export const updateNodeConfig = async (id: string, config: Array<{ key: string; val: string }>): Promise<NodeView> => {
-    _log(`> updateNodeConfig(${id})`, config);
-    return updateNode(id, { config$$: config });
-};
-
-export const updateNodeStatus = async (id: string, status: string, errorMessage?: string): Promise<NodeView> => {
-    _log(`> updateNodeStatus(${id}, ${status})`);
-    return updateNode(id, { status, errorMessage });
-};
-
-export const updateNodeLabel = async (id: string, customLabel: string): Promise<NodeView> => {
-    _log(`> updateNodeLabel(${id}, ${customLabel})`);
-    return updateNode(id, { customLabel });
-};
-
-export const toggleNodeDisabled = async (id: string, disabled: boolean): Promise<NodeView> => {
-    _log(`> toggleNodeDisabled(${id}, ${disabled})`);
-    return updateNode(id, { disabled });
 };
 
 /**
@@ -168,6 +152,3 @@ export const getImageInfo = async (s3Url: string): Promise<S3ImageInfo> => {
 
     return response.data;
 };
-
-// Re-export types
-export type { NodeView, NodeBody, Position, S3ImageInfo } from '../types';

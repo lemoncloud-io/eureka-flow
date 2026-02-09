@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useBlocks, useFlows } from '@flows/flows';
-import { parseExecutionStats, useInitFlowSocket } from '@flows/socket';
+import { getNode, useBlocks, useFlows } from '@flows/flows';
+import { useInitFlowSocket } from '@flows/socket';
 
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
+import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
-import type { FlowNodeMessage } from '@flows/socket';
+import type { NodeData } from '@flows/flows';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -22,6 +23,7 @@ const isInputElement = (target: EventTarget | null): boolean => {
 export const FlowEditorPage = () => {
     const { t } = useTranslation(['flows']);
     const canvasRef = useRef<WorkflowCanvasRef>(null);
+    const sidebarRef = useRef<SidebarRef>(null);
 
     const { loadBlocks } = useBlocks();
     const {
@@ -43,16 +45,146 @@ export const FlowEditorPage = () => {
         updateFlowName,
     } = useFlows();
 
-    // Handle node status updates from WebSocket
-    const handleNodeUpdate = useCallback((message: FlowNodeMessage) => {
-        const { nodeId, status, errorMessage, executionStats } = message;
+    // Handle flow update notification from WebSocket (new format)
+    // Fetches entire flow from server and updates canvas
+    const handleFlowUpdate = useCallback(
+        async (flowId: string) => {
+            try {
+                const flowData = await loadFlowById(flowId);
+                if (canvasRef.current && flowData) {
+                    canvasRef.current.loadWorkflow(flowData);
+                    lastSavedStateRef.current = serializeWorkflowState(flowData);
+                }
+            } catch (error) {
+                console.error('[FlowEditor] Failed to reload flow:', error);
+            }
+        },
+        [loadFlowById]
+    );
 
-        canvasRef.current?.updateNode(nodeId, {
-            status,
-            errorMessage: errorMessage || undefined,
-            executionStats: parseExecutionStats(executionStats),
-        });
-    }, []);
+    // Handle node update notification from WebSocket
+    // - For regular nodes: fetch and update canvas with status priority logic
+    // - For ports: update canvas UI only (server already saved data via propagation)
+    const handleNodeUpdate = useCallback(
+        async (info: {
+            nodeId: string;
+            flowId: string;
+            timestamp: number;
+            status?: string;
+            prevStatus?: string;
+            isPort: boolean;
+            parentNodeId?: string;
+        }) => {
+            const { nodeId, status, isPort, parentNodeId } = info;
+
+            // Always fetch latest node data from server
+            // (timestamp comparison removed - status changes may have same timestamp)
+
+            try {
+                if (isPort && parentNodeId) {
+                    // ============================================================
+                    // Port Update Handling
+                    // ============================================================
+                    // When socket notifies about port data changes, the server has
+                    // ALREADY saved the data via propagateDownstreamV2. We only need
+                    // to update the UI - no need to call upsertNode (it would be redundant).
+                    //
+                    // Data flow:
+                    //   1. Server runs node → applyOutputs saves output port
+                    //   2. Server propagateDownstreamV2 → saves to downstream input port
+                    //   3. Socket notification sent to frontend
+                    //   4. Frontend updates canvas UI (this code)
+                    //
+                    // Note: For isFrontend blocks where user enters data directly,
+                    // the save happens in WorkflowCanvas when user finishes input,
+                    // not here in socket handler.
+                    // ============================================================
+
+                    // Fetch port data for UI update only (no upsert needed)
+                    const portData = await getNode(nodeId);
+
+                    if (portData?.data$ && portData.direction && canvasRef.current) {
+                        // Convert PortData to DataPacket format for canvas update
+                        const portValue = portData.data$.S ?? portData.data$.N ?? portData.data$.F ?? portData.data$.M;
+                        const portType = portData.dataType || 'text';
+                        const portTimestamp = portData.data$.timestamp || info.timestamp;
+                        const portKey = portData.name || nodeId.split(':')[1] || 'data';
+
+                        const dataPacket = {
+                            value: portValue,
+                            type: portType,
+                            timestamp: portTimestamp,
+                        };
+
+                        // Update canvas with port data (UI only, no API call)
+                        const partialUpdate = {
+                            inputData: portData.direction === 'in' ? { [portKey]: dataPacket } : undefined,
+                            outputData: portData.direction === 'out' ? { [portKey]: dataPacket } : undefined,
+                        } as NodeData;
+                        canvasRef.current.updateNodeFromServer(parentNodeId, partialUpdate);
+                    }
+                    // Update status if provided
+                    else if (canvasRef.current && status) {
+                        canvasRef.current.updateNodeFromServer(parentNodeId, { status } as NodeData);
+                    }
+                } else {
+                    // ============================================================
+                    // Regular Node Update Logic
+                    // ============================================================
+                    // When a socket notification arrives, we fetch full node data from API.
+                    // However, there's a race condition:
+                    //   - Socket delivers real-time status changes instantly
+                    //   - API may return stale data if DB write hasn't committed yet
+                    //
+                    // Solution: Use the MORE COMPLETE status between socket and API
+                    //   Priority: COMPLETED/ERROR > RUNNING > READY > IDLE
+                    //
+                    // Examples:
+                    //   - Socket: COMPLETED, API: RUNNING → Use COMPLETED (socket is fresher)
+                    //   - Socket: RUNNING, API: COMPLETED → Use COMPLETED (API caught up)
+                    // ============================================================
+
+                    const nodeData = await getNode(nodeId);
+
+                    // Status priority: higher number = more "final" state
+                    const STATUS_PRIORITY: Record<string, number> = {
+                        IDLE: 0,
+                        READY: 1,
+                        RUNNING: 2,
+                        COMPLETED: 3,
+                        ERROR: 3, // ERROR is also a terminal state like COMPLETED
+                    };
+
+                    const getStatusPriority = (s: string | undefined): number => {
+                        if (!s) return -1;
+                        return STATUS_PRIORITY[s] ?? -1;
+                    };
+
+                    // Determine the best status to use
+                    const socketPriority = getStatusPriority(status);
+                    const apiPriority = getStatusPriority(nodeData?.status);
+                    const finalStatus = socketPriority >= apiPriority ? status : nodeData?.status;
+
+                    if (canvasRef.current && nodeData) {
+                        // Merge API data with the resolved status
+                        const mergedData = finalStatus ? { ...nodeData, status: finalStatus } : nodeData;
+                        canvasRef.current.updateNodeFromServer(nodeId, mergedData as NodeData);
+                    } else if (canvasRef.current && status) {
+                        // Fallback: No API data, use socket status
+                        canvasRef.current.updateNodeFromServer(nodeId, { status } as NodeData);
+                    }
+                }
+            } catch (error) {
+                // Node reload failed - silent fail, user can refresh
+                console.debug('[handleNodeUpdate] Failed to update node:', nodeId, error);
+            }
+        },
+        [] // Note: Empty deps intentional - uses refs and passed callbacks, doesn't need currentFlowId reactivity
+    );
+
+    // Track last local update to prevent self-echo from socket (use ref to avoid re-renders)
+    const lastLocalUpdateTimestampRef = useRef<number | null>(null);
+    const getLastLocalUpdateTimestamp = useCallback(() => lastLocalUpdateTimestampRef.current, []);
 
     // Initialize WebSocket connection when channelId is available
     const {
@@ -63,7 +195,10 @@ export const FlowEditorPage = () => {
         maxReconnectReached,
     } = useInitFlowSocket({
         channelId,
-        onNodeUpdate: handleNodeUpdate,
+        currentFlowId,
+        getLastLocalUpdateTimestamp,
+        onFlowUpdate: handleFlowUpdate,
+        onNodeReload: handleNodeUpdate,
     });
 
     const [isAppReady, setIsAppReady] = useState(false);
@@ -73,6 +208,10 @@ export const FlowEditorPage = () => {
     const autoSaveTimerRef = useRef<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const lastSavedStateRef = useRef<string | null>(null);
+
+    const handleOpenLibrary = useCallback(() => {
+        sidebarRef.current?.open();
+    }, []);
 
     const updateUrl = useCallback((flowId: string | null, nodeId?: string | null) => {
         try {
@@ -145,6 +284,7 @@ export const FlowEditorPage = () => {
         };
 
         boot();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Boot runs once on mount, dependencies are stable singletons
     }, []);
 
     const triggerAutoSave = useCallback(() => {
@@ -160,6 +300,7 @@ export const FlowEditorPage = () => {
                 const currentState = serializeWorkflowState(data);
 
                 if (currentState !== lastSavedStateRef.current) {
+                    lastLocalUpdateTimestampRef.current = Date.now(); // Mark save time to ignore self-echo
                     saveCurrentFlow(data);
                     lastSavedStateRef.current = currentState;
                 }
@@ -175,6 +316,7 @@ export const FlowEditorPage = () => {
     const handleSave = async () => {
         if (!canvasRef.current) return;
         const data = canvasRef.current.getWorkflow();
+        lastLocalUpdateTimestampRef.current = Date.now(); // Mark save time to ignore self-echo from socket
         const result = await saveCurrentFlow(data);
         if (result.success) {
             lastSavedStateRef.current = serializeWorkflowState(data);
@@ -210,6 +352,7 @@ export const FlowEditorPage = () => {
     const handleShare = async () => {
         if (canvasRef.current) {
             const data = canvasRef.current.getWorkflow();
+            lastLocalUpdateTimestampRef.current = Date.now();
             await saveCurrentFlow(data);
         }
 
@@ -238,12 +381,14 @@ export const FlowEditorPage = () => {
     };
 
     const handleCanvasChange = () => {
+        lastLocalUpdateTimestampRef.current = Date.now(); // Mark change time to ignore self-echo from socket
         triggerAutoSave();
     };
 
     const handleBeforeBackendRun = useCallback(async () => {
         if (!canvasRef.current) return;
         const data = canvasRef.current.getWorkflow();
+        lastLocalUpdateTimestampRef.current = Date.now();
         const result = await saveCurrentFlow(data);
         if (result.success) {
             lastSavedStateRef.current = serializeWorkflowState(data);
@@ -360,6 +505,7 @@ export const FlowEditorPage = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Uses handlersRef for stable callbacks, t is stable
     }, []);
 
     useEffect(() => {
@@ -397,9 +543,11 @@ export const FlowEditorPage = () => {
             <div className="absolute inset-0">
                 <WorkflowCanvas
                     ref={canvasRef}
+                    flowId={currentFlowId}
                     onNodeSelect={handleSelectionChange}
                     onChange={handleCanvasChange}
                     onBeforeBackendRun={handleBeforeBackendRun}
+                    onOpenLibrary={handleOpenLibrary}
                 />
             </div>
 
@@ -454,7 +602,7 @@ export const FlowEditorPage = () => {
             />
 
             {/* Floating Sidebar */}
-            <Sidebar onAddNode={handleAddNode} isLoading={isLoading} />
+            <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} />
 
             {/* Notification Toast */}
             {notification && (

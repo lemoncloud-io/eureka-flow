@@ -1,9 +1,25 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Ban, Check, Copy, Loader2, MoreVertical, Pencil, Play, RefreshCw, ScrollText, X, Zap } from 'lucide-react';
+import {
+    Ban,
+    Check,
+    Copy,
+    Hash,
+    Image,
+    Loader2,
+    MoreVertical,
+    Pencil,
+    Play,
+    RefreshCw,
+    ScrollText,
+    Sparkles,
+    Type,
+    X,
+    Zap,
+} from 'lucide-react';
 
-import { compressImageIfNeeded, useBlockRegistry } from '@flows/flows';
+import { compressImageIfNeeded, getBlockDefinition, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { S3Image } from './S3Image';
@@ -33,40 +49,101 @@ export interface NodeConfigHandlers {
 
 export interface NodeActions {
     onDelete: () => void;
-    onTrigger: () => void;
+    onTrigger: () => Promise<void> | void;
     onToggleDisabled?: () => void;
     onDuplicate?: () => void;
     onViewLogs: () => void;
+}
+
+export interface ConnectionDraftInfo {
+    sourceNodeId: string;
+    sourcePortId: string;
+    sourceType: string;
 }
 
 export interface NodeHighlightState {
     isSelected: boolean;
     isHighlighted?: boolean;
     highlightedPortIds?: string[];
+    /** Active connection being dragged - used for port compatibility feedback */
+    connectionDraft?: ConnectionDraftInfo | null;
 }
 
-const getStatusBorderColor = (status: NodeStatus, isSelected: boolean): string => {
-    // Selected: show colored border
+const getStatusStyles = (status: NodeStatus, isSelected: boolean): string => {
+    // Selected: show colored border with glow effect
     if (isSelected) {
         switch (status) {
             case 'RUNNING':
-                return 'border-status-running';
+                return 'border-status-running shadow-[0_0_20px_rgba(234,179,8,0.3)]';
             case 'COMPLETED':
-                return 'border-status-completed';
+                return 'border-status-completed shadow-[0_0_20px_rgba(34,197,94,0.25)]';
             case 'ERROR':
-                return 'border-status-error';
+                return 'border-status-error shadow-[0_0_20px_rgba(239,68,68,0.3)] animate-pulse-error';
             default:
-                return 'border-primary';
+                return 'border-primary shadow-[0_0_20px_rgba(139,92,246,0.25)]';
         }
     }
-    // Not selected: gray border only (status colors subtle)
+    // Not selected: status-based styling
     switch (status) {
         case 'RUNNING':
-            return 'border-muted-foreground/30';
+            return 'border-status-running/50 shadow-[0_0_12px_rgba(234,179,8,0.2)]';
         case 'ERROR':
-            return 'border-destructive/30';
+            return 'border-destructive/50 animate-pulse-error';
         default:
             return 'border-muted-foreground/20';
+    }
+};
+
+/** Get icon component for port type */
+const getPortTypeIcon = (portType: string): React.ElementType | null => {
+    switch (portType.toLowerCase()) {
+        case 'text':
+        case 'string':
+            return Type;
+        case 'image':
+            return Image;
+        case 'number':
+            return Hash;
+        case 'any':
+            return Sparkles;
+        default:
+            return null;
+    }
+};
+
+/** Check if two port types are compatible for connection */
+const arePortTypesCompatible = (sourceType: string, targetType: string): boolean => {
+    if (sourceType === 'any' || targetType === 'any') return true;
+    return sourceType.toLowerCase() === targetType.toLowerCase();
+};
+
+/** Get Tailwind classes for port type coloring */
+const getPortTypeColor = (portType: string, hasData: boolean, portDirection: 'input' | 'output'): string => {
+    // Always show color based on port type, brighter when has data
+    if (portDirection === 'input') {
+        return hasData
+            ? 'bg-port-input border-port-input shadow-[0_0_6px_rgba(34,197,94,0.4)]'
+            : 'bg-port-input/50 border-port-input/50';
+    }
+
+    switch (portType.toLowerCase()) {
+        case 'image':
+            return hasData
+                ? 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]'
+                : 'bg-port-image/50 border-port-image/50';
+        case 'text':
+        case 'string':
+            return hasData
+                ? 'bg-port-text border-port-text shadow-[0_0_6px_rgba(139,92,246,0.4)]'
+                : 'bg-port-text/50 border-port-text/50';
+        case 'number':
+            return hasData
+                ? 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]'
+                : 'bg-port-number/50 border-port-number/50';
+        default:
+            return hasData
+                ? 'bg-port-output border-port-output shadow-[0_0_6px_rgba(139,92,246,0.4)]'
+                : 'bg-port-output/50 border-port-output/50';
     }
 };
 
@@ -76,6 +153,8 @@ interface PortItemProps {
     nodeId: string;
     hasData: boolean;
     isHighlighted: boolean;
+    /** Connection being dragged - for compatibility feedback */
+    connectionDraft?: ConnectionDraftInfo | null;
     onMouseDown: (
         nodeId: string,
         portId: string,
@@ -86,42 +165,47 @@ interface PortItemProps {
     onMouseUp: (nodeId: string, portId: string, type: 'input' | 'output', portType: string) => void;
 }
 
-const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHighlighted, onMouseDown, onMouseUp }) => {
-    const getPortTypeColor = (portType: string, hasData: boolean, portDirection: 'input' | 'output') => {
-        // Always show color based on port type, brighter when has data
-        if (portDirection === 'input') {
-            return hasData
-                ? 'bg-port-input border-port-input shadow-[0_0_6px_rgba(34,197,94,0.4)]'
-                : 'bg-port-input/50 border-port-input/50';
-        }
+const PortItem: React.FC<PortItemProps> = ({
+    port,
+    type,
+    nodeId,
+    hasData,
+    isHighlighted,
+    connectionDraft,
+    onMouseDown,
+    onMouseUp,
+}) => {
+    // Determine if this input port is a valid drop target for the current connection draft
+    const isDraggingConnection = !!connectionDraft;
+    const isInputPort = type === 'input';
+    const isSourceNode = connectionDraft?.sourceNodeId === nodeId;
 
-        switch (portType.toLowerCase()) {
-            case 'image':
-                return hasData
-                    ? 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]'
-                    : 'bg-port-image/50 border-port-image/50';
-            case 'text':
-            case 'string':
-                return hasData
-                    ? 'bg-port-text border-port-text shadow-[0_0_6px_rgba(139,92,246,0.4)]'
-                    : 'bg-port-text/50 border-port-text/50';
-            case 'number':
-                return hasData
-                    ? 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]'
-                    : 'bg-port-number/50 border-port-number/50';
-            default:
-                return hasData
-                    ? 'bg-port-output border-port-output shadow-[0_0_6px_rgba(139,92,246,0.4)]'
-                    : 'bg-port-output/50 border-port-output/50';
-        }
-    };
+    // Only input ports can be drop targets, and not on the same node
+    const isValidDropTarget =
+        isDraggingConnection &&
+        isInputPort &&
+        !isSourceNode &&
+        arePortTypesCompatible(connectionDraft.sourceType, port.type);
+
+    const isIncompatibleTarget = isDraggingConnection && isInputPort && !isSourceNode && !isValidDropTarget;
 
     const portClasses = cn(
-        'w-3 h-3 rounded-full border-2 cursor-crosshair transition-all duration-200',
-        isHighlighted && 'scale-150 border-primary bg-primary ring-4 ring-primary/30 z-20',
-        !isHighlighted && 'hover:scale-125 hover:ring-2 hover:ring-white/20',
-        !isHighlighted && getPortTypeColor(port.type, hasData, type)
+        'w-3 h-3 rounded-full border-2 transition-all duration-200',
+        // Highlighted state (selected connection) - thicker border only, no ring
+        isHighlighted && 'scale-110 border-primary border-[3px] z-20',
+        // Valid drop target - slow gentle glow (2s animation in styles.css)
+        !isHighlighted && isValidDropTarget && 'border-success bg-success z-20 animate-port-glow cursor-copy',
+        // Incompatible target - dimmed with not-allowed cursor
+        !isHighlighted && isIncompatibleTarget && 'opacity-30 cursor-not-allowed',
+        // Normal state
+        !isHighlighted &&
+            !isValidDropTarget &&
+            !isIncompatibleTarget &&
+            'cursor-crosshair hover:scale-125 hover:ring-2 hover:ring-white/20',
+        !isHighlighted && !isValidDropTarget && getPortTypeColor(port.type, hasData, type)
     );
+
+    const PortIcon = getPortTypeIcon(port.type);
 
     const portCircle = (
         <div
@@ -136,7 +220,9 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
             }}
         >
             {/* Extended hit area - transparent 24x24px */}
-            <div className="absolute -inset-1.5 cursor-crosshair" />
+            <div
+                className={cn('absolute -inset-1.5', isIncompatibleTarget ? 'cursor-not-allowed' : 'cursor-crosshair')}
+            />
             {/* Visual port circle */}
             <div className={portClasses} />
         </div>
@@ -147,17 +233,23 @@ const PortItem: React.FC<PortItemProps> = ({ port, type, nodeId, hasData, isHigh
             className={cn('flex items-center h-7 relative group', type === 'output' ? 'justify-end' : 'justify-start')}
         >
             {type === 'input' && portCircle}
-            <span
+            <div
                 className={cn(
-                    'text-[10px] uppercase tracking-wider font-medium select-none transition-colors',
-                    isHighlighted ? 'text-primary font-semibold' : 'text-muted-foreground/80'
+                    'flex items-center gap-1 transition-all',
+                    isHighlighted && 'text-primary font-semibold',
+                    isValidDropTarget && 'text-success font-semibold',
+                    isIncompatibleTarget && 'opacity-30',
+                    !isHighlighted && !isValidDropTarget && !isIncompatibleTarget && 'text-muted-foreground/80'
                 )}
             >
-                {port.label}
-            </span>
+                {PortIcon && <PortIcon className="w-2.5 h-2.5" />}
+                <span className="text-[10px] uppercase tracking-wider font-medium select-none">{port.label}</span>
+            </div>
             {type === 'output' && portCircle}
 
-            <div className="absolute left-1/2 -translate-x-1/2 -top-8 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-150">
+            {/* Tooltip showing port type */}
+            <div className="absolute left-1/2 -translate-x-1/2 -top-8 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-150 flex items-center gap-1">
+                {PortIcon && <PortIcon className="w-2.5 h-2.5" />}
                 <span className="font-semibold">{port.type}</span>
             </div>
         </div>
@@ -213,7 +305,7 @@ interface EditableVisualizationProps {
 const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
     // Server uses 'image' key for input-image config
-    const img = node.config.imageData as string | undefined;
+    const img = node.config?.imageData as string | undefined;
     const fileInputId = `inline-image-${node.id}`;
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,13 +374,10 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
     const { t } = useTranslation(['nodes']);
     const [isEditing, setIsEditing] = useState(false);
     // Server uses 'value' key for input-text config
-    const text = (node.config.text as string) || '';
+    const text = (node.config?.text as string) || '';
 
-    const textDisplay = useMemo(() => {
-        if (!text) return null;
-        const lines = text.split('\n');
-        return { firstLine: lines[0], extraLines: lines.length - 1 };
-    }, [text]);
+    const lines = text ? text.split('\n') : [];
+    const textDisplay = text ? { firstLine: lines[0], extraLines: lines.length - 1 } : null;
 
     if (isEditing) {
         return (
@@ -382,6 +471,8 @@ const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
     // Server type names
     'console-log': DebugLogVisualization,
     'result-preview': PreviewVisualization,
+    // Alias for preview block type
+    preview: PreviewVisualization,
 };
 
 interface NodeBlockProps {
@@ -405,15 +496,30 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 }) => {
     const { t } = useTranslation(['nodes', 'flows']);
     const blockRegistry = useBlockRegistry();
-    const definition = blockRegistry[node.type];
 
-    const { isSelected, isHighlighted, highlightedPortIds = [] } = highlightState;
+    // Try direct lookup first, then fallback to config-based matching
+    const definition = getBlockDefinition(node, blockRegistry);
+
+    const { isSelected, isHighlighted, highlightedPortIds = [], connectionDraft } = highlightState;
     const { onPortMouseDown, onPortMouseUp } = portHandlers;
     const { onConfigChange, onLabelChange, onToggleAuto } = configHandlers;
     const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs } = actions;
 
     const isAuto = node.autoExecutionEnabled !== false;
     const isDisabled = (node as NodeData & { disabled?: boolean }).disabled === true;
+
+    // Track API call in progress (separate from node.status which reflects server state)
+    const [isRunning, setIsRunning] = useState(false);
+
+    const handleRun = async () => {
+        if (isRunning) return;
+        setIsRunning(true);
+        try {
+            await onTrigger();
+        } finally {
+            setIsRunning(false);
+        }
+    };
 
     const [showMenu, setShowMenu] = useState(false);
     const [isEditingLabel, setIsEditingLabel] = useState(false);
@@ -435,9 +541,10 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
     useEffect(() => {
         let interval: number;
-        if (node.status === 'RUNNING' && node.executionStats?.startTime) {
+        const startTime = node.executionStats?.startTime;
+        if (node.status === 'RUNNING' && startTime) {
             interval = window.setInterval(() => {
-                setElapsedTime(Date.now() - node.executionStats!.startTime!);
+                setElapsedTime(Date.now() - startTime);
             }, 100);
         } else {
             setElapsedTime(null);
@@ -466,14 +573,18 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     };
 
     const StatusIcon = () => {
-        if (isDisabled) return <Ban className="w-3 h-3 text-muted-foreground" />;
+        if (isDisabled) return <Ban className="w-4 h-4 text-muted-foreground" />;
         switch (node.status) {
             case 'RUNNING':
-                return <Loader2 className="w-3 h-3 text-status-running animate-spin" />;
+                return <Loader2 className="w-4 h-4 text-status-running animate-spin" />;
             case 'COMPLETED':
-                return <Check className="w-3 h-3 text-status-completed" />;
+                return <Check className="w-4 h-4 text-status-completed" />;
             case 'ERROR':
-                return <span className="text-status-error font-bold text-[10px]">!</span>;
+                return (
+                    <div className="w-4 h-4 rounded-full bg-destructive/20 flex items-center justify-center">
+                        <span className="text-destructive font-bold text-[10px]">!</span>
+                    </div>
+                );
             default:
                 return null;
         }
@@ -485,8 +596,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 'absolute w-[260px] bg-node-bg rounded-xl border-[1.5px] overflow-hidden',
                 !isDragging && 'transition-all duration-200',
                 isDisabled && 'opacity-50',
-                isSelected ? 'shadow-node-selected' : 'shadow-node',
-                isHighlighted ? 'border-accent/60' : getStatusBorderColor(node.status as NodeStatus, isSelected)
+                !isSelected && !isHighlighted && node.status === 'IDLE' && 'shadow-node',
+                isHighlighted ? 'border-accent/60' : getStatusStyles(node.status as NodeStatus, isSelected)
             )}
             style={{ left: node.position.x, top: node.position.y }}
             onMouseDown={onMouseDown}
@@ -671,6 +782,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 nodeId={node.id}
                                 hasData={!!node.inputData[p.id]}
                                 isHighlighted={highlightedPortIds.includes(p.id)}
+                                connectionDraft={connectionDraft}
                                 onMouseDown={onPortMouseDown}
                                 onMouseUp={onPortMouseUp}
                             />
@@ -685,6 +797,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 nodeId={node.id}
                                 hasData={!!node.outputData[p.id]}
                                 isHighlighted={highlightedPortIds.includes(p.id)}
+                                connectionDraft={connectionDraft}
                                 onMouseDown={onPortMouseDown}
                                 onMouseUp={onPortMouseUp}
                             />
@@ -697,16 +810,19 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     {/* Use definition.type for block type checks (node.type may be blockId like "1000006") */}
                     {(definition?.type?.startsWith('input-') || !isAuto) && (
                         <button
-                            onClick={onTrigger}
+                            onClick={handleRun}
+                            disabled={isRunning}
                             className={cn(
                                 'w-full text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
-                                !isAuto && definition.inputs.every(p => node.inputData[p.id])
-                                    ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
-                                    : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
+                                isRunning
+                                    ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
+                                    : !isAuto && definition.inputs.every(p => node.inputData[p.id])
+                                      ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
+                                      : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
                             )}
                             onMouseDown={e => e.stopPropagation()}
                         >
-                            <Play className="w-3 h-3" />
+                            {isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                             {definition?.type?.startsWith('input-') ? t('actions.run') : t('actions.forceRun')}
                         </button>
                     )}
@@ -733,11 +849,13 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
             {/* Progress Bar */}
             {node.status === 'RUNNING' && (
-                <div className="absolute bottom-0 left-0 w-full h-1 bg-muted/50 overflow-hidden">
+                <div className="absolute bottom-0 left-0 w-full h-1.5 bg-muted/50 overflow-hidden">
                     <div
-                        className="h-full bg-status-running transition-all duration-200 ease-out"
+                        className="h-full bg-status-running transition-all duration-200 ease-out animate-progress-pulse"
                         style={{ width: `${node.executionStats?.progress || 5}%` }}
                     />
+                    {/* Animated shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
                 </div>
             )}
 

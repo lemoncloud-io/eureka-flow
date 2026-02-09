@@ -3,12 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { blocksKeys } from './keys';
 import { listBlocks } from '../../api';
 
-import type { BlockDefinition } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinitionWithFrontend } from '../../types';
 
 /**
  * Query hook for listing all block definitions
  *
- * Block definitions are relatively static, so we use a longer staleTime
+ * Block definitions are relatively static, so we use a longer staleTime.
+ * Returns BlockDefinitionWithFrontend which includes the isFrontend flag.
  */
 export const useBlocksListQuery = () => {
     return useQuery({
@@ -19,4 +20,4 @@ export const useBlocksListQuery = () => {
 };
 
 // Re-export types for convenience
-export type { BlockDefinition };
+export type { BlockDefinitionWithFrontend };

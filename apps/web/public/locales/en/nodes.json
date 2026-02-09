@@ -44,7 +44,8 @@
     },
     "errors": {
         "executionFailed": "Execution Failed",
-        "unknownBlockType": "Unknown Block Type"
+        "unknownBlockType": "Unknown Block Type",
+        "missingInputs": "Missing required inputs: {{inputs}}"
     },
     "ports": {
         "in": "In",

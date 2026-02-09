@@ -23,7 +23,58 @@ export type {
     WorkflowState,
 } from '@lemoncloud/eureka-flows-api';
 
-import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinition, DataPacket, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+
+// ============================================================================
+// Block Definition Extension (isFrontend support)
+// ============================================================================
+
+/**
+ * BlockDefinitionWithFrontend - extends BlockDefinition with isFrontend flag
+ *
+ * This type extends the API package's BlockDefinition to include the `isFrontend`
+ * flag from the server response. When the API package is updated, this can be removed.
+ *
+ * @see /blocks/0/list API response
+ *
+ * Execution logic:
+ * - `isFrontend: true` → Execute on client (use `execute` function)
+ * - `isFrontend: false` → Execute on server (call POST /nodes/:id/run)
+ * - `isFrontend: undefined` → Fallback to legacy BACKEND_PROCESSOR_TYPES check
+ */
+/**
+ * BlockStereo - stereotype of block for categorization
+ * Matches server's BlockStereo type
+ */
+export type BlockStereo = 'input' | 'process' | 'output';
+
+export interface BlockDefinitionWithFrontend extends BlockDefinition {
+    /**
+     * Indicates whether this block should be executed on the frontend (client-side)
+     * or requires backend processing (server-side).
+     *
+     * - `true`: Client-side execution using the `execute` function
+     * - `false`: Server-side execution via POST /nodes/:id/run API
+     * - `undefined`: Use legacy fallback (BACKEND_PROCESSOR_TYPES check)
+     */
+    isFrontend?: boolean;
+
+    /**
+     * Block stereotype for categorization (input, process, output)
+     * Used by Sidebar for grouping blocks
+     */
+    stereo?: BlockStereo;
+
+    /**
+     * The function that runs when the block triggers (client-side only)
+     * This is attached by the frontend when `isFrontend: true`
+     */
+    execute?: (
+        inputs: Record<string, DataPacket>,
+        config: Record<string, unknown>,
+        onProgress?: (progress: number) => void
+    ) => Promise<Record<string, DataPacket>>;
+}
 
 /**
  * FlowStereo - stereotype of flow model
@@ -134,6 +185,23 @@ export interface DataPacketItem {
 }
 
 /**
+ * PortData - data stored in a port node
+ * Server uses DynamoDB-style typed values
+ */
+export interface PortData {
+    /** String value (for text, image types) */
+    S?: string;
+    /** Number value (integer) */
+    N?: number;
+    /** Float value */
+    F?: number;
+    /** Stringified JSON (for json, any types) */
+    M?: string;
+    /** Timestamp when data was produced */
+    timestamp?: number;
+}
+
+/**
  * NodeModel - extended node model for backend
  *
  * Execution state is managed at node level:
@@ -142,7 +210,7 @@ export interface DataPacketItem {
  */
 export interface NodeModel {
     id?: string;
-    stereo?: NodeStereo;
+    stereo?: NodeStereo | 'port';
     name?: string;
     url?: string;
     image?: string;
@@ -177,6 +245,29 @@ export interface NodeModel {
     autoExecutionEnabled?: boolean;
     createdAt?: string;
     updatedAt?: string;
+
+    // ============================================================================
+    // Port-specific fields (when stereo === 'port')
+    // ============================================================================
+    /** Parent node ID (for port nodes) */
+    parentId?: string;
+    /** Port direction */
+    direction?: 'in' | 'out';
+    /** Data type of the port */
+    dataType?: string;
+    /** Port data (for port nodes) */
+    data$?: PortData;
+    /** Child number for port node */
+    childNo?: number;
+
+    // ============================================================================
+    // isFrontend flag (from server response)
+    // ============================================================================
+    /**
+     * If 1, this is a frontend node (executes on client)
+     * If 0 or undefined, this is a backend node (executes on server)
+     */
+    isFrontend?: 0 | 1;
 }
 
 /**
@@ -257,6 +348,17 @@ export interface SaveFlowBody {
 export interface SaveFlowView extends FlowView {
     nodes$$: NodeView[];
     edges$$: EdgeView[];
+    ports$$: NodeView[];
+}
+
+/**
+ * UpsertNodeResult - response from node upsert endpoint
+ * POST /nodes/:id/upsert?flowId=<flowId>
+ *
+ * @see eureka-flows-api POST /nodes/:id/upsert response
+ */
+export interface UpsertNodeResult {
+    nodes$$: NodeView[];
     ports$$: NodeView[];
 }
 
