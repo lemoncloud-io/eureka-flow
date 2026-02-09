@@ -19,7 +19,7 @@ import {
     Zap,
 } from 'lucide-react';
 
-import { compressImageIfNeeded, useBlockRegistry } from '@flows/flows';
+import { compressImageIfNeeded, getBlockDefinition, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { S3Image } from './S3Image';
@@ -496,7 +496,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 }) => {
     const { t } = useTranslation(['nodes', 'flows']);
     const blockRegistry = useBlockRegistry();
-    const definition = blockRegistry[node.type];
+
+    // Try direct lookup first, then fallback to config-based matching
+    const definition = getBlockDefinition(node, blockRegistry);
 
     const { isSelected, isHighlighted, highlightedPortIds = [], connectionDraft } = highlightState;
     const { onPortMouseDown, onPortMouseUp } = portHandlers;
