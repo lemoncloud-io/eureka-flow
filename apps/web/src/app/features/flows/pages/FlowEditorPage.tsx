@@ -120,12 +120,16 @@ export const FlowEditorPage = () => {
                             // Call upsert API
                             await upsertNode(parentNodeId, currentFlowId, upsertBody);
 
-                            // Update canvas with parent node data
+                            // Update canvas directly with the data we already have
+                            // NOTE: Don't re-fetch with getNode because GET /nodes/:id
+                            // doesn't return inputData$$/outputData$$ fields
                             if (canvasRef.current) {
-                                const updatedParent = await getNode(parentNodeId);
-                                if (updatedParent) {
-                                    canvasRef.current.updateNodeFromServer(parentNodeId, updatedParent);
-                                }
+                                // Merge only the inputData/outputData we just upserted
+                                const partialUpdate = {
+                                    inputData: portData.direction === 'in' ? { [portKey]: dataPacket } : undefined,
+                                    outputData: portData.direction === 'out' ? { [portKey]: dataPacket } : undefined,
+                                } as NodeData;
+                                canvasRef.current.updateNodeFromServer(parentNodeId, partialUpdate);
                             }
                         }
                     }

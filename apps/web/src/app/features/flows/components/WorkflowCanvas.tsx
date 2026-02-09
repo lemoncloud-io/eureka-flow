@@ -662,16 +662,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     // Merge server data with existing node, preserving UI-specific fields
                     // Note: Server returns NodeView format from GET /nodes/:id
                     // - config$: ConfigItem[] (array) -> config: Record<string, string> (object)
+                    // - inputData$$: DataPacketItem[] (array) -> inputData: Record<string, DataPacket> (object)
+                    // - outputData$$: DataPacketItem[] (array) -> outputData: Record<string, DataPacket> (object)
                     // - position: { x, y } -> use directly
-                    // - inputData/outputData are not returned from GET /nodes/:id (only from /flows/:id/load)
                     setNodes(prev =>
                         prev.map(n => {
                             if (n.id !== nodeId) return n;
 
+                            const serverDataAny = serverData as unknown as Record<string, unknown>;
+
                             // Transform config$ (array) to config (object) if needed
                             // Server GET /nodes/:id returns config$ as ConfigItem[]
                             let transformedConfig = n.config;
-                            const serverDataAny = serverData as unknown as Record<string, unknown>;
                             if (Array.isArray(serverDataAny['config$'])) {
                                 transformedConfig = {};
                                 for (const item of serverDataAny['config$'] as Array<{
@@ -684,13 +686,46 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 transformedConfig = serverData.config;
                             }
 
+                            // Transform inputData$$ (array) to inputData (object) if needed
+                            // Server GET /nodes/:id returns inputData$$ as DataPacketItem[]
+                            // For partial updates (port updates), merge with existing data
+                            let transformedInputData = n.inputData;
+                            if (Array.isArray(serverDataAny['inputData$$'])) {
+                                transformedInputData = {};
+                                for (const item of serverDataAny['inputData$$'] as Array<{
+                                    portId: string;
+                                    packet: { value: unknown; type: string; timestamp?: number };
+                                }>) {
+                                    transformedInputData[item.portId] = item.packet as DataPacket;
+                                }
+                            } else if (serverData.inputData) {
+                                // Merge with existing data instead of replacing
+                                transformedInputData = { ...n.inputData, ...serverData.inputData };
+                            }
+
+                            // Transform outputData$$ (array) to outputData (object) if needed
+                            // Server GET /nodes/:id returns outputData$$ as DataPacketItem[]
+                            // For partial updates (port updates), merge with existing data
+                            let transformedOutputData = n.outputData;
+                            if (Array.isArray(serverDataAny['outputData$$'])) {
+                                transformedOutputData = {};
+                                for (const item of serverDataAny['outputData$$'] as Array<{
+                                    portId: string;
+                                    packet: { value: unknown; type: string; timestamp?: number };
+                                }>) {
+                                    transformedOutputData[item.portId] = item.packet as DataPacket;
+                                }
+                            } else if (serverData.outputData) {
+                                // Merge with existing data instead of replacing
+                                transformedOutputData = { ...n.outputData, ...serverData.outputData };
+                            }
+
                             return {
                                 ...n,
                                 // Update from server data (with transformation)
                                 config: transformedConfig,
-                                // Only update inputData/outputData if provided (flow/load format)
-                                inputData: serverData.inputData ?? n.inputData,
-                                outputData: serverData.outputData ?? n.outputData,
+                                inputData: transformedInputData,
+                                outputData: transformedOutputData,
                                 status: serverData.status ?? n.status,
                                 errorMessage: serverData.errorMessage,
                                 executionStats: serverData.executionStats,
