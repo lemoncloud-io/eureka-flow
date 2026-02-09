@@ -78,7 +78,7 @@ export const FlowEditorPage = () => {
             isPort: boolean;
             parentNodeId?: string;
         }) => {
-            const { nodeId, timestamp, status, isPort, parentNodeId } = info;
+            const { nodeId, status, isPort, parentNodeId } = info;
 
             // Always fetch latest node data from server
             // (timestamp comparison removed - status changes may have same timestamp)
@@ -99,7 +99,7 @@ export const FlowEditorPage = () => {
                             const portValue =
                                 portData.data$.S ?? portData.data$.N ?? portData.data$.F ?? portData.data$.M;
                             const portType = portData.dataType || 'text';
-                            const portTimestamp = portData.data$.timestamp || timestamp;
+                            const portTimestamp = portData.data$.timestamp || info.timestamp;
 
                             // Determine port key from port name or extract from ID
                             const portKey = portData.name || nodeId.split(':')[1] || 'data';
@@ -140,31 +140,26 @@ export const FlowEditorPage = () => {
                         canvasRef.current.updateNodeFromServer(parentNodeId, { status } as NodeData);
                     }
                 } else {
-                    // Regular node update - use socket status directly for immediate feedback
-                    // Then fetch full node data for other fields
-                    if (canvasRef.current && status) {
-                        // Immediately update status from socket message
+                    // Regular node update - fetch full node data from API
+                    // API response is the authoritative source for current status
+                    // Socket notification is just a trigger - its status may be stale
+                    const nodeData = await getNode(nodeId);
+                    console.log('[handleNodeUpdate] Regular node update:', nodeId, {
+                        socketStatus: status,
+                        apiStatus: nodeData?.status,
+                        hasNodeData: !!nodeData,
+                    });
+                    if (canvasRef.current && nodeData) {
+                        // Use API status as the authoritative source (not socket status)
+                        canvasRef.current.updateNodeFromServer(nodeId, nodeData as NodeData);
+                    } else if (canvasRef.current && status) {
+                        // Fallback: No node data from API, use socket status as last resort
                         canvasRef.current.updateNodeFromServer(nodeId, { status } as NodeData);
                     }
-
-                    // Fetch full node data for other fields (config, position, etc.)
-                    const nodeData = await getNode(nodeId);
-                    if (canvasRef.current && nodeData) {
-                        // If we already applied socket status, preserve it
-                        // API response may have stale status (e.g., RUNNING) that would overwrite
-                        // the correct socket status (e.g., COMPLETED)
-                        if (status) {
-                            const { status: _ignoredStatus, ...nodeDataWithoutStatus } = nodeData as NodeData & {
-                                status?: string;
-                            };
-                            canvasRef.current.updateNodeFromServer(nodeId, nodeDataWithoutStatus as NodeData);
-                        } else {
-                            canvasRef.current.updateNodeFromServer(nodeId, nodeData);
-                        }
-                    }
                 }
-            } catch {
+            } catch (error) {
                 // Node reload failed - silent fail, user can refresh
+                console.debug('[handleNodeUpdate] Failed to update node:', nodeId, error);
             }
         },
         [blockRegistry, currentFlowId]

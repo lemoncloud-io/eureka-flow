@@ -461,19 +461,54 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     executionQueueRef.current.clear();
                     isProcessingQueueRef.current = false;
                     executingNodesRef.current.clear();
+
                     // Normalize nodes to ensure config is never undefined
                     const loadedNodes = (state.nodes ?? []).map(n => ({
                         ...n,
                         config: n.config ?? {},
                     }));
-                    setNodes(loadedNodes);
-                    // Support both 'edges' (API format) and 'connections' (legacy)
-                    setConnections(state.edges ?? state.connections ?? []);
+
+                    // Get connections
+                    const loadedConnections = state.edges ?? state.connections ?? [];
+
+                    // Propagate outputData to downstream nodes' inputData
+                    // This ensures that existing completed nodes' outputs are reflected in downstream inputs
+                    const nodesWithPropagatedData = loadedNodes.map(node => {
+                        // Find all connections where this node is the target
+                        const incomingConnections = loadedConnections.filter(c => c.targetNodeId === node.id);
+
+                        if (incomingConnections.length === 0) {
+                            return node;
+                        }
+
+                        // Build inputData from upstream nodes' outputData
+                        const propagatedInputData = { ...node.inputData };
+                        let hasNewData = false;
+
+                        incomingConnections.forEach(conn => {
+                            const sourceNode = loadedNodes.find(n => n.id === conn.sourceNodeId);
+                            if (sourceNode?.outputData) {
+                                const packet = sourceNode.outputData[conn.sourcePortId];
+                                if (packet) {
+                                    propagatedInputData[conn.targetPortId] = packet;
+                                    hasNewData = true;
+                                }
+                            }
+                        });
+
+                        if (hasNewData) {
+                            return { ...node, inputData: propagatedInputData };
+                        }
+                        return node;
+                    });
+
+                    setNodes(nodesWithPropagatedData);
+                    setConnections(loadedConnections);
                     pastRef.current = [];
                     futureRef.current = [];
                     handleSelectionChange(null);
                     setSelectedConnectionId(null);
-                    initializeInputHashes(loadedNodes);
+                    initializeInputHashes(nodesWithPropagatedData);
                 },
                 clearWorkflow: () => {
                     if (readOnly) return;
@@ -665,14 +700,43 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     // - inputData$$: DataPacketItem[] (array) -> inputData: Record<string, DataPacket> (object)
                     // - outputData$$: DataPacketItem[] (array) -> outputData: Record<string, DataPacket> (object)
                     // - position: { x, y } -> use directly
+
+                    const serverDataAny = serverData as unknown as Record<string, unknown>;
+
+                    // Pre-calculate transformed outputData
+                    let outputDataForPropagation: Record<string, DataPacket> | null = null;
+                    if (Array.isArray(serverDataAny['outputData$$'])) {
+                        outputDataForPropagation = {};
+                        for (const item of serverDataAny['outputData$$'] as Array<{
+                            portId: string;
+                            packet: { value: unknown; type: string; timestamp?: number };
+                        }>) {
+                            outputDataForPropagation[item.portId] = item.packet as DataPacket;
+                        }
+                    } else if (serverData.outputData && Object.keys(serverData.outputData).length > 0) {
+                        outputDataForPropagation = serverData.outputData;
+                    }
+
+                    // Check if this is a completion transition (RUNNING -> COMPLETED)
+                    // We need to track this before the setNodes call
+                    const currentNode = nodesRef.current.find(n => n.id === nodeId);
+                    const wasRunning = currentNode?.status === 'RUNNING';
+                    const isNowCompleted = serverData.status === 'COMPLETED';
+                    const shouldPropagate = wasRunning && isNowCompleted && outputDataForPropagation;
+
+                    console.log('[updateNodeFromServer]', nodeId, {
+                        serverStatus: serverData.status,
+                        currentStatus: currentNode?.status,
+                        nodeExists: !!currentNode,
+                        wasRunning,
+                        isNowCompleted,
+                    });
+
                     setNodes(prev =>
                         prev.map(n => {
                             if (n.id !== nodeId) return n;
 
-                            const serverDataAny = serverData as unknown as Record<string, unknown>;
-
                             // Transform config$ (array) to config (object) if needed
-                            // Server GET /nodes/:id returns config$ as ConfigItem[]
                             let transformedConfig = n.config;
                             if (Array.isArray(serverDataAny['config$'])) {
                                 transformedConfig = {};
@@ -687,8 +751,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             }
 
                             // Transform inputData$$ (array) to inputData (object) if needed
-                            // Server GET /nodes/:id returns inputData$$ as DataPacketItem[]
-                            // For partial updates (port updates), merge with existing data
                             let transformedInputData = n.inputData;
                             if (Array.isArray(serverDataAny['inputData$$'])) {
                                 transformedInputData = {};
@@ -699,41 +761,48 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     transformedInputData[item.portId] = item.packet as DataPacket;
                                 }
                             } else if (serverData.inputData) {
-                                // Merge with existing data instead of replacing
                                 transformedInputData = { ...n.inputData, ...serverData.inputData };
                             }
 
                             // Transform outputData$$ (array) to outputData (object) if needed
-                            // Server GET /nodes/:id returns outputData$$ as DataPacketItem[]
-                            // For partial updates (port updates), merge with existing data
                             let transformedOutputData = n.outputData;
-                            if (Array.isArray(serverDataAny['outputData$$'])) {
-                                transformedOutputData = {};
-                                for (const item of serverDataAny['outputData$$'] as Array<{
-                                    portId: string;
-                                    packet: { value: unknown; type: string; timestamp?: number };
-                                }>) {
-                                    transformedOutputData[item.portId] = item.packet as DataPacket;
-                                }
-                            } else if (serverData.outputData) {
-                                // Merge with existing data instead of replacing
-                                transformedOutputData = { ...n.outputData, ...serverData.outputData };
+                            if (outputDataForPropagation) {
+                                transformedOutputData = { ...n.outputData, ...outputDataForPropagation };
                             }
 
                             return {
                                 ...n,
-                                // Update from server data (with transformation)
                                 config: transformedConfig,
                                 inputData: transformedInputData,
                                 outputData: transformedOutputData,
                                 status: serverData.status ?? n.status,
                                 errorMessage: serverData.errorMessage,
                                 executionStats: serverData.executionStats,
-                                // Use position object (server format)
                                 position: serverData.position ?? n.position,
                             };
                         })
                     );
+
+                    // Propagate outputs to downstream nodes ONLY when:
+                    // 1. Node transitioned from RUNNING to COMPLETED
+                    // 2. Node has outputData to propagate
+                    // This prevents infinite loops while ensuring data flows downstream
+                    if (shouldPropagate && propagateOutputsRef.current) {
+                        const updatedDownstreamNodes = propagateOutputsRef.current(
+                            nodeId,
+                            outputDataForPropagation as Record<string, DataPacket>
+                        );
+
+                        if (updatedDownstreamNodes.length > 0) {
+                            // Update downstream nodes' inputData
+                            setNodes(prev =>
+                                prev.map(n => {
+                                    const update = updatedDownstreamNodes.find(u => u.nodeId === n.id);
+                                    return update ? { ...n, inputData: update.inputData } : n;
+                                })
+                            );
+                        }
+                    }
                 },
                 handleBackendNodeComplete: (nodeId: string, outputData: Record<string, DataPacket>) => {
                     // Update node's outputData
