@@ -660,21 +660,42 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 },
                 updateNodeFromServer: (nodeId: string, serverData: NodeData) => {
                     // Merge server data with existing node, preserving UI-specific fields
+                    // Note: Server returns NodeView format from GET /nodes/:id
+                    // - config$: ConfigItem[] (array) -> config: Record<string, string> (object)
+                    // - position: { x, y } -> use directly
+                    // - inputData/outputData are not returned from GET /nodes/:id (only from /flows/:id/load)
                     setNodes(prev =>
                         prev.map(n => {
                             if (n.id !== nodeId) return n;
+
+                            // Transform config$ (array) to config (object) if needed
+                            // Server GET /nodes/:id returns config$ as ConfigItem[]
+                            let transformedConfig = n.config;
+                            const serverDataAny = serverData as unknown as Record<string, unknown>;
+                            if (Array.isArray(serverDataAny['config$'])) {
+                                transformedConfig = {};
+                                for (const item of serverDataAny['config$'] as Array<{
+                                    key: string;
+                                    val: string;
+                                }>) {
+                                    transformedConfig[item.key] = item.val;
+                                }
+                            } else if (serverData.config) {
+                                transformedConfig = serverData.config;
+                            }
+
                             return {
                                 ...n,
-                                // Update from server data
-                                config: serverData.config ?? n.config,
+                                // Update from server data (with transformation)
+                                config: transformedConfig,
+                                // Only update inputData/outputData if provided (flow/load format)
                                 inputData: serverData.inputData ?? n.inputData,
                                 outputData: serverData.outputData ?? n.outputData,
                                 status: serverData.status ?? n.status,
                                 errorMessage: serverData.errorMessage,
                                 executionStats: serverData.executionStats,
-                                // Preserve position if not provided by server
-                                x: serverData.x ?? n.x,
-                                y: serverData.y ?? n.y,
+                                // Use position object (server format)
+                                position: serverData.position ?? n.position,
                             };
                         })
                     );

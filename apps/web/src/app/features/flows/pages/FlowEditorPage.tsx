@@ -77,7 +77,7 @@ export const FlowEditorPage = () => {
             isPort: boolean;
             parentNodeId?: string;
         }) => {
-            const { nodeId, isPort, parentNodeId } = info;
+            const { nodeId, timestamp, isPort, parentNodeId } = info;
 
             // Always fetch latest node data from server
             // (timestamp comparison removed - status changes may have same timestamp)

@@ -183,11 +183,15 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
             // - Node run results come via socket and must be processed
             // - Self-echo prevention is only for flow save operations
             if (isNodeUpdateMessage(data)) {
+                // Skip history nodes (format: nodeId@N like 'ywb8c99z3@2')
+                // History nodes are snapshots and don't need to trigger updates
+                const isHistoryNode = data.id.includes('@');
+                if (isHistoryNode) return;
+
                 // Only process if it's for the current flow
                 if (currentFlowId && data.flowId === currentFlowId && onNodeReload) {
                     // Check if this is a port update (id contains ':' like 'nodeId:5')
-                    // Also handle history nodes with '@' like 'nodeId@2'
-                    const isPort = data.id.includes(':') && !data.id.includes('@');
+                    const isPort = data.id.includes(':');
                     const parentNodeId = isPort ? data.id.split(':')[0] : undefined;
 
                     onNodeReload({
