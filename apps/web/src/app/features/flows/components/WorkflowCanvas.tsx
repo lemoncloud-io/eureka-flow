@@ -14,7 +14,7 @@ import { TooltipImage } from './TooltipImage';
 import { ZoomControls } from './ZoomControls';
 import { generateId, isValidConnection } from '../utils';
 
-import type { Connection, DataPacket, NodeData, PortDefinition, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 export interface WorkflowCanvasRef {
     addNode: (type: string) => void;
@@ -32,8 +32,6 @@ export interface WorkflowCanvasRef {
     /** Update node from server data (used for socket node update notifications) */
     updateNodeFromServer: (nodeId: string, serverData: NodeData) => void;
     stopAll: () => void;
-    /** Handle backend node completion: update outputData and trigger downstream execution */
-    handleBackendNodeComplete: (nodeId: string, outputData: Record<string, DataPacket>) => void;
 }
 
 interface WorkflowCanvasProps {
@@ -112,18 +110,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const pastRef = useRef<WorkflowState[]>([]);
         const futureRef = useRef<WorkflowState[]>([]);
         const dragStartSnapshotRef = useRef<WorkflowState | null>(null);
-        const nodeInputHashesRef = useRef<Map<string, string>>(new Map());
         const executeNodeRef = useRef<(nodeId: string) => Promise<void>>();
-        const propagateOutputsRef =
-            useRef<
-                (
-                    sourceNodeId: string,
-                    outputs: Record<string, DataPacket>
-                ) => Array<{ nodeId: string; inputData: Record<string, DataPacket> }>
-            >();
-        const processExecutionQueueRef = useRef<() => Promise<void>>();
-        const queueDownstreamNodesRef =
-            useRef<(updatedNodes: Array<{ nodeId: string; inputData: Record<string, DataPacket> }>) => void>();
         /** Counter for batch run operations. When > 0, skip individual saves (already saved by runAll) */
         const batchRunCountRef = useRef(0);
 
@@ -131,13 +118,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const connectionsRef = useRef(connections);
         nodesRef.current = nodes;
         connectionsRef.current = connections;
-
-        /** Queue for pending node executions to ensure sequential processing
-         * Stores nodeId -> updatedInputData to avoid stale state issues */
-        const executionQueueRef = useRef<Map<string, Record<string, DataPacket>>>(new Map());
-        const isProcessingQueueRef = useRef(false);
-        /** Track currently executing nodes to prevent concurrent execution of the same node */
-        const executingNodesRef = useRef<Set<string>>(new Set());
 
         const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
         const [isPanning, setIsPanning] = useState(false);
@@ -194,20 +174,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             futureRef.current = [];
         }, [nodes, connections, readOnly]);
 
-        /** Initialize input hashes to prevent auto-execution on load */
-        const initializeInputHashes = useCallback(
-            (loadedNodes: NodeData[]) => {
-                loadedNodes.forEach(node => {
-                    const def = blockRegistry[node.type];
-                    if (def && def.inputs.length > 0) {
-                        const hash = def.inputs.map(p => node.inputData?.[p.id]?.timestamp).join('|');
-                        nodeInputHashesRef.current.set(node.id, hash);
-                    }
-                });
-            },
-            [blockRegistry]
-        );
-
         const undo = useCallback(() => {
             if (readOnly || pastRef.current.length === 0) return;
 
@@ -249,10 +215,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 setConnections(initialData.connections ?? []);
                 pastRef.current = [];
                 futureRef.current = [];
-
-                initializeInputHashes(loadedNodes);
             }
-        }, [initialData, blockRegistry, initializeInputHashes]);
+        }, [initialData, blockRegistry]);
 
         useEffect(() => {
             if (modalFlowId) {
@@ -458,10 +422,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 },
                 getWorkflow: () => ({ nodes, edges: connections }),
                 loadWorkflow: (state: WorkflowState) => {
-                    executionQueueRef.current.clear();
-                    isProcessingQueueRef.current = false;
-                    executingNodesRef.current.clear();
-
                     // Normalize nodes to ensure config is never undefined
                     const loadedNodes = (state.nodes ?? []).map(n => ({
                         ...n,
@@ -508,24 +468,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     futureRef.current = [];
                     handleSelectionChange(null);
                     setSelectedConnectionId(null);
-                    initializeInputHashes(nodesWithPropagatedData);
                 },
                 clearWorkflow: () => {
                     if (readOnly) return;
                     saveCheckpoint();
-                    executionQueueRef.current.clear();
-                    isProcessingQueueRef.current = false;
-                    executingNodesRef.current.clear();
                     setNodes([]);
                     setConnections([]);
                     handleSelectionChange(null);
                 },
                 newWorkflow: () => {
                     if (readOnly) return;
-                    executionQueueRef.current.clear();
-                    isProcessingQueueRef.current = false;
-                    executingNodesRef.current.clear();
-                    nodeInputHashesRef.current.clear();
                     setNodes([]);
                     setConnections([]);
                     pastRef.current = [];
@@ -648,6 +600,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     setViewport({ x: 20, y: 20, zoom: 1 });
                 },
                 runAll: async () => {
+                    // Find all input/source nodes (no incoming connections or no required inputs)
                     const inputNodes = nodes
                         .filter(n => {
                             const hasIncoming = connections.some(c => c.targetNodeId === n.id);
@@ -663,31 +616,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             await onBeforeBackendRun();
                         }
 
+                        // Execute input nodes - backend handles downstream propagation
                         for (const node of inputNodes) {
                             if (executeNodeRef.current) {
                                 await executeNodeRef.current(node.id);
                             }
                         }
-
-                        await new Promise<void>(resolve => {
-                            const checkQueue = () => {
-                                if (executionQueueRef.current.size === 0 && !isProcessingQueueRef.current) {
-                                    resolve();
-                                } else {
-                                    setTimeout(checkQueue, 50);
-                                }
-                            };
-                            setTimeout(checkQueue, 10);
-                        });
                     } finally {
                         batchRunCountRef.current--;
                     }
                 },
                 stopAll: () => {
                     batchRunCountRef.current = 0;
-                    executionQueueRef.current.clear();
-                    isProcessingQueueRef.current = false;
-                    executingNodesRef.current.clear();
                     setNodes(prev => prev.map(n => (n.status === 'RUNNING' ? { ...n, status: 'IDLE' } : n)));
                 },
                 updateNode: (nodeId: string, updates: Partial<NodeData>) => {
@@ -717,19 +657,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         outputDataForPropagation = serverData.outputData;
                     }
 
-                    // Check if this is a completion transition (RUNNING -> COMPLETED)
-                    // We need to track this before the setNodes call
+                    // Get current node for logging
                     const currentNode = nodesRef.current.find(n => n.id === nodeId);
-                    const wasRunning = currentNode?.status === 'RUNNING';
-                    const isNowCompleted = serverData.status === 'COMPLETED';
-                    const shouldPropagate = wasRunning && isNowCompleted && outputDataForPropagation;
 
                     console.log('[updateNodeFromServer]', nodeId, {
                         serverStatus: serverData.status,
                         currentStatus: currentNode?.status,
                         nodeExists: !!currentNode,
-                        wasRunning,
-                        isNowCompleted,
                     });
 
                     setNodes(prev =>
@@ -783,37 +717,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         })
                     );
 
-                    // Propagate outputs to downstream nodes ONLY when:
-                    // 1. Node transitioned from RUNNING to COMPLETED
-                    // 2. Node has outputData to propagate
-                    // This prevents infinite loops while ensuring data flows downstream
-                    if (shouldPropagate && propagateOutputsRef.current) {
-                        const updatedDownstreamNodes = propagateOutputsRef.current(
-                            nodeId,
-                            outputDataForPropagation as Record<string, DataPacket>
-                        );
-
-                        if (updatedDownstreamNodes.length > 0) {
-                            // Update downstream nodes' inputData
-                            setNodes(prev =>
-                                prev.map(n => {
-                                    const update = updatedDownstreamNodes.find(u => u.nodeId === n.id);
-                                    return update ? { ...n, inputData: update.inputData } : n;
-                                })
-                            );
-                        }
-                    }
-                },
-                handleBackendNodeComplete: (nodeId: string, outputData: Record<string, DataPacket>) => {
-                    // Update node's outputData
-                    setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, outputData } : n)));
-
-                    // Propagate outputs to downstream nodes (use ref to avoid initialization order issues)
-                    if (!propagateOutputsRef.current) return;
-                    const updatedDownstreamNodes = propagateOutputsRef.current(nodeId, outputData);
-
-                    // Queue downstream nodes for execution
-                    queueDownstreamNodesRef.current?.(updatedDownstreamNodes);
+                    // Note: Output propagation to downstream nodes is handled by the server
+                    // via propagateDownstreamV2. Socket notifications will update downstream
+                    // nodes' inputData separately, so we don't need to propagate here.
                 },
             }),
             [
@@ -831,132 +737,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 createNodeOnBackend,
             ]
         );
-
-        const propagateOutputs = useCallback(
-            (
-                sourceNodeId: string,
-                outputs: Record<string, DataPacket>
-            ): Array<{ nodeId: string; inputData: Record<string, DataPacket> }> => {
-                const relevantConnections = connectionsRef.current.filter(c => c.sourceNodeId === sourceNodeId);
-                if (relevantConnections.length === 0) return [];
-
-                // Calculate updated inputData for each downstream node
-                const updatedNodes: Array<{ nodeId: string; inputData: Record<string, DataPacket> }> = [];
-                const currentNodes = nodesRef.current;
-
-                currentNodes.forEach(node => {
-                    const incoming = relevantConnections.filter(c => c.targetNodeId === node.id);
-                    if (incoming.length === 0) return;
-
-                    const newInputData = { ...node.inputData };
-                    let nodeChanged = false;
-
-                    incoming.forEach(conn => {
-                        const packet = outputs[conn.sourcePortId];
-                        if (packet) {
-                            newInputData[conn.targetPortId] = packet;
-                            nodeChanged = true;
-                        }
-                    });
-
-                    if (nodeChanged) {
-                        updatedNodes.push({ nodeId: node.id, inputData: newInputData });
-                    }
-                });
-
-                // Update state
-                if (updatedNodes.length > 0) {
-                    const inputDataMap = new Map(updatedNodes.map(n => [n.nodeId, n.inputData]));
-
-                    setNodes(prevNodes =>
-                        prevNodes.map(node => {
-                            const newInputData = inputDataMap.get(node.id);
-                            return newInputData ? { ...node, inputData: newInputData } : node;
-                        })
-                    );
-                }
-
-                return updatedNodes;
-            },
-            []
-        );
-
-        /** Queue downstream nodes for execution after checking required inputs */
-        const queueDownstreamNodes = useCallback(
-            (updatedNodes: Array<{ nodeId: string; inputData: Record<string, DataPacket> }>) => {
-                if (updatedNodes.length === 0) return;
-
-                let queued = false;
-                updatedNodes.forEach(({ nodeId: downstreamId, inputData: updatedInputData }) => {
-                    const downstreamNode = nodesRef.current.find(n => n.id === downstreamId);
-                    if (!downstreamNode) return;
-
-                    const downstreamDef = blockRegistry[downstreamNode.type];
-                    if (!downstreamDef) return;
-
-                    if (downstreamNode.autoExecutionEnabled === false) return;
-
-                    // Only check required inputs (required === true)
-                    const requiredInputs = downstreamDef.inputs.filter((p: PortDefinition) => p.required === true);
-                    if (requiredInputs.every(p => updatedInputData[p.id])) {
-                        executionQueueRef.current.set(downstreamId, updatedInputData);
-                        queued = true;
-                    }
-                });
-
-                if (queued) {
-                    setTimeout(() => processExecutionQueueRef.current?.(), 0);
-                }
-            },
-            [blockRegistry]
-        );
-
-        const processExecutionQueue = useCallback(async () => {
-            if (isProcessingQueueRef.current) return;
-            if (executionQueueRef.current.size === 0) return;
-
-            isProcessingQueueRef.current = true;
-
-            try {
-                while (executionQueueRef.current.size > 0) {
-                    const nextEntry = executionQueueRef.current.entries().next();
-                    if (nextEntry.done || !nextEntry.value) break;
-                    const [nodeId, queuedInputData] = nextEntry.value;
-                    executionQueueRef.current.delete(nodeId);
-
-                    const node = nodesRef.current.find(n => n.id === nodeId);
-                    if (!node) continue;
-
-                    const def = blockRegistry[node.type];
-                    if (!def) continue;
-
-                    // Check if required inputs are available using queued data (avoids stale state)
-                    const requiredInputs = def.inputs.filter((p: PortDefinition) => p.required === true);
-                    const hasAllInputs = requiredInputs.every(p => queuedInputData[p.id]);
-                    if (!hasAllInputs) continue;
-
-                    const currentInputHash = def.inputs.map(p => queuedInputData[p.id]?.timestamp).join('|');
-                    const lastHash = nodeInputHashesRef.current.get(nodeId);
-
-                    if (currentInputHash !== lastHash) {
-                        // Skip if this node is already executing
-                        if (executingNodesRef.current.has(nodeId)) continue;
-
-                        nodeInputHashesRef.current.set(nodeId, currentInputHash);
-                        if (executeNodeRef.current) {
-                            executingNodesRef.current.add(nodeId);
-                            try {
-                                await executeNodeRef.current(nodeId);
-                            } finally {
-                                executingNodesRef.current.delete(nodeId);
-                            }
-                        }
-                    }
-                }
-            } finally {
-                isProcessingQueueRef.current = false;
-            }
-        }, [blockRegistry]);
 
         const executeNode = useCallback(
             async (nodeId: string, manualOverrideInputs?: Record<string, DataPacket>) => {
@@ -1026,26 +806,61 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         await onBeforeBackendRun();
                     }
 
-                    // Call server API and use response as fallback for status update
-                    // Socket messages should also update status, but API response ensures
-                    // we don't get stuck in RUNNING state if socket message is missed
+                    // ============================================================
+                    // API Call & Status Update
+                    // ============================================================
+                    // Call server API to execute the node.
+                    // API response provides status, but socket may have already delivered
+                    // a more recent status update (e.g., COMPLETED) before API returns.
+                    //
+                    // To prevent race condition:
+                    //   - Compare API response status with current node status
+                    //   - Only update if API status is "more complete" (higher priority)
+                    //
+                    // Priority: COMPLETED/ERROR (3) > RUNNING (2) > READY (1) > IDLE (0)
+                    // ============================================================
                     const result = await runNode(nodeId, { config$: currentNode.config || {} });
                     console.log('[executeNode] runNode response:', nodeId, result?.status, result);
 
-                    // Update status from API response if available
-                    // This handles cases where socket notification is delayed or missed
                     if (result?.status) {
                         const duration = Date.now() - startTime;
+
+                        // Status priority map (same as FlowEditorPage.tsx)
+                        const STATUS_PRIORITY: Record<string, number> = {
+                            IDLE: 0,
+                            READY: 1,
+                            RUNNING: 2,
+                            COMPLETED: 3,
+                            ERROR: 3,
+                        };
+
                         setNodes(prev =>
-                            prev.map(n =>
-                                n.id === nodeId
-                                    ? {
-                                          ...n,
-                                          status: result.status,
-                                          executionStats: { startTime, duration, progress: 100 },
-                                      }
-                                    : n
-                            )
+                            prev.map(n => {
+                                if (n.id !== nodeId) return n;
+
+                                // Compare priorities: only update if API status >= current status
+                                const currentPriority = STATUS_PRIORITY[n.status ?? ''] ?? -1;
+                                const apiPriority = STATUS_PRIORITY[result.status ?? ''] ?? -1;
+
+                                if (apiPriority >= currentPriority) {
+                                    return {
+                                        ...n,
+                                        status: result.status,
+                                        executionStats: { startTime, duration, progress: 100 },
+                                    };
+                                }
+
+                                // API status is lower priority (e.g., RUNNING when already COMPLETED)
+                                // Keep current status, but update executionStats
+                                console.log('[executeNode] Skipping status downgrade:', nodeId, {
+                                    currentStatus: n.status,
+                                    apiStatus: result.status,
+                                });
+                                return {
+                                    ...n,
+                                    executionStats: { startTime, duration, progress: 100 },
+                                };
+                            })
                         );
                     }
                 } catch (e: unknown) {
@@ -1070,31 +885,20 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         );
 
         executeNodeRef.current = executeNode;
-        propagateOutputsRef.current = propagateOutputs;
-        processExecutionQueueRef.current = processExecutionQueue;
-        queueDownstreamNodesRef.current = queueDownstreamNodes;
 
-        useEffect(() => {
-            if (readOnly) return;
-            nodes.forEach(node => {
-                const def = blockRegistry[node.type];
-                if (!def) return;
-                if (def.inputs.length === 0) return;
-                if (node.status === 'RUNNING') return;
-                if (node.autoExecutionEnabled === false) return;
-
-                const hasInputs = def.inputs.every(p => node.inputData[p.id]);
-                if (hasInputs) {
-                    const currentInputHash = def.inputs.map(p => node.inputData[p.id]?.timestamp).join('|');
-                    const lastHash = nodeInputHashesRef.current.get(node.id);
-
-                    if (currentInputHash !== lastHash) {
-                        nodeInputHashesRef.current.set(node.id, currentInputHash);
-                        executeNode(node.id);
-                    }
-                }
-            });
-        }, [nodes, executeNode, readOnly, blockRegistry]);
+        // ============================================================
+        // Auto-execution removed - Backend handles all propagation
+        // ============================================================
+        // Previously, this component watched for inputData changes and
+        // automatically executed downstream nodes. This has been removed
+        // because the server's propagateDownstreamV2 handles:
+        //   1. Copying output data to downstream input ports
+        //   2. Executing downstream nodes automatically
+        //
+        // Frontend now only executes nodes when:
+        //   - User clicks the "Run" button manually
+        //   - User clicks "Run All" to execute the entire flow
+        // ============================================================
 
         const handleConfigChange = (nodeId: string, key: string, value: unknown) => {
             if (readOnly) return;
@@ -1450,14 +1254,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     });
                     const packet = sourceNode.outputData[connectionDraft.sourcePortId];
                     if (packet) {
-                        // Prevent auto-execution: pre-set hash before updating inputData
-                        const targetDef = blockRegistry[targetNode.type];
-                        if (targetDef) {
-                            const newInputData = { ...targetNode.inputData, [targetPortId]: packet };
-                            const hash = targetDef.inputs.map(p => newInputData[p.id]?.timestamp).join('|');
-                            nodeInputHashesRef.current.set(targetNodeId, hash);
-                        }
-
+                        // Copy existing output data to the new connection's target input
                         setNodes(prev =>
                             prev.map(n =>
                                 n.id === targetNodeId
