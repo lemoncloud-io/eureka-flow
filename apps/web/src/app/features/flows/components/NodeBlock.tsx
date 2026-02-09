@@ -49,7 +49,7 @@ export interface NodeConfigHandlers {
 
 export interface NodeActions {
     onDelete: () => void;
-    onTrigger: () => void;
+    onTrigger: () => Promise<void> | void;
     onToggleDisabled?: () => void;
     onDuplicate?: () => void;
     onViewLogs: () => void;
@@ -508,6 +508,19 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const isAuto = node.autoExecutionEnabled !== false;
     const isDisabled = (node as NodeData & { disabled?: boolean }).disabled === true;
 
+    // Track API call in progress (separate from node.status which reflects server state)
+    const [isRunning, setIsRunning] = useState(false);
+
+    const handleRun = async () => {
+        if (isRunning) return;
+        setIsRunning(true);
+        try {
+            await onTrigger();
+        } finally {
+            setIsRunning(false);
+        }
+    };
+
     const [showMenu, setShowMenu] = useState(false);
     const [isEditingLabel, setIsEditingLabel] = useState(false);
     const [tempLabel, setTempLabel] = useState(node.customLabel || '');
@@ -797,16 +810,19 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     {/* Use definition.type for block type checks (node.type may be blockId like "1000006") */}
                     {(definition?.type?.startsWith('input-') || !isAuto) && (
                         <button
-                            onClick={onTrigger}
+                            onClick={handleRun}
+                            disabled={isRunning}
                             className={cn(
                                 'w-full text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
-                                !isAuto && definition.inputs.every(p => node.inputData[p.id])
-                                    ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
-                                    : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
+                                isRunning
+                                    ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
+                                    : !isAuto && definition.inputs.every(p => node.inputData[p.id])
+                                      ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
+                                      : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
                             )}
                             onMouseDown={e => e.stopPropagation()}
                         >
-                            <Play className="w-3 h-3" />
+                            {isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                             {definition?.type?.startsWith('input-') ? t('actions.run') : t('actions.forceRun')}
                         </button>
                     )}

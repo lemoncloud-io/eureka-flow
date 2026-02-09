@@ -657,15 +657,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         outputDataForPropagation = serverData.outputData;
                     }
 
-                    // Get current node for logging
-                    const currentNode = nodesRef.current.find(n => n.id === nodeId);
-
-                    console.log('[updateNodeFromServer]', nodeId, {
-                        serverStatus: serverData.status,
-                        currentStatus: currentNode?.status,
-                        nodeExists: !!currentNode,
-                    });
-
                     setNodes(prev =>
                         prev.map(n => {
                             if (n.id !== nodeId) return n;
@@ -820,7 +811,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     // Priority: COMPLETED/ERROR (3) > RUNNING (2) > READY (1) > IDLE (0)
                     // ============================================================
                     const result = await runNode(nodeId, { config$: currentNode.config || {} });
-                    console.log('[executeNode] runNode response:', nodeId, result?.status, result);
 
                     if (result?.status) {
                         const duration = Date.now() - startTime;
@@ -852,10 +842,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                                 // API status is lower priority (e.g., RUNNING when already COMPLETED)
                                 // Keep current status, but update executionStats
-                                console.log('[executeNode] Skipping status downgrade:', nodeId, {
-                                    currentStatus: n.status,
-                                    apiStatus: result.status,
-                                });
                                 return {
                                     ...n,
                                     executionStats: { startTime, duration, progress: 100 },

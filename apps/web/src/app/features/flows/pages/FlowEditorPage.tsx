@@ -165,13 +165,6 @@ export const FlowEditorPage = () => {
                     const apiPriority = getStatusPriority(nodeData?.status);
                     const finalStatus = socketPriority >= apiPriority ? status : nodeData?.status;
 
-                    console.log('[handleNodeUpdate] Regular node update:', nodeId, {
-                        socketStatus: status,
-                        apiStatus: nodeData?.status,
-                        finalStatus,
-                        hasNodeData: !!nodeData,
-                    });
-
                     if (canvasRef.current && nodeData) {
                         // Merge API data with the resolved status
                         const mergedData = finalStatus ? { ...nodeData, status: finalStatus } : nodeData;
@@ -186,7 +179,7 @@ export const FlowEditorPage = () => {
                 console.debug('[handleNodeUpdate] Failed to update node:', nodeId, error);
             }
         },
-        [currentFlowId]
+        [] // Note: Empty deps intentional - uses refs and passed callbacks, doesn't need currentFlowId reactivity
     );
 
     // Track last local update to prevent self-echo from socket (use ref to avoid re-renders)
@@ -291,6 +284,7 @@ export const FlowEditorPage = () => {
         };
 
         boot();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Boot runs once on mount, dependencies are stable singletons
     }, []);
 
     const triggerAutoSave = useCallback(() => {
@@ -511,6 +505,7 @@ export const FlowEditorPage = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Uses handlersRef for stable callbacks, t is stable
     }, []);
 
     useEffect(() => {
