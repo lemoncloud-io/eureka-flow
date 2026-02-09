@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getNode, useBlocks, useFlows } from '@flows/flows';
+import { getNode, upsertNode, useBlockRegistry, useBlocks, useFlows } from '@flows/flows';
 import { useInitFlowSocket } from '@flows/socket';
 
 import { Header } from '../components/Header';
@@ -61,18 +61,87 @@ export const FlowEditorPage = () => {
         [loadFlowById]
     );
 
-    // Handle node update notification from WebSocket (new format)
-    // Fetches single node from server and updates it in canvas
-    const handleNodeUpdateNew = useCallback(async (nodeId: string, _flowId: string) => {
-        try {
-            const nodeData = await getNode(nodeId);
-            if (canvasRef.current && nodeData) {
-                canvasRef.current.updateNodeFromServer(nodeId, nodeData);
+    // Get block registry for isFrontend check
+    const blockRegistry = useBlockRegistry();
+
+    // Handle node update notification from WebSocket
+    // - For regular nodes: fetch and update canvas
+    // - For ports: if parent is isFrontend + autoExecutionEnabled, upsert port data
+    const handleNodeUpdate = useCallback(
+        async (info: {
+            nodeId: string;
+            flowId: string;
+            timestamp: number;
+            status?: string;
+            prevStatus?: string;
+            isPort: boolean;
+            parentNodeId?: string;
+        }) => {
+            const { nodeId, isPort, parentNodeId } = info;
+
+            // Always fetch latest node data from server
+            // (timestamp comparison removed - status changes may have same timestamp)
+
+            try {
+                if (isPort && parentNodeId) {
+                    // Port update - check if parent node is isFrontend + auto mode
+                    const parentNode = await getNode(parentNodeId);
+                    const blockDef = parentNode?.block$?.name ? blockRegistry[parentNode.block$.name] : null;
+                    const isFrontend = blockDef?.isFrontend === true || parentNode?.isFrontend === 1;
+                    const isAutoEnabled = parentNode?.autoExecutionEnabled !== false; // default true
+
+                    if (isFrontend && isAutoEnabled && currentFlowId) {
+                        // Fetch port data and upsert to parent node
+                        const portData = await getNode(nodeId);
+                        if (portData?.data$ && portData.direction) {
+                            // Convert PortData to DataPacket format
+                            const portValue =
+                                portData.data$.S ?? portData.data$.N ?? portData.data$.F ?? portData.data$.M;
+                            const portType = portData.dataType || 'text';
+                            const portTimestamp = portData.data$.timestamp || timestamp;
+
+                            // Determine port key from port name or extract from ID
+                            const portKey = portData.name || nodeId.split(':')[1] || 'data';
+
+                            // Build upsert body based on port direction
+                            const dataPacket = {
+                                value: portValue,
+                                type: portType,
+                                timestamp: portTimestamp,
+                            };
+
+                            const upsertBody: Record<string, unknown> = {};
+                            if (portData.direction === 'in') {
+                                upsertBody.inputData = { [portKey]: dataPacket };
+                            } else if (portData.direction === 'out') {
+                                upsertBody.outputData = { [portKey]: dataPacket };
+                            }
+
+                            // Call upsert API
+                            await upsertNode(parentNodeId, currentFlowId, upsertBody);
+
+                            // Update canvas with parent node data
+                            if (canvasRef.current) {
+                                const updatedParent = await getNode(parentNodeId);
+                                if (updatedParent) {
+                                    canvasRef.current.updateNodeFromServer(parentNodeId, updatedParent);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Regular node update
+                    const nodeData = await getNode(nodeId);
+                    if (canvasRef.current && nodeData) {
+                        canvasRef.current.updateNodeFromServer(nodeId, nodeData);
+                    }
+                }
+            } catch {
+                // Node reload failed - silent fail, user can refresh
             }
-        } catch {
-            // Node reload failed - silent fail, user can refresh
-        }
-    }, []);
+        },
+        [blockRegistry, currentFlowId]
+    );
 
     // Track last local update to prevent self-echo from socket (use ref to avoid re-renders)
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
@@ -90,7 +159,7 @@ export const FlowEditorPage = () => {
         currentFlowId,
         getLastLocalUpdateTimestamp,
         onFlowUpdate: handleFlowUpdate,
-        onNodeReload: handleNodeUpdateNew,
+        onNodeReload: handleNodeUpdate,
     });
 
     const [isAppReady, setIsAppReady] = useState(false);

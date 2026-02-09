@@ -185,6 +185,23 @@ export interface DataPacketItem {
 }
 
 /**
+ * PortData - data stored in a port node
+ * Server uses DynamoDB-style typed values
+ */
+export interface PortData {
+    /** String value (for text, image types) */
+    S?: string;
+    /** Number value (integer) */
+    N?: number;
+    /** Float value */
+    F?: number;
+    /** Stringified JSON (for json, any types) */
+    M?: string;
+    /** Timestamp when data was produced */
+    timestamp?: number;
+}
+
+/**
  * NodeModel - extended node model for backend
  *
  * Execution state is managed at node level:
@@ -193,7 +210,7 @@ export interface DataPacketItem {
  */
 export interface NodeModel {
     id?: string;
-    stereo?: NodeStereo;
+    stereo?: NodeStereo | 'port';
     name?: string;
     url?: string;
     image?: string;
@@ -228,6 +245,29 @@ export interface NodeModel {
     autoExecutionEnabled?: boolean;
     createdAt?: string;
     updatedAt?: string;
+
+    // ============================================================================
+    // Port-specific fields (when stereo === 'port')
+    // ============================================================================
+    /** Parent node ID (for port nodes) */
+    parentId?: string;
+    /** Port direction */
+    direction?: 'in' | 'out';
+    /** Data type of the port */
+    dataType?: string;
+    /** Port data (for port nodes) */
+    data$?: PortData;
+    /** Child number for port node */
+    childNo?: number;
+
+    // ============================================================================
+    // isFrontend flag (from server response)
+    // ============================================================================
+    /**
+     * If 1, this is a frontend node (executes on client)
+     * If 0 or undefined, this is a backend node (executes on server)
+     */
+    isFrontend?: 0 | 1;
 }
 
 /**

@@ -61,6 +61,18 @@ export const isNodeUpdateMessage = (data: unknown): data is NodeUpdateMessage =>
     );
 };
 
+export interface NodeUpdateInfo {
+    nodeId: string;
+    flowId: string;
+    timestamp: number;
+    status?: string;
+    prevStatus?: string;
+    /** True if this is a port update (id contains ':') */
+    isPort: boolean;
+    /** Parent node ID (extracted from port ID like 'nodeId:5' -> 'nodeId') */
+    parentNodeId?: string;
+}
+
 export interface UseInitFlowSocketOptions {
     /** Channel ID to subscribe to (from flow load response) */
     channelId?: string | null;
@@ -71,7 +83,7 @@ export interface UseInitFlowSocketOptions {
     /** Callback when flow update notification is received - should reload entire flow */
     onFlowUpdate?: (flowId: string) => void;
     /** Callback when node update notification is received - should reload single node */
-    onNodeReload?: (nodeId: string, flowId: string) => void;
+    onNodeReload?: (info: NodeUpdateInfo) => void;
 }
 
 /**
@@ -91,8 +103,9 @@ export interface UseInitFlowSocketOptions {
  *   onFlowUpdate: (flowId) => {
  *     // Reload entire flow: GET /flows/:id/load
  *   },
- *   onNodeReload: (nodeId, flowId) => {
+ *   onNodeReload: (info) => {
  *     // Reload node: GET /nodes/:id
+ *     // info contains: nodeId, flowId, timestamp, status, prevStatus
  *   },
  * });
  */
@@ -166,14 +179,26 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
 
             // Handle node update notification (includes status changes)
             // Socket message is just a notification - actual data is fetched via API
+            // NOTE: Node updates do NOT use self-echo prevention because:
+            // - Node run results come via socket and must be processed
+            // - Self-echo prevention is only for flow save operations
             if (isNodeUpdateMessage(data)) {
-                // Skip if we just saved (self-echo prevention)
-                if (isRecentLocalUpdate) {
-                    return;
-                }
                 // Only process if it's for the current flow
                 if (currentFlowId && data.flowId === currentFlowId && onNodeReload) {
-                    onNodeReload(data.id, data.flowId);
+                    // Check if this is a port update (id contains ':' like 'nodeId:5')
+                    // Also handle history nodes with '@' like 'nodeId@2'
+                    const isPort = data.id.includes(':') && !data.id.includes('@');
+                    const parentNodeId = isPort ? data.id.split(':')[0] : undefined;
+
+                    onNodeReload({
+                        nodeId: data.id,
+                        flowId: data.flowId,
+                        timestamp: data.timestamp,
+                        status: data.status,
+                        prevStatus: data.prevStatus,
+                        isPort,
+                        parentNodeId,
+                    });
                 }
             }
         }

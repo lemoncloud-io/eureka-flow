@@ -51,6 +51,8 @@ export interface FlowUpdateMessage {
  *   "type": "node",
  *   "id": "isff9fs10",
  *   "flowId": "1000036",
+ *   "status": "COMPLETED",
+ *   "prevStatus": "RUNNING",
  *   "timestamp": 1769582611407
  * }
  */
@@ -59,6 +61,10 @@ export interface NodeUpdateMessage {
     id: string;
     flowId: string;
     timestamp: number;
+    /** Current node status (IDLE, RUNNING, COMPLETED, ERROR, etc.) */
+    status?: string;
+    /** Previous node status for detecting status transitions */
+    prevStatus?: string;
 }
 
 /**

@@ -3,15 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { MousePointerClick, Plus, X } from 'lucide-react';
 
-import {
-    LAYOUT_CONFIG,
-    estimateNodeHeight,
-    loadFlow,
-    requiresBackendProcessing,
-    runNode,
-    useBlockRegistry,
-    useNodeSync,
-} from '@flows/flows';
+import { LAYOUT_CONFIG, estimateNodeHeight, loadFlow, runNode, useBlockRegistry, useNodeSync } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { ConnectionLine } from './ConnectionLine';
@@ -902,105 +894,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     return;
                 }
 
-                const onProgress = (progress: number) => {
-                    setNodes(prev =>
-                        prev.map(n =>
-                            n.id === nodeId
-                                ? {
-                                      ...n,
-                                      executionStats: {
-                                          ...n.executionStats,
-                                          progress: Math.min(Math.max(progress, 0), 100),
-                                      },
-                                  }
-                                : n
-                        )
-                    );
-                };
-
                 try {
-                    let results: Record<string, DataPacket>;
-
-                    // Check if this block requires backend processing
-                    // Uses isFrontend flag from server, with fallback to legacy type check
-                    if (requiresBackendProcessing(nodeDef)) {
-                        // Skip if backend node is already running to avoid 409 conflict
-                        if (currentNode.status === 'RUNNING') {
-                            console.debug(`[WorkflowCanvas] Skipping node ${nodeId}: already RUNNING`);
-                            return;
-                        }
-
-                        if (batchRunCountRef.current === 0 && onBeforeBackendRun) {
-                            await onBeforeBackendRun();
-                        }
-
-                        const nodeResult = await runNode(nodeId, { config$: currentNode.config || {} });
-
-                        if (nodeResult.status === 'ERROR') {
-                            const duration = Date.now() - startTime;
-                            setNodes(prev =>
-                                prev.map(n =>
-                                    n.id === nodeId
-                                        ? {
-                                              ...n,
-                                              status: 'ERROR',
-                                              errorMessage:
-                                                  nodeResult.errorMessage || t('flows:detailPanel.unknownError'),
-                                              executionStats: { startTime, duration, progress: 0 },
-                                          }
-                                        : n
-                                )
-                            );
-                            return;
-                        }
-
-                        if (nodeResult.outputData$$) {
-                            type OutputDataItem = {
-                                portId: string;
-                                packet: { value: unknown; type: string; timestamp?: number };
-                            };
-                            results = nodeResult.outputData$$.reduce<Record<string, DataPacket>>(
-                                (acc: Record<string, DataPacket>, item: OutputDataItem) => {
-                                    acc[item.portId] = {
-                                        value: item.packet.value,
-                                        type: item.packet.type as 'text' | 'image' | 'number',
-                                        timestamp: item.packet.timestamp || Date.now(),
-                                    };
-                                    return acc;
-                                },
-                                {}
-                            );
-                        } else {
-                            results = {};
-                        }
-                    } else if (nodeDef.execute) {
-                        results = await nodeDef.execute(inputs, currentNode.config || {}, onProgress);
-                    } else {
-                        results = {};
+                    // All nodes call server API - no frontend/backend distinction
+                    // Save flow before run if not in batch mode
+                    if (batchRunCountRef.current === 0 && onBeforeBackendRun) {
+                        await onBeforeBackendRun();
                     }
 
-                    const duration = Date.now() - startTime;
+                    // Call server API - status updates will come via socket
+                    await runNode(nodeId, { config$: currentNode.config || {} });
 
-                    const hash = nodeDef.inputs.map((p: PortDefinition) => inputs[p.id]?.timestamp).join('|');
-                    nodeInputHashesRef.current.set(nodeId, hash);
-
-                    setNodes(prev =>
-                        prev.map(n =>
-                            n.id === nodeId
-                                ? {
-                                      ...n,
-                                      status: 'COMPLETED',
-                                      outputData: results,
-                                      executionStats: { startTime, duration, progress: 100 },
-                                  }
-                                : n
-                        )
-                    );
-
-                    const updatedDownstreamNodes = propagateOutputs(nodeId, results);
-
-                    // Queue downstream nodes for execution
-                    queueDownstreamNodes(updatedDownstreamNodes);
+                    // Note: We don't update status to COMPLETED here
+                    // The socket will notify us when the node execution is done
+                    // and we'll fetch the updated node data via getNode()
                 } catch (e: unknown) {
                     const duration = Date.now() - startTime;
                     const errorMessage = e instanceof Error ? e.message : t('flows:detailPanel.unknownError');
@@ -1019,7 +925,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [propagateOutputs, queueDownstreamNodes, readOnly, blockRegistry, t, onBeforeBackendRun]
+            [readOnly, blockRegistry, t, onBeforeBackendRun]
         );
 
         executeNodeRef.current = executeNode;
