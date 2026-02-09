@@ -5,7 +5,7 @@ import { useWebCoreStore } from '@flows/web-core';
 import { useWebSocketWorker } from './useWebSocketWorker';
 import { useWebSocketStore } from '../stores/useWebSocketStore';
 
-import type { ExecutionStats, FlowNodeMessage, FlowUpdateMessage, NodeUpdateMessage, WebSocketMessage } from '../types';
+import type { FlowUpdateMessage, NodeUpdateMessage, WebSocketMessage } from '../types';
 
 const WS_ENDPOINT = import.meta.env.VITE_WS_ENDPOINT || '';
 
@@ -39,28 +39,6 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
 };
 
 /**
- * Parse execution stats from JSON string
- */
-export const parseExecutionStats = (statsString?: string): ExecutionStats | undefined => {
-    if (!statsString) return undefined;
-    try {
-        return JSON.parse(statsString) as ExecutionStats;
-    } catch {
-        console.warn('[FlowSocket] Failed to parse executionStats:', statsString);
-        return undefined;
-    }
-};
-
-/**
- * Type guard for FlowNodeMessage (legacy format with nodeId and status)
- */
-export const isFlowNodeMessage = (data: unknown): data is FlowNodeMessage => {
-    if (typeof data !== 'object' || data === null) return false;
-    const msg = data as Record<string, unknown>;
-    return msg['type'] === 'node' && typeof msg['nodeId'] === 'string';
-};
-
-/**
  * Type guard for FlowUpdateMessage (new format)
  */
 export const isFlowUpdateMessage = (data: unknown): data is FlowUpdateMessage => {
@@ -88,14 +66,12 @@ export interface UseInitFlowSocketOptions {
     channelId?: string | null;
     /** Current flow ID for filtering messages */
     currentFlowId?: string | null;
-    /** Last local update timestamp - messages with timestamp <= this are ignored (prevents self-echo) */
-    lastLocalUpdateTimestamp?: number | null;
-    /** Callback when flow update notification is received (new format) */
+    /** Getter for last local update timestamp - messages within 3s of this are ignored (prevents self-echo) */
+    getLastLocalUpdateTimestamp?: () => number | null;
+    /** Callback when flow update notification is received - should reload entire flow */
     onFlowUpdate?: (flowId: string) => void;
-    /** Callback when node update notification is received (new format) */
+    /** Callback when node update notification is received - should reload single node */
     onNodeReload?: (nodeId: string, flowId: string) => void;
-    /** @deprecated Callback when node status update is received (legacy format with status) */
-    onNodeUpdate?: (message: FlowNodeMessage) => void;
 }
 
 /**
@@ -121,7 +97,7 @@ export interface UseInitFlowSocketOptions {
  * });
  */
 export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
-    const { channelId, currentFlowId, lastLocalUpdateTimestamp, onFlowUpdate, onNodeReload, onNodeUpdate } = options;
+    const { channelId, currentFlowId, getLastLocalUpdateTimestamp, onFlowUpdate, onNodeReload } = options;
 
     const apiKey = useWebCoreStore(state => state.apiKey);
     const setId = useWebSocketStore(state => state.setId);
@@ -169,19 +145,27 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
 
             const data = lastMessage.data;
 
-            // Self-echo prevention: ignore messages within 3 seconds of our last save
+            // Self-echo prevention: ignore messages within 3 seconds of our last local change
             const DEBOUNCE_MS = 3000;
             const now = Date.now();
-            const isRecentLocalUpdate = lastLocalUpdateTimestamp && now - lastLocalUpdateTimestamp < DEBOUNCE_MS;
+            const lastUpdate = getLastLocalUpdateTimestamp?.();
+            const isRecentLocalUpdate = lastUpdate && now - lastUpdate < DEBOUNCE_MS;
 
             // Handle new format: flow update notification
-            // NOTE: Disabled - flow updates are too frequent and cause UI flicker
-            // Flow-level changes (node add/remove) trigger this, but we handle nodes individually
             if (isFlowUpdateMessage(data)) {
-                return; // Skip flow reload entirely
+                // Skip if we just made local changes (self-echo prevention)
+                if (isRecentLocalUpdate) {
+                    return;
+                }
+                // Only process if it's for the current flow
+                if (currentFlowId && data.id === currentFlowId && onFlowUpdate) {
+                    onFlowUpdate(data.id);
+                }
+                return;
             }
 
-            // Handle new format: node update notification
+            // Handle node update notification (includes status changes)
+            // Socket message is just a notification - actual data is fetched via API
             if (isNodeUpdateMessage(data)) {
                 // Skip if we just saved (self-echo prevention)
                 if (isRecentLocalUpdate) {
@@ -191,23 +175,9 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                 if (currentFlowId && data.flowId === currentFlowId && onNodeReload) {
                     onNodeReload(data.id, data.flowId);
                 }
-                return;
-            }
-
-            // Handle legacy format: node status update with status field
-            if (onNodeUpdate && isFlowNodeMessage(data)) {
-                onNodeUpdate(data);
             }
         }
-    }, [
-        lastMessage,
-        broadcastMessage,
-        currentFlowId,
-        lastLocalUpdateTimestamp,
-        onFlowUpdate,
-        onNodeReload,
-        onNodeUpdate,
-    ]);
+    }, [lastMessage, broadcastMessage, currentFlowId, getLastLocalUpdateTimestamp, onFlowUpdate, onNodeReload]);
 
     // Cleanup on unmount - intentionally empty deps for mount/unmount only
     useEffect(() => {

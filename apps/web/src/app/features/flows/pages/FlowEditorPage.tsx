@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getNode, useBlocks, useFlows } from '@flows/flows';
-import { parseExecutionStats, useInitFlowSocket } from '@flows/socket';
+import { useInitFlowSocket } from '@flows/socket';
 
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
@@ -10,7 +10,6 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
-import type { FlowNodeMessage } from '@flows/socket';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -75,37 +74,9 @@ export const FlowEditorPage = () => {
         }
     }, []);
 
-    // Handle node status updates from WebSocket (legacy format with status field)
-    const handleNodeUpdate = useCallback((message: FlowNodeMessage) => {
-        const { nodeId, status, errorMessage, executionStats, outputData$$ } = message;
-
-        // Update node status
-        canvasRef.current?.updateNode(nodeId, {
-            status,
-            errorMessage: errorMessage || undefined,
-            executionStats: parseExecutionStats(executionStats),
-        });
-
-        // If backend node completed with output data, propagate to downstream nodes
-        if (status === 'COMPLETED' && outputData$$ && outputData$$.length > 0) {
-            const outputData = outputData$$.reduce(
-                (acc, item) => {
-                    acc[item.portId] = {
-                        value: item.packet.value,
-                        type: item.packet.type as 'text' | 'image' | 'number',
-                        timestamp: item.packet.timestamp || Date.now(),
-                    };
-                    return acc;
-                },
-                {} as Record<string, { value: unknown; type: 'text' | 'image' | 'number'; timestamp: number }>
-            );
-
-            canvasRef.current?.handleBackendNodeComplete(nodeId, outputData);
-        }
-    }, []);
-
-    // Track last local update to prevent self-echo from socket
-    const [lastLocalUpdateTimestamp, setLastLocalUpdateTimestamp] = useState<number | null>(null);
+    // Track last local update to prevent self-echo from socket (use ref to avoid re-renders)
+    const lastLocalUpdateTimestampRef = useRef<number | null>(null);
+    const getLastLocalUpdateTimestamp = useCallback(() => lastLocalUpdateTimestampRef.current, []);
 
     // Initialize WebSocket connection when channelId is available
     const {
@@ -117,10 +88,9 @@ export const FlowEditorPage = () => {
     } = useInitFlowSocket({
         channelId,
         currentFlowId,
-        lastLocalUpdateTimestamp,
+        getLastLocalUpdateTimestamp,
         onFlowUpdate: handleFlowUpdate,
         onNodeReload: handleNodeUpdateNew,
-        onNodeUpdate: handleNodeUpdate, // Legacy support
     });
 
     const [isAppReady, setIsAppReady] = useState(false);
@@ -221,7 +191,7 @@ export const FlowEditorPage = () => {
                 const currentState = serializeWorkflowState(data);
 
                 if (currentState !== lastSavedStateRef.current) {
-                    setLastLocalUpdateTimestamp(Date.now()); // Mark save time to ignore self-echo
+                    lastLocalUpdateTimestampRef.current = Date.now(); // Mark save time to ignore self-echo
                     saveCurrentFlow(data);
                     lastSavedStateRef.current = currentState;
                 }
@@ -237,7 +207,7 @@ export const FlowEditorPage = () => {
     const handleSave = async () => {
         if (!canvasRef.current) return;
         const data = canvasRef.current.getWorkflow();
-        setLastLocalUpdateTimestamp(Date.now()); // Mark save time to ignore self-echo from socket
+        lastLocalUpdateTimestampRef.current = Date.now(); // Mark save time to ignore self-echo from socket
         const result = await saveCurrentFlow(data);
         if (result.success) {
             lastSavedStateRef.current = serializeWorkflowState(data);
@@ -273,7 +243,7 @@ export const FlowEditorPage = () => {
     const handleShare = async () => {
         if (canvasRef.current) {
             const data = canvasRef.current.getWorkflow();
-            setLastLocalUpdateTimestamp(Date.now());
+            lastLocalUpdateTimestampRef.current = Date.now();
             await saveCurrentFlow(data);
         }
 
@@ -302,13 +272,14 @@ export const FlowEditorPage = () => {
     };
 
     const handleCanvasChange = () => {
+        lastLocalUpdateTimestampRef.current = Date.now(); // Mark change time to ignore self-echo from socket
         triggerAutoSave();
     };
 
     const handleBeforeBackendRun = useCallback(async () => {
         if (!canvasRef.current) return;
         const data = canvasRef.current.getWorkflow();
-        setLastLocalUpdateTimestamp(Date.now());
+        lastLocalUpdateTimestampRef.current = Date.now();
         const result = await saveCurrentFlow(data);
         if (result.success) {
             lastSavedStateRef.current = serializeWorkflowState(data);
