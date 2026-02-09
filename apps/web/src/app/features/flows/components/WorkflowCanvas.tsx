@@ -957,12 +957,28 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         await onBeforeBackendRun();
                     }
 
-                    // Call server API - status updates will come via socket
-                    await runNode(nodeId, { config$: currentNode.config || {} });
+                    // Call server API and use response as fallback for status update
+                    // Socket messages should also update status, but API response ensures
+                    // we don't get stuck in RUNNING state if socket message is missed
+                    const result = await runNode(nodeId, { config$: currentNode.config || {} });
+                    console.log('[executeNode] runNode response:', nodeId, result?.status, result);
 
-                    // Note: We don't update status to COMPLETED here
-                    // The socket will notify us when the node execution is done
-                    // and we'll fetch the updated node data via getNode()
+                    // Update status from API response if available
+                    // This handles cases where socket notification is delayed or missed
+                    if (result?.status) {
+                        const duration = Date.now() - startTime;
+                        setNodes(prev =>
+                            prev.map(n =>
+                                n.id === nodeId
+                                    ? {
+                                          ...n,
+                                          status: result.status,
+                                          executionStats: { startTime, duration, progress: 100 },
+                                      }
+                                    : n
+                            )
+                        );
+                    }
                 } catch (e: unknown) {
                     const duration = Date.now() - startTime;
                     const errorMessage = e instanceof Error ? e.message : t('flows:detailPanel.unknownError');

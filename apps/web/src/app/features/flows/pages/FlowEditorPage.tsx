@@ -10,6 +10,7 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
+import type { NodeData } from '@flows/flows';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -77,7 +78,7 @@ export const FlowEditorPage = () => {
             isPort: boolean;
             parentNodeId?: string;
         }) => {
-            const { nodeId, timestamp, isPort, parentNodeId } = info;
+            const { nodeId, timestamp, status, isPort, parentNodeId } = info;
 
             // Always fetch latest node data from server
             // (timestamp comparison removed - status changes may have same timestamp)
@@ -133,11 +134,33 @@ export const FlowEditorPage = () => {
                             }
                         }
                     }
+                    // For non-frontend nodes or non-auto nodes, still update status if provided
+                    // This ensures backend node status (RUNNING -> COMPLETED) is reflected
+                    else if (canvasRef.current && status) {
+                        canvasRef.current.updateNodeFromServer(parentNodeId, { status } as NodeData);
+                    }
                 } else {
-                    // Regular node update
+                    // Regular node update - use socket status directly for immediate feedback
+                    // Then fetch full node data for other fields
+                    if (canvasRef.current && status) {
+                        // Immediately update status from socket message
+                        canvasRef.current.updateNodeFromServer(nodeId, { status } as NodeData);
+                    }
+
+                    // Fetch full node data for other fields (config, position, etc.)
                     const nodeData = await getNode(nodeId);
                     if (canvasRef.current && nodeData) {
-                        canvasRef.current.updateNodeFromServer(nodeId, nodeData);
+                        // If we already applied socket status, preserve it
+                        // API response may have stale status (e.g., RUNNING) that would overwrite
+                        // the correct socket status (e.g., COMPLETED)
+                        if (status) {
+                            const { status: _ignoredStatus, ...nodeDataWithoutStatus } = nodeData as NodeData & {
+                                status?: string;
+                            };
+                            canvasRef.current.updateNodeFromServer(nodeId, nodeDataWithoutStatus as NodeData);
+                        } else {
+                            canvasRef.current.updateNodeFromServer(nodeId, nodeData);
+                        }
                     }
                 }
             } catch {
