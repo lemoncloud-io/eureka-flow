@@ -471,6 +471,8 @@ const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
     // Server type names
     'console-log': DebugLogVisualization,
     'result-preview': PreviewVisualization,
+    // Alias for preview block type
+    preview: PreviewVisualization,
 };
 
 interface NodeBlockProps {
