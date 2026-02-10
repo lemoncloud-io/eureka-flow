@@ -120,65 +120,40 @@ const arePortTypesCompatible = (sourceType: string, targetType: string): boolean
     return sourceType.toLowerCase() === targetType.toLowerCase();
 };
 
+/** Port type style configuration - single source of truth for all port styling */
+const PORT_TYPE_STYLES = {
+    text: { color: 'port-text', shadow: 'rgba(59,130,246,0.4)', glow: 'animate-port-glow-text' },
+    image: { color: 'port-image', shadow: 'rgba(168,85,247,0.4)', glow: 'animate-port-glow-image' },
+    number: { color: 'port-number', shadow: 'rgba(34,197,94,0.4)', glow: 'animate-port-glow-number' },
+    json: { color: 'port-json', shadow: 'rgba(245,158,11,0.4)', glow: 'animate-port-glow-json' },
+    any: { color: 'port-any', shadow: 'rgba(107,114,128,0.4)', glow: 'animate-port-glow-any' },
+} as const;
+
+type PortStyleKey = keyof typeof PORT_TYPE_STYLES;
+
+/** Normalize port type string to a valid style key */
+const getPortStyleKey = (portType: string): PortStyleKey => {
+    const normalized = portType.toLowerCase();
+    if (normalized === 'string') return 'text';
+    if (normalized in PORT_TYPE_STYLES) return normalized as PortStyleKey;
+    return 'any';
+};
+
 /** Get Tailwind classes for port type coloring - based on dataType only (same for input/output) */
 const getPortTypeColor = (portType: string, hasData: boolean): string => {
-    switch (portType.toLowerCase()) {
-        case 'text':
-        case 'string':
-            return hasData
-                ? 'bg-port-text border-port-text shadow-[0_0_6px_rgba(59,130,246,0.4)]' // Blue
-                : 'bg-port-text/50 border-port-text/50';
-        case 'image':
-            return hasData
-                ? 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]' // Purple
-                : 'bg-port-image/50 border-port-image/50';
-        case 'number':
-            return hasData
-                ? 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]' // Green
-                : 'bg-port-number/50 border-port-number/50';
-        case 'json':
-            return hasData
-                ? 'bg-port-json border-port-json shadow-[0_0_6px_rgba(245,158,11,0.4)]' // Orange
-                : 'bg-port-json/50 border-port-json/50';
-        default: // 'any' and others
-            return hasData
-                ? 'bg-port-any border-port-any shadow-[0_0_6px_rgba(107,114,128,0.4)]' // Gray
-                : 'bg-port-any/50 border-port-any/50';
-    }
+    const { color, shadow } = PORT_TYPE_STYLES[getPortStyleKey(portType)];
+    return hasData ? `bg-${color} border-${color} shadow-[0_0_6px_${shadow}]` : `bg-${color}/50 border-${color}/50`;
 };
 
 /** Get Tailwind classes for valid drop target highlighting - matches source port's dataType color */
 const getDropTargetColor = (sourceType: string): string => {
-    switch (sourceType.toLowerCase()) {
-        case 'text':
-        case 'string':
-            return 'border-port-text bg-port-text animate-port-glow-text'; // Blue
-        case 'image':
-            return 'border-port-image bg-port-image animate-port-glow-image'; // Purple
-        case 'number':
-            return 'border-port-number bg-port-number animate-port-glow-number'; // Green
-        case 'json':
-            return 'border-port-json bg-port-json animate-port-glow-json'; // Orange
-        default: // 'any' and others
-            return 'border-port-any bg-port-any animate-port-glow-any'; // Gray
-    }
+    const { color, glow } = PORT_TYPE_STYLES[getPortStyleKey(sourceType)];
+    return `border-${color} bg-${color} ${glow}`;
 };
 
 /** Get text color class for valid drop target label */
 const getDropTargetTextColor = (sourceType: string): string => {
-    switch (sourceType.toLowerCase()) {
-        case 'text':
-        case 'string':
-            return 'text-port-text'; // Blue
-        case 'image':
-            return 'text-port-image'; // Purple
-        case 'number':
-            return 'text-port-number'; // Green
-        case 'json':
-            return 'text-port-json'; // Orange
-        default: // 'any' and others
-            return 'text-port-any'; // Gray
-    }
+    return `text-${PORT_TYPE_STYLES[getPortStyleKey(sourceType)].color}`;
 };
 
 interface PortItemProps {
