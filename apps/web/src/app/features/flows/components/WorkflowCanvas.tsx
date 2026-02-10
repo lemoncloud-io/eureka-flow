@@ -3,7 +3,16 @@ import { useTranslation } from 'react-i18next';
 
 import { MousePointerClick, Plus, X } from 'lucide-react';
 
-import { LAYOUT_CONFIG, estimateNodeHeight, loadFlow, runNode, useBlockRegistry, useNodeSync } from '@flows/flows';
+import {
+    EXECUTE_FUNCTIONS,
+    LAYOUT_CONFIG,
+    estimateNodeHeight,
+    loadFlow,
+    runNode,
+    upsertNode,
+    useBlockRegistry,
+    useNodeSync,
+} from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { ConnectionLine } from './ConnectionLine';
@@ -27,6 +36,8 @@ export interface WorkflowCanvasRef {
     autoLayout: () => void;
     selectNode: (nodeId: string | null) => void;
     runAll: () => Promise<void>;
+    /** Execute a specific node by ID */
+    executeNode: (nodeId: string) => Promise<void>;
     /** Update node data (used for socket status updates) */
     updateNode: (nodeId: string, updates: Partial<NodeData>) => void;
     /** Update node from server data (used for socket node update notifications) */
@@ -626,6 +637,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         batchRunCountRef.current--;
                     }
                 },
+                executeNode: async (nodeId: string) => {
+                    if (executeNodeRef.current) {
+                        await executeNodeRef.current(nodeId);
+                    }
+                },
                 stopAll: () => {
                     batchRunCountRef.current = 0;
                     setNodes(prev => prev.map(n => (n.status === 'RUNNING' ? { ...n, status: 'IDLE' } : n)));
@@ -790,64 +806,137 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     return;
                 }
 
+                // ============================================================
+                // Frontend vs Backend Execution
+                // ============================================================
+                // Check if this node should be executed on frontend (isFrontend = true)
+                // Frontend nodes use EXECUTE_FUNCTIONS, then save output and trigger propagation
+                // Backend nodes call server API directly
+                // ============================================================
+                const shouldRunOnFrontend = nodeDef.isFrontend === true && EXECUTE_FUNCTIONS[nodeDef.type];
+
                 try {
-                    // All nodes call server API - no frontend/backend distinction
                     // Save flow before run if not in batch mode
                     if (batchRunCountRef.current === 0 && onBeforeBackendRun) {
                         await onBeforeBackendRun();
                     }
 
-                    // ============================================================
-                    // API Call & Status Update
-                    // ============================================================
-                    // Call server API to execute the node.
-                    // API response provides status, but socket may have already delivered
-                    // a more recent status update (e.g., COMPLETED) before API returns.
-                    //
-                    // To prevent race condition:
-                    //   - Compare API response status with current node status
-                    //   - Only update if API status is "more complete" (higher priority)
-                    //
-                    // Priority: COMPLETED/ERROR (3) > RUNNING (2) > READY (1) > IDLE (0)
-                    // ============================================================
-                    const result = await runNode(nodeId, { config$: currentNode.config || {} });
+                    if (shouldRunOnFrontend) {
+                        // ============================================================
+                        // Frontend Execution Path
+                        // ============================================================
+                        // 1. Execute locally using EXECUTE_FUNCTIONS
+                        // 2. Save outputs to server via upsertNode
+                        // 3. Trigger propagation via runNode with force flag
+                        // ============================================================
+                        const executeFunc = EXECUTE_FUNCTIONS[nodeDef.type];
 
-                    if (result?.status) {
-                        const duration = Date.now() - startTime;
-
-                        // Status priority map (same as FlowEditorPage.tsx)
-                        const STATUS_PRIORITY: Record<string, number> = {
-                            IDLE: 0,
-                            READY: 1,
-                            RUNNING: 2,
-                            COMPLETED: 3,
-                            ERROR: 3,
+                        const onProgress = (progress: number) => {
+                            setNodes(prev =>
+                                prev.map(n =>
+                                    n.id === nodeId
+                                        ? { ...n, executionStats: { ...(n.executionStats || {}), progress } }
+                                        : n
+                                )
+                            );
                         };
 
+                        // Execute frontend function
+                        const outputs = await executeFunc(inputs, currentNode.config || {}, onProgress);
+                        const duration = Date.now() - startTime;
+
+                        // Update local state with outputs
                         setNodes(prev =>
-                            prev.map(n => {
-                                if (n.id !== nodeId) return n;
+                            prev.map(n =>
+                                n.id === nodeId
+                                    ? {
+                                          ...n,
+                                          status: 'COMPLETED',
+                                          outputData: outputs,
+                                          executionStats: { startTime, duration, progress: 100 },
+                                      }
+                                    : n
+                            )
+                        );
 
-                                // Compare priorities: only update if API status >= current status
-                                const currentPriority = STATUS_PRIORITY[n.status ?? ''] ?? -1;
-                                const apiPriority = STATUS_PRIORITY[result.status ?? ''] ?? -1;
-
-                                if (apiPriority >= currentPriority) {
-                                    return {
-                                        ...n,
-                                        status: result.status,
-                                        executionStats: { startTime, duration, progress: 100 },
+                        // Save outputs to server and trigger propagation
+                        if (flowId) {
+                            // Convert outputs to server format (data$ format for each port)
+                            const outputPorts = nodeDef.outputs || [];
+                            const portUpdates: Record<string, unknown> = {};
+                            for (const port of outputPorts) {
+                                const portData = outputs[port.id];
+                                if (portData) {
+                                    portUpdates[port.id] = {
+                                        dataType: portData.type,
+                                        data$: { S: String(portData.value) },
+                                        timestamp: portData.timestamp || Date.now(),
                                     };
                                 }
+                            }
 
-                                // API status is lower priority (e.g., RUNNING when already COMPLETED)
-                                // Keep current status, but update executionStats
-                                return {
-                                    ...n,
-                                    executionStats: { startTime, duration, progress: 100 },
-                                };
-                            })
-                        );
+                            // Upsert node with output data
+                            await upsertNode(nodeId, flowId, {
+                                status: 'COMPLETED',
+                            });
+
+                            // Trigger server propagation with force flag
+                            // Server will copy outputs to downstream inputs and execute them
+                            await runNode(nodeId, { config$: currentNode.config || {} }, { force: true });
+                        }
+                    } else {
+                        // ============================================================
+                        // Backend Execution Path (existing logic)
+                        // ============================================================
+                        // Call server API to execute the node.
+                        // API response provides status, but socket may have already delivered
+                        // a more recent status update (e.g., COMPLETED) before API returns.
+                        //
+                        // To prevent race condition:
+                        //   - Compare API response status with current node status
+                        //   - Only update if API status is "more complete" (higher priority)
+                        //
+                        // Priority: COMPLETED/ERROR (3) > RUNNING (2) > READY (1) > IDLE (0)
+                        // ============================================================
+                        const result = await runNode(nodeId, { config$: currentNode.config || {} });
+
+                        if (result?.status) {
+                            const duration = Date.now() - startTime;
+
+                            // Status priority map (same as FlowEditorPage.tsx)
+                            const STATUS_PRIORITY: Record<string, number> = {
+                                IDLE: 0,
+                                READY: 1,
+                                RUNNING: 2,
+                                COMPLETED: 3,
+                                ERROR: 3,
+                            };
+
+                            setNodes(prev =>
+                                prev.map(n => {
+                                    if (n.id !== nodeId) return n;
+
+                                    // Compare priorities: only update if API status >= current status
+                                    const currentPriority = STATUS_PRIORITY[n.status ?? ''] ?? -1;
+                                    const apiPriority = STATUS_PRIORITY[result.status ?? ''] ?? -1;
+
+                                    if (apiPriority >= currentPriority) {
+                                        return {
+                                            ...n,
+                                            status: result.status,
+                                            executionStats: { startTime, duration, progress: 100 },
+                                        };
+                                    }
+
+                                    // API status is lower priority (e.g., RUNNING when already COMPLETED)
+                                    // Keep current status, but update executionStats
+                                    return {
+                                        ...n,
+                                        executionStats: { startTime, duration, progress: 100 },
+                                    };
+                                })
+                            );
+                        }
                     }
                 } catch (e: unknown) {
                     const duration = Date.now() - startTime;
@@ -867,7 +956,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [readOnly, blockRegistry, t, onBeforeBackendRun]
+            [readOnly, blockRegistry, t, onBeforeBackendRun, flowId]
         );
 
         executeNodeRef.current = executeNode;

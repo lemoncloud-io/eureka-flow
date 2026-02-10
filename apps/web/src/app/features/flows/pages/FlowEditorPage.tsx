@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getNode, useBlocks, useFlows } from '@flows/flows';
+import { EXECUTE_FUNCTIONS, getNode, useBlocks, useFlows } from '@flows/flows';
 import { useInitFlowSocket } from '@flows/socket';
 
 import { Header } from '../components/Header';
@@ -25,7 +25,7 @@ export const FlowEditorPage = () => {
     const canvasRef = useRef<WorkflowCanvasRef>(null);
     const sidebarRef = useRef<SidebarRef>(null);
 
-    const { loadBlocks } = useBlocks();
+    const { loadBlocks, blockRegistry } = useBlocks();
     const {
         currentFlowId,
         flowName,
@@ -169,6 +169,32 @@ export const FlowEditorPage = () => {
                         // Merge API data with the resolved status
                         const mergedData = finalStatus ? { ...nodeData, status: finalStatus } : nodeData;
                         canvasRef.current.updateNodeFromServer(nodeId, mergedData as NodeData);
+
+                        // ============================================================
+                        // Auto-execute isFrontend Nodes
+                        // ============================================================
+                        // When server propagates data to a downstream node and sets it
+                        // to READY status, check if it's an isFrontend node that needs
+                        // to be executed on the frontend.
+                        //
+                        // Flow:
+                        //   1. Server executes node → propagateDownstreamV2
+                        //   2. Server sets downstream node to READY (if all inputs ready)
+                        //   3. Server tries to run but isFrontend → stops (checkRunnable returns false)
+                        //   4. Socket notification: node status = READY
+                        //   5. Frontend detects isFrontend + READY → auto-execute
+                        // ============================================================
+                        const effectiveStatus = finalStatus ?? nodeData?.status;
+                        if (effectiveStatus === 'READY' && nodeData?.type) {
+                            const nodeDef = blockRegistry[nodeData.type];
+                            if (nodeDef?.isFrontend === true && EXECUTE_FUNCTIONS[nodeDef.type]) {
+                                // Auto-execute this isFrontend node
+                                // Use setTimeout to avoid blocking the socket handler
+                                setTimeout(() => {
+                                    canvasRef.current?.executeNode?.(nodeId);
+                                }, 0);
+                            }
+                        }
                     } else if (canvasRef.current && status) {
                         // Fallback: No API data, use socket status
                         canvasRef.current.updateNodeFromServer(nodeId, { status } as NodeData);
@@ -179,7 +205,7 @@ export const FlowEditorPage = () => {
                 console.debug('[handleNodeUpdate] Failed to update node:', nodeId, error);
             }
         },
-        [] // Note: Empty deps intentional - uses refs and passed callbacks, doesn't need currentFlowId reactivity
+        [blockRegistry]
     );
 
     // Track last local update to prevent self-echo from socket (use ref to avoid re-renders)

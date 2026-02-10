@@ -74,6 +74,18 @@ export const deleteNode = async (id: string): Promise<void> => {
 };
 
 /**
+ * Run node execution options
+ */
+export interface RunNodeOptions {
+    /** If true, queues execution via SQS and returns immediately */
+    async?: boolean;
+    /** If true, forces execution even if node is busy or isFrontend */
+    force?: boolean;
+    /** If true, propagates to downstream nodes after execution (default: true) */
+    propagate?: boolean;
+}
+
+/**
  * Run node execution
  * POST /nodes/:nodeId/run
  *
@@ -86,15 +98,19 @@ export const deleteNode = async (id: string): Promise<void> => {
  * @param body.config$ - Node config as Record<string, string>
  * @param options - Execution options
  * @param options.async - If true, queues execution and returns immediately
+ * @param options.force - If true, forces execution even for isFrontend nodes
+ * @param options.propagate - If true, propagates to downstream nodes (default: true)
  */
-export const runNode = async (
-    nodeId: string,
-    body?: doPostRunBody,
-    options?: { async?: boolean }
-): Promise<NodeView> => {
+export const runNode = async (nodeId: string, body?: doPostRunBody, options?: RunNodeOptions): Promise<NodeView> => {
     _log(`> runNode(${nodeId})`, { body, options });
     try {
-        const params = options?.async ? '?async' : '';
+        // Build query params
+        const queryParams: string[] = [];
+        if (options?.async) queryParams.push('async');
+        if (options?.force) queryParams.push('force');
+        if (options?.propagate === false) queryParams.push('propagate=0');
+
+        const params = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
         const response = await api.post<NodeView>(`/nodes/${nodeId}/run${params}`, body || {});
         return response.data;
     } catch (err) {
