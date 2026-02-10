@@ -801,19 +801,40 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         const outputs = await executeFunc(inputs, currentNode.config || {}, onProgress);
                         const duration = Date.now() - startTime;
 
-                        // Update local state with outputs
-                        setNodes(prev =>
-                            prev.map(n =>
+                        // Update local state with outputs and propagate to downstream nodes
+                        setNodes(prev => {
+                            // First, update the executed node
+                            const nodesWithOutput = prev.map(n =>
                                 n.id === nodeId
                                     ? {
                                           ...n,
-                                          status: 'COMPLETED',
+                                          status: 'COMPLETED' as const,
                                           outputData: outputs,
                                           executionStats: { startTime, duration, progress: 100 },
                                       }
                                     : n
-                            )
-                        );
+                            );
+
+                            // Then, propagate outputs to downstream nodes' inputData
+                            return nodesWithOutput.map(n => {
+                                // Find connections where this node receives data from the executed node
+                                const incomingFromExecuted = connections.filter(
+                                    c => c.targetNodeId === n.id && c.sourceNodeId === nodeId
+                                );
+                                if (incomingFromExecuted.length === 0) return n;
+
+                                // Build propagated inputData
+                                const propagatedInputData = { ...n.inputData };
+                                incomingFromExecuted.forEach(conn => {
+                                    const packet = outputs[conn.sourcePortId];
+                                    if (packet) {
+                                        propagatedInputData[conn.targetPortId] = packet;
+                                    }
+                                });
+
+                                return { ...n, inputData: propagatedInputData };
+                            });
+                        });
 
                         // Send outputs to server and trigger propagation
                         if (flowId) {
@@ -894,7 +915,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [readOnly, blockRegistry, t, flowId]
+            [readOnly, blockRegistry, t, flowId, connections]
         );
 
         executeNodeRef.current = executeNode;

@@ -24,7 +24,7 @@ import { cn } from '@flows/lib/utils';
 
 import { S3Image } from './S3Image';
 
-import type { NodeData, PortDefinition } from '@flows/flows';
+import type { BlockDefinitionWithFrontend, NodeData, PortDefinition } from '@flows/flows';
 
 type ConfigValue = string | number | boolean | string[] | null;
 
@@ -264,10 +264,22 @@ const PortItem: React.FC<PortItemProps> = ({
     );
 };
 
-const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
+interface VisualizationProps {
+    node: NodeData;
+    definition: BlockDefinitionWithFrontend;
+}
+
+/** Get first input data from node using definition's port ID or fallback to first available */
+const getFirstInputData = (node: NodeData, definition: BlockDefinitionWithFrontend) => {
+    const inputPortId = definition.inputs?.[0]?.id;
+    return inputPortId ? node.inputData[inputPortId] : Object.values(node.inputData)[0];
+};
+
+const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }) => {
     const { t } = useTranslation(['nodes']);
-    const lastInput = node.inputData['in'];
     const [dims, setDims] = useState<string | null>(null);
+
+    const lastInput = getFirstInputData(node, definition);
 
     if (!lastInput) {
         return (
@@ -391,48 +403,64 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
 const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
     const [isEditing, setIsEditing] = useState(false);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [height, setHeight] = useState<number | undefined>(undefined);
+    const heightRef = useRef<number>(0);
     // Server uses 'value' key for input-text config
     const text = (node.config?.text as string) || '';
-    const savedHeight = (node.config?.textareaHeight as number) || undefined;
+    const savedHeight = Number(node.config?.textareaHeight) || undefined;
 
-    const lines = text ? text.split('\n') : [];
-    const textDisplay = text ? { firstLine: lines[0], extraLines: lines.length - 1 } : null;
+    // Initialize height from saved value
+    const currentHeight = height ?? savedHeight ?? 80;
 
-    // Save height when textarea is resized
-    const handleMouseUp = () => {
-        if (textareaRef.current) {
-            const newHeight = textareaRef.current.offsetHeight;
-            if (newHeight !== savedHeight) {
-                onConfigChange('textareaHeight', newHeight);
+    // Handle drag resize
+    const handleResizeStart = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startY = e.clientY;
+        const startHeight = currentHeight;
+        heightRef.current = currentHeight;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const delta = moveEvent.clientY - startY;
+            const newHeight = Math.max(60, Math.min(1024, startHeight + delta));
+            heightRef.current = newHeight;
+            setHeight(newHeight);
+        };
+
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            // Save height on drag end
+            if (heightRef.current !== savedHeight) {
+                onConfigChange('textareaHeight', heightRef.current);
             }
-        }
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
     };
 
     if (isEditing) {
         return (
             <div
-                className="mt-3"
+                className="mt-3 flex flex-col"
                 onMouseDown={e => e.stopPropagation()}
                 onDoubleClick={e => e.stopPropagation()}
                 onWheel={e => e.stopPropagation()}
             >
                 <textarea
-                    ref={textareaRef}
                     autoFocus
-                    className="w-full p-2.5 bg-background/80 border border-primary/50 rounded-lg text-xs resize-y font-mono focus:outline-none focus:border-primary text-foreground"
+                    className="w-full p-2.5 bg-background/80 border border-primary/50 rounded-t-lg text-xs resize-none font-mono focus:outline-none focus:border-primary text-foreground"
                     style={{
-                        minHeight: '60px',
-                        maxHeight: '300px',
-                        height: savedHeight ? `${savedHeight}px` : undefined,
+                        height: `${currentHeight}px`,
                     }}
                     value={text}
                     onChange={e => onConfigChange('text', e.target.value)}
-                    onBlur={() => {
-                        handleMouseUp(); // Save height on blur
+                    onBlur={e => {
+                        // Don't close if clicking resize handle
+                        if (e.relatedTarget?.closest('.resize-handle')) return;
                         setIsEditing(false);
                     }}
-                    onMouseUp={handleMouseUp}
                     onKeyDown={e => {
                         // Allow Enter for newlines, Escape to exit
                         if (e.key === 'Escape') {
@@ -442,13 +470,24 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
                     }}
                     placeholder={t('visualization.enterText')}
                 />
+                {/* Resize handle bar */}
+                <div
+                    className="resize-handle h-3 bg-primary/10 hover:bg-primary/20 border border-t-0 border-primary/50 rounded-b-lg cursor-ns-resize flex items-center justify-center transition-colors"
+                    onMouseDown={handleResizeStart}
+                    tabIndex={-1}
+                >
+                    <div className="w-8 h-1 bg-primary/30 rounded-full" />
+                </div>
             </div>
         );
     }
 
     return (
         <div
-            className="mt-3 p-2.5 bg-muted/30 rounded-lg border border-border hover:border-primary/40 cursor-text transition-all group"
+            className="mt-3 p-2.5 bg-muted/30 rounded-lg border border-border hover:border-primary/40 cursor-text transition-all group overflow-hidden"
+            style={{
+                minHeight: savedHeight ? `${savedHeight}px` : undefined,
+            }}
             onClick={e => {
                 e.stopPropagation();
                 setIsEditing(true);
@@ -462,18 +501,15 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
                 {t('visualization.value')}
             </div>
             <div
-                className="text-xs text-foreground/70 font-mono flex items-center gap-1 group-hover:text-foreground/90 transition-colors"
+                className="text-xs text-foreground/70 font-mono whitespace-pre-wrap break-all group-hover:text-foreground/90 transition-colors"
+                style={{
+                    maxHeight: savedHeight ? `${savedHeight - 30}px` : '60px',
+                    overflow: 'hidden',
+                }}
                 title={text}
             >
-                {textDisplay ? (
-                    <>
-                        <span className="truncate">"{textDisplay.firstLine}"</span>
-                        {textDisplay.extraLines > 0 && (
-                            <span className="text-muted-foreground/50 text-[9px] shrink-0 bg-muted/50 px-1 rounded">
-                                +{textDisplay.extraLines}
-                            </span>
-                        )}
-                    </>
+                {text ? (
+                    <span>"{text}"</span>
                 ) : (
                     <span className="text-muted-foreground/50 italic">{t('visualization.clickToAddText')}</span>
                 )}
@@ -482,9 +518,9 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
     );
 };
 
-const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
+const DebugLogVisualization: React.FC<VisualizationProps> = ({ node, definition }) => {
     const { t } = useTranslation(['nodes']);
-    const lastInput = node.inputData['in']?.value;
+    const lastInput = getFirstInputData(node, definition)?.value;
     return (
         <div
             className="mt-3 p-2.5 bg-black/30 rounded-lg border border-border text-foreground/80 font-mono text-[10px] break-all max-h-28 overflow-y-auto"
@@ -503,7 +539,7 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
     );
 };
 
-const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
+const VISUALIZATION_COMPONENTS: Record<string, React.FC<VisualizationProps>> = {
     // New type names
     'output-console': DebugLogVisualization,
     'output-preview': PreviewVisualization,
@@ -549,6 +585,13 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
     // Track API call in progress (separate from node.status which reflects server state)
     const [isRunning, setIsRunning] = useState(false);
+
+    // Reset isRunning when node status changes to completed/error (socket may update before API returns)
+    useEffect(() => {
+        if (node.status === 'COMPLETED' || node.status === 'ERROR') {
+            setIsRunning(false);
+        }
+    }, [node.status]);
 
     const handleRun = async () => {
         if (isRunning) return;
@@ -888,7 +931,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     )}
                     {definition?.type &&
                         VISUALIZATION_COMPONENTS[definition.type] &&
-                        React.createElement(VISUALIZATION_COMPONENTS[definition.type], { node })}
+                        React.createElement(VISUALIZATION_COMPONENTS[definition.type], { node, definition })}
                 </div>
 
                 {/* Error Message */}

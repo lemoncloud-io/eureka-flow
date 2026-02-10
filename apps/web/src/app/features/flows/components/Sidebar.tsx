@@ -379,11 +379,11 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                 ) : (
                                                     blocks.map(block => (
                                                         <BlockItem
-                                                            key={block.type}
-                                                            type={block.type}
+                                                            key={block.id}
+                                                            type={block.id}
                                                             label={block.label}
                                                             description={block.description}
-                                                            onAdd={() => handleAddNode(block.type)}
+                                                            onAdd={() => handleAddNode(block.id)}
                                                             disabled={isLoading}
                                                             inputCount={block.inputs?.length}
                                                             outputCount={block.outputs?.length}

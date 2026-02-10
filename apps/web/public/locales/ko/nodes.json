@@ -40,8 +40,7 @@
         "clickToAddText": "클릭하여 텍스트 입력...",
         "enterText": "텍스트 입력...",
         "clickToUpload": "클릭하여 이미지 업로드",
-        "removeImage": "삭제",
-        "uploading": "업로드 중..."
+        "removeImage": "삭제"
     },
     "errors": {
         "executionFailed": "실행 실패",
