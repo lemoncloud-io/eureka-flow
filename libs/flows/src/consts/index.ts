@@ -1,4 +1,5 @@
 export * from './block-types';
+export * from './status';
 
 export const STORAGE_PREFIX = 'flow_mosaic_';
 export const INDEX_KEY = 'flow_mosaic_index';

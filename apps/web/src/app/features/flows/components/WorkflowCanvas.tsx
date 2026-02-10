@@ -9,6 +9,7 @@ import {
     estimateNodeHeight,
     loadFlow,
     runNode,
+    shouldUpdateStatus,
     useBlockRegistry,
     useNodeSync,
 } from '@flows/flows';
@@ -675,16 +676,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                             // Status priority: only update if server status is more "final"
                             // This prevents RUNNING from overwriting COMPLETED set by frontend
-                            const STATUS_PRIORITY: Record<string, number> = {
-                                IDLE: 0,
-                                READY: 1,
-                                RUNNING: 2,
-                                COMPLETED: 3,
-                                ERROR: 3,
-                            };
-                            const currentPriority = STATUS_PRIORITY[n.status ?? ''] ?? -1;
-                            const serverPriority = STATUS_PRIORITY[serverData.status ?? ''] ?? -1;
-                            const finalStatus = serverPriority >= currentPriority ? serverData.status : n.status;
+                            const finalStatus = shouldUpdateStatus(n.status, serverData.status)
+                                ? serverData.status
+                                : n.status;
 
                             return {
                                 ...n,
@@ -874,24 +868,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         if (result?.status) {
                             const duration = Date.now() - startTime;
 
-                            // Status priority map (same as FlowEditorPage.tsx)
-                            const STATUS_PRIORITY: Record<string, number> = {
-                                IDLE: 0,
-                                READY: 1,
-                                RUNNING: 2,
-                                COMPLETED: 3,
-                                ERROR: 3,
-                            };
-
                             setNodes(prev =>
                                 prev.map(n => {
                                     if (n.id !== nodeId) return n;
 
                                     // Compare priorities: only update if API status >= current status
-                                    const currentPriority = STATUS_PRIORITY[n.status ?? ''] ?? -1;
-                                    const apiPriority = STATUS_PRIORITY[result.status ?? ''] ?? -1;
-
-                                    if (apiPriority >= currentPriority) {
+                                    if (shouldUpdateStatus(n.status, result.status)) {
                                         return {
                                             ...n,
                                             status: result.status,

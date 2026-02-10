@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { EXECUTE_FUNCTIONS, getNode, useBlocks, useFlows } from '@flows/flows';
+import { EXECUTE_FUNCTIONS, getNode, getStatusPriority, useBlocks, useFlows } from '@flows/flows';
 import { useInitFlowSocket } from '@flows/socket';
 
 import { Header } from '../components/Header';
@@ -146,21 +146,7 @@ export const FlowEditorPage = () => {
 
                     const nodeData = await getNode(nodeId);
 
-                    // Status priority: higher number = more "final" state
-                    const STATUS_PRIORITY: Record<string, number> = {
-                        IDLE: 0,
-                        READY: 1,
-                        RUNNING: 2,
-                        COMPLETED: 3,
-                        ERROR: 3, // ERROR is also a terminal state like COMPLETED
-                    };
-
-                    const getStatusPriority = (s: string | undefined): number => {
-                        if (!s) return -1;
-                        return STATUS_PRIORITY[s] ?? -1;
-                    };
-
-                    // Determine the best status to use
+                    // Determine the best status to use (higher priority wins)
                     const socketPriority = getStatusPriority(status);
                     const apiPriority = getStatusPriority(nodeData?.status);
                     const finalStatus = socketPriority >= apiPriority ? status : nodeData?.status;

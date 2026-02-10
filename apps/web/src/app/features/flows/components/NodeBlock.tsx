@@ -693,7 +693,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             <div
                 className={cn(
                     'pl-4 pr-2 py-2 flex justify-between items-center cursor-move',
-                    'border-b border-node-border/30 bg-node-header/50',
+                    'border-b border-node-border/30',
+                    definition.isFrontend ? 'bg-primary/5 dark:bg-primary/15' : 'bg-node-header/50',
                     'transition-colors duration-200'
                 )}
             >
