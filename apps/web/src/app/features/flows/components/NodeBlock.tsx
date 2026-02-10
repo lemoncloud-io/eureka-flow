@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import {
     Ban,
+    Braces,
     Check,
     Copy,
     Hash,
@@ -104,6 +105,8 @@ const getPortTypeIcon = (portType: string): React.ElementType | null => {
             return Image;
         case 'number':
             return Hash;
+        case 'json':
+            return Braces;
         case 'any':
             return Sparkles;
         default:
@@ -117,33 +120,64 @@ const arePortTypesCompatible = (sourceType: string, targetType: string): boolean
     return sourceType.toLowerCase() === targetType.toLowerCase();
 };
 
-/** Get Tailwind classes for port type coloring */
-const getPortTypeColor = (portType: string, hasData: boolean, portDirection: 'input' | 'output'): string => {
-    // Always show color based on port type, brighter when has data
-    if (portDirection === 'input') {
-        return hasData
-            ? 'bg-port-input border-port-input shadow-[0_0_6px_rgba(34,197,94,0.4)]'
-            : 'bg-port-input/50 border-port-input/50';
-    }
-
+/** Get Tailwind classes for port type coloring - based on dataType only (same for input/output) */
+const getPortTypeColor = (portType: string, hasData: boolean): string => {
     switch (portType.toLowerCase()) {
-        case 'image':
-            return hasData
-                ? 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]'
-                : 'bg-port-image/50 border-port-image/50';
         case 'text':
         case 'string':
             return hasData
-                ? 'bg-port-text border-port-text shadow-[0_0_6px_rgba(139,92,246,0.4)]'
+                ? 'bg-port-text border-port-text shadow-[0_0_6px_rgba(59,130,246,0.4)]' // Blue
                 : 'bg-port-text/50 border-port-text/50';
+        case 'image':
+            return hasData
+                ? 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]' // Purple
+                : 'bg-port-image/50 border-port-image/50';
         case 'number':
             return hasData
-                ? 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]'
+                ? 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]' // Green
                 : 'bg-port-number/50 border-port-number/50';
-        default:
+        case 'json':
             return hasData
-                ? 'bg-port-output border-port-output shadow-[0_0_6px_rgba(139,92,246,0.4)]'
-                : 'bg-port-output/50 border-port-output/50';
+                ? 'bg-port-json border-port-json shadow-[0_0_6px_rgba(245,158,11,0.4)]' // Orange
+                : 'bg-port-json/50 border-port-json/50';
+        default: // 'any' and others
+            return hasData
+                ? 'bg-port-any border-port-any shadow-[0_0_6px_rgba(107,114,128,0.4)]' // Gray
+                : 'bg-port-any/50 border-port-any/50';
+    }
+};
+
+/** Get Tailwind classes for valid drop target highlighting - matches source port's dataType color */
+const getDropTargetColor = (sourceType: string): string => {
+    switch (sourceType.toLowerCase()) {
+        case 'text':
+        case 'string':
+            return 'border-port-text bg-port-text animate-port-glow-text'; // Blue
+        case 'image':
+            return 'border-port-image bg-port-image animate-port-glow-image'; // Purple
+        case 'number':
+            return 'border-port-number bg-port-number animate-port-glow-number'; // Green
+        case 'json':
+            return 'border-port-json bg-port-json animate-port-glow-json'; // Orange
+        default: // 'any' and others
+            return 'border-port-any bg-port-any animate-port-glow-any'; // Gray
+    }
+};
+
+/** Get text color class for valid drop target label */
+const getDropTargetTextColor = (sourceType: string): string => {
+    switch (sourceType.toLowerCase()) {
+        case 'text':
+        case 'string':
+            return 'text-port-text'; // Blue
+        case 'image':
+            return 'text-port-image'; // Purple
+        case 'number':
+            return 'text-port-number'; // Green
+        case 'json':
+            return 'text-port-json'; // Orange
+        default: // 'any' and others
+            return 'text-port-any'; // Gray
     }
 };
 
@@ -193,8 +227,8 @@ const PortItem: React.FC<PortItemProps> = ({
         'w-3 h-3 rounded-full border-2 transition-all duration-200',
         // Highlighted state (selected connection) - thicker border only, no ring
         isHighlighted && 'scale-110 border-primary border-[3px] z-20',
-        // Valid drop target - slow gentle glow (2s animation in styles.css)
-        !isHighlighted && isValidDropTarget && 'border-success bg-success z-20 animate-port-glow cursor-copy',
+        // Valid drop target - uses source port's dataType color with matching glow animation
+        !isHighlighted && isValidDropTarget && [getDropTargetColor(connectionDraft.sourceType), 'z-20 cursor-copy'],
         // Incompatible target - dimmed with not-allowed cursor
         !isHighlighted && isIncompatibleTarget && 'opacity-30 cursor-not-allowed',
         // Normal state
@@ -202,7 +236,7 @@ const PortItem: React.FC<PortItemProps> = ({
             !isValidDropTarget &&
             !isIncompatibleTarget &&
             'cursor-crosshair hover:scale-125 hover:ring-2 hover:ring-white/20',
-        !isHighlighted && !isValidDropTarget && getPortTypeColor(port.type, hasData, type)
+        !isHighlighted && !isValidDropTarget && getPortTypeColor(port.type, hasData)
     );
 
     const PortIcon = getPortTypeIcon(port.type);
@@ -237,7 +271,7 @@ const PortItem: React.FC<PortItemProps> = ({
                 className={cn(
                     'flex items-center gap-1 transition-all',
                     isHighlighted && 'text-primary font-semibold',
-                    isValidDropTarget && 'text-success font-semibold',
+                    isValidDropTarget && [getDropTargetTextColor(connectionDraft.sourceType), 'font-semibold'],
                     isIncompatibleTarget && 'opacity-30',
                     !isHighlighted && !isValidDropTarget && !isIncompatibleTarget && 'text-muted-foreground/80'
                 )}
