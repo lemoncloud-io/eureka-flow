@@ -473,8 +473,8 @@ const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
     'output-preview': PreviewVisualization,
     // Legacy type names (backward compat)
     'console-log': DebugLogVisualization,
+    'debug-log': DebugLogVisualization,
     'result-preview': PreviewVisualization,
-    // Alias for preview block type
     preview: PreviewVisualization,
 };
 

@@ -105,13 +105,15 @@ export const EXECUTE_FUNCTIONS: Record<string, ExecuteFunction> = {
         });
     },
 
-    // output-console: logs input to console (new name + legacy alias)
+    // output-console: logs input to console (new name + legacy aliases)
     'output-console': executeOutputConsole,
     'console-log': executeOutputConsole,
+    'debug-log': executeOutputConsole,
 
-    // output-preview: passes through input to output (new name + legacy alias)
+    // output-preview: passes through input to output (new name + legacy aliases)
     'output-preview': executeOutputPreview,
     'result-preview': executeOutputPreview,
+    preview: executeOutputPreview,
 
     // Server type: image-3-4-filter, config key: tolerance
     'image-3-4-filter': async (inputs, _config, onProgress) => {
