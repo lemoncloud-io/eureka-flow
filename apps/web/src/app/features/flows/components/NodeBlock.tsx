@@ -119,13 +119,42 @@ const arePortTypesCompatible = (sourceType: string, targetType: string): boolean
     return sourceType.toLowerCase() === targetType.toLowerCase();
 };
 
-/** Port type style configuration - single source of truth for all port styling */
+/**
+ * Port type style configuration - single source of truth for all port styling
+ * IMPORTANT: Use complete static class names for Tailwind's static analyzer.
+ * Dynamic interpolation like `bg-${color}` will NOT be detected at build time.
+ */
 const PORT_TYPE_STYLES = {
-    text: { color: 'port-text', shadow: 'rgba(59,130,246,0.4)', glow: 'animate-port-glow-text' },
-    image: { color: 'port-image', shadow: 'rgba(168,85,247,0.4)', glow: 'animate-port-glow-image' },
-    number: { color: 'port-number', shadow: 'rgba(34,197,94,0.4)', glow: 'animate-port-glow-number' },
-    json: { color: 'port-json', shadow: 'rgba(245,158,11,0.4)', glow: 'animate-port-glow-json' },
-    any: { color: 'port-any', shadow: 'rgba(107,114,128,0.4)', glow: 'animate-port-glow-any' },
+    text: {
+        base: 'bg-port-text border-port-text shadow-[0_0_6px_rgba(59,130,246,0.4)]',
+        dim: 'bg-port-text/50 border-port-text/50',
+        drop: 'border-port-text bg-port-text animate-port-glow-text',
+        text: 'text-port-text',
+    },
+    image: {
+        base: 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]',
+        dim: 'bg-port-image/50 border-port-image/50',
+        drop: 'border-port-image bg-port-image animate-port-glow-image',
+        text: 'text-port-image',
+    },
+    number: {
+        base: 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]',
+        dim: 'bg-port-number/50 border-port-number/50',
+        drop: 'border-port-number bg-port-number animate-port-glow-number',
+        text: 'text-port-number',
+    },
+    json: {
+        base: 'bg-port-json border-port-json shadow-[0_0_6px_rgba(245,158,11,0.4)]',
+        dim: 'bg-port-json/50 border-port-json/50',
+        drop: 'border-port-json bg-port-json animate-port-glow-json',
+        text: 'text-port-json',
+    },
+    any: {
+        base: 'bg-port-any border-port-any shadow-[0_0_6px_rgba(107,114,128,0.4)]',
+        dim: 'bg-port-any/50 border-port-any/50',
+        drop: 'border-port-any bg-port-any animate-port-glow-any',
+        text: 'text-port-any',
+    },
 } as const;
 
 type PortStyleKey = keyof typeof PORT_TYPE_STYLES;
@@ -140,19 +169,18 @@ const getPortStyleKey = (portType: string): PortStyleKey => {
 
 /** Get Tailwind classes for port type coloring - based on dataType only (same for input/output) */
 const getPortTypeColor = (portType: string, hasData: boolean): string => {
-    const { color, shadow } = PORT_TYPE_STYLES[getPortStyleKey(portType)];
-    return hasData ? `bg-${color} border-${color} shadow-[0_0_6px_${shadow}]` : `bg-${color}/50 border-${color}/50`;
+    const style = PORT_TYPE_STYLES[getPortStyleKey(portType)];
+    return hasData ? style.base : style.dim;
 };
 
 /** Get Tailwind classes for valid drop target highlighting - matches source port's dataType color */
 const getDropTargetColor = (sourceType: string): string => {
-    const { color, glow } = PORT_TYPE_STYLES[getPortStyleKey(sourceType)];
-    return `border-${color} bg-${color} ${glow}`;
+    return PORT_TYPE_STYLES[getPortStyleKey(sourceType)].drop;
 };
 
 /** Get text color class for valid drop target label */
 const getDropTargetTextColor = (sourceType: string): string => {
-    return `text-${PORT_TYPE_STYLES[getPortStyleKey(sourceType)].color}`;
+    return PORT_TYPE_STYLES[getPortStyleKey(sourceType)].text;
 };
 
 interface PortItemProps {
