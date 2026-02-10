@@ -673,12 +673,25 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 transformedOutputData = { ...n.outputData, ...outputDataForPropagation };
                             }
 
+                            // Status priority: only update if server status is more "final"
+                            // This prevents RUNNING from overwriting COMPLETED set by frontend
+                            const STATUS_PRIORITY: Record<string, number> = {
+                                IDLE: 0,
+                                READY: 1,
+                                RUNNING: 2,
+                                COMPLETED: 3,
+                                ERROR: 3,
+                            };
+                            const currentPriority = STATUS_PRIORITY[n.status ?? ''] ?? -1;
+                            const serverPriority = STATUS_PRIORITY[serverData.status ?? ''] ?? -1;
+                            const finalStatus = serverPriority >= currentPriority ? serverData.status : n.status;
+
                             return {
                                 ...n,
                                 config: transformedConfig,
                                 inputData: transformedInputData,
                                 outputData: transformedOutputData,
-                                status: serverData.status ?? n.status,
+                                status: finalStatus ?? n.status,
                                 errorMessage: serverData.errorMessage,
                                 executionStats: serverData.executionStats,
                                 position: serverData.position ?? n.position,
