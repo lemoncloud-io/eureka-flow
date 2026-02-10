@@ -5,6 +5,8 @@ import { useUpsertNodeMutation } from './queries/useNodesQuery';
 import type { NodeView } from '../types';
 
 const DEBOUNCE_MS = 500;
+const FLUSH_MAX_WAIT_MS = 5000;
+const FLUSH_POLL_INTERVAL_MS = 50;
 
 interface UseNodeSyncOptions {
     /** Flow ID for creating new nodes */
@@ -21,6 +23,8 @@ interface UseNodeSyncReturn {
         position: { x: number; y: number };
         config: Record<string, unknown>;
     }) => void;
+    /** Flush all pending updates immediately (call before run) */
+    flushPendingUpdates: () => Promise<void>;
     /** Check if any sync is pending */
     isPending: boolean;
 }
@@ -124,9 +128,68 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
         [flowId, upsertMutation]
     );
 
+    /**
+     * Flush all pending updates immediately and wait for in-flight mutations
+     * Call this before executing nodes to ensure all config changes are saved
+     */
+    const flushPendingUpdates = useCallback(async (): Promise<void> => {
+        if (!flowId) {
+            return;
+        }
+
+        // Cancel all debounce timers
+        debounceTimers.current.forEach(timer => clearTimeout(timer));
+        debounceTimers.current.clear();
+
+        // Collect all pending updates
+        const updates = Array.from(pendingUpdates.current.entries());
+        pendingUpdates.current.clear();
+
+        // Execute pending updates
+        if (updates.length > 0) {
+            console.log('[useNodeSync] Flushing pending updates:', updates.length);
+
+            const promises = updates.map(([nodeId, body]) => {
+                return new Promise<void>((resolve, reject) => {
+                    upsertMutation.mutate(
+                        { id: nodeId, flowId, body },
+                        {
+                            onSuccess: () => resolve(),
+                            onError: error => reject(error),
+                        }
+                    );
+                });
+            });
+
+            await Promise.all(promises).catch(error => {
+                console.error('[useNodeSync] Flush failed:', error);
+                throw error;
+            });
+        }
+
+        // Wait for any in-flight mutation to complete
+        // Poll isPending until it becomes false
+        let waited = 0;
+        let loggedWaiting = false;
+
+        while (upsertMutation.isPending && waited < FLUSH_MAX_WAIT_MS) {
+            if (!loggedWaiting) {
+                console.log('[useNodeSync] Waiting for in-flight mutation...');
+                loggedWaiting = true;
+            }
+            await new Promise(resolve => setTimeout(resolve, FLUSH_POLL_INTERVAL_MS));
+            waited += FLUSH_POLL_INTERVAL_MS;
+        }
+
+        if (loggedWaiting && waited < FLUSH_MAX_WAIT_MS) {
+            console.log('[useNodeSync] In-flight mutation completed');
+        }
+    }, [flowId, upsertMutation]);
+
     return {
         syncNodeUpdate,
         createNodeOnBackend,
+        flushPendingUpdates,
         isPending: upsertMutation.isPending,
     };
 };

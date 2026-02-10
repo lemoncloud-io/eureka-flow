@@ -108,7 +108,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
     ({ readOnly, initialData, flowId, onNodeSelect, onChange, onOpenLibrary }, ref) => {
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
-        const { syncNodeUpdate, createNodeOnBackend } = useNodeSync({ flowId: flowId ?? null });
+        const { syncNodeUpdate, createNodeOnBackend, flushPendingUpdates } = useNodeSync({ flowId: flowId ?? null });
 
         const [nodes, setNodes] = useState<NodeData[]>([]);
         const [connections, setConnections] = useState<Connection[]>([]);
@@ -716,6 +716,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const executeNode = useCallback(
             async (nodeId: string, manualOverrideInputs?: Record<string, DataPacket>) => {
                 if (readOnly) return;
+
+                // Flush any pending config updates before execution
+                await flushPendingUpdates();
+
                 const startTime = Date.now();
 
                 setNodes(prev =>
@@ -910,7 +914,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [readOnly, blockRegistry, t, flowId, connections]
+            [readOnly, blockRegistry, t, flowId, connections, flushPendingUpdates]
         );
 
         executeNodeRef.current = executeNode;
