@@ -35,14 +35,12 @@ export interface WorkflowCanvasRef {
     redo: () => void;
     autoLayout: () => void;
     selectNode: (nodeId: string | null) => void;
-    runAll: () => Promise<void>;
     /** Execute a specific node by ID */
     executeNode: (nodeId: string) => Promise<void>;
     /** Update node data (used for socket status updates) */
     updateNode: (nodeId: string, updates: Partial<NodeData>) => void;
     /** Update node from server data (used for socket node update notifications) */
     updateNodeFromServer: (nodeId: string, serverData: NodeData) => void;
-    stopAll: () => void;
 }
 
 interface WorkflowCanvasProps {
@@ -52,8 +50,6 @@ interface WorkflowCanvasProps {
     flowId?: string | null;
     onNodeSelect?: (nodeId: string | null) => void;
     onChange?: () => void;
-    /** Called before running a node that requires backend processing. Should save the flow. */
-    onBeforeBackendRun?: () => Promise<void>;
     /** Called when user clicks "Add Node" from empty state */
     onOpenLibrary?: () => void;
 }
@@ -109,7 +105,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onOpenLibrary }) => {
 };
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
-    ({ readOnly, initialData, flowId, onNodeSelect, onChange, onBeforeBackendRun, onOpenLibrary }, ref) => {
+    ({ readOnly, initialData, flowId, onNodeSelect, onChange, onOpenLibrary }, ref) => {
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
         const { syncNodeUpdate, createNodeOnBackend } = useNodeSync({ flowId: flowId ?? null });
@@ -122,8 +118,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const futureRef = useRef<WorkflowState[]>([]);
         const dragStartSnapshotRef = useRef<WorkflowState | null>(null);
         const executeNodeRef = useRef<(nodeId: string) => Promise<void>>();
-        /** Counter for batch run operations. When > 0, skip individual saves (already saved by runAll) */
-        const batchRunCountRef = useRef(0);
 
         const nodesRef = useRef(nodes);
         const connectionsRef = useRef(connections);
@@ -610,41 +604,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     setNodes(positionedNodes);
                     setViewport({ x: 20, y: 20, zoom: 1 });
                 },
-                runAll: async () => {
-                    // Find all input/source nodes (no incoming connections or no required inputs)
-                    const inputNodes = nodes
-                        .filter(n => {
-                            const hasIncoming = connections.some(c => c.targetNodeId === n.id);
-                            const def = blockRegistry[n.type];
-                            return !hasIncoming || (def && def.inputs.length === 0);
-                        })
-                        .filter(n => !(n as NodeData & { disabled?: boolean }).disabled);
-
-                    batchRunCountRef.current++;
-
-                    try {
-                        if (onBeforeBackendRun) {
-                            await onBeforeBackendRun();
-                        }
-
-                        // Execute input nodes - backend handles downstream propagation
-                        for (const node of inputNodes) {
-                            if (executeNodeRef.current) {
-                                await executeNodeRef.current(node.id);
-                            }
-                        }
-                    } finally {
-                        batchRunCountRef.current--;
-                    }
-                },
                 executeNode: async (nodeId: string) => {
                     if (executeNodeRef.current) {
                         await executeNodeRef.current(nodeId);
                     }
-                },
-                stopAll: () => {
-                    batchRunCountRef.current = 0;
-                    setNodes(prev => prev.map(n => (n.status === 'RUNNING' ? { ...n, status: 'IDLE' } : n)));
                 },
                 updateNode: (nodeId: string, updates: Partial<NodeData>) => {
                     setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, ...updates } : n)));
@@ -740,7 +703,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 selectedNodeId,
                 handleSelectionChange,
                 blockRegistry,
-                onBeforeBackendRun,
                 createNodeOnBackend,
             ]
         );
@@ -816,11 +778,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 const shouldRunOnFrontend = nodeDef.isFrontend === true && EXECUTE_FUNCTIONS[nodeDef.type];
 
                 try {
-                    // Save flow before run if not in batch mode
-                    if (batchRunCountRef.current === 0 && onBeforeBackendRun) {
-                        await onBeforeBackendRun();
-                    }
-
                     if (shouldRunOnFrontend) {
                         // ============================================================
                         // Frontend Execution Path
@@ -943,7 +900,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [readOnly, blockRegistry, t, onBeforeBackendRun, flowId]
+            [readOnly, blockRegistry, t, flowId]
         );
 
         executeNodeRef.current = executeNode;
@@ -957,9 +914,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         //   1. Copying output data to downstream input ports
         //   2. Executing downstream nodes automatically
         //
-        // Frontend now only executes nodes when:
-        //   - User clicks the "Run" button manually
-        //   - User clicks "Run All" to execute the entire flow
+        // Frontend now only executes nodes when user clicks the "Run" button manually
         // ============================================================
 
         const handleConfigChange = (nodeId: string, key: string, value: unknown) => {

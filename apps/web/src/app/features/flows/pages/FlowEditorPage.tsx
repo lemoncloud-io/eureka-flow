@@ -230,7 +230,6 @@ export const FlowEditorPage = () => {
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('');
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-    const [isRunning, setIsRunning] = useState(false);
     const autoSaveTimerRef = useRef<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const lastSavedStateRef = useRef<string | null>(null);
@@ -411,16 +410,6 @@ export const FlowEditorPage = () => {
         triggerAutoSave();
     };
 
-    const handleBeforeBackendRun = useCallback(async () => {
-        if (!canvasRef.current) return;
-        const data = canvasRef.current.getWorkflow();
-        lastLocalUpdateTimestampRef.current = Date.now();
-        const result = await saveCurrentFlow(data);
-        if (result.success) {
-            lastSavedStateRef.current = serializeWorkflowState(data);
-        }
-    }, [saveCurrentFlow]);
-
     const handleExport = () => {
         if (!canvasRef.current) return;
 
@@ -465,24 +454,6 @@ export const FlowEditorPage = () => {
         };
         reader.readAsText(file);
         e.target.value = '';
-    };
-
-    const handleRunAll = async () => {
-        if (!canvasRef.current) return;
-        setIsRunning(true);
-        showNotification(t('flowEditor.runningAllNodes'), 'success');
-        try {
-            await canvasRef.current.runAll();
-        } finally {
-            setIsRunning(false);
-        }
-    };
-
-    const handleStopAll = () => {
-        if (!canvasRef.current) return;
-        setIsRunning(false);
-        canvasRef.current.stopAll();
-        showNotification(t('flowEditor.executionStopped'), 'success');
     };
 
     const handlersRef = useRef({
@@ -572,7 +543,6 @@ export const FlowEditorPage = () => {
                     flowId={currentFlowId}
                     onNodeSelect={handleSelectionChange}
                     onChange={handleCanvasChange}
-                    onBeforeBackendRun={handleBeforeBackendRun}
                     onOpenLibrary={handleOpenLibrary}
                 />
             </div>
@@ -598,11 +568,6 @@ export const FlowEditorPage = () => {
                     },
                     onClear: handleClear,
                     onSave: handleSave,
-                }}
-                executionActions={{
-                    onRunAll: handleRunAll,
-                    onStopAll: handleStopAll,
-                    isRunning,
                 }}
                 saveState={{
                     isSaving,

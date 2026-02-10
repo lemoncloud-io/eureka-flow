@@ -1,25 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-    Download,
-    FileText,
-    LayoutGrid,
-    Link,
-    Menu,
-    Play,
-    Redo2,
-    Save,
-    Square,
-    Trash2,
-    Undo2,
-    Upload,
-    Workflow,
-} from 'lucide-react';
+import { Download, FileText, LayoutGrid, Link, Menu, Redo2, Save, Trash2, Undo2, Upload, Workflow } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import {
-    Button,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -56,12 +41,6 @@ export interface EditActionsProps {
     onSave: () => void;
 }
 
-export interface ExecutionActionsProps {
-    onRunAll: () => void;
-    onStopAll: () => void;
-    isRunning: boolean;
-}
-
 export interface SocketStateProps {
     isConnected: boolean;
     connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error';
@@ -83,7 +62,6 @@ interface HeaderProps {
     flowInfo: FlowInfoProps;
     fileActions: FileActionsProps;
     editActions: EditActionsProps;
-    executionActions: ExecutionActionsProps;
     saveState: SaveStateProps;
     socketState?: SocketStateProps;
     onShare: () => void;
@@ -290,7 +268,6 @@ export const Header: React.FC<HeaderProps> = ({
     flowInfo,
     fileActions,
     editActions,
-    executionActions,
     saveState,
     socketState,
     onShare,
@@ -365,28 +342,6 @@ export const Header: React.FC<HeaderProps> = ({
                         />
                         {socketState && <SocketDot {...socketState} />}
                     </div>
-
-                    {/* Primary Actions */}
-                    {executionActions.isRunning ? (
-                        <Button
-                            onClick={executionActions.onStopAll}
-                            variant="destructive"
-                            size="sm"
-                            className="h-9 sm:h-10 px-2.5 sm:px-4 rounded-xl text-xs font-medium shadow-sm"
-                        >
-                            <Square className="w-3.5 h-3.5 sm:mr-1.5" />
-                            <span className="hidden sm:inline">{t('header.stopAll')}</span>
-                        </Button>
-                    ) : (
-                        <Button
-                            onClick={executionActions.onRunAll}
-                            size="sm"
-                            className="h-9 sm:h-10 px-2.5 sm:px-4 rounded-xl text-xs font-medium bg-primary hover:bg-primary/90 shadow-sm"
-                        >
-                            <Play className="w-3.5 h-3.5 sm:mr-1.5" />
-                            <span className="hidden sm:inline">{t('header.runAll')}</span>
-                        </Button>
-                    )}
 
                     {/* Menu */}
                     <DropdownMenu>
