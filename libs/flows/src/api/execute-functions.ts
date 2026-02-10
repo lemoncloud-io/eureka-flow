@@ -13,6 +13,19 @@ const createPacket = (value: unknown, type: 'text' | 'image' | 'number') => ({
 
 type ExecuteFunction = NonNullable<BlockDefinition['execute']>;
 
+// Shared execute functions (used by multiple block types for backward compat)
+const executeOutputConsole: ExecuteFunction = async (inputs, config, onProgress) => {
+    const logMessage = config.message || inputs['in']?.value;
+    console.log('[output-console]', logMessage);
+    onProgress?.(100);
+    return { out: inputs['in'] || createPacket(logMessage, 'text') };
+};
+
+const executeOutputPreview: ExecuteFunction = async (inputs, _config, onProgress) => {
+    onProgress?.(100);
+    return { out: inputs['in'] || createPacket('', 'text') };
+};
+
 /**
  * Client-side execute functions for blocks that don't use backend processing
  * Key: block type from server (e.g., "input-text")
@@ -92,20 +105,13 @@ export const EXECUTE_FUNCTIONS: Record<string, ExecuteFunction> = {
         });
     },
 
-    // Server type: console-log, config key: message
-    'console-log': async (inputs, config, onProgress) => {
-        const logMessage = config.message || inputs['in']?.value;
-        console.log('[console-log]', logMessage);
-        onProgress?.(100);
-        return { out: inputs['in'] || createPacket(logMessage, 'text') };
-    },
+    // output-console: logs input to console (new name + legacy alias)
+    'output-console': executeOutputConsole,
+    'console-log': executeOutputConsole,
 
-    // Server type: result-preview, no config keys
-    'result-preview': async (inputs, _config, onProgress) => {
-        onProgress?.(100);
-        // Pass through input to output
-        return { out: inputs['in'] || createPacket('', 'text') };
-    },
+    // output-preview: passes through input to output (new name + legacy alias)
+    'output-preview': executeOutputPreview,
+    'result-preview': executeOutputPreview,
 
     // Server type: image-3-4-filter, config key: tolerance
     'image-3-4-filter': async (inputs, _config, onProgress) => {

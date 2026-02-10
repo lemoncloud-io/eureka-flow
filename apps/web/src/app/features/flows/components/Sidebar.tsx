@@ -20,7 +20,7 @@ import {
     X,
 } from 'lucide-react';
 
-import { useBlockRegistry } from '@flows/flows';
+import { isOutputBlock, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Collapsible,
@@ -198,13 +198,9 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
         return {
             inputs: filteredBlocks.filter(b => b.stereo === 'input' || (!b.stereo && b.type.startsWith('input-'))),
             process: filteredBlocks.filter(
-                b =>
-                    b.stereo === 'process' ||
-                    (!b.stereo && !b.type.startsWith('input-') && !['result-preview', 'console-log'].includes(b.type))
+                b => b.stereo === 'process' || (!b.stereo && !b.type.startsWith('input-') && !isOutputBlock(b.type))
             ),
-            outputs: filteredBlocks.filter(
-                b => b.stereo === 'output' || (!b.stereo && ['result-preview', 'console-log'].includes(b.type))
-            ),
+            outputs: filteredBlocks.filter(b => b.stereo === 'output' || (!b.stereo && isOutputBlock(b.type))),
         };
     }, [blockRegistry, searchQuery]);
 

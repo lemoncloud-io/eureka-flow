@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 
+import { isOutputConsole, isOutputPreview } from '../consts';
 import { useCanvasStore } from '../stores';
 import { useFlowsStore } from '../stores/useFlowsStore';
 
@@ -27,9 +28,9 @@ const NODE_HEIGHT = {
     PORT_ROW: 26,
     /** Extra height for input nodes (Run button + visualization) */
     INPUT_NODE: 100,
-    /** Extra height for console-log nodes (visualization area) */
+    /** Extra height for output-console nodes (visualization area) */
     DEBUG_LOG: 120,
-    /** Extra height for result-preview nodes (image area) */
+    /** Extra height for output-preview nodes (image area) */
     PREVIEW: 100,
     /** Extra height for error state (error message box) */
     ERROR: 70,
@@ -48,8 +49,8 @@ export const estimateNodeHeight = (node: NodeData, definition: BlockDefinition |
     let extraHeight = 0;
     // Use definition.type since loaded nodes may have blockId as type
     if (definition.type.startsWith('input-')) extraHeight += NODE_HEIGHT.INPUT_NODE;
-    if (definition.type === 'console-log') extraHeight += NODE_HEIGHT.DEBUG_LOG;
-    if (definition.type === 'result-preview') extraHeight += NODE_HEIGHT.PREVIEW;
+    if (isOutputConsole(definition.type)) extraHeight += NODE_HEIGHT.DEBUG_LOG;
+    if (isOutputPreview(definition.type)) extraHeight += NODE_HEIGHT.PREVIEW;
     if (node.status === 'ERROR') extraHeight += NODE_HEIGHT.ERROR;
 
     return NODE_HEIGHT.BASE + portsHeight + extraHeight;

@@ -468,7 +468,10 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
 };
 
 const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
-    // Server type names
+    // New type names
+    'output-console': DebugLogVisualization,
+    'output-preview': PreviewVisualization,
+    // Legacy type names (backward compat)
     'console-log': DebugLogVisualization,
     'result-preview': PreviewVisualization,
     // Alias for preview block type
