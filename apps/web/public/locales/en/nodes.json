@@ -40,7 +40,8 @@
         "clickToAddText": "Click to add text...",
         "enterText": "Enter text...",
         "clickToUpload": "Click to upload image",
-        "removeImage": "Remove"
+        "removeImage": "Remove",
+        "uploading": "Uploading..."
     },
     "errors": {
         "executionFailed": "Execution Failed",

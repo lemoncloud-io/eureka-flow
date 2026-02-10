@@ -22,7 +22,6 @@ import {
 import { compressImageIfNeeded, getBlockDefinition, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
-import { FrontendBadge } from './FrontendBadge';
 import { S3Image } from './S3Image';
 
 import type { NodeData, PortDefinition } from '@flows/flows';
@@ -313,6 +312,7 @@ interface EditableVisualizationProps {
 
 const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
+    const [isUploading, setIsUploading] = useState(false);
     // Server uses 'image' key for input-image config
     const img = node.config?.imageData as string | undefined;
     const fileInputId = `inline-image-${node.id}`;
@@ -320,6 +320,7 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            setIsUploading(true);
             const reader = new FileReader();
             reader.onload = async evt => {
                 const dataUrl = evt.target?.result as string;
@@ -327,7 +328,9 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
                     const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
                     onConfigChange('imageData', compressed);
                 }
+                setIsUploading(false);
             };
+            reader.onerror = () => setIsUploading(false);
             reader.readAsDataURL(file);
         }
     };
@@ -340,14 +343,20 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
             onWheel={e => e.stopPropagation()}
         >
             <input type="file" accept="image/*" className="hidden" id={fileInputId} onChange={handleImageUpload} />
-            {img ? (
-                <div className="relative group rounded-lg border border-border overflow-hidden bg-black/20 h-24">
+            {isUploading ? (
+                <div className="rounded-lg border border-dashed border-primary/60 overflow-hidden bg-black/20 h-24 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                    </div>
+                </div>
+            ) : img ? (
+                <div className="relative group rounded-lg border border-border overflow-hidden bg-black/20 min-h-[96px]">
                     <label
                         htmlFor={fileInputId}
-                        className="block h-full cursor-pointer"
+                        className="block cursor-pointer flex items-center justify-center p-2"
                         title={t('visualization.clickToUpload')}
                     >
-                        <S3Image src={img} className="h-full w-full object-cover" alt="Input" />
+                        <S3Image src={img} className="max-w-full max-h-32 object-contain" alt="Input" />
                     </label>
                     <button
                         onClick={e => {
@@ -382,11 +391,23 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
 const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
     const [isEditing, setIsEditing] = useState(false);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     // Server uses 'value' key for input-text config
     const text = (node.config?.text as string) || '';
+    const savedHeight = (node.config?.textareaHeight as number) || undefined;
 
     const lines = text ? text.split('\n') : [];
     const textDisplay = text ? { firstLine: lines[0], extraLines: lines.length - 1 } : null;
+
+    // Save height when textarea is resized
+    const handleMouseUp = () => {
+        if (textareaRef.current) {
+            const newHeight = textareaRef.current.offsetHeight;
+            if (newHeight !== savedHeight) {
+                onConfigChange('textareaHeight', newHeight);
+            }
+        }
+    };
 
     if (isEditing) {
         return (
@@ -397,22 +418,28 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
                 onWheel={e => e.stopPropagation()}
             >
                 <textarea
+                    ref={textareaRef}
                     autoFocus
-                    className="w-full p-2.5 bg-background/80 border border-primary/50 rounded-lg text-xs resize-none font-mono focus:outline-none focus:border-primary text-foreground"
+                    className="w-full p-2.5 bg-background/80 border border-primary/50 rounded-lg text-xs resize-y font-mono focus:outline-none focus:border-primary text-foreground"
+                    style={{
+                        minHeight: '60px',
+                        maxHeight: '300px',
+                        height: savedHeight ? `${savedHeight}px` : undefined,
+                    }}
                     value={text}
                     onChange={e => onConfigChange('text', e.target.value)}
-                    onBlur={() => setIsEditing(false)}
+                    onBlur={() => {
+                        handleMouseUp(); // Save height on blur
+                        setIsEditing(false);
+                    }}
+                    onMouseUp={handleMouseUp}
                     onKeyDown={e => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            setIsEditing(false);
-                        }
+                        // Allow Enter for newlines, Escape to exit
                         if (e.key === 'Escape') {
                             setIsEditing(false);
                         }
                         e.stopPropagation();
                     }}
-                    rows={3}
                     placeholder={t('visualization.enterText')}
                 />
             </div>
@@ -609,7 +636,11 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 !isDragging && 'transition-all duration-200',
                 isDisabled && 'opacity-50',
                 !isSelected && !isHighlighted && node.status === 'IDLE' && 'shadow-node',
-                isHighlighted ? 'border-accent/60' : getStatusStyles(node.status as NodeStatus, isSelected)
+                isHighlighted
+                    ? 'border-accent/60'
+                    : definition.isFrontend && !isSelected && node.status === 'IDLE'
+                      ? 'border-primary/50'
+                      : getStatusStyles(node.status as NodeStatus, isSelected)
             )}
             style={{ left: node.position.x, top: node.position.y }}
             onMouseDown={onMouseDown}
@@ -657,7 +688,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 <span className="font-semibold text-[13px] text-foreground truncate leading-tight">
                                     {node.customLabel || definition.label}
                                 </span>
-                                {definition.isFrontend && <FrontendBadge />}
                             </div>
                             {node.customLabel && (
                                 <span className="text-[9px] text-muted-foreground/70 truncate font-mono leading-tight">
@@ -670,6 +700,30 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
                 {/* Compact Actions */}
                 <div className="flex items-center gap-0.5 shrink-0">
+                    {/* Input nodes: Run button */}
+                    {definition?.type?.startsWith('input-') && (
+                        <button
+                            onClick={e => {
+                                e.stopPropagation();
+                                handleRun();
+                            }}
+                            onMouseDown={e => e.stopPropagation()}
+                            disabled={isRunning}
+                            className={cn(
+                                'w-6 h-6 rounded-md flex items-center justify-center transition-all',
+                                isRunning
+                                    ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
+                                    : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                            )}
+                            title={t('actions.run')}
+                        >
+                            {isRunning ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                                <Play className="w-3.5 h-3.5" />
+                            )}
+                        </button>
+                    )}
                     <button
                         onClick={e => {
                             e.stopPropagation();
@@ -806,8 +860,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
                 {/* Content Area */}
                 <div className="mt-2">
-                    {/* Use definition.type for block type checks (node.type may be blockId like "1000006") */}
-                    {(definition?.type?.startsWith('input-') || !isAuto) && (
+                    {/* Force Run button for non-auto nodes (input nodes have Run button in header) */}
+                    {!isAuto && !definition?.type?.startsWith('input-') && (
                         <button
                             onClick={handleRun}
                             disabled={isRunning}
@@ -815,14 +869,14 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 'w-full text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
                                 isRunning
                                     ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
-                                    : !isAuto && definition.inputs.every(p => node.inputData[p.id])
+                                    : definition.inputs.every(p => node.inputData[p.id])
                                       ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
                                       : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
                             )}
                             onMouseDown={e => e.stopPropagation()}
                         >
                             {isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                            {definition?.type?.startsWith('input-') ? t('actions.run') : t('actions.forceRun')}
+                            {t('actions.forceRun')}
                         </button>
                     )}
 

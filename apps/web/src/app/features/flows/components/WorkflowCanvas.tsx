@@ -9,7 +9,6 @@ import {
     estimateNodeHeight,
     loadFlow,
     runNode,
-    upsertNode,
     useBlockRegistry,
     useNodeSync,
 } from '@flows/flows';
@@ -816,16 +815,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             )
                         );
 
-                        // Save outputs to server and trigger propagation
+                        // Send outputs to server and trigger propagation
                         if (flowId) {
-                            // Upsert node status to COMPLETED
-                            await upsertNode(nodeId, flowId, {
-                                status: 'COMPLETED',
-                            });
-
-                            // Trigger server propagation with force flag
-                            // Server will copy outputs to downstream inputs and execute them
-                            await runNode(nodeId, { config$: currentNode.config || {} }, { force: true });
+                            // Send frontend execution output to server
+                            // Server will save outputs to ports and propagate to downstream nodes
+                            await runNode(nodeId, { output: outputs }, { force: true });
                         }
                     } else {
                         // ============================================================

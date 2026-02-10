@@ -1,8 +1,19 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { ApiListResult, NodeBody, NodeView, S3ImageInfo, UpsertNodeResult, doPostRunBody } from '../types';
+import type { ApiListResult, DataPacket, NodeBody, NodeView, S3ImageInfo, UpsertNodeResult } from '../types';
 
 const _log = console.log.bind(console, '[nodes-api]');
+
+/**
+ * Body for POST /nodes/:id/run
+ * @see eureka-flows-api #0.26.129
+ */
+export interface RunNodeBody {
+    /** Config to override (not saved) */
+    config$?: Record<string, string>;
+    /** Output data from frontend execution */
+    output?: Record<string, DataPacket>;
+}
 
 /**
  * List nodes by flow ID
@@ -92,16 +103,17 @@ export interface RunNodeOptions {
  * Executes the node's processor with current inputs and config.
  * Supports async execution via SQS queue.
  *
- * @see eureka-flows-api #0.26.114
+ * @see eureka-flows-api #0.26.129
  * @param nodeId - Node ID to execute
- * @param body - Request body containing config
- * @param body.config$ - Node config as Record<string, string>
+ * @param body - Request body
+ * @param body.config$ - Config to override (not saved)
+ * @param body.output - Output data from frontend execution (for isFrontend nodes)
  * @param options - Execution options
  * @param options.async - If true, queues execution and returns immediately
  * @param options.force - If true, forces execution even for isFrontend nodes
  * @param options.propagate - If true, propagates to downstream nodes (default: true)
  */
-export const runNode = async (nodeId: string, body?: doPostRunBody, options?: RunNodeOptions): Promise<NodeView> => {
+export const runNode = async (nodeId: string, body?: RunNodeBody, options?: RunNodeOptions): Promise<NodeView> => {
     _log(`> runNode(${nodeId})`, { body, options });
     try {
         // Build query params

@@ -26,8 +26,10 @@ export const S3Image: React.FC<S3ImageProps> = ({ src, alt, className, onLoad })
 
     if (isLoading) {
         return (
-            <div className={cn('animate-pulse bg-muted flex items-center justify-center', className)}>
-                <RefreshCw className="w-4 h-4 text-muted-foreground animate-spin" />
+            <div className={cn('flex items-center justify-center', className)}>
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                    <RefreshCw className="w-4 h-4 text-primary animate-spin" />
+                </div>
             </div>
         );
     }
