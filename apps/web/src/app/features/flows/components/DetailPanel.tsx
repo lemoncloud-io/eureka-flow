@@ -22,6 +22,7 @@ import {
 import { compressImageIfNeeded, downloadImage, useBlockRegistry, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
+import { FrontendBadge } from './FrontendBadge';
 import { S3Image } from './S3Image';
 
 import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@flows/flows';
@@ -475,6 +476,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         >
                             {def.type}
                         </span>
+                        {def.isFrontend && <FrontendBadge />}
                         <span
                             className={cn(
                                 'text-[10px] px-1.5 py-0.5 rounded font-semibold',

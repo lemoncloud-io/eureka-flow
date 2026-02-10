@@ -32,6 +32,8 @@ import {
     TooltipTrigger,
 } from '@flows/ui-kit';
 
+import { FrontendBadge } from './FrontendBadge';
+
 interface SidebarProps {
     onAddNode: (type: string) => void;
     isLoading?: boolean;
@@ -133,18 +135,7 @@ const BlockItem: React.FC<BlockItemProps> = ({
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                             <span className="text-sm font-medium text-foreground truncate">{label}</span>
-                            {isFrontend && (
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary shrink-0 cursor-help">
-                                            Client
-                                        </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="text-xs">
-                                        {t('sidebar.clientExecution')}
-                                    </TooltipContent>
-                                </Tooltip>
-                            )}
+                            {isFrontend && <FrontendBadge showTooltip />}
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-muted-foreground truncate flex-1">{description}</span>

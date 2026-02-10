@@ -43,6 +43,7 @@
         "resultsCount": "{{count}} results",
         "clickToAdd": "Click to add to canvas",
         "clientExecution": "Runs in browser (client-side)",
+        "frontend": "Frontend",
         "portsInfo": "{{inputs}} inputs → {{outputs}} outputs"
     },
     "canvas": {

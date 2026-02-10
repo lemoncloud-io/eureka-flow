@@ -861,21 +861,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         // Save outputs to server and trigger propagation
                         if (flowId) {
-                            // Convert outputs to server format (data$ format for each port)
-                            const outputPorts = nodeDef.outputs || [];
-                            const portUpdates: Record<string, unknown> = {};
-                            for (const port of outputPorts) {
-                                const portData = outputs[port.id];
-                                if (portData) {
-                                    portUpdates[port.id] = {
-                                        dataType: portData.type,
-                                        data$: { S: String(portData.value) },
-                                        timestamp: portData.timestamp || Date.now(),
-                                    };
-                                }
-                            }
-
-                            // Upsert node with output data
+                            // Upsert node status to COMPLETED
                             await upsertNode(nodeId, flowId, {
                                 status: 'COMPLETED',
                             });
@@ -939,6 +925,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
                     }
                 } catch (e: unknown) {
+                    console.error('[executeNode] Execution failed:', e);
                     const duration = Date.now() - startTime;
                     const errorMessage = e instanceof Error ? e.message : t('flows:detailPanel.unknownError');
 

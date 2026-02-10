@@ -16,12 +16,12 @@ import {
     Sparkles,
     Type,
     X,
-    Zap,
 } from 'lucide-react';
 
 import { compressImageIfNeeded, getBlockDefinition, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
+import { FrontendBadge } from './FrontendBadge';
 import { S3Image } from './S3Image';
 
 import type { NodeData, PortDefinition } from '@flows/flows';
@@ -502,7 +502,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
     const { isSelected, isHighlighted, highlightedPortIds = [], connectionDraft } = highlightState;
     const { onPortMouseDown, onPortMouseUp } = portHandlers;
-    const { onConfigChange, onLabelChange, onToggleAuto } = configHandlers;
+    const { onConfigChange, onLabelChange } = configHandlers;
     const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs } = actions;
 
     const isAuto = node.autoExecutionEnabled !== false;
@@ -641,9 +641,12 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             <StatusIcon />
                         </div>
                         <div className="flex flex-col overflow-hidden min-w-0">
-                            <span className="font-semibold text-[13px] text-foreground truncate leading-tight">
-                                {node.customLabel || definition.label}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-[13px] text-foreground truncate leading-tight">
+                                    {node.customLabel || definition.label}
+                                </span>
+                                {definition.isFrontend && <FrontendBadge />}
+                            </div>
                             {node.customLabel && (
                                 <span className="text-[9px] text-muted-foreground/70 truncate font-mono leading-tight">
                                     {definition.label}
@@ -655,22 +658,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
                 {/* Compact Actions */}
                 <div className="flex items-center gap-0.5 shrink-0">
-                    <button
-                        onClick={e => {
-                            e.stopPropagation();
-                            onToggleAuto();
-                        }}
-                        className={cn(
-                            'w-6 h-6 flex items-center justify-center rounded-md transition-all',
-                            isAuto
-                                ? 'text-primary hover:bg-primary/10'
-                                : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50'
-                        )}
-                        title={isAuto ? t('autoExecution.on') : t('autoExecution.off')}
-                    >
-                        {isAuto ? <Zap className="w-3.5 h-3.5" /> : <span className="text-[10px] font-mono">M</span>}
-                    </button>
-
                     <button
                         onClick={e => {
                             e.stopPropagation();
