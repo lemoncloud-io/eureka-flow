@@ -36,6 +36,9 @@ const NODE_HEIGHT = {
     ERROR: 70,
 } as const;
 
+/** Default textarea height for input-text nodes */
+const DEFAULT_TEXTAREA_HEIGHT = 80;
+
 /**
  * Estimate node height based on node type and port count.
  * Avoids DOM measurement timing issues while providing accurate spacing.
@@ -48,7 +51,17 @@ export const estimateNodeHeight = (node: NodeData, definition: BlockDefinition |
 
     let extraHeight = 0;
     // Use definition.type since loaded nodes may have blockId as type
-    if (definition.type.startsWith('input-')) extraHeight += NODE_HEIGHT.INPUT_NODE;
+    if (definition.type.startsWith('input-')) {
+        extraHeight += NODE_HEIGHT.INPUT_NODE;
+
+        // input-text nodes have dynamic textarea height stored in config
+        if (definition.type === 'input-text') {
+            const textareaHeight = Number(node.config?.textareaHeight) || DEFAULT_TEXTAREA_HEIGHT;
+            // Add height beyond default textarea height (INPUT_NODE already includes base textarea)
+            const additionalHeight = Math.max(0, textareaHeight - DEFAULT_TEXTAREA_HEIGHT);
+            extraHeight += additionalHeight;
+        }
+    }
     if (isOutputConsole(definition.type)) extraHeight += NODE_HEIGHT.DEBUG_LOG;
     if (isOutputPreview(definition.type)) extraHeight += NODE_HEIGHT.PREVIEW;
     if (node.status === 'ERROR') extraHeight += NODE_HEIGHT.ERROR;
