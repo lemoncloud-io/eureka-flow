@@ -208,7 +208,7 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
                 {
                     onSuccess: result => {
                         // Extract server-assigned ID from response
-                        const createdNode = result.nodes$$?.[0];
+                        const createdNode = result.nodes?.[0];
                         if (createdNode?.id) {
                             const serverId = createdNode.id;
                             console.log('[useNodeSync] Node created with server ID:', { tempId, serverId });

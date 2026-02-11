@@ -92,7 +92,7 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
                 {
                     onSuccess: result => {
                         // Extract server-assigned ID from response
-                        const createdEdge = result.edges$$?.[0];
+                        const createdEdge = result.edges?.[0];
                         if (createdEdge?.id) {
                             const serverId = createdEdge.id;
                             console.log('[useEdgeSync] Edge created with server ID:', { tempId, serverId });
