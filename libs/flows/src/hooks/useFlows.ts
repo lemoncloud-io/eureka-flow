@@ -12,6 +12,7 @@ import {
 } from './queries';
 import { useFlowsStore } from '../stores/useFlowsStore';
 import { flowStorage } from '../utils/flowStorage';
+import { getNodeHeight } from '../utils/nodeHeight';
 
 import type { SaveStatus } from '../stores/useFlowsStore';
 import type { LoadFlowResult, SaveFlowBody } from '../types';
@@ -208,14 +209,12 @@ export const useFlows = () => {
                 // 1. Convert type (block.id) -> blockId, and set type to processType
                 // 2. Remove runtime fields (status, inputData, outputData, etc.)
                 // 3. Remove empty customLabel, description
-                // 4. Extract height from config.textareaHeight if present
+                // 4. Extract height (with backward compatibility for legacy config.textareaHeight)
                 const { blockRegistry } = useFlowsStore.getState();
 
                 const slimNodes = nodes.map(node => {
                     const blockDef = blockRegistry[node.type];
-                    // Extract height from config.textareaHeight if present
-                    const textareaHeight = node.config?.textareaHeight;
-                    const height = node.height ?? (textareaHeight ? Number(textareaHeight) : undefined);
+                    const height = getNodeHeight(node);
 
                     const slimNode: Partial<NodeData> = {
                         id: node.id,

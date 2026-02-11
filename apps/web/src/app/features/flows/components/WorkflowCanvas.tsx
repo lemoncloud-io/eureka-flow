@@ -987,15 +987,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         // Frontend now only executes nodes when user clicks the "Run" button manually
         // ============================================================
 
+        // Node-level properties that should be saved directly on node, not in config
+        const NODE_LEVEL_PROPERTIES = ['height', 'width'] as const;
+        type NodeLevelProperty = (typeof NODE_LEVEL_PROPERTIES)[number];
+
         const handleConfigChange = (nodeId: string, key: string, value: unknown) => {
             if (readOnly) return;
             saveCheckpoint();
 
             // Handle node-level properties separately from config
-            if (key === 'height') {
-                const heightValue = typeof value === 'number' ? value : undefined;
-                setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, height: heightValue } : n)));
-                syncNodeUpdate(nodeId, { height: heightValue });
+            if (NODE_LEVEL_PROPERTIES.includes(key as NodeLevelProperty)) {
+                const numericValue = typeof value === 'number' && value > 0 ? value : undefined;
+                setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, [key]: numericValue } : n)));
+                syncNodeUpdate(nodeId, { [key]: numericValue });
                 return;
             }
 

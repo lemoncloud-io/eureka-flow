@@ -19,7 +19,14 @@ import {
     X,
 } from 'lucide-react';
 
-import { compressImageIfNeeded, getBlockDefinition, useBlockRegistry } from '@flows/flows';
+import {
+    DEFAULT_TEXTAREA_HEIGHT,
+    clampHeight,
+    compressImageIfNeeded,
+    getBlockDefinition,
+    getNodeHeight,
+    useBlockRegistry,
+} from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { S3Image } from './S3Image';
@@ -435,11 +442,10 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
     const heightRef = useRef<number>(0);
     // Server uses 'value' key for input-text config
     const text = (node.config?.text as string) || '';
-    // Use node.height (new) or fallback to config.textareaHeight (legacy)
-    const savedHeight = node.height ?? (Number(node.config?.textareaHeight) || undefined);
+    const savedHeight = getNodeHeight(node);
 
     // Initialize height from saved value
-    const currentHeight = localHeight ?? savedHeight ?? 80;
+    const currentHeight = localHeight ?? savedHeight ?? DEFAULT_TEXTAREA_HEIGHT;
 
     // Handle drag resize
     const handleResizeStart = (e: React.MouseEvent) => {
@@ -451,7 +457,7 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
             const delta = moveEvent.clientY - startY;
-            const newHeight = Math.max(60, Math.min(1024, startHeight + delta));
+            const newHeight = clampHeight(startHeight + delta);
             heightRef.current = newHeight;
             setLocalHeight(newHeight);
         };
