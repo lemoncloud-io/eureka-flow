@@ -274,7 +274,8 @@ export const FlowEditorPage = () => {
 
                 setIsAppReady(true);
 
-                setTimeout(() => {
+                // Wait for canvas to mount after render
+                const waitForCanvas = () => {
                     if (canvasRef.current) {
                         if (initialFlow) {
                             canvasRef.current.loadWorkflow(initialFlow);
@@ -286,8 +287,12 @@ export const FlowEditorPage = () => {
                         if (nodeIdFromHash) {
                             canvasRef.current.selectNode(nodeIdFromHash);
                         }
+                    } else {
+                        // Canvas not ready yet, retry
+                        requestAnimationFrame(waitForCanvas);
                     }
-                }, 0);
+                };
+                requestAnimationFrame(waitForCanvas);
             } catch (e) {
                 setLoadingText(t('flowEditor.errorLoadingApp'));
                 console.error(e);
