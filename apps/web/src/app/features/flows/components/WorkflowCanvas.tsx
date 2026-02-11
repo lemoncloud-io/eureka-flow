@@ -11,6 +11,7 @@ import {
     runNode,
     shouldUpdateStatus,
     useBlockRegistry,
+    useEdgeSync,
     useNodeSync,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -21,7 +22,7 @@ import { LogModal } from './LogModal';
 import { NodeBlock } from './NodeBlock';
 import { TooltipImage } from './TooltipImage';
 import { ZoomControls } from './ZoomControls';
-import { generateId, isValidConnection } from '../utils';
+import { generateTempId, isTempId, isValidConnection, replaceNodeIdInState } from '../utils';
 
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
@@ -108,7 +109,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
     ({ readOnly, initialData, flowId, onNodeSelect, onChange, onOpenLibrary }, ref) => {
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
-        const { syncNodeUpdate, createNodeOnBackend, flushPendingUpdates } = useNodeSync({ flowId: flowId ?? null });
+        const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId } = useNodeSync({
+            flowId: flowId ?? null,
+        });
+        const { createEdgeAsync } = useEdgeSync({ flowId: flowId ?? null });
 
         const [nodes, setNodes] = useState<NodeData[]>([]);
         const [connections, setConnections] = useState<Connection[]>([]);
@@ -348,8 +352,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const snappedX = Math.round(startX / GRID_SIZE) * GRID_SIZE;
                     const snappedY = Math.round(startY / GRID_SIZE) * GRID_SIZE;
 
+                    // Generate temp ID for optimistic UI
+                    const tempNodeId = generateTempId('node');
+
                     const newNode: NodeData = {
-                        id: generateId(),
+                        id: tempNodeId,
                         type,
                         position: { x: snappedX, y: snappedY },
                         config: { ...blockRegistry[type].defaultConfig },
@@ -359,13 +366,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         autoExecutionEnabled: true,
                     };
 
+                    // Generate temp edge ID if connection will be created
+                    const tempEdgeId = generateTempId('edge');
                     let newConnection: Connection | null = null;
                     if (sourceNode && sourcePortId && targetPortId) {
                         newConnection = {
-                            id: generateId(),
+                            id: tempEdgeId,
                             sourceNodeId: sourceNode.id,
                             sourcePortId: sourcePortId,
-                            targetNodeId: newNode.id,
+                            targetNodeId: tempNodeId,
                             targetPortId: targetPortId,
                         };
 
@@ -405,8 +414,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         if (targetNode && targetInputPortId && sourceOutputPortId) {
                             newConnection = {
-                                id: generateId(),
-                                sourceNodeId: newNode.id,
+                                id: tempEdgeId,
+                                sourceNodeId: tempNodeId,
                                 sourcePortId: sourceOutputPortId,
                                 targetNodeId: targetNode.id,
                                 targetPortId: targetInputPortId,
@@ -414,15 +423,61 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
                     }
 
+                    // Optimistic UI update
                     setNodes(prev => [...prev, newNode]);
                     if (newConnection) {
                         setConnections(prev => [...prev, newConnection]);
                     }
 
-                    // Sync new node to backend
-                    createNodeOnBackend(newNode);
+                    // Store connection info for later edge creation
+                    const connectionToCreate = newConnection;
 
-                    handleSelectionChange(newNode.id);
+                    // Create node on backend with server-assigned ID
+                    createNodeAsync(
+                        tempNodeId,
+                        {
+                            type,
+                            position: { x: snappedX, y: snappedY },
+                            config: { ...blockRegistry[type].defaultConfig },
+                            autoExecutionEnabled: true,
+                        },
+                        (oldTempId, newServerId) => {
+                            replaceNodeIdInState(oldTempId, newServerId, setNodes, setConnections, setSelectedNodeIds);
+
+                            // Now create the edge on the server if there was a connection
+                            if (connectionToCreate) {
+                                const resolvedConnection = {
+                                    ...connectionToCreate,
+                                    sourceNodeId:
+                                        connectionToCreate.sourceNodeId === oldTempId
+                                            ? newServerId
+                                            : connectionToCreate.sourceNodeId,
+                                    targetNodeId:
+                                        connectionToCreate.targetNodeId === oldTempId
+                                            ? newServerId
+                                            : connectionToCreate.targetNodeId,
+                                };
+
+                                createEdgeAsync(
+                                    tempEdgeId,
+                                    {
+                                        sourceNodeId: resolvedConnection.sourceNodeId,
+                                        sourcePortId: resolvedConnection.sourcePortId,
+                                        targetNodeId: resolvedConnection.targetNodeId,
+                                        targetPortId: resolvedConnection.targetPortId,
+                                    },
+                                    (oldEdgeTempId, newEdgeServerId) => {
+                                        // Replace temp edge ID with server ID
+                                        setConnections(prev =>
+                                            prev.map(c => (c.id === oldEdgeTempId ? { ...c, id: newEdgeServerId } : c))
+                                        );
+                                    }
+                                );
+                            }
+                        }
+                    );
+
+                    handleSelectionChange(tempNodeId);
                     setSelectedConnectionId(null);
                 },
                 getWorkflow: () => ({ nodes, edges: connections }),
@@ -709,7 +764,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 selectedNodeId,
                 handleSelectionChange,
                 blockRegistry,
-                createNodeOnBackend,
+                createNodeAsync,
+                createEdgeAsync,
             ]
         );
 
@@ -997,9 +1053,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 if (!node) return;
 
                 saveCheckpoint();
+
+                const tempId = generateTempId('node');
                 const newNode: NodeData = {
                     ...node,
-                    id: generateId(),
+                    id: tempId,
                     position: {
                         x: Math.round((node.position.x + 40) / GRID_SIZE) * GRID_SIZE,
                         y: Math.round((node.position.y + 40) / GRID_SIZE) * GRID_SIZE,
@@ -1013,10 +1071,26 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     customLabel: node.customLabel ? `${node.customLabel} (copy)` : undefined,
                 };
 
+                // Optimistic UI update
                 setNodes(prev => [...prev, newNode]);
-                handleSelectionChange(newNode.id);
+                handleSelectionChange(tempId);
+
+                // Create on backend with server-assigned ID
+                createNodeAsync(
+                    tempId,
+                    {
+                        type: node.type,
+                        position: newNode.position,
+                        config: newNode.config ?? {},
+                        customLabel: newNode.customLabel,
+                        autoExecutionEnabled: newNode.autoExecutionEnabled,
+                    },
+                    (oldTempId, newServerId) => {
+                        replaceNodeIdInState(oldTempId, newServerId, setNodes, setConnections, setSelectedNodeIds);
+                    }
+                );
             },
-            [readOnly, nodes, saveCheckpoint, handleSelectionChange]
+            [readOnly, nodes, saveCheckpoint, handleSelectionChange, createNodeAsync]
         );
 
         const toggleNodeDisabled = useCallback(
@@ -1270,19 +1344,24 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     isValidConnection(sourceNode, 0, targetNode, 0, connectionDraft.sourceType, targetType)
                 ) {
                     saveCheckpoint();
+
+                    const tempEdgeId = generateTempId('edge');
+                    const newConn: Connection = {
+                        id: tempEdgeId,
+                        sourceNodeId: connectionDraft.sourceNodeId,
+                        sourcePortId: connectionDraft.sourcePortId,
+                        targetNodeId,
+                        targetPortId,
+                    };
+
+                    // Optimistic UI update
                     setConnections(prev => {
                         const filtered = prev.filter(
                             c => !(c.targetNodeId === targetNodeId && c.targetPortId === targetPortId)
                         );
-                        const newConn = {
-                            id: generateId(),
-                            sourceNodeId: connectionDraft.sourceNodeId,
-                            sourcePortId: connectionDraft.sourcePortId,
-                            targetNodeId,
-                            targetPortId,
-                        };
                         return [...filtered, newConn];
                     });
+
                     const packet = sourceNode.outputData[connectionDraft.sourcePortId];
                     if (packet) {
                         // Copy existing output data to the new connection's target input
@@ -1299,6 +1378,49 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     : n
                             )
                         );
+                    }
+
+                    // Check if either node has a temp ID - if so, wait for real IDs
+                    const sourceIsTempId = isTempId(connectionDraft.sourceNodeId);
+                    const targetIsTempId = isTempId(targetNodeId);
+
+                    // Create edge callback to replace temp ID with server ID
+                    const onEdgeIdAssigned = (oldTempId: string, newServerId: string) => {
+                        setConnections(prev => prev.map(c => (c.id === oldTempId ? { ...c, id: newServerId } : c)));
+                    };
+
+                    if (!sourceIsTempId && !targetIsTempId) {
+                        // Both nodes have real IDs, create edge immediately
+                        createEdgeAsync(
+                            tempEdgeId,
+                            {
+                                sourceNodeId: connectionDraft.sourceNodeId,
+                                sourcePortId: connectionDraft.sourcePortId,
+                                targetNodeId,
+                                targetPortId,
+                            },
+                            onEdgeIdAssigned
+                        );
+                    } else {
+                        // One or both nodes have temp IDs - wait for real IDs then create edge
+                        const createEdgeAfterNodeIds = async () => {
+                            const resolvedSourceId = sourceIsTempId
+                                ? await waitForNodeId(connectionDraft.sourceNodeId)
+                                : connectionDraft.sourceNodeId;
+                            const resolvedTargetId = targetIsTempId ? await waitForNodeId(targetNodeId) : targetNodeId;
+
+                            createEdgeAsync(
+                                tempEdgeId,
+                                {
+                                    sourceNodeId: resolvedSourceId,
+                                    sourcePortId: connectionDraft.sourcePortId,
+                                    targetNodeId: resolvedTargetId,
+                                    targetPortId,
+                                },
+                                onEdgeIdAssigned
+                            );
+                        };
+                        createEdgeAfterNodeIds();
                     }
                 }
             }
@@ -1345,9 +1467,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         const offsetX = 40;
                         const offsetY = 40;
 
+                        // Generate temp IDs for all pasted nodes
                         const newNodes: NodeData[] = clipboard.map(node => ({
                             ...node,
-                            id: generateId(),
+                            id: generateTempId('node'),
                             position: {
                                 x: Math.round((node.position.x + offsetX) / GRID_SIZE) * GRID_SIZE,
                                 y: Math.round((node.position.y + offsetY) / GRID_SIZE) * GRID_SIZE,
@@ -1361,9 +1484,33 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             customLabel: node.customLabel,
                         }));
 
+                        // Optimistic UI update
                         setNodes(prev => [...prev, ...newNodes]);
                         // Select all pasted nodes
                         setSelectedNodeIds(new Set(newNodes.map(n => n.id)));
+
+                        // Create each node on backend
+                        newNodes.forEach(newNode => {
+                            createNodeAsync(
+                                newNode.id,
+                                {
+                                    type: newNode.type,
+                                    position: newNode.position,
+                                    config: newNode.config ?? {},
+                                    customLabel: newNode.customLabel,
+                                    autoExecutionEnabled: newNode.autoExecutionEnabled,
+                                },
+                                (oldTempId, newServerId) => {
+                                    replaceNodeIdInState(
+                                        oldTempId,
+                                        newServerId,
+                                        setNodes,
+                                        setConnections,
+                                        setSelectedNodeIds
+                                    );
+                                }
+                            );
+                        });
                     }
                 }
 
@@ -1405,6 +1552,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             viewport,
             saveCheckpoint,
             handleSelectionChange,
+            createNodeAsync,
         ]);
 
         const activeConnectionId = selectedConnectionId || hoveredConnectionId;

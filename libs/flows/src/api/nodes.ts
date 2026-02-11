@@ -1,6 +1,7 @@
 import { api, withRetry } from '@flows/web-core';
 
 import type { ApiListResult, DataPacket, NodeBody, NodeView, S3ImageInfo, UpsertNodeResult } from '../types';
+import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[nodes-api]');
 
@@ -60,6 +61,9 @@ export const createNode = async (body: NodeBody): Promise<NodeView> => {
  * Upsert node (create or update)
  * POST /nodes/:id/upsert?flowId=<flowId>
  *
+ * Request body format: { nodes: [nodeData] }
+ * Response format: { nodes$$: [...], ports$$: [...] }
+ *
  * - id="0" with no body.id → create new node
  * - id="0" with body.id → upsert by body.id
  * - id=<nodeId> → upsert existing node
@@ -71,7 +75,26 @@ export const createNode = async (body: NodeBody): Promise<NodeView> => {
  */
 export const upsertNode = async (id: string, flowId: string, body: Partial<NodeView>): Promise<UpsertNodeResult> => {
     _log(`> upsertNode(${id}, flowId=${flowId})`, body);
-    const response = await api.post<UpsertNodeResult>(`/nodes/${id}/upsert`, body, { params: { flowId } });
+    // Wrap node data in nodes array (SaveFlowBody format)
+    const requestBody = { nodes: [{ ...body, id: id === '0' ? undefined : id }] };
+    const response = await api.post<UpsertNodeResult>(`/nodes/${id}/upsert`, requestBody, { params: { flowId } });
+    return response.data;
+};
+
+/**
+ * Create edge with server-assigned ID
+ * POST /nodes/0/upsert?flowId=<flowId> with { edges: [edge] }
+ *
+ * Server assigns the edge ID and returns it in edges$$ array.
+ *
+ * @param flowId - Flow ID (required)
+ * @param edge - Edge data to create (without id)
+ * @returns UpsertNodeResult with edges$$[0].id containing server-assigned ID
+ */
+export const upsertEdge = async (flowId: string, edge: EdgeData): Promise<UpsertNodeResult> => {
+    _log(`> upsertEdge(flowId=${flowId})`, edge);
+    const body = { edges: [edge] };
+    const response = await api.post<UpsertNodeResult>('/nodes/0/upsert', body, { params: { flowId } });
     return response.data;
 };
 

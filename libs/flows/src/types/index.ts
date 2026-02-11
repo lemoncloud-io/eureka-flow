@@ -360,6 +360,8 @@ export interface SaveFlowView extends FlowView {
 export interface UpsertNodeResult {
     nodes$$: NodeView[];
     ports$$: NodeView[];
+    /** Edges created when body contains edges array */
+    edges$$?: EdgeView[];
 }
 
 /**

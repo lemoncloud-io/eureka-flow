@@ -2,6 +2,7 @@ export * from './useBlocks';
 export * from './useCanvasEngine';
 export * from './useCanvasHistory';
 export * from './useCanvasLayout';
+export * from './useEdgeSync';
 export * from './useFlows';
 export * from './useNodeSync';
 export * from './useS3Image';

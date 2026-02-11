@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { useUpsertNodeMutation } from './queries/useNodesQuery';
+import { useCreateNodeMutation, useUpsertNodeMutation } from './queries/useNodesQuery';
 
 import type { NodeView } from '../types';
 
 const DEBOUNCE_MS = 500;
 const FLUSH_MAX_WAIT_MS = 5000;
 const FLUSH_POLL_INTERVAL_MS = 50;
+
+/** Callback invoked when server assigns a real ID to replace temp ID */
+export type OnNodeIdAssigned = (tempId: string, serverId: string) => void;
 
 interface UseNodeSyncOptions {
     /** Flow ID for creating new nodes */
@@ -16,17 +19,53 @@ interface UseNodeSyncOptions {
 interface UseNodeSyncReturn {
     /** Sync node updates to backend (debounced) */
     syncNodeUpdate: (nodeId: string, updates: Partial<NodeView>) => void;
-    /** Create a new node on backend */
+
+    /**
+     * Create a new node on backend with server-assigned ID
+     * POST /nodes/0/upsert?flowId=:flowId (id="0" for server to assign ID)
+     *
+     * @param tempId - Temporary ID used in UI (will be replaced by server ID)
+     * @param node - Node data to create
+     * @param onIdAssigned - Callback when server assigns real ID
+     */
+    createNodeAsync: (
+        tempId: string,
+        node: {
+            type: string;
+            position: { x: number; y: number };
+            config: Record<string, unknown>;
+            customLabel?: string;
+            description?: string;
+            autoExecutionEnabled?: boolean;
+        },
+        onIdAssigned: OnNodeIdAssigned
+    ) => void;
+
+    /**
+     * @deprecated Use createNodeAsync instead for server-assigned IDs
+     * Create a new node on backend with client-provided ID
+     */
     createNodeOnBackend: (node: {
         id: string;
         type: string;
         position: { x: number; y: number };
         config: Record<string, unknown>;
     }) => void;
+
     /** Flush all pending updates immediately (call before run) */
     flushPendingUpdates: () => Promise<void>;
+
     /** Check if any sync is pending */
     isPending: boolean;
+
+    /** Set of temp IDs waiting for server response */
+    pendingNodeIds: Set<string>;
+
+    /**
+     * Wait for a specific temp ID to be resolved to server ID
+     * Returns the server ID when available
+     */
+    waitForNodeId: (tempId: string) => Promise<string>;
 }
 
 /**
@@ -36,28 +75,40 @@ interface UseNodeSyncReturn {
  * - Debounced updates (500ms) to prevent excessive API calls
  * - Per-node debounce timers (changes to different nodes don't interfere)
  * - Automatic cleanup on unmount
+ * - Server-assigned ID support with callback pattern
  * - Uses unified upsert endpoint (POST /nodes/:id/upsert)
  *
  * Usage:
  * ```tsx
- * const { syncNodeUpdate, createNodeOnBackend } = useNodeSync({ flowId });
+ * const { syncNodeUpdate, createNodeAsync } = useNodeSync({ flowId });
+ *
+ * // On new node with server-assigned ID
+ * const tempId = generateTempId('node');
+ * setNodes([...nodes, { id: tempId, ... }]); // Optimistic update
+ * createNodeAsync(tempId, nodeData, (tempId, serverId) => {
+ *     replaceNodeId(tempId, serverId); // Replace in state
+ * });
  *
  * // On config change
  * handleConfigChange(nodeId, key, value);
  * syncNodeUpdate(nodeId, { config: newConfig });
- *
- * // On new node
- * createNodeOnBackend(newNode);
  * ```
  */
 export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn => {
     const upsertMutation = useUpsertNodeMutation();
+    const createMutation = useCreateNodeMutation();
 
     // Per-node debounce timers
     const debounceTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
     // Pending updates per node (accumulated during debounce)
     const pendingUpdates = useRef<Map<string, Partial<NodeView>>>(new Map());
+
+    // Track pending temp IDs waiting for server response
+    const pendingNodeIdsRef = useRef<Set<string>>(new Set());
+
+    // Map of tempId -> Promise resolver (for waitForNodeId)
+    const pendingResolvers = useRef<Map<string, (serverId: string) => void>>(new Map());
 
     // Cleanup debounce timers on unmount
     useEffect(() => {
@@ -76,6 +127,13 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
         (nodeId: string, updates: Partial<NodeView>) => {
             if (!flowId) {
                 console.warn('[useNodeSync] Cannot sync node: flowId is null');
+                return;
+            }
+
+            // Skip if this is a temp ID that hasn't been resolved yet
+            // Updates will be synced after ID is assigned
+            if (nodeId.startsWith('temp_')) {
+                console.debug('[useNodeSync] Skipping sync for temp ID:', nodeId);
                 return;
             }
 
@@ -106,6 +164,92 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
     );
 
     /**
+     * Create a new node on backend with server-assigned ID
+     * POST /nodes/0/upsert?flowId=:flowId
+     *
+     * Uses optimistic UI pattern:
+     * 1. UI uses tempId immediately
+     * 2. Server assigns real ID
+     * 3. Callback replaces tempId with real ID in UI state
+     */
+    const createNodeAsync = useCallback(
+        (
+            tempId: string,
+            node: {
+                type: string;
+                position: { x: number; y: number };
+                config: Record<string, unknown>;
+                customLabel?: string;
+                description?: string;
+                autoExecutionEnabled?: boolean;
+            },
+            onIdAssigned: OnNodeIdAssigned
+        ) => {
+            if (!flowId) {
+                console.warn('[useNodeSync] Cannot create node: flowId is null');
+                return;
+            }
+
+            // Track pending temp ID
+            pendingNodeIdsRef.current.add(tempId);
+
+            const body: Partial<NodeView> = {
+                blockId: node.type,
+                position: node.position,
+                config: node.config,
+                customLabel: node.customLabel,
+                description: node.description,
+                autoExecutionEnabled: node.autoExecutionEnabled,
+            };
+
+            // Use id="0" to let server assign ID
+            createMutation.mutate(
+                { flowId, body },
+                {
+                    onSuccess: result => {
+                        // Extract server-assigned ID from response
+                        const createdNode = result.nodes$$?.[0];
+                        if (createdNode?.id) {
+                            const serverId = createdNode.id;
+                            console.log('[useNodeSync] Node created with server ID:', { tempId, serverId });
+
+                            // Remove from pending
+                            pendingNodeIdsRef.current.delete(tempId);
+
+                            // Resolve any waiting promises
+                            const resolver = pendingResolvers.current.get(tempId);
+                            if (resolver) {
+                                resolver(serverId);
+                                pendingResolvers.current.delete(tempId);
+                            }
+
+                            // Callback to replace temp ID in UI
+                            onIdAssigned(tempId, serverId);
+                        } else {
+                            console.error('[useNodeSync] Server did not return node ID', result);
+                            pendingNodeIdsRef.current.delete(tempId);
+                        }
+                    },
+                    onError: error => {
+                        console.error('[useNodeSync] Failed to create node:', tempId, error);
+                        pendingNodeIdsRef.current.delete(tempId);
+
+                        // Reject any waiting promises
+                        const resolver = pendingResolvers.current.get(tempId);
+                        if (resolver) {
+                            // We don't have a reject function, so just resolve with tempId
+                            // The caller should handle this case
+                            pendingResolvers.current.delete(tempId);
+                        }
+                    },
+                }
+            );
+        },
+        [flowId, createMutation]
+    );
+
+    /**
+     * @deprecated Use createNodeAsync instead for server-assigned IDs
      * Create a new node on backend via upsert (no debounce)
      * POST /nodes/:id/upsert - creates if not exists, updates if exists
      */
@@ -129,6 +273,23 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
     );
 
     /**
+     * Wait for a specific temp ID to be resolved to server ID
+     * Returns a promise that resolves with the server ID
+     */
+    const waitForNodeId = useCallback((tempId: string): Promise<string> => {
+        // If not pending, it might already be resolved or never existed
+        if (!pendingNodeIdsRef.current.has(tempId)) {
+            // Return immediately - assume it's already a real ID
+            return Promise.resolve(tempId);
+        }
+
+        // Create a promise that will be resolved when the ID is assigned
+        return new Promise(resolve => {
+            pendingResolvers.current.set(tempId, resolve);
+        });
+    }, []);
+
+    /**
      * Flush all pending updates immediately and wait for in-flight mutations
      * Call this before executing nodes to ensure all config changes are saved
      */
@@ -141,8 +302,8 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
         debounceTimers.current.forEach(timer => clearTimeout(timer));
         debounceTimers.current.clear();
 
-        // Collect all pending updates
-        const updates = Array.from(pendingUpdates.current.entries());
+        // Collect all pending updates (only for non-temp IDs)
+        const updates = Array.from(pendingUpdates.current.entries()).filter(([nodeId]) => !nodeId.startsWith('temp_'));
         pendingUpdates.current.clear();
 
         // Execute pending updates
@@ -167,12 +328,19 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
             });
         }
 
+        // Wait for any pending node creations to complete
+        if (pendingNodeIdsRef.current.size > 0) {
+            console.log('[useNodeSync] Waiting for pending node creations:', pendingNodeIdsRef.current.size);
+            const pendingPromises = Array.from(pendingNodeIdsRef.current).map(tempId => waitForNodeId(tempId));
+            await Promise.all(pendingPromises);
+        }
+
         // Wait for any in-flight mutation to complete
         // Poll isPending until it becomes false
         let waited = 0;
         let loggedWaiting = false;
 
-        while (upsertMutation.isPending && waited < FLUSH_MAX_WAIT_MS) {
+        while ((upsertMutation.isPending || createMutation.isPending) && waited < FLUSH_MAX_WAIT_MS) {
             if (!loggedWaiting) {
                 console.log('[useNodeSync] Waiting for in-flight mutation...');
                 loggedWaiting = true;
@@ -184,12 +352,15 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
         if (loggedWaiting && waited < FLUSH_MAX_WAIT_MS) {
             console.log('[useNodeSync] In-flight mutation completed');
         }
-    }, [flowId, upsertMutation]);
+    }, [flowId, upsertMutation, createMutation, waitForNodeId]);
 
     return {
         syncNodeUpdate,
+        createNodeAsync,
         createNodeOnBackend,
         flushPendingUpdates,
-        isPending: upsertMutation.isPending,
+        isPending: upsertMutation.isPending || createMutation.isPending,
+        pendingNodeIds: pendingNodeIdsRef.current,
+        waitForNodeId,
     };
 };
