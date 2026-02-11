@@ -1,6 +1,7 @@
 import { api, withRetry } from '@flows/web-core';
 
 import type { ApiListResult, DataPacket, NodeBody, NodeView, S3ImageInfo, UpsertNodeResult } from '../types';
+import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[nodes-api]');
 
@@ -60,6 +61,9 @@ export const createNode = async (body: NodeBody): Promise<NodeView> => {
  * Upsert node (create or update)
  * POST /nodes/:id/upsert?flowId=<flowId>
  *
+ * Request body format: { nodes: [nodeData] }
+ * Response format: { nodes$$: [...], ports$$: [...] }
+ *
  * - id="0" with no body.id → create new node
  * - id="0" with body.id → upsert by body.id
  * - id=<nodeId> → upsert existing node
@@ -71,8 +75,96 @@ export const createNode = async (body: NodeBody): Promise<NodeView> => {
  */
 export const upsertNode = async (id: string, flowId: string, body: Partial<NodeView>): Promise<UpsertNodeResult> => {
     _log(`> upsertNode(${id}, flowId=${flowId})`, body);
-    const response = await api.post<UpsertNodeResult>(`/nodes/${id}/upsert`, body, { params: { flowId } });
+    // Wrap node data in nodes array (SaveFlowBody format)
+    const requestBody = { nodes: [{ ...body, id: id === '0' ? undefined : id }] };
+    const response = await api.post<UpsertNodeResult>(`/nodes/${id}/upsert`, requestBody, { params: { flowId } });
     return response.data;
+};
+
+/**
+ * Create edge with server-assigned ID
+ * POST /nodes/0/upsert?flowId=<flowId> with { edges: [edge] }
+ *
+ * Server assigns the edge ID and returns it in edges$$ array.
+ *
+ * @param flowId - Flow ID (required)
+ * @param edge - Edge data to create (without id)
+ * @returns UpsertNodeResult with edges$$[0].id containing server-assigned ID
+ */
+export const upsertEdge = async (flowId: string, edge: EdgeData): Promise<UpsertNodeResult> => {
+    _log(`> upsertEdge(flowId=${flowId})`, edge);
+    const body = { edges: [edge] };
+    const response = await api.post<UpsertNodeResult>('/nodes/0/upsert', body, { params: { flowId } });
+    return response.data;
+};
+
+/**
+ * Port data storage format (DynamoDB-style typed values)
+ */
+export interface PortData {
+    /** String value (for text, image types) */
+    S?: string;
+    /** Number value (integer) */
+    N?: number;
+    /** Float value */
+    F?: number;
+    /** Stringified JSON (for json, any types) */
+    M?: string;
+    /** Timestamp when data was produced */
+    timestamp?: number;
+}
+
+/**
+ * Body for upserting a port node
+ */
+export interface PortNodeBody {
+    stereo: 'port';
+    parentId: string;
+    direction: 'in' | 'out';
+    name: string;
+    dataType?: string;
+    data$?: PortData;
+}
+
+/**
+ * Upsert port node (save input/output port data)
+ * POST /nodes/0/upsert?flowId=<flowId>
+ *
+ * Used to save port data before node execution.
+ * Server's hydrateInputs() reads from these port nodes.
+ *
+ * @param flowId - Flow ID (required)
+ * @param body - Port node data
+ * @returns UpsertNodeResult
+ */
+export const upsertPortNode = async (flowId: string, body: PortNodeBody): Promise<UpsertNodeResult> => {
+    _log(`> upsertPortNode(flowId=${flowId})`, body);
+    const requestBody = { nodes: [body] };
+    const response = await api.post<UpsertNodeResult>('/nodes/0/upsert', requestBody, { params: { flowId } });
+    return response.data;
+};
+
+/**
+ * Convert DataPacket to PortData format
+ * @param packet - Frontend DataPacket format
+ * @returns Server PortData format (S, N, M fields)
+ */
+export const toPortData = (packet: DataPacket): PortData => {
+    const { value, type, timestamp } = packet;
+    const base: PortData = {};
+    if (timestamp) base.timestamp = timestamp;
+
+    switch (type) {
+        case 'text':
+        case 'image':
+            return { ...base, S: String(value) };
+        case 'number':
+            return { ...base, N: Number(value) };
+        case 'json':
+        case 'any':
+        default:
+            return { ...base, M: JSON.stringify(value) };
+    }
 };
 
 /**

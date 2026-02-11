@@ -19,7 +19,14 @@ import {
     X,
 } from 'lucide-react';
 
-import { compressImageIfNeeded, getBlockDefinition, useBlockRegistry } from '@flows/flows';
+import {
+    DEFAULT_TEXTAREA_HEIGHT,
+    clampHeight,
+    compressImageIfNeeded,
+    getBlockDefinition,
+    getNodeHeight,
+    useBlockRegistry,
+} from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { S3Image } from './S3Image';
@@ -300,7 +307,7 @@ interface VisualizationProps {
 /** Get first input data from node using definition's port ID or fallback to first available */
 const getFirstInputData = (node: NodeData, definition: BlockDefinitionWithFrontend) => {
     const inputPortId = definition.inputs?.[0]?.id;
-    return inputPortId ? node.inputData[inputPortId] : Object.values(node.inputData)[0];
+    return inputPortId ? node.inputData?.[inputPortId] : Object.values(node.inputData ?? {})[0];
 };
 
 const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }) => {
@@ -431,14 +438,14 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
 const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
     const [isEditing, setIsEditing] = useState(false);
-    const [height, setHeight] = useState<number | undefined>(undefined);
+    const [localHeight, setLocalHeight] = useState<number | undefined>(undefined);
     const heightRef = useRef<number>(0);
     // Server uses 'value' key for input-text config
     const text = (node.config?.text as string) || '';
-    const savedHeight = Number(node.config?.textareaHeight) || undefined;
+    const savedHeight = getNodeHeight(node);
 
     // Initialize height from saved value
-    const currentHeight = height ?? savedHeight ?? 80;
+    const currentHeight = localHeight ?? savedHeight ?? DEFAULT_TEXTAREA_HEIGHT;
 
     // Handle drag resize
     const handleResizeStart = (e: React.MouseEvent) => {
@@ -450,17 +457,17 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
             const delta = moveEvent.clientY - startY;
-            const newHeight = Math.max(60, Math.min(1024, startHeight + delta));
+            const newHeight = clampHeight(startHeight + delta);
             heightRef.current = newHeight;
-            setHeight(newHeight);
+            setLocalHeight(newHeight);
         };
 
         const handleMouseUp = () => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
-            // Save height on drag end
+            // Save height at node level (not in config)
             if (heightRef.current !== savedHeight) {
-                onConfigChange('textareaHeight', heightRef.current);
+                onConfigChange('height', heightRef.current);
             }
         };
 
@@ -905,7 +912,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 port={p}
                                 type="input"
                                 nodeId={node.id}
-                                hasData={!!node.inputData[p.id]}
+                                hasData={!!node.inputData?.[p.id]}
                                 isHighlighted={highlightedPortIds.includes(p.id)}
                                 connectionDraft={connectionDraft}
                                 onMouseDown={onPortMouseDown}
@@ -920,7 +927,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 port={p}
                                 type="output"
                                 nodeId={node.id}
-                                hasData={!!node.outputData[p.id]}
+                                hasData={!!node.outputData?.[p.id]}
                                 isHighlighted={highlightedPortIds.includes(p.id)}
                                 connectionDraft={connectionDraft}
                                 onMouseDown={onPortMouseDown}
@@ -941,7 +948,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 'w-full text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
                                 isRunning
                                     ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
-                                    : definition.inputs.every(p => node.inputData[p.id])
+                                    : definition.inputs.every(p => node.inputData?.[p.id])
                                       ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
                                       : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
                             )}

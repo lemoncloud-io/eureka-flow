@@ -19,7 +19,15 @@ import {
     Zap,
 } from 'lucide-react';
 
-import { compressImageIfNeeded, downloadImage, useBlockRegistry, useS3Image } from '@flows/flows';
+import {
+    DEFAULT_TEXTAREA_HEIGHT,
+    clampHeight,
+    compressImageIfNeeded,
+    downloadImage,
+    getNodeHeight,
+    useBlockRegistry,
+    useS3Image,
+} from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { FrontendBadge } from './FrontendBadge';
@@ -214,12 +222,12 @@ interface InputTextConfigProps {
 
 const InputTextConfig: React.FC<InputTextConfigProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['flows']);
-    const [height, setHeight] = useState<number | undefined>(undefined);
+    const [localHeight, setLocalHeight] = useState<number | undefined>(undefined);
     const heightRef = useRef<number>(0);
     const text = (node.config?.text as string) || '';
-    const savedHeight = Number(node.config?.textareaHeight) || undefined;
+    const savedHeight = getNodeHeight(node);
 
-    const currentHeight = height ?? savedHeight ?? 80;
+    const currentHeight = localHeight ?? savedHeight ?? DEFAULT_TEXTAREA_HEIGHT;
 
     const handleResizeStart = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -230,16 +238,17 @@ const InputTextConfig: React.FC<InputTextConfigProps> = ({ node, onConfigChange 
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
             const delta = moveEvent.clientY - startY;
-            const newHeight = Math.max(60, Math.min(1024, startHeight + delta));
+            const newHeight = clampHeight(startHeight + delta);
             heightRef.current = newHeight;
-            setHeight(newHeight);
+            setLocalHeight(newHeight);
         };
 
         const handleMouseUp = () => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
+            // Save height at node level (not in config)
             if (heightRef.current !== savedHeight) {
-                onConfigChange('textareaHeight', heightRef.current);
+                onConfigChange('height', heightRef.current);
             }
         };
 
@@ -694,7 +703,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                     {input.type}
                                                 </span>
                                             </div>
-                                            {renderDataPreview(selectedNode.inputData[input.id])}
+                                            {renderDataPreview(selectedNode.inputData?.[input.id])}
                                         </div>
                                     );
                                 })
@@ -751,7 +760,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                     {output.type}
                                                 </span>
                                             </div>
-                                            {renderDataPreview(selectedNode.outputData[output.id])}
+                                            {renderDataPreview(selectedNode.outputData?.[output.id])}
                                         </div>
                                     );
                                 })
@@ -790,7 +799,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         const sourcePort = sourceDef?.outputs.find(p => p.id === selectedConnection.sourcePortId);
         const targetPort = targetDef?.inputs.find(p => p.id === selectedConnection.targetPortId);
 
-        const packet = sourceNode?.outputData[selectedConnection.sourcePortId];
+        const packet = sourceNode?.outputData?.[selectedConnection.sourcePortId];
 
         return (
             <div

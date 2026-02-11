@@ -267,10 +267,10 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
             if (node.status === 'RUNNING') return;
             if (node.autoExecutionEnabled === false) return;
 
-            const hasInputs = def.inputs.every(p => node.inputData[p.id]);
+            const hasInputs = def.inputs.every(p => node.inputData?.[p.id]);
             if (!hasInputs) return;
 
-            const currentInputHash = def.inputs.map(p => node.inputData[p.id]?.timestamp).join('|');
+            const currentInputHash = def.inputs.map(p => node.inputData?.[p.id]?.timestamp).join('|');
             const lastHash = nodeInputHashesRef.current.get(node.id);
 
             if (currentInputHash !== lastHash) {

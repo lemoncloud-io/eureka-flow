@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { isOutputConsole, isOutputPreview } from '../consts';
 import { useCanvasStore } from '../stores';
 import { useFlowsStore } from '../stores/useFlowsStore';
+import { DEFAULT_TEXTAREA_HEIGHT, getNodeHeight } from '../utils/nodeHeight';
 
 import type { BlockDefinition, NodeData } from '@lemoncloud/eureka-flows-api';
 
@@ -36,9 +37,6 @@ const NODE_HEIGHT = {
     ERROR: 70,
 } as const;
 
-/** Default textarea height for input-text nodes */
-const DEFAULT_TEXTAREA_HEIGHT = 80;
-
 /**
  * Estimate node height based on node type and port count.
  * Avoids DOM measurement timing issues while providing accurate spacing.
@@ -54,9 +52,9 @@ export const estimateNodeHeight = (node: NodeData, definition: BlockDefinition |
     if (definition.type.startsWith('input-')) {
         extraHeight += NODE_HEIGHT.INPUT_NODE;
 
-        // input-text nodes have dynamic textarea height stored in config
+        // input-text nodes have dynamic textarea height
         if (definition.type === 'input-text') {
-            const textareaHeight = Number(node.config?.textareaHeight) || DEFAULT_TEXTAREA_HEIGHT;
+            const textareaHeight = getNodeHeight(node, DEFAULT_TEXTAREA_HEIGHT) ?? DEFAULT_TEXTAREA_HEIGHT;
             // Add height beyond default textarea height (INPUT_NODE already includes base textarea)
             const additionalHeight = Math.max(0, textareaHeight - DEFAULT_TEXTAREA_HEIGHT);
             extraHeight += additionalHeight;
