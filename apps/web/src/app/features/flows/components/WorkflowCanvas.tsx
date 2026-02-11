@@ -10,6 +10,8 @@ import {
     loadFlow,
     runNode,
     shouldUpdateStatus,
+    toPortData,
+    upsertPortNode,
     useBlockRegistry,
     useEdgeSync,
     useNodeSync,
@@ -923,7 +925,40 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         //
                         // Priority: COMPLETED/ERROR (3) > RUNNING (2) > READY (1) > IDLE (0)
                         // ============================================================
-                        const result = await runNode(nodeId, { config$: currentNode.config || {} });
+
+                        // Step 1: Collect input data from upstream nodes' outputs
+                        // Server's hydrateInputs() reads from DB port nodes, so we must save port data first.
+                        const collectedInputData: Record<string, DataPacket> = { ...inputs };
+                        for (const conn of incomingConnections) {
+                            if (!conn.sourceNodeId || !conn.sourcePortId || !conn.targetPortId) continue;
+                            const sourceNode = nodesRef.current.find(n => n.id === conn.sourceNodeId);
+                            const sourceOutput = sourceNode?.outputData?.[conn.sourcePortId];
+                            if (sourceOutput) {
+                                collectedInputData[conn.targetPortId] = sourceOutput;
+                            }
+                        }
+
+                        // Step 2: Save input port data to server before execution
+                        // Server's fromNodeData ignores inputData, so we must upsert port nodes directly
+                        if (flowId && Object.keys(collectedInputData).length > 0) {
+                            await Promise.all(
+                                Object.entries(collectedInputData).map(([portName, packet]) =>
+                                    upsertPortNode(flowId, {
+                                        stereo: 'port',
+                                        parentId: nodeId,
+                                        direction: 'in',
+                                        name: portName,
+                                        dataType: packet.type,
+                                        data$: toPortData(packet),
+                                    })
+                                )
+                            );
+                        }
+
+                        // Step 3: Run the node (server will hydrate inputs from saved port nodes)
+                        const result = await runNode(nodeId, {
+                            config$: currentNode.config || {},
+                        });
 
                         if (result?.status) {
                             const duration = Date.now() - startTime;

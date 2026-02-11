@@ -1862,7 +1862,7 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@lemoncloud/eureka-flows-api@^0.26.211":
+"@lemoncloud/eureka-flows-api@^0.26.211e":
   version "0.26.211"
   resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-flows-api/-/eureka-flows-api-0.26.211.tgz#b090ff2bd6c94b6403b2a93e87aa9d566ee07a78"
   integrity sha512-wfxg/hTAsVTstQ7r7wxLSUtLp1afc5ggSjW+f0DG8uk1qVXUJzsfdx0kHyu9bjZwUTrO6dAmWOTI/XC8QsxazQ==
