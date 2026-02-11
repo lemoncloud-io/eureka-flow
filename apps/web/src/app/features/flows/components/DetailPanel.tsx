@@ -703,7 +703,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                     {input.type}
                                                 </span>
                                             </div>
-                                            {renderDataPreview(selectedNode.inputData[input.id])}
+                                            {renderDataPreview(selectedNode.inputData?.[input.id])}
                                         </div>
                                     );
                                 })
@@ -760,7 +760,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                     {output.type}
                                                 </span>
                                             </div>
-                                            {renderDataPreview(selectedNode.outputData[output.id])}
+                                            {renderDataPreview(selectedNode.outputData?.[output.id])}
                                         </div>
                                     );
                                 })
@@ -799,7 +799,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         const sourcePort = sourceDef?.outputs.find(p => p.id === selectedConnection.sourcePortId);
         const targetPort = targetDef?.inputs.find(p => p.id === selectedConnection.targetPortId);
 
-        const packet = sourceNode?.outputData[selectedConnection.sourcePortId];
+        const packet = sourceNode?.outputData?.[selectedConnection.sourcePortId];
 
         return (
             <div

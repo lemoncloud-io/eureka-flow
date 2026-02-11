@@ -307,7 +307,7 @@ interface VisualizationProps {
 /** Get first input data from node using definition's port ID or fallback to first available */
 const getFirstInputData = (node: NodeData, definition: BlockDefinitionWithFrontend) => {
     const inputPortId = definition.inputs?.[0]?.id;
-    return inputPortId ? node.inputData[inputPortId] : Object.values(node.inputData)[0];
+    return inputPortId ? node.inputData?.[inputPortId] : Object.values(node.inputData ?? {})[0];
 };
 
 const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }) => {
@@ -912,7 +912,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 port={p}
                                 type="input"
                                 nodeId={node.id}
-                                hasData={!!node.inputData[p.id]}
+                                hasData={!!node.inputData?.[p.id]}
                                 isHighlighted={highlightedPortIds.includes(p.id)}
                                 connectionDraft={connectionDraft}
                                 onMouseDown={onPortMouseDown}
@@ -927,7 +927,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 port={p}
                                 type="output"
                                 nodeId={node.id}
-                                hasData={!!node.outputData[p.id]}
+                                hasData={!!node.outputData?.[p.id]}
                                 isHighlighted={highlightedPortIds.includes(p.id)}
                                 connectionDraft={connectionDraft}
                                 onMouseDown={onPortMouseDown}
@@ -948,7 +948,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 'w-full text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
                                 isRunning
                                     ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
-                                    : definition.inputs.every(p => node.inputData[p.id])
+                                    : definition.inputs.every(p => node.inputData?.[p.id])
                                       ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
                                       : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
                             )}

@@ -378,7 +378,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             targetPortId: targetPortId,
                         };
 
-                        if (sourceNode.outputData[sourcePortId]) {
+                        if (sourceNode.outputData?.[sourcePortId]) {
                             newNode.inputData[targetPortId] = sourceNode.outputData[sourcePortId];
                         }
                     }
@@ -1375,7 +1375,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         return [...filtered, newConn];
                     });
 
-                    const packet = sourceNode.outputData[connectionDraft.sourcePortId];
+                    const packet = sourceNode.outputData?.[connectionDraft.sourcePortId];
                     if (packet) {
                         // Copy existing output data to the new connection's target input
                         setNodes(prev =>
@@ -1615,7 +1615,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 const end = getPortPosition(conn.targetNodeId, conn.targetPortId, 'input');
                                 const sourceNode = nodes.find(n => n.id === conn.sourceNodeId);
                                 const targetNode = nodes.find(n => n.id === conn.targetNodeId);
-                                const packet = sourceNode?.outputData[conn.sourcePortId];
+                                const packet = sourceNode?.outputData?.[conn.sourcePortId];
                                 const isActive = !!packet;
                                 const isFlowing = sourceNode?.status === 'RUNNING' || targetNode?.status === 'RUNNING';
 
