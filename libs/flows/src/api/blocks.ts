@@ -78,7 +78,7 @@ export const listBlocks = async (): Promise<BlockDefinitionWithFrontend[]> => {
     await delay(500);
 
     const response = await withRetry(
-        () => api.get<ListResult<BlockViewWithFrontend>>('/blocks/0/list?cores=1'),
+        () => api.get<ListResult<BlockViewWithFrontend>>('/blocks/0/list?cores=1&limit=-1'),
         3,
         'listBlocks'
     );

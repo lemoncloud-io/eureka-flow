@@ -101,11 +101,10 @@ module.exports = {
                 },
                 port: {
                     empty: 'hsl(var(--port-empty))',
-                    input: 'hsl(var(--port-filled-input))',
-                    output: 'hsl(var(--port-filled-output))',
                     text: 'hsl(var(--port-type-text))',
                     image: 'hsl(var(--port-type-image))',
                     number: 'hsl(var(--port-type-number))',
+                    json: 'hsl(var(--port-type-json))',
                     any: 'hsl(var(--port-type-any))',
                 },
                 'node-cat': {

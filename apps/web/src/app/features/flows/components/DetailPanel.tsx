@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -22,6 +22,7 @@ import {
 import { compressImageIfNeeded, downloadImage, useBlockRegistry, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
+import { FrontendBadge } from './FrontendBadge';
 import { S3Image } from './S3Image';
 
 import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@flows/flows';
@@ -213,7 +214,38 @@ interface InputTextConfigProps {
 
 const InputTextConfig: React.FC<InputTextConfigProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['flows']);
+    const [height, setHeight] = useState<number | undefined>(undefined);
+    const heightRef = useRef<number>(0);
     const text = (node.config?.text as string) || '';
+    const savedHeight = Number(node.config?.textareaHeight) || undefined;
+
+    const currentHeight = height ?? savedHeight ?? 80;
+
+    const handleResizeStart = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startY = e.clientY;
+        const startHeight = currentHeight;
+        heightRef.current = currentHeight;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const delta = moveEvent.clientY - startY;
+            const newHeight = Math.max(60, Math.min(1024, startHeight + delta));
+            heightRef.current = newHeight;
+            setHeight(newHeight);
+        };
+
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            if (heightRef.current !== savedHeight) {
+                onConfigChange('textareaHeight', heightRef.current);
+            }
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    };
 
     return (
         <div>
@@ -221,12 +253,19 @@ const InputTextConfig: React.FC<InputTextConfigProps> = ({ node, onConfigChange 
                 {t('flows:detailPanel.value')}
             </label>
             <textarea
-                className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors resize-y min-h-[80px] font-mono"
+                className="w-full bg-background/80 border border-border/60 rounded-t-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors resize-none font-mono"
+                style={{ height: `${currentHeight}px` }}
                 value={text}
                 onChange={e => onConfigChange('text', e.target.value)}
                 onKeyDown={e => e.stopPropagation()}
                 placeholder={t('flows:detailPanel.enterText')}
             />
+            <div
+                className="resize-handle h-3 bg-muted/50 hover:bg-primary/10 border border-t-0 border-border/60 rounded-b-md cursor-ns-resize flex items-center justify-center transition-colors"
+                onMouseDown={handleResizeStart}
+            >
+                <div className="w-8 h-1 bg-muted-foreground/30 rounded-full" />
+            </div>
         </div>
     );
 };
@@ -475,6 +514,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         >
                             {def.type}
                         </span>
+                        {def.isFrontend && <FrontendBadge />}
                         <span
                             className={cn(
                                 'text-[10px] px-1.5 py-0.5 rounded font-semibold',

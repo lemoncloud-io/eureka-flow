@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import {
     Ban,
+    Braces,
     Check,
     Copy,
     Hash,
@@ -16,7 +17,6 @@ import {
     Sparkles,
     Type,
     X,
-    Zap,
 } from 'lucide-react';
 
 import { compressImageIfNeeded, getBlockDefinition, useBlockRegistry } from '@flows/flows';
@@ -24,7 +24,7 @@ import { cn } from '@flows/lib/utils';
 
 import { S3Image } from './S3Image';
 
-import type { NodeData, PortDefinition } from '@flows/flows';
+import type { BlockDefinitionWithFrontend, NodeData, PortDefinition } from '@flows/flows';
 
 type ConfigValue = string | number | boolean | string[] | null;
 
@@ -104,6 +104,8 @@ const getPortTypeIcon = (portType: string): React.ElementType | null => {
             return Image;
         case 'number':
             return Hash;
+        case 'json':
+            return Braces;
         case 'any':
             return Sparkles;
         default:
@@ -117,34 +119,68 @@ const arePortTypesCompatible = (sourceType: string, targetType: string): boolean
     return sourceType.toLowerCase() === targetType.toLowerCase();
 };
 
-/** Get Tailwind classes for port type coloring */
-const getPortTypeColor = (portType: string, hasData: boolean, portDirection: 'input' | 'output'): string => {
-    // Always show color based on port type, brighter when has data
-    if (portDirection === 'input') {
-        return hasData
-            ? 'bg-port-input border-port-input shadow-[0_0_6px_rgba(34,197,94,0.4)]'
-            : 'bg-port-input/50 border-port-input/50';
-    }
+/**
+ * Port type style configuration - single source of truth for all port styling
+ * IMPORTANT: Use complete static class names for Tailwind's static analyzer.
+ * Dynamic interpolation like `bg-${color}` will NOT be detected at build time.
+ */
+const PORT_TYPE_STYLES = {
+    text: {
+        base: 'bg-port-text border-port-text shadow-[0_0_6px_rgba(59,130,246,0.4)]',
+        dim: 'bg-port-text/50 border-port-text/50',
+        drop: 'border-port-text bg-port-text animate-port-glow-text',
+        text: 'text-port-text',
+    },
+    image: {
+        base: 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]',
+        dim: 'bg-port-image/50 border-port-image/50',
+        drop: 'border-port-image bg-port-image animate-port-glow-image',
+        text: 'text-port-image',
+    },
+    number: {
+        base: 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]',
+        dim: 'bg-port-number/50 border-port-number/50',
+        drop: 'border-port-number bg-port-number animate-port-glow-number',
+        text: 'text-port-number',
+    },
+    json: {
+        base: 'bg-port-json border-port-json shadow-[0_0_6px_rgba(245,158,11,0.4)]',
+        dim: 'bg-port-json/50 border-port-json/50',
+        drop: 'border-port-json bg-port-json animate-port-glow-json',
+        text: 'text-port-json',
+    },
+    any: {
+        base: 'bg-port-any border-port-any shadow-[0_0_6px_rgba(107,114,128,0.4)]',
+        dim: 'bg-port-any/50 border-port-any/50',
+        drop: 'border-port-any bg-port-any animate-port-glow-any',
+        text: 'text-port-any',
+    },
+} as const;
 
-    switch (portType.toLowerCase()) {
-        case 'image':
-            return hasData
-                ? 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]'
-                : 'bg-port-image/50 border-port-image/50';
-        case 'text':
-        case 'string':
-            return hasData
-                ? 'bg-port-text border-port-text shadow-[0_0_6px_rgba(139,92,246,0.4)]'
-                : 'bg-port-text/50 border-port-text/50';
-        case 'number':
-            return hasData
-                ? 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]'
-                : 'bg-port-number/50 border-port-number/50';
-        default:
-            return hasData
-                ? 'bg-port-output border-port-output shadow-[0_0_6px_rgba(139,92,246,0.4)]'
-                : 'bg-port-output/50 border-port-output/50';
-    }
+type PortStyleKey = keyof typeof PORT_TYPE_STYLES;
+
+/** Normalize port type string to a valid style key */
+const getPortStyleKey = (portType: string): PortStyleKey => {
+    const normalized = portType.toLowerCase();
+    if (normalized === 'string') return 'text';
+    if (normalized in PORT_TYPE_STYLES) return normalized as PortStyleKey;
+    return 'any';
+};
+
+/** Get Tailwind classes for port type coloring - based on dataType only (same for input/output) */
+const getPortTypeColor = (portType: string, hasData: boolean): string => {
+    const style = PORT_TYPE_STYLES[getPortStyleKey(portType)];
+    return hasData ? style.base : style.dim;
+};
+
+/** Get Tailwind classes for valid drop target highlighting - matches source port's dataType color */
+const getDropTargetColor = (sourceType: string): string => {
+    return PORT_TYPE_STYLES[getPortStyleKey(sourceType)].drop;
+};
+
+/** Get text color class for valid drop target label */
+const getDropTargetTextColor = (sourceType: string): string => {
+    return PORT_TYPE_STYLES[getPortStyleKey(sourceType)].text;
 };
 
 interface PortItemProps {
@@ -193,8 +229,8 @@ const PortItem: React.FC<PortItemProps> = ({
         'w-3 h-3 rounded-full border-2 transition-all duration-200',
         // Highlighted state (selected connection) - thicker border only, no ring
         isHighlighted && 'scale-110 border-primary border-[3px] z-20',
-        // Valid drop target - slow gentle glow (2s animation in styles.css)
-        !isHighlighted && isValidDropTarget && 'border-success bg-success z-20 animate-port-glow cursor-copy',
+        // Valid drop target - uses source port's dataType color with matching glow animation
+        !isHighlighted && isValidDropTarget && [getDropTargetColor(connectionDraft.sourceType), 'z-20 cursor-copy'],
         // Incompatible target - dimmed with not-allowed cursor
         !isHighlighted && isIncompatibleTarget && 'opacity-30 cursor-not-allowed',
         // Normal state
@@ -202,7 +238,7 @@ const PortItem: React.FC<PortItemProps> = ({
             !isValidDropTarget &&
             !isIncompatibleTarget &&
             'cursor-crosshair hover:scale-125 hover:ring-2 hover:ring-white/20',
-        !isHighlighted && !isValidDropTarget && getPortTypeColor(port.type, hasData, type)
+        !isHighlighted && !isValidDropTarget && getPortTypeColor(port.type, hasData)
     );
 
     const PortIcon = getPortTypeIcon(port.type);
@@ -237,7 +273,7 @@ const PortItem: React.FC<PortItemProps> = ({
                 className={cn(
                     'flex items-center gap-1 transition-all',
                     isHighlighted && 'text-primary font-semibold',
-                    isValidDropTarget && 'text-success font-semibold',
+                    isValidDropTarget && [getDropTargetTextColor(connectionDraft.sourceType), 'font-semibold'],
                     isIncompatibleTarget && 'opacity-30',
                     !isHighlighted && !isValidDropTarget && !isIncompatibleTarget && 'text-muted-foreground/80'
                 )}
@@ -256,10 +292,22 @@ const PortItem: React.FC<PortItemProps> = ({
     );
 };
 
-const PreviewVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
+interface VisualizationProps {
+    node: NodeData;
+    definition: BlockDefinitionWithFrontend;
+}
+
+/** Get first input data from node using definition's port ID or fallback to first available */
+const getFirstInputData = (node: NodeData, definition: BlockDefinitionWithFrontend) => {
+    const inputPortId = definition.inputs?.[0]?.id;
+    return inputPortId ? node.inputData[inputPortId] : Object.values(node.inputData)[0];
+};
+
+const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }) => {
     const { t } = useTranslation(['nodes']);
-    const lastInput = node.inputData['in'];
     const [dims, setDims] = useState<string | null>(null);
+
+    const lastInput = getFirstInputData(node, definition);
 
     if (!lastInput) {
         return (
@@ -304,6 +352,7 @@ interface EditableVisualizationProps {
 
 const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
+    const [isUploading, setIsUploading] = useState(false);
     // Server uses 'image' key for input-image config
     const img = node.config?.imageData as string | undefined;
     const fileInputId = `inline-image-${node.id}`;
@@ -311,6 +360,7 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            setIsUploading(true);
             const reader = new FileReader();
             reader.onload = async evt => {
                 const dataUrl = evt.target?.result as string;
@@ -318,7 +368,9 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
                     const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
                     onConfigChange('imageData', compressed);
                 }
+                setIsUploading(false);
             };
+            reader.onerror = () => setIsUploading(false);
             reader.readAsDataURL(file);
         }
     };
@@ -331,14 +383,20 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
             onWheel={e => e.stopPropagation()}
         >
             <input type="file" accept="image/*" className="hidden" id={fileInputId} onChange={handleImageUpload} />
-            {img ? (
-                <div className="relative group rounded-lg border border-border overflow-hidden bg-black/20 h-24">
+            {isUploading ? (
+                <div className="rounded-lg border border-dashed border-primary/60 overflow-hidden bg-black/20 h-24 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                    </div>
+                </div>
+            ) : img ? (
+                <div className="relative group rounded-lg border border-border overflow-hidden bg-black/20 min-h-[96px]">
                     <label
                         htmlFor={fileInputId}
-                        className="block h-full cursor-pointer"
+                        className="block cursor-pointer flex items-center justify-center p-2"
                         title={t('visualization.clickToUpload')}
                     >
-                        <S3Image src={img} className="h-full w-full object-cover" alt="Input" />
+                        <S3Image src={img} className="max-w-full max-h-32 object-contain" alt="Input" />
                     </label>
                     <button
                         onClick={e => {
@@ -373,46 +431,91 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
 const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
     const [isEditing, setIsEditing] = useState(false);
+    const [height, setHeight] = useState<number | undefined>(undefined);
+    const heightRef = useRef<number>(0);
     // Server uses 'value' key for input-text config
     const text = (node.config?.text as string) || '';
+    const savedHeight = Number(node.config?.textareaHeight) || undefined;
 
-    const lines = text ? text.split('\n') : [];
-    const textDisplay = text ? { firstLine: lines[0], extraLines: lines.length - 1 } : null;
+    // Initialize height from saved value
+    const currentHeight = height ?? savedHeight ?? 80;
+
+    // Handle drag resize
+    const handleResizeStart = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startY = e.clientY;
+        const startHeight = currentHeight;
+        heightRef.current = currentHeight;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const delta = moveEvent.clientY - startY;
+            const newHeight = Math.max(60, Math.min(1024, startHeight + delta));
+            heightRef.current = newHeight;
+            setHeight(newHeight);
+        };
+
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            // Save height on drag end
+            if (heightRef.current !== savedHeight) {
+                onConfigChange('textareaHeight', heightRef.current);
+            }
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    };
 
     if (isEditing) {
         return (
             <div
-                className="mt-3"
+                className="mt-3 flex flex-col"
                 onMouseDown={e => e.stopPropagation()}
                 onDoubleClick={e => e.stopPropagation()}
                 onWheel={e => e.stopPropagation()}
             >
                 <textarea
                     autoFocus
-                    className="w-full p-2.5 bg-background/80 border border-primary/50 rounded-lg text-xs resize-none font-mono focus:outline-none focus:border-primary text-foreground"
+                    className="w-full p-2.5 bg-background/80 border border-primary/50 rounded-t-lg text-xs resize-none font-mono focus:outline-none focus:border-primary text-foreground"
+                    style={{
+                        height: `${currentHeight}px`,
+                    }}
                     value={text}
                     onChange={e => onConfigChange('text', e.target.value)}
-                    onBlur={() => setIsEditing(false)}
+                    onBlur={e => {
+                        // Don't close if clicking resize handle
+                        if (e.relatedTarget?.closest('.resize-handle')) return;
+                        setIsEditing(false);
+                    }}
                     onKeyDown={e => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            setIsEditing(false);
-                        }
+                        // Allow Enter for newlines, Escape to exit
                         if (e.key === 'Escape') {
                             setIsEditing(false);
                         }
                         e.stopPropagation();
                     }}
-                    rows={3}
                     placeholder={t('visualization.enterText')}
                 />
+                {/* Resize handle bar */}
+                <div
+                    className="resize-handle h-3 bg-primary/10 hover:bg-primary/20 border border-t-0 border-primary/50 rounded-b-lg cursor-ns-resize flex items-center justify-center transition-colors"
+                    onMouseDown={handleResizeStart}
+                    tabIndex={-1}
+                >
+                    <div className="w-8 h-1 bg-primary/30 rounded-full" />
+                </div>
             </div>
         );
     }
 
     return (
         <div
-            className="mt-3 p-2.5 bg-muted/30 rounded-lg border border-border hover:border-primary/40 cursor-text transition-all group"
+            className="mt-3 p-2.5 bg-muted/30 rounded-lg border border-border hover:border-primary/40 cursor-text transition-all group overflow-hidden"
+            style={{
+                minHeight: savedHeight ? `${savedHeight}px` : undefined,
+            }}
             onClick={e => {
                 e.stopPropagation();
                 setIsEditing(true);
@@ -426,18 +529,15 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
                 {t('visualization.value')}
             </div>
             <div
-                className="text-xs text-foreground/70 font-mono flex items-center gap-1 group-hover:text-foreground/90 transition-colors"
+                className="text-xs text-foreground/70 font-mono whitespace-pre-wrap break-all group-hover:text-foreground/90 transition-colors"
+                style={{
+                    maxHeight: savedHeight ? `${savedHeight - 30}px` : '60px',
+                    overflow: 'hidden',
+                }}
                 title={text}
             >
-                {textDisplay ? (
-                    <>
-                        <span className="truncate">"{textDisplay.firstLine}"</span>
-                        {textDisplay.extraLines > 0 && (
-                            <span className="text-muted-foreground/50 text-[9px] shrink-0 bg-muted/50 px-1 rounded">
-                                +{textDisplay.extraLines}
-                            </span>
-                        )}
-                    </>
+                {text ? (
+                    <span>"{text}"</span>
                 ) : (
                     <span className="text-muted-foreground/50 italic">{t('visualization.clickToAddText')}</span>
                 )}
@@ -446,9 +546,9 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
     );
 };
 
-const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
+const DebugLogVisualization: React.FC<VisualizationProps> = ({ node, definition }) => {
     const { t } = useTranslation(['nodes']);
-    const lastInput = node.inputData['in']?.value;
+    const lastInput = getFirstInputData(node, definition)?.value;
     return (
         <div
             className="mt-3 p-2.5 bg-black/30 rounded-lg border border-border text-foreground/80 font-mono text-[10px] break-all max-h-28 overflow-y-auto"
@@ -467,11 +567,14 @@ const DebugLogVisualization: React.FC<{ node: NodeData }> = ({ node }) => {
     );
 };
 
-const VISUALIZATION_COMPONENTS: Record<string, React.FC<{ node: NodeData }>> = {
-    // Server type names
+const VISUALIZATION_COMPONENTS: Record<string, React.FC<VisualizationProps>> = {
+    // New type names
+    'output-console': DebugLogVisualization,
+    'output-preview': PreviewVisualization,
+    // Legacy type names (backward compat)
     'console-log': DebugLogVisualization,
+    'debug-log': DebugLogVisualization,
     'result-preview': PreviewVisualization,
-    // Alias for preview block type
     preview: PreviewVisualization,
 };
 
@@ -502,7 +605,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
     const { isSelected, isHighlighted, highlightedPortIds = [], connectionDraft } = highlightState;
     const { onPortMouseDown, onPortMouseUp } = portHandlers;
-    const { onConfigChange, onLabelChange, onToggleAuto } = configHandlers;
+    const { onConfigChange, onLabelChange } = configHandlers;
     const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs } = actions;
 
     const isAuto = node.autoExecutionEnabled !== false;
@@ -510,6 +613,13 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
     // Track API call in progress (separate from node.status which reflects server state)
     const [isRunning, setIsRunning] = useState(false);
+
+    // Reset isRunning when node status changes to completed/error (socket may update before API returns)
+    useEffect(() => {
+        if (node.status === 'COMPLETED' || node.status === 'ERROR') {
+            setIsRunning(false);
+        }
+    }, [node.status]);
 
     const handleRun = async () => {
         if (isRunning) return;
@@ -597,7 +707,11 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 !isDragging && 'transition-all duration-200',
                 isDisabled && 'opacity-50',
                 !isSelected && !isHighlighted && node.status === 'IDLE' && 'shadow-node',
-                isHighlighted ? 'border-accent/60' : getStatusStyles(node.status as NodeStatus, isSelected)
+                isHighlighted
+                    ? 'border-accent/60'
+                    : definition.isFrontend && !isSelected && node.status === 'IDLE'
+                      ? 'border-primary/50'
+                      : getStatusStyles(node.status as NodeStatus, isSelected)
             )}
             style={{ left: node.position.x, top: node.position.y }}
             onMouseDown={onMouseDown}
@@ -607,7 +721,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             <div
                 className={cn(
                     'pl-4 pr-2 py-2 flex justify-between items-center cursor-move',
-                    'border-b border-node-border/30 bg-node-header/50',
+                    'border-b border-node-border/30',
+                    definition.isFrontend ? 'bg-primary/5 dark:bg-primary/15' : 'bg-node-header/50',
                     'transition-colors duration-200'
                 )}
             >
@@ -641,9 +756,11 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             <StatusIcon />
                         </div>
                         <div className="flex flex-col overflow-hidden min-w-0">
-                            <span className="font-semibold text-[13px] text-foreground truncate leading-tight">
-                                {node.customLabel || definition.label}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-[13px] text-foreground truncate leading-tight">
+                                    {node.customLabel || definition.label}
+                                </span>
+                            </div>
                             {node.customLabel && (
                                 <span className="text-[9px] text-muted-foreground/70 truncate font-mono leading-tight">
                                     {definition.label}
@@ -655,22 +772,30 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
                 {/* Compact Actions */}
                 <div className="flex items-center gap-0.5 shrink-0">
-                    <button
-                        onClick={e => {
-                            e.stopPropagation();
-                            onToggleAuto();
-                        }}
-                        className={cn(
-                            'w-6 h-6 flex items-center justify-center rounded-md transition-all',
-                            isAuto
-                                ? 'text-primary hover:bg-primary/10'
-                                : 'text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50'
-                        )}
-                        title={isAuto ? t('autoExecution.on') : t('autoExecution.off')}
-                    >
-                        {isAuto ? <Zap className="w-3.5 h-3.5" /> : <span className="text-[10px] font-mono">M</span>}
-                    </button>
-
+                    {/* Input nodes: Run button */}
+                    {definition?.type?.startsWith('input-') && (
+                        <button
+                            onClick={e => {
+                                e.stopPropagation();
+                                handleRun();
+                            }}
+                            onMouseDown={e => e.stopPropagation()}
+                            disabled={isRunning}
+                            className={cn(
+                                'w-6 h-6 rounded-md flex items-center justify-center transition-all',
+                                isRunning
+                                    ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
+                                    : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                            )}
+                            title={t('actions.run')}
+                        >
+                            {isRunning ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                                <Play className="w-3.5 h-3.5" />
+                            )}
+                        </button>
+                    )}
                     <button
                         onClick={e => {
                             e.stopPropagation();
@@ -807,8 +932,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
                 {/* Content Area */}
                 <div className="mt-2">
-                    {/* Use definition.type for block type checks (node.type may be blockId like "1000006") */}
-                    {(definition?.type?.startsWith('input-') || !isAuto) && (
+                    {/* Force Run button for non-auto nodes (input nodes have Run button in header) */}
+                    {!isAuto && !definition?.type?.startsWith('input-') && (
                         <button
                             onClick={handleRun}
                             disabled={isRunning}
@@ -816,14 +941,14 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 'w-full text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
                                 isRunning
                                     ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
-                                    : !isAuto && definition.inputs.every(p => node.inputData[p.id])
+                                    : definition.inputs.every(p => node.inputData[p.id])
                                       ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
                                       : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
                             )}
                             onMouseDown={e => e.stopPropagation()}
                         >
                             {isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                            {definition?.type?.startsWith('input-') ? t('actions.run') : t('actions.forceRun')}
+                            {t('actions.forceRun')}
                         </button>
                     )}
 
@@ -835,7 +960,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     )}
                     {definition?.type &&
                         VISUALIZATION_COMPONENTS[definition.type] &&
-                        React.createElement(VISUALIZATION_COMPONENTS[definition.type], { node })}
+                        React.createElement(VISUALIZATION_COMPONENTS[definition.type], { node, definition })}
                 </div>
 
                 {/* Error Message */}

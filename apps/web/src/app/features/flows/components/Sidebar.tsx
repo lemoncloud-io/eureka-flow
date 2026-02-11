@@ -20,7 +20,7 @@ import {
     X,
 } from 'lucide-react';
 
-import { useBlockRegistry } from '@flows/flows';
+import { isOutputBlock, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Collapsible,
@@ -31,6 +31,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@flows/ui-kit';
+
+import { FrontendBadge } from './FrontendBadge';
 
 interface SidebarProps {
     onAddNode: (type: string) => void;
@@ -133,18 +135,7 @@ const BlockItem: React.FC<BlockItemProps> = ({
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                             <span className="text-sm font-medium text-foreground truncate">{label}</span>
-                            {isFrontend && (
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary shrink-0 cursor-help">
-                                            Client
-                                        </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="text-xs">
-                                        {t('sidebar.clientExecution')}
-                                    </TooltipContent>
-                                </Tooltip>
-                            )}
+                            {isFrontend && <FrontendBadge showTooltip />}
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-muted-foreground truncate flex-1">{description}</span>
@@ -207,13 +198,9 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
         return {
             inputs: filteredBlocks.filter(b => b.stereo === 'input' || (!b.stereo && b.type.startsWith('input-'))),
             process: filteredBlocks.filter(
-                b =>
-                    b.stereo === 'process' ||
-                    (!b.stereo && !b.type.startsWith('input-') && !['result-preview', 'console-log'].includes(b.type))
+                b => b.stereo === 'process' || (!b.stereo && !b.type.startsWith('input-') && !isOutputBlock(b.type))
             ),
-            outputs: filteredBlocks.filter(
-                b => b.stereo === 'output' || (!b.stereo && ['result-preview', 'console-log'].includes(b.type))
-            ),
+            outputs: filteredBlocks.filter(b => b.stereo === 'output' || (!b.stereo && isOutputBlock(b.type))),
         };
     }, [blockRegistry, searchQuery]);
 
@@ -392,11 +379,11 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                 ) : (
                                                     blocks.map(block => (
                                                         <BlockItem
-                                                            key={block.type}
-                                                            type={block.type}
+                                                            key={block.id}
+                                                            type={block.id}
                                                             label={block.label}
                                                             description={block.description}
-                                                            onAdd={() => handleAddNode(block.type)}
+                                                            onAdd={() => handleAddNode(block.id)}
                                                             disabled={isLoading}
                                                             inputCount={block.inputs?.length}
                                                             outputCount={block.outputs?.length}

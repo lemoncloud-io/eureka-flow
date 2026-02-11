@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 
+import { isOutputConsole, isOutputPreview } from '../consts';
 import { useCanvasStore } from '../stores';
 import { useFlowsStore } from '../stores/useFlowsStore';
 
@@ -27,13 +28,16 @@ const NODE_HEIGHT = {
     PORT_ROW: 26,
     /** Extra height for input nodes (Run button + visualization) */
     INPUT_NODE: 100,
-    /** Extra height for console-log nodes (visualization area) */
+    /** Extra height for output-console nodes (visualization area) */
     DEBUG_LOG: 120,
-    /** Extra height for result-preview nodes (image area) */
+    /** Extra height for output-preview nodes (image area) */
     PREVIEW: 100,
     /** Extra height for error state (error message box) */
     ERROR: 70,
 } as const;
+
+/** Default textarea height for input-text nodes */
+const DEFAULT_TEXTAREA_HEIGHT = 80;
 
 /**
  * Estimate node height based on node type and port count.
@@ -47,9 +51,19 @@ export const estimateNodeHeight = (node: NodeData, definition: BlockDefinition |
 
     let extraHeight = 0;
     // Use definition.type since loaded nodes may have blockId as type
-    if (definition.type.startsWith('input-')) extraHeight += NODE_HEIGHT.INPUT_NODE;
-    if (definition.type === 'console-log') extraHeight += NODE_HEIGHT.DEBUG_LOG;
-    if (definition.type === 'result-preview') extraHeight += NODE_HEIGHT.PREVIEW;
+    if (definition.type.startsWith('input-')) {
+        extraHeight += NODE_HEIGHT.INPUT_NODE;
+
+        // input-text nodes have dynamic textarea height stored in config
+        if (definition.type === 'input-text') {
+            const textareaHeight = Number(node.config?.textareaHeight) || DEFAULT_TEXTAREA_HEIGHT;
+            // Add height beyond default textarea height (INPUT_NODE already includes base textarea)
+            const additionalHeight = Math.max(0, textareaHeight - DEFAULT_TEXTAREA_HEIGHT);
+            extraHeight += additionalHeight;
+        }
+    }
+    if (isOutputConsole(definition.type)) extraHeight += NODE_HEIGHT.DEBUG_LOG;
+    if (isOutputPreview(definition.type)) extraHeight += NODE_HEIGHT.PREVIEW;
     if (node.status === 'ERROR') extraHeight += NODE_HEIGHT.ERROR;
 
     return NODE_HEIGHT.BASE + portsHeight + extraHeight;
