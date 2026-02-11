@@ -214,12 +214,13 @@ interface InputTextConfigProps {
 
 const InputTextConfig: React.FC<InputTextConfigProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['flows']);
-    const [height, setHeight] = useState<number | undefined>(undefined);
+    const [localHeight, setLocalHeight] = useState<number | undefined>(undefined);
     const heightRef = useRef<number>(0);
     const text = (node.config?.text as string) || '';
-    const savedHeight = Number(node.config?.textareaHeight) || undefined;
+    // Use node.height (new) or fallback to config.textareaHeight (legacy)
+    const savedHeight = node.height ?? (Number(node.config?.textareaHeight) || undefined);
 
-    const currentHeight = height ?? savedHeight ?? 80;
+    const currentHeight = localHeight ?? savedHeight ?? 80;
 
     const handleResizeStart = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -232,14 +233,15 @@ const InputTextConfig: React.FC<InputTextConfigProps> = ({ node, onConfigChange 
             const delta = moveEvent.clientY - startY;
             const newHeight = Math.max(60, Math.min(1024, startHeight + delta));
             heightRef.current = newHeight;
-            setHeight(newHeight);
+            setLocalHeight(newHeight);
         };
 
         const handleMouseUp = () => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
+            // Save height at node level (not in config)
             if (heightRef.current !== savedHeight) {
-                onConfigChange('textareaHeight', heightRef.current);
+                onConfigChange('height', heightRef.current);
             }
         };
 

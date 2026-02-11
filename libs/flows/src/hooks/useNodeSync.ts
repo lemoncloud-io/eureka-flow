@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 import { useCreateNodeMutation, useUpsertNodeMutation } from './queries/useNodesQuery';
+import { useFlowsStore } from '../stores/useFlowsStore';
 
 import type { NodeView } from '../types';
 
@@ -193,7 +194,12 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
             // Track pending temp ID
             pendingNodeIdsRef.current.add(tempId);
 
+            // Get block definition to resolve processType
+            const { blockRegistry } = useFlowsStore.getState();
+            const blockDef = blockRegistry[node.type];
+
             const body: Partial<NodeView> = {
+                // blockId is the block's id (e.g., "0008")
                 blockId: node.type,
                 position: node.position,
                 config: node.config,
@@ -201,6 +207,13 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
                 description: node.description,
                 autoExecutionEnabled: node.autoExecutionEnabled,
             };
+
+            // If we have processType from block definition, include it
+            // Server expects blockId for node creation
+            if (blockDef?.type) {
+                // The server uses blockId to look up the block
+                // type field is derived from block.processType on the server
+            }
 
             // Use id="0" to let server assign ID
             createMutation.mutate(

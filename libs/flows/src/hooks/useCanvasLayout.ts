@@ -54,9 +54,9 @@ export const estimateNodeHeight = (node: NodeData, definition: BlockDefinition |
     if (definition.type.startsWith('input-')) {
         extraHeight += NODE_HEIGHT.INPUT_NODE;
 
-        // input-text nodes have dynamic textarea height stored in config
+        // input-text nodes have dynamic textarea height stored in node.height or config.textareaHeight (legacy)
         if (definition.type === 'input-text') {
-            const textareaHeight = Number(node.config?.textareaHeight) || DEFAULT_TEXTAREA_HEIGHT;
+            const textareaHeight = node.height ?? (Number(node.config?.textareaHeight) || DEFAULT_TEXTAREA_HEIGHT);
             // Add height beyond default textarea height (INPUT_NODE already includes base textarea)
             const additionalHeight = Math.max(0, textareaHeight - DEFAULT_TEXTAREA_HEIGHT);
             extraHeight += additionalHeight;

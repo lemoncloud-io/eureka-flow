@@ -990,6 +990,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const handleConfigChange = (nodeId: string, key: string, value: unknown) => {
             if (readOnly) return;
             saveCheckpoint();
+
+            // Handle node-level properties separately from config
+            if (key === 'height') {
+                const heightValue = typeof value === 'number' ? value : undefined;
+                setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, height: heightValue } : n)));
+                syncNodeUpdate(nodeId, { height: heightValue });
+                return;
+            }
+
             setNodes(prev => {
                 const node = prev.find(n => n.id === nodeId);
                 if (node) {
