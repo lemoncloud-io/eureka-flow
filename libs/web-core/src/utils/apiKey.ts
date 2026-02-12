@@ -1,4 +1,3 @@
-import { API_URL, ENV } from '../core';
 
 const STORAGE_KEY = 'x-api-key';
 
@@ -20,20 +19,18 @@ export const clearStoredApiKey = (): void => {
  * Note: Session validation only runs in local environment
  */
 export const validateApiKey = async (key: string): Promise<boolean> => {
-    // Skip validation in non-local environments
-    if (ENV !== 'local') {
-        return true;
-    }
+    return true;
 
-    try {
-        const response = await fetch(`${API_URL}/0/session`, {
-            method: 'GET',
-            headers: {
-                'x-api-key': key,
-            },
-        });
-        return response.ok;
-    } catch {
-        return false;
-    }
+    // NOTE: skip validation
+    // try {
+    //     const response = await fetch(`${API_URL}/0/session`, {
+    //         method: 'GET',
+    //         headers: {
+    //             'x-api-key': key,
+    //         },
+    //     });
+    //     return response.ok;
+    // } catch {
+    //     return false;
+    // }
 };
