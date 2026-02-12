@@ -6,6 +6,7 @@ import { MousePointerClick, Plus, X } from 'lucide-react';
 import {
     EXECUTE_FUNCTIONS,
     LAYOUT_CONFIG,
+    PORT_LAYOUT,
     estimateNodeHeight,
     loadFlow,
     runNode,
@@ -1497,9 +1498,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     ? def.inputs.findIndex(p => p.id === portId)
                     : def.outputs.findIndex(p => p.id === portId);
             const safeIndex = portIndex !== -1 ? portIndex : 0;
-            // Ports at node edges: header 45px + port center offset + index * (port height 24px + gap 4px)
-            const yOffset = 58 + safeIndex * 28;
-            const xOffset = type === 'input' ? -3 : 263;
+            const yOffset = PORT_LAYOUT.FIRST_PORT_Y + safeIndex * PORT_LAYOUT.PORT_SPACING;
+            const xOffset = type === 'input' ? PORT_LAYOUT.INPUT_X : PORT_LAYOUT.OUTPUT_X;
             return { x: node.position.x + xOffset, y: node.position.y + yOffset };
         };
 

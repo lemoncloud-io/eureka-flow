@@ -191,7 +191,6 @@ interface PortItemProps {
     port: PortDefinition;
     type: 'input' | 'output';
     nodeId: string;
-    hasData: boolean;
     isHighlighted: boolean;
     isConnected: boolean;
     /** Connection being dragged - for compatibility feedback */
@@ -210,7 +209,6 @@ const PortItem: React.FC<PortItemProps> = ({
     port,
     type,
     nodeId,
-    hasData: _hasData,
     isHighlighted,
     isConnected,
     connectionDraft,
@@ -275,7 +273,7 @@ const PortItem: React.FC<PortItemProps> = ({
             {portCircle}
 
             {/* Tooltip showing port label on hover */}
-            <div className="absolute left-1/2 -translate-x-1/2 -top-7 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-100 whitespace-nowrap shadow-lg transition-opacity duration-150 flex items-center gap-1">
+            <div className="absolute left-1/2 -translate-x-1/2 -top-7 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-150 flex items-center gap-1">
                 {PortIcon && <PortIcon className="w-2.5 h-2.5" />}
                 <span className="font-semibold uppercase tracking-wider">{port.label}</span>
             </div>
@@ -969,7 +967,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         port={p}
                         type="input"
                         nodeId={node.id}
-                        hasData={!!node.inputData?.[p.id]}
                         isHighlighted={highlightedPortIds.includes(p.id)}
                         isConnected={connectedPortIds.includes(p.id)}
                         connectionDraft={connectionDraft}
@@ -985,7 +982,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         port={p}
                         type="output"
                         nodeId={node.id}
-                        hasData={!!node.outputData?.[p.id]}
                         isHighlighted={highlightedPortIds.includes(p.id)}
                         isConnected={connectedPortIds.includes(p.id)}
                         connectionDraft={connectionDraft}
