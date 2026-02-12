@@ -72,6 +72,8 @@ export interface NodeHighlightState {
     isSelected: boolean;
     isHighlighted?: boolean;
     highlightedPortIds?: string[];
+    /** Port IDs that have connections */
+    connectedPortIds?: string[];
     /** Active connection being dragged - used for port compatibility feedback */
     connectionDraft?: ConnectionDraftInfo | null;
 }
@@ -133,32 +135,32 @@ const arePortTypesCompatible = (sourceType: string, targetType: string): boolean
  */
 const PORT_TYPE_STYLES = {
     text: {
-        base: 'bg-port-text border-port-text shadow-[0_0_6px_rgba(59,130,246,0.4)]',
-        dim: 'bg-port-text/50 border-port-text/50',
+        connected: 'bg-port-text border-port-text',
+        disconnected: 'bg-background border-port-text',
         drop: 'border-port-text bg-port-text animate-port-glow-text',
         text: 'text-port-text',
     },
     image: {
-        base: 'bg-port-image border-port-image shadow-[0_0_6px_rgba(168,85,247,0.4)]',
-        dim: 'bg-port-image/50 border-port-image/50',
+        connected: 'bg-port-image border-port-image',
+        disconnected: 'bg-background border-port-image',
         drop: 'border-port-image bg-port-image animate-port-glow-image',
         text: 'text-port-image',
     },
     number: {
-        base: 'bg-port-number border-port-number shadow-[0_0_6px_rgba(34,197,94,0.4)]',
-        dim: 'bg-port-number/50 border-port-number/50',
+        connected: 'bg-port-number border-port-number',
+        disconnected: 'bg-background border-port-number',
         drop: 'border-port-number bg-port-number animate-port-glow-number',
         text: 'text-port-number',
     },
     json: {
-        base: 'bg-port-json border-port-json shadow-[0_0_6px_rgba(245,158,11,0.4)]',
-        dim: 'bg-port-json/50 border-port-json/50',
+        connected: 'bg-port-json border-port-json',
+        disconnected: 'bg-background border-port-json',
         drop: 'border-port-json bg-port-json animate-port-glow-json',
         text: 'text-port-json',
     },
     any: {
-        base: 'bg-port-any border-port-any shadow-[0_0_6px_rgba(107,114,128,0.4)]',
-        dim: 'bg-port-any/50 border-port-any/50',
+        connected: 'bg-port-any border-port-any',
+        disconnected: 'bg-background border-port-any',
         drop: 'border-port-any bg-port-any animate-port-glow-any',
         text: 'text-port-any',
     },
@@ -174,10 +176,10 @@ const getPortStyleKey = (portType: string): PortStyleKey => {
     return 'any';
 };
 
-/** Get Tailwind classes for port type coloring - based on dataType only (same for input/output) */
-const getPortTypeColor = (portType: string, hasData: boolean): string => {
+/** Get Tailwind classes for port type coloring - filled when connected, outline when disconnected */
+const getPortTypeColor = (portType: string, isConnected: boolean): string => {
     const style = PORT_TYPE_STYLES[getPortStyleKey(portType)];
-    return hasData ? style.base : style.dim;
+    return isConnected ? style.connected : style.disconnected;
 };
 
 /** Get Tailwind classes for valid drop target highlighting - matches source port's dataType color */
@@ -191,6 +193,7 @@ interface PortItemProps {
     nodeId: string;
     hasData: boolean;
     isHighlighted: boolean;
+    isConnected: boolean;
     /** Connection being dragged - for compatibility feedback */
     connectionDraft?: ConnectionDraftInfo | null;
     onMouseDown: (
@@ -207,8 +210,9 @@ const PortItem: React.FC<PortItemProps> = ({
     port,
     type,
     nodeId,
-    hasData,
+    hasData: _hasData,
     isHighlighted,
+    isConnected,
     connectionDraft,
     onMouseDown,
     onMouseUp,
@@ -240,7 +244,7 @@ const PortItem: React.FC<PortItemProps> = ({
             !isValidDropTarget &&
             !isIncompatibleTarget &&
             'cursor-crosshair hover:scale-125 hover:ring-2 hover:ring-white/20',
-        !isHighlighted && !isValidDropTarget && getPortTypeColor(port.type, hasData)
+        !isHighlighted && !isValidDropTarget && getPortTypeColor(port.type, isConnected)
     );
 
     const PortIcon = getPortTypeIcon(port.type);
@@ -660,7 +664,13 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     // Try direct lookup first, then fallback to config-based matching
     const definition = getBlockDefinition(node, blockRegistry);
 
-    const { isSelected, isHighlighted, highlightedPortIds = [], connectionDraft } = highlightState;
+    const {
+        isSelected,
+        isHighlighted,
+        highlightedPortIds = [],
+        connectedPortIds = [],
+        connectionDraft,
+    } = highlightState;
     const { onPortMouseDown, onPortMouseUp } = portHandlers;
     const { onConfigChange, onLabelChange } = configHandlers;
     const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs } = actions;
@@ -961,6 +971,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         nodeId={node.id}
                         hasData={!!node.inputData?.[p.id]}
                         isHighlighted={highlightedPortIds.includes(p.id)}
+                        isConnected={connectedPortIds.includes(p.id)}
                         connectionDraft={connectionDraft}
                         onMouseDown={onPortMouseDown}
                         onMouseUp={onPortMouseUp}
@@ -976,6 +987,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         nodeId={node.id}
                         hasData={!!node.outputData?.[p.id]}
                         isHighlighted={highlightedPortIds.includes(p.id)}
+                        isConnected={connectedPortIds.includes(p.id)}
                         connectionDraft={connectionDraft}
                         onMouseDown={onPortMouseDown}
                         onMouseUp={onPortMouseUp}

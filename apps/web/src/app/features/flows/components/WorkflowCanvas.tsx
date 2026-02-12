@@ -1743,6 +1743,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     highlightedPorts.push(activeConnection.targetPortId);
                                 }
 
+                                // Calculate connected ports for this node
+                                const connectedPorts = connections
+                                    .filter(c => c.sourceNodeId === node.id || c.targetNodeId === node.id)
+                                    .map(c => (c.sourceNodeId === node.id ? c.sourcePortId : c.targetPortId));
+
                                 return (
                                     <div key={node.id}>
                                         <NodeBlock
@@ -1751,6 +1756,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 isSelected: selectedNodeIds.has(node.id),
                                                 isHighlighted: !!isConnected,
                                                 highlightedPortIds: highlightedPorts,
+                                                connectedPortIds: connectedPorts,
                                                 connectionDraft: connectionDraft
                                                     ? {
                                                           sourceNodeId: connectionDraft.sourceNodeId,
