@@ -1,18 +1,18 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { ApiListResult, DataPacket, NodeBody, NodeView, S3ImageInfo, UpsertNodeResult } from '../types';
+import type { ApiListResult, DataPacket, NodeBody, NodeView, PortData, S3ImageInfo, UpsertNodeResult } from '../types';
 import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[nodes-api]');
 
 /**
  * Body for POST /nodes/:id/run
- * @see eureka-flows-api #0.26.129
+ * @see eureka-flows-api #0.26.212
  */
 export interface RunNodeBody {
-    /** Config to override (not saved) */
-    config$?: Record<string, string>;
-    /** Output data from frontend execution */
+    /** Config to override during execution (not saved to node) */
+    config?: Record<string, string>;
+    /** Output data from frontend execution (for isFrontend nodes) */
     output?: Record<string, DataPacket>;
 }
 
@@ -61,58 +61,42 @@ export const createNode = async (body: NodeBody): Promise<NodeView> => {
  * Upsert node (create or update)
  * POST /nodes/:id/upsert?flowId=<flowId>
  *
- * Request body format: { nodes: [nodeData] }
- * Response format: { nodes$$: [...], ports$$: [...] }
+ * @see eureka-flows-api #0.26.129
  *
- * - id="0" with no body.id → create new node
- * - id="0" with body.id → upsert by body.id
- * - id=<nodeId> → upsert existing node
+ * Request body format: { config?, output?, blockId?, position?, ... }
+ * Response format: NodeData (direct object with id)
+ *
+ * - id="0" → create new node (server assigns ID)
+ * - id=<nodeId> → update existing node
  *
  * @param id - Node ID or "0" for auto-assign
  * @param flowId - Flow ID (required)
- * @param body - Node data to upsert
- * @returns UpsertNodeResult with upserted nodes and ports
+ * @param body - Node data: { config, output, blockId, position, ... }
+ * @returns NodeData with server-assigned or existing ID
  */
 export const upsertNode = async (id: string, flowId: string, body: Partial<NodeView>): Promise<UpsertNodeResult> => {
     _log(`> upsertNode(${id}, flowId=${flowId})`, body);
-    // Wrap node data in nodes array (SaveFlowBody format)
-    const requestBody = { nodes: [{ ...body, id: id === '0' ? undefined : id }] };
-    const response = await api.post<UpsertNodeResult>(`/nodes/${id}/upsert`, requestBody, { params: { flowId } });
+    // Send body directly - server expects { config?, output?, ...nodeFields }
+    // NOT wrapped in { nodes: [...] } format
+    const response = await api.post<UpsertNodeResult>(`/nodes/${id}/upsert`, body, { params: { flowId } });
     return response.data;
 };
 
 /**
- * Create edge with server-assigned ID
- * POST /nodes/0/upsert?flowId=<flowId> with { edges: [edge] }
+ * @deprecated Use upsertFlow() from flows.ts instead for edge operations
+ * Edge creation should use POST /flows/:id/upsert with { nodes: [], edges: [...] }
  *
- * Server assigns the edge ID and returns it in edges$$ array.
- *
- * @param flowId - Flow ID (required)
- * @param edge - Edge data to create (without id)
- * @returns UpsertNodeResult with edges$$[0].id containing server-assigned ID
+ * This function incorrectly calls /nodes/0/upsert which only supports { config, output } body format.
  */
 export const upsertEdge = async (flowId: string, edge: EdgeData): Promise<UpsertNodeResult> => {
+    console.warn('[DEPRECATED] upsertEdge() is deprecated. Use upsertFlow() for edge operations.');
     _log(`> upsertEdge(flowId=${flowId})`, edge);
+    // This is incorrect - /nodes/:id/upsert only supports { config, output } format
+    // Edge operations should use POST /flows/:id/upsert with { nodes: [], edges: [...] }
     const body = { edges: [edge] };
     const response = await api.post<UpsertNodeResult>('/nodes/0/upsert', body, { params: { flowId } });
     return response.data;
 };
-
-/**
- * Port data storage format (DynamoDB-style typed values)
- */
-export interface PortData {
-    /** String value (for text, image types) */
-    S?: string;
-    /** Number value (integer) */
-    N?: number;
-    /** Float value */
-    F?: number;
-    /** Stringified JSON (for json, any types) */
-    M?: string;
-    /** Timestamp when data was produced */
-    timestamp?: number;
-}
 
 /**
  * Body for upserting a port node
@@ -198,7 +182,7 @@ export interface RunNodeOptions {
  * @see eureka-flows-api #0.26.129
  * @param nodeId - Node ID to execute
  * @param body - Request body
- * @param body.config$ - Config to override (not saved)
+ * @param body.config - Config to override (not saved)
  * @param body.output - Output data from frontend execution (for isFrontend nodes)
  * @param options - Execution options
  * @param options.async - If true, queues execution and returns immediately

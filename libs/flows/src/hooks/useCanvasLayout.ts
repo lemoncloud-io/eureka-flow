@@ -21,6 +21,26 @@ export const LAYOUT_CONFIG = {
     START_Y: 50,
 } as const;
 
+/** Port layout configuration - used for edge connection positioning */
+export const PORT_LAYOUT = {
+    /** Node header height */
+    HEADER_HEIGHT: 45,
+    /** First port Y offset from node top (header + centering) */
+    FIRST_PORT_Y: 58,
+    /** Vertical spacing between ports (port height 24px + gap 4px) */
+    PORT_SPACING: 28,
+    /** Input port X offset from node left edge */
+    INPUT_X: -3,
+    /** Output port X offset from node left edge (node width 260px + offset) */
+    OUTPUT_X: 263,
+    /** Node width */
+    NODE_WIDTH: 260,
+    /** Port circle size */
+    PORT_SIZE: 12,
+    /** Port visual offset from edge (half of port size) */
+    PORT_EDGE_OFFSET: 6,
+} as const;
+
 /** Node height estimation constants */
 const NODE_HEIGHT = {
     /** Base: header(40) + description(20) + border(10) + padding(40) */

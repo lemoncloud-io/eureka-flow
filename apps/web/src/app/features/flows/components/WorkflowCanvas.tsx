@@ -6,11 +6,14 @@ import { MousePointerClick, Plus, X } from 'lucide-react';
 import {
     EXECUTE_FUNCTIONS,
     LAYOUT_CONFIG,
+    PORT_LAYOUT,
     estimateNodeHeight,
     loadFlow,
     runNode,
+    saveFlow,
     shouldUpdateStatus,
     toPortData,
+    upsertFlow,
     upsertPortNode,
     useBlockRegistry,
     useEdgeSync,
@@ -959,7 +962,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         // Step 3: Run the node (server will hydrate inputs from saved port nodes)
                         const result = await runNode(nodeId, {
-                            config$: currentNode.config || {},
+                            config: currentNode.config || {},
                         });
 
                         if (result?.status) {
@@ -1090,10 +1093,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             (id: string) => {
                 if (readOnly) return;
                 saveCheckpoint();
-                setConnections(prev => prev.filter(c => c.id !== id));
+
+                const updatedConnections = connectionsRef.current.filter(c => c.id !== id);
+                setConnections(updatedConnections);
                 setSelectedConnectionId(null);
+
+                // Sync to server via saveFlow (upsert doesn't support deletion)
+                if (flowId && !flowId.startsWith('local-')) {
+                    saveFlow(flowId, { nodes: nodesRef.current, edges: updatedConnections }).catch(err => {
+                        console.error('[WorkflowCanvas] Failed to sync edge deletion:', err);
+                    });
+                }
             },
-            [readOnly, saveCheckpoint]
+            [readOnly, saveCheckpoint, flowId]
         );
 
         const duplicateNode = useCallback(
@@ -1336,18 +1348,38 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             if (dragState && dragStartSnapshotRef.current) {
                 // Check if any node was actually moved
-                const hasMoved = Array.from(dragState.initialPositions.entries()).some(([nodeId, initialPos]) => {
-                    const currentNode = nodes.find(n => n.id === nodeId);
-                    return (
-                        currentNode &&
-                        (currentNode.position.x !== initialPos.x || currentNode.position.y !== initialPos.y)
-                    );
-                });
+                const movedNodes = Array.from(dragState.initialPositions.entries())
+                    .map(([nodeId, initialPos]) => {
+                        const currentNode = nodes.find(n => n.id === nodeId);
+                        if (
+                            currentNode &&
+                            (currentNode.position.x !== initialPos.x || currentNode.position.y !== initialPos.y)
+                        ) {
+                            return currentNode;
+                        }
+                        return null;
+                    })
+                    .filter((n): n is NodeData => n !== null);
 
-                if (hasMoved) {
+                if (movedNodes.length > 0) {
                     pastRef.current.push(dragStartSnapshotRef.current);
                     futureRef.current = [];
-                    // Position changes are saved via flow save, not individual node updates
+
+                    // Batch update moved nodes' positions via /flows/:id/upsert
+                    if (flowId && !flowId.startsWith('local-')) {
+                        const nodesToUpdate = movedNodes
+                            .filter(n => n.id && !isTempId(n.id))
+                            .map(n => ({
+                                id: n.id,
+                                position: n.position,
+                            }));
+
+                        if (nodesToUpdate.length > 0) {
+                            upsertFlow(flowId, { nodes: nodesToUpdate as NodeData[], edges: [] }).catch(err => {
+                                console.error('[WorkflowCanvas] Failed to batch update node positions:', err);
+                            });
+                        }
+                    }
                 }
             }
 
@@ -1497,8 +1529,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     ? def.inputs.findIndex(p => p.id === portId)
                     : def.outputs.findIndex(p => p.id === portId);
             const safeIndex = portIndex !== -1 ? portIndex : 0;
-            const yOffset = 69 + safeIndex * 28;
-            const xOffset = type === 'input' ? 8 : 252;
+            const yOffset = PORT_LAYOUT.FIRST_PORT_Y + safeIndex * PORT_LAYOUT.PORT_SPACING;
+            const xOffset = type === 'input' ? PORT_LAYOUT.INPUT_X : PORT_LAYOUT.OUTPUT_X;
             return { x: node.position.x + xOffset, y: node.position.y + yOffset };
         };
 
@@ -1742,6 +1774,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     highlightedPorts.push(activeConnection.targetPortId);
                                 }
 
+                                // Calculate connected ports for this node
+                                const connectedPorts = connections
+                                    .filter(c => c.sourceNodeId === node.id || c.targetNodeId === node.id)
+                                    .map(c => (c.sourceNodeId === node.id ? c.sourcePortId : c.targetPortId));
+
                                 return (
                                     <div key={node.id}>
                                         <NodeBlock
@@ -1750,6 +1787,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 isSelected: selectedNodeIds.has(node.id),
                                                 isHighlighted: !!isConnected,
                                                 highlightedPortIds: highlightedPorts,
+                                                connectedPortIds: connectedPorts,
                                                 connectionDraft: connectionDraft
                                                     ? {
                                                           sourceNodeId: connectionDraft.sourceNodeId,

@@ -341,14 +341,27 @@ export interface SaveFlowBody {
 
 /**
  * SaveFlowView - response from save flow snapshot
- * Backend returns array format with $$ suffix
  *
- * @see eureka-flows-api POST /flows/:id/save response
+ * Server v0.26.213+ returns both formats:
+ * - `nodes`, `edges`, `ports` (preferred)
+ * - `nodes$$`, `edges$$`, `ports$$` (deprecated)
+ *
+ * @see eureka-flows-api POST /flows/:id/save, /upsert, /load response
  */
 export interface SaveFlowView extends FlowView {
-    nodes$$: NodeView[];
-    edges$$: EdgeView[];
-    ports$$: NodeView[];
+    /** List of nodes (preferred) */
+    nodes?: NodeData[];
+    /** List of edges (preferred) */
+    edges?: EdgeData[];
+    /** List of ports (preferred) */
+    ports?: NodeView[];
+
+    /** @deprecated use `nodes` instead */
+    nodes$$?: NodeView[];
+    /** @deprecated use `edges` instead */
+    edges$$?: EdgeView[];
+    /** @deprecated use `ports` instead */
+    ports$$?: NodeView[];
 }
 
 /**
