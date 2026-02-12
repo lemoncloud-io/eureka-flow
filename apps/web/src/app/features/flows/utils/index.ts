@@ -1,35 +1,46 @@
 import type { Connection, NodeData } from '@lemoncloud/eureka-flows-api';
 import type { Dispatch, SetStateAction } from 'react';
 
+export const getConnectionKey = (conn: Connection): string =>
+    `${conn.sourceNodeId}:${conn.sourcePortId}→${conn.targetNodeId}:${conn.targetPortId}`;
+
+export const deduplicateEdges = (edges: Connection[]): Connection[] => {
+    const edgeMap = new Map<string, Connection>();
+
+    edges.forEach(edge => {
+        const key = getConnectionKey(edge);
+        const existing = edgeMap.get(key);
+
+        if (!existing) {
+            edgeMap.set(key, edge);
+        } else {
+            const existingIsTemp = isTempId(existing.id);
+            const newIsTemp = isTempId(edge.id);
+
+            if (existingIsTemp && !newIsTemp) {
+                edgeMap.set(key, edge);
+            }
+        }
+    });
+
+    return Array.from(edgeMap.values());
+};
+
 /**
  * Generate a unique ID
  * @deprecated Use generateTempId for new node/edge creation (server assigns final ID)
  */
 export const generateId = (): string => Math.random().toString(36).slice(2, 11);
 
-/**
- * Prefix for temporary IDs (before server assigns real ID)
- */
+export const TEMP_ID_PREFIXES = ['temp_', 'edge_', 'node_'] as const;
 export const TEMP_ID_PREFIX = 'temp_';
 
-/**
- * Generate a temporary ID for optimistic UI updates
- * Server will assign the real ID via POST /nodes/0/upsert
- *
- * Format: temp_{timestamp}_{random}
- * Example: temp_1707658800000_abc12
- *
- * @param prefix - Optional prefix type (default: 'temp')
- */
-export const generateTempId = (prefix = 'temp'): string =>
+export const generateTempId = (prefix: 'temp' | 'edge' | 'node' = 'temp'): string =>
     `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-/**
- * Check if an ID is a temporary ID (not yet assigned by server)
- */
 export const isTempId = (id: string | undefined): boolean => {
     if (!id) return false;
-    return id.startsWith(TEMP_ID_PREFIX);
+    return TEMP_ID_PREFIXES.some(prefix => id.startsWith(prefix));
 };
 
 /**

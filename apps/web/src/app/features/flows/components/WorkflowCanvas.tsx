@@ -27,7 +27,14 @@ import { LogModal } from './LogModal';
 import { NodeBlock } from './NodeBlock';
 import { TooltipImage } from './TooltipImage';
 import { ZoomControls } from './ZoomControls';
-import { generateTempId, isTempId, isValidConnection, replaceNodeIdInState, wouldCreateCycle } from '../utils';
+import {
+    deduplicateEdges,
+    generateTempId,
+    isTempId,
+    isValidConnection,
+    replaceNodeIdInState,
+    wouldCreateCycle,
+} from '../utils';
 
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
@@ -119,7 +126,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId } = useNodeSync({
             flowId: flowId ?? null,
         });
-        const { createEdgeAsync } = useEdgeSync({ flowId: flowId ?? null });
+        const { createEdgeAsync, pendingEdgeIds } = useEdgeSync({ flowId: flowId ?? null });
 
         const [nodes, setNodes] = useState<NodeData[]>([]);
         const [connections, setConnections] = useState<Connection[]>([]);
@@ -487,7 +494,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     handleSelectionChange(tempNodeId);
                     setSelectedConnectionId(null);
                 },
-                getWorkflow: () => ({ nodes, edges: connections }),
+                getWorkflow: () => ({
+                    nodes,
+                    edges: connections.filter(c => !pendingEdgeIds.has(c.id)),
+                }),
                 loadWorkflow: (state: WorkflowState) => {
                     // Normalize nodes to ensure config is never undefined
                     const loadedNodes = (state.nodes ?? []).map(n => ({
@@ -495,8 +505,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         config: n.config ?? {},
                     }));
 
-                    // Get connections
-                    const loadedConnections = state.edges ?? state.connections ?? [];
+                    const rawConnections = state.edges ?? state.connections ?? [];
+                    const loadedConnections = deduplicateEdges(rawConnections);
 
                     // Propagate outputData to downstream nodes' inputData
                     // This ensures that existing completed nodes' outputs are reflected in downstream inputs
@@ -773,6 +783,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 blockRegistry,
                 createNodeAsync,
                 createEdgeAsync,
+                pendingEdgeIds,
             ]
         );
 
