@@ -111,13 +111,9 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
                 { flowId, edge: edgeData },
                 {
                     onSuccess: result => {
-                        // Extract server-assigned ID from response
-                        // IMPORTANT: Find the edge matching our source/target, not just edges[0]
-                        // because upsert response may contain ALL edges in the flow
                         const resultAny = result as Record<string, unknown>;
                         const allEdges = result.edges ?? (resultAny['edges$$'] as typeof result.edges) ?? [];
 
-                        // Find the edge that matches our request by source/target
                         const createdEdge =
                             (resultAny.id ? (result as unknown as EdgeData) : null) ??
                             allEdges.find(

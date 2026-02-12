@@ -496,8 +496,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 },
                 getWorkflow: () => ({
                     nodes,
-                    // Filter out edges that are still pending server ID assignment
-                    // This prevents duplicate edges when auto-save races with createEdgeAsync
                     edges: connections.filter(c => !pendingEdgeIds.has(c.id)),
                 }),
                 loadWorkflow: (state: WorkflowState) => {
@@ -507,8 +505,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         config: n.config ?? {},
                     }));
 
-                    // Get connections and deduplicate by connection key
-                    // This handles duplicate edges that may exist due to race conditions
                     const rawConnections = state.edges ?? state.connections ?? [];
                     const loadedConnections = deduplicateEdges(rawConnections);
 
