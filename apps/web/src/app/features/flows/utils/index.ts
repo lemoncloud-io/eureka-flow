@@ -2,34 +2,88 @@ import type { Connection, NodeData } from '@lemoncloud/eureka-flows-api';
 import type { Dispatch, SetStateAction } from 'react';
 
 /**
+ * Generate a unique key for a connection based on its source and target
+ * Used for deduplication (same connection may have different IDs due to race conditions)
+ *
+ * Format: sourceNodeId:sourcePortId→targetNodeId:targetPortId
+ */
+export const getConnectionKey = (conn: Connection): string =>
+    `${conn.sourceNodeId}:${conn.sourcePortId}→${conn.targetNodeId}:${conn.targetPortId}`;
+
+/**
+ * Deduplicate edges by connection key (source/target combination)
+ * When duplicates exist, prefer the edge with a server-assigned ID (non-temp ID)
+ *
+ * This handles the race condition where:
+ * 1. createEdgeAsync creates edge with temp ID, then gets server ID
+ * 2. saveCurrentFlow sends same edge (with temp or server ID)
+ * 3. Server creates two edges with different IDs for same connection
+ *
+ * @param edges - Array of connections/edges to deduplicate
+ * @returns Deduplicated array, preferring server-assigned IDs over temp IDs
+ */
+export const deduplicateEdges = (edges: Connection[]): Connection[] => {
+    const edgeMap = new Map<string, Connection>();
+
+    edges.forEach(edge => {
+        const key = getConnectionKey(edge);
+        const existing = edgeMap.get(key);
+
+        if (!existing) {
+            // First edge with this connection key
+            edgeMap.set(key, edge);
+        } else {
+            // Duplicate found - prefer server ID over temp ID
+            const existingIsTemp = isTempId(existing.id);
+            const newIsTemp = isTempId(edge.id);
+
+            if (existingIsTemp && !newIsTemp) {
+                // New edge has server ID, prefer it
+                edgeMap.set(key, edge);
+            }
+            // Otherwise keep existing (either both have server IDs or existing has server ID)
+        }
+    });
+
+    return Array.from(edgeMap.values());
+};
+
+/**
  * Generate a unique ID
  * @deprecated Use generateTempId for new node/edge creation (server assigns final ID)
  */
 export const generateId = (): string => Math.random().toString(36).slice(2, 11);
 
 /**
- * Prefix for temporary IDs (before server assigns real ID)
+ * Prefixes for temporary IDs (before server assigns real ID)
+ * - temp_: generic temporary ID
+ * - edge_: temporary edge ID
+ * - node_: temporary node ID
  */
+export const TEMP_ID_PREFIXES = ['temp_', 'edge_', 'node_'] as const;
+
+/** @deprecated Use TEMP_ID_PREFIXES instead */
 export const TEMP_ID_PREFIX = 'temp_';
 
 /**
  * Generate a temporary ID for optimistic UI updates
  * Server will assign the real ID via POST /nodes/0/upsert
  *
- * Format: temp_{timestamp}_{random}
- * Example: temp_1707658800000_abc12
+ * Format: {prefix}_{timestamp}_{random}
+ * Example: edge_1707658800000_abc12
  *
- * @param prefix - Optional prefix type (default: 'temp')
+ * @param prefix - Type prefix ('temp', 'edge', 'node')
  */
-export const generateTempId = (prefix = 'temp'): string =>
+export const generateTempId = (prefix: 'temp' | 'edge' | 'node' = 'temp'): string =>
     `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
 /**
  * Check if an ID is a temporary ID (not yet assigned by server)
+ * Recognizes all temp prefixes: temp_, edge_, node_
  */
 export const isTempId = (id: string | undefined): boolean => {
     if (!id) return false;
-    return id.startsWith(TEMP_ID_PREFIX);
+    return TEMP_ID_PREFIXES.some(prefix => id.startsWith(prefix));
 };
 
 /**

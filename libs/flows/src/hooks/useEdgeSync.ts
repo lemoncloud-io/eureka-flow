@@ -112,17 +112,23 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
                 {
                     onSuccess: result => {
                         // Extract server-assigned ID from response
-                        // Support multiple response formats:
-                        // 1. Direct edge object: { id: '...', sourceNodeId: '...', ... }
-                        // 2. edges array: { edges: [{ id: '...', ... }] }
-                        // 3. edges$$ array (deprecated): { edges$$: [{ id: '...', ... }] }
+                        // IMPORTANT: Find the edge matching our source/target, not just edges[0]
+                        // because upsert response may contain ALL edges in the flow
                         const resultAny = result as Record<string, unknown>;
-                        const createdEdge =
-                            (resultAny.id ? (result as unknown as { id: string }) : null) ??
-                            result.edges?.[0] ??
-                            (resultAny['edges$$'] as typeof result.edges)?.[0];
+                        const allEdges = result.edges ?? (resultAny['edges$$'] as typeof result.edges) ?? [];
 
-                        console.debug('[useEdgeSync] API response:', { tempId, result, createdEdge });
+                        // Find the edge that matches our request by source/target
+                        const createdEdge =
+                            (resultAny.id ? (result as unknown as EdgeData) : null) ??
+                            allEdges.find(
+                                e =>
+                                    e.sourceNodeId === edgeData.sourceNodeId &&
+                                    e.sourcePortId === edgeData.sourcePortId &&
+                                    e.targetNodeId === edgeData.targetNodeId &&
+                                    e.targetPortId === edgeData.targetPortId
+                            );
+
+                        console.debug('[useEdgeSync] API response:', { tempId, result, createdEdge, edgeData });
 
                         if (createdEdge?.id) {
                             const serverId = createdEdge.id;
