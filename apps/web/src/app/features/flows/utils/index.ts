@@ -120,3 +120,5 @@ export const replaceNodeIdInState = (
         return prev;
     });
 };
+
+export { wouldCreateCycle } from './graph';

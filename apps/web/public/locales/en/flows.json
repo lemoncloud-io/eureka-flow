@@ -143,7 +143,8 @@
         "runningAllNodes": "Running all nodes...",
         "executionStopped": "Execution stopped",
         "savedAs": "Saved as \"{{flowName}}\"",
-        "failedToSaveWorkflow": "Failed to save workflow"
+        "failedToSaveWorkflow": "Failed to save workflow",
+        "circularConnectionError": "Cannot create connection: would create a circular loop"
     },
     "nodeBlock": {
         "inputAlt": "Input",

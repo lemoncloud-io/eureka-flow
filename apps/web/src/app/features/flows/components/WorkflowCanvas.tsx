@@ -24,7 +24,7 @@ import { LogModal } from './LogModal';
 import { NodeBlock } from './NodeBlock';
 import { TooltipImage } from './TooltipImage';
 import { ZoomControls } from './ZoomControls';
-import { generateTempId, isTempId, isValidConnection, replaceNodeIdInState } from '../utils';
+import { generateTempId, isTempId, isValidConnection, replaceNodeIdInState, wouldCreateCycle } from '../utils';
 
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
@@ -55,6 +55,8 @@ interface WorkflowCanvasProps {
     onChange?: () => void;
     /** Called when user clicks "Add Node" from empty state */
     onOpenLibrary?: () => void;
+    /** Called when a connection is rejected due to validation error */
+    onConnectionError?: (error: 'cycle' | 'invalid_type') => void;
 }
 
 const GRID_SIZE = 20;
@@ -108,7 +110,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onOpenLibrary }) => {
 };
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
-    ({ readOnly, initialData, flowId, onNodeSelect, onChange, onOpenLibrary }, ref) => {
+    ({ readOnly, initialData, flowId, onNodeSelect, onChange, onOpenLibrary, onConnectionError }, ref) => {
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
         const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId } = useNodeSync({
@@ -1391,6 +1393,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     targetNode &&
                     isValidConnection(sourceNode, 0, targetNode, 0, connectionDraft.sourceType, targetType)
                 ) {
+                    // Check for cycle before creating connection
+                    // Use sourceNode.id (current state) instead of connectionDraft.sourceNodeId
+                    // to handle race condition where temp ID was replaced with server ID
+                    if (wouldCreateCycle(connections, sourceNode.id, targetNode.id)) {
+                        onConnectionError?.('cycle');
+                        setConnectionDraft(null);
+                        return;
+                    }
+
                     saveCheckpoint();
 
                     const tempEdgeId = generateTempId('edge');

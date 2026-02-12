@@ -143,7 +143,8 @@
         "runningAllNodes": "모든 노드 실행 중...",
         "executionStopped": "실행이 중지되었습니다",
         "savedAs": "\"{{flowName}}\"(으)로 저장됨",
-        "failedToSaveWorkflow": "워크플로우 저장 실패"
+        "failedToSaveWorkflow": "워크플로우 저장 실패",
+        "circularConnectionError": "연결을 생성할 수 없습니다: 순환 연결이 발생합니다"
     },
     "nodeBlock": {
         "inputAlt": "입력",

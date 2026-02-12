@@ -401,6 +401,15 @@ export const FlowEditorPage = () => {
         triggerAutoSave();
     };
 
+    const handleConnectionError = useCallback(
+        (error: 'cycle' | 'invalid_type') => {
+            if (error === 'cycle') {
+                showNotification(t('flowEditor.circularConnectionError'), 'error');
+            }
+        },
+        [t]
+    );
+
     const handleExport = () => {
         if (!canvasRef.current) return;
 
@@ -535,6 +544,7 @@ export const FlowEditorPage = () => {
                     onNodeSelect={handleSelectionChange}
                     onChange={handleCanvasChange}
                     onOpenLibrary={handleOpenLibrary}
+                    onConnectionError={handleConnectionError}
                 />
             </div>
 
