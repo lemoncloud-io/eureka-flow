@@ -1,6 +1,8 @@
 import { useCallback, useRef } from 'react';
 
-import { useCreateEdgeMutation } from './queries/useNodesQuery';
+import { useMutation } from '@tanstack/react-query';
+
+import { upsertFlow } from '../api';
 
 import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
@@ -15,7 +17,7 @@ interface UseEdgeSyncOptions {
 interface UseEdgeSyncReturn {
     /**
      * Create a new edge on backend with server-assigned ID
-     * POST /nodes/0/upsert?flowId=:flowId with { edges: [edge] }
+     * POST /flows/:flowId/upsert with { nodes: [], edges: [edge] }
      *
      * @param tempId - Temporary ID used in UI (will be replaced by server ID)
      * @param edge - Edge data to create (without id, or with temp id)
@@ -42,7 +44,7 @@ interface UseEdgeSyncReturn {
  * Features:
  * - Server-assigned ID support with callback pattern
  * - Optimistic UI: temp ID → server ID replacement
- * - Uses POST /nodes/0/upsert?flowId with edges array
+ * - Uses POST /flows/:id/upsert with edges array
  *
  * Usage:
  * ```tsx
@@ -57,17 +59,23 @@ interface UseEdgeSyncReturn {
  * ```
  */
 export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn => {
-    const createMutation = useCreateEdgeMutation();
+    // Use upsertFlow mutation for POST /flows/:id/upsert
+    const createMutation = useMutation({
+        mutationFn: ({ flowId, edge }: { flowId: string; edge: EdgeData }) =>
+            upsertFlow(flowId, { nodes: [], edges: [edge] }),
+    });
 
     // Track pending temp edge IDs waiting for server response
     const pendingEdgeIdsRef = useRef<Set<string>>(new Set());
 
-    // Map of tempId -> Promise resolver (for waitForEdgeId)
-    const pendingResolvers = useRef<Map<string, (serverId: string) => void>>(new Map());
+    // Map of tempId -> Promise resolve/reject (for waitForEdgeId)
+    const pendingResolvers = useRef<
+        Map<string, { resolve: (serverId: string) => void; reject: (error: Error) => void }>
+    >(new Map());
 
     /**
      * Create a new edge on backend with server-assigned ID
-     * POST /nodes/0/upsert?flowId=:flowId with { edges: [edge] }
+     * POST /flows/:flowId/upsert with { nodes: [], edges: [edge] }
      */
     const createEdgeAsync = useCallback(
         (tempId: string, edge: Omit<EdgeData, 'id'>, onIdAssigned: OnEdgeIdAssigned) => {
@@ -101,9 +109,9 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
                             pendingEdgeIdsRef.current.delete(tempId);
 
                             // Resolve any waiting promises
-                            const resolver = pendingResolvers.current.get(tempId);
-                            if (resolver) {
-                                resolver(serverId);
+                            const pending = pendingResolvers.current.get(tempId);
+                            if (pending) {
+                                pending.resolve(serverId);
                                 pendingResolvers.current.delete(tempId);
                             }
 
@@ -112,14 +120,25 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
                         } else {
                             console.error('[useEdgeSync] Server did not return edge ID', result);
                             pendingEdgeIdsRef.current.delete(tempId);
+
+                            // Reject waiting promises
+                            const pending = pendingResolvers.current.get(tempId);
+                            if (pending) {
+                                pending.reject(new Error('Server did not return edge ID'));
+                                pendingResolvers.current.delete(tempId);
+                            }
                         }
                     },
                     onError: error => {
                         console.error('[useEdgeSync] Failed to create edge:', tempId, error);
                         pendingEdgeIdsRef.current.delete(tempId);
 
-                        // Clean up pending resolver
-                        pendingResolvers.current.delete(tempId);
+                        // Reject any waiting promises
+                        const pending = pendingResolvers.current.get(tempId);
+                        if (pending) {
+                            pending.reject(error instanceof Error ? error : new Error(String(error)));
+                            pendingResolvers.current.delete(tempId);
+                        }
                     },
                 }
             );
@@ -129,7 +148,7 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
 
     /**
      * Wait for a specific temp edge ID to be resolved to server ID
-     * Returns a promise that resolves with the server ID
+     * Returns a promise that resolves with the server ID, or rejects on error
      */
     const waitForEdgeId = useCallback((tempId: string): Promise<string> => {
         // If not pending, it might already be resolved or never existed
@@ -138,9 +157,9 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
             return Promise.resolve(tempId);
         }
 
-        // Create a promise that will be resolved when the ID is assigned
-        return new Promise(resolve => {
-            pendingResolvers.current.set(tempId, resolve);
+        // Create a promise that will be resolved/rejected when the ID is assigned/fails
+        return new Promise((resolve, reject) => {
+            pendingResolvers.current.set(tempId, { resolve, reject });
         });
     }, []);
 

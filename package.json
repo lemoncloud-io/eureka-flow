@@ -76,7 +76,7 @@
         "@commitlint/cli": "^19.6.0",
         "@commitlint/config-conventional": "^19.6.0",
         "@eslint/js": "^9.8.0",
-        "@lemoncloud/eureka-flows-api": "^0.26.212",
+        "@lemoncloud/eureka-flows-api": "^0.26.213",
         "@nx/eslint": "22.3.3",
         "@nx/eslint-plugin": "22.3.3",
         "@nx/jest": "22.3.3",

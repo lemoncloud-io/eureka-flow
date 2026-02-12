@@ -10,8 +10,10 @@ import {
     estimateNodeHeight,
     loadFlow,
     runNode,
+    saveFlow,
     shouldUpdateStatus,
     toPortData,
+    upsertFlow,
     upsertPortNode,
     useBlockRegistry,
     useEdgeSync,
@@ -960,7 +962,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         // Step 3: Run the node (server will hydrate inputs from saved port nodes)
                         const result = await runNode(nodeId, {
-                            config$: currentNode.config || {},
+                            config: currentNode.config || {},
                         });
 
                         if (result?.status) {
@@ -1091,10 +1093,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             (id: string) => {
                 if (readOnly) return;
                 saveCheckpoint();
-                setConnections(prev => prev.filter(c => c.id !== id));
+
+                const updatedConnections = connectionsRef.current.filter(c => c.id !== id);
+                setConnections(updatedConnections);
                 setSelectedConnectionId(null);
+
+                // Sync to server via saveFlow (upsert doesn't support deletion)
+                if (flowId && !flowId.startsWith('local-')) {
+                    saveFlow(flowId, { nodes: nodesRef.current, edges: updatedConnections }).catch(err => {
+                        console.error('[WorkflowCanvas] Failed to sync edge deletion:', err);
+                    });
+                }
             },
-            [readOnly, saveCheckpoint]
+            [readOnly, saveCheckpoint, flowId]
         );
 
         const duplicateNode = useCallback(
@@ -1337,18 +1348,38 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             if (dragState && dragStartSnapshotRef.current) {
                 // Check if any node was actually moved
-                const hasMoved = Array.from(dragState.initialPositions.entries()).some(([nodeId, initialPos]) => {
-                    const currentNode = nodes.find(n => n.id === nodeId);
-                    return (
-                        currentNode &&
-                        (currentNode.position.x !== initialPos.x || currentNode.position.y !== initialPos.y)
-                    );
-                });
+                const movedNodes = Array.from(dragState.initialPositions.entries())
+                    .map(([nodeId, initialPos]) => {
+                        const currentNode = nodes.find(n => n.id === nodeId);
+                        if (
+                            currentNode &&
+                            (currentNode.position.x !== initialPos.x || currentNode.position.y !== initialPos.y)
+                        ) {
+                            return currentNode;
+                        }
+                        return null;
+                    })
+                    .filter((n): n is NodeData => n !== null);
 
-                if (hasMoved) {
+                if (movedNodes.length > 0) {
                     pastRef.current.push(dragStartSnapshotRef.current);
                     futureRef.current = [];
-                    // Position changes are saved via flow save, not individual node updates
+
+                    // Batch update moved nodes' positions via /flows/:id/upsert
+                    if (flowId && !flowId.startsWith('local-')) {
+                        const nodesToUpdate = movedNodes
+                            .filter(n => n.id && !isTempId(n.id))
+                            .map(n => ({
+                                id: n.id,
+                                position: n.position,
+                            }));
+
+                        if (nodesToUpdate.length > 0) {
+                            upsertFlow(flowId, { nodes: nodesToUpdate as NodeData[], edges: [] }).catch(err => {
+                                console.error('[WorkflowCanvas] Failed to batch update node positions:', err);
+                            });
+                        }
+                    }
                 }
             }
 

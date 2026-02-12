@@ -1,18 +1,18 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { ApiListResult, DataPacket, NodeBody, NodeView, S3ImageInfo, UpsertNodeResult } from '../types';
+import type { ApiListResult, DataPacket, NodeBody, NodeView, PortData, S3ImageInfo, UpsertNodeResult } from '../types';
 import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[nodes-api]');
 
 /**
  * Body for POST /nodes/:id/run
- * @see eureka-flows-api #0.26.129
+ * @see eureka-flows-api #0.26.212
  */
 export interface RunNodeBody {
-    /** Config to override (not saved) */
-    config$?: Record<string, string>;
-    /** Output data from frontend execution */
+    /** Config to override during execution (not saved to node) */
+    config?: Record<string, string>;
+    /** Output data from frontend execution (for isFrontend nodes) */
     output?: Record<string, DataPacket>;
 }
 
@@ -99,22 +99,6 @@ export const upsertEdge = async (flowId: string, edge: EdgeData): Promise<Upsert
 };
 
 /**
- * Port data storage format (DynamoDB-style typed values)
- */
-export interface PortData {
-    /** String value (for text, image types) */
-    S?: string;
-    /** Number value (integer) */
-    N?: number;
-    /** Float value */
-    F?: number;
-    /** Stringified JSON (for json, any types) */
-    M?: string;
-    /** Timestamp when data was produced */
-    timestamp?: number;
-}
-
-/**
  * Body for upserting a port node
  */
 export interface PortNodeBody {
@@ -198,7 +182,7 @@ export interface RunNodeOptions {
  * @see eureka-flows-api #0.26.129
  * @param nodeId - Node ID to execute
  * @param body - Request body
- * @param body.config$ - Config to override (not saved)
+ * @param body.config - Config to override (not saved)
  * @param body.output - Output data from frontend execution (for isFrontend nodes)
  * @param options - Execution options
  * @param options.async - If true, queues execution and returns immediately

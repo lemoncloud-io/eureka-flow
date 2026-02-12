@@ -59,6 +59,28 @@ export const createFlow = async (body?: Partial<SaveFlowBody>): Promise<SaveFlow
 };
 
 /**
+ * Upsert flow (batch update nodes and edges)
+ * POST /flows/:id/upsert
+ *
+ * Use this for batch operations like:
+ * - Moving multiple nodes at once
+ * - Bulk node/edge updates
+ *
+ * @see eureka-flows-api v0.26.212
+ * @param id - Flow ID to upsert into
+ * @param body - SaveFlowBody { nodes: NodeData[], edges: EdgeData[] }
+ * @returns SaveFlowView with updated nodes, edges, ports
+ */
+export const upsertFlow = async (id: string, body: SaveFlowBody): Promise<SaveFlowView> => {
+    if (!id) {
+        throw new Error('Flow ID is required');
+    }
+    _log(`> upsertFlow(${id})`, { nodeCount: body.nodes?.length ?? 0, edgeCount: body.edges?.length ?? 0 });
+    const response = await api.post<SaveFlowView>(`/flows/${id}/upsert`, body);
+    return response.data;
+};
+
+/**
  * Update flow metadata (name, etc.)
  * POST /flows/:id
  *
@@ -76,8 +98,15 @@ export const updateFlowMetadata = async (id: string, body: UpdateFlowBody): Prom
     return response.data;
 };
 
+/**
+ * Fetch execution logs for a node
+ * TODO: Implement when server API is available
+ * @param nodeId - Node ID to fetch logs for
+ * @returns Empty array (placeholder)
+ */
 export const fetchBlockLogs = async (nodeId: string): Promise<LogEntry[]> => {
     _log(`> fetchBlockLogs(${nodeId})`);
+    // TODO: Implement when GET /nodes/:id/logs API is available
     return [];
 };
 
@@ -89,4 +118,4 @@ export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'):
 
 // Re-export types for convenience
 export type { BlockDefinition, DataPacket, LogEntry };
-export type { FlowView, FlowBody, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../types';
+export type { FlowBody, FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../types';
