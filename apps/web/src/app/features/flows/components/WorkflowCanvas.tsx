@@ -1497,8 +1497,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     ? def.inputs.findIndex(p => p.id === portId)
                     : def.outputs.findIndex(p => p.id === portId);
             const safeIndex = portIndex !== -1 ? portIndex : 0;
-            const yOffset = 69 + safeIndex * 28;
-            const xOffset = type === 'input' ? 8 : 252;
+            // Ports at node edges: header 45px + port center offset + index * (port height 24px + gap 4px)
+            const yOffset = 58 + safeIndex * 28;
+            const xOffset = type === 'input' ? 0 : 260;
             return { x: node.position.x + xOffset, y: node.position.y + yOffset };
         };
 

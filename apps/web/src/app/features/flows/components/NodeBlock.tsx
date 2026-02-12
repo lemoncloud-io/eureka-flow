@@ -247,7 +247,7 @@ const PortItem: React.FC<PortItemProps> = ({
 
     const portCircle = (
         <div
-            className={cn('relative', type === 'input' ? '-ml-1.5 mr-1.5' : 'ml-1.5 -mr-1.5')}
+            className={cn('relative')}
             onMouseDown={e => {
                 e.stopPropagation();
                 onMouseDown(nodeId, port.id, type, port.type, e);
@@ -267,14 +267,11 @@ const PortItem: React.FC<PortItemProps> = ({
     );
 
     return (
-        <div
-            className={cn('flex items-center h-7 relative group', type === 'output' ? 'justify-end' : 'justify-start')}
-        >
-            {type === 'input' && portCircle}
-            {type === 'output' && portCircle}
+        <div className="relative group flex items-center justify-center w-3 h-6">
+            {portCircle}
 
             {/* Tooltip showing port label on hover */}
-            <div className="absolute left-1/2 -translate-x-1/2 -top-8 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-100 whitespace-nowrap shadow-lg transition-opacity duration-150 flex items-center gap-1">
+            <div className="absolute left-1/2 -translate-x-1/2 -top-7 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-100 whitespace-nowrap shadow-lg transition-opacity duration-150 flex items-center gap-1">
                 {PortIcon && <PortIcon className="w-2.5 h-2.5" />}
                 <span className="font-semibold uppercase tracking-wider">{port.label}</span>
             </div>
@@ -950,42 +947,40 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 </div>
             </div>
 
+            {/* Ports at node edges - centered on border */}
+            <div className="absolute left-[-6px] top-[45px] flex flex-col gap-1">
+                {definition.inputs.map(p => (
+                    <PortItem
+                        key={p.id}
+                        port={p}
+                        type="input"
+                        nodeId={node.id}
+                        hasData={!!node.inputData?.[p.id]}
+                        isHighlighted={highlightedPortIds.includes(p.id)}
+                        connectionDraft={connectionDraft}
+                        onMouseDown={onPortMouseDown}
+                        onMouseUp={onPortMouseUp}
+                    />
+                ))}
+            </div>
+            <div className="absolute right-[-6px] top-[45px] flex flex-col gap-1">
+                {definition.outputs.map(p => (
+                    <PortItem
+                        key={p.id}
+                        port={p}
+                        type="output"
+                        nodeId={node.id}
+                        hasData={!!node.outputData?.[p.id]}
+                        isHighlighted={highlightedPortIds.includes(p.id)}
+                        connectionDraft={connectionDraft}
+                        onMouseDown={onPortMouseDown}
+                        onMouseUp={onPortMouseUp}
+                    />
+                ))}
+            </div>
+
             {/* Body */}
             <div className="px-3 py-3">
-                {/* Ports */}
-                <div className="flex justify-between gap-2">
-                    <div className="flex flex-col gap-0.5 min-w-[45%]">
-                        {definition.inputs.map(p => (
-                            <PortItem
-                                key={p.id}
-                                port={p}
-                                type="input"
-                                nodeId={node.id}
-                                hasData={!!node.inputData?.[p.id]}
-                                isHighlighted={highlightedPortIds.includes(p.id)}
-                                connectionDraft={connectionDraft}
-                                onMouseDown={onPortMouseDown}
-                                onMouseUp={onPortMouseUp}
-                            />
-                        ))}
-                    </div>
-                    <div className="flex flex-col gap-0.5 items-end min-w-[45%]">
-                        {definition.outputs.map(p => (
-                            <PortItem
-                                key={p.id}
-                                port={p}
-                                type="output"
-                                nodeId={node.id}
-                                hasData={!!node.outputData?.[p.id]}
-                                isHighlighted={highlightedPortIds.includes(p.id)}
-                                connectionDraft={connectionDraft}
-                                onMouseDown={onPortMouseDown}
-                                onMouseUp={onPortMouseUp}
-                            />
-                        ))}
-                    </div>
-                </div>
-
                 {/* Content Area */}
                 <div className="mt-2">
                     {/* Force Run button for non-auto nodes (input nodes have Run button in header) */}
