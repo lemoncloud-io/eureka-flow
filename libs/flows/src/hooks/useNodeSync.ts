@@ -116,11 +116,18 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
         Map<string, { resolve: (serverId: string) => void; reject: (error: Error) => void }>
     >(new Map());
 
-    // Cleanup debounce timers on unmount
+    // Map of tempId -> serverId (for already resolved IDs)
+    const resolvedIdsRef = useRef<Map<string, string>>(new Map());
+
+    // Cleanup on unmount
     useEffect(() => {
         return () => {
             debounceTimers.current.forEach(timer => clearTimeout(timer));
             debounceTimers.current.clear();
+            pendingUpdates.current.clear();
+            pendingNodeIdsRef.current.clear();
+            pendingResolvers.current.clear();
+            resolvedIdsRef.current.clear();
         };
     }, []);
 
@@ -216,10 +223,24 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
                 {
                     onSuccess: result => {
                         // Extract server-assigned ID from response
-                        const createdNode = result.nodes?.[0];
+                        // Support multiple response formats:
+                        // 1. Direct node object: { id: '...', type: '...', ... }
+                        // 2. nodes array: { nodes: [{ id: '...', ... }] }
+                        // 3. nodes$$ array (deprecated): { nodes$$: [{ id: '...', ... }] }
+                        const resultAny = result as Record<string, unknown>;
+                        const createdNode =
+                            (resultAny.id ? (result as unknown as { id: string }) : null) ??
+                            result.nodes?.[0] ??
+                            (resultAny['nodes$$'] as typeof result.nodes)?.[0];
+
+                        console.debug('[useNodeSync] API response:', { tempId, result, createdNode });
+
                         if (createdNode?.id) {
                             const serverId = createdNode.id;
                             console.log('[useNodeSync] Node created with server ID:', { tempId, serverId });
+
+                            // Store mapping for future lookups
+                            resolvedIdsRef.current.set(tempId, serverId);
 
                             // Remove from pending
                             pendingNodeIdsRef.current.delete(tempId);
@@ -291,13 +312,22 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
      * Returns a promise that resolves with the server ID, or rejects on error
      */
     const waitForNodeId = useCallback((tempId: string): Promise<string> => {
+        // Check if already resolved (ID mapping exists)
+        const resolvedId = resolvedIdsRef.current.get(tempId);
+        if (resolvedId) {
+            console.debug('[useNodeSync] waitForNodeId: already resolved', { tempId, resolvedId });
+            return Promise.resolve(resolvedId);
+        }
+
         // If not pending, it might already be resolved or never existed
         if (!pendingNodeIdsRef.current.has(tempId)) {
-            // Return immediately - assume it's already a real ID
+            // Return immediately - assume it's already a real ID (not a temp ID)
+            console.debug('[useNodeSync] waitForNodeId: not pending, returning as-is', { tempId });
             return Promise.resolve(tempId);
         }
 
         // Create a promise that will be resolved/rejected when the ID is assigned/fails
+        console.debug('[useNodeSync] waitForNodeId: waiting for resolution', { tempId });
         return new Promise((resolve, reject) => {
             pendingResolvers.current.set(tempId, { resolve, reject });
         });

@@ -62,16 +62,10 @@ interface CreateEdgeVariables {
 }
 
 /**
- * Mutation hook for creating a new edge with server-assigned ID
- * POST /nodes/0/upsert?flowId=<flowId> with { edges: [edge] }
+ * @deprecated Use useEdgeSync hook instead for edge creation
+ * Edge creation should use POST /flows/:id/upsert with { nodes: [], edges: [...] }
  *
- * Server assigns the edge ID and returns it in the response.
- * Use this for optimistic UI pattern:
- * 1. Create edge in UI with temp ID
- * 2. Call this mutation
- * 3. Replace temp ID with server-assigned ID from response
- *
- * @returns UpsertNodeResult with edges$$[0].id containing server-assigned ID
+ * This hook incorrectly uses upsertEdge() which calls the wrong API endpoint.
  */
 export const useCreateEdgeMutation = (): UseMutationResult<UpsertNodeResult, Error, CreateEdgeVariables> => {
     return useMutation({

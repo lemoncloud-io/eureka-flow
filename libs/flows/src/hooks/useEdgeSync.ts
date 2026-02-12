@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { useMutation } from '@tanstack/react-query';
 
@@ -73,6 +73,18 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
         Map<string, { resolve: (serverId: string) => void; reject: (error: Error) => void }>
     >(new Map());
 
+    // Map of tempId -> serverId (for already resolved IDs)
+    const resolvedIdsRef = useRef<Map<string, string>>(new Map());
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            pendingEdgeIdsRef.current.clear();
+            pendingResolvers.current.clear();
+            resolvedIdsRef.current.clear();
+        };
+    }, []);
+
     /**
      * Create a new edge on backend with server-assigned ID
      * POST /flows/:flowId/upsert with { nodes: [], edges: [edge] }
@@ -100,10 +112,24 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
                 {
                     onSuccess: result => {
                         // Extract server-assigned ID from response
-                        const createdEdge = result.edges?.[0];
+                        // Support multiple response formats:
+                        // 1. Direct edge object: { id: '...', sourceNodeId: '...', ... }
+                        // 2. edges array: { edges: [{ id: '...', ... }] }
+                        // 3. edges$$ array (deprecated): { edges$$: [{ id: '...', ... }] }
+                        const resultAny = result as Record<string, unknown>;
+                        const createdEdge =
+                            (resultAny.id ? (result as unknown as { id: string }) : null) ??
+                            result.edges?.[0] ??
+                            (resultAny['edges$$'] as typeof result.edges)?.[0];
+
+                        console.debug('[useEdgeSync] API response:', { tempId, result, createdEdge });
+
                         if (createdEdge?.id) {
                             const serverId = createdEdge.id;
                             console.log('[useEdgeSync] Edge created with server ID:', { tempId, serverId });
+
+                            // Store mapping for future lookups
+                            resolvedIdsRef.current.set(tempId, serverId);
 
                             // Remove from pending
                             pendingEdgeIdsRef.current.delete(tempId);
@@ -151,13 +177,22 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
      * Returns a promise that resolves with the server ID, or rejects on error
      */
     const waitForEdgeId = useCallback((tempId: string): Promise<string> => {
+        // Check if already resolved (ID mapping exists)
+        const resolvedId = resolvedIdsRef.current.get(tempId);
+        if (resolvedId) {
+            console.debug('[useEdgeSync] waitForEdgeId: already resolved', { tempId, resolvedId });
+            return Promise.resolve(resolvedId);
+        }
+
         // If not pending, it might already be resolved or never existed
         if (!pendingEdgeIdsRef.current.has(tempId)) {
-            // Return immediately - assume it's already a real ID
+            // Return immediately - assume it's already a real ID (not a temp ID)
+            console.debug('[useEdgeSync] waitForEdgeId: not pending, returning as-is', { tempId });
             return Promise.resolve(tempId);
         }
 
         // Create a promise that will be resolved/rejected when the ID is assigned/fails
+        console.debug('[useEdgeSync] waitForEdgeId: waiting for resolution', { tempId });
         return new Promise((resolve, reject) => {
             pendingResolvers.current.set(tempId, { resolve, reject });
         });
