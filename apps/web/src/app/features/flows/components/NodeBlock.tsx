@@ -298,14 +298,14 @@ const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }
 
     if (!lastInput) {
         return (
-            <div className="mt-3 text-[10px] text-muted-foreground/60 italic text-center py-6 bg-muted/30 rounded-lg border border-dashed border-border">
+            <div className="text-[10px] text-muted-foreground/60 italic text-center py-6 bg-muted/30 rounded-lg border border-dashed border-border">
                 {t('visualization.waitingForData')}
             </div>
         );
     }
 
     return (
-        <div className="mt-3 rounded-lg border border-border overflow-hidden bg-black/20 relative">
+        <div className="rounded-lg border border-border overflow-hidden bg-black/20 relative">
             {lastInput.type === 'image' ? (
                 <>
                     <div className="flex justify-center items-center p-2 min-h-[80px]">
@@ -364,7 +364,6 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
 
     return (
         <div
-            className="mt-3"
             onMouseDown={e => e.stopPropagation()}
             onDoubleClick={e => e.stopPropagation()}
             onWheel={e => e.stopPropagation()}
@@ -458,7 +457,7 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
     if (isEditing) {
         return (
             <div
-                className="mt-3 flex flex-col"
+                className="flex flex-col"
                 onMouseDown={e => e.stopPropagation()}
                 onDoubleClick={e => e.stopPropagation()}
                 onWheel={e => e.stopPropagation()}
@@ -499,7 +498,7 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
 
     return (
         <div
-            className="mt-3 p-2.5 bg-muted/30 rounded-lg border border-border hover:border-primary/40 cursor-text transition-all group overflow-hidden"
+            className="p-2.5 bg-muted/30 rounded-lg border border-border hover:border-primary/40 cursor-text transition-all group overflow-hidden"
             style={{
                 minHeight: savedHeight ? `${savedHeight}px` : undefined,
             }}
@@ -538,7 +537,7 @@ const DebugLogVisualization: React.FC<VisualizationProps> = ({ node, definition 
     const lastInput = getFirstInputData(node, definition)?.value;
     return (
         <div
-            className="mt-3 p-2.5 bg-black/30 rounded-lg border border-border text-foreground/80 font-mono text-[10px] break-all max-h-28 overflow-y-auto"
+            className="p-2.5 bg-black/30 rounded-lg border border-border text-foreground/80 font-mono text-[10px] break-all max-h-28 overflow-y-auto"
             onWheel={e => e.stopPropagation()}
         >
             {lastInput !== undefined ? (
@@ -576,6 +575,7 @@ const getFirstOutputData = (node: NodeData, definition: BlockDefinitionWithFront
 };
 
 const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
+    const { t } = useTranslation(['nodes']);
     const packet = getFirstOutputData(node, definition);
 
     // Skip if this is an input/output visualization node (they have their own visualizations)
@@ -587,14 +587,18 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
         return null;
     }
 
-    // No data yet - don't show anything
+    // No data yet - show waiting message
     if (!packet) {
-        return null;
+        return (
+            <div className="text-[10px] text-muted-foreground/60 italic text-center py-4 bg-muted/30 rounded-lg border border-dashed border-border">
+                {t('visualization.waitingForData')}
+            </div>
+        );
     }
 
     if (packet.type === 'image') {
         return (
-            <div className="mt-2 rounded-lg border border-border overflow-hidden bg-black/20">
+            <div className="rounded-lg border border-border overflow-hidden bg-black/20">
                 <div className="flex justify-center items-center p-2">
                     <S3Image
                         src={packet.value as string}
@@ -610,7 +614,7 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
         const jsonStr = JSON.stringify(packet.value, null, 2);
         return (
             <div
-                className="mt-2 p-2 bg-black/20 rounded-lg border border-border overflow-auto"
+                className="p-2 bg-black/20 rounded-lg border border-border overflow-auto"
                 style={{ maxHeight: '180px' }}
                 onWheel={e => e.stopPropagation()}
             >
@@ -623,7 +627,7 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
     const strValue = String(packet.value);
     return (
         <div
-            className="mt-2 p-2.5 bg-muted/30 rounded-lg border border-border"
+            className="p-2.5 bg-muted/30 rounded-lg border border-border"
             style={{ maxHeight: '180px', overflow: 'hidden' }}
         >
             <div className="text-xs text-foreground/80 break-words whitespace-pre-wrap">{strValue}</div>
@@ -979,10 +983,15 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 ))}
             </div>
 
-            {/* Body */}
-            <div className="px-3 py-3">
+            {/* Body - min height based on port count */}
+            <div
+                className="px-3 py-3"
+                style={{
+                    minHeight: `${Math.max(definition.inputs.length, definition.outputs.length) * 30}px`,
+                }}
+            >
                 {/* Content Area */}
-                <div className="mt-2">
+                <div>
                     {/* Force Run button for non-auto nodes (input nodes have Run button in header) */}
                     {!isAuto && !definition?.type?.startsWith('input-') && (
                         <button
