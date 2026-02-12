@@ -31,7 +31,7 @@ import { cn } from '@flows/lib/utils';
 
 import { S3Image } from './S3Image';
 
-import type { BlockDefinitionWithFrontend, NodeData, PortDefinition } from '@flows/flows';
+import type { BlockDefinitionWithFrontend, DataPacket, NodeData, PortDefinition } from '@flows/flows';
 
 type ConfigValue = string | number | boolean | string[] | null;
 
@@ -185,11 +185,6 @@ const getDropTargetColor = (sourceType: string): string => {
     return PORT_TYPE_STYLES[getPortStyleKey(sourceType)].drop;
 };
 
-/** Get text color class for valid drop target label */
-const getDropTargetTextColor = (sourceType: string): string => {
-    return PORT_TYPE_STYLES[getPortStyleKey(sourceType)].text;
-};
-
 interface PortItemProps {
     port: PortDefinition;
     type: 'input' | 'output';
@@ -276,24 +271,12 @@ const PortItem: React.FC<PortItemProps> = ({
             className={cn('flex items-center h-7 relative group', type === 'output' ? 'justify-end' : 'justify-start')}
         >
             {type === 'input' && portCircle}
-            <div
-                className={cn(
-                    'flex items-center gap-1 transition-all',
-                    isHighlighted && 'text-primary font-semibold',
-                    isValidDropTarget && [getDropTargetTextColor(connectionDraft.sourceType), 'font-semibold'],
-                    isIncompatibleTarget && 'opacity-30',
-                    !isHighlighted && !isValidDropTarget && !isIncompatibleTarget && 'text-muted-foreground/80'
-                )}
-            >
-                {PortIcon && <PortIcon className="w-2.5 h-2.5" />}
-                <span className="text-[10px] uppercase tracking-wider font-medium select-none">{port.label}</span>
-            </div>
             {type === 'output' && portCircle}
 
-            {/* Tooltip showing port type */}
-            <div className="absolute left-1/2 -translate-x-1/2 -top-8 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-150 flex items-center gap-1">
+            {/* Tooltip showing port label on hover */}
+            <div className="absolute left-1/2 -translate-x-1/2 -top-8 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-100 whitespace-nowrap shadow-lg transition-opacity duration-150 flex items-center gap-1">
                 {PortIcon && <PortIcon className="w-2.5 h-2.5" />}
-                <span className="font-semibold">{port.type}</span>
+                <span className="font-semibold uppercase tracking-wider">{port.label}</span>
             </div>
         </div>
     );
@@ -585,6 +568,72 @@ const VISUALIZATION_COMPONENTS: Record<string, React.FC<VisualizationProps>> = {
     preview: PreviewVisualization,
 };
 
+// ============================================================================
+// Output Preview Component (shows first output data in node body)
+// ============================================================================
+
+/** Get first output data from node */
+const getFirstOutputData = (node: NodeData, definition: BlockDefinitionWithFrontend): DataPacket | undefined => {
+    const outputPortId = definition.outputs?.[0]?.id;
+    return outputPortId ? node.outputData?.[outputPortId] : Object.values(node.outputData ?? {})[0];
+};
+
+const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
+    const packet = getFirstOutputData(node, definition);
+
+    // Skip if this is an input/output visualization node (they have their own visualizations)
+    if (
+        definition.type?.startsWith('input-') ||
+        definition.type?.startsWith('output-') ||
+        VISUALIZATION_COMPONENTS[definition.type ?? '']
+    ) {
+        return null;
+    }
+
+    // No data yet - don't show anything
+    if (!packet) {
+        return null;
+    }
+
+    if (packet.type === 'image') {
+        return (
+            <div className="mt-2 rounded-lg border border-border overflow-hidden bg-black/20">
+                <div className="flex justify-center items-center p-2">
+                    <S3Image
+                        src={packet.value as string}
+                        className="max-w-full max-h-[180px] rounded object-contain"
+                        alt="Output"
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    if (packet.type === 'json' || typeof packet.value === 'object') {
+        const jsonStr = JSON.stringify(packet.value, null, 2);
+        return (
+            <div
+                className="mt-2 p-2 bg-black/20 rounded-lg border border-border overflow-auto"
+                style={{ maxHeight: '180px' }}
+                onWheel={e => e.stopPropagation()}
+            >
+                <pre className="text-[10px] font-mono text-foreground/80 whitespace-pre-wrap break-all">{jsonStr}</pre>
+            </div>
+        );
+    }
+
+    // Text/number/any
+    const strValue = String(packet.value);
+    return (
+        <div
+            className="mt-2 p-2.5 bg-muted/30 rounded-lg border border-border"
+            style={{ maxHeight: '180px', overflow: 'hidden' }}
+        >
+            <div className="text-xs text-foreground/80 break-words whitespace-pre-wrap">{strValue}</div>
+        </div>
+    );
+};
+
 interface NodeBlockProps {
     node: NodeData;
     highlightState: NodeHighlightState;
@@ -710,7 +759,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     return (
         <div
             className={cn(
-                'absolute w-[260px] bg-node-bg rounded-xl border-[1.5px] overflow-hidden',
+                'absolute w-[260px] bg-node-bg rounded-xl border-[1.5px]',
                 !isDragging && 'transition-all duration-200',
                 isDisabled && 'opacity-50',
                 !isSelected && !isHighlighted && node.status === 'IDLE' && 'shadow-node',
@@ -779,8 +828,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
                 {/* Compact Actions */}
                 <div className="flex items-center gap-0.5 shrink-0">
-                    {/* Input nodes: Run button */}
-                    {definition?.type?.startsWith('input-') && (
+                    {/* Run button: show for all executable nodes (has execute function or backend execution) */}
+                    {(definition?.execute || !definition?.isFrontend) && (
                         <button
                             onClick={e => {
                                 e.stopPropagation();
@@ -968,6 +1017,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     {definition?.type &&
                         VISUALIZATION_COMPONENTS[definition.type] &&
                         React.createElement(VISUALIZATION_COMPONENTS[definition.type], { node, definition })}
+
+                    {/* Output Preview for process nodes */}
+                    <OutputPreview node={node} definition={definition} />
                 </div>
 
                 {/* Error Message */}
