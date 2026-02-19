@@ -65,7 +65,7 @@
             "title": "워크플로우 만들기",
             "description": "라이브러리에서 첫 번째 노드를 추가하여 시작하세요. 노드를 연결하여 강력한 자동화 플로우를 만들 수 있습니다.",
             "addFirstNode": "첫 노드 추가",
-            "keyboardHint": "팁: Space를 눌러 노드를 빠르게 검색하세요"
+            "keyboardHint": "팁: 사이드바에서 노드를 드래그하여 시작하세요"
         }
     },
     "detailPanel": {

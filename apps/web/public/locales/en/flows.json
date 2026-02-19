@@ -65,7 +65,7 @@
             "title": "Start Building Your Workflow",
             "description": "Add your first node from the library to get started. Connect nodes to create powerful automation flows.",
             "addFirstNode": "Add First Node",
-            "keyboardHint": "Tip: Press Space to quick search nodes"
+            "keyboardHint": "Tip: Drag nodes from the sidebar to get started"
         }
     },
     "detailPanel": {
