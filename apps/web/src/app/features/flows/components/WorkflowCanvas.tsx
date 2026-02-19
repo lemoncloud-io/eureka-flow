@@ -10,7 +10,6 @@ import {
     estimateNodeHeight,
     loadFlow,
     runNode,
-    saveFlow,
     shouldUpdateStatus,
     toPortData,
     upsertFlow,
@@ -1093,11 +1092,27 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             (id: string) => {
                 if (readOnly) return;
                 saveCheckpoint();
+
+                // Get connected edges before removing from state
+                const connectedEdges = connectionsRef.current.filter(
+                    c => c.sourceNodeId === id || c.targetNodeId === id
+                );
+
                 setNodes(prev => prev.filter(n => n.id !== id));
                 setConnections(prev => prev.filter(c => c.sourceNodeId !== id && c.targetNodeId !== id));
                 handleSelectionChange(null);
+
+                if (flowId && !flowId.startsWith('local-') && !isTempId(id)) {
+                    const serverEdges = connectedEdges.filter(e => e.id && !isTempId(e.id));
+                    const nodesToDelete = [{ id: `#${id}` }] as unknown as NodeData[];
+                    const edgesToDelete = serverEdges.map(e => ({ id: `#${e.id}` })) as unknown as Connection[];
+
+                    upsertFlow(flowId, { nodes: nodesToDelete, edges: edgesToDelete }).catch(err => {
+                        console.error('[WorkflowCanvas] Failed to delete node:', err);
+                    });
+                }
             },
-            [readOnly, saveCheckpoint, handleSelectionChange]
+            [readOnly, saveCheckpoint, handleSelectionChange, flowId]
         );
 
         const deleteConnection = useCallback(
@@ -1105,14 +1120,14 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 if (readOnly) return;
                 saveCheckpoint();
 
-                const updatedConnections = connectionsRef.current.filter(c => c.id !== id);
-                setConnections(updatedConnections);
+                setConnections(prev => prev.filter(c => c.id !== id));
                 setSelectedConnectionId(null);
 
-                // Sync to server via saveFlow (upsert doesn't support deletion)
-                if (flowId && !flowId.startsWith('local-')) {
-                    saveFlow(flowId, { nodes: nodesRef.current, edges: updatedConnections }).catch(err => {
-                        console.error('[WorkflowCanvas] Failed to sync edge deletion:', err);
+                if (flowId && !flowId.startsWith('local-') && !isTempId(id)) {
+                    const edgesToDelete = [{ id: `#${id}` }] as unknown as Connection[];
+
+                    upsertFlow(flowId, { nodes: [], edges: edgesToDelete }).catch(err => {
+                        console.error('[WorkflowCanvas] Failed to delete edge:', err);
                     });
                 }
             },
@@ -1620,12 +1635,37 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     if (selectedNodeIds.size > 0) {
                         // Delete all selected nodes
                         saveCheckpoint();
-                        const idsToDelete = selectedNodeIds;
-                        setNodes(prev => prev.filter(n => !idsToDelete.has(n.id)));
+
+                        // Get connected edges before removing from state
+                        const connectedEdges = connectionsRef.current.filter(
+                            c => selectedNodeIds.has(c.sourceNodeId) || selectedNodeIds.has(c.targetNodeId)
+                        );
+
+                        setNodes(prev => prev.filter(n => !selectedNodeIds.has(n.id)));
                         setConnections(prev =>
-                            prev.filter(c => !idsToDelete.has(c.sourceNodeId) && !idsToDelete.has(c.targetNodeId))
+                            prev.filter(
+                                c => !selectedNodeIds.has(c.sourceNodeId) && !selectedNodeIds.has(c.targetNodeId)
+                            )
                         );
                         handleSelectionChange(null);
+
+                        if (flowId && !flowId.startsWith('local-')) {
+                            const serverNodeIds = Array.from(selectedNodeIds).filter(id => !isTempId(id));
+                            const serverEdges = connectedEdges.filter(e => e.id && !isTempId(e.id));
+
+                            if (serverNodeIds.length > 0 || serverEdges.length > 0) {
+                                const nodesToDelete = serverNodeIds.map(id => ({
+                                    id: `#${id}`,
+                                })) as unknown as NodeData[];
+                                const edgesToDelete = serverEdges.map(e => ({
+                                    id: `#${e.id}`,
+                                })) as unknown as Connection[];
+
+                                upsertFlow(flowId, { nodes: nodesToDelete, edges: edgesToDelete }).catch(err => {
+                                    console.error('[WorkflowCanvas] Failed to delete nodes:', err);
+                                });
+                            }
+                        }
                     } else if (selectedConnectionId || hoveredConnectionId) {
                         const targetId = selectedConnectionId || hoveredConnectionId;
                         saveCheckpoint();
@@ -1633,6 +1673,14 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         setSelectedConnectionId(null);
                         setHoveredConnectionId(null);
                         setTooltip(null);
+
+                        if (flowId && !flowId.startsWith('local-') && targetId && !isTempId(targetId)) {
+                            const edgesToDelete = [{ id: `#${targetId}` }] as unknown as Connection[];
+
+                            upsertFlow(flowId, { nodes: [], edges: edgesToDelete }).catch(err => {
+                                console.error('[WorkflowCanvas] Failed to delete edge:', err);
+                            });
+                        }
                     }
                 }
 
@@ -1655,6 +1703,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             saveCheckpoint,
             handleSelectionChange,
             createNodeAsync,
+            flowId,
         ]);
 
         const activeConnectionId = selectedConnectionId || hoveredConnectionId;
