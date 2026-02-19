@@ -234,7 +234,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     config: n.config ?? {},
                 }));
                 setNodes(loadedNodes);
-                setConnections(initialData.connections ?? []);
+                setConnections(deduplicateEdges(initialData.connections ?? []));
                 pastRef.current = [];
                 futureRef.current = [];
             }
@@ -758,7 +758,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 outputData: transformedOutputData,
                                 status: finalStatus ?? n.status,
                                 errorMessage: serverData.errorMessage,
-                                executionStats: serverData.executionStats,
+                                // Merge executionStats to preserve existing values (startTime, duration)
+                                // when only progress is being updated
+                                executionStats: serverData.executionStats
+                                    ? { ...n.executionStats, ...serverData.executionStats }
+                                    : n.executionStats,
                                 position: serverData.position ?? n.position,
                             };
                         })

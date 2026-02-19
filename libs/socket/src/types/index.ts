@@ -44,27 +44,16 @@ export interface FlowUpdateMessage {
 
 /**
  * Node update notification from WebSocket
- * When received, client should reload the node via GET /nodes/:id
- *
- * @example
- * {
- *   "type": "node",
- *   "id": "isff9fs10",
- *   "flowId": "1000036",
- *   "status": "COMPLETED",
- *   "prevStatus": "RUNNING",
- *   "timestamp": 1769582611407
- * }
  */
 export interface NodeUpdateMessage {
     type: 'node';
     id: string;
-    flowId: string;
-    timestamp: number;
-    /** Current node status (IDLE, RUNNING, COMPLETED, ERROR, etc.) */
+    flowId?: string;
+    timestamp?: number;
     status?: string;
-    /** Previous node status for detecting status transitions */
     prevStatus?: string;
+    state?: 'RUNNING' | 'COMPLETED';
+    progress?: number;
 }
 
 /**

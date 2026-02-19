@@ -6,19 +6,29 @@ export const getConnectionKey = (conn: Connection): string =>
 
 export const deduplicateEdges = (edges: Connection[]): Connection[] => {
     const edgeMap = new Map<string, Connection>();
+    const seenIds = new Set<string>();
 
     edges.forEach(edge => {
+        // Skip if we've already seen this ID (prevents duplicate key errors in React)
+        if (edge.id && seenIds.has(edge.id)) {
+            return;
+        }
+
         const key = getConnectionKey(edge);
         const existing = edgeMap.get(key);
 
         if (!existing) {
             edgeMap.set(key, edge);
+            if (edge.id) seenIds.add(edge.id);
         } else {
             const existingIsTemp = isTempId(existing.id);
             const newIsTemp = isTempId(edge.id);
 
             if (existingIsTemp && !newIsTemp) {
+                // Remove the old temp ID from seenIds before replacing
+                if (existing.id) seenIds.delete(existing.id);
                 edgeMap.set(key, edge);
+                if (edge.id) seenIds.add(edge.id);
             }
         }
     });

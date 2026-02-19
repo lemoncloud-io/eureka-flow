@@ -62,23 +62,28 @@ export const FlowEditorPage = () => {
         [loadFlowById]
     );
 
-    // Handle node update notification from WebSocket
-    // - For regular nodes: fetch and update canvas with status priority logic
-    // - For ports: update canvas UI only (server already saved data via propagation)
     const handleNodeUpdate = useCallback(
         async (info: {
             nodeId: string;
-            flowId: string;
-            timestamp: number;
+            flowId?: string;
+            timestamp?: number;
             status?: string;
             prevStatus?: string;
             isPort: boolean;
             parentNodeId?: string;
+            state?: 'RUNNING' | 'COMPLETED';
+            progress?: number;
         }) => {
-            const { nodeId, status, isPort, parentNodeId } = info;
+            const { nodeId, status, isPort, parentNodeId, state, progress } = info;
 
-            // Always fetch latest node data from server
-            // (timestamp comparison removed - status changes may have same timestamp)
+            // Progress-only update (no flowId) - update UI immediately without API call
+            if (progress !== undefined && !info.flowId && canvasRef.current) {
+                const effectiveProgress = state === 'COMPLETED' ? 100 : progress;
+                canvasRef.current.updateNodeFromServer(nodeId, {
+                    executionStats: { progress: effectiveProgress },
+                } as NodeData);
+                return;
+            }
 
             try {
                 if (isPort && parentNodeId) {
