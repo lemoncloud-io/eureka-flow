@@ -1102,8 +1102,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 setConnections(prev => prev.filter(c => c.sourceNodeId !== id && c.targetNodeId !== id));
                 handleSelectionChange(null);
 
-                // Sync deletion to server via upsert with # prefix
-                // Server interprets #-prefixed IDs as "delete this item"
                 if (flowId && !flowId.startsWith('local-') && !isTempId(id)) {
                     const serverEdges = connectedEdges.filter(e => e.id && !isTempId(e.id));
                     const nodesToDelete = [{ id: `#${id}` }] as unknown as NodeData[];
@@ -1125,8 +1123,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 setConnections(prev => prev.filter(c => c.id !== id));
                 setSelectedConnectionId(null);
 
-                // Sync deletion to server via upsert with # prefix
-                // Server interprets #-prefixed IDs as "delete this item"
                 if (flowId && !flowId.startsWith('local-') && !isTempId(id)) {
                     const edgesToDelete = [{ id: `#${id}` }] as unknown as Connection[];
 
@@ -1653,8 +1649,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         );
                         handleSelectionChange(null);
 
-                        // Sync deletion to server via upsert with # prefix
-                        // Server interprets #-prefixed IDs as "delete this item"
                         if (flowId && !flowId.startsWith('local-')) {
                             const serverNodeIds = Array.from(selectedNodeIds).filter(id => !isTempId(id));
                             const serverEdges = connectedEdges.filter(e => e.id && !isTempId(e.id));
@@ -1680,8 +1674,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         setHoveredConnectionId(null);
                         setTooltip(null);
 
-                        // Sync deletion to server via upsert with # prefix
-                        // Server interprets #-prefixed IDs as "delete this item"
                         if (flowId && !flowId.startsWith('local-') && targetId && !isTempId(targetId)) {
                             const edgesToDelete = [{ id: `#${targetId}` }] as unknown as Connection[];
 
