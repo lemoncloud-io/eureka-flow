@@ -100,7 +100,8 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
             pendingEdgeIdsRef.current.add(tempId);
 
             // Prepare edge data for server (no id field, server will assign)
-            const edgeData: EdgeData = {
+            const edgeData: EdgeData & { id?: string } = {
+                id: '', // Optional: can omit or set to tempId for debugging
                 sourceNodeId: edge.sourceNodeId,
                 sourcePortId: edge.sourcePortId,
                 targetNodeId: edge.targetNodeId,
@@ -115,7 +116,8 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
                         const allEdges = result.edges ?? (resultAny['edges$$'] as typeof result.edges) ?? [];
 
                         const createdEdge =
-                            (resultAny.id ? (result as unknown as EdgeData) : null) ??
+                            // NOTE - resultAny should be FlowView
+                            // (resultAny.id ? (result as unknown as EdgeData) : null) ??
                             allEdges.find(
                                 e =>
                                     e.sourceNodeId === edgeData.sourceNodeId &&
