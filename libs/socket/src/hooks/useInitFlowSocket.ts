@@ -47,30 +47,22 @@ export const isFlowUpdateMessage = (data: unknown): data is FlowUpdateMessage =>
     return msg['type'] === 'flow' && typeof msg['id'] === 'string' && !('nodeId' in msg);
 };
 
-/**
- * Type guard for NodeUpdateMessage (new format)
- */
 export const isNodeUpdateMessage = (data: unknown): data is NodeUpdateMessage => {
     if (typeof data !== 'object' || data === null) return false;
     const msg = data as Record<string, unknown>;
-    return (
-        msg['type'] === 'node' &&
-        typeof msg['id'] === 'string' &&
-        typeof msg['flowId'] === 'string' &&
-        !('nodeId' in msg)
-    );
+    return msg['type'] === 'node' && typeof msg['id'] === 'string' && !('nodeId' in msg);
 };
 
 export interface NodeUpdateInfo {
     nodeId: string;
-    flowId: string;
-    timestamp: number;
+    flowId?: string;
+    timestamp?: number;
     status?: string;
     prevStatus?: string;
-    /** True if this is a port update (id contains ':') */
     isPort: boolean;
-    /** Parent node ID (extracted from port ID like 'nodeId:5' -> 'nodeId') */
     parentNodeId?: string;
+    state?: 'RUNNING' | 'COMPLETED';
+    progress?: number;
 }
 
 export interface UseInitFlowSocketOptions {
@@ -177,7 +169,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                 return;
             }
 
-            // Handle node update notification (includes status changes)
+            // Handle node update notification (includes status changes and progress)
             // Socket message is just a notification - actual data is fetched via API
             // NOTE: Node updates do NOT use self-echo prevention because:
             // - Node run results come via socket and must be processed
@@ -188,12 +180,16 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                 const isHistoryNode = data.id.includes('@');
                 if (isHistoryNode) return;
 
-                // Only process if it's for the current flow
-                if (currentFlowId && data.flowId === currentFlowId && onNodeReload) {
-                    // Check if this is a port update (id contains ':' like 'nodeId:5')
-                    const isPort = data.id.includes(':');
-                    const parentNodeId = isPort ? data.id.split(':')[0] : undefined;
+                // Check if this is a port update (id contains ':' like 'nodeId:5')
+                const isPort = data.id.includes(':');
+                const parentNodeId = isPort ? data.id.split(':')[0] : undefined;
 
+                // Progress-only messages may not have flowId
+                // Process if: has matching flowId OR is a progress update without flowId
+                const isProgressOnlyMessage = data.progress !== undefined && !data.flowId;
+                const isForCurrentFlow = data.flowId === currentFlowId;
+
+                if (onNodeReload && (isForCurrentFlow || isProgressOnlyMessage)) {
                     onNodeReload({
                         nodeId: data.id,
                         flowId: data.flowId,
@@ -202,6 +198,8 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         prevStatus: data.prevStatus,
                         isPort,
                         parentNodeId,
+                        state: data.state,
+                        progress: data.progress,
                     });
                 }
             }

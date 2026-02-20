@@ -1,7 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Download, FileText, LayoutGrid, Link, Menu, Redo2, Save, Trash2, Undo2, Upload, Workflow } from 'lucide-react';
+import {
+    Download,
+    FileText,
+    Key,
+    LayoutGrid,
+    Link,
+    Menu,
+    Redo2,
+    Save,
+    Trash2,
+    Undo2,
+    Upload,
+    Workflow,
+} from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import {
@@ -65,6 +78,7 @@ interface HeaderProps {
     saveState: SaveStateProps;
     socketState?: SocketStateProps;
     onShare: () => void;
+    onApiKeySettings?: () => void;
 }
 
 const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
@@ -271,6 +285,7 @@ export const Header: React.FC<HeaderProps> = ({
     saveState,
     socketState,
     onShare,
+    onApiKeySettings,
 }) => {
     const { t } = useTranslation(['flows']);
 
@@ -342,6 +357,30 @@ export const Header: React.FC<HeaderProps> = ({
                         />
                         {socketState && <SocketDot {...socketState} />}
                     </div>
+
+                    {/* API Key Settings */}
+                    {onApiKeySettings && (
+                        <TooltipProvider delayDuration={300}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        onClick={onApiKeySettings}
+                                        className={cn(
+                                            'flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl',
+                                            'bg-background/80 backdrop-blur-xl border border-border/50',
+                                            'text-muted-foreground hover:text-foreground',
+                                            'shadow-sm transition-colors duration-150'
+                                        )}
+                                    >
+                                        <Key className="w-4 h-4" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">
+                                    {t('header.apiKeySettings')}
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
 
                     {/* Menu */}
                     <DropdownMenu>

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { EXECUTE_FUNCTIONS, getNode, getStatusPriority, useBlocks, useFlows } from '@flows/flows';
+import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
+import { useWebCoreStore } from '@flows/web-core';
 
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
@@ -62,23 +64,28 @@ export const FlowEditorPage = () => {
         [loadFlowById]
     );
 
-    // Handle node update notification from WebSocket
-    // - For regular nodes: fetch and update canvas with status priority logic
-    // - For ports: update canvas UI only (server already saved data via propagation)
     const handleNodeUpdate = useCallback(
         async (info: {
             nodeId: string;
-            flowId: string;
-            timestamp: number;
+            flowId?: string;
+            timestamp?: number;
             status?: string;
             prevStatus?: string;
             isPort: boolean;
             parentNodeId?: string;
+            state?: 'RUNNING' | 'COMPLETED';
+            progress?: number;
         }) => {
-            const { nodeId, status, isPort, parentNodeId } = info;
+            const { nodeId, status, isPort, parentNodeId, state, progress } = info;
 
-            // Always fetch latest node data from server
-            // (timestamp comparison removed - status changes may have same timestamp)
+            // Progress-only update (no flowId) - update UI immediately without API call
+            if (progress !== undefined && !info.flowId && canvasRef.current) {
+                const effectiveProgress = state === 'COMPLETED' ? 100 : progress;
+                canvasRef.current.updateNodeFromServer(nodeId, {
+                    executionStats: { progress: effectiveProgress },
+                } as NodeData);
+                return;
+            }
 
             try {
                 if (isPort && parentNodeId) {
@@ -216,6 +223,9 @@ export const FlowEditorPage = () => {
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('');
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
+
+    const { apiKey, setApiKey } = useWebCoreStore();
     const autoSaveTimerRef = useRef<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const lastSavedStateRef = useRef<string | null>(null);
@@ -223,6 +233,19 @@ export const FlowEditorPage = () => {
     const handleOpenLibrary = useCallback(() => {
         sidebarRef.current?.open();
     }, []);
+
+    const handleApiKeySettings = useCallback(() => {
+        setIsApiKeyDialogOpen(true);
+    }, []);
+
+    const handleApiKeySubmit = useCallback(
+        async (key: string): Promise<boolean> => {
+            setApiKey(key);
+            setIsApiKeyDialogOpen(false);
+            return true;
+        },
+        [setApiKey]
+    );
 
     const updateUrl = useCallback((flowId: string | null, nodeId?: string | null) => {
         try {
@@ -591,10 +614,20 @@ export const FlowEditorPage = () => {
                         : undefined
                 }
                 onShare={handleShare}
+                onApiKeySettings={handleApiKeySettings}
             />
 
             {/* Floating Sidebar */}
             <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} />
+
+            {/* API Key Dialog */}
+            <ApiKeyDialog
+                open={isApiKeyDialogOpen}
+                onSubmit={handleApiKeySubmit}
+                onOpenChange={setIsApiKeyDialogOpen}
+                codesUrl={import.meta.env.VITE_CODES_URL}
+                initialValue={apiKey ?? undefined}
+            />
 
             {/* Notification Toast */}
             {notification && (
