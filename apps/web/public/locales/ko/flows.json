@@ -26,7 +26,8 @@
         "socketLive": "실시간",
         "socketOffline": "오프라인",
         "socketClickToRetry": "클릭하여 재시도",
-        "socketClickToConnect": "클릭하여 연결"
+        "socketClickToConnect": "클릭하여 연결",
+        "apiKeySettings": "API 키 설정"
     },
     "sidebar": {
         "library": "라이브러리",

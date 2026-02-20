@@ -26,7 +26,8 @@
         "socketLive": "Live",
         "socketOffline": "Offline",
         "socketClickToRetry": "Click to retry",
-        "socketClickToConnect": "Click to connect"
+        "socketClickToConnect": "Click to connect",
+        "apiKeySettings": "API Key Settings"
     },
     "sidebar": {
         "library": "Library",
