@@ -75,9 +75,18 @@ export const FlowEditorPage = () => {
             // NOTE: state=COMPLETED takes priority over status (server may send status=RUNNING with state=COMPLETED)
             if (state && !isPort && canvasRef.current) {
                 const effectiveStatus = state === 'COMPLETED' ? 'COMPLETED' : (status ?? state);
+
+                // Reset executionStats when RUNNING starts, preserve progress if provided
+                const executionStats =
+                    state === 'RUNNING'
+                        ? { startTime: Date.now(), duration: 0, progress: progress ?? 0 }
+                        : progress !== undefined
+                          ? { progress }
+                          : undefined;
+
                 canvasRef.current.updateNodeFromServer(nodeId, {
                     status: effectiveStatus,
-                    executionStats: progress !== undefined ? { progress } : undefined,
+                    executionStats,
                 });
                 return;
             }
