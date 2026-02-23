@@ -5,7 +5,7 @@ import { useWebCoreStore } from '@flows/web-core';
 import { useWebSocketWorker } from './useWebSocketWorker';
 import { useWebSocketStore } from '../stores/useWebSocketStore';
 
-import type { FlowUpdateMessage, NodeUpdateMessage, WebSocketMessage } from '../types';
+import type { FlowUpdateMessage, NodeUpdateMessage, PortUpdateMessage, WebSocketMessage } from '../types';
 
 const WS_ENDPOINT = import.meta.env.VITE_WS_ENDPOINT || '';
 
@@ -53,6 +53,54 @@ export const isNodeUpdateMessage = (data: unknown): data is NodeUpdateMessage =>
     return msg['type'] === 'node' && typeof msg['id'] === 'string' && !('nodeId' in msg);
 };
 
+/**
+ * Type guard for PortUpdateMessage
+ * Matches: { type: 'node/port', id: 'nodeId:direction@portName', ... }
+ */
+export const isPortUpdateMessage = (data: unknown): data is PortUpdateMessage => {
+    if (typeof data !== 'object' || data === null) return false;
+    const msg = data as Record<string, unknown>;
+    return msg['type'] === 'node/port' && typeof msg['id'] === 'string';
+};
+
+/**
+ * Parse port ID into components
+ * Format: "nodeId:portName@direction" (e.g., "1000637:in@in")
+ *
+ * - Full ID with @: "1000637:in@in" → nodeId=1000637, portName=in, direction=in
+ * - ID without @: "1000637:in" → nodeId=1000637, portName=in, direction from API
+ */
+const parsePortId = (
+    fullId: string
+): { nodeId: string; portId: string; portName: string; direction?: 'in' | 'out' } | null => {
+    // Check for @ which indicates direction suffix
+    const atIndex = fullId.indexOf('@');
+
+    let portId: string;
+    let direction: 'in' | 'out' | undefined;
+
+    if (atIndex !== -1) {
+        // Format: "nodeId:portName@direction"
+        portId = fullId.slice(0, atIndex); // "1000637:in"
+        const directionStr = fullId.slice(atIndex + 1); // "in" or "out"
+        if (directionStr === 'in' || directionStr === 'out') {
+            direction = directionStr;
+        }
+    } else {
+        // Format: "nodeId:portName" (no direction suffix)
+        portId = fullId;
+    }
+
+    // Parse portId to get nodeId and portName
+    const colonIndex = portId.indexOf(':');
+    if (colonIndex === -1) return null;
+
+    const nodeId = portId.slice(0, colonIndex); // "1000637"
+    const portName = portId.slice(colonIndex + 1); // "in"
+
+    return { nodeId, portId, portName, direction };
+};
+
 export interface NodeUpdateInfo {
     nodeId: string;
     flowId?: string;
@@ -63,6 +111,25 @@ export interface NodeUpdateInfo {
     parentNodeId?: string;
     state?: 'RUNNING' | 'COMPLETED';
     progress?: number;
+}
+
+/**
+ * Port update info parsed from WebSocket message
+ * Used by onPortUpdate callback for port data synchronization
+ */
+export interface PortUpdateInfo {
+    /** Port ID for API call: "nodeId:portName" (e.g., "1000637:in") */
+    portId: string;
+    /** Parent node ID (e.g., "1000637") */
+    nodeId: string;
+    /** Port name/key (e.g., "in", "out", "data") */
+    portName: string;
+    /** Port direction (from @suffix: "in" or "out") */
+    direction?: 'in' | 'out';
+    /** Flow ID */
+    flowId?: string;
+    /** Timestamp when port data changed */
+    timestamp?: number;
 }
 
 export interface UseInitFlowSocketOptions {
@@ -76,6 +143,8 @@ export interface UseInitFlowSocketOptions {
     onFlowUpdate?: (flowId: string) => void;
     /** Callback when node update notification is received - should reload single node */
     onNodeReload?: (info: NodeUpdateInfo) => void;
+    /** Callback when port update notification is received - should fetch port data */
+    onPortUpdate?: (info: PortUpdateInfo) => void;
 }
 
 /**
@@ -102,7 +171,7 @@ export interface UseInitFlowSocketOptions {
  * });
  */
 export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
-    const { channelId, currentFlowId, getLastLocalUpdateTimestamp, onFlowUpdate, onNodeReload } = options;
+    const { channelId, currentFlowId, getLastLocalUpdateTimestamp, onFlowUpdate, onNodeReload, onPortUpdate } = options;
 
     const apiKey = useWebCoreStore(state => state.apiKey);
     const setId = useWebSocketStore(state => state.setId);
@@ -202,9 +271,41 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         progress: data.progress,
                     });
                 }
+                return;
+            }
+
+            // Handle port update notification (type: 'node/port')
+            // Triggered when port data (input/output) changes
+            // Used for real-time data synchronization between browser tabs
+            if (isPortUpdateMessage(data)) {
+                // Only process if it's for the current flow
+                if (data.flowId && data.flowId !== currentFlowId) return;
+
+                // Parse port ID to extract nodeId, direction, portName
+                const parsed = parsePortId(data.id);
+                if (!parsed) return;
+
+                if (onPortUpdate) {
+                    onPortUpdate({
+                        portId: parsed.portId, // "nodeId:portName" without @direction
+                        nodeId: parsed.nodeId,
+                        portName: parsed.portName,
+                        direction: parsed.direction, // from @suffix
+                        flowId: data.flowId,
+                        timestamp: data.timestamp,
+                    });
+                }
             }
         }
-    }, [lastMessage, broadcastMessage, currentFlowId, getLastLocalUpdateTimestamp, onFlowUpdate, onNodeReload]);
+    }, [
+        lastMessage,
+        broadcastMessage,
+        currentFlowId,
+        getLastLocalUpdateTimestamp,
+        onFlowUpdate,
+        onNodeReload,
+        onPortUpdate,
+    ]);
 
     // Cleanup on unmount
     // Note: Empty deps intentional - runs only on unmount

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { EXECUTE_FUNCTIONS, getNode, getStatusPriority, useBlocks, useFlows } from '@flows/flows';
+import { EXECUTE_FUNCTIONS, getNode, getPortData, getStatusPriority, useBlocks, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { useWebCoreStore } from '@flows/web-core';
@@ -12,7 +12,7 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
-import type { NodeUpdateInfo } from '@flows/socket';
+import type { NodeUpdateInfo, PortUpdateInfo } from '@flows/socket';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -196,6 +196,72 @@ export const FlowEditorPage = () => {
         [blockRegistry]
     );
 
+    // Track port timestamps to detect changes and prevent duplicate fetches
+    const portTimestampsRef = useRef<Map<string, number>>(new Map());
+
+    /**
+     * Handle port update notification from WebSocket (type: 'node/port')
+     * Fetches port data and updates the parent node's inputData/outputData
+     *
+     * Only syncs 'in' direction ports (input data) as per requirements.
+     * 'out' ports are execution results and don't need external sync.
+     */
+    const handlePortUpdate = useCallback(
+        async (info: PortUpdateInfo) => {
+            const { portId, nodeId, direction, portName, timestamp } = info;
+
+            // Only sync 'in' direction (input data synchronization)
+            // Skip if direction is explicitly 'out'
+            if (direction === 'out') return;
+
+            // Use direction from message, default to 'in' if not specified
+            const effectiveDirection = direction ?? 'in';
+
+            // Check if timestamp changed to prevent duplicate fetches
+            const prevTimestamp = portTimestampsRef.current.get(portId);
+            if (prevTimestamp && timestamp && prevTimestamp >= timestamp) return;
+
+            // Update timestamp before fetch to prevent concurrent fetches
+            if (timestamp) {
+                portTimestampsRef.current.set(portId, timestamp);
+            }
+
+            try {
+                // Fetch port data from server
+                const portData = await getPortData(portId, effectiveDirection);
+
+                if (portData?.data$ && canvasRef.current) {
+                    // Convert PortData to DataPacket format for canvas update
+                    const portValue = portData.data$.S ?? portData.data$.N ?? portData.data$.F ?? portData.data$.M;
+                    const portType = portData.dataType || 'text';
+                    const portTimestamp = portData.data$.timestamp || timestamp;
+                    // Use portName from parsed info, fallback to portData.name
+                    const portKey = portName || portData.name || 'data';
+
+                    const dataPacket = {
+                        value: portValue,
+                        type: portType,
+                        timestamp: portTimestamp,
+                    };
+
+                    // Update canvas with port data (inputData for 'in' direction)
+                    canvasRef.current.updateNodeFromServer(nodeId, {
+                        inputData: { [portKey]: dataPacket },
+                    });
+                }
+            } catch (error) {
+                // Port fetch failed - revert timestamp to allow retry
+                if (prevTimestamp) {
+                    portTimestampsRef.current.set(portId, prevTimestamp);
+                } else {
+                    portTimestampsRef.current.delete(portId);
+                }
+                console.debug('[handlePortUpdate] Failed to fetch port data:', portId, error);
+            }
+        },
+        [] // No dependencies - uses refs and stable canvasRef
+    );
+
     // Track last local update to prevent self-echo from socket (use ref to avoid re-renders)
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
     const getLastLocalUpdateTimestamp = useCallback(() => lastLocalUpdateTimestampRef.current, []);
@@ -213,6 +279,7 @@ export const FlowEditorPage = () => {
         getLastLocalUpdateTimestamp,
         onFlowUpdate: handleFlowUpdate,
         onNodeReload: handleNodeUpdate,
+        onPortUpdate: handlePortUpdate,
     });
 
     const [isAppReady, setIsAppReady] = useState(false);

@@ -57,9 +57,33 @@ export interface NodeUpdateMessage {
 }
 
 /**
+ * Port update notification from WebSocket
+ * Received when port data (input/output) changes
+ *
+ * @example
+ * {
+ *   "type": "node/port",
+ *   "id": "1000637:in@in",
+ *   "flowId": "1000088",
+ *   "timestamp": 1771810838212
+ * }
+ *
+ * ID format: "nodeId:direction@portName"
+ * - nodeId: parent node ID (e.g., "1000637")
+ * - direction: "in" or "out"
+ * - portName: port identifier (e.g., "in", "out", "data")
+ */
+export interface PortUpdateMessage {
+    type: 'node/port';
+    id: string;
+    flowId?: string;
+    timestamp?: number;
+}
+
+/**
  * Union type for socket data messages
  */
-export type SocketDataMessage = FlowUpdateMessage | NodeUpdateMessage;
+export type SocketDataMessage = FlowUpdateMessage | NodeUpdateMessage | PortUpdateMessage;
 
 /**
  * Raw WebSocket message wrapper from server

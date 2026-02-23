@@ -41,6 +41,29 @@ export const getNode = async (id: string): Promise<NodeView> => {
 };
 
 /**
+ * Get port data by port ID
+ * GET /nodes/:portId/port?direction=in|out
+ *
+ * Used for real-time port data synchronization via WebSocket.
+ * When a port update notification is received, this fetches the latest port data.
+ *
+ * @param portId - Port ID (e.g., "1000637:in@in" or "1000637:in")
+ * @param direction - Port direction ('in' or 'out')
+ * @returns NodeView with port data (data$ field)
+ *
+ * @example
+ * const portData = await getPortData('1000637:in@in', 'in');
+ * // portData.data$ contains: { S?, N?, F?, M?, timestamp? }
+ */
+export const getPortData = async (portId: string, direction: 'in' | 'out'): Promise<NodeView> => {
+    _log(`> getPortData(${portId}, direction=${direction})`);
+    const response = await api.get<NodeView>(`/nodes/${portId}/port`, {
+        params: { direction },
+    });
+    return response.data;
+};
+
+/**
  * Create new node
  * POST /nodes/0
  *
