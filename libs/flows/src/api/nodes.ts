@@ -47,20 +47,19 @@ export const getNode = async (id: string): Promise<NodeView> => {
  * Used for real-time port data synchronization via WebSocket.
  * When a port update notification is received, this fetches the latest port data.
  *
- * @param portId - Port ID (e.g., "1000637:in@in" or "1000637:in")
- * @param direction - Port direction ('in' or 'out')
- * @returns NodeView with port data (data$ field)
+ * TODO: API not yet available - returns null until implemented
+ * @see https://github.com/lemoncloud-io/eureka-flows-api/issues/XXX
  *
- * @example
- * const portData = await getPortData('1000637:in@in', 'in');
- * // portData.data$ contains: { S?, N?, F?, M?, timestamp? }
+ * @param portId - Port ID (e.g., "1000637:in" or "1000637:out")
+ * @param direction - Port direction ('in' or 'out')
+ * @returns NodeView with port data, or null if API not available
  */
-export const getPortData = async (portId: string, direction: 'in' | 'out'): Promise<NodeView> => {
-    _log(`> getPortData(${portId}, direction=${direction})`);
-    const response = await api.get<NodeView>(`/nodes/${portId}/port`, {
-        params: { direction },
-    });
-    return response.data;
+export const getPortData = async (portId: string, direction: 'in' | 'out'): Promise<NodeView | null> => {
+    // TODO: Enable when API is ready
+    // const response = await api.get<NodeView>(`/nodes/${portId}/port`, { params: { direction } });
+    // return response.data;
+    _log(`> getPortData(${portId}, direction=${direction}) - API not yet available, skipping`);
+    return null;
 };
 
 /**
