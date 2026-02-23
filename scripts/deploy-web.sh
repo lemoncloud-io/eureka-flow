@@ -5,9 +5,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 APP_NAME="web"
-BUCKET_NAME="eureka-flows-front"  # TODO: Update with actual bucket name
-DEV_DISTRIBUTION_ID="TODO"        # TODO: Update with actual CloudFront distribution ID
-PROD_DISTRIBUTION_ID="TODO"       # TODO: Update with actual CloudFront distribution ID
+BUCKET_NAME="eureka-flows-front"
+DEV_DISTRIBUTION_ID="CF_FLOW_DEV"   # TODO: Replace with actual CloudFront distribution ID
+PROD_DISTRIBUTION_ID="CF_FLOW_PROD" # TODO: Replace with actual CloudFront distribution ID
 DIST_DIR="${PROJECT_ROOT}/dist/apps/${APP_NAME}"
 CACHE_CONTROL_NO_CACHE="max-age=0,no-cache,no-store,must-revalidate"
 CACHE_CONTROL_LOCALES="max-age=0,s-maxage=0,no-cache,no-store,must-revalidate,proxy-revalidate"
