@@ -40,9 +40,6 @@ jobs:
               if: ${{ steps.cache-dependencies.outputs.cache-hit != 'true' }}
               run: yarn install --frozen-lockfile
 
-            - name: Build for DEV
-              run: yarn web:build:dev
-
             - name: Configure AWS Credentials
               uses: aws-actions/configure-aws-credentials@v4
               with:
