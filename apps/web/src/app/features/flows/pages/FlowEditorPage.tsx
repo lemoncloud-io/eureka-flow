@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { EXECUTE_FUNCTIONS, getNode, getStatusPriority, useBlocks, useFlows } from '@flows/flows';
+import { EXECUTE_FUNCTIONS, getNode, getPortData, getStatusPriority, useBlocks, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { useWebCoreStore } from '@flows/web-core';
@@ -12,7 +12,7 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
-import type { NodeData } from '@flows/flows';
+import type { NodeUpdateInfo, PortUpdateInfo } from '@flows/socket';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -65,25 +65,20 @@ export const FlowEditorPage = () => {
     );
 
     const handleNodeUpdate = useCallback(
-        async (info: {
-            nodeId: string;
-            flowId?: string;
-            timestamp?: number;
-            status?: string;
-            prevStatus?: string;
-            isPort: boolean;
-            parentNodeId?: string;
-            state?: 'RUNNING' | 'COMPLETED';
-            progress?: number;
-        }) => {
+        async (info: NodeUpdateInfo) => {
             const { nodeId, status, isPort, parentNodeId, state, progress } = info;
 
-            // Progress-only update (no flowId) - update UI immediately without API call
-            if (progress !== undefined && !info.flowId && canvasRef.current) {
-                const effectiveProgress = state === 'COMPLETED' ? 100 : progress;
+            // When state field exists, update UI directly from socket data (no API fetch needed)
+            // - state=RUNNING/COMPLETED is the execution state from server
+            // - Output data comes separately via node/port messages
+            // - API fetch only needed for isPort (port data) or status-only messages (no state)
+            // NOTE: state=COMPLETED takes priority over status (server may send status=RUNNING with state=COMPLETED)
+            if (state && !isPort && canvasRef.current) {
+                const effectiveStatus = state === 'COMPLETED' ? 'COMPLETED' : (status ?? state);
                 canvasRef.current.updateNodeFromServer(nodeId, {
-                    executionStats: { progress: effectiveProgress },
-                } as NodeData);
+                    status: effectiveStatus,
+                    executionStats: progress !== undefined ? { progress } : undefined,
+                });
                 return;
             }
 
@@ -127,12 +122,12 @@ export const FlowEditorPage = () => {
                         const partialUpdate = {
                             inputData: portData.direction === 'in' ? { [portKey]: dataPacket } : undefined,
                             outputData: portData.direction === 'out' ? { [portKey]: dataPacket } : undefined,
-                        } as NodeData;
+                        };
                         canvasRef.current.updateNodeFromServer(parentNodeId, partialUpdate);
                     }
                     // Update status if provided
                     else if (canvasRef.current && status) {
-                        canvasRef.current.updateNodeFromServer(parentNodeId, { status } as NodeData);
+                        canvasRef.current.updateNodeFromServer(parentNodeId, { status });
                     }
                 } else {
                     // ============================================================
@@ -161,7 +156,7 @@ export const FlowEditorPage = () => {
                     if (canvasRef.current && nodeData) {
                         // Merge API data with the resolved status
                         const mergedData = finalStatus ? { ...nodeData, status: finalStatus } : nodeData;
-                        canvasRef.current.updateNodeFromServer(nodeId, mergedData as NodeData);
+                        canvasRef.current.updateNodeFromServer(nodeId, mergedData);
 
                         // ============================================================
                         // Auto-execute isFrontend Nodes
@@ -190,7 +185,7 @@ export const FlowEditorPage = () => {
                         }
                     } else if (canvasRef.current && status) {
                         // Fallback: No API data, use socket status
-                        canvasRef.current.updateNodeFromServer(nodeId, { status } as NodeData);
+                        canvasRef.current.updateNodeFromServer(nodeId, { status });
                     }
                 }
             } catch (error) {
@@ -199,6 +194,72 @@ export const FlowEditorPage = () => {
             }
         },
         [blockRegistry]
+    );
+
+    // Track port timestamps to detect changes and prevent duplicate fetches
+    const portTimestampsRef = useRef<Map<string, number>>(new Map());
+
+    /**
+     * Handle port update notification from WebSocket (type: 'node/port')
+     * Fetches port data and updates the parent node's inputData/outputData
+     *
+     * Only syncs 'in' direction ports (input data) as per requirements.
+     * 'out' ports are execution results and don't need external sync.
+     */
+    const handlePortUpdate = useCallback(
+        async (info: PortUpdateInfo) => {
+            const { portId, nodeId, direction, portName, timestamp } = info;
+
+            // Only sync 'in' direction (input data synchronization)
+            // Skip if direction is explicitly 'out'
+            if (direction === 'out') return;
+
+            // Use direction from message, default to 'in' if not specified
+            const effectiveDirection = direction ?? 'in';
+
+            // Check if timestamp changed to prevent duplicate fetches
+            const prevTimestamp = portTimestampsRef.current.get(portId);
+            if (prevTimestamp && timestamp && prevTimestamp >= timestamp) return;
+
+            // Update timestamp before fetch to prevent concurrent fetches
+            if (timestamp) {
+                portTimestampsRef.current.set(portId, timestamp);
+            }
+
+            try {
+                // Fetch port data from server
+                const portData = await getPortData(portId, effectiveDirection);
+
+                if (portData?.data$ && canvasRef.current) {
+                    // Convert PortData to DataPacket format for canvas update
+                    const portValue = portData.data$.S ?? portData.data$.N ?? portData.data$.F ?? portData.data$.M;
+                    const portType = portData.dataType || 'text';
+                    const portTimestamp = portData.data$.timestamp || timestamp;
+                    // Use portName from parsed info, fallback to portData.name
+                    const portKey = portName || portData.name || 'data';
+
+                    const dataPacket = {
+                        value: portValue,
+                        type: portType,
+                        timestamp: portTimestamp,
+                    };
+
+                    // Update canvas with port data (inputData for 'in' direction)
+                    canvasRef.current.updateNodeFromServer(nodeId, {
+                        inputData: { [portKey]: dataPacket },
+                    });
+                }
+            } catch (error) {
+                // Port fetch failed - revert timestamp to allow retry
+                if (prevTimestamp) {
+                    portTimestampsRef.current.set(portId, prevTimestamp);
+                } else {
+                    portTimestampsRef.current.delete(portId);
+                }
+                console.debug('[handlePortUpdate] Failed to fetch port data:', portId, error);
+            }
+        },
+        [] // No dependencies - uses refs and stable canvasRef
     );
 
     // Track last local update to prevent self-echo from socket (use ref to avoid re-renders)
@@ -218,6 +279,7 @@ export const FlowEditorPage = () => {
         getLastLocalUpdateTimestamp,
         onFlowUpdate: handleFlowUpdate,
         onNodeReload: handleNodeUpdate,
+        onPortUpdate: handlePortUpdate,
     });
 
     const [isAppReady, setIsAppReady] = useState(false);

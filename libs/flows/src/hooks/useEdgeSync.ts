@@ -4,7 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 
 import { upsertFlow } from '../api';
 
-import type { EdgeData } from '@lemoncloud/eureka-flows-api';
+import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
 /** Callback invoked when server assigns a real ID to replace temp ID */
 export type OnEdgeIdAssigned = (tempId: string, serverId: string) => void;
@@ -17,13 +17,19 @@ interface UseEdgeSyncOptions {
 interface UseEdgeSyncReturn {
     /**
      * Create a new edge on backend with server-assigned ID
-     * POST /flows/:flowId/upsert with { nodes: [], edges: [edge] }
+     * POST /flows/:flowId/upsert with { nodes: [...], edges: [edge] }
      *
      * @param tempId - Temporary ID used in UI (will be replaced by server ID)
      * @param edge - Edge data to create (without id, or with temp id)
      * @param onIdAssigned - Callback when server assigns real ID
+     * @param nodes - Optional nodes to include in upsert (for newly created nodes)
      */
-    createEdgeAsync: (tempId: string, edge: Omit<EdgeData, 'id'>, onIdAssigned: OnEdgeIdAssigned) => void;
+    createEdgeAsync: (
+        tempId: string,
+        edge: Omit<EdgeData, 'id'>,
+        onIdAssigned: OnEdgeIdAssigned,
+        nodes?: NodeData[]
+    ) => void;
 
     /** Check if any edge creation is pending */
     isPending: boolean;
@@ -61,8 +67,8 @@ interface UseEdgeSyncReturn {
 export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn => {
     // Use upsertFlow mutation for POST /flows/:id/upsert
     const createMutation = useMutation({
-        mutationFn: ({ flowId, edge }: { flowId: string; edge: EdgeData }) =>
-            upsertFlow(flowId, { nodes: [], edges: [edge] }),
+        mutationFn: ({ flowId, edge, nodes }: { flowId: string; edge: EdgeData; nodes?: NodeData[] }) =>
+            upsertFlow(flowId, { nodes: nodes ?? [], edges: [edge] }),
     });
 
     // Track pending temp edge IDs waiting for server response
@@ -87,10 +93,10 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
 
     /**
      * Create a new edge on backend with server-assigned ID
-     * POST /flows/:flowId/upsert with { nodes: [], edges: [edge] }
+     * POST /flows/:flowId/upsert with { nodes: [...], edges: [edge] }
      */
     const createEdgeAsync = useCallback(
-        (tempId: string, edge: Omit<EdgeData, 'id'>, onIdAssigned: OnEdgeIdAssigned) => {
+        (tempId: string, edge: Omit<EdgeData, 'id'>, onIdAssigned: OnEdgeIdAssigned, nodes?: NodeData[]) => {
             if (!flowId) {
                 console.warn('[useEdgeSync] Cannot create edge: flowId is null');
                 return;
@@ -109,7 +115,7 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
             };
 
             createMutation.mutate(
-                { flowId, edge: edgeData },
+                { flowId, edge: edgeData, nodes },
                 {
                     onSuccess: result => {
                         const resultAny = result as Record<string, unknown>;

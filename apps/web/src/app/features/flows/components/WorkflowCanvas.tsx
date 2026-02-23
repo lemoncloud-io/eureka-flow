@@ -52,7 +52,7 @@ export interface WorkflowCanvasRef {
     /** Update node data (used for socket status updates) */
     updateNode: (nodeId: string, updates: Partial<NodeData>) => void;
     /** Update node from server data (used for socket node update notifications) */
-    updateNodeFromServer: (nodeId: string, serverData: NodeData) => void;
+    updateNodeFromServer: (nodeId: string, serverData: Partial<NodeData>) => void;
 }
 
 interface WorkflowCanvasProps {
@@ -471,6 +471,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             : connectionToCreate.targetNodeId,
                                 };
 
+                                // Prepare node data with server ID for upsert
+                                const nodeForServer: NodeData = {
+                                    ...newNode,
+                                    id: newServerId,
+                                };
+
                                 createEdgeAsync(
                                     tempEdgeId,
                                     {
@@ -484,7 +490,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                         setConnections(prev =>
                                             prev.map(c => (c.id === oldEdgeTempId ? { ...c, id: newEdgeServerId } : c))
                                         );
-                                    }
+                                    },
+                                    [nodeForServer]
                                 );
                             }
                         }
@@ -683,7 +690,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 updateNode: (nodeId: string, updates: Partial<NodeData>) => {
                     setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, ...updates } : n)));
                 },
-                updateNodeFromServer: (nodeId: string, serverData: NodeData) => {
+                updateNodeFromServer: (nodeId: string, serverData: Partial<NodeData>) => {
                     // Merge server data with existing node, preserving UI-specific fields
                     // Note: Server returns NodeView format from GET /nodes/:id
                     // - config$: ConfigItem[] (array) -> config: Record<string, string> (object)
@@ -746,10 +753,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             }
 
                             // Status priority: only update if server status is more "final"
-                            // This prevents RUNNING from overwriting COMPLETED set by frontend
-                            const finalStatus = shouldUpdateStatus(n.status, serverData.status)
-                                ? serverData.status
-                                : n.status;
+                            // EXCEPTION: If RUNNING with progress, force update (active execution)
+                            const isActiveExecution =
+                                serverData.status === 'RUNNING' && serverData.executionStats?.progress !== undefined;
+                            const finalStatus =
+                                isActiveExecution || shouldUpdateStatus(n.status, serverData.status)
+                                    ? serverData.status
+                                    : n.status;
 
                             return {
                                 ...n,
