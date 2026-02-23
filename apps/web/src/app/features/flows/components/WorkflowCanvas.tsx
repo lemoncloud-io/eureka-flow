@@ -471,6 +471,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             : connectionToCreate.targetNodeId,
                                 };
 
+                                // Prepare node data with server ID for upsert
+                                const nodeForServer: NodeData = {
+                                    ...newNode,
+                                    id: newServerId,
+                                };
+
                                 createEdgeAsync(
                                     tempEdgeId,
                                     {
@@ -484,7 +490,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                         setConnections(prev =>
                                             prev.map(c => (c.id === oldEdgeTempId ? { ...c, id: newEdgeServerId } : c))
                                         );
-                                    }
+                                    },
+                                    [nodeForServer]
                                 );
                             }
                         }
