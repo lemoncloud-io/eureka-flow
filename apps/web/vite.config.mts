@@ -14,28 +14,30 @@ const removeVitePrefix = (envVar: string) => envVar.replace('VITE_', '');
 const htmlEnvInjectionPlugin = (env: Record<string, string>) => {
     return {
         name: 'html-env-injection',
-        transformIndexHtml(html: string) {
-            const envVars = Object.entries(env)
-                .filter(([key]) => key.startsWith('VITE_'))
-                .reduce(
-                    (acc, [key, value]) => {
-                        acc[removeVitePrefix(key)] = value || '';
-                        return acc;
-                    },
-                    {} as Record<string, string>
-                );
+        transformIndexHtml: {
+            order: 'pre' as const,
+            handler(html: string) {
+                const envVars = Object.entries(env)
+                    .filter(([key]) => key.startsWith('VITE_'))
+                    .reduce(
+                        (acc, [key, value]) => {
+                            acc[removeVitePrefix(key)] = value || '';
+                            return acc;
+                        },
+                        {} as Record<string, string>
+                    );
 
-            const envScript = `
-                <script>
-                    (function() {
-                        ${Object.entries(envVars)
-                            .map(([key, value]) => `window.${key}="${value}";`)
-                            .join('\n')}
-                    })();
-                </script>
-            `;
+                const envScript = `
+    <script>
+        (function() {
+            ${Object.entries(envVars)
+                .map(([key, value]) => `window.${key}="${value}";`)
+                .join('\n            ')}
+        })();
+    </script>`;
 
-            return html.replace(/<body>/, `${envScript}\n<body>`);
+                return html.replace(/(<body[^>]*>)/i, `${envScript}\n$1`);
+            },
         },
     };
 };
