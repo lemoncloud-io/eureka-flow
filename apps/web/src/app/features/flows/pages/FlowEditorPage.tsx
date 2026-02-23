@@ -12,7 +12,7 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
-import type { NodeData } from '@flows/flows';
+import type { NodeUpdateInfo } from '@flows/socket';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -65,25 +65,20 @@ export const FlowEditorPage = () => {
     );
 
     const handleNodeUpdate = useCallback(
-        async (info: {
-            nodeId: string;
-            flowId?: string;
-            timestamp?: number;
-            status?: string;
-            prevStatus?: string;
-            isPort: boolean;
-            parentNodeId?: string;
-            state?: 'RUNNING' | 'COMPLETED';
-            progress?: number;
-        }) => {
+        async (info: NodeUpdateInfo) => {
             const { nodeId, status, isPort, parentNodeId, state, progress } = info;
 
-            // Progress-only update (no flowId) - update UI immediately without API call
-            if (progress !== undefined && !info.flowId && canvasRef.current) {
-                const effectiveProgress = state === 'COMPLETED' ? 100 : progress;
+            // When state field exists, update UI directly from socket data (no API fetch needed)
+            // - state=RUNNING/COMPLETED is the execution state from server
+            // - Output data comes separately via node/port messages
+            // - API fetch only needed for isPort (port data) or status-only messages (no state)
+            // NOTE: state=COMPLETED takes priority over status (server may send status=RUNNING with state=COMPLETED)
+            if (state && !isPort && canvasRef.current) {
+                const effectiveStatus = state === 'COMPLETED' ? 'COMPLETED' : (status ?? state);
                 canvasRef.current.updateNodeFromServer(nodeId, {
-                    executionStats: { progress: effectiveProgress },
-                } as NodeData);
+                    status: effectiveStatus,
+                    executionStats: progress !== undefined ? { progress } : undefined,
+                });
                 return;
             }
 
@@ -127,12 +122,12 @@ export const FlowEditorPage = () => {
                         const partialUpdate = {
                             inputData: portData.direction === 'in' ? { [portKey]: dataPacket } : undefined,
                             outputData: portData.direction === 'out' ? { [portKey]: dataPacket } : undefined,
-                        } as NodeData;
+                        };
                         canvasRef.current.updateNodeFromServer(parentNodeId, partialUpdate);
                     }
                     // Update status if provided
                     else if (canvasRef.current && status) {
-                        canvasRef.current.updateNodeFromServer(parentNodeId, { status } as NodeData);
+                        canvasRef.current.updateNodeFromServer(parentNodeId, { status });
                     }
                 } else {
                     // ============================================================
@@ -161,7 +156,7 @@ export const FlowEditorPage = () => {
                     if (canvasRef.current && nodeData) {
                         // Merge API data with the resolved status
                         const mergedData = finalStatus ? { ...nodeData, status: finalStatus } : nodeData;
-                        canvasRef.current.updateNodeFromServer(nodeId, mergedData as NodeData);
+                        canvasRef.current.updateNodeFromServer(nodeId, mergedData);
 
                         // ============================================================
                         // Auto-execute isFrontend Nodes
@@ -190,7 +185,7 @@ export const FlowEditorPage = () => {
                         }
                     } else if (canvasRef.current && status) {
                         // Fallback: No API data, use socket status
-                        canvasRef.current.updateNodeFromServer(nodeId, { status } as NodeData);
+                        canvasRef.current.updateNodeFromServer(nodeId, { status });
                     }
                 }
             } catch (error) {
