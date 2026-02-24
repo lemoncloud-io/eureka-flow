@@ -9,8 +9,7 @@ jobs:
         name: Check changed projects
         runs-on: ubuntu-latest
         outputs:
-            web: ${{ steps.filter.outputs.web == 'true' && 'true' || 'false' }}
-            admin: ${{ steps.filter.outputs.admin == 'true' && 'true' || 'false' }}
+            web: ${{ steps.set-matrix.outputs.web }}
             matrix: ${{ steps.set-matrix.outputs.matrix }}
             has-changes: ${{ steps.set-matrix.outputs.has-changes }}
 
@@ -37,26 +36,17 @@ jobs:
                           - 'libs/**'
                           - 'package.json'
                           - 'yarn.lock'
-                      admin:
-                          - 'apps/admin/src/**'
-                          - 'apps/admin/public/**'
-                          - 'apps/admin/index.html'
-                          - 'apps/admin/vite.config.ts'
-                          - 'apps/admin/project.json'
-                          - 'apps/admin/tsconfig*.json'
-                          - 'apps/admin/tailwind.config.js'
-                          - 'apps/admin/postcss.config.js'
-                          - 'apps/admin/.env.*'
-                          - 'libs/**'
-                          - 'package.json'
-                          - 'yarn.lock'
 
             - name: Set matrix for changed projects
               id: set-matrix
               run: |
                   PROJECTS=()
-                  [[ "${{ steps.filter.outputs.web }}" == "true" && -d "apps/web" ]] && PROJECTS+=('"web"')
-                  [[ "${{ steps.filter.outputs.admin }}" == "true" && -d "apps/admin" ]] && PROJECTS+=('"admin"')
+                  WEB_CHANGED="false"
+
+                  if [[ "${{ steps.filter.outputs.web }}" == "true" && -d "apps/web" ]]; then
+                      PROJECTS+=('"web"')
+                      WEB_CHANGED="true"
+                  fi
 
                   if [ ${#PROJECTS[@]} -eq 0 ]; then
                       echo "matrix=[]" >> $GITHUB_OUTPUT
@@ -66,6 +56,8 @@ jobs:
                       echo "matrix=${MATRIX}" >> $GITHUB_OUTPUT
                       echo "has-changes=true" >> $GITHUB_OUTPUT
                   fi
+
+                  echo "web=${WEB_CHANGED}" >> $GITHUB_OUTPUT
 
     version-update:
         needs: changes
@@ -78,7 +70,6 @@ jobs:
         outputs:
             root-version: ${{ steps.version-update.outputs.root-version }}
             web-version: ${{ steps.version-update.outputs.web-version }}
-            admin-version: ${{ steps.version-update.outputs.admin-version }}
 
         steps:
             - name: Check out repository
@@ -104,8 +95,7 @@ jobs:
                   chmod +x scripts/version-update.js
 
                   PROJECTS=()
-                  [[ "${{ needs.changes.outputs.web }}" == "true" && -d "apps/web" ]] && PROJECTS+=("web")
-                  [[ "${{ needs.changes.outputs.admin }}" == "true" && -d "apps/admin" ]] && PROJECTS+=("admin")
+                  [[ "${{ needs.changes.outputs.web }}" == "true" ]] && PROJECTS+=("web")
 
                   if [ ${#PROJECTS[@]} -eq 0 ]; then
                     echo "No projects to update"
@@ -121,11 +111,6 @@ jobs:
                   if [[ -f "apps/web/package.json" ]]; then
                       WEB_VERSION=$(node -p "require('./apps/web/package.json').version")
                       echo "web-version=${WEB_VERSION}" >> $GITHUB_OUTPUT
-                  fi
-
-                  if [[ -f "apps/admin/package.json" ]]; then
-                      ADMIN_VERSION=$(node -p "require('./apps/admin/package.json').version")
-                      echo "admin-version=${ADMIN_VERSION}" >> $GITHUB_OUTPUT
                   fi
 
             - name: Commit and push changes
@@ -231,11 +216,7 @@ jobs:
                   DEPLOY_MESSAGES=()
 
                   if [[ "${{ needs.changes.outputs.web }}" == "true" ]]; then
-                      DEPLOY_MESSAGES+=("• *Flows* <https://flows-dev.eureka.codes/|개발 서버> \`v${{ needs.version-update.outputs.web-version }}\`")
-                  fi
-
-                  if [[ "${{ needs.changes.outputs.admin }}" == "true" ]]; then
-                      DEPLOY_MESSAGES+=("• *Admin* <https://flows-admin-dev.eureka.codes/|개발 서버> \`v${{ needs.version-update.outputs.admin-version }}\`")
+                      DEPLOY_MESSAGES+=("• *Flows* <https://flow-dev.eureka.codes/|개발 서버> \`v${{ needs.version-update.outputs.web-version }}\`")
                   fi
 
                   if [ ${#DEPLOY_MESSAGES[@]} -eq 0 ]; then
@@ -324,11 +305,7 @@ jobs:
                   DEPLOY_MESSAGES=()
 
                   if [[ "${{ needs.changes.outputs.web }}" == "true" ]]; then
-                      DEPLOY_MESSAGES+=("• *Flows* <https://flows-dev.eureka.codes/|개발 서버>")
-                  fi
-
-                  if [[ "${{ needs.changes.outputs.admin }}" == "true" ]]; then
-                      DEPLOY_MESSAGES+=("• *Admin* <https://flows-admin-dev.eureka.codes/|개발 서버>")
+                      DEPLOY_MESSAGES+=("• *Flows* <https://flow-dev.eureka.codes/|개발 서버>")
                   fi
 
                   if [ ${#DEPLOY_MESSAGES[@]} -eq 0 ]; then
