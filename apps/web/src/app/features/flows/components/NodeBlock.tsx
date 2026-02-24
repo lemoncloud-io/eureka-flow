@@ -997,11 +997,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
             {/* Ports at node edges - centered on border */}
             {/* Show only: first port + connected ports + compatible ports during drag */}
-            {/* Use overflow-y-clip + height transition so ports reveal smoothly (x-axis visible for port circles) */}
-            <div
-                className="absolute left-[-6px] top-[45px] flex flex-col gap-1 overflow-y-clip overflow-x-visible transition-[height] duration-150 ease-out"
-                style={{ height: `${visibleInputPorts.length * PORT_LAYOUT.PORT_SPACING}px` }}
-            >
+            <div className="absolute left-[-6px] top-[45px] flex flex-col gap-1">
                 {visibleInputPorts.map(p => (
                     <PortItem
                         key={p.id}
@@ -1017,10 +1013,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     />
                 ))}
             </div>
-            <div
-                className="absolute right-[-6px] top-[45px] flex flex-col gap-1 overflow-y-clip overflow-x-visible transition-[height] duration-150 ease-out"
-                style={{ height: `${visibleOutputPorts.length * PORT_LAYOUT.PORT_SPACING}px` }}
-            >
+            <div className="absolute right-[-6px] top-[45px] flex flex-col gap-1">
                 {visibleOutputPorts.map(p => (
                     <PortItem
                         key={p.id}
@@ -1037,11 +1030,11 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 ))}
             </div>
 
-            {/* Body - min height based on visible port count (PORT_SPACING + 2px padding) */}
+            {/* Body - min height based on visible port count */}
             <div
-                className="px-3 py-3 transition-[min-height] duration-150 ease-out"
+                className="px-3 py-3"
                 style={{
-                    minHeight: `${Math.max(visibleInputPorts.length, visibleOutputPorts.length) * (PORT_LAYOUT.PORT_SPACING + 2)}px`,
+                    minHeight: `${Math.max(visibleInputPorts.length, visibleOutputPorts.length) * PORT_LAYOUT.PORT_SPACING}px`,
                 }}
             >
                 {/* Content Area */}
