@@ -392,7 +392,16 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
         switch (field.type) {
             case 'text':
-                return (
+                return field.short ? (
+                    <input
+                        type="text"
+                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors font-mono"
+                        value={value || ''}
+                        onChange={e => handleChange(e.target.value)}
+                        onKeyDown={e => e.stopPropagation()}
+                        placeholder={field.placeholder}
+                    />
+                ) : (
                     <textarea
                         className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors resize-y min-h-[56px] font-mono"
                         value={value || ''}
