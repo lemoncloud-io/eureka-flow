@@ -290,12 +290,20 @@ const PortItem: React.FC<PortItemProps> = ({
                     <div className="mt-1 pt-1 border-t border-border/50 font-mono text-[10px] text-foreground/80 break-all max-h-[60px] overflow-hidden">
                         {portData.type === 'image' ? (
                             <span className="text-muted-foreground italic">[Image]</span>
-                        ) : typeof portData.value === 'object' ? (
-                            JSON.stringify(portData.value).slice(0, 100)
                         ) : (
-                            String(portData.value).slice(0, 100)
+                            (() => {
+                                const strValue =
+                                    typeof portData.value === 'object'
+                                        ? JSON.stringify(portData.value)
+                                        : String(portData.value);
+                                return (
+                                    <>
+                                        {strValue.slice(0, 100)}
+                                        {strValue.length > 100 && '...'}
+                                    </>
+                                );
+                            })()
                         )}
-                        {String(portData.value).length > 100 && '...'}
                     </div>
                 )}
             </div>
