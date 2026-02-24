@@ -30,6 +30,7 @@ import {
 import { cn } from '@flows/lib/utils';
 
 import { S3Image } from './S3Image';
+import { TooltipImage } from './TooltipImage';
 
 import type { BlockDefinitionWithFrontend, DataPacket, NodeData, PortDefinition } from '@flows/flows';
 
@@ -271,6 +272,13 @@ const PortItem: React.FC<PortItemProps> = ({
         </div>
     );
 
+    // Tooltip positioning based on content type
+    const tooltipPosition = !portData
+        ? '-top-7 whitespace-nowrap'
+        : portData.type === 'image'
+          ? 'bottom-full mb-2'
+          : '-top-14 max-w-[200px]';
+
     return (
         <div className="relative group flex items-center justify-center w-3 h-6">
             {portCircle}
@@ -279,7 +287,7 @@ const PortItem: React.FC<PortItemProps> = ({
             <div
                 className={cn(
                     'absolute left-1/2 -translate-x-1/2 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 shadow-lg transition-opacity duration-150',
-                    portData ? '-top-14 max-w-[200px]' : '-top-7 whitespace-nowrap'
+                    tooltipPosition
                 )}
             >
                 <div className="flex items-center gap-1">
@@ -287,22 +295,19 @@ const PortItem: React.FC<PortItemProps> = ({
                     <span className="font-semibold uppercase tracking-wider">{port.label}</span>
                 </div>
                 {portData && (
-                    <div className="mt-1 pt-1 border-t border-border/50 font-mono text-[10px] text-foreground/80 break-all max-h-[60px] overflow-hidden">
+                    <div className="mt-1 pt-1 border-t border-border/50">
                         {portData.type === 'image' ? (
-                            <span className="text-muted-foreground italic">[Image]</span>
+                            <TooltipImage src={portData.value as string} altText="Port data" />
                         ) : (
-                            (() => {
-                                const strValue =
-                                    typeof portData.value === 'object'
-                                        ? JSON.stringify(portData.value)
-                                        : String(portData.value);
-                                return (
-                                    <>
-                                        {strValue.slice(0, 100)}
-                                        {strValue.length > 100 && '...'}
-                                    </>
-                                );
-                            })()
+                            <div className="font-mono text-[10px] text-foreground/80 break-all max-h-[60px] overflow-hidden">
+                                {(() => {
+                                    const strValue =
+                                        typeof portData.value === 'object'
+                                            ? JSON.stringify(portData.value)
+                                            : String(portData.value);
+                                    return strValue.length > 100 ? `${strValue.slice(0, 100)}...` : strValue;
+                                })()}
+                            </div>
                         )}
                     </div>
                 )}
