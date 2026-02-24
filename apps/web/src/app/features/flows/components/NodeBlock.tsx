@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -21,6 +21,7 @@ import {
 
 import {
     DEFAULT_TEXTAREA_HEIGHT,
+    PORT_LAYOUT,
     clampHeight,
     compressImageIfNeeded,
     getBlockDefinition,
@@ -28,9 +29,13 @@ import {
     useBlockRegistry,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
 import { S3Image } from './S3Image';
+import { TooltipImage } from './TooltipImage';
+import { arePortTypesCompatible, getVisiblePorts } from '../utils';
 
+import type { ConnectionDraftInfo } from '../utils';
 import type { BlockDefinitionWithFrontend, DataPacket, NodeData, PortDefinition } from '@flows/flows';
 
 type ConfigValue = string | number | boolean | string[] | null;
@@ -60,12 +65,6 @@ export interface NodeActions {
     onToggleDisabled?: () => void;
     onDuplicate?: () => void;
     onViewLogs: () => void;
-}
-
-export interface ConnectionDraftInfo {
-    sourceNodeId: string;
-    sourcePortId: string;
-    sourceType: string;
 }
 
 export interface NodeHighlightState {
@@ -120,12 +119,6 @@ const getPortTypeIcon = (portType: string): React.ElementType | null => {
         default:
             return null;
     }
-};
-
-/** Check if two port types are compatible for connection */
-const arePortTypesCompatible = (sourceType: string, targetType: string): boolean => {
-    if (sourceType === 'any' || targetType === 'any') return true;
-    return sourceType.toLowerCase() === targetType.toLowerCase();
 };
 
 /**
@@ -193,6 +186,8 @@ interface PortItemProps {
     nodeId: string;
     isHighlighted: boolean;
     isConnected: boolean;
+    /** Port data value if available */
+    portData?: DataPacket | null;
     /** Connection being dragged - for compatibility feedback */
     connectionDraft?: ConnectionDraftInfo | null;
     onMouseDown: (
@@ -211,6 +206,7 @@ const PortItem: React.FC<PortItemProps> = ({
     nodeId,
     isHighlighted,
     isConnected,
+    portData,
     connectionDraft,
     onMouseDown,
     onMouseUp,
@@ -268,14 +264,45 @@ const PortItem: React.FC<PortItemProps> = ({
         </div>
     );
 
+    // Tooltip positioning based on content type
+    const tooltipPosition = !portData
+        ? '-top-7 whitespace-nowrap'
+        : portData.type === 'image'
+          ? 'bottom-full mb-2'
+          : '-top-14 max-w-[200px]';
+
     return (
         <div className="relative group flex items-center justify-center w-3 h-6">
             {portCircle}
 
-            {/* Tooltip showing port label on hover */}
-            <div className="absolute left-1/2 -translate-x-1/2 -top-7 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-150 flex items-center gap-1">
-                {PortIcon && <PortIcon className="w-2.5 h-2.5" />}
-                <span className="font-semibold uppercase tracking-wider">{port.label}</span>
+            {/* Tooltip showing port label and data on hover */}
+            <div
+                className={cn(
+                    'absolute left-1/2 -translate-x-1/2 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 shadow-lg transition-opacity duration-150',
+                    tooltipPosition
+                )}
+            >
+                <div className="flex items-center gap-1">
+                    {PortIcon && <PortIcon className="w-2.5 h-2.5 shrink-0" />}
+                    <span className="font-semibold uppercase tracking-wider">{port.label}</span>
+                </div>
+                {portData && (
+                    <div className="mt-1 pt-1 border-t border-border/50">
+                        {portData.type === 'image' ? (
+                            <TooltipImage src={portData.value as string} altText="Port data" />
+                        ) : (
+                            <div className="font-mono text-[10px] text-foreground/80 break-all max-h-[60px] overflow-hidden">
+                                {(() => {
+                                    const strValue =
+                                        typeof portData.value === 'object'
+                                            ? JSON.stringify(portData.value)
+                                            : String(portData.value);
+                                    return strValue.length > 100 ? `${strValue.slice(0, 100)}...` : strValue;
+                                })()}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -613,14 +640,17 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
     }
 
     if (packet.type === 'json' || typeof packet.value === 'object') {
-        const jsonStr = JSON.stringify(packet.value, null, 2);
         return (
-            <div
-                className="p-2 bg-black/20 rounded-lg border border-border overflow-auto"
-                style={{ maxHeight: '180px' }}
-                onWheel={e => e.stopPropagation()}
-            >
-                <pre className="text-[10px] font-mono text-foreground/80 whitespace-pre-wrap break-all">{jsonStr}</pre>
+            <div className="p-2 bg-black/20 rounded-lg border border-border" onWheel={e => e.stopPropagation()}>
+                <JsonViewer data={packet.value} maxHeight={180} collapsed={2} />
+            </div>
+        );
+    }
+
+    if (packet.type === 'markdown' || isMarkdownContent(packet.value)) {
+        return (
+            <div className="p-2 bg-muted/30 rounded-lg border border-border" onWheel={e => e.stopPropagation()}>
+                <MarkdownViewer content={String(packet.value)} maxHeight={180} />
             </div>
         );
     }
@@ -672,6 +702,16 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const { onPortMouseDown, onPortMouseUp } = portHandlers;
     const { onConfigChange, onLabelChange } = configHandlers;
     const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs } = actions;
+
+    // Memoize visible ports to avoid recalculating on every render
+    const visibleInputPorts = useMemo(
+        () => getVisiblePorts(definition?.inputs ?? [], connectedPortIds, connectionDraft, node.id, 'input'),
+        [definition?.inputs, connectedPortIds, connectionDraft, node.id]
+    );
+    const visibleOutputPorts = useMemo(
+        () => getVisiblePorts(definition?.outputs ?? [], connectedPortIds, connectionDraft, node.id, 'output'),
+        [definition?.outputs, connectedPortIds, connectionDraft, node.id]
+    );
 
     const isAuto = node.autoExecutionEnabled !== false;
     const isDisabled = (node as NodeData & { disabled?: boolean }).disabled === true;
@@ -960,8 +1000,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             </div>
 
             {/* Ports at node edges - centered on border */}
+            {/* Show only: first port + connected ports + compatible ports during drag */}
             <div className="absolute left-[-6px] top-[45px] flex flex-col gap-1">
-                {definition.inputs.map(p => (
+                {visibleInputPorts.map(p => (
                     <PortItem
                         key={p.id}
                         port={p}
@@ -969,6 +1010,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         nodeId={node.id}
                         isHighlighted={highlightedPortIds.includes(p.id)}
                         isConnected={connectedPortIds.includes(p.id)}
+                        portData={node.inputData?.[p.id]}
                         connectionDraft={connectionDraft}
                         onMouseDown={onPortMouseDown}
                         onMouseUp={onPortMouseUp}
@@ -976,7 +1018,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 ))}
             </div>
             <div className="absolute right-[-6px] top-[45px] flex flex-col gap-1">
-                {definition.outputs.map(p => (
+                {visibleOutputPorts.map(p => (
                     <PortItem
                         key={p.id}
                         port={p}
@@ -984,6 +1026,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         nodeId={node.id}
                         isHighlighted={highlightedPortIds.includes(p.id)}
                         isConnected={connectedPortIds.includes(p.id)}
+                        portData={node.outputData?.[p.id]}
                         connectionDraft={connectionDraft}
                         onMouseDown={onPortMouseDown}
                         onMouseUp={onPortMouseUp}
@@ -991,11 +1034,11 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 ))}
             </div>
 
-            {/* Body - min height based on port count */}
+            {/* Body - min height based on visible port count */}
             <div
                 className="px-3 py-3"
                 style={{
-                    minHeight: `${Math.max(definition.inputs.length, definition.outputs.length) * 30}px`,
+                    minHeight: `${Math.max(visibleInputPorts.length, visibleOutputPorts.length) * PORT_LAYOUT.PORT_SPACING}px`,
                 }}
             >
                 {/* Content Area */}

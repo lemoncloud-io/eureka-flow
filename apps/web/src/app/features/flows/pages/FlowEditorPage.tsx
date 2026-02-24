@@ -75,9 +75,18 @@ export const FlowEditorPage = () => {
             // NOTE: state=COMPLETED takes priority over status (server may send status=RUNNING with state=COMPLETED)
             if (state && !isPort && canvasRef.current) {
                 const effectiveStatus = state === 'COMPLETED' ? 'COMPLETED' : (status ?? state);
+
+                // Reset executionStats when RUNNING starts, preserve progress if provided
+                const executionStats =
+                    state === 'RUNNING'
+                        ? { startTime: Date.now(), duration: 0, progress: progress ?? 0 }
+                        : progress !== undefined
+                          ? { progress }
+                          : undefined;
+
                 canvasRef.current.updateNodeFromServer(nodeId, {
                     status: effectiveStatus,
-                    executionStats: progress !== undefined ? { progress } : undefined,
+                    executionStats,
                 });
                 return;
             }
@@ -203,16 +212,12 @@ export const FlowEditorPage = () => {
      * Handle port update notification from WebSocket (type: 'node/port')
      * Fetches port data and updates the parent node's inputData/outputData
      *
-     * Only syncs 'in' direction ports (input data) as per requirements.
-     * 'out' ports are execution results and don't need external sync.
+     * - 'in' direction: updates inputData (data flowing into the node)
+     * - 'out' direction: updates outputData (execution results)
      */
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
             const { portId, nodeId, direction, portName, timestamp } = info;
-
-            // Only sync 'in' direction (input data synchronization)
-            // Skip if direction is explicitly 'out'
-            if (direction === 'out') return;
 
             // Use direction from message, default to 'in' if not specified
             const effectiveDirection = direction ?? 'in';
@@ -230,24 +235,27 @@ export const FlowEditorPage = () => {
                 // Fetch port data from server
                 const portData = await getPortData(portId, effectiveDirection);
 
-                if (portData?.data$ && canvasRef.current) {
-                    // Convert PortData to DataPacket format for canvas update
-                    const portValue = portData.data$.S ?? portData.data$.N ?? portData.data$.F ?? portData.data$.M;
-                    const portType = portData.dataType || 'text';
-                    const portTimestamp = portData.data$.timestamp || timestamp;
-                    // Use portName from parsed info, fallback to portData.name
-                    const portKey = portName || portData.name || 'data';
-
+                if (portData?.data && canvasRef.current) {
+                    // API returns data in DataPacket-like format: { value, type, timestamp }
                     const dataPacket = {
-                        value: portValue,
-                        type: portType,
-                        timestamp: portTimestamp,
+                        value: portData.data.value,
+                        type: portData.data.type,
+                        timestamp: portData.data.timestamp || timestamp,
                     };
 
-                    // Update canvas with port data (inputData for 'in' direction)
-                    canvasRef.current.updateNodeFromServer(nodeId, {
-                        inputData: { [portKey]: dataPacket },
-                    });
+                    // Use portId from response (e.g., "in", "out") as the key
+                    const portKey = portData.portId || portName || 'data';
+
+                    // Update canvas with port data based on direction
+                    if (effectiveDirection === 'out') {
+                        canvasRef.current.updateNodeFromServer(nodeId, {
+                            outputData: { [portKey]: dataPacket },
+                        });
+                    } else {
+                        canvasRef.current.updateNodeFromServer(nodeId, {
+                            inputData: { [portKey]: dataPacket },
+                        });
+                    }
                 }
             } catch (error) {
                 // Port fetch failed - revert timestamp to allow retry

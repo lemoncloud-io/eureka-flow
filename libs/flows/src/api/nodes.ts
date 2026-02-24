@@ -1,6 +1,15 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { ApiListResult, DataPacket, NodeBody, NodeView, PortData, S3ImageInfo, UpsertNodeResult } from '../types';
+import type {
+    ApiListResult,
+    DataPacket,
+    NodeBody,
+    NodeView,
+    PortData,
+    PortDataResponse,
+    S3ImageInfo,
+    UpsertNodeResult,
+} from '../types';
 import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[nodes-api]');
@@ -47,19 +56,14 @@ export const getNode = async (id: string): Promise<NodeView> => {
  * Used for real-time port data synchronization via WebSocket.
  * When a port update notification is received, this fetches the latest port data.
  *
- * TODO: API not yet available - returns null until implemented
- * @see https://github.com/lemoncloud-io/eureka-flows-api/issues/XXX
- *
  * @param portId - Port ID (e.g., "1000637:in" or "1000637:out")
  * @param direction - Port direction ('in' or 'out')
- * @returns NodeView with port data, or null if API not available
+ * @returns PortDataResponse with port data
  */
-export const getPortData = async (portId: string, direction: 'in' | 'out'): Promise<NodeView | null> => {
-    // TODO: Enable when API is ready
-    // const response = await api.get<NodeView>(`/nodes/${portId}/port`, { params: { direction } });
-    // return response.data;
-    _log(`> getPortData(${portId}, direction=${direction}) - API not yet available, skipping`);
-    return null;
+export const getPortData = async (portId: string, direction: 'in' | 'out'): Promise<PortDataResponse> => {
+    _log(`> getPortData(${portId}, direction=${direction})`);
+    const response = await api.get<PortDataResponse>(`/nodes/${portId}/port`, { params: { direction } });
+    return response.data;
 };
 
 /**

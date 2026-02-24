@@ -32,3 +32,4 @@ export * from './components/ui/theme-toggle';
 export * from './components/ui/language-switcher';
 export * from './hooks/use-toast';
 export * from './utils';
+export * from './components/data-viewers';

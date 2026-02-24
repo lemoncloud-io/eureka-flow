@@ -29,6 +29,7 @@ import {
     useS3Image,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
 import { FrontendBadge } from './FrontendBadge';
 import { S3Image } from './S3Image';
@@ -351,12 +352,35 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         if (packet.type === 'image') {
             return <ImagePreview src={packet.value} t={t} />;
         }
+
+        if (packet.type === 'json' || typeof packet.value === 'object') {
+            return (
+                <div
+                    className="bg-black/20 p-2 rounded-md border border-border/50 mt-1.5"
+                    onWheel={e => e.stopPropagation()}
+                >
+                    <JsonViewer data={packet.value} maxHeight={120} collapsed={2} />
+                </div>
+            );
+        }
+
+        if (packet.type === 'markdown' || isMarkdownContent(packet.value)) {
+            return (
+                <div
+                    className="bg-muted/30 p-2 rounded-md border border-border/50 mt-1.5"
+                    onWheel={e => e.stopPropagation()}
+                >
+                    <MarkdownViewer content={String(packet.value)} maxHeight={120} className="text-[11px]" />
+                </div>
+            );
+        }
+
         return (
             <div
                 className="bg-black/20 p-2 rounded-md border border-border/50 text-[11px] font-mono text-foreground/80 break-words max-h-20 overflow-y-auto mt-1.5"
                 onWheel={e => e.stopPropagation()}
             >
-                {typeof packet.value === 'object' ? JSON.stringify(packet.value, null, 2) : String(packet.value)}
+                {String(packet.value)}
             </div>
         );
     };
@@ -368,7 +392,16 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
         switch (field.type) {
             case 'text':
-                return (
+                return field.short ? (
+                    <input
+                        type="text"
+                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors font-mono"
+                        value={value || ''}
+                        onChange={e => handleChange(e.target.value)}
+                        onKeyDown={e => e.stopPropagation()}
+                        placeholder={field.placeholder}
+                    />
+                ) : (
                     <textarea
                         className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors resize-y min-h-[56px] font-mono"
                         value={value || ''}
