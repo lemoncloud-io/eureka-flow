@@ -212,16 +212,12 @@ export const FlowEditorPage = () => {
      * Handle port update notification from WebSocket (type: 'node/port')
      * Fetches port data and updates the parent node's inputData/outputData
      *
-     * Only syncs 'in' direction ports (input data) as per requirements.
-     * 'out' ports are execution results and don't need external sync.
+     * - 'in' direction: updates inputData (data flowing into the node)
+     * - 'out' direction: updates outputData (execution results)
      */
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
             const { portId, nodeId, direction, portName, timestamp } = info;
-
-            // Only sync 'in' direction (input data synchronization)
-            // Skip if direction is explicitly 'out'
-            if (direction === 'out') return;
 
             // Use direction from message, default to 'in' if not specified
             const effectiveDirection = direction ?? 'in';
@@ -247,13 +243,19 @@ export const FlowEditorPage = () => {
                         timestamp: portData.data.timestamp || timestamp,
                     };
 
-                    // Use portId from response (e.g., "in") as the key for inputData/outputData
+                    // Use portId from response (e.g., "in", "out") as the key
                     const portKey = portData.portId || portName || 'data';
 
-                    // Update canvas with port data (inputData for 'in' direction)
-                    canvasRef.current.updateNodeFromServer(nodeId, {
-                        inputData: { [portKey]: dataPacket },
-                    });
+                    // Update canvas with port data based on direction
+                    if (effectiveDirection === 'out') {
+                        canvasRef.current.updateNodeFromServer(nodeId, {
+                            outputData: { [portKey]: dataPacket },
+                        });
+                    } else {
+                        canvasRef.current.updateNodeFromServer(nodeId, {
+                            inputData: { [portKey]: dataPacket },
+                        });
+                    }
                 }
             } catch (error) {
                 // Port fetch failed - revert timestamp to allow retry
