@@ -239,19 +239,16 @@ export const FlowEditorPage = () => {
                 // Fetch port data from server
                 const portData = await getPortData(portId, effectiveDirection);
 
-                if (portData?.data$ && canvasRef.current) {
-                    // Convert PortData to DataPacket format for canvas update
-                    const portValue = portData.data$.S ?? portData.data$.N ?? portData.data$.F ?? portData.data$.M;
-                    const portType = portData.dataType || 'text';
-                    const portTimestamp = portData.data$.timestamp || timestamp;
-                    // Use portName from parsed info, fallback to portData.name
-                    const portKey = portName || portData.name || 'data';
-
+                if (portData?.data && canvasRef.current) {
+                    // API returns data in DataPacket-like format: { value, type, timestamp }
                     const dataPacket = {
-                        value: portValue,
-                        type: portType,
-                        timestamp: portTimestamp,
+                        value: portData.data.value,
+                        type: portData.data.type,
+                        timestamp: portData.data.timestamp || timestamp,
                     };
+
+                    // Use portId from response (e.g., "in") as the key for inputData/outputData
+                    const portKey = portData.portId || portName || 'data';
 
                     // Update canvas with port data (inputData for 'in' direction)
                     canvasRef.current.updateNodeFromServer(nodeId, {

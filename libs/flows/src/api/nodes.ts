@@ -1,6 +1,15 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { ApiListResult, DataPacket, NodeBody, NodeView, PortData, S3ImageInfo, UpsertNodeResult } from '../types';
+import type {
+    ApiListResult,
+    DataPacket,
+    NodeBody,
+    NodeView,
+    PortData,
+    PortDataResponse,
+    S3ImageInfo,
+    UpsertNodeResult,
+} from '../types';
 import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[nodes-api]');
@@ -49,11 +58,11 @@ export const getNode = async (id: string): Promise<NodeView> => {
  *
  * @param portId - Port ID (e.g., "1000637:in" or "1000637:out")
  * @param direction - Port direction ('in' or 'out')
- * @returns NodeView with port data
+ * @returns PortDataResponse with port data
  */
-export const getPortData = async (portId: string, direction: 'in' | 'out'): Promise<NodeView> => {
+export const getPortData = async (portId: string, direction: 'in' | 'out'): Promise<PortDataResponse> => {
     _log(`> getPortData(${portId}, direction=${direction})`);
-    const response = await api.get<NodeView>(`/nodes/${portId}/port`, { params: { direction } });
+    const response = await api.get<PortDataResponse>(`/nodes/${portId}/port`, { params: { direction } });
     return response.data;
 };
 

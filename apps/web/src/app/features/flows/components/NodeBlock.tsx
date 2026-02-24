@@ -193,6 +193,8 @@ interface PortItemProps {
     nodeId: string;
     isHighlighted: boolean;
     isConnected: boolean;
+    /** Port data value if available */
+    portData?: DataPacket | null;
     /** Connection being dragged - for compatibility feedback */
     connectionDraft?: ConnectionDraftInfo | null;
     onMouseDown: (
@@ -211,6 +213,7 @@ const PortItem: React.FC<PortItemProps> = ({
     nodeId,
     isHighlighted,
     isConnected,
+    portData,
     connectionDraft,
     onMouseDown,
     onMouseUp,
@@ -272,10 +275,29 @@ const PortItem: React.FC<PortItemProps> = ({
         <div className="relative group flex items-center justify-center w-3 h-6">
             {portCircle}
 
-            {/* Tooltip showing port label on hover */}
-            <div className="absolute left-1/2 -translate-x-1/2 -top-7 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 whitespace-nowrap shadow-lg transition-opacity duration-150 flex items-center gap-1">
-                {PortIcon && <PortIcon className="w-2.5 h-2.5" />}
-                <span className="font-semibold uppercase tracking-wider">{port.label}</span>
+            {/* Tooltip showing port label and data on hover */}
+            <div
+                className={cn(
+                    'absolute left-1/2 -translate-x-1/2 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 shadow-lg transition-opacity duration-150',
+                    portData ? '-top-14 max-w-[200px]' : '-top-7 whitespace-nowrap'
+                )}
+            >
+                <div className="flex items-center gap-1">
+                    {PortIcon && <PortIcon className="w-2.5 h-2.5 shrink-0" />}
+                    <span className="font-semibold uppercase tracking-wider">{port.label}</span>
+                </div>
+                {portData && (
+                    <div className="mt-1 pt-1 border-t border-border/50 font-mono text-[10px] text-foreground/80 break-all max-h-[60px] overflow-hidden">
+                        {portData.type === 'image' ? (
+                            <span className="text-muted-foreground italic">[Image]</span>
+                        ) : typeof portData.value === 'object' ? (
+                            JSON.stringify(portData.value).slice(0, 100)
+                        ) : (
+                            String(portData.value).slice(0, 100)
+                        )}
+                        {String(portData.value).length > 100 && '...'}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -969,6 +991,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         nodeId={node.id}
                         isHighlighted={highlightedPortIds.includes(p.id)}
                         isConnected={connectedPortIds.includes(p.id)}
+                        portData={node.inputData?.[p.id]}
                         connectionDraft={connectionDraft}
                         onMouseDown={onPortMouseDown}
                         onMouseUp={onPortMouseUp}
@@ -984,6 +1007,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         nodeId={node.id}
                         isHighlighted={highlightedPortIds.includes(p.id)}
                         isConnected={connectedPortIds.includes(p.id)}
+                        portData={node.outputData?.[p.id]}
                         connectionDraft={connectionDraft}
                         onMouseDown={onPortMouseDown}
                         onMouseUp={onPortMouseUp}

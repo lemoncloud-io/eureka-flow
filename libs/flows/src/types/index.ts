@@ -202,6 +202,39 @@ export interface PortData {
 }
 
 /**
+ * PortDataResponse - response from GET /nodes/:portId/port API
+ *
+ * @example
+ * {
+ *   "id": "1000882:in@in",
+ *   "nodeId": "1000882",
+ *   "portId": "in",
+ *   "direction": "in",
+ *   "data": {
+ *     "value": "Hello World",
+ *     "type": "text",
+ *     "timestamp": 1771898187560
+ *   }
+ * }
+ */
+export interface PortDataResponse {
+    /** Full port ID (e.g., "1000882:in@in") */
+    id: string;
+    /** Parent node ID (e.g., "1000882") */
+    nodeId: string;
+    /** Port name/key (e.g., "in") */
+    portId: string;
+    /** Port direction */
+    direction: 'in' | 'out';
+    /** Port data in DataPacket-like format */
+    data: {
+        value: unknown;
+        type: string;
+        timestamp?: number;
+    };
+}
+
+/**
  * NodeModel - extended node model for backend
  *
  * Execution state is managed at node level:
