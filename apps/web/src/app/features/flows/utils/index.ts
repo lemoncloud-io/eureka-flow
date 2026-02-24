@@ -1,5 +1,80 @@
-import type { Connection, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { Connection, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
 import type { Dispatch, SetStateAction } from 'react';
+
+// ============================================================
+// Port Visibility Utilities
+// ============================================================
+
+/**
+ * Information about the connection being dragged
+ */
+export interface ConnectionDraftInfo {
+    sourceNodeId: string;
+    sourcePortId: string;
+    sourceType: string;
+}
+
+/**
+ * Check if two port types are compatible for connection.
+ * Handles undefined target type by treating it as 'any'.
+ */
+export const arePortTypesCompatible = (sourceType: string, targetType: string | undefined): boolean => {
+    const normalizedTarget = targetType ?? 'any';
+    if (sourceType === 'any' || normalizedTarget === 'any') return true;
+    return sourceType.toLowerCase() === normalizedTarget.toLowerCase();
+};
+
+/**
+ * Filter ports based on visibility rules:
+ * 1. First port is always visible
+ * 2. Connected ports are always visible
+ * 3. During connection drag: show compatible input ports on target nodes
+ *
+ * @param allPorts - All port definitions
+ * @param connectedPortIds - IDs of ports that have connections
+ * @param connectionDraft - Active connection being dragged (null if not dragging)
+ * @param nodeId - Current node's ID
+ * @param portType - 'input' or 'output'
+ * @returns Filtered array of visible ports
+ */
+export const getVisiblePorts = (
+    allPorts: PortDefinition[],
+    connectedPortIds: string[],
+    connectionDraft: ConnectionDraftInfo | null,
+    nodeId: string,
+    portType: 'input' | 'output'
+): PortDefinition[] => {
+    if (allPorts.length === 0) return [];
+
+    const visible = new Set<string>();
+
+    // 1. First port is always visible
+    visible.add(allPorts[0].id);
+
+    // 2. Connected ports are always visible
+    connectedPortIds.forEach(id => {
+        if (allPorts.some(p => p.id === id)) {
+            visible.add(id);
+        }
+    });
+
+    // 3. During connection drag: show compatible input ports on OTHER nodes
+    // Note: Output ports don't expand during drag (they are the source)
+    if (connectionDraft && portType === 'input' && connectionDraft.sourceNodeId !== nodeId) {
+        allPorts.forEach(port => {
+            if (arePortTypesCompatible(connectionDraft.sourceType, port.type)) {
+                visible.add(port.id);
+            }
+        });
+    }
+
+    // Preserve original order
+    return allPorts.filter(p => visible.has(p.id));
+};
+
+// ============================================================
+// Connection Utilities
+// ============================================================
 
 export const getConnectionKey = (conn: Connection): string =>
     `${conn.sourceNodeId}:${conn.sourcePortId}→${conn.targetNodeId}:${conn.targetPortId}`;

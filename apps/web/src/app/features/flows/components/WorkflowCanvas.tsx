@@ -29,6 +29,7 @@ import { ZoomControls } from './ZoomControls';
 import {
     deduplicateEdges,
     generateTempId,
+    getVisiblePorts,
     isTempId,
     isValidConnection,
     replaceNodeIdInState,
@@ -1559,16 +1560,35 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             handleSelectionChange(null);
         };
 
+        /**
+         * Calculate port position based on VISIBLE ports only.
+         *
+         * Visibility rules (from getVisiblePorts):
+         * 1. First port is always visible
+         * 2. Connected ports are always visible
+         * 3. Input ports: also show compatible ports when dragging from output
+         */
         const getPortPosition = (nodeId: string, portId: string, type: 'input' | 'output') => {
             const node = nodes.find(n => n.id === nodeId);
             if (!node) return { x: 0, y: 0 };
             const def = blockRegistry[node.type];
             if (!def) return { x: node.position.x, y: node.position.y };
-            const portIndex =
-                type === 'input'
-                    ? def.inputs.findIndex(p => p.id === portId)
-                    : def.outputs.findIndex(p => p.id === portId);
-            const safeIndex = portIndex !== -1 ? portIndex : 0;
+
+            const allPorts = type === 'input' ? def.inputs : def.outputs;
+            if (allPorts.length === 0) return { x: node.position.x, y: node.position.y };
+
+            // Calculate connected port IDs for this node
+            const connectedPortIds = connections
+                .filter(c => (type === 'input' ? c.targetNodeId : c.sourceNodeId) === nodeId)
+                .map(c => (type === 'input' ? c.targetPortId : c.sourcePortId));
+
+            // Use shared utility for consistent visibility calculation
+            const visiblePorts = getVisiblePorts(allPorts, connectedPortIds, connectionDraft, nodeId, type);
+
+            // Find index within visible ports
+            const visibleIndex = visiblePorts.findIndex(p => p.id === portId);
+            const safeIndex = visibleIndex !== -1 ? visibleIndex : 0;
+
             const yOffset = PORT_LAYOUT.FIRST_PORT_Y + safeIndex * PORT_LAYOUT.PORT_SPACING;
             const xOffset = type === 'input' ? PORT_LAYOUT.INPUT_X : PORT_LAYOUT.OUTPUT_X;
             return { x: node.position.x + xOffset, y: node.position.y + yOffset };
