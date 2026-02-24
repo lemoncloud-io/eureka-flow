@@ -29,6 +29,7 @@ import {
     useBlockRegistry,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
 import { S3Image } from './S3Image';
 import { TooltipImage } from './TooltipImage';
@@ -639,14 +640,17 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
     }
 
     if (packet.type === 'json' || typeof packet.value === 'object') {
-        const jsonStr = JSON.stringify(packet.value, null, 2);
         return (
-            <div
-                className="p-2 bg-black/20 rounded-lg border border-border overflow-auto"
-                style={{ maxHeight: '180px' }}
-                onWheel={e => e.stopPropagation()}
-            >
-                <pre className="text-[10px] font-mono text-foreground/80 whitespace-pre-wrap break-all">{jsonStr}</pre>
+            <div className="p-2 bg-black/20 rounded-lg border border-border" onWheel={e => e.stopPropagation()}>
+                <JsonViewer data={packet.value} maxHeight={180} collapsed={2} />
+            </div>
+        );
+    }
+
+    if (packet.type === 'markdown' || isMarkdownContent(packet.value)) {
+        return (
+            <div className="p-2 bg-muted/30 rounded-lg border border-border" onWheel={e => e.stopPropagation()}>
+                <MarkdownViewer content={String(packet.value)} maxHeight={180} />
             </div>
         );
     }
