@@ -160,20 +160,22 @@ export const getBezierPath = (x1: number, y1: number, x2: number, y2: number): s
 };
 
 /**
- * Check if a connection between two ports is valid
+ * Check if a connection between two ports is valid.
+ * Uses arePortTypesCompatible for consistent case-insensitive type matching.
+ *
+ * @deprecated sourceIdx/targetIdx are unused - kept for backward compatibility.
+ * Consider using arePortTypesCompatible directly for new code.
  */
 export const isValidConnection = (
     sourceNode: NodeData,
-    sourceIdx: number,
+    _sourceIdx: number,
     targetNode: NodeData,
-    targetIdx: number,
+    _targetIdx: number,
     sourceType: string,
     targetType: string
 ): boolean => {
     if (sourceNode.id === targetNode.id) return false;
-    if (targetType === 'any') return true;
-    if (sourceType === 'any') return true;
-    return sourceType === targetType;
+    return arePortTypesCompatible(sourceType, targetType);
 };
 
 /**

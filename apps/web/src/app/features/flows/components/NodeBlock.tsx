@@ -21,6 +21,7 @@ import {
 
 import {
     DEFAULT_TEXTAREA_HEIGHT,
+    PORT_LAYOUT,
     clampHeight,
     compressImageIfNeeded,
     getBlockDefinition,
@@ -999,7 +1000,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             {/* Use overflow-y-clip + height transition so ports reveal smoothly (x-axis visible for port circles) */}
             <div
                 className="absolute left-[-6px] top-[45px] flex flex-col gap-1 overflow-y-clip overflow-x-visible transition-[height] duration-150 ease-out"
-                style={{ height: `${visibleInputPorts.length * 28}px` }}
+                style={{ height: `${visibleInputPorts.length * PORT_LAYOUT.PORT_SPACING}px` }}
             >
                 {visibleInputPorts.map(p => (
                     <PortItem
@@ -1018,7 +1019,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             </div>
             <div
                 className="absolute right-[-6px] top-[45px] flex flex-col gap-1 overflow-y-clip overflow-x-visible transition-[height] duration-150 ease-out"
-                style={{ height: `${visibleOutputPorts.length * 28}px` }}
+                style={{ height: `${visibleOutputPorts.length * PORT_LAYOUT.PORT_SPACING}px` }}
             >
                 {visibleOutputPorts.map(p => (
                     <PortItem
@@ -1036,11 +1037,11 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 ))}
             </div>
 
-            {/* Body - min height based on visible port count */}
+            {/* Body - min height based on visible port count (PORT_SPACING + 2px padding) */}
             <div
                 className="px-3 py-3 transition-[min-height] duration-150 ease-out"
                 style={{
-                    minHeight: `${Math.max(visibleInputPorts.length, visibleOutputPorts.length) * 30}px`,
+                    minHeight: `${Math.max(visibleInputPorts.length, visibleOutputPorts.length) * (PORT_LAYOUT.PORT_SPACING + 2)}px`,
                 }}
             >
                 {/* Content Area */}
