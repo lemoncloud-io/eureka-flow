@@ -6,7 +6,24 @@ import ChainedBackend from 'i18next-chained-backend';
 import HttpBackend from 'i18next-http-backend';
 import LocalStorageBackend from 'i18next-localstorage-backend';
 
+const I18N_VERSION = process.env.I18N_VERSION || 'fallback';
+const isDevelopment = import.meta.env.DEV;
 const namespaces = ['common', 'flows', 'nodes'];
+
+// Clean up old i18n caches (production only)
+if (!isDevelopment) {
+    const currentPrefix = `i18next_res_${I18N_VERSION}_`;
+    Object.keys(localStorage).forEach(key => {
+        // Clean legacy prefix (one-time migration)
+        if (key.startsWith('flows_i18n_')) {
+            localStorage.removeItem(key);
+        }
+        // Clean outdated versioned caches
+        if (key.startsWith('i18next_res_') && !key.startsWith(currentPrefix)) {
+            localStorage.removeItem(key);
+        }
+    });
+}
 
 i18n.use(ChainedBackend)
     .use(LanguageDetector)
@@ -16,18 +33,18 @@ i18n.use(ChainedBackend)
         supportedLngs: ['en', 'ko'],
         defaultNS: 'common',
         ns: namespaces,
-        debug: import.meta.env.DEV,
+        debug: isDevelopment,
         interpolation: { escapeValue: false },
         backend: {
             backends: [LocalStorageBackend, HttpBackend],
             backendOptions: [
                 {
-                    prefix: 'flows_i18n_',
-                    expirationTime: 7 * 24 * 60 * 60 * 1000,
-                    defaultVersion: 'v1',
+                    prefix: `i18next_res_${I18N_VERSION}_`,
+                    expirationTime: isDevelopment ? 5 * 60 * 1000 : 60 * 60 * 1000,
+                    versions: { en: I18N_VERSION, ko: I18N_VERSION },
                 },
                 {
-                    loadPath: '/locales/{{lng}}/{{ns}}.json',
+                    loadPath: `/locales/{{lng}}/{{ns}}.json${isDevelopment ? '' : `?v=${I18N_VERSION}`}`,
                 },
             ],
         },
