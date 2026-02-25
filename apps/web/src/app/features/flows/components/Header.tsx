@@ -312,8 +312,9 @@ export const Header: React.FC<HeaderProps> = ({
                         )}
                     >
                         <Workflow className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
-                        <span className="text-xs sm:text-sm font-semibold text-foreground hidden sm:inline">
-                            FlowMosaic
+                        <span className="text-xs sm:text-sm font-semibold text-foreground hidden sm:inline">Flow</span>
+                        <span className="text-[10px] text-muted-foreground/60 hidden sm:inline">
+                            v{__APP_VERSION__}
                         </span>
                         <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
                         <FlowNameInput {...flowInfo} />
@@ -468,7 +469,7 @@ export const Header: React.FC<HeaderProps> = ({
 
                             <DropdownMenuSeparator />
 
-                            <div className="flex items-center justify-between px-2 py-1.5">
+                            <div className="flex items-center justify-center gap-4 px-2 py-1.5">
                                 <ThemeToggle />
                                 <LanguageSwitcher />
                             </div>
