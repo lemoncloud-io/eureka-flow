@@ -7,9 +7,11 @@ import { useInitFlowSocket } from '@flows/socket';
 import { useWebCoreStore } from '@flows/web-core';
 
 import { Header } from '../components/Header';
+import { HelpDialog } from '../components/HelpDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
+import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { NodeUpdateInfo, PortUpdateInfo } from '@flows/socket';
@@ -294,6 +296,8 @@ export const FlowEditorPage = () => {
     const [loadingText, setLoadingText] = useState('');
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
+    const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
+    const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
 
     const { apiKey, setApiKey } = useWebCoreStore();
     const autoSaveTimerRef = useRef<number | null>(null);
@@ -306,6 +310,11 @@ export const FlowEditorPage = () => {
 
     const handleApiKeySettings = useCallback(() => {
         setIsApiKeyDialogOpen(true);
+    }, []);
+
+    const handleOpenHelp = useCallback((tab: HelpTab = 'gettingStarted') => {
+        setHelpDialogTab(tab);
+        setIsHelpDialogOpen(true);
     }, []);
 
     const handleApiKeySubmit = useCallback(
@@ -554,17 +563,26 @@ export const FlowEditorPage = () => {
         new: handleNew,
         export: handleExport,
         showNotification,
+        openHelp: handleOpenHelp,
     });
     handlersRef.current = {
         save: handleSave,
         new: handleNew,
         export: handleExport,
         showNotification,
+        openHelp: handleOpenHelp,
     };
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (isInputElement(e.target)) return;
+
+            // Handle ? key for help (Shift + / on most keyboards)
+            if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+                e.preventDefault();
+                handlersRef.current.openHelp('gettingStarted');
+                return;
+            }
 
             const isCtrlOrCmd = e.ctrlKey || e.metaKey;
             if (!isCtrlOrCmd) return;
@@ -685,6 +703,7 @@ export const FlowEditorPage = () => {
                 }
                 onShare={handleShare}
                 onApiKeySettings={handleApiKeySettings}
+                onHelp={() => handleOpenHelp('gettingStarted')}
             />
 
             {/* Floating Sidebar */}
@@ -698,6 +717,9 @@ export const FlowEditorPage = () => {
                 codesUrl={import.meta.env.VITE_CODES_URL}
                 initialValue={apiKey ?? undefined}
             />
+
+            {/* Help Dialog */}
+            <HelpDialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen} defaultTab={helpDialogTab} />
 
             {/* Notification Toast */}
             {notification && (
