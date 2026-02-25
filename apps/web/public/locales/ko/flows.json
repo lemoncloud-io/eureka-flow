@@ -151,5 +151,171 @@
         "inputAlt": "입력",
         "previewAlt": "미리보기",
         "error": "오류:"
+    },
+    "help": {
+        "title": "도움말",
+        "searchPlaceholder": "도움말 검색...",
+        "close": "닫기",
+        "keyboardHint": "?를 눌러 언제든 도움말을 열 수 있습니다",
+        "tabs": {
+            "gettingStarted": "시작하기",
+            "blocks": "블록",
+            "shortcuts": "단축키",
+            "examples": "예제"
+        },
+        "gettingStarted": {
+            "title": "FlowMosaic 시작하기",
+            "intro": "FlowMosaic은 블록을 연결하여 자동화 워크플로우를 만드는 비주얼 에디터입니다. 각 블록은 특정 작업을 수행하며, 데이터는 한 블록에서 다음 블록으로 흐릅니다.",
+            "steps": {
+                "navigate": {
+                    "title": "캔버스 탐색",
+                    "description": "마우스 휠로 확대/축소하세요. 빈 공간을 클릭하고 드래그하여 이동할 수 있습니다. 하단의 줌 컨트롤을 사용하면 정밀하게 조절할 수 있습니다."
+                },
+                "addBlock": {
+                    "title": "블록 추가",
+                    "description": "왼쪽 라이브러리 버튼을 클릭하거나 사이드바를 눌러 사용 가능한 블록을 찾아보세요. 블록을 클릭하여 캔버스에 추가하거나, 드래그하여 원하는 위치에 놓을 수 있습니다."
+                },
+                "connect": {
+                    "title": "블록 연결",
+                    "description": "출력 포트(블록 오른쪽)에서 입력 포트(다른 블록 왼쪽)로 드래그하여 연결을 만드세요. 데이터는 이 연결을 통해 흐릅니다."
+                },
+                "configure": {
+                    "title": "블록 설정",
+                    "description": "블록을 클릭하여 선택하면 오른쪽에 상세 패널이 열립니다. 여기서 설정을 변경하고, 입력/출력을 확인하고, 자동 실행 같은 옵션을 설정할 수 있습니다."
+                },
+                "run": {
+                    "title": "워크플로우 실행",
+                    "description": "블록의 실행 버튼을 클릭하여 실행하거나, 헤더의 전체 실행 버튼을 사용하세요. 자동 실행이 활성화되어 있으면 모든 입력이 준비된 블록이 자동으로 실행됩니다."
+                },
+                "save": {
+                    "title": "작업 저장",
+                    "description": "Cmd/Ctrl + S를 눌러 저장하거나, 헤더에서 자동 저장을 활성화하세요. 워크플로우는 클라우드에 저장되어 어느 기기에서든 접근할 수 있습니다."
+                }
+            }
+        },
+        "shortcuts": {
+            "title": "키보드 단축키",
+            "categories": {
+                "canvas": "캔버스",
+                "editing": "편집",
+                "workflow": "워크플로우",
+                "help": "도움말"
+            },
+            "keys": {
+                "pan": {
+                    "label": "캔버스 이동",
+                    "keys": ["Space", "드래그"]
+                },
+                "zoomIn": {
+                    "label": "확대",
+                    "keys": ["Cmd/Ctrl", "+"]
+                },
+                "zoomOut": {
+                    "label": "축소",
+                    "keys": ["Cmd/Ctrl", "-"]
+                },
+                "fitView": {
+                    "label": "화면에 맞추기",
+                    "keys": ["Cmd/Ctrl", "0"]
+                },
+                "undo": {
+                    "label": "실행 취소",
+                    "keys": ["Cmd/Ctrl", "Z"]
+                },
+                "redo": {
+                    "label": "다시 실행",
+                    "keys": ["Cmd/Ctrl", "Y"]
+                },
+                "save": {
+                    "label": "저장",
+                    "keys": ["Cmd/Ctrl", "S"]
+                },
+                "newFlow": {
+                    "label": "새 워크플로우",
+                    "keys": ["Cmd/Ctrl", "N"]
+                },
+                "export": {
+                    "label": "JSON 내보내기",
+                    "keys": ["Cmd/Ctrl", "E"]
+                },
+                "autoLayout": {
+                    "label": "자동 정렬",
+                    "keys": ["Cmd/Ctrl", "L"]
+                },
+                "delete": {
+                    "label": "선택 항목 삭제",
+                    "keys": ["Delete"]
+                },
+                "openHelp": {
+                    "label": "도움말 열기",
+                    "keys": ["?"]
+                },
+                "escape": {
+                    "label": "패널 닫기 / 선택 해제",
+                    "keys": ["Esc"]
+                }
+            }
+        },
+        "blocks": {
+            "title": "블록 레퍼런스",
+            "searchPlaceholder": "블록 검색...",
+            "noResults": "검색 결과 없음",
+            "selectToView": "블록을 선택하여 상세 정보를 확인하세요",
+            "allCategories": "전체",
+            "inputs": "입력",
+            "outputs": "출력",
+            "config": "설정",
+            "noConfig": "설정 옵션 없음",
+            "required": "필수",
+            "optional": "선택",
+            "frontend": "프론트엔드 블록",
+            "frontendDescription": "이 블록은 서버가 아닌 브라우저에서 실행됩니다."
+        },
+        "examples": {
+            "title": "예제 워크플로우",
+            "description": "미리 만들어진 워크플로우 템플릿으로 빠르게 시작하세요.",
+            "useTemplate": "템플릿 사용",
+            "preview": "미리보기",
+            "difficulty": {
+                "beginner": "초급",
+                "intermediate": "중급",
+                "advanced": "고급"
+            },
+            "categories": {
+                "all": "전체",
+                "gettingStarted": "시작하기",
+                "textProcessing": "텍스트 처리",
+                "aiGeneration": "AI 생성"
+            },
+            "templates": {
+                "helloWorld": {
+                    "name": "Hello World",
+                    "description": "사용자 입력을 받아 미리보기 블록에 표시하는 간단한 워크플로우입니다. 기초를 배우기에 좋습니다."
+                },
+                "textTransform": {
+                    "name": "텍스트 변환 파이프라인",
+                    "description": "대문자, 소문자, 반전 등 여러 텍스트 변환을 연결합니다."
+                },
+                "delayedOutput": {
+                    "name": "지연 출력",
+                    "description": "Buffer 블록을 사용하여 작업 간에 지연을 추가하는 방법을 배웁니다."
+                }
+            }
+        },
+        "emptyState": {
+            "title": "워크플로우 만들기",
+            "description": "사이드바에서 블록을 드래그하거나 아래 빠른 작업을 사용하세요.",
+            "actions": {
+                "addBlock": "첫 블록 추가",
+                "browseExamples": "예제 둘러보기",
+                "viewHelp": "도움말 보기"
+            },
+            "tips": {
+                "title": "빠른 팁",
+                "search": "라이브러리 아이콘을 클릭하여 블록을 찾아보세요",
+                "connect": "포트 사이를 드래그하여 블록을 연결하세요",
+                "help": "언제든지 ?를 눌러 도움말을 확인하세요"
+            }
+        }
     }
 }

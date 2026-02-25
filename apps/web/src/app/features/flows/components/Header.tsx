@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
     Download,
     FileText,
+    HelpCircle,
     Key,
     LayoutGrid,
     Link,
@@ -79,6 +80,7 @@ interface HeaderProps {
     socketState?: SocketStateProps;
     onShare: () => void;
     onApiKeySettings?: () => void;
+    onHelp?: () => void;
 }
 
 const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
@@ -286,6 +288,7 @@ export const Header: React.FC<HeaderProps> = ({
     socketState,
     onShare,
     onApiKeySettings,
+    onHelp,
 }) => {
     const { t } = useTranslation(['flows']);
 
@@ -470,6 +473,16 @@ export const Header: React.FC<HeaderProps> = ({
                                     />
                                 </button>
                             </div>
+
+                            <DropdownMenuSeparator />
+
+                            {onHelp && (
+                                <DropdownMenuItem onClick={onHelp}>
+                                    <HelpCircle className="w-4 h-4 mr-2" />
+                                    {t('help.title')}
+                                    <DropdownMenuShortcut>?</DropdownMenuShortcut>
+                                </DropdownMenuItem>
+                            )}
 
                             <DropdownMenuSeparator />
 

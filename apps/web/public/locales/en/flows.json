@@ -151,5 +151,171 @@
         "inputAlt": "Input",
         "previewAlt": "Preview",
         "error": "Error:"
+    },
+    "help": {
+        "title": "Help",
+        "searchPlaceholder": "Search help...",
+        "close": "Close",
+        "keyboardHint": "Press ? anytime to open help",
+        "tabs": {
+            "gettingStarted": "Getting Started",
+            "blocks": "Blocks",
+            "shortcuts": "Shortcuts",
+            "examples": "Examples"
+        },
+        "gettingStarted": {
+            "title": "Getting Started with FlowMosaic",
+            "intro": "FlowMosaic is a visual workflow editor that lets you build automation flows by connecting blocks. Each block performs a specific action, and data flows from one block to the next.",
+            "steps": {
+                "navigate": {
+                    "title": "Navigate the Canvas",
+                    "description": "Use mouse wheel to zoom in/out. Click and drag on empty space to pan. Use the zoom controls at the bottom for precise control."
+                },
+                "addBlock": {
+                    "title": "Add Blocks",
+                    "description": "Click the library button on the left or press the sidebar to browse available blocks. Click a block to add it to the canvas, or drag it to a specific position."
+                },
+                "connect": {
+                    "title": "Connect Blocks",
+                    "description": "Drag from an output port (right side of a block) to an input port (left side of another block) to create a connection. Data flows through these connections."
+                },
+                "configure": {
+                    "title": "Configure Blocks",
+                    "description": "Click a block to select it and open the detail panel on the right. Here you can configure settings, view inputs/outputs, and set options like auto-run."
+                },
+                "run": {
+                    "title": "Run Your Workflow",
+                    "description": "Click the Run button on a block to execute it, or use the Run All button in the header. Blocks with all inputs ready will execute automatically if auto-run is enabled."
+                },
+                "save": {
+                    "title": "Save Your Work",
+                    "description": "Press Cmd/Ctrl + S to save, or enable auto-save in the header. Your workflow is saved to the cloud and can be accessed from any device."
+                }
+            }
+        },
+        "shortcuts": {
+            "title": "Keyboard Shortcuts",
+            "categories": {
+                "canvas": "Canvas",
+                "editing": "Editing",
+                "workflow": "Workflow",
+                "help": "Help"
+            },
+            "keys": {
+                "pan": {
+                    "label": "Pan canvas",
+                    "keys": ["Space", "Drag"]
+                },
+                "zoomIn": {
+                    "label": "Zoom in",
+                    "keys": ["Cmd/Ctrl", "+"]
+                },
+                "zoomOut": {
+                    "label": "Zoom out",
+                    "keys": ["Cmd/Ctrl", "-"]
+                },
+                "fitView": {
+                    "label": "Fit to view",
+                    "keys": ["Cmd/Ctrl", "0"]
+                },
+                "undo": {
+                    "label": "Undo",
+                    "keys": ["Cmd/Ctrl", "Z"]
+                },
+                "redo": {
+                    "label": "Redo",
+                    "keys": ["Cmd/Ctrl", "Y"]
+                },
+                "save": {
+                    "label": "Save workflow",
+                    "keys": ["Cmd/Ctrl", "S"]
+                },
+                "newFlow": {
+                    "label": "New workflow",
+                    "keys": ["Cmd/Ctrl", "N"]
+                },
+                "export": {
+                    "label": "Export JSON",
+                    "keys": ["Cmd/Ctrl", "E"]
+                },
+                "autoLayout": {
+                    "label": "Auto layout",
+                    "keys": ["Cmd/Ctrl", "L"]
+                },
+                "delete": {
+                    "label": "Delete selected",
+                    "keys": ["Delete"]
+                },
+                "openHelp": {
+                    "label": "Open help",
+                    "keys": ["?"]
+                },
+                "escape": {
+                    "label": "Close panel / Deselect",
+                    "keys": ["Esc"]
+                }
+            }
+        },
+        "blocks": {
+            "title": "Block Reference",
+            "searchPlaceholder": "Search blocks...",
+            "noResults": "No blocks found",
+            "selectToView": "Select a block to view details",
+            "allCategories": "All",
+            "inputs": "Inputs",
+            "outputs": "Outputs",
+            "config": "Configuration",
+            "noConfig": "No configuration options",
+            "required": "Required",
+            "optional": "Optional",
+            "frontend": "Frontend Block",
+            "frontendDescription": "This block runs in your browser, not on the server."
+        },
+        "examples": {
+            "title": "Example Workflows",
+            "description": "Get started quickly with these pre-built workflow templates.",
+            "useTemplate": "Use Template",
+            "preview": "Preview",
+            "difficulty": {
+                "beginner": "Beginner",
+                "intermediate": "Intermediate",
+                "advanced": "Advanced"
+            },
+            "categories": {
+                "all": "All",
+                "gettingStarted": "Getting Started",
+                "textProcessing": "Text Processing",
+                "aiGeneration": "AI Generation"
+            },
+            "templates": {
+                "helloWorld": {
+                    "name": "Hello World",
+                    "description": "A simple workflow that takes user input and displays it in a preview block. Perfect for learning the basics."
+                },
+                "textTransform": {
+                    "name": "Text Transform Pipeline",
+                    "description": "Chain multiple text transformations together - uppercase, lowercase, reverse, and more."
+                },
+                "delayedOutput": {
+                    "name": "Delayed Output",
+                    "description": "Learn how to use the Buffer block to add delays between operations."
+                }
+            }
+        },
+        "emptyState": {
+            "title": "Start Building Your Workflow",
+            "description": "Drag blocks from the sidebar or use the quick actions below.",
+            "actions": {
+                "addBlock": "Add First Block",
+                "browseExamples": "Browse Examples",
+                "viewHelp": "View Help"
+            },
+            "tips": {
+                "title": "Quick Tips",
+                "search": "Click the library icon to browse blocks",
+                "connect": "Connect blocks by dragging between ports",
+                "help": "Press ? for help anytime"
+            }
+        }
     }
 }

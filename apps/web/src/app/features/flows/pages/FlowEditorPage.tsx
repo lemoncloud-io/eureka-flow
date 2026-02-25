@@ -7,9 +7,11 @@ import { useInitFlowSocket } from '@flows/socket';
 import { useWebCoreStore } from '@flows/web-core';
 
 import { Header } from '../components/Header';
+import { HelpDialog } from '../components/HelpDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
+import type { HelpTab, WorkflowTemplate } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { NodeUpdateInfo, PortUpdateInfo } from '@flows/socket';
@@ -294,6 +296,8 @@ export const FlowEditorPage = () => {
     const [loadingText, setLoadingText] = useState('');
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
+    const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
+    const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
 
     const { apiKey, setApiKey } = useWebCoreStore();
     const autoSaveTimerRef = useRef<number | null>(null);
@@ -307,6 +311,32 @@ export const FlowEditorPage = () => {
     const handleApiKeySettings = useCallback(() => {
         setIsApiKeyDialogOpen(true);
     }, []);
+
+    const handleOpenHelp = useCallback((tab: HelpTab = 'gettingStarted') => {
+        setHelpDialogTab(tab);
+        setIsHelpDialogOpen(true);
+    }, []);
+
+    const handleUseTemplate = useCallback(
+        (template: WorkflowTemplate) => {
+            if (canvasRef.current) {
+                // Convert template to workflow format
+                const workflow = {
+                    nodes: template.nodes.map(node => ({
+                        id: node.id,
+                        type: node.type,
+                        position: node.position,
+                        data: node.data,
+                    })),
+                    edges: template.edges,
+                };
+                canvasRef.current.loadWorkflow(workflow);
+                lastSavedStateRef.current = null; // Mark as unsaved
+                showNotification(t('flowEditor.workflowImported'), 'success');
+            }
+        },
+        [t]
+    );
 
     const handleApiKeySubmit = useCallback(
         async (key: string): Promise<boolean> => {
@@ -554,17 +584,26 @@ export const FlowEditorPage = () => {
         new: handleNew,
         export: handleExport,
         showNotification,
+        openHelp: handleOpenHelp,
     });
     handlersRef.current = {
         save: handleSave,
         new: handleNew,
         export: handleExport,
         showNotification,
+        openHelp: handleOpenHelp,
     };
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (isInputElement(e.target)) return;
+
+            // Handle ? key for help (Shift + / on most keyboards)
+            if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+                e.preventDefault();
+                handlersRef.current.openHelp('gettingStarted');
+                return;
+            }
 
             const isCtrlOrCmd = e.ctrlKey || e.metaKey;
             if (!isCtrlOrCmd) return;
@@ -685,6 +724,7 @@ export const FlowEditorPage = () => {
                 }
                 onShare={handleShare}
                 onApiKeySettings={handleApiKeySettings}
+                onHelp={() => handleOpenHelp('gettingStarted')}
             />
 
             {/* Floating Sidebar */}
@@ -697,6 +737,14 @@ export const FlowEditorPage = () => {
                 onOpenChange={setIsApiKeyDialogOpen}
                 codesUrl={import.meta.env.VITE_CODES_URL}
                 initialValue={apiKey ?? undefined}
+            />
+
+            {/* Help Dialog */}
+            <HelpDialog
+                open={isHelpDialogOpen}
+                onOpenChange={setIsHelpDialogOpen}
+                onUseTemplate={handleUseTemplate}
+                defaultTab={helpDialogTab}
             />
 
             {/* Notification Toast */}
