@@ -11,7 +11,7 @@ import { HelpDialog } from '../components/HelpDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 
-import type { HelpTab, WorkflowTemplate } from '../components/help';
+import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { NodeUpdateInfo, PortUpdateInfo } from '@flows/socket';
@@ -316,27 +316,6 @@ export const FlowEditorPage = () => {
         setHelpDialogTab(tab);
         setIsHelpDialogOpen(true);
     }, []);
-
-    const handleUseTemplate = useCallback(
-        (template: WorkflowTemplate) => {
-            if (canvasRef.current) {
-                // Convert template to workflow format
-                const workflow = {
-                    nodes: template.nodes.map(node => ({
-                        id: node.id,
-                        type: node.type,
-                        position: node.position,
-                        data: node.data,
-                    })),
-                    edges: template.edges,
-                };
-                canvasRef.current.loadWorkflow(workflow);
-                lastSavedStateRef.current = null; // Mark as unsaved
-                showNotification(t('flowEditor.workflowImported'), 'success');
-            }
-        },
-        [t]
-    );
 
     const handleApiKeySubmit = useCallback(
         async (key: string): Promise<boolean> => {
@@ -740,12 +719,7 @@ export const FlowEditorPage = () => {
             />
 
             {/* Help Dialog */}
-            <HelpDialog
-                open={isHelpDialogOpen}
-                onOpenChange={setIsHelpDialogOpen}
-                onUseTemplate={handleUseTemplate}
-                defaultTab={helpDialogTab}
-            />
+            <HelpDialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen} defaultTab={helpDialogTab} />
 
             {/* Notification Toast */}
             {notification && (

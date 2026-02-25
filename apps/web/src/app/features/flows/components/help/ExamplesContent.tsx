@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Play, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { cn } from '@flows/lib/utils';
 
@@ -128,16 +129,19 @@ const CATEGORIES = ['all', 'gettingStarted', 'textProcessing'] as const;
 
 interface TemplateCardProps {
     template: WorkflowTemplate;
-    onUse: (template: WorkflowTemplate) => void;
 }
 
-const TemplateCard = ({ template, onUse }: TemplateCardProps) => {
+const TemplateCard = ({ template }: TemplateCardProps) => {
     const { t } = useTranslation(['flows']);
 
     const difficultyColors = {
         beginner: 'bg-green-500/10 text-green-600',
         intermediate: 'bg-yellow-500/10 text-yellow-600',
         advanced: 'bg-red-500/10 text-red-600',
+    };
+
+    const handleUseTemplate = () => {
+        toast.info(t('flows:help.examples.comingSoon'));
     };
 
     return (
@@ -166,7 +170,7 @@ const TemplateCard = ({ template, onUse }: TemplateCardProps) => {
                 </div>
 
                 <button
-                    onClick={() => onUse(template)}
+                    onClick={handleUseTemplate}
                     className={cn(
                         'flex items-center gap-1.5 px-3 py-1.5 text-sm',
                         'bg-primary text-primary-foreground rounded-md',
@@ -181,11 +185,7 @@ const TemplateCard = ({ template, onUse }: TemplateCardProps) => {
     );
 };
 
-interface ExamplesContentProps {
-    onUseTemplate?: (template: WorkflowTemplate) => void;
-}
-
-export const ExamplesContent = ({ onUseTemplate }: ExamplesContentProps) => {
+export const ExamplesContent = () => {
     const { t } = useTranslation(['flows']);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
@@ -219,7 +219,7 @@ export const ExamplesContent = ({ onUseTemplate }: ExamplesContentProps) => {
 
             <div className="grid gap-3">
                 {filteredTemplates.map(template => (
-                    <TemplateCard key={template.id} template={template} onUse={onUseTemplate} />
+                    <TemplateCard key={template.id} template={template} />
                 ))}
             </div>
         </div>

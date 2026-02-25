@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@flows/ui-kit'
 
 import { BlockReferenceContent, ExamplesContent, GettingStartedContent, KeyboardShortcutsContent } from './help';
 
-import type { HelpTab, WorkflowTemplate } from './help';
+import type { HelpTab } from './help';
 
 const TABS: { key: HelpTab; icon: typeof BookOpen }[] = [
     { key: 'gettingStarted', icon: BookOpen },
@@ -20,11 +20,10 @@ const TABS: { key: HelpTab; icon: typeof BookOpen }[] = [
 interface HelpDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onUseTemplate?: (template: WorkflowTemplate) => void;
     defaultTab?: HelpTab;
 }
 
-export const HelpDialog = ({ open, onOpenChange, onUseTemplate, defaultTab = 'gettingStarted' }: HelpDialogProps) => {
+export const HelpDialog = ({ open, onOpenChange, defaultTab = 'gettingStarted' }: HelpDialogProps) => {
     const { t } = useTranslation(['flows']);
     const [activeTab, setActiveTab] = useState<HelpTab>(defaultTab);
 
@@ -35,11 +34,6 @@ export const HelpDialog = ({ open, onOpenChange, onUseTemplate, defaultTab = 'ge
         }
     }, [open, defaultTab]);
 
-    const handleUseTemplate = (template: WorkflowTemplate) => {
-        onUseTemplate?.(template);
-        onOpenChange(false);
-    };
-
     const renderContent = () => {
         switch (activeTab) {
             case 'gettingStarted':
@@ -49,7 +43,7 @@ export const HelpDialog = ({ open, onOpenChange, onUseTemplate, defaultTab = 'ge
             case 'shortcuts':
                 return <KeyboardShortcutsContent />;
             case 'examples':
-                return <ExamplesContent onUseTemplate={handleUseTemplate} />;
+                return <ExamplesContent />;
             default:
                 return null;
         }

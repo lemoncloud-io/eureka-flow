@@ -275,6 +275,7 @@
             "title": "예제 워크플로우",
             "description": "미리 만들어진 워크플로우 템플릿으로 빠르게 시작하세요.",
             "useTemplate": "템플릿 사용",
+            "comingSoon": "템플릿 불러오기 기능이 곧 추가됩니다!",
             "preview": "미리보기",
             "difficulty": {
                 "beginner": "초급",
@@ -284,8 +285,7 @@
             "categories": {
                 "all": "전체",
                 "gettingStarted": "시작하기",
-                "textProcessing": "텍스트 처리",
-                "aiGeneration": "AI 생성"
+                "textProcessing": "텍스트 처리"
             },
             "templates": {
                 "helloWorld": {

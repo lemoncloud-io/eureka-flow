@@ -275,6 +275,7 @@
             "title": "Example Workflows",
             "description": "Get started quickly with these pre-built workflow templates.",
             "useTemplate": "Use Template",
+            "comingSoon": "Template import feature coming soon!",
             "preview": "Preview",
             "difficulty": {
                 "beginner": "Beginner",
@@ -284,8 +285,7 @@
             "categories": {
                 "all": "All",
                 "gettingStarted": "Getting Started",
-                "textProcessing": "Text Processing",
-                "aiGeneration": "AI Generation"
+                "textProcessing": "Text Processing"
             },
             "templates": {
                 "helloWorld": {

@@ -361,30 +361,6 @@ export const Header: React.FC<HeaderProps> = ({
                         {socketState && <SocketDot {...socketState} />}
                     </div>
 
-                    {/* API Key Settings */}
-                    {onApiKeySettings && (
-                        <TooltipProvider delayDuration={300}>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <button
-                                        onClick={onApiKeySettings}
-                                        className={cn(
-                                            'flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl',
-                                            'bg-background/80 backdrop-blur-xl border border-border/50',
-                                            'text-muted-foreground hover:text-foreground',
-                                            'shadow-sm transition-colors duration-150'
-                                        )}
-                                    >
-                                        <Key className="w-4 h-4" />
-                                    </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom" className="text-xs">
-                                    {t('header.apiKeySettings')}
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    )}
-
                     {/* Menu */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -476,6 +452,12 @@ export const Header: React.FC<HeaderProps> = ({
 
                             <DropdownMenuSeparator />
 
+                            {onApiKeySettings && (
+                                <DropdownMenuItem onClick={onApiKeySettings}>
+                                    <Key className="w-4 h-4 mr-2" />
+                                    {t('header.apiKeySettings')}
+                                </DropdownMenuItem>
+                            )}
                             {onHelp && (
                                 <DropdownMenuItem onClick={onHelp}>
                                     <HelpCircle className="w-4 h-4 mr-2" />
