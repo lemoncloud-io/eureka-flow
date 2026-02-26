@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { EXECUTE_FUNCTIONS, getNode, getPortData, getStatusPriority, useBlocks, useFlows } from '@flows/flows';
+import {
+    EXECUTE_FUNCTIONS,
+    getEffectiveState,
+    getNode,
+    getPortData,
+    getStatePriority,
+    useBlocks,
+    useFlows,
+} from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { useWebCoreStore } from '@flows/web-core';
@@ -68,16 +76,14 @@ export const FlowEditorPage = () => {
 
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
-            const { nodeId, status, isPort, parentNodeId, state, progress } = info;
+            const { nodeId, isPort, parentNodeId, state, progress } = info;
 
             // When state field exists, update UI directly from socket data (no API fetch needed)
             // - state=RUNNING/COMPLETED is the execution state from server
             // - Output data comes separately via node/port messages
-            // - API fetch only needed for isPort (port data) or status-only messages (no state)
-            // NOTE: state=COMPLETED takes priority over status (server may send status=RUNNING with state=COMPLETED)
+            // - API fetch only needed for isPort (port data) or state-less messages
+            // NOTE: state field is preferred, status is deprecated but kept for backward compatibility
             if (state && !isPort && canvasRef.current) {
-                const effectiveStatus = state === 'COMPLETED' ? 'COMPLETED' : (status ?? state);
-
                 // Reset executionStats when RUNNING starts, preserve progress if provided
                 const executionStats =
                     state === 'RUNNING'
@@ -87,7 +93,8 @@ export const FlowEditorPage = () => {
                           : undefined;
 
                 canvasRef.current.updateNodeFromServer(nodeId, {
-                    status: effectiveStatus,
+                    state,
+                    status: state, // Deprecated: kept for backward compatibility
                     executionStats,
                 });
                 return;
@@ -136,9 +143,12 @@ export const FlowEditorPage = () => {
                         };
                         canvasRef.current.updateNodeFromServer(parentNodeId, partialUpdate);
                     }
-                    // Update status if provided
-                    else if (canvasRef.current && status) {
-                        canvasRef.current.updateNodeFromServer(parentNodeId, { status });
+                    // Update state if provided (state preferred, status fallback)
+                    else if (canvasRef.current && state) {
+                        canvasRef.current.updateNodeFromServer(parentNodeId, {
+                            state,
+                            status: state, // Deprecated: kept for backward compatibility
+                        });
                     }
                 } else {
                     // ============================================================
@@ -146,10 +156,10 @@ export const FlowEditorPage = () => {
                     // ============================================================
                     // When a socket notification arrives, we fetch full node data from API.
                     // However, there's a race condition:
-                    //   - Socket delivers real-time status changes instantly
+                    //   - Socket delivers real-time state changes instantly
                     //   - API may return stale data if DB write hasn't committed yet
                     //
-                    // Solution: Use the MORE COMPLETE status between socket and API
+                    // Solution: Use the MORE COMPLETE state between socket and API
                     //   Priority: COMPLETED/ERROR > RUNNING > READY > IDLE
                     //
                     // Examples:
@@ -159,32 +169,37 @@ export const FlowEditorPage = () => {
 
                     const nodeData = await getNode(nodeId);
 
-                    // Determine the best status to use (higher priority wins)
-                    const socketPriority = getStatusPriority(status);
-                    const apiPriority = getStatusPriority(nodeData?.status);
-                    const finalStatus = socketPriority >= apiPriority ? status : nodeData?.status;
+                    // Determine the best state to use (higher priority wins)
+                    // Use getEffectiveState for backward compatibility
+                    const socketState = state;
+                    const apiState = getEffectiveState(nodeData?.state, nodeData?.status);
+                    const socketPriority = getStatePriority(socketState);
+                    const apiPriority = getStatePriority(apiState);
+                    const finalState = socketPriority >= apiPriority ? socketState : apiState;
 
                     if (canvasRef.current && nodeData) {
-                        // Merge API data with the resolved status
-                        const mergedData = finalStatus ? { ...nodeData, status: finalStatus } : nodeData;
+                        // Merge API data with the resolved state
+                        const mergedData = finalState
+                            ? { ...nodeData, state: finalState, status: finalState }
+                            : nodeData;
                         canvasRef.current.updateNodeFromServer(nodeId, mergedData);
 
                         // ============================================================
                         // Auto-execute isFrontend Nodes
                         // ============================================================
                         // When server propagates data to a downstream node and sets it
-                        // to READY status, check if it's an isFrontend node that needs
+                        // to READY state, check if it's an isFrontend node that needs
                         // to be executed on the frontend.
                         //
                         // Flow:
                         //   1. Server executes node → propagateDownstreamV2
                         //   2. Server sets downstream node to READY (if all inputs ready)
                         //   3. Server tries to run but isFrontend → stops (checkRunnable returns false)
-                        //   4. Socket notification: node status = READY
+                        //   4. Socket notification: node state = READY
                         //   5. Frontend detects isFrontend + READY → auto-execute
                         // ============================================================
-                        const effectiveStatus = finalStatus ?? nodeData?.status;
-                        if (effectiveStatus === 'READY' && nodeData?.type) {
+                        const effectiveState = finalState ?? getEffectiveState(nodeData?.state, nodeData?.status);
+                        if (effectiveState === 'READY' && nodeData?.type) {
                             const nodeDef = blockRegistry[nodeData.type];
                             if (nodeDef?.isFrontend === true && EXECUTE_FUNCTIONS[nodeDef.type]) {
                                 // Auto-execute this isFrontend node
@@ -194,9 +209,12 @@ export const FlowEditorPage = () => {
                                 }, 0);
                             }
                         }
-                    } else if (canvasRef.current && status) {
-                        // Fallback: No API data, use socket status
-                        canvasRef.current.updateNodeFromServer(nodeId, { status });
+                    } else if (canvasRef.current && state) {
+                        // Fallback: No API data, use socket state
+                        canvasRef.current.updateNodeFromServer(nodeId, {
+                            state,
+                            status: state, // Deprecated: kept for backward compatibility
+                        });
                     }
                 }
             } catch (error) {

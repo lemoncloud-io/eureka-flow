@@ -4,7 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { useBlockRegistry, useCanvasStore } from '../stores';
 import { useCanvasHistory } from './useCanvasHistory';
 import { useCanvasLayout } from './useCanvasLayout';
+import { getEffectiveState } from '../consts/status';
 
+import type { NodeState } from '../types';
 import type { DataPacket, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
 
 const GRID_SIZE = 20;
@@ -92,7 +94,8 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
                     x: Math.round((node.position.x + 40) / GRID_SIZE) * GRID_SIZE,
                     y: Math.round((node.position.y + 40) / GRID_SIZE) * GRID_SIZE,
                 },
-                status: 'IDLE',
+                state: 'IDLE' as NodeState,
+                status: 'IDLE', // Deprecated: kept for backward compatibility
                 inputData: {},
                 outputData: {},
                 errorMessage: undefined,
@@ -174,7 +177,8 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
                     n.id === nodeId
                         ? {
                               ...n,
-                              status: 'RUNNING',
+                              state: 'RUNNING' as NodeState,
+                              status: 'RUNNING', // Deprecated: kept for backward compatibility
                               errorMessage: undefined,
                               executionStats: { startTime, progress: 0, duration: 0 },
                           }
@@ -192,7 +196,12 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
                 setNodes(prev =>
                     prev.map(n =>
                         n.id === nodeId
-                            ? { ...n, status: 'ERROR', errorMessage: t('nodes:errors.unknownBlockType') }
+                            ? {
+                                  ...n,
+                                  state: 'ERROR' as NodeState,
+                                  status: 'ERROR', // Deprecated: kept for backward compatibility
+                                  errorMessage: t('nodes:errors.unknownBlockType'),
+                              }
                             : n
                     )
                 );
@@ -227,7 +236,8 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
                         n.id === nodeId
                             ? {
                                   ...n,
-                                  status: 'COMPLETED',
+                                  state: 'COMPLETED' as NodeState,
+                                  status: 'COMPLETED', // Deprecated: kept for backward compatibility
                                   outputData: results,
                                   executionStats: { startTime, duration, progress: 100 },
                               }
@@ -245,7 +255,8 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
                         n.id === nodeId
                             ? {
                                   ...n,
-                                  status: 'ERROR',
+                                  state: 'ERROR' as NodeState,
+                                  status: 'ERROR', // Deprecated: kept for backward compatibility
                                   errorMessage,
                                   executionStats: { startTime, duration, progress: 0 },
                               }
@@ -264,7 +275,9 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
             const def = blockRegistry[node.type];
             if (!def) return;
             if (def.inputs.length === 0) return;
-            if (node.status === 'RUNNING') return;
+            // Use getEffectiveState for backward compatibility (state preferred, status fallback)
+            const effectiveState = getEffectiveState(node.state, node.status);
+            if (effectiveState === 'RUNNING') return;
             if (node.autoExecutionEnabled === false) return;
 
             const hasInputs = def.inputs.every(p => node.inputData?.[p.id]);
@@ -330,11 +343,32 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
             .filter(n => !(n as NodeData & { disabled?: boolean }).disabled)
             .map(n => n.id);
 
-        setNodes(prev => prev.map(n => (inputNodeIds.includes(n.id) ? { ...n, status: 'running' as const } : n)));
+        setNodes(prev =>
+            prev.map(n =>
+                inputNodeIds.includes(n.id)
+                    ? {
+                          ...n,
+                          state: 'RUNNING' as NodeState,
+                          status: 'RUNNING', // Deprecated: kept for backward compatibility
+                      }
+                    : n
+            )
+        );
     }, [nodes, connections, blockRegistry, setNodes]);
 
     const stopAll = useCallback(() => {
-        setNodes(prev => prev.map(n => (n.status === 'running' ? { ...n, status: 'idle' as const } : n)));
+        setNodes(prev =>
+            prev.map(n => {
+                const effectiveState = getEffectiveState(n.state, n.status);
+                return effectiveState === 'RUNNING'
+                    ? {
+                          ...n,
+                          state: 'IDLE' as NodeState,
+                          status: 'IDLE', // Deprecated: kept for backward compatibility
+                      }
+                    : n;
+            })
+        );
     }, [setNodes]);
 
     return {

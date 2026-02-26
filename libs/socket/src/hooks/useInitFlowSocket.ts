@@ -5,7 +5,7 @@ import { useWebCoreStore } from '@flows/web-core';
 import { useWebSocketWorker } from './useWebSocketWorker';
 import { useWebSocketStore } from '../stores/useWebSocketStore';
 
-import type { FlowUpdateMessage, NodeUpdateMessage, PortUpdateMessage, WebSocketMessage } from '../types';
+import type { FlowUpdateMessage, NodeState, NodeUpdateMessage, PortUpdateMessage, WebSocketMessage } from '../types';
 
 const WS_ENDPOINT = import.meta.env.VITE_WS_ENDPOINT || '';
 
@@ -105,11 +105,25 @@ export interface NodeUpdateInfo {
     nodeId: string;
     flowId?: string;
     timestamp?: number;
+    /**
+     * @deprecated Use `state` instead. Kept for backward compatibility.
+     */
     status?: string;
+    /**
+     * @deprecated Use `prevState` instead. Kept for backward compatibility.
+     */
     prevStatus?: string;
     isPort: boolean;
     parentNodeId?: string;
-    state?: 'RUNNING' | 'COMPLETED';
+    /**
+     * Node execution state (preferred field)
+     * Values: 'IDLE' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR'
+     */
+    state?: NodeState;
+    /**
+     * Previous execution state before this update
+     */
+    prevState?: NodeState;
     progress?: number;
 }
 
@@ -259,15 +273,22 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                 const isForCurrentFlow = data.flowId === currentFlowId;
 
                 if (onNodeReload && (isForCurrentFlow || isProgressOnlyMessage)) {
+                    // Prefer state over status (backward compatibility)
+                    const effectiveState = (data.state ?? data.status) as NodeState | undefined;
+                    const effectivePrevState = (data.prevState ?? data.prevStatus) as NodeState | undefined;
+
                     onNodeReload({
                         nodeId: data.id,
                         flowId: data.flowId,
                         timestamp: data.timestamp,
+                        // Deprecated fields (kept for backward compatibility)
                         status: data.status,
                         prevStatus: data.prevStatus,
                         isPort,
                         parentNodeId,
-                        state: data.state,
+                        // Preferred fields
+                        state: effectiveState,
+                        prevState: effectivePrevState,
                         progress: data.progress,
                     });
                 }

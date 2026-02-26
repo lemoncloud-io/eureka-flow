@@ -25,6 +25,7 @@ import {
     clampHeight,
     compressImageIfNeeded,
     getBlockDefinition,
+    getEffectiveState,
     getNodeHeight,
     useBlockRegistry,
 } from '@flows/flows';
@@ -36,11 +37,9 @@ import { TooltipImage } from './TooltipImage';
 import { arePortTypesCompatible, getVisiblePorts } from '../utils';
 
 import type { ConnectionDraftInfo } from '../utils';
-import type { BlockDefinitionWithFrontend, DataPacket, NodeData, PortDefinition } from '@flows/flows';
+import type { BlockDefinitionWithFrontend, DataPacket, NodeData, NodeState, PortDefinition } from '@flows/flows';
 
 type ConfigValue = string | number | boolean | string[] | null;
-
-type NodeStatus = 'IDLE' | 'RUNNING' | 'COMPLETED' | 'ERROR';
 
 export interface NodePortHandlers {
     onPortMouseDown: (
@@ -77,26 +76,31 @@ export interface NodeHighlightState {
     connectionDraft?: ConnectionDraftInfo | null;
 }
 
-const getStatusStyles = (status: NodeStatus, isSelected: boolean): string => {
+const getStatusStyles = (state: NodeState | undefined, isSelected: boolean): string => {
     // Selected: show colored border with glow effect
     if (isSelected) {
-        switch (status) {
+        switch (state) {
             case 'RUNNING':
                 return 'border-status-running shadow-[0_0_20px_rgba(234,179,8,0.3)]';
             case 'COMPLETED':
                 return 'border-status-completed shadow-[0_0_20px_rgba(34,197,94,0.25)]';
             case 'ERROR':
                 return 'border-status-error shadow-[0_0_20px_rgba(239,68,68,0.3)] animate-pulse-error';
+            case 'IDLE':
+            case 'READY':
             default:
                 return 'border-primary shadow-[0_0_20px_rgba(139,92,246,0.25)]';
         }
     }
-    // Not selected: status-based styling
-    switch (status) {
+    // Not selected: state-based styling
+    switch (state) {
         case 'RUNNING':
             return 'border-status-running/50 shadow-[0_0_12px_rgba(234,179,8,0.2)]';
         case 'ERROR':
             return 'border-destructive/50 animate-pulse-error';
+        case 'IDLE':
+        case 'READY':
+        case 'COMPLETED':
         default:
             return 'border-muted-foreground/20';
     }
@@ -716,15 +720,18 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const isAuto = node.autoExecutionEnabled !== false;
     const isDisabled = (node as NodeData & { disabled?: boolean }).disabled === true;
 
-    // Track API call in progress (separate from node.status which reflects server state)
+    // Get effective state (state preferred, status fallback for backward compatibility)
+    const nodeState = getEffectiveState(node.state, node.status);
+
+    // Track API call in progress (separate from node.state which reflects server state)
     const [isRunning, setIsRunning] = useState(false);
 
-    // Reset isRunning when node status changes to completed/error (socket may update before API returns)
+    // Reset isRunning when node state changes to completed/error (socket may update before API returns)
     useEffect(() => {
-        if (node.status === 'COMPLETED' || node.status === 'ERROR') {
+        if (nodeState === 'COMPLETED' || nodeState === 'ERROR') {
             setIsRunning(false);
         }
-    }, [node.status]);
+    }, [nodeState]);
 
     const handleRun = async () => {
         if (isRunning) return;
@@ -757,7 +764,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     useEffect(() => {
         let interval: number;
         const startTime = node.executionStats?.startTime;
-        if (node.status === 'RUNNING' && startTime) {
+        if (nodeState === 'RUNNING' && startTime) {
             interval = window.setInterval(() => {
                 setElapsedTime(Date.now() - startTime);
             }, 100);
@@ -765,9 +772,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             setElapsedTime(null);
         }
         return () => clearInterval(interval);
-    }, [node.status, node.executionStats?.startTime]);
+    }, [nodeState, node.executionStats?.startTime]);
 
-    const duration = node.status === 'RUNNING' ? elapsedTime : node.executionStats?.duration;
+    const duration = nodeState === 'RUNNING' ? elapsedTime : node.executionStats?.duration;
     const displayDuration =
         duration != null ? (duration > 1000 ? `${(duration / 1000).toFixed(2)}s` : `${duration}ms`) : null;
 
@@ -789,7 +796,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
     const StatusIcon = () => {
         if (isDisabled) return <Ban className="w-4 h-4 text-muted-foreground" />;
-        switch (node.status) {
+        switch (nodeState) {
             case 'RUNNING':
                 return <Loader2 className="w-4 h-4 text-status-running animate-spin" />;
             case 'COMPLETED':
@@ -811,12 +818,12 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 'absolute w-[260px] bg-node-bg rounded-xl border-[1.5px]',
                 !isDragging && 'transition-all duration-200',
                 isDisabled && 'opacity-50',
-                !isSelected && !isHighlighted && node.status === 'IDLE' && 'shadow-node',
+                !isSelected && !isHighlighted && nodeState === 'IDLE' && 'shadow-node',
                 isHighlighted
                     ? 'border-accent/60'
-                    : definition.isFrontend && !isSelected && node.status === 'IDLE'
+                    : definition.isFrontend && !isSelected && nodeState === 'IDLE'
                       ? 'border-primary/50'
-                      : getStatusStyles(node.status as NodeStatus, isSelected)
+                      : getStatusStyles(nodeState, isSelected)
             )}
             style={{ left: node.position.x, top: node.position.y }}
             onMouseDown={onMouseDown}
@@ -960,7 +967,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                         {isDisabled ? t('contextMenu.enable') : t('contextMenu.disable')}
                                     </button>
                                 )}
-                                {node.status === 'ERROR' && (
+                                {nodeState === 'ERROR' && (
                                     <button
                                         onClick={e => {
                                             e.stopPropagation();
@@ -1078,7 +1085,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 </div>
 
                 {/* Error Message */}
-                {node.status === 'ERROR' && (
+                {nodeState === 'ERROR' && (
                     <div className="mt-2 text-destructive text-[10px] bg-destructive/10 p-2 rounded-lg border border-destructive/20 flex items-start gap-1.5">
                         <span className="font-semibold shrink-0">{t('flows:nodeBlock.error')}</span>
                         <span className="opacity-80">{node.errorMessage || t('errors.executionFailed')}</span>
@@ -1087,7 +1094,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             </div>
 
             {/* Progress Bar */}
-            {node.status === 'RUNNING' && (
+            {nodeState === 'RUNNING' && (
                 <div className="absolute bottom-0 left-0 w-full h-1.5 bg-muted/50 overflow-hidden">
                     <div
                         className="h-full bg-status-running transition-all duration-200 ease-out animate-progress-pulse"

@@ -23,6 +23,25 @@ export type {
     WorkflowState,
 } from '@lemoncloud/eureka-flows-api';
 
+// ============================================================================
+// Node Execution State (state field - replacing status)
+// ============================================================================
+
+/**
+ * NodeState - execution state of a node
+ *
+ * Values:
+ * - IDLE: Initial state, no execution started
+ * - READY: All inputs ready, waiting for execution
+ * - RUNNING: Currently executing
+ * - COMPLETED: Execution finished successfully
+ * - ERROR: Execution failed
+ *
+ * @note This replaces the deprecated `status` field.
+ * During migration, use `node.state ?? node.status` for backward compatibility.
+ */
+export type NodeState = 'IDLE' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR';
+
 import type { BlockDefinition, DataPacket, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
 // ============================================================================
@@ -238,7 +257,8 @@ export interface PortDataResponse {
  * NodeModel - extended node model for backend
  *
  * Execution state is managed at node level:
- * - status: IDLE → RUNNING → COMPLETED/ERROR
+ * - state: IDLE → READY → RUNNING → COMPLETED/ERROR (new field)
+ * - status: IDLE → RUNNING → COMPLETED/ERROR (deprecated, use state)
  * - autoExecutionEnabled: auto-trigger on inputData change
  */
 export interface NodeModel {
@@ -258,6 +278,14 @@ export interface NodeModel {
     config$$?: ConfigItem[];
     customLabel?: string;
     description?: string;
+    /**
+     * Node execution state (new field - preferred)
+     * Values: 'IDLE' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR'
+     */
+    state?: NodeState;
+    /**
+     * @deprecated Use `state` instead. Kept for backward compatibility.
+     */
     status?: string;
     errorMessage?: string;
     inputData$$?: DataPacketItem[];

@@ -24,6 +24,7 @@ import {
     clampHeight,
     compressImageIfNeeded,
     downloadImage,
+    getEffectiveState,
     getNodeHeight,
     useBlockRegistry,
     useS3Image,
@@ -557,21 +558,27 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             {def.type}
                         </span>
                         {def.isFrontend && <FrontendBadge />}
-                        <span
-                            className={cn(
-                                'text-[10px] px-1.5 py-0.5 rounded font-semibold',
-                                selectedNode.status === 'ERROR' &&
-                                    'bg-destructive/20 text-destructive border border-destructive/30',
-                                selectedNode.status === 'RUNNING' &&
-                                    'bg-status-running/20 text-status-running border border-status-running/30',
-                                selectedNode.status === 'COMPLETED' &&
-                                    'bg-status-completed/20 text-status-completed border border-status-completed/30',
-                                selectedNode.status === 'IDLE' &&
-                                    'bg-muted/50 text-muted-foreground border border-border/50'
-                            )}
-                        >
-                            {selectedNode.status}
-                        </span>
+                        {(() => {
+                            // Get effective state (state preferred, status fallback for backward compatibility)
+                            const nodeState = getEffectiveState(selectedNode.state, selectedNode.status);
+                            return (
+                                <span
+                                    className={cn(
+                                        'text-[10px] px-1.5 py-0.5 rounded font-semibold',
+                                        nodeState === 'ERROR' &&
+                                            'bg-destructive/20 text-destructive border border-destructive/30',
+                                        nodeState === 'RUNNING' &&
+                                            'bg-status-running/20 text-status-running border border-status-running/30',
+                                        nodeState === 'COMPLETED' &&
+                                            'bg-status-completed/20 text-status-completed border border-status-completed/30',
+                                        (nodeState === 'IDLE' || nodeState === 'READY') &&
+                                            'bg-muted/50 text-muted-foreground border border-border/50'
+                                    )}
+                                >
+                                    {nodeState}
+                                </span>
+                            );
+                        })()}
                         <button
                             onClick={() => onViewLogs(selectedNode.id)}
                             className="ml-auto text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
@@ -592,7 +599,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 </div>
 
                 {/* Error Display */}
-                {selectedNode.status === 'ERROR' && (
+                {getEffectiveState(selectedNode.state, selectedNode.status) === 'ERROR' && (
                     <div className="px-3 py-2 bg-destructive/10 border-b border-destructive/20 flex-shrink-0">
                         <div className="flex items-center gap-2 mb-1 text-destructive text-xs font-semibold">
                             <AlertTriangle className="w-3.5 h-3.5" /> {t('flows:detailPanel.errorDetails')}
