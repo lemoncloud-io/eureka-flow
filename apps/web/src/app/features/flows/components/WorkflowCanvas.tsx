@@ -69,6 +69,8 @@ interface WorkflowCanvasProps {
     onOpenLibrary?: () => void;
     /** Called when a connection is rejected due to validation error */
     onConnectionError?: (error: 'cycle' | 'invalid_type') => void;
+    /** Called to show notification message (dev only, for touch debug) */
+    onShowNotification?: (message: string, type: 'success' | 'error') => void;
 }
 
 const GRID_SIZE = 20;
@@ -122,7 +124,10 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onOpenLibrary }) => {
 };
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
-    ({ readOnly, initialData, flowId, onNodeSelect, onChange, onOpenLibrary, onConnectionError }, ref) => {
+    (
+        { readOnly, initialData, flowId, onNodeSelect, onChange, onOpenLibrary, onConnectionError, onShowNotification },
+        ref
+    ) => {
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
         const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId } = useNodeSync({
@@ -2023,6 +2028,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             handleSelectionChange(null);
                             setSelectedConnectionId(null);
                         }}
+                        onShowNotification={onShowNotification}
                     />
                 </div>
             </div>

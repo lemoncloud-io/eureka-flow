@@ -282,3 +282,38 @@ export const getImageInfo = async (s3Url: string): Promise<S3ImageInfo> => {
 
     return response.data;
 };
+
+/**
+ * Body for POST /nodes/:id/touch
+ * Debug/test endpoint to update node metadata
+ */
+export interface TouchNodeBody {
+    timestamp?: string;
+    progress?: number;
+    disabled?: boolean;
+    required?: boolean;
+    modifiedAt?: string;
+    enterNo?: number;
+    exitNo?: number;
+    position?: { x: number; y: number };
+    name?: string;
+    width?: number;
+    height?: number;
+}
+
+/**
+ * Touch node (debug/test endpoint)
+ * POST /nodes/:id/touch
+ *
+ * Updates node metadata for testing purposes.
+ * Only available in development environment.
+ *
+ * @param nodeId - Node ID to touch
+ * @param body - Touch body with optional fields
+ * @returns Updated NodeView
+ */
+export const touchNode = async (nodeId: string, body: TouchNodeBody): Promise<NodeView> => {
+    _log(`> touchNode(${nodeId})`, body);
+    const response = await api.post<NodeView>(`/nodes/${nodeId}/touch`, body);
+    return response.data;
+};

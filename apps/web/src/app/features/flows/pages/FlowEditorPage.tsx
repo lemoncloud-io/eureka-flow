@@ -674,6 +674,7 @@ export const FlowEditorPage = () => {
                     onChange={handleCanvasChange}
                     onOpenLibrary={handleOpenLibrary}
                     onConnectionError={handleConnectionError}
+                    onShowNotification={showNotification}
                 />
             </div>
 

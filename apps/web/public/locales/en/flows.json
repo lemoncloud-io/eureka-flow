@@ -116,7 +116,24 @@
         "image": "Image",
         "value": "Value",
         "clickToUpload": "Click to upload",
-        "enterText": "Enter text..."
+        "enterText": "Enter text...",
+        "touchDebug": "Touch Debug",
+        "touchDialog": {
+            "title": "Touch Debug",
+            "description": "Send debug touch request to node {{nodeId}}",
+            "sections": {
+                "timestamps": "Timestamps",
+                "state": "State",
+                "counters": "Counters",
+                "layout": "Layout",
+                "metadata": "Metadata"
+            },
+            "reset": "Reset",
+            "send": "Send Touch",
+            "sending": "Sending...",
+            "success": "Touch request sent successfully",
+            "error": "Failed to send touch request"
+        }
     },
     "flowEditor": {
         "initializingEngine": "Initializing FlowMosaic Engine...",

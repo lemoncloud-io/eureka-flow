@@ -15,6 +15,7 @@ import {
     Settings,
     Trash2,
     Upload,
+    Wrench,
     X,
     Zap,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
 import { FrontendBadge } from './FrontendBadge';
 import { S3Image } from './S3Image';
+import { TouchDialog } from './TouchDialog';
 
 import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@flows/flows';
 
@@ -53,6 +55,7 @@ interface DetailPanelProps {
     onSelectNode: (nodeId: string) => void;
     onSelectConnection: (connectionId: string) => void;
     onClose: () => void;
+    onShowNotification?: (message: string, type: 'success' | 'error') => void;
 }
 
 type ConfigControlType = 'text' | 'number' | 'boolean' | 'select' | 'file' | 'workflow-selector';
@@ -335,9 +338,11 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     onSelectNode,
     onSelectConnection,
     onClose,
+    onShowNotification,
 }) => {
     const { t } = useTranslation(['flows', 'common']);
     const blockRegistry = useBlockRegistry();
+    const [isTouchDialogOpen, setIsTouchDialogOpen] = useState(false);
 
     if (!selectedNode && !selectedConnection) return null;
 
@@ -817,6 +822,15 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     >
                         <Play className="w-3.5 h-3.5" /> {t('flows:detailPanel.runBlock')}
                     </button>
+                    {import.meta.env.DEV && (
+                        <button
+                            onClick={() => setIsTouchDialogOpen(true)}
+                            className="px-3 bg-warning/10 border border-warning/30 hover:bg-warning/20 text-warning text-xs rounded-lg transition-colors flex items-center justify-center"
+                            title={t('flows:detailPanel.touchDebug')}
+                        >
+                            <Wrench className="w-3.5 h-3.5" />
+                        </button>
+                    )}
                     <button
                         onClick={() => onDeleteNode(selectedNode.id)}
                         className="px-3 bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs rounded-lg transition-colors flex items-center justify-center"
@@ -825,6 +839,18 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         <Trash2 className="w-3.5 h-3.5" />
                     </button>
                 </div>
+
+                {/* Touch Debug Dialog (Dev only) */}
+                {import.meta.env.DEV && (
+                    <TouchDialog
+                        open={isTouchDialogOpen}
+                        onOpenChange={setIsTouchDialogOpen}
+                        nodeId={selectedNode.id}
+                        initialNode={selectedNode}
+                        onSuccess={msg => onShowNotification?.(msg, 'success')}
+                        onError={msg => onShowNotification?.(msg, 'error')}
+                    />
+                )}
             </div>
         );
     }
