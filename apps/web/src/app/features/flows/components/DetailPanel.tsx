@@ -343,6 +343,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     const { t } = useTranslation(['flows', 'common']);
     const blockRegistry = useBlockRegistry();
     const [isTouchDialogOpen, setIsTouchDialogOpen] = useState(false);
+    const [touchPortId, setTouchPortId] = useState<string | null>(null);
 
     if (!selectedNode && !selectedConnection) return null;
 
@@ -722,6 +723,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                     const incomingConn = connections.find(
                                         c => c.targetNodeId === selectedNode.id && c.targetPortId === input.id
                                     );
+                                    const portId = `${selectedNode.id}:${input.id}`;
 
                                     return (
                                         <div
@@ -741,6 +743,15 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                         >
                                                             <Zap className="w-2.5 h-2.5" />
                                                             {t('flows:detailPanel.link')}
+                                                        </button>
+                                                    )}
+                                                    {import.meta.env.DEV && (
+                                                        <button
+                                                            onClick={() => setTouchPortId(portId)}
+                                                            className="text-[9px] bg-muted/50 hover:bg-warning/20 text-muted-foreground hover:text-warning px-1 py-0.5 rounded transition-colors"
+                                                            title={t('flows:detailPanel.touchDebug')}
+                                                        >
+                                                            <Wrench className="w-2.5 h-2.5" />
                                                         </button>
                                                     )}
                                                 </div>
@@ -772,6 +783,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                     const outgoingConns = connections.filter(
                                         c => c.sourceNodeId === selectedNode.id && c.sourcePortId === output.id
                                     );
+                                    const portId = `${selectedNode.id}:${output.id}`;
 
                                     return (
                                         <div
@@ -799,6 +811,15 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                                 </button>
                                                             ))}
                                                         </div>
+                                                    )}
+                                                    {import.meta.env.DEV && (
+                                                        <button
+                                                            onClick={() => setTouchPortId(portId)}
+                                                            className="text-[9px] bg-muted/50 hover:bg-warning/20 text-muted-foreground hover:text-warning px-1 py-0.5 rounded transition-colors"
+                                                            title={t('flows:detailPanel.touchDebug')}
+                                                        >
+                                                            <Wrench className="w-2.5 h-2.5" />
+                                                        </button>
                                                     )}
                                                 </div>
                                                 <span className="text-[9px] text-muted-foreground/60 uppercase font-mono bg-muted/30 px-1.5 py-0.5 rounded">
@@ -840,7 +861,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     </button>
                 </div>
 
-                {/* Touch Debug Dialog (Dev only) */}
+                {/* Touch Debug Dialog for Node (Dev only) */}
                 {import.meta.env.DEV && (
                     <TouchDialog
                         open={isTouchDialogOpen}
@@ -848,6 +869,20 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         nodeId={selectedNode.id}
                         initialNode={selectedNode}
                         onSuccess={msg => onShowNotification?.(msg, 'success')}
+                        onError={msg => onShowNotification?.(msg, 'error')}
+                    />
+                )}
+
+                {/* Touch Debug Dialog for Port (Dev only) */}
+                {import.meta.env.DEV && touchPortId && (
+                    <TouchDialog
+                        open={!!touchPortId}
+                        onOpenChange={open => !open && setTouchPortId(null)}
+                        nodeId={touchPortId}
+                        onSuccess={msg => {
+                            onShowNotification?.(msg, 'success');
+                            setTouchPortId(null);
+                        }}
                         onError={msg => onShowNotification?.(msg, 'error')}
                     />
                 )}
