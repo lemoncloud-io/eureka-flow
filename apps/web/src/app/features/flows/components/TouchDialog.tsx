@@ -16,7 +16,7 @@ import {
     Switch,
 } from '@flows/ui-kit';
 
-import type { NodeData, TouchNodeBody } from '@flows/flows';
+import type { Connection, NodeData, TouchNodeBody } from '@flows/flows';
 
 interface TouchDialogProps {
     open: boolean;
@@ -24,6 +24,8 @@ interface TouchDialogProps {
     nodeId: string;
     /** Initial node data to populate form defaults */
     initialNode?: NodeData | null;
+    /** Initial connection/edge data to populate form defaults */
+    initialConnection?: Connection | null;
     onSuccess: (message: string) => void;
     onError: (error: string) => void;
 }
@@ -81,37 +83,66 @@ const buildTouchBody = (formData: FormData): TouchNodeBody => {
     return body;
 };
 
-export const TouchDialog = ({ open, onOpenChange, nodeId, initialNode, onSuccess, onError }: TouchDialogProps) => {
+export const TouchDialog = ({
+    open,
+    onOpenChange,
+    nodeId,
+    initialNode,
+    initialConnection,
+    onSuccess,
+    onError,
+}: TouchDialogProps) => {
     const { t } = useTranslation(['flows']);
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState<FormData>(initialFormData);
 
-    // Compute initial form data from node
-    const nodeFormData = useMemo<FormData>(() => {
-        if (!initialNode) return initialFormData;
+    // Compute initial form data from node or connection
+    const computedFormData = useMemo<FormData>(() => {
+        // Node data takes priority
+        if (initialNode) {
+            return {
+                timestamp: '',
+                progress: initialNode.executionStats?.progress?.toString() ?? '',
+                disabled: initialNode.disabled ?? false,
+                required: initialNode.required ?? false,
+                modifiedAt: '',
+                enterNo: initialNode.enterNo?.toString() ?? '',
+                exitNo: initialNode.exitNo?.toString() ?? '',
+                positionX: initialNode.position?.x?.toString() ?? '',
+                positionY: initialNode.position?.y?.toString() ?? '',
+                name: initialNode.customLabel ?? initialNode.name ?? '',
+                width: initialNode.width?.toString() ?? '',
+                height: initialNode.height?.toString() ?? '',
+            };
+        }
 
-        return {
-            timestamp: '',
-            progress: initialNode.executionStats?.progress?.toString() ?? '',
-            disabled: initialNode.disabled ?? false,
-            required: initialNode.required ?? false,
-            modifiedAt: '',
-            enterNo: initialNode.enterNo?.toString() ?? '',
-            exitNo: initialNode.exitNo?.toString() ?? '',
-            positionX: initialNode.position?.x?.toString() ?? '',
-            positionY: initialNode.position?.y?.toString() ?? '',
-            name: initialNode.customLabel ?? initialNode.name ?? '',
-            width: initialNode.width?.toString() ?? '',
-            height: initialNode.height?.toString() ?? '',
-        };
-    }, [initialNode]);
+        // Connection/edge data
+        if (initialConnection) {
+            return {
+                timestamp: '',
+                progress: '',
+                disabled: initialConnection.disabled ?? false,
+                required: false,
+                modifiedAt: '',
+                enterNo: '',
+                exitNo: '',
+                positionX: initialConnection.position?.x?.toString() ?? '',
+                positionY: initialConnection.position?.y?.toString() ?? '',
+                name: initialConnection.label ?? '',
+                width: '',
+                height: '',
+            };
+        }
+
+        return initialFormData;
+    }, [initialNode, initialConnection]);
 
     // Reset form when dialog opens
     useEffect(() => {
         if (open) {
-            setFormData(nodeFormData);
+            setFormData(computedFormData);
         }
-    }, [open, nodeFormData]);
+    }, [open, computedFormData]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -130,7 +161,7 @@ export const TouchDialog = ({ open, onOpenChange, nodeId, initialNode, onSuccess
     };
 
     const handleReset = () => {
-        setFormData(nodeFormData);
+        setFormData(computedFormData);
     };
 
     const updateField = <K extends keyof FormData>(key: K, value: FormData[K]) => {

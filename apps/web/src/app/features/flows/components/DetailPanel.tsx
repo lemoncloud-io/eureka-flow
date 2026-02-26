@@ -943,14 +943,35 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     </div>
                 </div>
 
-                <div className="p-3 border-t border-border/50 bg-surface-elevated/30 flex-shrink-0">
+                <div className="p-3 border-t border-border/50 bg-surface-elevated/30 flex gap-2 flex-shrink-0">
+                    {import.meta.env.DEV && (
+                        <button
+                            onClick={() => setIsTouchDialogOpen(true)}
+                            className="px-3 bg-warning/10 border border-warning/30 hover:bg-warning/20 text-warning text-xs py-2.5 rounded-lg transition-colors flex items-center justify-center"
+                            title={t('flows:detailPanel.touchDebug')}
+                        >
+                            <Wrench className="w-3.5 h-3.5" />
+                        </button>
+                    )}
                     <button
                         onClick={() => onDeleteConnection(selectedConnection.id)}
-                        className="w-full bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
                     >
                         <Trash2 className="w-3.5 h-3.5" /> {t('flows:detailPanel.deleteConnection')}
                     </button>
                 </div>
+
+                {/* Touch Debug Dialog (Dev only) */}
+                {import.meta.env.DEV && (
+                    <TouchDialog
+                        open={isTouchDialogOpen}
+                        onOpenChange={setIsTouchDialogOpen}
+                        nodeId={selectedConnection.id}
+                        initialConnection={selectedConnection}
+                        onSuccess={msg => onShowNotification?.(msg, 'success')}
+                        onError={msg => onShowNotification?.(msg, 'error')}
+                    />
+                )}
             </div>
         );
     }
