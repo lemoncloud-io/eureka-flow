@@ -56,6 +56,11 @@ export interface NodeUpdateMessage {
     flowId?: string;
     timestamp?: number;
     /**
+     * Message sequence number (monotonically increasing)
+     * Higher values indicate more recent updates - used for ordering
+     */
+    no?: number;
+    /**
      * @deprecated Use `state` instead. Kept for backward compatibility.
      */
     status?: string;
@@ -84,7 +89,8 @@ export interface NodeUpdateMessage {
  *   "type": "node/port",
  *   "id": "1000637:in@in",
  *   "flowId": "1000088",
- *   "timestamp": 1771810838212
+ *   "timestamp": 1771810838212,
+ *   "no": 42
  * }
  *
  * ID format: "nodeId:direction@portName"
@@ -97,6 +103,11 @@ export interface PortUpdateMessage {
     id: string;
     flowId?: string;
     timestamp?: number;
+    /**
+     * Message sequence number (monotonically increasing)
+     * Higher values indicate more recent updates - used for ordering
+     */
+    no?: number;
 }
 
 /**
