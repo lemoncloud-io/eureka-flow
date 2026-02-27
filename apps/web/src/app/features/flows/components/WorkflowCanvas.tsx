@@ -18,7 +18,7 @@ import {
     useBlockRegistry,
     useEdgeSync,
     useNodeSync,
-    usePortUpdatedNodeIds,
+    useUpdatedPortIds,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
@@ -131,7 +131,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
     ) => {
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
-        const portUpdatedNodeIds = usePortUpdatedNodeIds();
+        const updatedPortIds = useUpdatedPortIds();
         const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId } = useNodeSync({
             flowId: flowId ?? null,
         });
@@ -1912,7 +1912,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             highlightState={{
                                                 isSelected: selectedNodeIds.has(node.id),
                                                 isHighlighted: !!isConnected,
-                                                isPortUpdated: portUpdatedNodeIds.has(node.id),
+                                                updatedPortIds: Array.from(updatedPortIds)
+                                                    .filter(pid => pid.startsWith(`${node.id}:`))
+                                                    .map(pid => pid.substring(node.id.length + 1)),
                                                 highlightedPortIds: highlightedPorts,
                                                 connectedPortIds: connectedPorts,
                                                 connectionDraft: connectionDraft

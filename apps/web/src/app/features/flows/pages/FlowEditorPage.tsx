@@ -252,10 +252,10 @@ export const FlowEditorPage = () => {
     const portTimestampsRef = useRef<Map<string, number>>(new Map());
 
     // Get port highlight actions from canvas store
-    const setPortUpdatedNode = useCanvasStore(state => state.setPortUpdatedNode);
-    const clearPortUpdatedNode = useCanvasStore(state => state.clearPortUpdatedNode);
+    const setUpdatedPort = useCanvasStore(state => state.setUpdatedPort);
+    const clearUpdatedPort = useCanvasStore(state => state.clearUpdatedPort);
 
-    // Track highlight timeouts per node to cancel previous timeout on rapid updates
+    // Track highlight timeouts per port to cancel previous timeout on rapid updates
     const highlightTimeoutsRef = useRef<Map<string, number>>(new Map());
 
     /**
@@ -318,19 +318,19 @@ export const FlowEditorPage = () => {
                         });
                     }
 
-                    // Trigger port update highlight on the node
-                    // Cancel existing timeout if rapid updates occur on same node
-                    const existingTimeout = highlightTimeoutsRef.current.get(nodeId);
+                    // Trigger port update highlight on the specific port
+                    // Cancel existing timeout if rapid updates occur on same port
+                    const existingTimeout = highlightTimeoutsRef.current.get(portId);
                     if (existingTimeout) {
                         window.clearTimeout(existingTimeout);
                     }
 
-                    setPortUpdatedNode(nodeId);
+                    setUpdatedPort(portId);
                     const timeoutId = window.setTimeout(() => {
-                        clearPortUpdatedNode(nodeId);
-                        highlightTimeoutsRef.current.delete(nodeId);
+                        clearUpdatedPort(portId);
+                        highlightTimeoutsRef.current.delete(portId);
                     }, 2000);
-                    highlightTimeoutsRef.current.set(nodeId, timeoutId);
+                    highlightTimeoutsRef.current.set(portId, timeoutId);
                 }
             } catch (error) {
                 // Port fetch failed - revert no/timestamp to allow retry
@@ -350,7 +350,7 @@ export const FlowEditorPage = () => {
                 console.debug('[handlePortUpdate] Failed to fetch port data:', portId, error);
             }
         },
-        [setPortUpdatedNode, clearPortUpdatedNode]
+        [setUpdatedPort, clearUpdatedPort]
     );
 
     // Cleanup highlight timeouts on unmount

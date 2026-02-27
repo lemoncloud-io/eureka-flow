@@ -63,8 +63,8 @@ interface CanvasState {
     logViewerNodeId: string | null;
     modalFlowId: string | null;
 
-    // Port Update Highlight
-    portUpdatedNodeIds: Map<string, number>;
+    // Port Update Highlight (portId format: "nodeId:portName")
+    updatedPortIds: Set<string>;
 
     // Actions - Core Data
     setNodes: (nodes: NodeData[] | ((prev: NodeData[]) => NodeData[])) => void;
@@ -95,8 +95,8 @@ interface CanvasState {
     setModalFlowId: (id: string | null) => void;
 
     // Actions - Port Update Highlight
-    setPortUpdatedNode: (nodeId: string) => void;
-    clearPortUpdatedNode: (nodeId: string) => void;
+    setUpdatedPort: (portId: string) => void;
+    clearUpdatedPort: (portId: string) => void;
 
     // Compound Actions
     clearSelection: () => void;
@@ -133,7 +133,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
     tooltip: null,
     logViewerNodeId: null,
     modalFlowId: null,
-    portUpdatedNodeIds: new Map(),
+    updatedPortIds: new Set(),
 
     // Core Data Actions
     setNodes: nodes =>
@@ -178,18 +178,18 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
     setModalFlowId: modalFlowId => set({ modalFlowId }),
 
     // Port Update Highlight Actions
-    setPortUpdatedNode: nodeId =>
+    setUpdatedPort: portId =>
         set(state => {
-            const newMap = new Map(state.portUpdatedNodeIds);
-            newMap.set(nodeId, Date.now());
-            return { portUpdatedNodeIds: newMap };
+            const newSet = new Set(state.updatedPortIds);
+            newSet.add(portId);
+            return { updatedPortIds: newSet };
         }),
 
-    clearPortUpdatedNode: nodeId =>
+    clearUpdatedPort: portId =>
         set(state => {
-            const newMap = new Map(state.portUpdatedNodeIds);
-            newMap.delete(nodeId);
-            return { portUpdatedNodeIds: newMap };
+            const newSet = new Set(state.updatedPortIds);
+            newSet.delete(portId);
+            return { updatedPortIds: newSet };
         }),
 
     // Compound Actions
@@ -281,7 +281,7 @@ export const useCanvasSelectedConnectionId = () => useCanvasStore(state => state
 export const useCanvasClipboard = () => useCanvasStore(state => state.clipboard);
 export const useCanvasDragState = () => useCanvasStore(state => state.dragState);
 export const useCanvasConnectionDraft = () => useCanvasStore(state => state.connectionDraft);
-export const usePortUpdatedNodeIds = () => useCanvasStore(state => state.portUpdatedNodeIds);
+export const useUpdatedPortIds = () => useCanvasStore(state => state.updatedPortIds);
 
 /**
  * Selector to get connections as EdgeView format (for API compatibility)

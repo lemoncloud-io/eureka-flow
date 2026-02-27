@@ -69,8 +69,8 @@ export interface NodeActions {
 export interface NodeHighlightState {
     isSelected: boolean;
     isHighlighted?: boolean;
-    /** Port data was just updated via WebSocket - shows cyan pulse */
-    isPortUpdated?: boolean;
+    /** Port IDs that were just updated via WebSocket */
+    updatedPortIds?: string[];
     highlightedPortIds?: string[];
     /** Port IDs that have connections */
     connectedPortIds?: string[];
@@ -192,6 +192,8 @@ interface PortItemProps {
     nodeId: string;
     isHighlighted: boolean;
     isConnected: boolean;
+    /** Port was just updated via WebSocket */
+    isUpdated?: boolean;
     /** Port data value if available */
     portData?: DataPacket | null;
     /** Connection being dragged - for compatibility feedback */
@@ -212,6 +214,7 @@ const PortItem: React.FC<PortItemProps> = ({
     nodeId,
     isHighlighted,
     isConnected,
+    isUpdated,
     portData,
     connectionDraft,
     onMouseDown,
@@ -235,6 +238,8 @@ const PortItem: React.FC<PortItemProps> = ({
         'w-3 h-3 rounded-full border-2 transition-all duration-200',
         // Highlighted state (selected connection) - thicker border only, no ring
         isHighlighted && 'scale-110 border-primary border-[3px] z-20',
+        // Updated state (port data just received) - subtle cyan ring
+        !isHighlighted && isUpdated && 'scale-110 ring-2 ring-cyan-400 z-20',
         // Valid drop target - uses source port's dataType color with matching glow animation
         !isHighlighted && isValidDropTarget && [getDropTargetColor(connectionDraft.sourceType), 'z-20 cursor-copy'],
         // Incompatible target - dimmed with not-allowed cursor
@@ -701,7 +706,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const {
         isSelected,
         isHighlighted,
-        isPortUpdated,
+        updatedPortIds = [],
         highlightedPortIds = [],
         connectedPortIds = [],
         connectionDraft,
@@ -822,15 +827,12 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 !isDragging && 'transition-all duration-200',
                 isDisabled && 'opacity-50',
                 !isSelected && !isHighlighted && nodeState === 'IDLE' && 'shadow-node',
-                // Port update highlight (cyan pulse) - highest priority visual feedback
-                isPortUpdated && 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] animate-pulse',
-                // Normal highlight/selection states (only if not port updated)
-                !isPortUpdated &&
-                    (isHighlighted
-                        ? 'border-accent/60'
-                        : definition.isFrontend && !isSelected && nodeState === 'IDLE'
-                          ? 'border-primary/50'
-                          : getStatusStyles(nodeState, isSelected))
+                // Normal highlight/selection states
+                isHighlighted
+                    ? 'border-accent/60'
+                    : definition.isFrontend && !isSelected && nodeState === 'IDLE'
+                      ? 'border-primary/50'
+                      : getStatusStyles(nodeState, isSelected)
             )}
             style={{ left: node.position.x, top: node.position.y }}
             onMouseDown={onMouseDown}
@@ -1024,6 +1026,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         nodeId={node.id}
                         isHighlighted={highlightedPortIds.includes(p.id)}
                         isConnected={connectedPortIds.includes(p.id)}
+                        isUpdated={updatedPortIds.includes(p.id)}
                         portData={node.inputData?.[p.id]}
                         connectionDraft={connectionDraft}
                         onMouseDown={onPortMouseDown}
@@ -1040,6 +1043,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         nodeId={node.id}
                         isHighlighted={highlightedPortIds.includes(p.id)}
                         isConnected={connectedPortIds.includes(p.id)}
+                        isUpdated={updatedPortIds.includes(p.id)}
                         portData={node.outputData?.[p.id]}
                         connectionDraft={connectionDraft}
                         onMouseDown={onPortMouseDown}
