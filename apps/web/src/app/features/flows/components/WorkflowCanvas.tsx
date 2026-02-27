@@ -584,25 +584,32 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     // Step 2: Apply port data from ports[] array to nodes' inputData/outputData
                     // This loads persisted port values that may not be reflected in node outputData
                     // Port format: { id, nodeId, portId, direction, data: DataPacket }
-                    if (state.ports?.length) {
-                        state.ports.forEach(port => {
-                            if (!port.nodeId || !port.portId || !port.data || !port.direction) return;
+                    const ports = state.ports ?? [];
+                    const nodesWithPortData = ports.length
+                        ? nodesWithPropagatedData.map(node => {
+                              const nodePorts = ports.filter(
+                                  p => p.nodeId === node.id && p.portId && p.data && p.direction
+                              );
+                              if (nodePorts.length === 0) return node;
 
-                            const node = nodesWithPropagatedData.find(n => n.id === port.nodeId);
-                            if (!node) return;
+                              let inputData = { ...node.inputData };
+                              let outputData = { ...node.outputData };
 
-                            const portKey = port.portId;
-                            const packet: DataPacket = port.data;
+                              for (const port of nodePorts) {
+                                  const { portId, data, direction } = port;
+                                  if (!portId || !data) continue;
+                                  if (direction === 'in') {
+                                      inputData = { ...inputData, [portId]: data };
+                                  } else {
+                                      outputData = { ...outputData, [portId]: data };
+                                  }
+                              }
 
-                            if (port.direction === 'in') {
-                                node.inputData = { ...node.inputData, [portKey]: packet };
-                            } else if (port.direction === 'out') {
-                                node.outputData = { ...node.outputData, [portKey]: packet };
-                            }
-                        });
-                    }
+                              return { ...node, inputData, outputData };
+                          })
+                        : nodesWithPropagatedData;
 
-                    setNodes(nodesWithPropagatedData);
+                    setNodes(nodesWithPortData);
                     setConnections(loadedConnections);
                     pastRef.current = [];
                     futureRef.current = [];
