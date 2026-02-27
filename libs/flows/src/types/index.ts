@@ -17,6 +17,7 @@ export type {
     NodeData,
     NodeDataPacketItem,
     NodeStatus,
+    PortData,
     PortDefinition,
     ProcessBody,
     ProcessResult,
@@ -42,7 +43,7 @@ export type {
  */
 export type NodeState = 'IDLE' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR';
 
-import type { BlockDefinition, DataPacket, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinition, DataPacket, EdgeData, NodeData, PortData } from '@lemoncloud/eureka-flows-api';
 
 // ============================================================================
 // Block Definition Extension (isFrontend support)
@@ -447,11 +448,14 @@ export interface UpsertNodeResult {
  * Uses NodeData/EdgeData from API package to match backend response format.
  * - NodeData: uses object format for config, inputData, outputData
  * - EdgeData: connection data between nodes
+ * - PortData: port data with current values (id, nodeId, portId, direction, data)
  * - channelId: WebSocket channel for real-time updates
  */
 export interface LoadFlowResult extends FlowModel {
     nodes: NodeData[];
     edges: EdgeData[];
+    /** Port data with current values for input/output ports */
+    ports?: PortData[];
     /** WebSocket channel ID for real-time node status updates */
     channelId?: string;
 }

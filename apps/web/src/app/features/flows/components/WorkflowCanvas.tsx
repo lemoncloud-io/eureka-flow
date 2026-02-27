@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { MousePointerClick, Plus, X } from 'lucide-react';
@@ -18,6 +18,7 @@ import {
     useBlockRegistry,
     useEdgeSync,
     useNodeSync,
+    useUpdatedPortIds,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
@@ -37,13 +38,18 @@ import {
     wouldCreateCycle,
 } from '../utils';
 
-import type { NodeState } from '@flows/flows';
+import type { NodeState, PortData } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+
+/** Extended WorkflowState with optional ports array from LoadFlowResult */
+interface WorkflowStateWithPorts extends WorkflowState {
+    ports?: PortData[];
+}
 
 export interface WorkflowCanvasRef {
     addNode: (type: string) => void;
     getWorkflow: () => WorkflowState;
-    loadWorkflow: (state: WorkflowState) => void;
+    loadWorkflow: (state: WorkflowStateWithPorts) => void;
     clearWorkflow: () => void;
     newWorkflow: () => void;
     undo: () => void;
@@ -130,6 +136,27 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
     ) => {
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
+        const updatedPortIds = useUpdatedPortIds();
+
+        // Pre-compute updated ports grouped by nodeId for O(1) lookup per node
+        const updatedPortIdsByNode = useMemo(() => {
+            const map = new Map<string, string[]>();
+            updatedPortIds.forEach(pid => {
+                const colonIndex = pid.indexOf(':');
+                if (colonIndex !== -1) {
+                    const nodeId = pid.substring(0, colonIndex);
+                    const portName = pid.substring(colonIndex + 1);
+                    const existing = map.get(nodeId);
+                    if (existing) {
+                        existing.push(portName);
+                    } else {
+                        map.set(nodeId, [portName]);
+                    }
+                }
+            });
+            return map;
+        }, [updatedPortIds]);
+
         const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId } = useNodeSync({
             flowId: flowId ?? null,
         });
@@ -513,7 +540,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     nodes,
                     edges: connections.filter(c => !pendingEdgeIds.has(c.id)),
                 }),
-                loadWorkflow: (state: WorkflowState) => {
+                loadWorkflow: (state: WorkflowStateWithPorts) => {
                     // Normalize nodes to ensure config is never undefined
                     const loadedNodes = (state.nodes ?? []).map(n => ({
                         ...n,
@@ -523,7 +550,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const rawConnections = state.edges ?? state.connections ?? [];
                     const loadedConnections = deduplicateEdges(rawConnections);
 
-                    // Propagate outputData to downstream nodes' inputData
+                    // Step 1: Propagate outputData to downstream nodes' inputData
                     // This ensures that existing completed nodes' outputs are reflected in downstream inputs
                     const nodesWithPropagatedData = loadedNodes.map(node => {
                         // Find all connections where this node is the target
@@ -554,7 +581,35 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         return node;
                     });
 
-                    setNodes(nodesWithPropagatedData);
+                    // Step 2: Apply port data from ports[] array to nodes' inputData/outputData
+                    // This loads persisted port values that may not be reflected in node outputData
+                    // Port format: { id, nodeId, portId, direction, data: DataPacket }
+                    const ports = state.ports ?? [];
+                    const nodesWithPortData = ports.length
+                        ? nodesWithPropagatedData.map(node => {
+                              const nodePorts = ports.filter(
+                                  p => p.nodeId === node.id && p.portId && p.data && p.direction
+                              );
+                              if (nodePorts.length === 0) return node;
+
+                              let inputData = { ...node.inputData };
+                              let outputData = { ...node.outputData };
+
+                              for (const port of nodePorts) {
+                                  const { portId, data, direction } = port;
+                                  if (!portId || !data) continue;
+                                  if (direction === 'in') {
+                                      inputData = { ...inputData, [portId]: data };
+                                  } else {
+                                      outputData = { ...outputData, [portId]: data };
+                                  }
+                              }
+
+                              return { ...node, inputData, outputData };
+                          })
+                        : nodesWithPropagatedData;
+
+                    setNodes(nodesWithPortData);
                     setConnections(loadedConnections);
                     pastRef.current = [];
                     futureRef.current = [];
@@ -1910,6 +1965,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             highlightState={{
                                                 isSelected: selectedNodeIds.has(node.id),
                                                 isHighlighted: !!isConnected,
+                                                updatedPortIds: updatedPortIdsByNode.get(node.id) ?? [],
                                                 highlightedPortIds: highlightedPorts,
                                                 connectedPortIds: connectedPorts,
                                                 connectionDraft: connectionDraft
@@ -1959,7 +2015,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     altText={t('flows:nodeBlock.previewAlt')}
                                 />
                             ) : (
-                                <div className="text-xs text-foreground max-w-[200px] break-all">
+                                <div className="text-xs text-foreground min-w-[100px] max-w-[400px] break-all">
                                     {typeof tooltip.content === 'object'
                                         ? JSON.stringify(tooltip.content).slice(0, 100) +
                                           (JSON.stringify(tooltip.content).length > 100 ? '...' : '')

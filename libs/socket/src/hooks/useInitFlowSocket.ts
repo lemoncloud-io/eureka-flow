@@ -106,6 +106,11 @@ export interface NodeUpdateInfo {
     flowId?: string;
     timestamp?: number;
     /**
+     * Message sequence number (monotonically increasing)
+     * Higher values indicate more recent updates - used for ordering
+     */
+    no?: number;
+    /**
      * @deprecated Use `state` instead. Kept for backward compatibility.
      */
     status?: string;
@@ -144,6 +149,11 @@ export interface PortUpdateInfo {
     flowId?: string;
     /** Timestamp when port data changed */
     timestamp?: number;
+    /**
+     * Message sequence number (monotonically increasing)
+     * Higher values indicate more recent updates - used for ordering
+     */
+    no?: number;
 }
 
 export interface UseInitFlowSocketOptions {
@@ -281,6 +291,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         nodeId: data.id,
                         flowId: data.flowId,
                         timestamp: data.timestamp,
+                        no: data.no,
                         // Deprecated fields (kept for backward compatibility)
                         status: data.status,
                         prevStatus: data.prevStatus,
@@ -314,6 +325,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         direction: parsed.direction, // from @suffix
                         flowId: data.flowId,
                         timestamp: data.timestamp,
+                        no: data.no,
                     });
                 }
             }

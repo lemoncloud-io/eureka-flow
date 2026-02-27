@@ -8,6 +8,7 @@ import {
     getPortData,
     getStatePriority,
     useBlocks,
+    useCanvasStore,
     useFlows,
 } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
@@ -74,9 +75,41 @@ export const FlowEditorPage = () => {
         [loadFlowById]
     );
 
+    // Track node sequence numbers to detect stale updates (higher no = newer)
+    const nodeNoRef = useRef<Map<string, number>>(new Map());
+
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
-            const { nodeId, isPort, parentNodeId, state, progress } = info;
+            const { nodeId, isPort, parentNodeId, state, progress, no } = info;
+
+            // Check if this update is stale based on sequence number (no)
+            // Higher 'no' means more recent - skip if we've seen a higher number
+            // EXCEPTION: If same 'no' but higher priority state (ERROR > COMPLETED), allow update
+            const prevNo = nodeNoRef.current.get(nodeId);
+            if (no !== undefined) {
+                if (prevNo !== undefined && prevNo > no) {
+                    console.debug('[handleNodeUpdate] Skipping stale update:', nodeId, 'prevNo:', prevNo, 'no:', no);
+                    return;
+                }
+                // Same 'no' - check if new state has higher priority (e.g., ERROR > COMPLETED)
+                // This handles race condition where server sends COMPLETED and ERROR with same sequence number
+                if (prevNo !== undefined && prevNo === no && state) {
+                    const currentPriority = getStatePriority(
+                        canvasRef.current?.getWorkflow().nodes.find(n => n.id === nodeId)?.state
+                    );
+                    const newPriority = getStatePriority(state);
+                    if (newPriority <= currentPriority) {
+                        console.debug('[handleNodeUpdate] Skipping same-no lower priority:', nodeId);
+                        return;
+                    }
+                }
+                nodeNoRef.current.set(nodeId, no);
+            } else if (prevNo !== undefined) {
+                // If we've been tracking sequence numbers for this node,
+                // messages without 'no' are likely stale (from a different source)
+                console.debug('[handleNodeUpdate] Skipping update without no (prevNo exists):', nodeId);
+                return;
+            }
 
             // When state field exists, update UI directly from socket data (no API fetch needed)
             // - state=RUNNING/COMPLETED is the execution state from server
@@ -218,15 +251,30 @@ export const FlowEditorPage = () => {
                     }
                 }
             } catch (error) {
-                // Node reload failed - silent fail, user can refresh
+                // Node reload failed - revert no to allow retry
+                if (no !== undefined) {
+                    const prevNo = nodeNoRef.current.get(nodeId);
+                    if (prevNo === no) {
+                        nodeNoRef.current.delete(nodeId);
+                    }
+                }
                 console.debug('[handleNodeUpdate] Failed to update node:', nodeId, error);
             }
         },
         [blockRegistry]
     );
 
-    // Track port timestamps to detect changes and prevent duplicate fetches
+    // Track port sequence numbers to detect stale updates (higher no = newer)
+    // Falls back to timestamp comparison when 'no' is not available
+    const portNoRef = useRef<Map<string, number>>(new Map());
     const portTimestampsRef = useRef<Map<string, number>>(new Map());
+
+    // Get port highlight actions from canvas store
+    const setUpdatedPort = useCanvasStore(state => state.setUpdatedPort);
+    const clearUpdatedPort = useCanvasStore(state => state.clearUpdatedPort);
+
+    // Track highlight timeouts per port to cancel previous timeout on rapid updates
+    const highlightTimeoutsRef = useRef<Map<string, number>>(new Map());
 
     /**
      * Handle port update notification from WebSocket (type: 'node/port')
@@ -237,18 +285,29 @@ export const FlowEditorPage = () => {
      */
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
-            const { portId, nodeId, direction, portName, timestamp } = info;
+            const { portId, nodeId, direction, portName, timestamp, no } = info;
 
             // Use direction from message, default to 'in' if not specified
             const effectiveDirection = direction ?? 'in';
 
-            // Check if timestamp changed to prevent duplicate fetches
-            const prevTimestamp = portTimestampsRef.current.get(portId);
-            if (prevTimestamp && timestamp && prevTimestamp >= timestamp) return;
+            // Check if this update is stale based on sequence number (no)
+            // Higher 'no' means more recent - skip if we've seen a higher number
+            if (no !== undefined) {
+                const prevNo = portNoRef.current.get(portId);
+                if (prevNo !== undefined && prevNo >= no) {
+                    console.debug('[handlePortUpdate] Skipping stale update:', portId, 'prevNo:', prevNo, 'no:', no);
+                    return;
+                }
+                portNoRef.current.set(portId, no);
+            } else {
+                // Fallback: Check if timestamp changed to prevent duplicate fetches
+                const prevTimestamp = portTimestampsRef.current.get(portId);
+                if (prevTimestamp && timestamp && prevTimestamp >= timestamp) return;
 
-            // Update timestamp before fetch to prevent concurrent fetches
-            if (timestamp) {
-                portTimestampsRef.current.set(portId, timestamp);
+                // Update timestamp before fetch to prevent concurrent fetches
+                if (timestamp) {
+                    portTimestampsRef.current.set(portId, timestamp);
+                }
             }
 
             try {
@@ -276,19 +335,52 @@ export const FlowEditorPage = () => {
                             inputData: { [portKey]: dataPacket },
                         });
                     }
+
+                    // Trigger port update highlight on the specific port
+                    // Cancel existing timeout if rapid updates occur on same port
+                    const existingTimeout = highlightTimeoutsRef.current.get(portId);
+                    if (existingTimeout) {
+                        window.clearTimeout(existingTimeout);
+                    }
+
+                    setUpdatedPort(portId);
+                    const timeoutId = window.setTimeout(() => {
+                        clearUpdatedPort(portId);
+                        highlightTimeoutsRef.current.delete(portId);
+                    }, 500);
+                    highlightTimeoutsRef.current.set(portId, timeoutId);
                 }
             } catch (error) {
-                // Port fetch failed - revert timestamp to allow retry
-                if (prevTimestamp) {
-                    portTimestampsRef.current.set(portId, prevTimestamp);
+                // Port fetch failed - revert no/timestamp to allow retry
+                if (no !== undefined) {
+                    const prevNo = portNoRef.current.get(portId);
+                    // Only revert if we set it (prevNo would be our 'no' value)
+                    if (prevNo === no) {
+                        portNoRef.current.delete(portId);
+                    }
                 } else {
-                    portTimestampsRef.current.delete(portId);
+                    // Fallback: revert timestamp
+                    const currentTimestamp = portTimestampsRef.current.get(portId);
+                    if (currentTimestamp === timestamp) {
+                        portTimestampsRef.current.delete(portId);
+                    }
                 }
                 console.debug('[handlePortUpdate] Failed to fetch port data:', portId, error);
             }
         },
-        [] // No dependencies - uses refs and stable canvasRef
+        [setUpdatedPort, clearUpdatedPort]
     );
+
+    // Cleanup highlight timeouts on unmount
+    useEffect(() => {
+        const timeoutsMap = highlightTimeoutsRef.current;
+        return () => {
+            timeoutsMap.forEach(timeoutId => {
+                window.clearTimeout(timeoutId);
+            });
+            timeoutsMap.clear();
+        };
+    }, []);
 
     // Track last local update to prevent self-echo from socket (use ref to avoid re-renders)
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);

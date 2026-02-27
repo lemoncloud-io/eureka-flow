@@ -9,13 +9,16 @@ const VALID_STATES: ReadonlySet<string> = new Set(['IDLE', 'READY', 'RUNNING', '
  * Node state priority for comparing state updates
  * Higher number = more "final" state
  * Used to prevent race conditions between frontend/socket/API updates
+ *
+ * ERROR has highest priority (4) because it's a terminal failure state
+ * that should not be overwritten by COMPLETED or other states.
  */
 export const STATE_PRIORITY: Record<string, number> = {
     IDLE: 0,
     READY: 1,
     RUNNING: 2,
     COMPLETED: 3,
-    ERROR: 3,
+    ERROR: 4, // Terminal failure - highest priority
 };
 
 /**
