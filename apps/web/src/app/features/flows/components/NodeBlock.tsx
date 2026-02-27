@@ -280,7 +280,7 @@ const PortItem: React.FC<PortItemProps> = ({
         ? '-top-7 whitespace-nowrap'
         : portData.type === 'image'
           ? 'bottom-full mb-2'
-          : '-top-14 max-w-[200px]';
+          : '-top-14 min-w-[100px] max-w-[400px]';
 
     return (
         <div className="relative group flex items-center justify-center w-3 h-6">

@@ -2015,7 +2015,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     altText={t('flows:nodeBlock.previewAlt')}
                                 />
                             ) : (
-                                <div className="text-xs text-foreground max-w-[200px] break-all">
+                                <div className="text-xs text-foreground min-w-[100px] max-w-[400px] break-all">
                                     {typeof tooltip.content === 'object'
                                         ? JSON.stringify(tooltip.content).slice(0, 100) +
                                           (JSON.stringify(tooltip.content).length > 100 ? '...' : '')

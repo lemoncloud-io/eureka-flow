@@ -26,7 +26,7 @@ export const DataTooltip: React.FC<DataTooltipProps> = ({ tooltip }) => {
             {tooltip.type === 'image' ? (
                 <TooltipImage src={tooltip.content as string} altText={t('nodeBlock.previewAlt')} />
             ) : (
-                <div className="text-xs text-foreground max-w-[200px] break-all">
+                <div className="text-xs text-foreground min-w-[100px] max-w-[400px] break-all">
                     {typeof tooltip.content === 'object'
                         ? JSON.stringify(tooltip.content).slice(0, 100) +
                           (JSON.stringify(tooltip.content).length > 100 ? '...' : '')
