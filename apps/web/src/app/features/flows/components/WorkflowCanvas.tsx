@@ -8,9 +8,10 @@ import {
     LAYOUT_CONFIG,
     PORT_LAYOUT,
     estimateNodeHeight,
+    getEffectiveState,
     loadFlow,
     runNode,
-    shouldUpdateStatus,
+    shouldUpdateState,
     toPortData,
     upsertFlow,
     upsertPortNode,
@@ -36,6 +37,7 @@ import {
     wouldCreateCycle,
 } from '../utils';
 
+import type { NodeState } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 export interface WorkflowCanvasRef {
@@ -67,6 +69,8 @@ interface WorkflowCanvasProps {
     onOpenLibrary?: () => void;
     /** Called when a connection is rejected due to validation error */
     onConnectionError?: (error: 'cycle' | 'invalid_type') => void;
+    /** Called to show notification message (dev only, for touch debug) */
+    onShowNotification?: (message: string, type: 'success' | 'error') => void;
 }
 
 const GRID_SIZE = 20;
@@ -120,7 +124,10 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onOpenLibrary }) => {
 };
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
-    ({ readOnly, initialData, flowId, onNodeSelect, onChange, onOpenLibrary, onConnectionError }, ref) => {
+    (
+        { readOnly, initialData, flowId, onNodeSelect, onChange, onOpenLibrary, onConnectionError, onShowNotification },
+        ref
+    ) => {
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
         const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId } = useNodeSync({
@@ -374,7 +381,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         type,
                         position: { x: snappedX, y: snappedY },
                         config: { ...blockRegistry[type].defaultConfig },
-                        status: 'IDLE',
+                        state: 'IDLE' as NodeState,
+                        status: 'IDLE', // Deprecated: kept for backward compatibility
                         inputData: {},
                         outputData: {},
                         autoExecutionEnabled: true,
@@ -753,21 +761,25 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 transformedOutputData = { ...n.outputData, ...outputDataForPropagation };
                             }
 
-                            // Status priority: only update if server status is more "final"
+                            // State priority: only update if server state is more "final"
                             // EXCEPTION: If RUNNING with progress, force update (active execution)
+                            // Use getEffectiveState for backward compatibility (state preferred, status fallback)
+                            const serverState = getEffectiveState(serverData.state, serverData.status);
+                            const currentState = getEffectiveState(n.state, n.status);
                             const isActiveExecution =
-                                serverData.status === 'RUNNING' && serverData.executionStats?.progress !== undefined;
-                            const finalStatus =
-                                isActiveExecution || shouldUpdateStatus(n.status, serverData.status)
-                                    ? serverData.status
-                                    : n.status;
+                                serverState === 'RUNNING' && serverData.executionStats?.progress !== undefined;
+                            const finalState =
+                                isActiveExecution || shouldUpdateState(currentState, serverState)
+                                    ? serverState
+                                    : currentState;
 
                             return {
                                 ...n,
                                 config: transformedConfig,
                                 inputData: transformedInputData,
                                 outputData: transformedOutputData,
-                                status: finalStatus ?? n.status,
+                                state: finalState ?? n.state,
+                                status: finalState ?? n.status, // Deprecated: kept for backward compatibility
                                 errorMessage: serverData.errorMessage,
                                 // Merge executionStats to preserve existing values (startTime, duration)
                                 // when only progress is being updated
@@ -815,7 +827,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         n.id === nodeId
                             ? {
                                   ...n,
-                                  status: 'RUNNING',
+                                  state: 'RUNNING' as NodeState,
+                                  status: 'RUNNING', // Deprecated: kept for backward compatibility
                                   errorMessage: undefined,
                                   executionStats: { startTime, progress: 0, duration: 0 },
                               }
@@ -833,7 +846,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     setNodes(prev =>
                         prev.map(n =>
                             n.id === nodeId
-                                ? { ...n, status: 'ERROR', errorMessage: t('nodes:errors.unknownBlockType') }
+                                ? {
+                                      ...n,
+                                      state: 'ERROR' as NodeState,
+                                      status: 'ERROR', // Deprecated: kept for backward compatibility
+                                      errorMessage: t('nodes:errors.unknownBlockType'),
+                                  }
                                 : n
                         )
                     );
@@ -856,7 +874,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             n.id === nodeId
                                 ? {
                                       ...n,
-                                      status: 'ERROR',
+                                      state: 'ERROR' as NodeState,
+                                      status: 'ERROR', // Deprecated: kept for backward compatibility
                                       errorMessage: t('nodes:errors.missingInputs', { inputs: missingLabels }),
                                       executionStats: { startTime, duration: 0, progress: 0 },
                                   }
@@ -907,7 +926,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 n.id === nodeId
                                     ? {
                                           ...n,
-                                          status: 'COMPLETED' as const,
+                                          state: 'COMPLETED' as NodeState,
+                                          status: 'COMPLETED' as const, // Deprecated: kept for backward compatibility
                                           outputData: outputs,
                                           executionStats: { startTime, duration, progress: 100 },
                                       }
@@ -990,24 +1010,28 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             config: currentNode.config || {},
                         });
 
-                        if (result?.status) {
+                        // Use state from result if available, fallback to status for backward compatibility
+                        const resultState = getEffectiveState(result?.state, result?.status);
+                        if (resultState) {
                             const duration = Date.now() - startTime;
 
                             setNodes(prev =>
                                 prev.map(n => {
                                     if (n.id !== nodeId) return n;
 
-                                    // Compare priorities: only update if API status >= current status
-                                    if (shouldUpdateStatus(n.status, result.status)) {
+                                    // Compare priorities: only update if API state >= current state
+                                    const currentState = getEffectiveState(n.state, n.status);
+                                    if (shouldUpdateState(currentState, resultState)) {
                                         return {
                                             ...n,
-                                            status: result.status,
+                                            state: resultState as NodeState,
+                                            status: resultState, // Deprecated: kept for backward compatibility
                                             executionStats: { startTime, duration, progress: 100 },
                                         };
                                     }
 
-                                    // API status is lower priority (e.g., RUNNING when already COMPLETED)
-                                    // Keep current status, but update executionStats
+                                    // API state is lower priority (e.g., RUNNING when already COMPLETED)
+                                    // Keep current state, but update executionStats
                                     return {
                                         ...n,
                                         executionStats: { startTime, duration, progress: 100 },
@@ -1026,7 +1050,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             n.id === nodeId
                                 ? {
                                       ...n,
-                                      status: 'ERROR',
+                                      state: 'ERROR' as NodeState,
+                                      status: 'ERROR', // Deprecated: kept for backward compatibility
                                       errorMessage,
                                       executionStats: { startTime, duration, progress: 0 },
                                   }
@@ -1165,7 +1190,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         x: Math.round((node.position.x + 40) / GRID_SIZE) * GRID_SIZE,
                         y: Math.round((node.position.y + 40) / GRID_SIZE) * GRID_SIZE,
                     },
-                    status: 'IDLE',
+                    state: 'IDLE' as NodeState,
+                    status: 'IDLE', // Deprecated: kept for backward compatibility
                     inputData: {},
                     outputData: {},
                     errorMessage: undefined,
@@ -1626,7 +1652,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 x: Math.round((node.position.x + offsetX) / GRID_SIZE) * GRID_SIZE,
                                 y: Math.round((node.position.y + offsetY) / GRID_SIZE) * GRID_SIZE,
                             },
-                            status: 'IDLE',
+                            state: 'IDLE' as NodeState,
+                            status: 'IDLE', // Deprecated: kept for backward compatibility
                             inputData: {},
                             outputData: {},
                             errorMessage: undefined,
@@ -1789,7 +1816,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 const targetNode = nodes.find(n => n.id === conn.targetNodeId);
                                 const packet = sourceNode?.outputData?.[conn.sourcePortId];
                                 const isActive = !!packet;
-                                const isFlowing = sourceNode?.status === 'RUNNING' || targetNode?.status === 'RUNNING';
+                                // Use getEffectiveState for backward compatibility (state preferred, status fallback)
+                                const sourceState = getEffectiveState(sourceNode?.state, sourceNode?.status);
+                                const targetState = getEffectiveState(targetNode?.state, targetNode?.status);
+                                const isFlowing = sourceState === 'RUNNING' || targetState === 'RUNNING';
 
                                 const handleHover = (e: React.MouseEvent) => {
                                     setHoveredConnectionId(conn.id);
@@ -1998,6 +2028,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             handleSelectionChange(null);
                             setSelectedConnectionId(null);
                         }}
+                        onShowNotification={onShowNotification}
                     />
                 </div>
             </div>

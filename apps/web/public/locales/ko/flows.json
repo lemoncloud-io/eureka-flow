@@ -116,7 +116,24 @@
         "image": "이미지",
         "value": "값",
         "clickToUpload": "클릭하여 업로드",
-        "enterText": "텍스트를 입력하세요..."
+        "enterText": "텍스트를 입력하세요...",
+        "touchDebug": "Touch 디버그",
+        "touchDialog": {
+            "title": "Touch 디버그",
+            "description": "노드 {{nodeId}}에 디버그 touch 요청 전송",
+            "sections": {
+                "timestamps": "타임스탬프",
+                "state": "상태",
+                "counters": "카운터",
+                "layout": "레이아웃",
+                "metadata": "메타데이터"
+            },
+            "reset": "초기화",
+            "send": "Touch 전송",
+            "sending": "전송 중...",
+            "success": "Touch 요청이 성공적으로 전송되었습니다",
+            "error": "Touch 요청 전송 실패"
+        }
     },
     "flowEditor": {
         "initializingEngine": "FlowMosaic 엔진 초기화 중...",

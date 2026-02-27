@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import { isOutputConsole, isOutputPreview } from '../consts';
+import { getEffectiveState, isOutputConsole, isOutputPreview } from '../consts';
 import { useCanvasStore } from '../stores';
 import { useFlowsStore } from '../stores/useFlowsStore';
 import { DEFAULT_TEXTAREA_HEIGHT, getNodeHeight } from '../utils/nodeHeight';
@@ -82,7 +82,8 @@ export const estimateNodeHeight = (node: NodeData, definition: BlockDefinition |
     }
     if (isOutputConsole(definition.type)) extraHeight += NODE_HEIGHT.DEBUG_LOG;
     if (isOutputPreview(definition.type)) extraHeight += NODE_HEIGHT.PREVIEW;
-    if (node.status === 'ERROR') extraHeight += NODE_HEIGHT.ERROR;
+    // Use getEffectiveState for backward compatibility (state preferred, status fallback)
+    if (getEffectiveState(node.state, node.status) === 'ERROR') extraHeight += NODE_HEIGHT.ERROR;
 
     return NODE_HEIGHT.BASE + portsHeight + extraHeight;
 };

@@ -15,6 +15,7 @@ import {
     Settings,
     Trash2,
     Upload,
+    Wrench,
     X,
     Zap,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ import {
     clampHeight,
     compressImageIfNeeded,
     downloadImage,
+    getEffectiveState,
     getNodeHeight,
     useBlockRegistry,
     useS3Image,
@@ -33,6 +35,7 @@ import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
 import { FrontendBadge } from './FrontendBadge';
 import { S3Image } from './S3Image';
+import { TouchDialog } from './TouchDialog';
 
 import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@flows/flows';
 
@@ -52,6 +55,7 @@ interface DetailPanelProps {
     onSelectNode: (nodeId: string) => void;
     onSelectConnection: (connectionId: string) => void;
     onClose: () => void;
+    onShowNotification?: (message: string, type: 'success' | 'error') => void;
 }
 
 type ConfigControlType = 'text' | 'number' | 'boolean' | 'select' | 'file' | 'workflow-selector';
@@ -334,9 +338,12 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     onSelectNode,
     onSelectConnection,
     onClose,
+    onShowNotification,
 }) => {
     const { t } = useTranslation(['flows', 'common']);
     const blockRegistry = useBlockRegistry();
+    const [isTouchDialogOpen, setIsTouchDialogOpen] = useState(false);
+    const [touchPortId, setTouchPortId] = useState<string | null>(null);
 
     if (!selectedNode && !selectedConnection) return null;
 
@@ -557,21 +564,27 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             {def.type}
                         </span>
                         {def.isFrontend && <FrontendBadge />}
-                        <span
-                            className={cn(
-                                'text-[10px] px-1.5 py-0.5 rounded font-semibold',
-                                selectedNode.status === 'ERROR' &&
-                                    'bg-destructive/20 text-destructive border border-destructive/30',
-                                selectedNode.status === 'RUNNING' &&
-                                    'bg-status-running/20 text-status-running border border-status-running/30',
-                                selectedNode.status === 'COMPLETED' &&
-                                    'bg-status-completed/20 text-status-completed border border-status-completed/30',
-                                selectedNode.status === 'IDLE' &&
-                                    'bg-muted/50 text-muted-foreground border border-border/50'
-                            )}
-                        >
-                            {selectedNode.status}
-                        </span>
+                        {(() => {
+                            // Get effective state (state preferred, status fallback for backward compatibility)
+                            const nodeState = getEffectiveState(selectedNode.state, selectedNode.status);
+                            return (
+                                <span
+                                    className={cn(
+                                        'text-[10px] px-1.5 py-0.5 rounded font-semibold',
+                                        nodeState === 'ERROR' &&
+                                            'bg-destructive/20 text-destructive border border-destructive/30',
+                                        nodeState === 'RUNNING' &&
+                                            'bg-status-running/20 text-status-running border border-status-running/30',
+                                        nodeState === 'COMPLETED' &&
+                                            'bg-status-completed/20 text-status-completed border border-status-completed/30',
+                                        (nodeState === 'IDLE' || nodeState === 'READY') &&
+                                            'bg-muted/50 text-muted-foreground border border-border/50'
+                                    )}
+                                >
+                                    {nodeState}
+                                </span>
+                            );
+                        })()}
                         <button
                             onClick={() => onViewLogs(selectedNode.id)}
                             className="ml-auto text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
@@ -592,7 +605,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 </div>
 
                 {/* Error Display */}
-                {selectedNode.status === 'ERROR' && (
+                {getEffectiveState(selectedNode.state, selectedNode.status) === 'ERROR' && (
                     <div className="px-3 py-2 bg-destructive/10 border-b border-destructive/20 flex-shrink-0">
                         <div className="flex items-center gap-2 mb-1 text-destructive text-xs font-semibold">
                             <AlertTriangle className="w-3.5 h-3.5" /> {t('flows:detailPanel.errorDetails')}
@@ -710,6 +723,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                     const incomingConn = connections.find(
                                         c => c.targetNodeId === selectedNode.id && c.targetPortId === input.id
                                     );
+                                    const portId = `${selectedNode.id}:${input.id}`;
 
                                     return (
                                         <div
@@ -729,6 +743,15 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                         >
                                                             <Zap className="w-2.5 h-2.5" />
                                                             {t('flows:detailPanel.link')}
+                                                        </button>
+                                                    )}
+                                                    {import.meta.env.DEV && (
+                                                        <button
+                                                            onClick={() => setTouchPortId(portId)}
+                                                            className="text-[9px] bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 hover:text-violet-300 px-1.5 py-0.5 rounded flex items-center justify-center transition-colors"
+                                                            title={t('flows:detailPanel.touchDebug')}
+                                                        >
+                                                            <Wrench className="w-3 h-3" />
                                                         </button>
                                                     )}
                                                 </div>
@@ -760,6 +783,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                     const outgoingConns = connections.filter(
                                         c => c.sourceNodeId === selectedNode.id && c.sourcePortId === output.id
                                     );
+                                    const portId = `${selectedNode.id}:${output.id}`;
 
                                     return (
                                         <div
@@ -788,6 +812,15 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                             ))}
                                                         </div>
                                                     )}
+                                                    {import.meta.env.DEV && (
+                                                        <button
+                                                            onClick={() => setTouchPortId(portId)}
+                                                            className="text-[9px] bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 hover:text-violet-300 px-1.5 py-0.5 rounded flex items-center justify-center transition-colors"
+                                                            title={t('flows:detailPanel.touchDebug')}
+                                                        >
+                                                            <Wrench className="w-3 h-3" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                                 <span className="text-[9px] text-muted-foreground/60 uppercase font-mono bg-muted/30 px-1.5 py-0.5 rounded">
                                                     {output.type}
@@ -810,6 +843,15 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     >
                         <Play className="w-3.5 h-3.5" /> {t('flows:detailPanel.runBlock')}
                     </button>
+                    {import.meta.env.DEV && (
+                        <button
+                            onClick={() => setIsTouchDialogOpen(true)}
+                            className="px-3 bg-warning/10 border border-warning/30 hover:bg-warning/20 text-warning text-xs rounded-lg transition-colors flex items-center justify-center"
+                            title={t('flows:detailPanel.touchDebug')}
+                        >
+                            <Wrench className="w-3.5 h-3.5" />
+                        </button>
+                    )}
                     <button
                         onClick={() => onDeleteNode(selectedNode.id)}
                         className="px-3 bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs rounded-lg transition-colors flex items-center justify-center"
@@ -818,6 +860,32 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         <Trash2 className="w-3.5 h-3.5" />
                     </button>
                 </div>
+
+                {/* Touch Debug Dialog for Node (Dev only) */}
+                {import.meta.env.DEV && (
+                    <TouchDialog
+                        open={isTouchDialogOpen}
+                        onOpenChange={setIsTouchDialogOpen}
+                        nodeId={selectedNode.id}
+                        initialNode={selectedNode}
+                        onSuccess={msg => onShowNotification?.(msg, 'success')}
+                        onError={msg => onShowNotification?.(msg, 'error')}
+                    />
+                )}
+
+                {/* Touch Debug Dialog for Port (Dev only) */}
+                {import.meta.env.DEV && touchPortId && (
+                    <TouchDialog
+                        open={!!touchPortId}
+                        onOpenChange={open => !open && setTouchPortId(null)}
+                        nodeId={touchPortId}
+                        onSuccess={msg => {
+                            onShowNotification?.(msg, 'success');
+                            setTouchPortId(null);
+                        }}
+                        onError={msg => onShowNotification?.(msg, 'error')}
+                    />
+                )}
             </div>
         );
     }
@@ -910,14 +978,35 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     </div>
                 </div>
 
-                <div className="p-3 border-t border-border/50 bg-surface-elevated/30 flex-shrink-0">
+                <div className="p-3 border-t border-border/50 bg-surface-elevated/30 flex gap-2 flex-shrink-0">
+                    {import.meta.env.DEV && (
+                        <button
+                            onClick={() => setIsTouchDialogOpen(true)}
+                            className="px-3 bg-warning/10 border border-warning/30 hover:bg-warning/20 text-warning text-xs py-2.5 rounded-lg transition-colors flex items-center justify-center"
+                            title={t('flows:detailPanel.touchDebug')}
+                        >
+                            <Wrench className="w-3.5 h-3.5" />
+                        </button>
+                    )}
                     <button
                         onClick={() => onDeleteConnection(selectedConnection.id)}
-                        className="w-full bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
                     >
                         <Trash2 className="w-3.5 h-3.5" /> {t('flows:detailPanel.deleteConnection')}
                     </button>
                 </div>
+
+                {/* Touch Debug Dialog (Dev only) */}
+                {import.meta.env.DEV && (
+                    <TouchDialog
+                        open={isTouchDialogOpen}
+                        onOpenChange={setIsTouchDialogOpen}
+                        nodeId={selectedConnection.id}
+                        initialConnection={selectedConnection}
+                        onSuccess={msg => onShowNotification?.(msg, 'success')}
+                        onError={msg => onShowNotification?.(msg, 'error')}
+                    />
+                )}
             </div>
         );
     }

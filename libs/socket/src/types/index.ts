@@ -3,6 +3,9 @@
  * @packageDocumentation
  */
 
+// Re-export NodeState from flows package (single source of truth)
+export type { NodeState } from '@flows/flows';
+
 /**
  * WebSocket connection status
  */
@@ -42,6 +45,8 @@ export interface FlowUpdateMessage {
     timestamp: number;
 }
 
+import type { NodeState } from '@flows/flows';
+
 /**
  * Node update notification from WebSocket
  */
@@ -50,9 +55,23 @@ export interface NodeUpdateMessage {
     id: string;
     flowId?: string;
     timestamp?: number;
+    /**
+     * @deprecated Use `state` instead. Kept for backward compatibility.
+     */
     status?: string;
+    /**
+     * @deprecated Use `prevState` instead. Kept for backward compatibility.
+     */
     prevStatus?: string;
-    state?: 'RUNNING' | 'COMPLETED';
+    /**
+     * Node execution state (preferred field)
+     * Values: 'IDLE' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR'
+     */
+    state?: NodeState;
+    /**
+     * Previous execution state before this update
+     */
+    prevState?: NodeState;
     progress?: number;
 }
 
