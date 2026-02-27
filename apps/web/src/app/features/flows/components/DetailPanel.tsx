@@ -748,10 +748,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                     {import.meta.env.DEV && (
                                                         <button
                                                             onClick={() => setTouchPortId(portId)}
-                                                            className="text-[9px] bg-muted/50 hover:bg-warning/20 text-muted-foreground hover:text-warning px-1 py-0.5 rounded transition-colors"
+                                                            className="text-[9px] bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 hover:text-violet-300 px-1.5 py-0.5 rounded flex items-center justify-center transition-colors"
                                                             title={t('flows:detailPanel.touchDebug')}
                                                         >
-                                                            <Wrench className="w-2.5 h-2.5" />
+                                                            <Wrench className="w-3 h-3" />
                                                         </button>
                                                     )}
                                                 </div>
@@ -815,10 +815,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                                     {import.meta.env.DEV && (
                                                         <button
                                                             onClick={() => setTouchPortId(portId)}
-                                                            className="text-[9px] bg-muted/50 hover:bg-warning/20 text-muted-foreground hover:text-warning px-1 py-0.5 rounded transition-colors"
+                                                            className="text-[9px] bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 hover:text-violet-300 px-1.5 py-0.5 rounded flex items-center justify-center transition-colors"
                                                             title={t('flows:detailPanel.touchDebug')}
                                                         >
-                                                            <Wrench className="w-2.5 h-2.5" />
+                                                            <Wrench className="w-3 h-3" />
                                                         </button>
                                                     )}
                                                 </div>
