@@ -329,7 +329,7 @@ export const FlowEditorPage = () => {
                     const timeoutId = window.setTimeout(() => {
                         clearUpdatedPort(portId);
                         highlightTimeoutsRef.current.delete(portId);
-                    }, 2000);
+                    }, 500);
                     highlightTimeoutsRef.current.set(portId, timeoutId);
                 }
             } catch (error) {
