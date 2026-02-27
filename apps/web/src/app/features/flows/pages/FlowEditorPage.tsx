@@ -115,6 +115,7 @@ export const FlowEditorPage = () => {
             // - state=RUNNING/COMPLETED is the execution state from server
             // - Output data comes separately via node/port messages
             // - API fetch only needed for isPort (port data) or state-less messages
+            // EXCEPTION: ERROR state requires API fetch to get errorMessage (not sent via WebSocket)
             // NOTE: state field is preferred, status is deprecated but kept for backward compatibility
             if (state && !isPort && canvasRef.current) {
                 // Reset executionStats when RUNNING starts, preserve progress if provided
@@ -124,6 +125,27 @@ export const FlowEditorPage = () => {
                         : progress !== undefined
                           ? { progress }
                           : undefined;
+
+                // ERROR state: fetch node from API to get errorMessage (not sent via WebSocket)
+                if (state === 'ERROR') {
+                    try {
+                        const nodeData = await getNode(nodeId);
+                        canvasRef.current.updateNodeFromServer(nodeId, {
+                            state,
+                            status: state, // Deprecated: kept for backward compatibility
+                            executionStats,
+                            errorMessage: nodeData.errorMessage,
+                        });
+                    } catch {
+                        // Fallback: update state without errorMessage if API fails
+                        canvasRef.current.updateNodeFromServer(nodeId, {
+                            state,
+                            status: state,
+                            executionStats,
+                        });
+                    }
+                    return;
+                }
 
                 canvasRef.current.updateNodeFromServer(nodeId, {
                     state,
