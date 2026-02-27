@@ -8,6 +8,7 @@ import {
     getPortData,
     getStatePriority,
     useBlocks,
+    useCanvasStore,
     useFlows,
 } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
@@ -232,7 +233,13 @@ export const FlowEditorPage = () => {
                     }
                 }
             } catch (error) {
-                // Node reload failed - silent fail, user can refresh
+                // Node reload failed - revert no to allow retry
+                if (no !== undefined) {
+                    const prevNo = nodeNoRef.current.get(nodeId);
+                    if (prevNo === no) {
+                        nodeNoRef.current.delete(nodeId);
+                    }
+                }
                 console.debug('[handleNodeUpdate] Failed to update node:', nodeId, error);
             }
         },
@@ -243,6 +250,13 @@ export const FlowEditorPage = () => {
     // Falls back to timestamp comparison when 'no' is not available
     const portNoRef = useRef<Map<string, number>>(new Map());
     const portTimestampsRef = useRef<Map<string, number>>(new Map());
+
+    // Get port highlight actions from canvas store
+    const setPortUpdatedNode = useCanvasStore(state => state.setPortUpdatedNode);
+    const clearPortUpdatedNode = useCanvasStore(state => state.clearPortUpdatedNode);
+
+    // Track highlight timeouts per node to cancel previous timeout on rapid updates
+    const highlightTimeoutsRef = useRef<Map<string, number>>(new Map());
 
     /**
      * Handle port update notification from WebSocket (type: 'node/port')
@@ -303,6 +317,20 @@ export const FlowEditorPage = () => {
                             inputData: { [portKey]: dataPacket },
                         });
                     }
+
+                    // Trigger port update highlight on the node
+                    // Cancel existing timeout if rapid updates occur on same node
+                    const existingTimeout = highlightTimeoutsRef.current.get(nodeId);
+                    if (existingTimeout) {
+                        window.clearTimeout(existingTimeout);
+                    }
+
+                    setPortUpdatedNode(nodeId);
+                    const timeoutId = window.setTimeout(() => {
+                        clearPortUpdatedNode(nodeId);
+                        highlightTimeoutsRef.current.delete(nodeId);
+                    }, 2000);
+                    highlightTimeoutsRef.current.set(nodeId, timeoutId);
                 }
             } catch (error) {
                 // Port fetch failed - revert no/timestamp to allow retry
@@ -322,8 +350,19 @@ export const FlowEditorPage = () => {
                 console.debug('[handlePortUpdate] Failed to fetch port data:', portId, error);
             }
         },
-        [] // No dependencies - uses refs and stable canvasRef
+        [setPortUpdatedNode, clearPortUpdatedNode]
     );
+
+    // Cleanup highlight timeouts on unmount
+    useEffect(() => {
+        const timeoutsMap = highlightTimeoutsRef.current;
+        return () => {
+            timeoutsMap.forEach(timeoutId => {
+                window.clearTimeout(timeoutId);
+            });
+            timeoutsMap.clear();
+        };
+    }, []);
 
     // Track last local update to prevent self-echo from socket (use ref to avoid re-renders)
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);

@@ -69,6 +69,8 @@ export interface NodeActions {
 export interface NodeHighlightState {
     isSelected: boolean;
     isHighlighted?: boolean;
+    /** Port data was just updated via WebSocket - shows cyan pulse */
+    isPortUpdated?: boolean;
     highlightedPortIds?: string[];
     /** Port IDs that have connections */
     connectedPortIds?: string[];
@@ -699,6 +701,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const {
         isSelected,
         isHighlighted,
+        isPortUpdated,
         highlightedPortIds = [],
         connectedPortIds = [],
         connectionDraft,
@@ -819,11 +822,15 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 !isDragging && 'transition-all duration-200',
                 isDisabled && 'opacity-50',
                 !isSelected && !isHighlighted && nodeState === 'IDLE' && 'shadow-node',
-                isHighlighted
-                    ? 'border-accent/60'
-                    : definition.isFrontend && !isSelected && nodeState === 'IDLE'
-                      ? 'border-primary/50'
-                      : getStatusStyles(nodeState, isSelected)
+                // Port update highlight (cyan pulse) - highest priority visual feedback
+                isPortUpdated && 'border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] animate-pulse',
+                // Normal highlight/selection states (only if not port updated)
+                !isPortUpdated &&
+                    (isHighlighted
+                        ? 'border-accent/60'
+                        : definition.isFrontend && !isSelected && nodeState === 'IDLE'
+                          ? 'border-primary/50'
+                          : getStatusStyles(nodeState, isSelected))
             )}
             style={{ left: node.position.x, top: node.position.y }}
             onMouseDown={onMouseDown}
