@@ -50,43 +50,26 @@ function getProjectsToProcess() {
     });
 }
 
-function parseSquashMergeCommit(commitMessage) {
+function parseCommitMessages(commitMessages) {
     const commits = [];
-    const lines = commitMessage.trim().split('\n');
 
-    const firstLine = lines[0].replace(/\s*\(#\d+\)$/, '').trim();
-    const titleMatch = firstLine.match(/^([a-z]+)(?:\(([^\)]+)\))?:\s*(.+)/i);
+    commitMessages.forEach(message => {
+        const line = message.trim();
+        if (!line) return;
 
-    if (titleMatch) {
-        commits.push({
-            type: titleMatch[1].toLowerCase(),
-            scope: titleMatch[2]?.toLowerCase() || '',
-            message: titleMatch[3].trim(),
-        });
-    }
+        // Skip merge commits
+        if (line.toLowerCase().startsWith('merge ')) return;
 
-    lines.forEach(line => {
-        line = line.trim();
-        if (!line || !line.startsWith('*')) return;
-
-        line = line.substring(1).trim();
-        const match = line.match(/^([a-z]+)(?:\(([^\)]+)\))?:\s*(.+)/);
+        // Parse conventional commit format: type(scope): message
+        const match = line.match(/^([a-z]+)(?:\(([^\)]+)\))?:\s*(.+)/i);
         if (match) {
             commits.push({
-                type: match[1],
+                type: match[1].toLowerCase(),
                 scope: match[2]?.toLowerCase() || '',
                 message: match[3].trim(),
             });
         }
     });
-
-    if (commits.length === 0 && firstLine.toLowerCase().startsWith('feature/')) {
-        commits.push({
-            type: 'feat',
-            scope: '',
-            message: firstLine.substring(8).trim(),
-        });
-    }
 
     console.log('Parsed commits:', JSON.stringify(commits, null, 2));
 
@@ -215,9 +198,18 @@ function updatePackageVersion(projectPath, newVersion) {
     };
 }
 
-function getSquashMergeCommitMessage() {
-    const result = spawnSync('git', ['log', '-1', '--pretty=%B']);
-    return result.stdout.toString().trim();
+function getMergedCommitMessages() {
+    // Get commit messages from the merged PR (HEAD^1..HEAD^2)
+    const result = spawnSync('git', ['log', 'HEAD^1..HEAD^2', '--pretty=%s']);
+    const output = result.stdout.toString().trim();
+
+    if (!output) {
+        console.log('No commits found in merge range, falling back to last commit');
+        const fallback = spawnSync('git', ['log', '-1', '--pretty=%s']);
+        return [fallback.stdout.toString().trim()];
+    }
+
+    return output.split('\n').filter(line => line.trim());
 }
 
 function incrementVersion(version, type) {
@@ -244,11 +236,11 @@ function main() {
             return;
         }
 
-        const commitMessage = getSquashMergeCommitMessage();
-        const commits = parseSquashMergeCommit(commitMessage);
+        const commitMessages = getMergedCommitMessages();
+        const commits = parseCommitMessages(commitMessages);
 
         if (commits.length === 0) {
-            console.log('No conventional commits found in the squash merge message');
+            console.log('No conventional commits found in the merged commits');
             return;
         }
 

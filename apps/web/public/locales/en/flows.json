@@ -27,7 +27,12 @@
         "socketOffline": "Offline",
         "socketClickToRetry": "Click to retry",
         "socketClickToConnect": "Click to connect",
-        "apiKeySettings": "API Key Settings"
+        "apiKeySettings": "API Key Settings",
+        "menuGroup": {
+            "file": "File",
+            "canvas": "Canvas",
+            "settings": "Settings"
+        }
     },
     "sidebar": {
         "library": "Library",
