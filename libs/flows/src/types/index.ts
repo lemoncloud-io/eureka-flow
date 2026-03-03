@@ -599,3 +599,24 @@ export interface BinaryImageResponse {
     body: string; // base64 encoded
     isBase64Encoded: true;
 }
+
+// ============================================================================
+// System Info API Types
+// ============================================================================
+
+/**
+ * SystemComponent - component version info from backend
+ * GET / (root endpoint) response
+ */
+export interface SystemComponent {
+    name: string;
+    version: string;
+}
+
+/**
+ * SystemInfo - system information response
+ * GET / (root endpoint)
+ */
+export interface SystemInfo {
+    components: SystemComponent[];
+}

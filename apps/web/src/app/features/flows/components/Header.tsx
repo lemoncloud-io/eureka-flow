@@ -17,6 +17,7 @@ import {
     Workflow,
 } from 'lucide-react';
 
+import { useSystemInfoQuery } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     DropdownMenu,
@@ -280,6 +281,20 @@ const SocketDot: React.FC<SocketStateProps> = ({
     );
 };
 
+/**
+ * Version info component for dropdown menu
+ */
+const VersionInfo: React.FC = () => {
+    const { data: systemInfo } = useSystemInfoQuery();
+    const apiVersion = systemInfo?.components?.find(c => c.name === 'eureka-flows-api')?.version;
+
+    return (
+        <div className="px-2 py-1.5 text-[10px] text-muted-foreground/50 text-center">
+            Web v{__APP_VERSION__} {apiVersion && `/ API v${apiVersion}`}
+        </div>
+    );
+};
+
 export const Header: React.FC<HeaderProps> = ({
     flowInfo,
     fileActions,
@@ -313,9 +328,6 @@ export const Header: React.FC<HeaderProps> = ({
                     >
                         <Workflow className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
                         <span className="text-xs sm:text-sm font-semibold text-foreground hidden sm:inline">Flow</span>
-                        <span className="text-[10px] text-muted-foreground/60 hidden sm:inline">
-                            v{__APP_VERSION__}
-                        </span>
                         <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
                         <FlowNameInput {...flowInfo} />
                         <span className="hidden md:inline">
@@ -473,6 +485,10 @@ export const Header: React.FC<HeaderProps> = ({
                                 <ThemeToggle />
                                 <LanguageSwitcher />
                             </div>
+
+                            <DropdownMenuSeparator />
+
+                            <VersionInfo />
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
