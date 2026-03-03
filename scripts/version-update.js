@@ -76,15 +76,24 @@ function parseCommitMessages(commitMessages) {
     return commits;
 }
 
+function isGlobalScope(scope) {
+    // No scope or scope not in any project's scopeMap = global (applies to all projects)
+    if (!scope) return true;
+    const knownScopes = Object.values(CONFIG.scopeMap);
+    return !knownScopes.includes(scope);
+}
+
 function shouldUpdateProject(projectName, commits) {
-    const hasGlobalCommit = commits.some(commit => !commit.scope);
+    const hasGlobalCommit = commits.some(commit => isGlobalScope(commit.scope));
     const hasProjectScopedCommit = commits.some(commit => commit.scope === CONFIG.scopeMap[projectName]);
 
     return hasGlobalCommit || hasProjectScopedCommit;
 }
 
 function determineReleaseType(commits, projectName) {
-    const relevantCommits = commits.filter(commit => !commit.scope || commit.scope === CONFIG.scopeMap[projectName]);
+    const relevantCommits = commits.filter(
+        commit => isGlobalScope(commit.scope) || commit.scope === CONFIG.scopeMap[projectName]
+    );
 
     let releaseType = 'patch';
 
