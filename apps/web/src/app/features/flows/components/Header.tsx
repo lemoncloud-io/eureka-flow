@@ -23,6 +23,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuShortcut,
     DropdownMenuTrigger,
@@ -389,6 +390,10 @@ export const Header: React.FC<HeaderProps> = ({
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
+                            {/* File Group */}
+                            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                                {t('header.menuGroup.file')}
+                            </DropdownMenuLabel>
                             <DropdownMenuItem onClick={fileActions.onNew}>
                                 <FileText className="w-4 h-4 mr-2" />
                                 {t('header.newFlow')}
@@ -398,6 +403,19 @@ export const Header: React.FC<HeaderProps> = ({
                                 <Save className="w-4 h-4 mr-2" />
                                 {t('header.saveFlow')}
                                 <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={fileActions.onImport}>
+                                <Upload className="w-4 h-4 mr-2" />
+                                {t('header.importJson')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={fileActions.onExport}>
+                                <Download className="w-4 h-4 mr-2" />
+                                {t('header.exportJson')}
+                                <DropdownMenuShortcut>⌘E</DropdownMenuShortcut>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onShare}>
+                                <Link className="w-4 h-4 mr-2" />
+                                {t('header.share')}
                             </DropdownMenuItem>
 
                             <DropdownMenuSeparator />
@@ -417,22 +435,10 @@ export const Header: React.FC<HeaderProps> = ({
                                 <DropdownMenuSeparator />
                             </div>
 
-                            <DropdownMenuItem onClick={fileActions.onExport}>
-                                <Download className="w-4 h-4 mr-2" />
-                                {t('header.exportJson')}
-                                <DropdownMenuShortcut>⌘E</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={fileActions.onImport}>
-                                <Upload className="w-4 h-4 mr-2" />
-                                {t('header.importJson')}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={onShare}>
-                                <Link className="w-4 h-4 mr-2" />
-                                {t('header.share')}
-                            </DropdownMenuItem>
-
-                            <DropdownMenuSeparator />
-
+                            {/* Canvas Group */}
+                            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                                {t('header.menuGroup.canvas')}
+                            </DropdownMenuLabel>
                             <DropdownMenuItem onClick={editActions.onAutoLayout}>
                                 <LayoutGrid className="w-4 h-4 mr-2" />
                                 {t('header.autoLayout')}
@@ -445,10 +451,17 @@ export const Header: React.FC<HeaderProps> = ({
 
                             <DropdownMenuSeparator />
 
+                            {/* Settings Group */}
+                            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                                {t('header.menuGroup.settings')}
+                            </DropdownMenuLabel>
                             <div className="flex items-center justify-between px-2 py-1.5">
                                 <span className="text-sm">{t('header.autoSave')}</span>
                                 <button
                                     onClick={saveState.onToggleAutoSave}
+                                    role="switch"
+                                    aria-checked={saveState.isAutoSaveEnabled}
+                                    aria-label={t('header.toggleAutoSave')}
                                     className={cn(
                                         'w-9 h-5 rounded-full p-0.5 transition-colors relative',
                                         saveState.isAutoSaveEnabled ? 'bg-primary' : 'bg-muted'
@@ -462,31 +475,32 @@ export const Header: React.FC<HeaderProps> = ({
                                     />
                                 </button>
                             </div>
-
-                            <DropdownMenuSeparator />
-
                             {onApiKeySettings && (
                                 <DropdownMenuItem onClick={onApiKeySettings}>
                                     <Key className="w-4 h-4 mr-2" />
                                     {t('header.apiKeySettings')}
                                 </DropdownMenuItem>
                             )}
+
+                            {/* Help */}
                             {onHelp && (
-                                <DropdownMenuItem onClick={onHelp}>
-                                    <HelpCircle className="w-4 h-4 mr-2" />
-                                    {t('help.title')}
-                                    <DropdownMenuShortcut>?</DropdownMenuShortcut>
-                                </DropdownMenuItem>
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={onHelp}>
+                                        <HelpCircle className="w-4 h-4 mr-2" />
+                                        {t('help.title')}
+                                        <DropdownMenuShortcut>?</DropdownMenuShortcut>
+                                    </DropdownMenuItem>
+                                </>
                             )}
 
                             <DropdownMenuSeparator />
 
+                            {/* Theme & Language */}
                             <div className="flex items-center justify-center gap-4 px-2 py-1.5">
                                 <ThemeToggle />
                                 <LanguageSwitcher />
                             </div>
-
-                            <DropdownMenuSeparator />
 
                             <VersionInfo />
                         </DropdownMenuContent>
