@@ -25,9 +25,11 @@ import { cn } from '@flows/lib/utils';
 import { ConnectionLine } from './ConnectionLine';
 import { DetailPanel } from './DetailPanel';
 import { LogModal } from './LogModal';
+import { MobileControls } from './MobileControls';
 import { NodeBlock } from './NodeBlock';
 import { TooltipImage } from './TooltipImage';
 import { ZoomControls } from './ZoomControls';
+import { TOUCH_GESTURE_THRESHOLD, useTouchCanvas } from '../hooks';
 import {
     deduplicateEdges,
     generateTempId,
@@ -80,6 +82,8 @@ interface WorkflowCanvasProps {
 }
 
 const GRID_SIZE = 20;
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 5;
 
 interface EmptyStateProps {
     onOpenLibrary: () => void;
@@ -176,9 +180,39 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         nodesRef.current = nodes;
         connectionsRef.current = connections;
 
+        const canvasRef = useRef<HTMLDivElement>(null);
+
         const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
         const [isPanning, setIsPanning] = useState(false);
         const lastMousePosRef = useRef({ x: 0, y: 0 });
+
+        // Node drag state - declared before useTouchCanvas so it can check isNodeDragging
+        const [dragState, setDragState] = useState<{
+            nodeId: string;
+            startX: number;
+            startY: number;
+            /** Initial positions of all dragged nodes (for multi-select) */
+            initialPositions: Map<string, { x: number; y: number }>;
+        } | null>(null);
+
+        // Ref for tracking touch drag position
+        const lastTouchPosRef = useRef<{ x: number; y: number } | null>(null);
+
+        // Touch gesture handling for mobile
+        const {
+            handleTouchStart: handleCanvasTouchStart,
+            handleTouchMove: handleCanvasTouchMove,
+            handleTouchEnd: handleCanvasTouchEnd,
+        } = useTouchCanvas({
+            viewport,
+            setViewport,
+            minZoom: MIN_ZOOM,
+            maxZoom: MAX_ZOOM,
+            canvasRef,
+            isNodeDragging: dragState !== null,
+            onPanStart: () => setIsPanning(true),
+            onPanEnd: () => setIsPanning(false),
+        });
 
         const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
         const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
@@ -189,13 +223,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         const [logViewerNodeId, setLogViewerNodeId] = useState<string | null>(null);
 
-        const [dragState, setDragState] = useState<{
-            nodeId: string;
-            startX: number;
-            startY: number;
-            /** Initial positions of all dragged nodes (for multi-select) */
-            initialPositions: Map<string, { x: number; y: number }>;
-        } | null>(null);
         const [tooltip, setTooltip] = useState<{ x: number; y: number; content: unknown; type: string } | null>(null);
 
         const [modalFlowId, setModalFlowId] = useState<string | null>(null);
@@ -208,8 +235,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             mouseX: number;
             mouseY: number;
         } | null>(null);
-
-        const canvasRef = useRef<HTMLDivElement>(null);
 
         const isMounted = useRef(false);
         useEffect(() => {
@@ -1290,9 +1315,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [readOnly, saveCheckpoint]
         );
 
-        const MIN_ZOOM = 0.1;
-        const MAX_ZOOM = 5;
-
         const handleWheel = (e: React.WheelEvent) => {
             const rect = canvasRef.current?.getBoundingClientRect();
             if (!rect) return;
@@ -1427,6 +1449,138 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 initialPositions,
             });
         };
+
+        // Touch version of node drag start
+        // Note: Selection happens on touch END (tap), not start, to distinguish tap vs drag
+        const handleNodeTouchStart = (e: React.TouchEvent, nodeId: string) => {
+            if (readOnly) return;
+            e.stopPropagation();
+            setSelectedConnectionId(null);
+
+            const target = e.target as HTMLElement;
+            if (
+                ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'LABEL'].includes(target.tagName) ||
+                target.isContentEditable
+            ) {
+                return;
+            }
+
+            const touch = e.touches[0];
+            lastTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+            dragStartSnapshotRef.current = {
+                nodes: JSON.parse(JSON.stringify(nodes)),
+                connections: [...connections],
+            };
+
+            const isAlreadySelected = selectedNodeIds.has(nodeId);
+
+            // Determine which nodes will be dragged
+            const nodesToDrag = isAlreadySelected ? new Set([...selectedNodeIds]) : new Set([nodeId]);
+
+            // Store initial positions of all nodes to be dragged
+            const initialPositions = new Map<string, { x: number; y: number }>();
+            nodesToDrag.forEach(id => {
+                const node = nodes.find(n => n.id === id);
+                if (node) {
+                    initialPositions.set(id, { x: node.position.x, y: node.position.y });
+                }
+            });
+
+            setDragState({
+                nodeId,
+                startX: touch.clientX,
+                startY: touch.clientY,
+                initialPositions,
+            });
+        };
+
+        // Touch move handler for node dragging
+        const handleNodeTouchMove = useCallback(
+            (e: React.TouchEvent) => {
+                if (!dragState || readOnly) return;
+
+                e.preventDefault(); // Prevent scroll while dragging node
+                const touch = e.touches[0];
+
+                const screenDx = touch.clientX - dragState.startX;
+                const screenDy = touch.clientY - dragState.startY;
+                const dx = screenDx / viewport.zoom;
+                const dy = screenDy / viewport.zoom;
+
+                // Move all nodes that are being dragged
+                setNodes(prev =>
+                    prev.map(n => {
+                        const initialPos = dragState.initialPositions.get(n.id);
+                        if (!initialPos) return n;
+
+                        const rawX = initialPos.x + dx;
+                        const rawY = initialPos.y + dy;
+                        const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
+                        const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
+
+                        return { ...n, position: { x: snappedX, y: snappedY } };
+                    })
+                );
+
+                lastTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
+            },
+            [dragState, readOnly, viewport.zoom]
+        );
+
+        // Touch end handler for node dragging
+        const handleNodeTouchEnd = useCallback(() => {
+            if (dragState && dragStartSnapshotRef.current) {
+                // Check if any node was actually moved
+                const movedNodes = Array.from(dragState.initialPositions.entries())
+                    .map(([nodeId, initialPos]) => {
+                        const currentNode = nodes.find(n => n.id === nodeId);
+                        if (
+                            currentNode &&
+                            (currentNode.position.x !== initialPos.x || currentNode.position.y !== initialPos.y)
+                        ) {
+                            return currentNode;
+                        }
+                        return null;
+                    })
+                    .filter((n): n is NodeData => n !== null);
+
+                // Check if this was a tap (no significant movement)
+                const endX = lastTouchPosRef.current?.x ?? dragState.startX;
+                const endY = lastTouchPosRef.current?.y ?? dragState.startY;
+                const moveDistance = Math.hypot(endX - dragState.startX, endY - dragState.startY);
+                const wasTap = moveDistance < TOUCH_GESTURE_THRESHOLD;
+
+                if (wasTap) {
+                    // It was a tap - select the node (opens DetailPanel)
+                    handleSelectionChange(dragState.nodeId);
+                } else if (movedNodes.length > 0) {
+                    // It was a drag - save the new positions
+                    pastRef.current.push(dragStartSnapshotRef.current);
+                    futureRef.current = [];
+
+                    // Batch update moved nodes' positions via /flows/:id/upsert
+                    if (flowId && !flowId.startsWith('local-')) {
+                        const nodesToUpdate = movedNodes
+                            .filter(n => n.id && !isTempId(n.id))
+                            .map(n => ({
+                                id: n.id,
+                                position: n.position,
+                            }));
+
+                        if (nodesToUpdate.length > 0) {
+                            upsertFlow(flowId, { nodes: nodesToUpdate as NodeData[], edges: [] }).catch(err => {
+                                console.error('[WorkflowCanvas] Failed to batch update node positions:', err);
+                            });
+                        }
+                    }
+                }
+            }
+
+            setDragState(null);
+            dragStartSnapshotRef.current = null;
+            lastTouchPosRef.current = null;
+        }, [dragState, nodes, flowId, handleSelectionChange]);
 
         const handleMouseMove = (e: React.MouseEvent) => {
             if (isPanning) {
@@ -1841,6 +1995,21 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     className={`relative flex-1 bg-canvas overflow-hidden outline-none ${readOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                     onMouseMove={handleMouseMove}
                     onMouseDown={handleCanvasMouseDown}
+                    onTouchStart={handleCanvasTouchStart}
+                    onTouchMove={e => {
+                        if (dragState) {
+                            handleNodeTouchMove(e);
+                        } else {
+                            handleCanvasTouchMove(e);
+                        }
+                    }}
+                    onTouchEnd={e => {
+                        if (dragState) {
+                            handleNodeTouchEnd();
+                        } else {
+                            handleCanvasTouchEnd(e);
+                        }
+                    }}
                     tabIndex={0}
                 >
                     {/* Background Grid - always visible with subtle opacity */}
@@ -1993,6 +2162,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 onViewLogs: () => setLogViewerNodeId(node.id),
                                             }}
                                             onMouseDown={e => handleNodeMouseDown(e, node.id)}
+                                            onTouchStart={e => handleNodeTouchStart(e, node.id)}
                                             isDragging={dragState?.initialPositions.has(node.id) ?? false}
                                         />
                                     </div>
@@ -2025,6 +2195,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         </div>
                     )}
 
+                    {/* Desktop Zoom Controls - hidden on mobile */}
                     {!readOnly && (
                         <ZoomControls
                             zoom={viewport.zoom}
@@ -2032,7 +2203,17 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             onZoomOut={handleZoomOut}
                             onFitToScreen={handleFitToScreen}
                             onReset={handleResetView}
-                            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20"
+                            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden sm:flex"
+                        />
+                    )}
+
+                    {/* Mobile Zoom Controls - visible only on mobile */}
+                    {!readOnly && (
+                        <MobileControls
+                            onZoomIn={handleZoomIn}
+                            onZoomOut={handleZoomOut}
+                            onFitToScreen={handleFitToScreen}
+                            onReset={handleResetView}
                         />
                     )}
 

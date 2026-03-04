@@ -685,6 +685,7 @@ interface NodeBlockProps {
     configHandlers: NodeConfigHandlers;
     actions: NodeActions;
     onMouseDown: (e: React.MouseEvent) => void;
+    onTouchStart?: (e: React.TouchEvent) => void;
     isDragging?: boolean;
 }
 
@@ -695,6 +696,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     configHandlers,
     actions,
     onMouseDown,
+    onTouchStart,
     isDragging = false,
 }) => {
     const { t } = useTranslation(['nodes', 'flows']);
@@ -836,6 +838,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             )}
             style={{ left: node.position.x, top: node.position.y }}
             onMouseDown={onMouseDown}
+            onTouchStart={onTouchStart}
             onDoubleClick={e => e.stopPropagation()}
         >
             {/* Header */}
