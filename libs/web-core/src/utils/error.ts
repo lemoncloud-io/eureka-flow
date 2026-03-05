@@ -1,5 +1,5 @@
 export enum ErrorType {
-    AUTHENTICATION = 'authentication', // 403 - requires logout
+    AUTHENTICATION = 'authentication', // Auth failure (e.g., invalid API key) - requires logout
     NETWORK = 'network', // Network connection issue - retry
     CONNECTION_REFUSED = 'connection_refused', // Server not running - no retry
     SERVER = 'server', // 5xx - retry
@@ -32,6 +32,22 @@ export const classifyError = (error: any): ErrorClassification => {
     }
 
     if (status === 403) {
+        // Check if FORBIDDEN (permission denied) vs UNAUTHORIZED (auth failure)
+        // Backend sends 'FORBIDDEN' in message for permission errors
+        const responseMessage = error?.response?.data?.message || '';
+        const isForbidden = responseMessage.includes('FORBIDDEN');
+
+        if (isForbidden) {
+            // FORBIDDEN: valid user, no permission -> toast only, no logout
+            return {
+                type: ErrorType.CLIENT,
+                shouldRetry: false,
+                shouldLogout: false,
+                message: 'errors.forbidden',
+            };
+        }
+
+        // UNAUTHORIZED: invalid/expired API key -> logout
         return {
             type: ErrorType.AUTHENTICATION,
             shouldRetry: false,

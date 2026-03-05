@@ -1,4 +1,6 @@
 import axios from 'axios';
+import i18n from 'i18next';
+import { toast } from 'sonner';
 
 import { API_URL } from '../core';
 import { useWebCoreStore } from '../stores/useWebCoreStore';
@@ -38,14 +40,22 @@ apiClient.interceptors.response.use(
     (response: AxiosResponse) => response,
     (error: AxiosError) => {
         const status = error.response?.status;
-
-        // Clear API key on 403 (unauthorized/forbidden)
-        if (status === 403) {
-            useWebCoreStore.getState().clearApiKey();
-        }
-
         const classification = classifyError(error);
 
+        // Handle 403 errors: FORBIDDEN (permission) vs UNAUTHORIZED (auth)
+        if (status === 403) {
+            if (classification.shouldLogout) {
+                // UNAUTHORIZED: clear API key and logout
+                useWebCoreStore.getState().clearApiKey();
+                handleAuthError(error, true, classification.message);
+            } else {
+                // FORBIDDEN: just show toast (no logout, no API key clear)
+                toast.error(i18n.t(classification.message, { ns: 'common' }));
+            }
+            return Promise.reject(error);
+        }
+
+        // Handle other errors that require logout
         if (classification.shouldLogout) {
             handleAuthError(error, true, classification.message);
         }
