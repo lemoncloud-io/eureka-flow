@@ -46,6 +46,12 @@ export const getVisiblePorts = (
 ): PortDefinition[] => {
     if (allPorts.length === 0) return [];
 
+    // Output ports are always visible (no progressive disclosure)
+    if (portType === 'output') {
+        return allPorts;
+    }
+
+    // Input ports use progressive disclosure
     const visible = new Set<string>();
 
     // 1. First port is always visible
@@ -59,8 +65,7 @@ export const getVisiblePorts = (
     });
 
     // 3. During connection drag: show compatible input ports on OTHER nodes
-    // Note: Output ports don't expand during drag (they are the source)
-    if (connectionDraft && portType === 'input' && connectionDraft.sourceNodeId !== nodeId) {
+    if (connectionDraft && connectionDraft.sourceNodeId !== nodeId) {
         allPorts.forEach(port => {
             if (arePortTypesCompatible(connectionDraft.sourceType, port.type)) {
                 visible.add(port.id);
