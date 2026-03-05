@@ -837,12 +837,15 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
                 {/* Footer Actions */}
                 <div className="p-3 border-t border-border/50 bg-surface-elevated/30 flex gap-2 flex-shrink-0">
-                    <button
-                        onClick={() => onTriggerNode(selectedNode.id)}
-                        className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                    >
-                        <Play className="w-3.5 h-3.5" /> {t('flows:detailPanel.runBlock')}
-                    </button>
+                    {/* Run button: hidden when isRunnable is explicitly false */}
+                    {def?.isRunnable !== false && (
+                        <button
+                            onClick={() => onTriggerNode(selectedNode.id)}
+                            className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                            <Play className="w-3.5 h-3.5" /> {t('flows:detailPanel.runBlock')}
+                        </button>
+                    )}
                     {import.meta.env.DEV && (
                         <button
                             onClick={() => setIsTouchDialogOpen(true)}

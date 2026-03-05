@@ -6,6 +6,7 @@ import {
     Braces,
     Check,
     Copy,
+    Expand,
     Hash,
     Image,
     Loader2,
@@ -32,6 +33,7 @@ import {
 import { cn } from '@flows/lib/utils';
 import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
+import { ContentPreviewModal } from './ContentPreviewModal';
 import { S3Image } from './S3Image';
 import { TooltipImage } from './TooltipImage';
 import { arePortTypesCompatible, getVisiblePorts } from '../utils';
@@ -333,6 +335,7 @@ const getFirstInputData = (node: NodeData, definition: BlockDefinitionWithFronte
 const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }) => {
     const { t } = useTranslation(['nodes']);
     const [dims, setDims] = useState<string | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const lastInput = getFirstInputData(node, definition);
 
@@ -344,13 +347,20 @@ const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }
         );
     }
 
-    return (
-        <div className="rounded-lg border border-border overflow-hidden bg-black/20 relative">
-            {lastInput.type === 'image' ? (
+    const handleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsModalOpen(true);
+    };
+
+    // Render inline preview based on content type
+    const renderInlinePreview = () => {
+        // Image type
+        if (lastInput.type === 'image') {
+            return (
                 <>
                     <div className="flex justify-center items-center p-2 min-h-[80px]">
                         <S3Image
-                            src={lastInput.value as string}
+                            src={String(lastInput.value)}
                             className="max-w-full max-h-32 rounded object-contain"
                             alt="Preview"
                             onLoad={e => setDims(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight}`)}
@@ -362,13 +372,69 @@ const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }
                         </div>
                     )}
                 </>
-            ) : (
-                <div className="text-xs p-3 text-foreground/80 break-words text-center font-mono">
-                    {String(lastInput.value).slice(0, 100)}
-                    {String(lastInput.value).length > 100 && '...'}
+            );
+        }
+
+        // JSON type
+        if (lastInput.type === 'json' || typeof lastInput.value === 'object') {
+            return (
+                <div className="p-2" onWheel={e => e.stopPropagation()}>
+                    <JsonViewer data={lastInput.value} maxHeight={120} collapsed={2} />
                 </div>
-            )}
-        </div>
+            );
+        }
+
+        // Markdown type (explicit or auto-detected)
+        if (lastInput.type === 'markdown' || isMarkdownContent(lastInput.value)) {
+            return (
+                <div className="p-2" onWheel={e => e.stopPropagation()}>
+                    <MarkdownViewer content={String(lastInput.value)} maxHeight={120} />
+                </div>
+            );
+        }
+
+        // Plain text (default)
+        const strValue = String(lastInput.value);
+        const lines = strValue.split('\n').slice(0, 3);
+        const truncatedText = lines.join('\n');
+        const isTruncated = strValue.split('\n').length > 3 || strValue.length > 150;
+
+        return (
+            <div className="text-xs p-3 text-foreground/80 break-words font-mono whitespace-pre-wrap">
+                {truncatedText.slice(0, 150)}
+                {isTruncated && <span className="text-muted-foreground">...</span>}
+            </div>
+        );
+    };
+
+    return (
+        <>
+            <div
+                className="rounded-lg border border-border overflow-hidden bg-black/20 relative cursor-pointer group hover:border-primary/50 transition-colors"
+                onClick={handleClick}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setIsModalOpen(true);
+                    }
+                }}
+            >
+                {renderInlinePreview()}
+                {/* Expand indicator on hover */}
+                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="bg-black/70 text-white/90 p-1 rounded backdrop-blur-sm">
+                        <Expand className="w-3 h-3" />
+                    </div>
+                </div>
+            </div>
+            <ContentPreviewModal
+                open={isModalOpen}
+                onOpenChange={setIsModalOpen}
+                content={{ value: lastInput.value, type: lastInput.type }}
+            />
+        </>
     );
 };
 
@@ -897,7 +963,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 {/* Compact Actions */}
                 <div className="flex items-center gap-0.5 shrink-0">
                     {/* Run button: show for all executable nodes (has execute function or backend execution) */}
-                    {(definition?.execute || !definition?.isFrontend) && (
+                    {/* Hidden when isRunnable is explicitly false */}
+                    {definition?.isRunnable !== false && (definition?.execute || !definition?.isFrontend) && (
                         <button
                             onClick={e => {
                                 e.stopPropagation();

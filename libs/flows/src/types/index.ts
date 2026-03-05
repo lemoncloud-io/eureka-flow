@@ -86,6 +86,13 @@ export interface BlockDefinitionWithFrontend extends BlockDefinition {
     stereo?: BlockStereo;
 
     /**
+     * Indicates whether this block can be executed (shows run button)
+     * - `true` or `undefined`: Run button is visible (default behavior)
+     * - `false`: Run button is hidden
+     */
+    isRunnable?: boolean;
+
+    /**
      * The function that runs when the block triggers (client-side only)
      * This is attached by the frontend when `isFrontend: true`
      */

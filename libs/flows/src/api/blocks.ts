@@ -40,6 +40,8 @@ interface BlockViewWithFrontend extends BlockView {
     isFrontend?: 0 | 1;
     /** Block stereotype for categorization (input, process, output) */
     stereo?: BlockStereo;
+    /** Flag indicating if block can be executed (shows run button). Default true. */
+    isRunnable?: boolean;
 }
 
 /**
@@ -114,6 +116,7 @@ export const listBlocks = async (): Promise<BlockDefinitionWithFrontend[]> => {
                 ...definition,
                 isFrontend,
                 stereo,
+                isRunnable: item.isRunnable,
                 execute,
             };
         });

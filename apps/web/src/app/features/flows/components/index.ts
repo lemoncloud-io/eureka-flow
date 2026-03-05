@@ -1,4 +1,5 @@
 export * from './ConnectionLine';
+export * from './ContentPreviewModal';
 export * from './DetailPanel';
 export * from './EmptyStateGuide';
 export * from './FrontendBadge';
