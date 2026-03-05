@@ -4,9 +4,18 @@ import { toast } from 'sonner';
 
 import { API_URL } from '../core';
 import { useWebCoreStore } from '../stores/useWebCoreStore';
-import { classifyError, handleAuthError } from '../utils/error';
+import { classifyError } from '../utils/error';
 
 import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+
+/** Clear flow-related localStorage on auth error */
+const clearFlowStorage = (): void => {
+    try {
+        localStorage.removeItem('flows-current-flow-id');
+    } catch {
+        // Silently ignore - non-critical operation
+    }
+};
 
 /**
  * Centralized Axios instance for all API calls
@@ -45,9 +54,10 @@ apiClient.interceptors.response.use(
         // Handle 403 errors: FORBIDDEN (permission) vs UNAUTHORIZED (auth)
         if (status === 403) {
             if (classification.shouldLogout) {
-                // UNAUTHORIZED: clear API key and logout
+                // UNAUTHORIZED: clear API key, flow storage, show toast
                 useWebCoreStore.getState().clearApiKey();
-                handleAuthError(error, true, classification.message);
+                clearFlowStorage();
+                toast.error(i18n.t('errors.authExpired', { ns: 'common' }));
             } else {
                 // FORBIDDEN: just show toast (no logout, no API key clear)
                 toast.error(i18n.t(classification.message, { ns: 'common' }));
@@ -57,7 +67,9 @@ apiClient.interceptors.response.use(
 
         // Handle other errors that require logout
         if (classification.shouldLogout) {
-            handleAuthError(error, true, classification.message);
+            useWebCoreStore.getState().clearApiKey();
+            clearFlowStorage();
+            toast.error(i18n.t('errors.authExpired', { ns: 'common' }));
         }
 
         return Promise.reject(error);

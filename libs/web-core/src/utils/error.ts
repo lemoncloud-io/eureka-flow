@@ -181,14 +181,12 @@ export const extractErrorMessage = (error: any): string => {
 
 export const handleAuthError = (error: any, shouldLogout: boolean, message?: string): never => {
     console.error(message || 'Authentication error:', error);
-    const errorMessage = extractErrorMessage(error);
 
-    if (shouldLogout) {
-        alert(`Authentication error: ${errorMessage}`);
-        window.location.href = '/auth/logout';
-    } else {
-        console.error(`Request error: ${errorMessage}`);
+    if (!shouldLogout) {
+        console.error(`Request error: ${extractErrorMessage(error)}`);
     }
+    // Note: API key clearing and toast notification are handled by the caller (client.ts interceptor)
+    // No redirect - ApiKeyGate will show the API key dialog when apiKey is cleared
 
     throw error;
 };
