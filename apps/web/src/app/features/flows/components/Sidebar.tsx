@@ -139,16 +139,23 @@ const BlockItem: React.FC<BlockItemProps> = ({
                             {isFrontend && <FrontendBadge showTooltip />}
                         </div>
                         <div className="flex items-center gap-2">
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <span className="text-[10px] text-muted-foreground truncate flex-1 cursor-help">
-                                        {description}
-                                    </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom" className="max-w-xs">
-                                    <MarkdownViewer content={description} className="text-xs" />
-                                </TooltipContent>
-                            </Tooltip>
+                            {description ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="text-[10px] text-muted-foreground truncate flex-1 cursor-help">
+                                            {description}
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" className="max-w-xs">
+                                        <MarkdownViewer
+                                            content={description}
+                                            className="text-xs [&_p]:m-0 [&_ul]:m-0 [&_ol]:m-0"
+                                        />
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <span className="text-[10px] text-muted-foreground truncate flex-1" />
+                            )}
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <span className="text-[9px] text-muted-foreground/70 shrink-0 cursor-help">
