@@ -1,4 +1,4 @@
-import { classifyError, handleAuthError } from './error';
+import { classifyError, extractErrorMessage } from './error';
 import { ENV } from '../core';
 
 export const isDev = ENV === 'local' || ENV === 'dev';
@@ -50,7 +50,8 @@ export const withRetry = async <T>(operation: () => Promise<T>, maxRetries = 4, 
             const classification = classifyError(error);
 
             if (classification.shouldLogout) {
-                handleAuthError(error, true, `${context} - ${classification.message}`);
+                console.error(`${context} - ${classification.message}:`, extractErrorMessage(error));
+                throw error;
             }
 
             if (!classification.shouldRetry) {

@@ -42,26 +42,45 @@ apiClient.interceptors.request.use(
     (error: unknown) => Promise.reject(error)
 );
 
+/** Check if response data contains permission error (403 forbidden) */
+const hasPermissionError = (data: unknown): boolean => {
+    if (!data) return false;
+    const str = typeof data === 'string' ? data : JSON.stringify(data);
+    return str.toUpperCase().includes('403') && str.toUpperCase().includes('FORBIDDEN');
+};
+
 /**
  * Response interceptor: Handle errors globally
  */
 apiClient.interceptors.response.use(
-    (response: AxiosResponse) => response,
+    (response: AxiosResponse) => {
+        // Check 200 response for permission error (403 forbidden in body)
+        if (hasPermissionError(response.data)) {
+            toast.error(i18n.t('errors.forbidden', { ns: 'common' }));
+        }
+        return response;
+    },
     (error: AxiosError) => {
         const status = error.response?.status;
         const classification = classifyError(error);
+        const hasApiKey = !!useWebCoreStore.getState().apiKey;
 
-        // Handle 403 errors: FORBIDDEN (permission) vs UNAUTHORIZED (auth)
+        // HTTP 403 status → always reset API key
         if (status === 403) {
-            if (classification.shouldLogout) {
-                // UNAUTHORIZED: clear API key, flow storage, show toast
-                useWebCoreStore.getState().clearApiKey();
-                clearFlowStorage();
-                toast.error(i18n.t('errors.authExpired', { ns: 'common' }));
-            } else {
-                // FORBIDDEN: just show toast (no logout, no API key clear)
-                toast.error(i18n.t(classification.message, { ns: 'common' }));
-            }
+            useWebCoreStore.getState().clearApiKey();
+            clearFlowStorage();
+            // Delay toast to show after dialog appears
+            setTimeout(() => toast.error(i18n.t('errors.authExpired', { ns: 'common' })), 100);
+            return Promise.reject(error);
+        }
+
+        // Network error with API key set → likely CORS-blocked 403, reset API key
+        // (Server returns 403 without CORS headers, browser blocks response)
+        if (!status && hasApiKey && (error.code === 'ERR_NETWORK' || error.code === 'ERR_FAILED')) {
+            useWebCoreStore.getState().clearApiKey();
+            clearFlowStorage();
+            // Delay toast to show after dialog appears
+            setTimeout(() => toast.error(i18n.t('errors.authExpired', { ns: 'common' })), 100);
             return Promise.reject(error);
         }
 
@@ -69,7 +88,7 @@ apiClient.interceptors.response.use(
         if (classification.shouldLogout) {
             useWebCoreStore.getState().clearApiKey();
             clearFlowStorage();
-            toast.error(i18n.t('errors.authExpired', { ns: 'common' }));
+            setTimeout(() => toast.error(i18n.t('errors.authExpired', { ns: 'common' })), 100);
         }
 
         return Promise.reject(error);
