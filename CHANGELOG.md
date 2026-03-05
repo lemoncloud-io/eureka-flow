@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-05] - root@0.2.0, @flows/web@0.2.0
+
+### Features
+
+- add demo pages
+
 ## [2026-03-04] - root@0.1.0, @flows/web@0.1.0
 
 ### Features
