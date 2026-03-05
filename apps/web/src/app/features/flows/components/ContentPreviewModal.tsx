@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Check, Copy, Download, Expand, FileJson, FileText, ImageIcon, Type } from 'lucide-react';
+import { Check, Copy, Download } from 'lucide-react';
 
 import { downloadImage, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -9,8 +9,6 @@ import {
     Button,
     Dialog,
     DialogContent,
-    DialogHeader,
-    DialogTitle,
     JsonViewer,
     MarkdownViewer,
     ScrollArea,
@@ -27,20 +25,6 @@ interface ContentPreviewModalProps {
         type?: string;
     } | null;
 }
-
-const TYPE_ICONS: Record<ContentType, typeof Type> = {
-    image: ImageIcon,
-    json: FileJson,
-    markdown: FileText,
-    text: Type,
-};
-
-const TYPE_LABELS: Record<ContentType, string> = {
-    image: 'Image',
-    json: 'JSON',
-    markdown: 'Markdown',
-    text: 'Text',
-};
 
 /** Detect content type from value and explicit type */
 const detectContentType = (value: unknown, explicitType?: string): ContentType => {
@@ -131,14 +115,12 @@ const ImagePreview: React.FC<{ src: string }> = ({ src }) => {
             </div>
             <div className="flex items-center justify-between">
                 {dims && <span className="text-xs text-muted-foreground font-mono">{dims}</span>}
-                <div className="flex gap-2 ml-auto">
-                    <Button variant="outline" size="sm" onClick={handleCopyToClipboard}>
-                        {copied ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
-                        {copied ? 'Copied!' : 'Copy'}
+                <div className="flex gap-1 ml-auto">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopyToClipboard}>
+                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleDownload}>
-                        <Download className="w-4 h-4 mr-1" />
-                        Download
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleDownload}>
+                        <Download className="w-4 h-4" />
                     </Button>
                 </div>
             </div>
@@ -170,23 +152,17 @@ const CopyButton: React.FC<{ value: string }> = ({ value }) => {
     }, [value]);
 
     return (
-        <Button variant="ghost" size="sm" onClick={handleCopy} className="h-8">
-            {copied ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
-            {copied ? 'Copied!' : 'Copy'}
+        <Button variant="ghost" size="icon" onClick={handleCopy} className="h-8 w-8">
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
         </Button>
     );
 };
 
 export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, onOpenChange, content }) => {
-    const { t } = useTranslation(['nodes']);
-
     // Derive content type from props (no useState needed)
     const contentType = useMemo(() => (content ? detectContentType(content.value, content.type) : 'text'), [content]);
 
     if (!content) return null;
-
-    const TypeIcon = TYPE_ICONS[contentType];
-    const typeLabel = TYPE_LABELS[contentType];
 
     const renderContent = () => {
         switch (contentType) {
@@ -199,10 +175,7 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
                         <div className="absolute top-2 right-2 z-10">
                             <CopyButton value={JSON.stringify(content.value, null, 2)} />
                         </div>
-                        <div
-                            className="p-4 bg-muted/30 rounded-lg border border-border"
-                            onWheel={e => e.stopPropagation()}
-                        >
+                        <div className="p-4 bg-muted/30 rounded-lg" onWheel={e => e.stopPropagation()}>
                             <JsonViewer data={content.value} collapsed={false} />
                         </div>
                     </div>
@@ -214,10 +187,7 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
                         <div className="absolute top-2 right-2 z-10">
                             <CopyButton value={String(content.value)} />
                         </div>
-                        <div
-                            className="p-4 bg-muted/30 rounded-lg border border-border"
-                            onWheel={e => e.stopPropagation()}
-                        >
+                        <div className="p-4" onWheel={e => e.stopPropagation()}>
                             <MarkdownViewer content={String(content.value)} />
                         </div>
                     </div>
@@ -230,7 +200,7 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
                         <div className="absolute top-2 right-2 z-10">
                             <CopyButton value={String(content.value)} />
                         </div>
-                        <div className="p-4 bg-muted/30 rounded-lg border border-border font-mono text-sm whitespace-pre-wrap break-words">
+                        <div className="p-4 bg-muted/30 rounded-lg font-mono text-sm whitespace-pre-wrap break-words">
                             {String(content.value)}
                         </div>
                     </div>
@@ -240,38 +210,8 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent
-                className={cn('max-w-4xl max-h-[85vh] p-0 gap-0', 'bg-background/95 backdrop-blur-xl', 'flex flex-col')}
-            >
-                {/* Header */}
-                <DialogHeader className="px-6 py-4 border-b border-border flex-shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full">
-                            <TypeIcon className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-xs font-medium text-muted-foreground">{typeLabel}</span>
-                        </div>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Expand className="w-5 h-5 text-primary" />
-                            {t('visualization.value')}
-                        </DialogTitle>
-                    </div>
-                </DialogHeader>
-
-                {/* Content */}
-                <ScrollArea className="flex-1 p-6">{renderContent()}</ScrollArea>
-
-                {/* Footer */}
-                <div className="px-6 py-3 border-t border-border flex-shrink-0">
-                    <div className="flex items-center justify-end text-xs text-muted-foreground">
-                        <button
-                            onClick={() => onOpenChange(false)}
-                            className="flex items-center gap-1 hover:text-foreground transition-colors"
-                        >
-                            <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs">Esc</kbd>
-                            <span>Close</span>
-                        </button>
-                    </div>
-                </div>
+            <DialogContent className={cn('max-w-4xl max-h-[85vh] p-6', 'bg-background/95 backdrop-blur-xl')}>
+                <ScrollArea className="max-h-[75vh]">{renderContent()}</ScrollArea>
             </DialogContent>
         </Dialog>
     );

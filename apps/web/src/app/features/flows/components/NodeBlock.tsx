@@ -375,8 +375,8 @@ const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }
             );
         }
 
-        // JSON type
-        if (lastInput.type === 'json' || typeof lastInput.value === 'object') {
+        // JSON type (only actual objects, not null/strings)
+        if (lastInput.type === 'json' || (lastInput.value !== null && typeof lastInput.value === 'object')) {
             return (
                 <div className="p-2" onWheel={e => e.stopPropagation()}>
                     <JsonViewer data={lastInput.value} maxHeight={120} collapsed={2} />
@@ -384,17 +384,17 @@ const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }
             );
         }
 
-        // Markdown type (explicit or auto-detected)
-        if (lastInput.type === 'markdown' || isMarkdownContent(lastInput.value)) {
+        // Markdown type (explicit type OR auto-detected from content)
+        const strValue = String(lastInput.value ?? '');
+        if (lastInput.type === 'markdown' || isMarkdownContent(strValue)) {
             return (
                 <div className="p-2" onWheel={e => e.stopPropagation()}>
-                    <MarkdownViewer content={String(lastInput.value)} maxHeight={120} />
+                    <MarkdownViewer content={strValue} maxHeight={120} />
                 </div>
             );
         }
 
         // Plain text (default)
-        const strValue = String(lastInput.value);
         const lines = strValue.split('\n').slice(0, 3);
         const truncatedText = lines.join('\n');
         const isTruncated = strValue.split('\n').length > 3 || strValue.length > 150;
