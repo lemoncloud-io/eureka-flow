@@ -62,6 +62,21 @@ export const EXECUTE_FUNCTIONS: Record<string, ExecuteFunction> = {
         return { out: { ...input, timestamp: Date.now() } };
     },
 
+    // Alias: buffer (same as buffer-delay)
+    buffer: async (inputs, config, onProgress) => {
+        const input = inputs['in'];
+        const totalMs = Number(config.delayMs) || 1000;
+        const steps = 10;
+        const stepMs = totalMs / steps;
+
+        for (let i = 1; i <= steps; i++) {
+            await delay(stepMs);
+            onProgress?.(Math.round((i / steps) * 100));
+        }
+
+        return { out: { ...input, timestamp: Date.now() } };
+    },
+
     // Server type: text-transform, config key: mode
     'text-transform': async (inputs, config, onProgress) => {
         const text = String(inputs['in'].value);
@@ -114,6 +129,13 @@ export const EXECUTE_FUNCTIONS: Record<string, ExecuteFunction> = {
     'output-preview': executeOutputPreview,
     'result-preview': executeOutputPreview,
     preview: executeOutputPreview,
+
+    // Server type: image-resize, config keys: rotation, flipHorizontal, flipVertical
+    // Demo mode: pass-through (actual resize would require canvas manipulation)
+    'image-resize': async (inputs, _config, onProgress) => {
+        onProgress?.(100);
+        return { out: inputs['in'] || createPacket('', 'image') };
+    },
 
     // Server type: image-3-4-filter, config key: tolerance
     'image-3-4-filter': async (inputs, _config, onProgress) => {

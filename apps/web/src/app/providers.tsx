@@ -43,8 +43,16 @@ interface ProvidersProps {
 }
 
 /**
+ * Check if current path is a demo route that doesn't require authentication
+ */
+const isDemoRoute = (): boolean => {
+    return window.location.pathname.startsWith('/flow/examples');
+};
+
+/**
  * API Key gate component
  * Blocks app content until a valid API key is provided
+ * Bypasses authentication for demo routes
  */
 const ApiKeyGate = ({ children }: { children: ReactNode }) => {
     const { apiKey, setApiKey, initializeApiKey } = useWebCoreStore();
@@ -64,6 +72,11 @@ const ApiKeyGate = ({ children }: { children: ReactNode }) => {
         setError('Invalid API key. Please try again.');
         return false;
     };
+
+    // Bypass authentication for demo routes
+    if (isDemoRoute()) {
+        return children;
+    }
 
     if (!apiKey) {
         const codesUrl = import.meta.env.VITE_CODES_URL;
