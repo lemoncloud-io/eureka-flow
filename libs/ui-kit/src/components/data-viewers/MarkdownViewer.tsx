@@ -12,10 +12,12 @@ export interface MarkdownViewerProps {
 
 export const MarkdownViewer = ({ content, maxHeight, className }: MarkdownViewerProps) => {
     return (
-        <div className={cn('overflow-auto', className)} style={maxHeight ? { maxHeight } : undefined}>
+        <div
+            className={cn('overflow-auto prose prose-sm dark:prose-invert max-w-none break-words', className)}
+            style={maxHeight ? { maxHeight } : undefined}
+        >
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
-                className="prose prose-sm dark:prose-invert max-w-none break-words"
                 components={{
                     pre: ({ children }) => (
                         <pre className="bg-muted/50 p-2 rounded-md overflow-x-auto text-xs">{children}</pre>

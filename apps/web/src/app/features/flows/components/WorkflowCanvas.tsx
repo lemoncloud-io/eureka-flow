@@ -1222,7 +1222,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 setConnections(prev => prev.filter(c => c.sourceNodeId !== id && c.targetNodeId !== id));
                 handleSelectionChange(null);
 
-                if (flowId && !flowId.startsWith('local-') && !isTempId(id)) {
+                if (flowId && !isTempId(id)) {
                     const serverEdges = connectedEdges.filter(e => e.id && !isTempId(e.id));
                     const nodesToDelete = [{ id: `#${id}` }] as unknown as NodeData[];
                     const edgesToDelete = serverEdges.map(e => ({ id: `#${e.id}` })) as unknown as Connection[];
@@ -1243,7 +1243,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 setConnections(prev => prev.filter(c => c.id !== id));
                 setSelectedConnectionId(null);
 
-                if (flowId && !flowId.startsWith('local-') && !isTempId(id)) {
+                if (flowId && !isTempId(id)) {
                     const edgesToDelete = [{ id: `#${id}` }] as unknown as Connection[];
 
                     upsertFlow(flowId, { nodes: [], edges: edgesToDelete }).catch(err => {
@@ -1560,7 +1560,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     futureRef.current = [];
 
                     // Batch update moved nodes' positions via /flows/:id/upsert
-                    if (flowId && !flowId.startsWith('local-')) {
+                    if (flowId) {
                         const nodesToUpdate = movedNodes
                             .filter(n => n.id && !isTempId(n.id))
                             .map(n => ({
@@ -1642,7 +1642,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     futureRef.current = [];
 
                     // Batch update moved nodes' positions via /flows/:id/upsert
-                    if (flowId && !flowId.startsWith('local-')) {
+                    if (flowId) {
                         const nodesToUpdate = movedNodes
                             .filter(n => n.id && !isTempId(n.id))
                             .map(n => ({
@@ -1919,7 +1919,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         );
                         handleSelectionChange(null);
 
-                        if (flowId && !flowId.startsWith('local-')) {
+                        if (flowId) {
                             const serverNodeIds = Array.from(selectedNodeIds).filter(id => !isTempId(id));
                             const serverEdges = connectedEdges.filter(e => e.id && !isTempId(e.id));
 
@@ -1944,7 +1944,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         setHoveredConnectionId(null);
                         setTooltip(null);
 
-                        if (flowId && !flowId.startsWith('local-') && targetId && !isTempId(targetId)) {
+                        if (flowId && targetId && !isTempId(targetId)) {
                             const edgesToDelete = [{ id: `#${targetId}` }] as unknown as Connection[];
 
                             upsertFlow(flowId, { nodes: [], edges: edgesToDelete }).catch(err => {
