@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Check, Copy, Download, X } from 'lucide-react';
+import { Code2, FileImage, FileText, Type, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { downloadImage, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -10,6 +11,8 @@ import {
     Dialog,
     DialogClose,
     DialogContent,
+    DialogHeader,
+    DialogTitle,
     JsonViewer,
     MarkdownViewer,
     ScrollArea,
@@ -19,6 +22,29 @@ import {
 import { tryParseJson } from '../utils';
 
 type ContentType = 'image' | 'json' | 'markdown' | 'text';
+
+/** Props for ContentPreviewModal */
+export interface ContentPreviewModalProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    content: { value: unknown; type?: string } | null;
+}
+
+/** Get icon for content type */
+const getContentTypeIcon = (type: ContentType): React.ReactNode => {
+    const iconClass = 'w-4 h-4';
+    switch (type) {
+        case 'image':
+            return <FileImage className={iconClass} />;
+        case 'json':
+            return <Code2 className={iconClass} />;
+        case 'markdown':
+            return <FileText className={iconClass} />;
+        case 'text':
+        default:
+            return <Type className={iconClass} />;
+    }
+};
 
 /** Detect content type from value and explicit type */
 const detectContentType = (value: unknown, explicitType?: string): ContentType => {
@@ -34,30 +60,16 @@ const ImagePreview: React.FC<{ src: string }> = ({ src }) => {
     const { t } = useTranslation(['nodes']);
     const { src: resolvedSrc, isLoading, error } = useS3Image(src);
     const [dims, setDims] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
-    const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-
-    // Cleanup timeout on unmount
-    useEffect(() => {
-        return () => {
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        };
-    }, []);
 
     const handleDownload = useCallback(() => {
         if (resolvedSrc) {
             downloadImage(resolvedSrc, `preview-${Date.now()}.png`);
+            toast.success(t('preview.downloadStarted'));
         }
-    }, [resolvedSrc]);
+    }, [resolvedSrc, t]);
 
     const handleCopyToClipboard = useCallback(async () => {
         if (!resolvedSrc) return;
-
-        const showCopied = () => {
-            setCopied(true);
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            timeoutRef.current = setTimeout(() => setCopied(false), 2000);
-        };
 
         try {
             // Fetch the image and convert to blob
@@ -71,18 +83,17 @@ const ImagePreview: React.FC<{ src: string }> = ({ src }) => {
                 }),
             ]);
 
-            showCopied();
+            toast.success(t('preview.imageCopied'));
         } catch {
             // Fallback: copy the URL instead
             try {
                 await navigator.clipboard.writeText(src);
-                showCopied();
+                toast.success(t('preview.urlCopied'));
             } catch {
-                // Clipboard API not available - silently fail
-                console.warn('Failed to copy to clipboard');
+                toast.error(t('preview.copyFailed'));
             }
         }
-    }, [resolvedSrc, src]);
+    }, [resolvedSrc, src, t]);
 
     if (isLoading) {
         return (
@@ -110,52 +121,68 @@ const ImagePreview: React.FC<{ src: string }> = ({ src }) => {
             </div>
             <div className="flex items-center justify-between">
                 {dims && <span className="text-xs text-muted-foreground font-mono">{dims}</span>}
-                <div className="flex gap-1 ml-auto">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopyToClipboard}>
-                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleDownload}>
-                        <Download className="w-4 h-4" />
-                    </Button>
-                </div>
+                <ImageActions onCopy={handleCopyToClipboard} onDownload={handleDownload} />
             </div>
+        </div>
+    );
+};
+
+/** Image action buttons */
+const ImageActions: React.FC<{ onCopy: () => void; onDownload: () => void }> = ({ onCopy, onDownload }) => {
+    const { t } = useTranslation(['nodes']);
+
+    return (
+        <div className="flex gap-1 ml-auto">
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={onCopy}>
+                {t('preview.copy')}
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={onDownload}>
+                {t('preview.download')}
+            </Button>
         </div>
     );
 };
 
 /** Text/JSON copy button */
 const CopyButton: React.FC<{ value: string }> = ({ value }) => {
-    const [copied, setCopied] = useState(false);
-    const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-
-    // Cleanup timeout on unmount
-    useEffect(() => {
-        return () => {
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        };
-    }, []);
+    const { t } = useTranslation(['nodes']);
 
     const handleCopy = useCallback(async () => {
         try {
             await navigator.clipboard.writeText(value);
-            setCopied(true);
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            timeoutRef.current = setTimeout(() => setCopied(false), 2000);
+            toast.success(t('preview.copied'));
         } catch {
-            console.warn('Failed to copy to clipboard');
+            toast.error(t('preview.copyFailed'));
         }
-    }, [value]);
+    }, [value, t]);
 
     return (
-        <Button variant="ghost" size="icon" onClick={handleCopy} className="h-8 w-8">
-            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+        <Button variant="outline" size="sm" onClick={handleCopy} className="h-8 gap-1.5 text-xs">
+            {t('preview.copy')}
         </Button>
     );
 };
 
 export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, onOpenChange, content }) => {
+    const { t } = useTranslation(['nodes']);
+
     // Derive content type from props (no useState needed)
     const contentType = useMemo(() => (content ? detectContentType(content.value, content.type) : 'text'), [content]);
+
+    // Get localized content type label
+    const contentTypeLabel = useMemo(() => {
+        switch (contentType) {
+            case 'image':
+                return t('preview.types.image');
+            case 'json':
+                return t('preview.types.json');
+            case 'markdown':
+                return t('preview.types.markdown');
+            case 'text':
+            default:
+                return t('preview.types.text');
+        }
+    }, [contentType, t]);
 
     if (!content) return null;
 
@@ -214,16 +241,21 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
                     '[&>button]:hidden' // Hide default close button
                 )}
             >
-                {/* Custom header with prominent close button */}
-                <div className="flex items-center justify-end p-3 border-b border-border">
+                {/* Header with content type and close button */}
+                <DialogHeader className="flex flex-row items-center justify-between p-4 border-b border-border space-y-0">
+                    <DialogTitle className="flex items-center gap-2 text-sm font-medium">
+                        {getContentTypeIcon(contentType)}
+                        <span>{contentTypeLabel}</span>
+                    </DialogTitle>
                     <DialogClose asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted">
-                            <X className="w-5 h-5" />
+                            <X className="w-4 h-4" />
+                            <span className="sr-only">{t('preview.close')}</span>
                         </Button>
                     </DialogClose>
-                </div>
+                </DialogHeader>
                 {/* Content */}
-                <ScrollArea className="max-h-[calc(85vh-56px)] p-6">{renderContent()}</ScrollArea>
+                <ScrollArea className="max-h-[calc(85vh-64px)] p-4">{renderContent()}</ScrollArea>
             </DialogContent>
         </Dialog>
     );

@@ -1,4 +1,21 @@
 {
+    "preview": {
+        "title": "콘텐츠 미리보기",
+        "close": "닫기",
+        "copy": "복사",
+        "download": "다운로드",
+        "copied": "클립보드에 복사되었습니다",
+        "imageCopied": "이미지가 클립보드에 복사되었습니다",
+        "urlCopied": "URL이 클립보드에 복사되었습니다",
+        "copyFailed": "복사에 실패했습니다",
+        "downloadStarted": "다운로드가 시작되었습니다",
+        "types": {
+            "image": "이미지",
+            "json": "JSON",
+            "markdown": "마크다운",
+            "text": "텍스트"
+        }
+    },
     "contextMenu": {
         "rename": "이름 변경",
         "duplicate": "복제",

@@ -1,4 +1,21 @@
 {
+    "preview": {
+        "title": "Content Preview",
+        "close": "Close",
+        "copy": "Copy",
+        "download": "Download",
+        "copied": "Copied to clipboard",
+        "imageCopied": "Image copied to clipboard",
+        "urlCopied": "URL copied to clipboard",
+        "copyFailed": "Failed to copy",
+        "downloadStarted": "Download started",
+        "types": {
+            "image": "Image",
+            "json": "JSON",
+            "markdown": "Markdown",
+            "text": "Text"
+        }
+    },
     "contextMenu": {
         "rename": "Rename",
         "duplicate": "Duplicate",

@@ -277,30 +277,38 @@ const PortItem: React.FC<PortItemProps> = ({
         </div>
     );
 
-    // Tooltip positioning based on content type
+    // Tooltip positioning: input ports show tooltip to LEFT, output ports show tooltip to RIGHT
+    // This prevents tooltip from visually covering the port, making drag operations easier
     const hasRichContent =
         portData &&
         (portData.type === 'json' ||
             portData.type === 'markdown' ||
             (portData.value !== null && typeof portData.value === 'object') ||
             isMarkdownContent(portData.value));
-    const tooltipPosition = !portData
-        ? '-top-7 whitespace-nowrap'
-        : portData.type === 'image'
-          ? 'bottom-full mb-2'
-          : hasRichContent
-            ? 'bottom-full mb-2 min-w-[150px] max-w-[400px]'
-            : '-top-14 min-w-[100px] max-w-[400px]';
+
+    // Horizontal positioning based on port type
+    const horizontalPosition = isInputPort
+        ? 'right-full mr-2' // Input ports: tooltip to the left
+        : 'left-full ml-2'; // Output ports: tooltip to the right
+
+    // Width constraints based on content type
+    const widthConstraint =
+        !portData || portData.type === 'image'
+            ? 'whitespace-nowrap'
+            : hasRichContent
+              ? 'min-w-[150px] max-w-[400px]'
+              : 'min-w-[100px] max-w-[400px]';
 
     return (
         <div className="relative group flex items-center justify-center w-3 h-6">
             {portCircle}
 
-            {/* Tooltip showing port label and data on hover */}
+            {/* Tooltip showing port label and data on hover - positioned away from port */}
             <div
                 className={cn(
-                    'absolute left-1/2 -translate-x-1/2 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 shadow-lg transition-opacity duration-150',
-                    tooltipPosition
+                    'absolute top-1/2 -translate-y-1/2 bg-popover/95 backdrop-blur-sm text-popover-foreground text-[9px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none border border-border z-50 shadow-lg transition-opacity duration-150',
+                    horizontalPosition,
+                    widthConstraint
                 )}
             >
                 <div className="flex items-center gap-1">
