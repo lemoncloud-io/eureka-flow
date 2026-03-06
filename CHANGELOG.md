@@ -1,5 +1,35 @@
 # Changelog
 
+## [2026-03-06] - root@0.3.0, @flows/web@0.3.0
+
+### Features
+
+- add image editing functionality
+- add node resizing functionality
+- add separator config type
+- update socket no logic
+- add image copy to clipboard functionality
+- improve content preview modal UI and feedback
+- add JSON parsing and viewer for content preview
+- add expand functionality and enhance tooltip rendering
+- add content preview modal
+- remove local fallback logic and enhance description display with markdown viewer
+- (auth) add forbidden error handling and update dependencies
+
+### Bug Fixes
+
+- (auth) handle API key and permission errors
+
+### Refactor
+
+- migrate image editor to react-image-crop
+- improve DebugLogVisualization component
+- extract tooltip content rendering into reusable component
+- simplify content preview modal and markdown viewer
+- simplify getVisiblePorts logic
+- (flows) improve description tooltip handling
+- (api) remove handleAuthError and improve auth error handling
+
 ## [2026-03-05] - root@0.2.0, @flows/web@0.2.0
 
 ### Features
