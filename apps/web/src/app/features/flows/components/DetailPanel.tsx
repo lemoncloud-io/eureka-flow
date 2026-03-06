@@ -61,7 +61,7 @@ interface DetailPanelProps {
     onShowNotification?: (message: string, type: 'success' | 'error') => void;
 }
 
-type ConfigControlType = 'text' | 'number' | 'boolean' | 'select' | 'file' | 'workflow-selector';
+type ConfigControlType = 'text' | 'number' | 'boolean' | 'select' | 'file' | 'workflow-selector' | 'separator';
 
 const ImagePreview = ({ src, t }: { src: string; t: (key: string) => string }) => {
     const [dims, setDims] = useState<string | null>(null);
@@ -562,6 +562,18 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         {t('flows:detailPanel.useNodeSettings')}
                     </div>
                 );
+            case 'separator':
+                return (
+                    <div className="flex items-center gap-2 py-1">
+                        <div className="flex-1 h-px bg-border/50" />
+                        {field.label && (
+                            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">
+                                {field.label}
+                            </span>
+                        )}
+                        <div className="flex-1 h-px bg-border/50" />
+                    </div>
+                );
             default:
                 return null;
         }
@@ -758,14 +770,18 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                         {t('flows:detailPanel.noSettings')}
                                     </div>
                                 ) : (
-                                    configSchema.map(field => (
-                                        <div key={field.key}>
-                                            <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
-                                                {field.label}
-                                            </label>
-                                            {renderConfigInput(selectedNode, field, def)}
-                                        </div>
-                                    ))
+                                    configSchema.map(field =>
+                                        field.type === 'separator' ? (
+                                            <div key={field.key}>{renderConfigInput(selectedNode, field, def)}</div>
+                                        ) : (
+                                            <div key={field.key}>
+                                                <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
+                                                    {field.label}
+                                                </label>
+                                                {renderConfigInput(selectedNode, field, def)}
+                                            </div>
+                                        )
+                                    )
                                 ))}
                         </div>
                     </CollapsibleSection>

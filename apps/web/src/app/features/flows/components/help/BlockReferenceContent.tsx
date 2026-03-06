@@ -122,17 +122,29 @@ const BlockDetail = ({ block }: BlockDetailProps) => {
                 <div>
                     <h4 className="text-sm font-medium mb-2">{t('flows:help.blocks.config')}</h4>
                     <div className="space-y-2">
-                        {block.configSchema.map(config => (
-                            <div key={config.key} className="p-2 rounded bg-muted/30">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">{config.label}</span>
-                                    <span className="text-xs text-muted-foreground">{config.type}</span>
+                        {block.configSchema.map(config =>
+                            config.type === 'separator' ? (
+                                <div key={config.key} className="flex items-center gap-2 py-1">
+                                    <div className="flex-1 h-px bg-border/50" />
+                                    {config.label && (
+                                        <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">
+                                            {config.label}
+                                        </span>
+                                    )}
+                                    <div className="flex-1 h-px bg-border/50" />
                                 </div>
-                                {config.description && (
-                                    <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
-                                )}
-                            </div>
-                        ))}
+                            ) : (
+                                <div key={config.key} className="p-2 rounded bg-muted/30">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium">{config.label}</span>
+                                        <span className="text-xs text-muted-foreground">{config.type}</span>
+                                    </div>
+                                    {config.description && (
+                                        <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
+                                    )}
+                                </div>
+                            )
+                        )}
                     </div>
                 </div>
             )}

@@ -1401,6 +1401,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string) => {
             if (readOnly) return;
             e.stopPropagation();
+
+            // Don't change selection during port connection drag
+            if (connectionDraft) return;
+
             setSelectedConnectionId(null);
 
             const isMultiSelectKey = e.shiftKey || e.metaKey || e.ctrlKey;
@@ -1455,6 +1459,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const handleNodeTouchStart = (e: React.TouchEvent, nodeId: string) => {
             if (readOnly) return;
             e.stopPropagation();
+
+            // Don't start drag during port connection
+            if (connectionDraft) return;
+
             setSelectedConnectionId(null);
 
             const target = e.target as HTMLElement;
@@ -1672,7 +1680,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             e: React.MouseEvent
         ) => {
             if (readOnly) return;
-            handleSelectionChange(nodeId);
+            // Don't change node selection when interacting with ports
+            // Port interactions are for creating connections, not for selecting nodes
             setSelectedConnectionId(null);
             if (type === 'output') {
                 const worldPos = screenToWorld(e.clientX, e.clientY);
