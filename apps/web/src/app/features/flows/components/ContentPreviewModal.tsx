@@ -27,10 +27,23 @@ interface ContentPreviewModalProps {
     } | null;
 }
 
+/** Try to parse JSON string, returns parsed object or null if not valid JSON */
+const tryParseJson = (value: unknown): object | null => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
+    try {
+        return JSON.parse(trimmed);
+    } catch {
+        return null;
+    }
+};
+
 /** Detect content type from value and explicit type */
 const detectContentType = (value: unknown, explicitType?: string): ContentType => {
     if (explicitType === 'image') return 'image';
-    if (explicitType === 'json' || typeof value === 'object') return 'json';
+    if (explicitType === 'json' || (value !== null && typeof value === 'object')) return 'json';
+    if (tryParseJson(value)) return 'json';
     if (explicitType === 'markdown' || isMarkdownContent(value)) return 'markdown';
     return 'text';
 };
@@ -170,17 +183,19 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
             case 'image':
                 return <ImagePreview src={String(content.value)} />;
 
-            case 'json':
+            case 'json': {
+                const jsonData = tryParseJson(content.value) ?? content.value;
                 return (
                     <div className="relative">
                         <div className="absolute top-2 right-2 z-10">
-                            <CopyButton value={JSON.stringify(content.value, null, 2)} />
+                            <CopyButton value={JSON.stringify(jsonData, null, 2)} />
                         </div>
-                        <div className="p-4 bg-muted/30 rounded-lg" onWheel={e => e.stopPropagation()}>
-                            <JsonViewer data={content.value} collapsed={false} />
+                        <div className="p-4" onWheel={e => e.stopPropagation()}>
+                            <JsonViewer data={jsonData} collapsed={false} />
                         </div>
                     </div>
                 );
+            }
 
             case 'markdown':
                 return (
@@ -201,7 +216,7 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
                         <div className="absolute top-2 right-2 z-10">
                             <CopyButton value={String(content.value)} />
                         </div>
-                        <div className="p-4 bg-muted/30 rounded-lg font-mono text-sm whitespace-pre-wrap break-words">
+                        <div className="p-4 font-mono text-sm whitespace-pre-wrap break-words">
                             {String(content.value)}
                         </div>
                     </div>

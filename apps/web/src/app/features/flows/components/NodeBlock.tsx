@@ -413,6 +413,16 @@ const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }
             );
         }
 
+        // Try to parse JSON string
+        const parsedJson = tryParseJson(lastInput.value);
+        if (parsedJson) {
+            return (
+                <div className="p-2" onWheel={e => e.stopPropagation()}>
+                    <JsonViewer data={parsedJson} maxHeight={120} collapsed={2} />
+                </div>
+            );
+        }
+
         // Markdown type (explicit type OR auto-detected from content)
         const strValue = String(lastInput.value ?? '');
         if (lastInput.type === 'markdown' || isMarkdownContent(strValue)) {
@@ -439,7 +449,7 @@ const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }
     return (
         <>
             <div
-                className="rounded-lg border border-border overflow-hidden bg-black/20 relative cursor-pointer group hover:border-primary/50 transition-colors"
+                className="rounded-lg border border-border/30 overflow-hidden bg-muted/10 relative cursor-pointer group hover:border-primary/50 transition-colors"
                 onClick={handleClick}
                 role="button"
                 tabIndex={0}
@@ -703,6 +713,18 @@ const VISUALIZATION_COMPONENTS: Record<string, React.FC<VisualizationProps>> = {
 // Output Preview Component (shows first output data in node body)
 // ============================================================================
 
+/** Try to parse JSON string, returns parsed object or null if not valid JSON */
+const tryParseJson = (value: unknown): object | null => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
+    try {
+        return JSON.parse(trimmed);
+    } catch {
+        return null;
+    }
+};
+
 /** Get first output data from node */
 const getFirstOutputData = (node: NodeData, definition: BlockDefinitionWithFrontend): DataPacket | undefined => {
     const outputPortId = definition.outputs?.[0]?.id;
@@ -745,10 +767,21 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
         );
     }
 
-    if (packet.type === 'json' || typeof packet.value === 'object') {
+    // JSON type or object value
+    if (packet.type === 'json' || (packet.value !== null && typeof packet.value === 'object')) {
         return (
             <div className="p-2 bg-muted/10 rounded-lg border border-border/30" onWheel={e => e.stopPropagation()}>
                 <JsonViewer data={packet.value} maxHeight={180} collapsed={2} />
+            </div>
+        );
+    }
+
+    // Try to parse JSON string
+    const parsedJson = tryParseJson(packet.value);
+    if (parsedJson) {
+        return (
+            <div className="p-2 bg-muted/10 rounded-lg border border-border/30" onWheel={e => e.stopPropagation()}>
+                <JsonViewer data={parsedJson} maxHeight={180} collapsed={2} />
             </div>
         );
     }

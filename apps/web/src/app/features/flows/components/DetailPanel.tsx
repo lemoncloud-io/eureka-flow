@@ -324,6 +324,18 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     );
 };
 
+/** Try to parse JSON string, returns parsed object or null if not valid JSON */
+const tryParseJson = (value: unknown): object | null => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
+    try {
+        return JSON.parse(trimmed);
+    } catch {
+        return null;
+    }
+};
+
 export const DetailPanel: React.FC<DetailPanelProps> = ({
     selectedNode,
     selectedConnection,
@@ -392,6 +404,29 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         <Expand className="w-3 h-3" />
                     </button>
                     <JsonViewer data={packet.value} maxHeight={120} collapsed={2} />
+                </div>
+            );
+        }
+
+        // Try to parse JSON string
+        const parsedJson = tryParseJson(packet.value);
+        if (parsedJson) {
+            const handleExpandJson = () => {
+                setPreviewContent({ value: parsedJson, type: 'json' });
+            };
+            return (
+                <div
+                    className="relative group bg-muted/10 p-2 rounded-md border border-border/30 mt-1.5"
+                    onWheel={e => e.stopPropagation()}
+                >
+                    <button
+                        onClick={handleExpandJson}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-muted hover:bg-primary text-foreground hover:text-primary-foreground rounded-md border border-border/50 opacity-0 group-hover:opacity-100 transition-all z-10"
+                        title={t('flows:detailPanel.expand')}
+                    >
+                        <Expand className="w-3 h-3" />
+                    </button>
+                    <JsonViewer data={parsedJson} maxHeight={120} collapsed={2} />
                 </div>
             );
         }
