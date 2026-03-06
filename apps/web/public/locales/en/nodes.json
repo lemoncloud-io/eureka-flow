@@ -28,7 +28,8 @@
     },
     "actions": {
         "run": "Run",
-        "forceRun": "Force Run"
+        "forceRun": "Force Run",
+        "resize": "Drag to resize ({{min}}-{{max}}px)"
     },
     "status": {
         "running": "Running",

@@ -9,6 +9,7 @@ import {
     PORT_LAYOUT,
     estimateNodeHeight,
     getEffectiveState,
+    getNodeWidth,
     loadFlow,
     runNode,
     shouldUpdateState,
@@ -1208,6 +1209,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             syncNodeUpdate(nodeId, { autoExecutionEnabled: newValue });
         };
 
+        const handleNodeResize = (nodeId: string, width: number, height: number) => {
+            if (readOnly) return;
+            saveCheckpoint();
+            const updates: Partial<{ width: number; height: number }> = {};
+            if (width > 0) updates.width = width;
+            if (height > 0) updates.height = height;
+            setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, ...updates } : n)));
+            syncNodeUpdate(nodeId, updates);
+        };
+
         const deleteNode = useCallback(
             (id: string) => {
                 if (readOnly) return;
@@ -1834,7 +1845,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             const safeIndex = visibleIndex !== -1 ? visibleIndex : 0;
 
             const yOffset = PORT_LAYOUT.FIRST_PORT_Y + safeIndex * PORT_LAYOUT.PORT_SPACING;
-            const xOffset = type === 'input' ? PORT_LAYOUT.INPUT_X : PORT_LAYOUT.OUTPUT_X;
+            // Use dynamic node width for output port position
+            const nodeWidth = getNodeWidth(node);
+            const xOffset = type === 'input' ? PORT_LAYOUT.INPUT_X : nodeWidth + 3;
             return { x: node.position.x + xOffset, y: node.position.y + yOffset };
         };
 
@@ -2169,6 +2182,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 onToggleDisabled: () => toggleNodeDisabled(node.id),
                                                 onDuplicate: () => duplicateNode(node.id),
                                                 onViewLogs: () => setLogViewerNodeId(node.id),
+                                                onResize: (w, h) => handleNodeResize(node.id, w, h),
                                             }}
                                             onMouseDown={e => handleNodeMouseDown(e, node.id)}
                                             onTouchStart={e => handleNodeTouchStart(e, node.id)}

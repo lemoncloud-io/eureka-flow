@@ -22,12 +22,15 @@ import {
 
 import {
     DEFAULT_TEXTAREA_HEIGHT,
+    NODE_WIDTH_BOUNDS,
     PORT_LAYOUT,
     clampHeight,
+    clampWidth,
     compressImageIfNeeded,
     getBlockDefinition,
     getEffectiveState,
     getNodeHeight,
+    getNodeWidth,
     useBlockRegistry,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -66,6 +69,7 @@ export interface NodeActions {
     onToggleDisabled?: () => void;
     onDuplicate?: () => void;
     onViewLogs: () => void;
+    onResize?: (width: number, height: number) => void;
 }
 
 export interface NodeHighlightState {
@@ -824,7 +828,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     } = highlightState;
     const { onPortMouseDown, onPortMouseUp } = portHandlers;
     const { onConfigChange, onLabelChange } = configHandlers;
-    const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs } = actions;
+    const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs, onResize } = actions;
 
     // Memoize visible ports to avoid recalculating on every render
     const visibleInputPorts = useMemo(
@@ -897,6 +901,61 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const displayDuration =
         duration != null ? (duration > 1000 ? `${(duration / 1000).toFixed(2)}s` : `${duration}ms`) : null;
 
+    // Resize state
+    const [isResizing, setIsResizing] = useState(false);
+    const [localWidth, setLocalWidth] = useState<number | undefined>(undefined);
+    const [localHeight, setLocalHeight] = useState<number | undefined>(undefined);
+    const resizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
+    const nodeRef = useRef<HTMLDivElement>(null);
+
+    // Get current dimensions (local during resize, otherwise from node)
+    const currentWidth = localWidth ?? getNodeWidth(node);
+    const currentHeight = localHeight ?? node.height;
+
+    // Handle node resize via corner drag
+    const handleResizeStart = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startWidth = currentWidth;
+        // Use actual rendered height if no saved height exists
+        const actualHeight = nodeRef.current?.getBoundingClientRect().height ?? 120;
+        const startHeight = currentHeight ?? actualHeight;
+        resizeRef.current = { width: startWidth, height: startHeight };
+        setIsResizing(true);
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const deltaX = moveEvent.clientX - startX;
+            const deltaY = moveEvent.clientY - startY;
+            const newWidth = clampWidth(startWidth + deltaX);
+            const newHeight = Math.max(80, startHeight + deltaY); // Min 80px
+            resizeRef.current = { width: newWidth, height: newHeight };
+            setLocalWidth(newWidth);
+            setLocalHeight(newHeight);
+        };
+
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            setIsResizing(false);
+            // Save resize to node data
+            if (onResize) {
+                const finalWidth = resizeRef.current.width;
+                const finalHeight = resizeRef.current.height;
+                if (finalWidth !== getNodeWidth(node) || finalHeight !== node.height) {
+                    onResize(finalWidth, finalHeight);
+                }
+            }
+            // Clear local state after save
+            setLocalWidth(undefined);
+            setLocalHeight(undefined);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    };
+
     if (!definition) return null;
 
     const commitLabel = () => {
@@ -933,9 +992,10 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
     return (
         <div
+            ref={nodeRef}
             className={cn(
-                'absolute w-[260px] bg-node-bg rounded-xl border-[1.5px]',
-                !isDragging && 'transition-all duration-200',
+                'absolute bg-node-bg rounded-xl border-[1.5px]',
+                !isDragging && !isResizing && 'transition-all duration-200',
                 isDisabled && 'opacity-50',
                 !isSelected && !isHighlighted && nodeState === 'IDLE' && 'shadow-node',
                 // Normal highlight/selection states
@@ -945,7 +1005,12 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                       ? 'border-primary/50'
                       : getStatusStyles(nodeState, isSelected)
             )}
-            style={{ left: node.position.x, top: node.position.y }}
+            style={{
+                left: node.position.x,
+                top: node.position.y,
+                width: `${currentWidth}px`,
+                minHeight: currentHeight ? `${currentHeight}px` : undefined,
+            }}
             onMouseDown={onMouseDown}
             onTouchStart={onTouchStart}
             onDoubleClick={e => e.stopPropagation()}
@@ -1233,6 +1298,24 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             {displayDuration && (
                 <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-[9px] text-white/90 px-1.5 py-0.5 rounded font-mono pointer-events-none">
                     {displayDuration}
+                </div>
+            )}
+
+            {/* Resize Handle - Bottom Right Corner */}
+            {onResize && (
+                <div
+                    className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize group z-10"
+                    onMouseDown={handleResizeStart}
+                    title={t('actions.resize', {
+                        min: NODE_WIDTH_BOUNDS.MIN,
+                        max: NODE_WIDTH_BOUNDS.MAX,
+                    })}
+                >
+                    {/* Visual indicator - diagonal lines */}
+                    <div className="absolute bottom-1 right-1 w-2 h-2 opacity-30 group-hover:opacity-70 transition-opacity">
+                        <div className="absolute bottom-0 right-0 w-[6px] h-[1px] bg-foreground rotate-45 origin-bottom-right" />
+                        <div className="absolute bottom-0 right-0 w-[4px] h-[1px] bg-foreground rotate-45 origin-bottom-right translate-x-[-2px] translate-y-[-2px]" />
+                    </div>
                 </div>
             )}
         </div>
