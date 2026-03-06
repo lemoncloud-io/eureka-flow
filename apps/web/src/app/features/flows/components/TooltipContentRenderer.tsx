@@ -3,6 +3,7 @@ import React from 'react';
 import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
 import { TooltipImage } from './TooltipImage';
+import { tryParseJson } from '../utils';
 
 export interface TooltipContentRendererProps {
     content: unknown;
@@ -40,8 +41,20 @@ export const TooltipContentRenderer: React.FC<TooltipContentRendererProps> = ({
         );
     }
 
-    // String content - check for markdown
+    // String content
     const strValue = String(content ?? '');
+
+    // Try to parse JSON string
+    const parsedJson = tryParseJson(strValue);
+    if (parsedJson) {
+        return (
+            <div className="min-w-[100px] max-w-[400px]">
+                <JsonViewer data={parsedJson} maxHeight={maxHeight} collapsed={collapsed} />
+            </div>
+        );
+    }
+
+    // Check for markdown
     if (type === 'markdown' || isMarkdownContent(strValue)) {
         return (
             <div className="min-w-[100px] max-w-[400px]">

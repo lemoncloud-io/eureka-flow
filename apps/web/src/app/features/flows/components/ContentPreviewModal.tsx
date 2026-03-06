@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Code2, FileImage, FileText, Type, X } from 'lucide-react';
@@ -55,11 +55,40 @@ const detectContentType = (value: unknown, explicitType?: string): ContentType =
     return 'text';
 };
 
+/** Copy image to clipboard using canvas (handles CORS and format issues) */
+const copyImageToClipboard = async (imgElement: HTMLImageElement): Promise<void> => {
+    const canvas = document.createElement('canvas');
+    canvas.width = imgElement.naturalWidth;
+    canvas.height = imgElement.naturalHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Failed to get canvas context');
+
+    ctx.drawImage(imgElement, 0, 0);
+
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(async blob => {
+            if (!blob) {
+                reject(new Error('Failed to create blob'));
+                return;
+            }
+
+            try {
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                resolve();
+            } catch (err) {
+                reject(err);
+            }
+        }, 'image/png');
+    });
+};
+
 /** Image preview with download support */
 const ImagePreview: React.FC<{ src: string }> = ({ src }) => {
     const { t } = useTranslation(['nodes']);
     const { src: resolvedSrc, isLoading, error } = useS3Image(src);
     const [dims, setDims] = useState<string | null>(null);
+    const imgRef = useRef<HTMLImageElement>(null);
 
     const handleDownload = useCallback(() => {
         if (resolvedSrc) {
@@ -69,20 +98,10 @@ const ImagePreview: React.FC<{ src: string }> = ({ src }) => {
     }, [resolvedSrc, t]);
 
     const handleCopyToClipboard = useCallback(async () => {
-        if (!resolvedSrc) return;
+        if (!imgRef.current) return;
 
         try {
-            // Fetch the image and convert to blob
-            const response = await fetch(resolvedSrc);
-            const blob = await response.blob();
-
-            // Copy to clipboard
-            await navigator.clipboard.write([
-                new ClipboardItem({
-                    [blob.type]: blob,
-                }),
-            ]);
-
+            await copyImageToClipboard(imgRef.current);
             toast.success(t('preview.imageCopied'));
         } catch {
             // Fallback: copy the URL instead
@@ -93,7 +112,7 @@ const ImagePreview: React.FC<{ src: string }> = ({ src }) => {
                 toast.error(t('preview.copyFailed'));
             }
         }
-    }, [resolvedSrc, src, t]);
+    }, [src, t]);
 
     if (isLoading) {
         return (
@@ -113,8 +132,10 @@ const ImagePreview: React.FC<{ src: string }> = ({ src }) => {
         <div className="flex flex-col gap-4">
             <div className="flex justify-center bg-black/20 rounded-lg p-4">
                 <img
+                    ref={imgRef}
                     src={resolvedSrc}
                     alt="Preview"
+                    crossOrigin="anonymous"
                     className="max-w-full max-h-[60vh] object-contain rounded"
                     onLoad={e => setDims(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight}`)}
                 />
