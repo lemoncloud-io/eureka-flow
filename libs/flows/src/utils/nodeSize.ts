@@ -18,6 +18,9 @@ export const NODE_HEIGHT_BOUNDS = {
     MAX: 600,
 } as const;
 
+/** Node content overhead: header(45px) + body vertical padding(12px top + 12px bottom) = 69px */
+export const NODE_CONTENT_OVERHEAD = 69;
+
 /**
  * Get node width with fallback to default
  *

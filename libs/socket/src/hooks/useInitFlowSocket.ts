@@ -130,6 +130,12 @@ export interface NodeUpdateInfo {
      */
     prevState?: NodeState;
     progress?: number;
+    /**
+     * Stereotype indicator for message content completeness
+     * - 0: Socket message contains all necessary data - no API fetch needed
+     * - Other values or undefined: Additional data may be needed via API
+     */
+    stereo?: number;
 }
 
 /**
@@ -301,6 +307,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         state: effectiveState,
                         prevState: effectivePrevState,
                         progress: data.progress,
+                        stereo: data.stereo,
                     });
                 }
                 return;

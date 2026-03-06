@@ -22,9 +22,11 @@ import {
 
 import {
     DEFAULT_TEXTAREA_HEIGHT,
+    NODE_CONTENT_OVERHEAD,
     NODE_WIDTH_BOUNDS,
     PORT_LAYOUT,
     clampHeight,
+    clampNodeHeight,
     clampWidth,
     compressImageIfNeeded,
     getBlockDefinition,
@@ -70,6 +72,8 @@ export interface NodeActions {
     onDuplicate?: () => void;
     onViewLogs: () => void;
     onResize?: (width: number, height: number) => void;
+    /** Called during resize for real-time edge updates */
+    onResizing?: (width: number | null) => void;
 }
 
 export interface NodeHighlightState {
@@ -339,6 +343,8 @@ const PortItem: React.FC<PortItemProps> = ({
 interface VisualizationProps {
     node: NodeData;
     definition: BlockDefinitionWithFrontend;
+    /** Custom content height from node resize */
+    contentHeight?: number;
 }
 
 /** Get first input data from node using definition's port ID or fallback to first available */
@@ -347,16 +353,20 @@ const getFirstInputData = (node: NodeData, definition: BlockDefinitionWithFronte
     return inputPortId ? node.inputData?.[inputPortId] : Object.values(node.inputData ?? {})[0];
 };
 
-const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }) => {
+const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition, contentHeight }) => {
     const { t } = useTranslation(['nodes']);
     const [dims, setDims] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const lastInput = getFirstInputData(node, definition);
+    const maxH = contentHeight ?? 120;
 
     if (!lastInput) {
         return (
-            <div className="text-[10px] text-muted-foreground/60 italic text-center py-6 bg-muted/30 rounded-lg border border-dashed border-border">
+            <div
+                className="text-[10px] text-muted-foreground/60 italic text-center py-6 bg-muted/30 rounded-lg border border-dashed border-border flex items-center justify-center"
+                style={{ minHeight: contentHeight ? `${contentHeight}px` : undefined }}
+            >
                 {t('visualization.waitingForData')}
             </div>
         );
@@ -376,7 +386,8 @@ const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }
                     <div className="flex justify-center items-center p-2 min-h-[80px]">
                         <S3Image
                             src={String(lastInput.value)}
-                            className="max-w-full max-h-32 rounded object-contain"
+                            className="max-w-full rounded object-contain"
+                            style={{ maxHeight: `${maxH}px` }}
                             alt="Preview"
                             onLoad={e => setDims(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight}`)}
                         />
@@ -394,7 +405,7 @@ const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }
         if (lastInput.type === 'json' || (lastInput.value !== null && typeof lastInput.value === 'object')) {
             return (
                 <div className="p-2" onWheel={e => e.stopPropagation()}>
-                    <JsonViewer data={lastInput.value} maxHeight={120} collapsed={2} />
+                    <JsonViewer data={lastInput.value} maxHeight={maxH} collapsed={2} />
                 </div>
             );
         }
@@ -404,7 +415,7 @@ const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }
         if (parsedJson) {
             return (
                 <div className="p-2" onWheel={e => e.stopPropagation()}>
-                    <JsonViewer data={parsedJson} maxHeight={120} collapsed={2} />
+                    <JsonViewer data={parsedJson} maxHeight={maxH} collapsed={2} />
                 </div>
             );
         }
@@ -414,7 +425,7 @@ const PreviewVisualization: React.FC<VisualizationProps> = ({ node, definition }
         if (lastInput.type === 'markdown' || isMarkdownContent(strValue)) {
             return (
                 <div className="p-2" onWheel={e => e.stopPropagation()}>
-                    <MarkdownViewer content={strValue} maxHeight={120} />
+                    <MarkdownViewer content={strValue} maxHeight={maxH} />
                 </div>
             );
         }
@@ -663,9 +674,12 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
     );
 };
 
-const DebugLogVisualization: React.FC<VisualizationProps> = ({ node, definition }) => {
+const DebugLogVisualization: React.FC<VisualizationProps> = ({ node, definition, contentHeight }) => {
     const { t } = useTranslation(['nodes']);
     const lastInput = getFirstInputData(node, definition)?.value;
+
+    // Use custom height or default 112px (max-h-28)
+    const maxH = contentHeight ?? 112;
 
     // Check if content is JSON (object or parseable string)
     const jsonData =
@@ -677,12 +691,13 @@ const DebugLogVisualization: React.FC<VisualizationProps> = ({ node, definition 
 
     return (
         <div
-            className="p-2 bg-muted/10 rounded-lg border border-border/30 max-h-28 overflow-y-auto"
+            className="p-2 bg-muted/10 rounded-lg border border-border/30 overflow-y-auto"
+            style={{ maxHeight: `${maxH}px`, minHeight: contentHeight ? `${contentHeight}px` : undefined }}
             onWheel={e => e.stopPropagation()}
         >
             {lastInput !== undefined ? (
                 jsonData ? (
-                    <JsonViewer data={jsonData} maxHeight={100} collapsed={2} />
+                    <JsonViewer data={jsonData} maxHeight={maxH - 16} collapsed={2} />
                 ) : (
                     <div className="text-xs text-foreground/80 break-words whitespace-pre-wrap">
                         {String(lastInput)}
@@ -716,9 +731,12 @@ const getFirstOutputData = (node: NodeData, definition: BlockDefinitionWithFront
     return outputPortId ? node.outputData?.[outputPortId] : Object.values(node.outputData ?? {})[0];
 };
 
-const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
+const OutputPreview: React.FC<VisualizationProps> = ({ node, definition, contentHeight }) => {
     const { t } = useTranslation(['nodes']);
     const packet = getFirstOutputData(node, definition);
+
+    // Use custom height or default 180px
+    const maxH = contentHeight ?? 180;
 
     // Skip if this is an input/output visualization node (they have their own visualizations)
     if (
@@ -732,7 +750,10 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
     // No data yet - show waiting message
     if (!packet) {
         return (
-            <div className="text-[10px] text-muted-foreground/60 italic text-center py-4 bg-muted/30 rounded-lg border border-dashed border-border">
+            <div
+                className="text-[10px] text-muted-foreground/60 italic text-center py-4 bg-muted/30 rounded-lg border border-dashed border-border flex items-center justify-center"
+                style={{ minHeight: contentHeight ? `${contentHeight}px` : undefined }}
+            >
                 {t('visualization.waitingForData')}
             </div>
         );
@@ -744,7 +765,8 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
                 <div className="flex justify-center items-center p-2">
                     <S3Image
                         src={packet.value as string}
-                        className="max-w-full max-h-[180px] rounded object-contain"
+                        className="max-w-full rounded object-contain"
+                        style={{ maxHeight: `${maxH}px` }}
                         alt="Output"
                     />
                 </div>
@@ -756,7 +778,7 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
     if (packet.type === 'json' || (packet.value !== null && typeof packet.value === 'object')) {
         return (
             <div className="p-2 bg-muted/10 rounded-lg border border-border/30" onWheel={e => e.stopPropagation()}>
-                <JsonViewer data={packet.value} maxHeight={180} collapsed={2} />
+                <JsonViewer data={packet.value} maxHeight={maxH} collapsed={2} />
             </div>
         );
     }
@@ -766,7 +788,7 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
     if (parsedJson) {
         return (
             <div className="p-2 bg-muted/10 rounded-lg border border-border/30" onWheel={e => e.stopPropagation()}>
-                <JsonViewer data={parsedJson} maxHeight={180} collapsed={2} />
+                <JsonViewer data={parsedJson} maxHeight={maxH} collapsed={2} />
             </div>
         );
     }
@@ -774,7 +796,7 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
     if (packet.type === 'markdown' || isMarkdownContent(packet.value)) {
         return (
             <div className="p-2 bg-muted/10 rounded-lg border border-border/30" onWheel={e => e.stopPropagation()}>
-                <MarkdownViewer content={String(packet.value)} maxHeight={180} />
+                <MarkdownViewer content={String(packet.value)} maxHeight={maxH} />
             </div>
         );
     }
@@ -783,8 +805,8 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
     const strValue = String(packet.value);
     return (
         <div
-            className="p-2.5 bg-muted/10 rounded-lg border border-border/30"
-            style={{ maxHeight: '180px', overflow: 'hidden' }}
+            className="p-2.5 bg-muted/10 rounded-lg border border-border/30 overflow-auto"
+            style={{ maxHeight: `${maxH}px` }}
         >
             <div className="text-xs text-foreground/80 break-words whitespace-pre-wrap">{strValue}</div>
         </div>
@@ -828,7 +850,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     } = highlightState;
     const { onPortMouseDown, onPortMouseUp } = portHandlers;
     const { onConfigChange, onLabelChange } = configHandlers;
-    const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs, onResize } = actions;
+    const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs, onResize, onResizing } = actions;
 
     // Memoize visible ports to avoid recalculating on every render
     const visibleInputPorts = useMemo(
@@ -907,10 +929,21 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const [localHeight, setLocalHeight] = useState<number | undefined>(undefined);
     const resizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
     const nodeRef = useRef<HTMLDivElement>(null);
+    const resizeCleanupRef = useRef<(() => void) | null>(null);
+
+    // Cleanup resize event listeners on unmount
+    useEffect(() => {
+        return () => {
+            resizeCleanupRef.current?.();
+        };
+    }, []);
 
     // Get current dimensions (local during resize, otherwise from node)
     const currentWidth = localWidth ?? getNodeWidth(node);
     const currentHeight = localHeight ?? node.height;
+
+    // Calculate content area height (total height minus header and padding overhead)
+    const contentAreaHeight = currentHeight ? Math.max(0, currentHeight - NODE_CONTENT_OVERHEAD) : undefined;
 
     // Handle node resize via corner drag
     const handleResizeStart = (e: React.MouseEvent) => {
@@ -924,21 +957,25 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
         const startHeight = currentHeight ?? actualHeight;
         resizeRef.current = { width: startWidth, height: startHeight };
         setIsResizing(true);
+        onResizing?.(startWidth);
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
             const deltaX = moveEvent.clientX - startX;
             const deltaY = moveEvent.clientY - startY;
             const newWidth = clampWidth(startWidth + deltaX);
-            const newHeight = Math.max(80, startHeight + deltaY); // Min 80px
+            const newHeight = clampNodeHeight(startHeight + deltaY);
             resizeRef.current = { width: newWidth, height: newHeight };
             setLocalWidth(newWidth);
             setLocalHeight(newHeight);
+            onResizing?.(newWidth);
         };
 
         const handleMouseUp = () => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
+            resizeCleanupRef.current = null;
             setIsResizing(false);
+            onResizing?.(null); // Clear resizing state
             // Save resize to node data
             if (onResize) {
                 const finalWidth = resizeRef.current.width;
@@ -950,6 +987,12 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             // Clear local state after save
             setLocalWidth(undefined);
             setLocalHeight(undefined);
+        };
+
+        // Store cleanup function for unmount safety
+        resizeCleanupRef.current = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
         };
 
         document.addEventListener('mousemove', handleMouseMove);
@@ -1009,7 +1052,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 left: node.position.x,
                 top: node.position.y,
                 width: `${currentWidth}px`,
-                minHeight: currentHeight ? `${currentHeight}px` : undefined,
             }}
             onMouseDown={onMouseDown}
             onTouchStart={onTouchStart}
@@ -1230,11 +1272,14 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 ))}
             </div>
 
-            {/* Body - min height based on visible port count */}
+            {/* Body - min height based on visible port count or custom height */}
             <div
                 className="px-3 py-3"
                 style={{
-                    minHeight: `${Math.max(visibleInputPorts.length, visibleOutputPorts.length) * PORT_LAYOUT.PORT_SPACING}px`,
+                    minHeight: `${Math.max(
+                        Math.max(visibleInputPorts.length, visibleOutputPorts.length) * PORT_LAYOUT.PORT_SPACING,
+                        currentHeight ?? 0
+                    )}px`,
                 }}
             >
                 {/* Content Area */}
@@ -1267,10 +1312,14 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     )}
                     {definition?.type &&
                         VISUALIZATION_COMPONENTS[definition.type] &&
-                        React.createElement(VISUALIZATION_COMPONENTS[definition.type], { node, definition })}
+                        React.createElement(VISUALIZATION_COMPONENTS[definition.type], {
+                            node,
+                            definition,
+                            contentHeight: contentAreaHeight,
+                        })}
 
                     {/* Output Preview for process nodes */}
-                    <OutputPreview node={node} definition={definition} />
+                    <OutputPreview node={node} definition={definition} contentHeight={contentAreaHeight} />
                 </div>
 
                 {/* Error Message */}

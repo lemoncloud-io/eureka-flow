@@ -11,6 +11,7 @@ import {
     Download,
     Expand,
     FileText,
+    Pencil,
     Play,
     ScrollText,
     Settings,
@@ -36,6 +37,7 @@ import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
 import { ContentPreviewModal } from './ContentPreviewModal';
 import { FrontendBadge } from './FrontendBadge';
+import { ImageEditorDialog } from './ImageEditorDialog';
 import { S3Image } from './S3Image';
 import { TouchDialog } from './TouchDialog';
 import { tryParseJson } from '../utils';
@@ -68,6 +70,7 @@ const ImagePreview = ({ src, t }: { src: string; t: (key: string) => string }) =
     const { src: resolvedSrc, isLoading } = useS3Image(src);
 
     const handleDownload = (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         if (resolvedSrc) downloadImage(resolvedSrc);
     };
@@ -95,6 +98,7 @@ const ImagePreview = ({ src, t }: { src: string; t: (key: string) => string }) =
             </div>
 
             <button
+                type="button"
                 onClick={handleDownload}
                 disabled={isLoading || !resolvedSrc}
                 className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-black/60 hover:bg-primary text-white rounded-md border border-white/10 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black/60"
@@ -110,6 +114,7 @@ const FileImagePreview = ({ src, onRemove, t }: { src: string; onRemove: () => v
     const { src: resolvedSrc, isLoading } = useS3Image(src);
 
     const handleDownload = (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         if (resolvedSrc) downloadImage(resolvedSrc);
     };
@@ -119,6 +124,7 @@ const FileImagePreview = ({ src, onRemove, t }: { src: string; onRemove: () => v
             <S3Image src={src} alt="Preview" className="max-w-full max-h-full object-contain" />
             <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
+                    type="button"
                     onClick={handleDownload}
                     disabled={isLoading || !resolvedSrc}
                     className="bg-black/60 hover:bg-primary text-white rounded-md p-1 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -127,6 +133,7 @@ const FileImagePreview = ({ src, onRemove, t }: { src: string; onRemove: () => v
                     <Download className="w-3 h-3" />
                 </button>
                 <button
+                    type="button"
                     onClick={onRemove}
                     className="bg-destructive/80 hover:bg-destructive text-white rounded-md p-1"
                     title={t('flows:detailPanel.removeImage')}
@@ -147,6 +154,7 @@ interface InputImageConfigProps {
 const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChange, t }) => {
     const img = node.config?.imageData as string | undefined;
     const { src: resolvedSrc, isLoading } = useS3Image(img || '');
+    const [isEditorOpen, setIsEditorOpen] = useState(false);
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -164,8 +172,21 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
     };
 
     const handleDownload = (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         if (resolvedSrc) downloadImage(resolvedSrc);
+    };
+
+    const handleEditClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (resolvedSrc) {
+            setIsEditorOpen(true);
+        }
+    };
+
+    const handleEditorSave = (croppedImageDataUrl: string) => {
+        onConfigChange('imageData', croppedImageDataUrl);
     };
 
     const fileInputId = `detail-image-${node.id}`;
@@ -177,27 +198,52 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
             </label>
             <input type="file" accept="image/*" className="hidden" id={fileInputId} onChange={handleImageUpload} />
             {img ? (
-                <div className="w-full h-28 bg-black/30 rounded-lg border border-border flex items-center justify-center overflow-hidden relative group">
-                    <S3Image src={img} alt="Preview" className="max-w-full max-h-full object-contain" />
-                    <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="space-y-2">
+                    {/* Image Preview */}
+                    <div className="w-full h-28 bg-black/30 rounded-lg border border-border flex items-center justify-center overflow-hidden relative group">
+                        <S3Image src={img} alt="Preview" className="max-w-full max-h-full object-contain" />
+                        {/* Quick action overlay (download only) */}
+                        <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                                type="button"
+                                onClick={handleDownload}
+                                disabled={isLoading || !resolvedSrc}
+                                className="bg-black/60 hover:bg-primary text-white rounded-md p-1 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={t('flows:detailPanel.downloadImage')}
+                            >
+                                <Download className="w-3 h-3" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Action Buttons - Always visible */}
+                    <div className="flex gap-1.5">
+                        {/* Edit Button - Primary action */}
                         <button
-                            onClick={handleDownload}
+                            onClick={handleEditClick}
                             disabled={isLoading || !resolvedSrc}
-                            className="bg-black/60 hover:bg-primary text-white rounded-md p-1 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={t('flows:detailPanel.downloadImage')}
+                            className={cn(
+                                'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-medium transition-colors',
+                                'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30',
+                                'disabled:opacity-50 disabled:cursor-not-allowed'
+                            )}
                         >
-                            <Download className="w-3 h-3" />
+                            <Pencil className="w-3 h-3" />
+                            {t('flows:detailPanel.editImage')}
                         </button>
+
+                        {/* Change Button */}
                         <label
                             htmlFor={fileInputId}
-                            className="bg-black/60 hover:bg-primary text-white rounded-md p-1 border border-white/10 cursor-pointer"
-                            title={t('flows:detailPanel.changeFile')}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-md text-[11px] font-medium bg-muted/50 hover:bg-muted text-foreground/70 hover:text-foreground border border-border/50 cursor-pointer transition-colors"
                         >
                             <Upload className="w-3 h-3" />
                         </label>
+
+                        {/* Remove Button */}
                         <button
                             onClick={() => onConfigChange('imageData', '')}
-                            className="bg-destructive/80 hover:bg-destructive text-white rounded-md p-1"
+                            className="flex items-center justify-center py-1.5 px-2.5 rounded-md text-[11px] font-medium bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/30 transition-colors"
                             title={t('flows:detailPanel.removeImage')}
                         >
                             <X className="w-3 h-3" />
@@ -211,13 +257,23 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
                 >
                     <div className="h-full flex flex-col items-center justify-center gap-1">
                         <div className="w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                            <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                            <Upload className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
                         </div>
                         <span className="text-[10px] text-muted-foreground/70">
                             {t('flows:detailPanel.clickToUpload')}
                         </span>
                     </div>
                 </label>
+            )}
+
+            {/* Image Editor Dialog */}
+            {resolvedSrc && (
+                <ImageEditorDialog
+                    open={isEditorOpen}
+                    onOpenChange={setIsEditorOpen}
+                    imageSrc={resolvedSrc}
+                    onSave={handleEditorSave}
+                />
             )}
         </div>
     );

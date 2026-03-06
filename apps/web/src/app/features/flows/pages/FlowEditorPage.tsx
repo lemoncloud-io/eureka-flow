@@ -80,7 +80,7 @@ export const FlowEditorPage = () => {
 
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
-            const { nodeId, isPort, parentNodeId, state, progress, no } = info;
+            const { nodeId, isPort, parentNodeId, state, progress, no, stereo } = info;
 
             // Check if this update is stale based on sequence number (no)
             // Higher 'no' means more recent - skip if we've seen equal or higher number
@@ -132,7 +132,18 @@ export const FlowEditorPage = () => {
 
                 // COMPLETED state: fetch full node data to get outputData
                 // Server has finished execution and saved results - we need the complete data
+                // EXCEPTION: stereo === 0 means socket already has all necessary data
                 if (state === 'COMPLETED') {
+                    // stereo === 0: Skip API fetch, socket data is sufficient
+                    if (stereo === 0) {
+                        canvasRef.current.updateNodeFromServer(nodeId, {
+                            state,
+                            status: state, // Deprecated: kept for backward compatibility
+                            executionStats,
+                        });
+                        return;
+                    }
+
                     try {
                         const nodeData = await getNode(nodeId);
                         canvasRef.current.updateNodeFromServer(nodeId, {
@@ -226,7 +237,28 @@ export const FlowEditorPage = () => {
                     // Examples:
                     //   - Socket: COMPLETED, API: RUNNING → Use COMPLETED (socket is fresher)
                     //   - Socket: RUNNING, API: COMPLETED → Use COMPLETED (API caught up)
+                    //
+                    // OPTIMIZATION: stereo === 0 means socket contains all necessary data
+                    //   - Skip API fetch to reduce network overhead
+                    //   - Use socket state directly for UI update
                     // ============================================================
+
+                    // stereo === 0: Skip API fetch, use socket data directly
+                    if (stereo === 0 && state && canvasRef.current) {
+                        const executionStats =
+                            state === 'RUNNING'
+                                ? { startTime: Date.now(), duration: 0, progress: progress ?? 0 }
+                                : progress !== undefined
+                                  ? { progress }
+                                  : undefined;
+
+                        canvasRef.current.updateNodeFromServer(nodeId, {
+                            state,
+                            status: state, // Deprecated: kept for backward compatibility
+                            executionStats,
+                        });
+                        return;
+                    }
 
                     const nodeData = await getNode(nodeId);
 

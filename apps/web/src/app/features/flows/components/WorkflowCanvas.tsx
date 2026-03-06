@@ -170,6 +170,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const [nodes, setNodes] = useState<NodeData[]>([]);
         const [connections, setConnections] = useState<Connection[]>([]);
         const [clipboard, setClipboard] = useState<NodeData[]>([]);
+        const [resizingNode, setResizingNode] = useState<{ nodeId: string; width: number } | null>(null);
 
         const pastRef = useRef<WorkflowState[]>([]);
         const futureRef = useRef<WorkflowState[]>([]);
@@ -1846,7 +1847,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             const yOffset = PORT_LAYOUT.FIRST_PORT_Y + safeIndex * PORT_LAYOUT.PORT_SPACING;
             // Use dynamic node width for output port position
-            const nodeWidth = getNodeWidth(node);
+            // If node is being resized, use the resizing width for real-time edge updates
+            const nodeWidth = resizingNode?.nodeId === nodeId ? resizingNode.width : getNodeWidth(node);
             const xOffset = type === 'input' ? PORT_LAYOUT.INPUT_X : nodeWidth + 3;
             return { x: node.position.x + xOffset, y: node.position.y + yOffset };
         };
@@ -2183,6 +2185,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 onDuplicate: () => duplicateNode(node.id),
                                                 onViewLogs: () => setLogViewerNodeId(node.id),
                                                 onResize: (w, h) => handleNodeResize(node.id, w, h),
+                                                onResizing: w =>
+                                                    setResizingNode(w !== null ? { nodeId: node.id, width: w } : null),
                                             }}
                                             onMouseDown={e => handleNodeMouseDown(e, node.id)}
                                             onTouchStart={e => handleNodeTouchStart(e, node.id)}
