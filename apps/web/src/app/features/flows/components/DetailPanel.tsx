@@ -38,6 +38,7 @@ import { ContentPreviewModal } from './ContentPreviewModal';
 import { FrontendBadge } from './FrontendBadge';
 import { S3Image } from './S3Image';
 import { TouchDialog } from './TouchDialog';
+import { tryParseJson } from '../utils';
 
 import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@flows/flows';
 
@@ -322,18 +323,6 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
             {isOpen && <div className="px-3 pb-3">{children}</div>}
         </div>
     );
-};
-
-/** Try to parse JSON string, returns parsed object or null if not valid JSON */
-const tryParseJson = (value: unknown): object | null => {
-    if (typeof value !== 'string') return null;
-    const trimmed = value.trim();
-    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
-    try {
-        return JSON.parse(trimmed);
-    } catch {
-        return null;
-    }
 };
 
 export const DetailPanel: React.FC<DetailPanelProps> = ({

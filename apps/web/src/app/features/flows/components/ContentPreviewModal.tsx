@@ -16,28 +16,9 @@ import {
     isMarkdownContent,
 } from '@flows/ui-kit';
 
+import { tryParseJson } from '../utils';
+
 type ContentType = 'image' | 'json' | 'markdown' | 'text';
-
-interface ContentPreviewModalProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    content: {
-        value: unknown;
-        type?: string;
-    } | null;
-}
-
-/** Try to parse JSON string, returns parsed object or null if not valid JSON */
-const tryParseJson = (value: unknown): object | null => {
-    if (typeof value !== 'string') return null;
-    const trimmed = value.trim();
-    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
-    try {
-        return JSON.parse(trimmed);
-    } catch {
-        return null;
-    }
-};
 
 /** Detect content type from value and explicit type */
 const detectContentType = (value: unknown, explicitType?: string): ContentType => {

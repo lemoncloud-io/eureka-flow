@@ -35,8 +35,8 @@ import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
 import { ContentPreviewModal } from './ContentPreviewModal';
 import { S3Image } from './S3Image';
-import { TooltipImage } from './TooltipImage';
-import { arePortTypesCompatible, getVisiblePorts } from '../utils';
+import { TooltipContentRenderer } from './TooltipContentRenderer';
+import { arePortTypesCompatible, getVisiblePorts, tryParseJson } from '../utils';
 
 import type { ConnectionDraftInfo } from '../utils';
 import type { BlockDefinitionWithFrontend, DataPacket, NodeData, NodeState, PortDefinition } from '@flows/flows';
@@ -309,40 +309,14 @@ const PortItem: React.FC<PortItemProps> = ({
                 </div>
                 {portData && (
                     <div className="mt-1 pt-1 border-t border-border/50">
-                        {(() => {
-                            // Image type
-                            if (portData.type === 'image') {
-                                return <TooltipImage src={portData.value as string} altText="Port data" />;
-                            }
-
-                            // JSON/object type
-                            if (
-                                portData.type === 'json' ||
-                                (portData.value !== null && typeof portData.value === 'object')
-                            ) {
-                                return <JsonViewer data={portData.value} maxHeight={80} collapsed={1} />;
-                            }
-
-                            // String content - check for markdown
-                            const strValue = String(portData.value ?? '');
-                            if (portData.type === 'markdown' || isMarkdownContent(strValue)) {
-                                return (
-                                    <MarkdownViewer
-                                        content={strValue.slice(0, 300)}
-                                        maxHeight={80}
-                                        className="text-[10px] [&_h1]:text-xs [&_h2]:text-[11px] [&_h3]:text-[10px] [&_p]:text-[10px] [&_code]:text-[9px]"
-                                    />
-                                );
-                            }
-
-                            // Plain text
-                            return (
-                                <div className="font-mono text-[10px] text-foreground/80 break-all max-h-[60px] overflow-hidden whitespace-pre-wrap">
-                                    {strValue.slice(0, 100)}
-                                    {strValue.length > 100 && <span className="text-muted-foreground">...</span>}
-                                </div>
-                            );
-                        })()}
+                        <TooltipContentRenderer
+                            content={portData.value}
+                            type={portData.type}
+                            maxHeight={80}
+                            collapsed={1}
+                            textLimit={100}
+                            markdownClassName="text-[10px] [&_h1]:text-xs [&_h2]:text-[11px] [&_h3]:text-[10px] [&_p]:text-[10px] [&_code]:text-[9px]"
+                        />
                     </div>
                 )}
             </div>
@@ -712,18 +686,6 @@ const VISUALIZATION_COMPONENTS: Record<string, React.FC<VisualizationProps>> = {
 // ============================================================================
 // Output Preview Component (shows first output data in node body)
 // ============================================================================
-
-/** Try to parse JSON string, returns parsed object or null if not valid JSON */
-const tryParseJson = (value: unknown): object | null => {
-    if (typeof value !== 'string') return null;
-    const trimmed = value.trim();
-    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
-    try {
-        return JSON.parse(trimmed);
-    } catch {
-        return null;
-    }
-};
 
 /** Get first output data from node */
 const getFirstOutputData = (node: NodeData, definition: BlockDefinitionWithFrontend): DataPacket | undefined => {

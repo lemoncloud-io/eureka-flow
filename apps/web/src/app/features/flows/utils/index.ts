@@ -225,3 +225,22 @@ export const replaceNodeIdInState = (
 };
 
 export { wouldCreateCycle } from './graph';
+
+// ============================================================
+// JSON Parsing Utilities
+// ============================================================
+
+/**
+ * Try to parse a JSON string, returns parsed object or null if not valid JSON.
+ * Only attempts parsing for strings that start with '{' or '['.
+ */
+export const tryParseJson = (value: unknown): object | null => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
+    try {
+        return JSON.parse(trimmed);
+    } catch {
+        return null;
+    }
+};
