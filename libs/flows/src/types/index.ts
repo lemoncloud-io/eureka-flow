@@ -462,7 +462,7 @@ export interface LoadFlowResult extends FlowModel {
     nodes: NodeData[];
     edges: EdgeData[];
     /** Port data with current values for input/output ports */
-    ports?: PortData[];
+    ports?: PortDataResponse[];
     /** WebSocket channel ID for real-time node status updates */
     channelId?: string;
 }

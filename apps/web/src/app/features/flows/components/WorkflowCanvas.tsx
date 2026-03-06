@@ -41,12 +41,12 @@ import {
     wouldCreateCycle,
 } from '../utils';
 
-import type { NodeState, PortData } from '@flows/flows';
+import type { NodeState, PortDataResponse } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 /** Extended WorkflowState with optional ports array from LoadFlowResult */
 interface WorkflowStateWithPorts extends WorkflowState {
-    ports?: PortData[];
+    ports?: PortDataResponse[];
 }
 
 export interface WorkflowCanvasRef {
@@ -577,43 +577,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const rawConnections = state.edges ?? state.connections ?? [];
                     const loadedConnections = deduplicateEdges(rawConnections);
 
-                    // Step 1: Propagate outputData to downstream nodes' inputData
-                    // This ensures that existing completed nodes' outputs are reflected in downstream inputs
-                    const nodesWithPropagatedData = loadedNodes.map(node => {
-                        // Find all connections where this node is the target
-                        const incomingConnections = loadedConnections.filter(c => c.targetNodeId === node.id);
-
-                        if (incomingConnections.length === 0) {
-                            return node;
-                        }
-
-                        // Build inputData from upstream nodes' outputData
-                        const propagatedInputData = { ...node.inputData };
-                        let hasNewData = false;
-
-                        incomingConnections.forEach(conn => {
-                            const sourceNode = loadedNodes.find(n => n.id === conn.sourceNodeId);
-                            if (sourceNode?.outputData) {
-                                const packet = sourceNode.outputData[conn.sourcePortId];
-                                if (packet) {
-                                    propagatedInputData[conn.targetPortId] = packet;
-                                    hasNewData = true;
-                                }
-                            }
-                        });
-
-                        if (hasNewData) {
-                            return { ...node, inputData: propagatedInputData };
-                        }
-                        return node;
-                    });
-
-                    // Step 2: Apply port data from ports[] array to nodes' inputData/outputData
-                    // This loads persisted port values that may not be reflected in node outputData
-                    // Port format: { id, nodeId, portId, direction, data: DataPacket }
+                    // Step 1: Apply port data from ports[] array to nodes' outputData
+                    // This populates actual DataPacket values from persisted port data
+                    // Must run BEFORE propagation so source nodes have real data to propagate
                     const ports = state.ports ?? [];
                     const nodesWithPortData = ports.length
-                        ? nodesWithPropagatedData.map(node => {
+                        ? loadedNodes.map(node => {
                               const nodePorts = ports.filter(
                                   p => p.nodeId === node.id && p.portId && p.data && p.direction
                               );
@@ -634,9 +603,40 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                               return { ...node, inputData, outputData };
                           })
-                        : nodesWithPropagatedData;
+                        : loadedNodes;
 
-                    setNodes(nodesWithPortData);
+                    // Step 2: Propagate outputData to downstream nodes' inputData via edges
+                    // This ensures output nodes (Preview, Debug Log) receive data from connected sources
+                    // Uses nodesWithPortData so source nodes have real DataPackets to propagate
+                    const nodesWithPropagatedData = nodesWithPortData.map(node => {
+                        const incomingConnections = loadedConnections.filter(c => c.targetNodeId === node.id);
+
+                        if (incomingConnections.length === 0) {
+                            return node;
+                        }
+
+                        const propagatedInputData = { ...node.inputData };
+                        let hasNewData = false;
+
+                        incomingConnections.forEach(conn => {
+                            const sourceNode = nodesWithPortData.find(n => n.id === conn.sourceNodeId);
+                            if (sourceNode?.outputData) {
+                                const packet = sourceNode.outputData[conn.sourcePortId];
+                                // Only propagate if it's a DataPacket (has value property), not just a type string
+                                if (packet && typeof packet === 'object' && 'value' in packet) {
+                                    propagatedInputData[conn.targetPortId] = packet;
+                                    hasNewData = true;
+                                }
+                            }
+                        });
+
+                        if (hasNewData) {
+                            return { ...node, inputData: propagatedInputData };
+                        }
+                        return node;
+                    });
+
+                    setNodes(nodesWithPropagatedData);
                     setConnections(loadedConnections);
                     pastRef.current = [];
                     futureRef.current = [];

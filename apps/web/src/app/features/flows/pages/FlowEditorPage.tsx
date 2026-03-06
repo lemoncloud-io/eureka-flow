@@ -386,7 +386,8 @@ export const FlowEditorPage = () => {
                     const portKey = portData.portId || portName || 'data';
 
                     // Update canvas with port data based on direction
-                    if (effectiveDirection === 'out') {
+                    // Use API response's direction (more reliable than parsing @ suffix)
+                    if (portData.direction === 'out') {
                         canvasRef.current.updateNodeFromServer(nodeId, {
                             outputData: { [portKey]: dataPacket },
                         });
