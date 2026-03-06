@@ -123,6 +123,7 @@
         "clickToUpload": "클릭하여 업로드",
         "enterText": "텍스트를 입력하세요...",
         "touchDebug": "Touch 디버그",
+        "expand": "확대",
         "touchDialog": {
             "title": "Touch 디버그",
             "description": "노드 {{nodeId}}에 디버그 touch 요청 전송",

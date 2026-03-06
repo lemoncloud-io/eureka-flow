@@ -278,11 +278,19 @@ const PortItem: React.FC<PortItemProps> = ({
     );
 
     // Tooltip positioning based on content type
+    const hasRichContent =
+        portData &&
+        (portData.type === 'json' ||
+            portData.type === 'markdown' ||
+            (portData.value !== null && typeof portData.value === 'object') ||
+            isMarkdownContent(portData.value));
     const tooltipPosition = !portData
         ? '-top-7 whitespace-nowrap'
         : portData.type === 'image'
           ? 'bottom-full mb-2'
-          : '-top-14 min-w-[100px] max-w-[400px]';
+          : hasRichContent
+            ? 'bottom-full mb-2 min-w-[150px] max-w-[400px]'
+            : '-top-14 min-w-[100px] max-w-[400px]';
 
     return (
         <div className="relative group flex items-center justify-center w-3 h-6">
@@ -301,19 +309,40 @@ const PortItem: React.FC<PortItemProps> = ({
                 </div>
                 {portData && (
                     <div className="mt-1 pt-1 border-t border-border/50">
-                        {portData.type === 'image' ? (
-                            <TooltipImage src={portData.value as string} altText="Port data" />
-                        ) : (
-                            <div className="font-mono text-[10px] text-foreground/80 break-all max-h-[60px] overflow-hidden">
-                                {(() => {
-                                    const strValue =
-                                        typeof portData.value === 'object'
-                                            ? JSON.stringify(portData.value)
-                                            : String(portData.value);
-                                    return strValue.length > 100 ? `${strValue.slice(0, 100)}...` : strValue;
-                                })()}
-                            </div>
-                        )}
+                        {(() => {
+                            // Image type
+                            if (portData.type === 'image') {
+                                return <TooltipImage src={portData.value as string} altText="Port data" />;
+                            }
+
+                            // JSON/object type
+                            if (
+                                portData.type === 'json' ||
+                                (portData.value !== null && typeof portData.value === 'object')
+                            ) {
+                                return <JsonViewer data={portData.value} maxHeight={80} collapsed={1} />;
+                            }
+
+                            // String content - check for markdown
+                            const strValue = String(portData.value ?? '');
+                            if (portData.type === 'markdown' || isMarkdownContent(strValue)) {
+                                return (
+                                    <MarkdownViewer
+                                        content={strValue.slice(0, 300)}
+                                        maxHeight={80}
+                                        className="text-[10px] [&_h1]:text-xs [&_h2]:text-[11px] [&_h3]:text-[10px] [&_p]:text-[10px] [&_code]:text-[9px]"
+                                    />
+                                );
+                            }
+
+                            // Plain text
+                            return (
+                                <div className="font-mono text-[10px] text-foreground/80 break-all max-h-[60px] overflow-hidden whitespace-pre-wrap">
+                                    {strValue.slice(0, 100)}
+                                    {strValue.length > 100 && <span className="text-muted-foreground">...</span>}
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
             </div>
@@ -718,7 +747,7 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
 
     if (packet.type === 'json' || typeof packet.value === 'object') {
         return (
-            <div className="p-2 bg-black/20 rounded-lg border border-border" onWheel={e => e.stopPropagation()}>
+            <div className="p-2 bg-muted/10 rounded-lg border border-border/30" onWheel={e => e.stopPropagation()}>
                 <JsonViewer data={packet.value} maxHeight={180} collapsed={2} />
             </div>
         );
@@ -726,7 +755,7 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
 
     if (packet.type === 'markdown' || isMarkdownContent(packet.value)) {
         return (
-            <div className="p-2 bg-muted/30 rounded-lg border border-border" onWheel={e => e.stopPropagation()}>
+            <div className="p-2 bg-muted/10 rounded-lg border border-border/30" onWheel={e => e.stopPropagation()}>
                 <MarkdownViewer content={String(packet.value)} maxHeight={180} />
             </div>
         );
@@ -736,7 +765,7 @@ const OutputPreview: React.FC<VisualizationProps> = ({ node, definition }) => {
     const strValue = String(packet.value);
     return (
         <div
-            className="p-2.5 bg-muted/30 rounded-lg border border-border"
+            className="p-2.5 bg-muted/10 rounded-lg border border-border/30"
             style={{ maxHeight: '180px', overflow: 'hidden' }}
         >
             <div className="text-xs text-foreground/80 break-words whitespace-pre-wrap">{strValue}</div>

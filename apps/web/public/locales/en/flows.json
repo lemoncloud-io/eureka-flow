@@ -123,6 +123,7 @@
         "clickToUpload": "Click to upload",
         "enterText": "Enter text...",
         "touchDebug": "Touch Debug",
+        "expand": "Expand",
         "touchDialog": {
             "title": "Touch Debug",
             "description": "Send debug touch request to node {{nodeId}}",

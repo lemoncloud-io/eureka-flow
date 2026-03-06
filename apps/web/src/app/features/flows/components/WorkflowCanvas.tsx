@@ -21,6 +21,7 @@ import {
     useUpdatedPortIds,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
 import { ConnectionLine } from './ConnectionLine';
 import { DetailPanel } from './DetailPanel';
@@ -2179,19 +2180,51 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             <div className="text-[10px] text-muted-foreground uppercase font-bold mb-1">
                                 {tooltip.type}
                             </div>
-                            {tooltip.type === 'image' ? (
-                                <TooltipImage
-                                    src={tooltip.content as string}
-                                    altText={t('flows:nodeBlock.previewAlt')}
-                                />
-                            ) : (
-                                <div className="text-xs text-foreground min-w-[100px] max-w-[400px] break-all">
-                                    {typeof tooltip.content === 'object'
-                                        ? JSON.stringify(tooltip.content).slice(0, 100) +
-                                          (JSON.stringify(tooltip.content).length > 100 ? '...' : '')
-                                        : String(tooltip.content).slice(0, 150)}
-                                </div>
-                            )}
+                            {(() => {
+                                // Image type
+                                if (tooltip.type === 'image') {
+                                    return (
+                                        <TooltipImage
+                                            src={tooltip.content as string}
+                                            altText={t('flows:nodeBlock.previewAlt')}
+                                        />
+                                    );
+                                }
+
+                                // JSON/object type
+                                if (
+                                    tooltip.type === 'json' ||
+                                    (tooltip.content !== null && typeof tooltip.content === 'object')
+                                ) {
+                                    return (
+                                        <div className="min-w-[100px] max-w-[400px]">
+                                            <JsonViewer data={tooltip.content} maxHeight={120} collapsed={2} />
+                                        </div>
+                                    );
+                                }
+
+                                // String content - check for markdown
+                                const strValue = String(tooltip.content ?? '');
+                                if (tooltip.type === 'markdown' || isMarkdownContent(strValue)) {
+                                    return (
+                                        <div className="min-w-[100px] max-w-[400px]">
+                                            <MarkdownViewer
+                                                content={strValue.slice(0, 500)}
+                                                maxHeight={120}
+                                                className="text-xs [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-xs [&_p]:text-xs [&_code]:text-[10px]"
+                                            />
+                                        </div>
+                                    );
+                                }
+
+                                // Plain text
+                                return (
+                                    <div className="text-xs text-foreground min-w-[100px] max-w-[400px] break-all whitespace-pre-wrap">
+                                        {strValue.slice(0, 150)}
+                                        {strValue.length > 150 && <span className="text-muted-foreground">...</span>}
+                                    </div>
+                                );
+                            })()}
                         </div>
                     )}
 

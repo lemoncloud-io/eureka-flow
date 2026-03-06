@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Check, Copy, Download } from 'lucide-react';
+import { Check, Copy, Download, X } from 'lucide-react';
 
 import { downloadImage, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Button,
     Dialog,
+    DialogClose,
     DialogContent,
     JsonViewer,
     MarkdownViewer,
@@ -210,8 +211,23 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className={cn('max-w-4xl max-h-[85vh] p-6', 'bg-background/95 backdrop-blur-xl')}>
-                <ScrollArea className="max-h-[75vh]">{renderContent()}</ScrollArea>
+            <DialogContent
+                className={cn(
+                    'max-w-4xl max-h-[85vh] p-0 gap-0',
+                    'bg-background/95 backdrop-blur-xl',
+                    '[&>button]:hidden' // Hide default close button
+                )}
+            >
+                {/* Custom header with prominent close button */}
+                <div className="flex items-center justify-end p-3 border-b border-border">
+                    <DialogClose asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted">
+                            <X className="w-5 h-5" />
+                        </Button>
+                    </DialogClose>
+                </div>
+                {/* Content */}
+                <ScrollArea className="max-h-[calc(85vh-56px)] p-6">{renderContent()}</ScrollArea>
             </DialogContent>
         </Dialog>
     );

@@ -5,6 +5,7 @@ import { ChevronRight, Cpu, Search } from 'lucide-react';
 
 import { useBlocks } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+import { MarkdownViewer } from '@flows/ui-kit';
 
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
 
@@ -59,7 +60,12 @@ const BlockDetail = ({ block }: BlockDetailProps) => {
                 </div>
             </div>
 
-            <p className="text-sm text-muted-foreground whitespace-pre-line">{block.description}</p>
+            <div className="text-sm text-muted-foreground">
+                <MarkdownViewer
+                    content={block.description || ''}
+                    className="[&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_p]:text-sm [&_code]:text-xs"
+                />
+            </div>
 
             {block.isFrontend && (
                 <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">

@@ -9,6 +9,7 @@ import {
     ChevronDown,
     ChevronRight,
     Download,
+    Expand,
     FileText,
     Play,
     ScrollText,
@@ -33,6 +34,7 @@ import {
 import { cn } from '@flows/lib/utils';
 import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
+import { ContentPreviewModal } from './ContentPreviewModal';
 import { FrontendBadge } from './FrontendBadge';
 import { S3Image } from './S3Image';
 import { TouchDialog } from './TouchDialog';
@@ -344,6 +346,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     const blockRegistry = useBlockRegistry();
     const [isTouchDialogOpen, setIsTouchDialogOpen] = useState(false);
     const [touchPortId, setTouchPortId] = useState<string | null>(null);
+    const [previewContent, setPreviewContent] = useState<{ value: unknown; type?: string } | null>(null);
 
     if (!selectedNode && !selectedConnection) return null;
 
@@ -356,16 +359,38 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             );
         }
 
+        const handleExpand = () => {
+            setPreviewContent({ value: packet.value, type: packet.type });
+        };
+
         if (packet.type === 'image') {
-            return <ImagePreview src={packet.value} t={t} />;
+            return (
+                <div className="relative group">
+                    <ImagePreview src={packet.value} t={t} />
+                    <button
+                        onClick={handleExpand}
+                        className="absolute top-3 left-1.5 w-6 h-6 flex items-center justify-center bg-muted hover:bg-primary text-foreground hover:text-primary-foreground rounded-md border border-border/50 opacity-0 group-hover:opacity-100 transition-all"
+                        title={t('flows:detailPanel.expand')}
+                    >
+                        <Expand className="w-3 h-3" />
+                    </button>
+                </div>
+            );
         }
 
-        if (packet.type === 'json' || typeof packet.value === 'object') {
+        if (packet.type === 'json' || (packet.value !== null && typeof packet.value === 'object')) {
             return (
                 <div
-                    className="bg-black/20 p-2 rounded-md border border-border/50 mt-1.5"
+                    className="relative group bg-muted/10 p-2 rounded-md border border-border/30 mt-1.5"
                     onWheel={e => e.stopPropagation()}
                 >
+                    <button
+                        onClick={handleExpand}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-muted hover:bg-primary text-foreground hover:text-primary-foreground rounded-md border border-border/50 opacity-0 group-hover:opacity-100 transition-all z-10"
+                        title={t('flows:detailPanel.expand')}
+                    >
+                        <Expand className="w-3 h-3" />
+                    </button>
                     <JsonViewer data={packet.value} maxHeight={120} collapsed={2} />
                 </div>
             );
@@ -374,9 +399,16 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         if (packet.type === 'markdown' || isMarkdownContent(packet.value)) {
             return (
                 <div
-                    className="bg-muted/30 p-2 rounded-md border border-border/50 mt-1.5"
+                    className="relative group bg-muted/10 p-2 rounded-md border border-border/30 mt-1.5"
                     onWheel={e => e.stopPropagation()}
                 >
+                    <button
+                        onClick={handleExpand}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-muted hover:bg-primary text-foreground hover:text-primary-foreground rounded-md border border-border/50 opacity-0 group-hover:opacity-100 transition-all z-10"
+                        title={t('flows:detailPanel.expand')}
+                    >
+                        <Expand className="w-3 h-3" />
+                    </button>
                     <MarkdownViewer content={String(packet.value)} maxHeight={120} className="text-[11px]" />
                 </div>
             );
@@ -384,9 +416,16 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
         return (
             <div
-                className="bg-black/20 p-2 rounded-md border border-border/50 text-[11px] font-mono text-foreground/80 break-words max-h-20 overflow-y-auto mt-1.5"
+                className="relative group bg-muted/10 p-2 rounded-md border border-border/30 text-[11px] font-mono text-foreground/80 break-words max-h-20 overflow-y-auto mt-1.5"
                 onWheel={e => e.stopPropagation()}
             >
+                <button
+                    onClick={handleExpand}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-muted hover:bg-primary text-foreground hover:text-primary-foreground rounded-md border border-border/50 opacity-0 group-hover:opacity-100 transition-all z-10"
+                    title={t('flows:detailPanel.expand')}
+                >
+                    <Expand className="w-3 h-3" />
+                </button>
                 {String(packet.value)}
             </div>
         );
@@ -889,6 +928,13 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         onError={msg => onShowNotification?.(msg, 'error')}
                     />
                 )}
+
+                {/* Content Preview Modal */}
+                <ContentPreviewModal
+                    open={!!previewContent}
+                    onOpenChange={open => !open && setPreviewContent(null)}
+                    content={previewContent}
+                />
             </div>
         );
     }
@@ -1010,6 +1056,13 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         onError={msg => onShowNotification?.(msg, 'error')}
                     />
                 )}
+
+                {/* Content Preview Modal */}
+                <ContentPreviewModal
+                    open={!!previewContent}
+                    onOpenChange={open => !open && setPreviewContent(null)}
+                    content={previewContent}
+                />
             </div>
         );
     }
