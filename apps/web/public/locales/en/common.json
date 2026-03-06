@@ -75,7 +75,8 @@
         "serverError": "A server error occurred",
         "requestError": "There was a problem with the request",
         "unknownError": "An unknown error occurred",
-        "authError": "Authentication error"
+        "authError": "Authentication error",
+        "forbidden": "You don't have permission"
     },
     "version": {
         "newAvailable": "New version available",

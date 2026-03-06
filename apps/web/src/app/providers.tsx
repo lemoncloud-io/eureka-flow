@@ -7,6 +7,7 @@ import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toaster } from 'sonner';
 
+import { flowStorage } from '@flows/flows';
 import {
     ApiKeyDialog,
     ErrorFallback,
@@ -58,9 +59,20 @@ const ApiKeyGate = ({ children }: { children: ReactNode }) => {
     const { apiKey, setApiKey, initializeApiKey } = useWebCoreStore();
     const [error, setError] = useState<string | null>(null);
 
+    const [isInitialized, setIsInitialized] = useState(false);
+
     useEffect(() => {
         initializeApiKey();
+        setIsInitialized(true);
     }, [initializeApiKey]);
+
+    // Clear flow ID and redirect to root when no API key on flow pages (only after initialization)
+    useEffect(() => {
+        if (isInitialized && !apiKey && window.location.pathname.startsWith('/flows/')) {
+            flowStorage.clearFlowId();
+            window.location.href = '/';
+        }
+    }, [isInitialized, apiKey]);
 
     const handleApiKeySubmit = async (key: string): Promise<boolean> => {
         setError(null);
@@ -102,7 +114,6 @@ const AppContent = ({ children }: { children: ReactNode }) => {
             />
             {children}
             <GlobalLoader />
-            <Toaster />
         </>
     );
 };
@@ -127,6 +138,7 @@ export const Providers = ({ children }: ProvidersProps) => {
                                 <ApiKeyGate>
                                     <AppContent>{children}</AppContent>
                                 </ApiKeyGate>
+                                <Toaster />
                             </ThemeProvider>
                             {import.meta.env.DEV && <ReactQueryDevtools />}
                         </QueryClientProvider>

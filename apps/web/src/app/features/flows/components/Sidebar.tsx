@@ -26,6 +26,7 @@ import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
+    MarkdownViewer,
     Tooltip,
     TooltipContent,
     TooltipProvider,
@@ -138,7 +139,26 @@ const BlockItem: React.FC<BlockItemProps> = ({
                             {isFrontend && <FrontendBadge showTooltip />}
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-muted-foreground truncate flex-1">{description}</span>
+                            {description ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="text-[10px] text-muted-foreground truncate flex-1 cursor-help">
+                                            {description}
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                        side="bottom"
+                                        className="max-w-sm bg-popover text-popover-foreground border border-border shadow-lg"
+                                    >
+                                        <MarkdownViewer
+                                            content={description}
+                                            className="text-xs [&_h1]:text-sm [&_h2]:text-xs [&_h3]:text-xs [&_p]:m-0 [&_p]:mb-1 [&_ul]:m-0 [&_ol]:m-0 [&_pre]:bg-muted [&_code]:bg-muted/70"
+                                        />
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <span className="text-[10px] text-muted-foreground truncate flex-1" />
+                            )}
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <span className="text-[9px] text-muted-foreground/70 shrink-0 cursor-help">

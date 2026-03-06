@@ -123,6 +123,7 @@
         "clickToUpload": "Click to upload",
         "enterText": "Enter text...",
         "touchDebug": "Touch Debug",
+        "expand": "Expand",
         "touchDialog": {
             "title": "Touch Debug",
             "description": "Send debug touch request to node {{nodeId}}",
@@ -138,7 +139,18 @@
             "sending": "Sending...",
             "success": "Touch request sent successfully",
             "error": "Failed to send touch request"
-        }
+        },
+        "editImage": "Edit Image"
+    },
+    "imageEditor": {
+        "title": "Edit Image",
+        "zoom": "Zoom",
+        "ratio": "Ratio",
+        "reset": "Reset",
+        "cancel": "Cancel",
+        "apply": "Apply",
+        "processing": "Processing...",
+        "maxWidthInfo": "Max output: {{width}}px"
     },
     "flowEditor": {
         "initializingEngine": "Initializing FlowMosaic Engine...",

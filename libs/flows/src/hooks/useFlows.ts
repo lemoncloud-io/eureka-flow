@@ -104,25 +104,17 @@ export const useFlows = () => {
 
         // No saved flow or failed to load - create new flow
         console.log('[useFlows] Creating new flow via POST /flows/0/save');
-        try {
-            const result = await createFlow({ nodes: [], edges: [] });
-            const newFlowId = result.id;
+        const result = await createFlow({ nodes: [], edges: [] });
+        const newFlowId = result.id;
 
-            if (newFlowId) {
-                setCurrentFlowId(newFlowId);
-                flowStorage.setFlowId(newFlowId);
-                setFlowName('Untitled Workflow');
-                return { flowId: newFlowId, flowData: null, isNew: true };
-            }
-        } catch (err) {
-            console.error('[useFlows] Failed to create new flow:', err);
+        if (!newFlowId) {
+            throw new Error('Failed to create new flow: no ID returned');
         }
 
-        // Fallback: use a local ID (offline mode - will sync on first save)
-        const fallbackId = `local-${Date.now()}`;
-        setCurrentFlowId(fallbackId);
+        setCurrentFlowId(newFlowId);
+        flowStorage.setFlowId(newFlowId);
         setFlowName('Untitled Workflow');
-        return { flowId: fallbackId, flowData: null, isNew: true };
+        return { flowId: newFlowId, flowData: null, isNew: true };
     }, [queryClient, setCurrentFlowId, setFlowName, setChannelId]);
 
     /**
@@ -244,7 +236,7 @@ export const useFlows = () => {
                 let flowId = currentFlowId;
 
                 // If no current flow ID, create new flow
-                if (!flowId || flowId.startsWith('local-')) {
+                if (!flowId) {
                     console.log('[useFlows] Creating new flow via POST /flows/0/save');
                     const result = await createFlowMutation.mutateAsync(saveBody);
                     flowId = result.id;
@@ -315,7 +307,7 @@ export const useFlows = () => {
      */
     const updateFlowName = useCallback(
         async (name: string): Promise<boolean> => {
-            if (!currentFlowId || currentFlowId.startsWith('local-')) {
+            if (!currentFlowId) {
                 // Just update local state if no server flow exists
                 setFlowName(name);
                 return true;

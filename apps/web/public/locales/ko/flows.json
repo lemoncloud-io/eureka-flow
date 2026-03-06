@@ -123,6 +123,7 @@
         "clickToUpload": "클릭하여 업로드",
         "enterText": "텍스트를 입력하세요...",
         "touchDebug": "Touch 디버그",
+        "expand": "확대",
         "touchDialog": {
             "title": "Touch 디버그",
             "description": "노드 {{nodeId}}에 디버그 touch 요청 전송",
@@ -138,7 +139,18 @@
             "sending": "전송 중...",
             "success": "Touch 요청이 성공적으로 전송되었습니다",
             "error": "Touch 요청 전송 실패"
-        }
+        },
+        "editImage": "이미지 편집"
+    },
+    "imageEditor": {
+        "title": "이미지 편집",
+        "zoom": "확대",
+        "ratio": "비율",
+        "reset": "초기화",
+        "cancel": "취소",
+        "apply": "적용",
+        "processing": "처리 중...",
+        "maxWidthInfo": "최대 출력: {{width}}px"
     },
     "flowEditor": {
         "initializingEngine": "FlowMosaic 엔진 초기화 중...",

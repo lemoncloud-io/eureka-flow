@@ -75,7 +75,8 @@
         "serverError": "서버 오류가 발생했습니다",
         "requestError": "요청에 문제가 있습니다",
         "unknownError": "알 수 없는 오류가 발생했습니다",
-        "authError": "인증 오류"
+        "authError": "인증 오류",
+        "forbidden": "권한이 없습니다"
     },
     "version": {
         "newAvailable": "새 버전이 있습니다",

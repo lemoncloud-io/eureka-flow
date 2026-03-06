@@ -1863,9 +1863,9 @@
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
 "@lemoncloud/eureka-flows-api@^0.26.226":
-  version "0.26.226"
-  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-flows-api/-/eureka-flows-api-0.26.226.tgz#6897c3324ed16b9450b130b6b59ff6d0fb8bc98d"
-  integrity sha512-QP7DcZ6G8ZmsK4a9DfIjDzQEAc0eQ/G6SLuroghoxJoRfwUd1cTMiUonEifrwOwu7kv2EsF1XIdUOsp+V3vF2g==
+  version "0.26.305"
+  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-flows-api/-/eureka-flows-api-0.26.305.tgz#38600be4c38763ecf5a6e4c9ec445e0b1079bac3"
+  integrity sha512-vbR7gOtXlMn2hl8k+XR41nI07zdMyzwnm+1fEGgx1FrEc5ZYD14MyNlZtSILT53oRGh3+OThtYDB59MNaF34Qw==
   dependencies:
     lemon-model "^1.1.1"
 
@@ -10937,6 +10937,11 @@ react-i18next@^16.5.2:
     "@babel/runtime" "^7.28.4"
     html-parse-stringify "^3.0.1"
     use-sync-external-store "^1.6.0"
+
+react-image-crop@^11.0.10:
+  version "11.0.10"
+  resolved "https://registry.yarnpkg.com/react-image-crop/-/react-image-crop-11.0.10.tgz#20fe6e3ff6fe29745a37eac1b4c0e73e6b17f2e0"
+  integrity sha512-+5FfDXUgYLLqBh1Y/uQhIycpHCbXkI50a+nbfkB1C0xXXUTwkisHDo2QCB1SQJyHCqIuia4FeyReqXuMDKWQTQ==
 
 react-is@^16.13.1:
   version "16.13.1"

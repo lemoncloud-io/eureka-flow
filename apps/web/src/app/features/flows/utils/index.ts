@@ -46,6 +46,12 @@ export const getVisiblePorts = (
 ): PortDefinition[] => {
     if (allPorts.length === 0) return [];
 
+    // Output ports are always visible (no progressive disclosure)
+    if (portType === 'output') {
+        return allPorts;
+    }
+
+    // Input ports use progressive disclosure
     const visible = new Set<string>();
 
     // 1. First port is always visible
@@ -59,8 +65,7 @@ export const getVisiblePorts = (
     });
 
     // 3. During connection drag: show compatible input ports on OTHER nodes
-    // Note: Output ports don't expand during drag (they are the source)
-    if (connectionDraft && portType === 'input' && connectionDraft.sourceNodeId !== nodeId) {
+    if (connectionDraft && connectionDraft.sourceNodeId !== nodeId) {
         allPorts.forEach(port => {
             if (arePortTypesCompatible(connectionDraft.sourceType, port.type)) {
                 visible.add(port.id);
@@ -220,3 +225,22 @@ export const replaceNodeIdInState = (
 };
 
 export { wouldCreateCycle } from './graph';
+
+// ============================================================
+// JSON Parsing Utilities
+// ============================================================
+
+/**
+ * Try to parse a JSON string, returns parsed object or null if not valid JSON.
+ * Only attempts parsing for strings that start with '{' or '['.
+ */
+export const tryParseJson = (value: unknown): object | null => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
+    try {
+        return JSON.parse(trimmed);
+    } catch {
+        return null;
+    }
+};

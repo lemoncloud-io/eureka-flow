@@ -78,6 +78,12 @@ export interface NodeUpdateMessage {
      */
     prevState?: NodeState;
     progress?: number;
+    /**
+     * Stereotype indicator for message content completeness
+     * - 0: Socket message contains all necessary data (state, progress) - no API fetch needed
+     * - Other values or undefined: Additional data may be needed via API
+     */
+    stereo?: number;
 }
 
 /**

@@ -78,41 +78,20 @@ export const FlowEditorPage = () => {
     // Track node sequence numbers to detect stale updates (higher no = newer)
     const nodeNoRef = useRef<Map<string, number>>(new Map());
 
-    // Helper: check if new state has lower or equal priority than current node state
-    const isLowerOrEqualPriority = useCallback((nodeId: string, newState: string | undefined): boolean => {
-        if (!newState) return false;
-        const currentState = canvasRef.current?.getWorkflow().nodes.find(n => n.id === nodeId)?.state;
-        return getStatePriority(newState) <= getStatePriority(currentState);
-    }, []);
-
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
-            const { nodeId, isPort, parentNodeId, state, progress, no } = info;
+            const { nodeId, isPort, parentNodeId, state, progress, no, stereo } = info;
 
             // Check if this update is stale based on sequence number (no)
-            // Higher 'no' means more recent - skip if we've seen a higher number
-            // EXCEPTION: If same 'no' but higher priority state (ERROR > COMPLETED), allow update
-            const prevNo = nodeNoRef.current.get(nodeId);
+            // Higher 'no' means more recent - skip if we've seen equal or higher number
+            // Consistent with handlePortUpdate logic
             if (no !== undefined) {
-                if (prevNo !== undefined && prevNo > no) {
+                const prevNo = nodeNoRef.current.get(nodeId);
+                if (prevNo !== undefined && prevNo >= no) {
                     console.debug('[handleNodeUpdate] Skipping stale update:', nodeId, 'prevNo:', prevNo, 'no:', no);
                     return;
                 }
-                // Same 'no' - check if new state has higher priority (e.g., ERROR > COMPLETED)
-                // This handles race condition where server sends COMPLETED and ERROR with same sequence number
-                if (prevNo !== undefined && prevNo === no && state && isLowerOrEqualPriority(nodeId, state)) {
-                    console.debug('[handleNodeUpdate] Skipping same-no lower priority:', nodeId);
-                    return;
-                }
                 nodeNoRef.current.set(nodeId, no);
-            } else if (prevNo !== undefined && state) {
-                // No 'no' field but we have prevNo - check if state has higher priority
-                // This handles final status messages (e.g., progress=100) that may not include 'no'
-                if (isLowerOrEqualPriority(nodeId, state)) {
-                    console.debug('[handleNodeUpdate] Skipping without-no lower priority:', nodeId, state);
-                    return;
-                }
-                // Higher priority state without 'no' - continue processing
             }
 
             // When state field exists, update UI directly from socket data (no API fetch needed)
@@ -153,7 +132,18 @@ export const FlowEditorPage = () => {
 
                 // COMPLETED state: fetch full node data to get outputData
                 // Server has finished execution and saved results - we need the complete data
+                // EXCEPTION: stereo === 0 means socket already has all necessary data
                 if (state === 'COMPLETED') {
+                    // stereo === 0: Skip API fetch, socket data is sufficient
+                    if (stereo === 0) {
+                        canvasRef.current.updateNodeFromServer(nodeId, {
+                            state,
+                            status: state, // Deprecated: kept for backward compatibility
+                            executionStats,
+                        });
+                        return;
+                    }
+
                     try {
                         const nodeData = await getNode(nodeId);
                         canvasRef.current.updateNodeFromServer(nodeId, {
@@ -247,7 +237,28 @@ export const FlowEditorPage = () => {
                     // Examples:
                     //   - Socket: COMPLETED, API: RUNNING → Use COMPLETED (socket is fresher)
                     //   - Socket: RUNNING, API: COMPLETED → Use COMPLETED (API caught up)
+                    //
+                    // OPTIMIZATION: stereo === 0 means socket contains all necessary data
+                    //   - Skip API fetch to reduce network overhead
+                    //   - Use socket state directly for UI update
                     // ============================================================
+
+                    // stereo === 0: Skip API fetch, use socket data directly
+                    if (stereo === 0 && state && canvasRef.current) {
+                        const executionStats =
+                            state === 'RUNNING'
+                                ? { startTime: Date.now(), duration: 0, progress: progress ?? 0 }
+                                : progress !== undefined
+                                  ? { progress }
+                                  : undefined;
+
+                        canvasRef.current.updateNodeFromServer(nodeId, {
+                            state,
+                            status: state, // Deprecated: kept for backward compatibility
+                            executionStats,
+                        });
+                        return;
+                    }
 
                     const nodeData = await getNode(nodeId);
 
@@ -310,7 +321,7 @@ export const FlowEditorPage = () => {
                 console.debug('[handleNodeUpdate] Failed to update node:', nodeId, error);
             }
         },
-        [blockRegistry, isLowerOrEqualPriority]
+        [blockRegistry]
     );
 
     // Track port sequence numbers to detect stale updates (higher no = newer)
@@ -340,7 +351,7 @@ export const FlowEditorPage = () => {
             const effectiveDirection = direction ?? 'in';
 
             // Check if this update is stale based on sequence number (no)
-            // Higher 'no' means more recent - skip if we've seen a higher number
+            // Higher 'no' means more recent - skip if we've seen equal or higher number
             if (no !== undefined) {
                 const prevNo = portNoRef.current.get(portId);
                 if (prevNo !== undefined && prevNo >= no) {
@@ -375,7 +386,8 @@ export const FlowEditorPage = () => {
                     const portKey = portData.portId || portName || 'data';
 
                     // Update canvas with port data based on direction
-                    if (effectiveDirection === 'out') {
+                    // Use API response's direction (more reliable than parsing @ suffix)
+                    if (portData.direction === 'out') {
                         canvasRef.current.updateNodeFromServer(nodeId, {
                             outputData: { [portKey]: dataPacket },
                         });

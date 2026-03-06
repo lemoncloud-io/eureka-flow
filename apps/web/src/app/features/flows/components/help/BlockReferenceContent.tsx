@@ -5,6 +5,7 @@ import { ChevronRight, Cpu, Search } from 'lucide-react';
 
 import { useBlocks } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+import { MarkdownViewer } from '@flows/ui-kit';
 
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
 
@@ -59,7 +60,12 @@ const BlockDetail = ({ block }: BlockDetailProps) => {
                 </div>
             </div>
 
-            <p className="text-sm text-muted-foreground whitespace-pre-line">{block.description}</p>
+            <div className="text-sm text-muted-foreground">
+                <MarkdownViewer
+                    content={block.description || ''}
+                    className="[&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_p]:text-sm [&_code]:text-xs"
+                />
+            </div>
 
             {block.isFrontend && (
                 <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
@@ -116,17 +122,29 @@ const BlockDetail = ({ block }: BlockDetailProps) => {
                 <div>
                     <h4 className="text-sm font-medium mb-2">{t('flows:help.blocks.config')}</h4>
                     <div className="space-y-2">
-                        {block.configSchema.map(config => (
-                            <div key={config.key} className="p-2 rounded bg-muted/30">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">{config.label}</span>
-                                    <span className="text-xs text-muted-foreground">{config.type}</span>
+                        {block.configSchema.map(config =>
+                            config.type === 'separator' ? (
+                                <div key={config.key} className="flex items-center gap-2 py-1">
+                                    <div className="flex-1 h-px bg-border/50" />
+                                    {config.label && (
+                                        <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">
+                                            {config.label}
+                                        </span>
+                                    )}
+                                    <div className="flex-1 h-px bg-border/50" />
                                 </div>
-                                {config.description && (
-                                    <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
-                                )}
-                            </div>
-                        ))}
+                            ) : (
+                                <div key={config.key} className="p-2 rounded bg-muted/30">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium">{config.label}</span>
+                                        <span className="text-xs text-muted-foreground">{config.type}</span>
+                                    </div>
+                                    {config.description && (
+                                        <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
+                                    )}
+                                </div>
+                            )
+                        )}
                     </div>
                 </div>
             )}

@@ -9,6 +9,7 @@ import {
     PORT_LAYOUT,
     estimateNodeHeight,
     getEffectiveState,
+    getNodeWidth,
     loadFlow,
     runNode,
     shouldUpdateState,
@@ -23,11 +24,11 @@ import {
 import { cn } from '@flows/lib/utils';
 
 import { ConnectionLine } from './ConnectionLine';
+import { DataTooltip } from './DataTooltip';
 import { DetailPanel } from './DetailPanel';
 import { LogModal } from './LogModal';
 import { MobileControls } from './MobileControls';
 import { NodeBlock } from './NodeBlock';
-import { TooltipImage } from './TooltipImage';
 import { ZoomControls } from './ZoomControls';
 import { TOUCH_GESTURE_THRESHOLD, useTouchCanvas } from '../hooks';
 import {
@@ -40,12 +41,12 @@ import {
     wouldCreateCycle,
 } from '../utils';
 
-import type { NodeState, PortData } from '@flows/flows';
+import type { NodeState, PortDataResponse } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 /** Extended WorkflowState with optional ports array from LoadFlowResult */
 interface WorkflowStateWithPorts extends WorkflowState {
-    ports?: PortData[];
+    ports?: PortDataResponse[];
 }
 
 export interface WorkflowCanvasRef {
@@ -169,6 +170,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const [nodes, setNodes] = useState<NodeData[]>([]);
         const [connections, setConnections] = useState<Connection[]>([]);
         const [clipboard, setClipboard] = useState<NodeData[]>([]);
+        const [resizingNode, setResizingNode] = useState<{ nodeId: string; width: number } | null>(null);
 
         const pastRef = useRef<WorkflowState[]>([]);
         const futureRef = useRef<WorkflowState[]>([]);
@@ -575,43 +577,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const rawConnections = state.edges ?? state.connections ?? [];
                     const loadedConnections = deduplicateEdges(rawConnections);
 
-                    // Step 1: Propagate outputData to downstream nodes' inputData
-                    // This ensures that existing completed nodes' outputs are reflected in downstream inputs
-                    const nodesWithPropagatedData = loadedNodes.map(node => {
-                        // Find all connections where this node is the target
-                        const incomingConnections = loadedConnections.filter(c => c.targetNodeId === node.id);
-
-                        if (incomingConnections.length === 0) {
-                            return node;
-                        }
-
-                        // Build inputData from upstream nodes' outputData
-                        const propagatedInputData = { ...node.inputData };
-                        let hasNewData = false;
-
-                        incomingConnections.forEach(conn => {
-                            const sourceNode = loadedNodes.find(n => n.id === conn.sourceNodeId);
-                            if (sourceNode?.outputData) {
-                                const packet = sourceNode.outputData[conn.sourcePortId];
-                                if (packet) {
-                                    propagatedInputData[conn.targetPortId] = packet;
-                                    hasNewData = true;
-                                }
-                            }
-                        });
-
-                        if (hasNewData) {
-                            return { ...node, inputData: propagatedInputData };
-                        }
-                        return node;
-                    });
-
-                    // Step 2: Apply port data from ports[] array to nodes' inputData/outputData
-                    // This loads persisted port values that may not be reflected in node outputData
-                    // Port format: { id, nodeId, portId, direction, data: DataPacket }
+                    // Step 1: Apply port data from ports[] array to nodes' outputData
+                    // This populates actual DataPacket values from persisted port data
+                    // Must run BEFORE propagation so source nodes have real data to propagate
                     const ports = state.ports ?? [];
                     const nodesWithPortData = ports.length
-                        ? nodesWithPropagatedData.map(node => {
+                        ? loadedNodes.map(node => {
                               const nodePorts = ports.filter(
                                   p => p.nodeId === node.id && p.portId && p.data && p.direction
                               );
@@ -632,9 +603,40 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                               return { ...node, inputData, outputData };
                           })
-                        : nodesWithPropagatedData;
+                        : loadedNodes;
 
-                    setNodes(nodesWithPortData);
+                    // Step 2: Propagate outputData to downstream nodes' inputData via edges
+                    // This ensures output nodes (Preview, Debug Log) receive data from connected sources
+                    // Uses nodesWithPortData so source nodes have real DataPackets to propagate
+                    const nodesWithPropagatedData = nodesWithPortData.map(node => {
+                        const incomingConnections = loadedConnections.filter(c => c.targetNodeId === node.id);
+
+                        if (incomingConnections.length === 0) {
+                            return node;
+                        }
+
+                        const propagatedInputData = { ...node.inputData };
+                        let hasNewData = false;
+
+                        incomingConnections.forEach(conn => {
+                            const sourceNode = nodesWithPortData.find(n => n.id === conn.sourceNodeId);
+                            if (sourceNode?.outputData) {
+                                const packet = sourceNode.outputData[conn.sourcePortId];
+                                // Only propagate if it's a DataPacket (has value property), not just a type string
+                                if (packet && typeof packet === 'object' && 'value' in packet) {
+                                    propagatedInputData[conn.targetPortId] = packet;
+                                    hasNewData = true;
+                                }
+                            }
+                        });
+
+                        if (hasNewData) {
+                            return { ...node, inputData: propagatedInputData };
+                        }
+                        return node;
+                    });
+
+                    setNodes(nodesWithPropagatedData);
                     setConnections(loadedConnections);
                     pastRef.current = [];
                     futureRef.current = [];
@@ -1208,6 +1210,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             syncNodeUpdate(nodeId, { autoExecutionEnabled: newValue });
         };
 
+        const handleNodeResize = (nodeId: string, width: number, height: number) => {
+            if (readOnly) return;
+            saveCheckpoint();
+            const updates: Partial<{ width: number; height: number }> = {};
+            if (width > 0) updates.width = width;
+            if (height > 0) updates.height = height;
+            setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, ...updates } : n)));
+            syncNodeUpdate(nodeId, updates);
+        };
+
         const deleteNode = useCallback(
             (id: string) => {
                 if (readOnly) return;
@@ -1222,7 +1234,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 setConnections(prev => prev.filter(c => c.sourceNodeId !== id && c.targetNodeId !== id));
                 handleSelectionChange(null);
 
-                if (flowId && !flowId.startsWith('local-') && !isTempId(id)) {
+                if (flowId && !isTempId(id)) {
                     const serverEdges = connectedEdges.filter(e => e.id && !isTempId(e.id));
                     const nodesToDelete = [{ id: `#${id}` }] as unknown as NodeData[];
                     const edgesToDelete = serverEdges.map(e => ({ id: `#${e.id}` })) as unknown as Connection[];
@@ -1243,7 +1255,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 setConnections(prev => prev.filter(c => c.id !== id));
                 setSelectedConnectionId(null);
 
-                if (flowId && !flowId.startsWith('local-') && !isTempId(id)) {
+                if (flowId && !isTempId(id)) {
                     const edgesToDelete = [{ id: `#${id}` }] as unknown as Connection[];
 
                     upsertFlow(flowId, { nodes: [], edges: edgesToDelete }).catch(err => {
@@ -1401,6 +1413,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string) => {
             if (readOnly) return;
             e.stopPropagation();
+
+            // Don't change selection during port connection drag
+            if (connectionDraft) return;
+
             setSelectedConnectionId(null);
 
             const isMultiSelectKey = e.shiftKey || e.metaKey || e.ctrlKey;
@@ -1455,6 +1471,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const handleNodeTouchStart = (e: React.TouchEvent, nodeId: string) => {
             if (readOnly) return;
             e.stopPropagation();
+
+            // Don't start drag during port connection
+            if (connectionDraft) return;
+
             setSelectedConnectionId(null);
 
             const target = e.target as HTMLElement;
@@ -1560,7 +1580,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     futureRef.current = [];
 
                     // Batch update moved nodes' positions via /flows/:id/upsert
-                    if (flowId && !flowId.startsWith('local-')) {
+                    if (flowId) {
                         const nodesToUpdate = movedNodes
                             .filter(n => n.id && !isTempId(n.id))
                             .map(n => ({
@@ -1642,7 +1662,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     futureRef.current = [];
 
                     // Batch update moved nodes' positions via /flows/:id/upsert
-                    if (flowId && !flowId.startsWith('local-')) {
+                    if (flowId) {
                         const nodesToUpdate = movedNodes
                             .filter(n => n.id && !isTempId(n.id))
                             .map(n => ({
@@ -1672,7 +1692,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             e: React.MouseEvent
         ) => {
             if (readOnly) return;
-            handleSelectionChange(nodeId);
+            // Don't change node selection when interacting with ports
+            // Port interactions are for creating connections, not for selecting nodes
             setSelectedConnectionId(null);
             if (type === 'output') {
                 const worldPos = screenToWorld(e.clientX, e.clientY);
@@ -1825,7 +1846,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             const safeIndex = visibleIndex !== -1 ? visibleIndex : 0;
 
             const yOffset = PORT_LAYOUT.FIRST_PORT_Y + safeIndex * PORT_LAYOUT.PORT_SPACING;
-            const xOffset = type === 'input' ? PORT_LAYOUT.INPUT_X : PORT_LAYOUT.OUTPUT_X;
+            // Use dynamic node width for output port position
+            // If node is being resized, use the resizing width for real-time edge updates
+            const nodeWidth = resizingNode?.nodeId === nodeId ? resizingNode.width : getNodeWidth(node);
+            const xOffset = type === 'input' ? PORT_LAYOUT.INPUT_X : nodeWidth + 3;
             return { x: node.position.x + xOffset, y: node.position.y + yOffset };
         };
 
@@ -1919,7 +1943,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         );
                         handleSelectionChange(null);
 
-                        if (flowId && !flowId.startsWith('local-')) {
+                        if (flowId) {
                             const serverNodeIds = Array.from(selectedNodeIds).filter(id => !isTempId(id));
                             const serverEdges = connectedEdges.filter(e => e.id && !isTempId(e.id));
 
@@ -1944,7 +1968,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         setHoveredConnectionId(null);
                         setTooltip(null);
 
-                        if (flowId && !flowId.startsWith('local-') && targetId && !isTempId(targetId)) {
+                        if (flowId && targetId && !isTempId(targetId)) {
                             const edgesToDelete = [{ id: `#${targetId}` }] as unknown as Connection[];
 
                             upsertFlow(flowId, { nodes: [], edges: edgesToDelete }).catch(err => {
@@ -2160,6 +2184,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 onToggleDisabled: () => toggleNodeDisabled(node.id),
                                                 onDuplicate: () => duplicateNode(node.id),
                                                 onViewLogs: () => setLogViewerNodeId(node.id),
+                                                onResize: (w, h) => handleNodeResize(node.id, w, h),
+                                                onResizing: w =>
+                                                    setResizingNode(w !== null ? { nodeId: node.id, width: w } : null),
                                             }}
                                             onMouseDown={e => handleNodeMouseDown(e, node.id)}
                                             onTouchStart={e => handleNodeTouchStart(e, node.id)}
@@ -2171,29 +2198,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         </div>
                     </div>
 
-                    {tooltip && (
-                        <div
-                            className="absolute z-50 bg-popover border border-border rounded p-2 shadow-xl pointer-events-none transform -translate-y-full -translate-x-1/2 mt-[-10px]"
-                            style={{ left: tooltip.x, top: tooltip.y }}
-                        >
-                            <div className="text-[10px] text-muted-foreground uppercase font-bold mb-1">
-                                {tooltip.type}
-                            </div>
-                            {tooltip.type === 'image' ? (
-                                <TooltipImage
-                                    src={tooltip.content as string}
-                                    altText={t('flows:nodeBlock.previewAlt')}
-                                />
-                            ) : (
-                                <div className="text-xs text-foreground min-w-[100px] max-w-[400px] break-all">
-                                    {typeof tooltip.content === 'object'
-                                        ? JSON.stringify(tooltip.content).slice(0, 100) +
-                                          (JSON.stringify(tooltip.content).length > 100 ? '...' : '')
-                                        : String(tooltip.content).slice(0, 150)}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    {tooltip && <DataTooltip tooltip={tooltip} />}
 
                     {/* Desktop Zoom Controls - hidden on mobile */}
                     {!readOnly && (

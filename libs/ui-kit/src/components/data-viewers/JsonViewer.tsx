@@ -16,11 +16,17 @@ export interface JsonViewerProps {
 export const JsonViewer = ({ data, maxHeight = 180, collapsed = 2, className }: JsonViewerProps) => {
     const { isDarkTheme } = useTheme();
 
+    // Override theme background to transparent
+    const theme = {
+        ...(isDarkTheme ? githubDarkTheme : githubLightTheme),
+        '--w-rjv-background-color': 'transparent',
+    };
+
     return (
         <div className={cn('overflow-auto', className)} style={{ maxHeight }}>
             <JsonView
                 value={(data ?? {}) as object}
-                style={isDarkTheme ? githubDarkTheme : githubLightTheme}
+                style={theme}
                 collapsed={collapsed}
                 displayDataTypes={false}
                 displayObjectSize={false}
