@@ -662,19 +662,30 @@ const InputTextVisualizationEditable: React.FC<EditableVisualizationProps> = ({ 
 const DebugLogVisualization: React.FC<VisualizationProps> = ({ node, definition }) => {
     const { t } = useTranslation(['nodes']);
     const lastInput = getFirstInputData(node, definition)?.value;
+
+    // Check if content is JSON (object or parseable string)
+    const jsonData =
+        typeof lastInput === 'object' && lastInput !== null
+            ? lastInput
+            : typeof lastInput === 'string'
+              ? tryParseJson(lastInput)
+              : null;
+
     return (
         <div
-            className="p-2.5 bg-black/30 rounded-lg border border-border text-foreground/80 font-mono text-[10px] break-all max-h-28 overflow-y-auto"
+            className="p-2 bg-muted/10 rounded-lg border border-border/30 max-h-28 overflow-y-auto"
             onWheel={e => e.stopPropagation()}
         >
             {lastInput !== undefined ? (
-                typeof lastInput === 'object' ? (
-                    <pre className="whitespace-pre-wrap">{JSON.stringify(lastInput, null, 2)}</pre>
+                jsonData ? (
+                    <JsonViewer data={jsonData} maxHeight={100} collapsed={2} />
                 ) : (
-                    String(lastInput)
+                    <div className="text-xs text-foreground/80 break-words whitespace-pre-wrap">
+                        {String(lastInput)}
+                    </div>
                 )
             ) : (
-                <span className="text-muted-foreground/50 italic">{t('visualization.waitingForData')}</span>
+                <span className="text-muted-foreground/50 italic text-[10px]">{t('visualization.waitingForData')}</span>
             )}
         </div>
     );
