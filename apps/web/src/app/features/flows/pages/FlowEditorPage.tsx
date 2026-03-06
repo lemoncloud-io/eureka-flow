@@ -78,41 +78,20 @@ export const FlowEditorPage = () => {
     // Track node sequence numbers to detect stale updates (higher no = newer)
     const nodeNoRef = useRef<Map<string, number>>(new Map());
 
-    // Helper: check if new state has lower or equal priority than current node state
-    const isLowerOrEqualPriority = useCallback((nodeId: string, newState: string | undefined): boolean => {
-        if (!newState) return false;
-        const currentState = canvasRef.current?.getWorkflow().nodes.find(n => n.id === nodeId)?.state;
-        return getStatePriority(newState) <= getStatePriority(currentState);
-    }, []);
-
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
             const { nodeId, isPort, parentNodeId, state, progress, no } = info;
 
             // Check if this update is stale based on sequence number (no)
-            // Higher 'no' means more recent - skip if we've seen a higher number
-            // EXCEPTION: If same 'no' but higher priority state (ERROR > COMPLETED), allow update
-            const prevNo = nodeNoRef.current.get(nodeId);
+            // Higher 'no' means more recent - skip if we've seen equal or higher number
+            // Consistent with handlePortUpdate logic
             if (no !== undefined) {
-                if (prevNo !== undefined && prevNo > no) {
+                const prevNo = nodeNoRef.current.get(nodeId);
+                if (prevNo !== undefined && prevNo >= no) {
                     console.debug('[handleNodeUpdate] Skipping stale update:', nodeId, 'prevNo:', prevNo, 'no:', no);
                     return;
                 }
-                // Same 'no' - check if new state has higher priority (e.g., ERROR > COMPLETED)
-                // This handles race condition where server sends COMPLETED and ERROR with same sequence number
-                if (prevNo !== undefined && prevNo === no && state && isLowerOrEqualPriority(nodeId, state)) {
-                    console.debug('[handleNodeUpdate] Skipping same-no lower priority:', nodeId);
-                    return;
-                }
                 nodeNoRef.current.set(nodeId, no);
-            } else if (prevNo !== undefined && state) {
-                // No 'no' field but we have prevNo - check if state has higher priority
-                // This handles final status messages (e.g., progress=100) that may not include 'no'
-                if (isLowerOrEqualPriority(nodeId, state)) {
-                    console.debug('[handleNodeUpdate] Skipping without-no lower priority:', nodeId, state);
-                    return;
-                }
-                // Higher priority state without 'no' - continue processing
             }
 
             // When state field exists, update UI directly from socket data (no API fetch needed)
@@ -310,7 +289,7 @@ export const FlowEditorPage = () => {
                 console.debug('[handleNodeUpdate] Failed to update node:', nodeId, error);
             }
         },
-        [blockRegistry, isLowerOrEqualPriority]
+        [blockRegistry]
     );
 
     // Track port sequence numbers to detect stale updates (higher no = newer)
@@ -340,7 +319,7 @@ export const FlowEditorPage = () => {
             const effectiveDirection = direction ?? 'in';
 
             // Check if this update is stale based on sequence number (no)
-            // Higher 'no' means more recent - skip if we've seen a higher number
+            // Higher 'no' means more recent - skip if we've seen equal or higher number
             if (no !== undefined) {
                 const prevNo = portNoRef.current.get(portId);
                 if (prevNo !== undefined && prevNo >= no) {
