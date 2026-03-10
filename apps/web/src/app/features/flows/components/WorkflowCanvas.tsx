@@ -240,6 +240,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             mouseY: number;
         } | null>(null);
 
+        // Ref to track latest connectionDraft for touch events (avoids stale closure)
+        const connectionDraftRef = useRef(connectionDraft);
+        connectionDraftRef.current = connectionDraft;
+
         const isMounted = useRef(false);
         useEffect(() => {
             if (isMounted.current) {
@@ -1443,6 +1447,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             // Don't change selection during port connection drag
             if (connectionDraft) return;
 
+            // Skip selection and drag for interactive elements (buttons, inputs, etc.)
+            // This must be checked BEFORE selection logic to prevent node selection
+            // when clicking delete button or other controls
+            // Use closest() to also catch clicks on icons inside buttons (SVG, path, etc.)
+            const target = e.target as HTMLElement;
+            if (
+                ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'LABEL'].includes(target.tagName) ||
+                target.isContentEditable ||
+                target.closest('button')
+            ) {
+                return;
+            }
+
             setSelectedConnectionId(null);
 
             const isMultiSelectKey = e.shiftKey || e.metaKey || e.ctrlKey;
@@ -1457,14 +1474,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 handleSelectionChange(nodeId);
             }
             // If already selected without modifier, keep current selection for group drag
-
-            const target = e.target as HTMLElement;
-            if (
-                ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'LABEL'].includes(target.tagName) ||
-                target.isContentEditable
-            ) {
-                return;
-            }
 
             dragStartSnapshotRef.current = {
                 nodes: JSON.parse(JSON.stringify(nodes)),
@@ -1503,10 +1512,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             setSelectedConnectionId(null);
 
+            // Skip drag for interactive elements (buttons, inputs, etc.)
+            // Use closest() to also catch touches on icons inside buttons (SVG, path, etc.)
             const target = e.target as HTMLElement;
             if (
                 ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'LABEL'].includes(target.tagName) ||
-                target.isContentEditable
+                target.isContentEditable ||
+                target.closest('button')
             ) {
                 return;
             }
@@ -1723,6 +1735,30 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             setSelectedConnectionId(null);
             if (type === 'output') {
                 const worldPos = screenToWorld(e.clientX, e.clientY);
+                setConnectionDraft({
+                    sourceNodeId: nodeId,
+                    sourcePortId: portId,
+                    sourceType: portType,
+                    mouseX: worldPos.x,
+                    mouseY: worldPos.y,
+                });
+            }
+        };
+
+        // Touch version of port drag start for mobile
+        const handlePortTouchStart = (
+            nodeId: string,
+            portId: string,
+            type: 'input' | 'output',
+            portType: string,
+            e: React.TouchEvent
+        ) => {
+            if (readOnly) return;
+            e.stopPropagation();
+            setSelectedConnectionId(null);
+            if (type === 'output') {
+                const touch = e.touches[0];
+                const worldPos = screenToWorld(touch.clientX, touch.clientY);
                 setConnectionDraft({
                     sourceNodeId: nodeId,
                     sourcePortId: portId,
@@ -2052,8 +2088,73 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         } else {
                             handleCanvasTouchMove(e);
                         }
+                        // Update connection draft position during touch drag
+                        if (connectionDraft && !readOnly && e.touches.length > 0) {
+                            const touch = e.touches[0];
+                            const worldPos = screenToWorld(touch.clientX, touch.clientY);
+                            setConnectionDraft(prev =>
+                                prev ? { ...prev, mouseX: worldPos.x, mouseY: worldPos.y } : null
+                            );
+                        }
                     }}
                     onTouchEnd={e => {
+                        // Use ref to get latest connectionDraft (avoids stale closure issue)
+                        const currentDraft = connectionDraftRef.current;
+
+                        // Handle connection drop on touch end
+                        if (currentDraft && e.changedTouches.length > 0) {
+                            const touch = e.changedTouches[0];
+                            const worldPos = screenToWorld(touch.clientX, touch.clientY);
+
+                            // Find the closest input port within threshold distance
+                            const PORT_HIT_THRESHOLD = 50; // pixels in world coordinates
+                            let closestPort: {
+                                nodeId: string;
+                                portId: string;
+                                portType: string;
+                                distance: number;
+                            } | null = null;
+
+                            for (const node of nodes) {
+                                // Skip source node
+                                if (node.id === currentDraft.sourceNodeId) continue;
+
+                                const def = blockRegistry[node.type];
+                                if (!def) continue;
+
+                                // Calculate input port positions (left side of node)
+                                // Ports start at y=45 from node top, spaced 16px apart (12px port + 4px gap)
+                                const portX = node.position.x - 6;
+                                def.inputs.forEach((input, index) => {
+                                    const portY = node.position.y + 45 + index * 16 + 6; // +6 for center
+                                    const distance = Math.hypot(worldPos.x - portX, worldPos.y - portY);
+
+                                    if (distance < PORT_HIT_THRESHOLD) {
+                                        if (!closestPort || distance < closestPort.distance) {
+                                            closestPort = {
+                                                nodeId: node.id,
+                                                portId: input.id,
+                                                portType: input.type,
+                                                distance,
+                                            };
+                                        }
+                                    }
+                                });
+                            }
+
+                            if (closestPort) {
+                                handlePortMouseUp(
+                                    closestPort.nodeId,
+                                    closestPort.portId,
+                                    'input',
+                                    closestPort.portType
+                                );
+                            }
+
+                            setConnectionDraft(null);
+                            return;
+                        }
+
                         if (dragState) {
                             handleNodeTouchEnd();
                         } else {
@@ -2198,6 +2299,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             portHandlers={{
                                                 onPortMouseDown: handlePortMouseDown,
                                                 onPortMouseUp: handlePortMouseUp,
+                                                onPortTouchStart: handlePortTouchStart,
                                             }}
                                             configHandlers={{
                                                 onConfigChange: (k, v) => handleConfigChange(node.id, k, v),

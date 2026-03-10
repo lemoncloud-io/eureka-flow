@@ -73,8 +73,8 @@ export const FlowEditorPage = () => {
         async (info: NodeUpdateInfo) => {
             const { nodeId, flowId, isPort, parentNodeId, state, progress, no } = info;
 
-            // Skip if not for current flow (socket channel is shared)
-            if (flowId && flowId !== currentFlowId) return;
+            // Skip if flowId is missing or doesn't match current flow (socket channel is shared)
+            if (!flowId || flowId !== currentFlowId) return;
 
             // Check if this update is stale based on sequence number (no)
             // Higher 'no' means more recent - skip if we've seen equal or higher number
@@ -134,20 +134,27 @@ export const FlowEditorPage = () => {
                 executionStats,
             });
 
-            // Auto-execute isFrontend nodes when they become READY
-            // Get node type from canvas store (no API fetch needed)
-            if (state === 'READY') {
-                const workflow = canvasRef.current.getWorkflow();
-                const nodeInCanvas = workflow?.nodes?.find(n => n.id === nodeId);
-                if (nodeInCanvas?.type) {
-                    const nodeDef = blockRegistry[nodeInCanvas.type];
-                    if (nodeDef?.isFrontend === true && EXECUTE_FUNCTIONS[nodeDef.type]) {
-                        setTimeout(() => {
-                            canvasRef.current?.executeNode?.(nodeId);
-                        }, 0);
-                    }
-                }
-            }
+            // Auto-execute isFrontend nodes when READY (if all inputs have data)
+            if (state !== 'READY') return;
+
+            const workflow = canvasRef.current.getWorkflow();
+            const node = workflow?.nodes?.find(n => n.id === nodeId);
+            if (!node?.type) return;
+
+            const nodeDef = blockRegistry[node.type];
+            if (!nodeDef?.isFrontend || !EXECUTE_FUNCTIONS[nodeDef.type]) return;
+
+            // Skip input blocks (require user interaction, no upstream data propagation)
+            if (nodeDef.stereo === 'input') return;
+
+            // Skip if required inputs don't have data (upstream not executed yet)
+            const hasAllInputs = (nodeDef.inputs ?? []).every(input => node.inputData?.[input.id]?.value !== undefined);
+            if (!hasAllInputs) return;
+
+            // Defer execution to next tick to prevent blocking socket handler
+            setTimeout(() => {
+                canvasRef.current?.executeNode(nodeId);
+            }, 0);
         },
         [blockRegistry, currentFlowId]
     );
@@ -173,8 +180,8 @@ export const FlowEditorPage = () => {
         async (info: PortUpdateInfo) => {
             const { portId, nodeId, flowId, portName, no } = info;
 
-            // Skip if not for current flow (socket channel is shared)
-            if (flowId && flowId !== currentFlowId) return;
+            // Skip if flowId is missing or doesn't match current flow (socket channel is shared)
+            if (!flowId || flowId !== currentFlowId) return;
 
             // Check if this update is stale based on sequence number (no)
             // Higher 'no' means more recent - skip if we've seen equal or higher number

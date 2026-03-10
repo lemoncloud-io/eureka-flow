@@ -86,6 +86,7 @@ const cropAndResizeImage = (
             let cropY = 0;
 
             // Apply aspect ratio crop (center crop)
+            // If currentAspect === aspect, no cropping needed (exact match)
             if (aspect) {
                 const currentAspect = img.naturalWidth / img.naturalHeight;
 
@@ -93,11 +94,12 @@ const cropAndResizeImage = (
                     // Image is wider than target - crop sides
                     cropWidth = Math.round(img.naturalHeight * aspect);
                     cropX = Math.round((img.naturalWidth - cropWidth) / 2);
-                } else {
+                } else if (currentAspect < aspect) {
                     // Image is taller than target - crop top/bottom
                     cropHeight = Math.round(img.naturalWidth / aspect);
                     cropY = Math.round((img.naturalHeight - cropHeight) / 2);
                 }
+                // else: exact match, no crop needed
             }
 
             // Calculate output dimensions
@@ -123,7 +125,13 @@ const cropAndResizeImage = (
 
             ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, outputWidth, outputHeight);
 
-            resolve(canvas.toDataURL('image/jpeg', OUTPUT_QUALITY));
+            const result = canvas.toDataURL('image/jpeg', OUTPUT_QUALITY);
+
+            // Cleanup to free memory
+            canvas.width = 0;
+            canvas.height = 0;
+
+            resolve(result);
         };
 
         img.onerror = () => reject(new Error('Failed to load image'));
@@ -155,7 +163,8 @@ export const processImageWithConfig = async (dataUrl: string, config: ImageProce
 
     // Parse config values
     const aspect = parseAspectRatio(config.aspectRatio);
-    const maxWidth = config.maxWidth ? parseInt(config.maxWidth, 10) : undefined;
+    const parsedWidth = config.maxWidth ? parseInt(config.maxWidth, 10) : undefined;
+    const maxWidth = parsedWidth && !isNaN(parsedWidth) ? parsedWidth : undefined;
 
     // Skip processing if no valid settings
     if (!aspect && !maxWidth) {
