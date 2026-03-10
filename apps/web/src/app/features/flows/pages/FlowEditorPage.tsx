@@ -161,8 +161,10 @@ export const FlowEditorPage = () => {
 
     /**
      * Handle port update notification from WebSocket (type: 'node/port')
-     * - Output ports: fetch data and update outputData
-     * - Input ports: fetch data and update inputData (for terminal nodes like preview)
+     * - Output ports: always fetch data and update outputData
+     * - Input ports: only fetch for terminal nodes (output$ is empty)
+     *   - Terminal nodes (미리보기, 디버그 로그): need inputData to display
+     *   - Non-terminal nodes: skip fetch (data same as upstream output)
      */
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
@@ -193,8 +195,23 @@ export const FlowEditorPage = () => {
 
             if (!canvasRef.current) return;
 
-            // Determine port direction from portName
             const isOutputPort = portName === 'out';
+
+            // For input ports, check if this is a terminal node (no outputs)
+            // Terminal nodes need inputData to display, others can skip (data same as upstream)
+            if (!isOutputPort) {
+                const workflow = canvasRef.current.getWorkflow();
+                const nodeInCanvas = workflow?.nodes?.find(n => n.id === nodeId);
+                if (nodeInCanvas?.type) {
+                    const nodeDef = blockRegistry[nodeInCanvas.type];
+                    const isTerminalNode = !nodeDef?.output$ || nodeDef.output$.length === 0;
+                    if (!isTerminalNode) {
+                        // Non-terminal node: skip fetch (data same as upstream output)
+                        return;
+                    }
+                }
+            }
+
             const direction = isOutputPort ? 'out' : 'in';
 
             try {
@@ -230,7 +247,7 @@ export const FlowEditorPage = () => {
                 console.debug('[handlePortUpdate] Failed to fetch port data:', portId, error);
             }
         },
-        [setUpdatedPort, clearUpdatedPort]
+        [setUpdatedPort, clearUpdatedPort, blockRegistry]
     );
 
     // Cleanup highlight timeouts on unmount
