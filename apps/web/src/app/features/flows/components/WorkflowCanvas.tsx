@@ -88,6 +88,65 @@ const GRID_SIZE = 20;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
 
+/** Touch port hit detection threshold in world coordinates */
+const TOUCH_PORT_HIT_THRESHOLD = 50;
+
+/** Port position constants for touch hit detection */
+const TOUCH_PORT_LAYOUT = {
+    /** Input port X offset from node left edge */
+    INPUT_X_OFFSET: -6,
+    /** First port Y offset from node top */
+    FIRST_PORT_Y: 45,
+    /** Vertical spacing between ports */
+    PORT_SPACING: 16,
+    /** Port center offset */
+    PORT_CENTER_OFFSET: 6,
+} as const;
+
+/**
+ * Find the closest input port to a given world position (for touch connection drop)
+ */
+const findClosestInputPort = (
+    worldPos: { x: number; y: number },
+    nodes: NodeData[],
+    blockRegistry: Record<string, { inputs: Array<{ id: string; type: string }> }>,
+    sourceNodeId: string
+): { nodeId: string; portId: string; portType: string; distance: number } | null => {
+    let closestPort: { nodeId: string; portId: string; portType: string; distance: number } | null = null;
+
+    for (const node of nodes) {
+        // Skip source node
+        if (node.id === sourceNodeId) continue;
+
+        const def = blockRegistry[node.type];
+        if (!def) continue;
+
+        // Calculate input port positions (left side of node)
+        const portX = node.position.x + TOUCH_PORT_LAYOUT.INPUT_X_OFFSET;
+        def.inputs.forEach((input, index) => {
+            const portY =
+                node.position.y +
+                TOUCH_PORT_LAYOUT.FIRST_PORT_Y +
+                index * TOUCH_PORT_LAYOUT.PORT_SPACING +
+                TOUCH_PORT_LAYOUT.PORT_CENTER_OFFSET;
+            const distance = Math.hypot(worldPos.x - portX, worldPos.y - portY);
+
+            if (distance < TOUCH_PORT_HIT_THRESHOLD) {
+                if (!closestPort || distance < closestPort.distance) {
+                    closestPort = {
+                        nodeId: node.id,
+                        portId: input.id,
+                        portType: input.type,
+                        distance,
+                    };
+                }
+            }
+        });
+    }
+
+    return closestPort;
+};
+
 interface EmptyStateProps {
     onOpenLibrary: () => void;
 }
@@ -2106,41 +2165,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             const touch = e.changedTouches[0];
                             const worldPos = screenToWorld(touch.clientX, touch.clientY);
 
-                            // Find the closest input port within threshold distance
-                            const PORT_HIT_THRESHOLD = 50; // pixels in world coordinates
-                            let closestPort: {
-                                nodeId: string;
-                                portId: string;
-                                portType: string;
-                                distance: number;
-                            } | null = null;
-
-                            for (const node of nodes) {
-                                // Skip source node
-                                if (node.id === currentDraft.sourceNodeId) continue;
-
-                                const def = blockRegistry[node.type];
-                                if (!def) continue;
-
-                                // Calculate input port positions (left side of node)
-                                // Ports start at y=45 from node top, spaced 16px apart (12px port + 4px gap)
-                                const portX = node.position.x - 6;
-                                def.inputs.forEach((input, index) => {
-                                    const portY = node.position.y + 45 + index * 16 + 6; // +6 for center
-                                    const distance = Math.hypot(worldPos.x - portX, worldPos.y - portY);
-
-                                    if (distance < PORT_HIT_THRESHOLD) {
-                                        if (!closestPort || distance < closestPort.distance) {
-                                            closestPort = {
-                                                nodeId: node.id,
-                                                portId: input.id,
-                                                portType: input.type,
-                                                distance,
-                                            };
-                                        }
-                                    }
-                                });
-                            }
+                            const closestPort = findClosestInputPort(
+                                worldPos,
+                                nodes,
+                                blockRegistry,
+                                currentDraft.sourceNodeId
+                            );
 
                             if (closestPort) {
                                 handlePortMouseUp(

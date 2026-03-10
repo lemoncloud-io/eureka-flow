@@ -312,19 +312,9 @@ const PortItem: React.FC<PortItemProps> = ({
             {/* Extended hit area - transparent 24x24px */}
             <div
                 className={cn('absolute -inset-1.5', isIncompatibleTarget ? 'cursor-not-allowed' : 'cursor-crosshair')}
-                data-port-node-id={nodeId}
-                data-port-id={port.id}
-                data-port-type={type}
-                data-port-data-type={port.type}
             />
             {/* Visual port circle */}
-            <div
-                className={portClasses}
-                data-port-node-id={nodeId}
-                data-port-id={port.id}
-                data-port-type={type}
-                data-port-data-type={port.type}
-            />
+            <div className={portClasses} />
         </div>
     );
 
