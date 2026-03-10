@@ -17,6 +17,14 @@ const clearFlowStorage = (): void => {
     }
 };
 
+/** Handle auth error: clear credentials and show toast */
+const handleAuthError = (): void => {
+    useWebCoreStore.getState().clearApiKey();
+    clearFlowStorage();
+    // Delay toast to show after dialog appears
+    setTimeout(() => toast.error(i18n.t('errors.authExpired', { ns: 'common' })), 100);
+};
+
 /**
  * Centralized Axios instance for all API calls
  */
@@ -51,6 +59,11 @@ const hasPermissionError = (data: unknown): boolean => {
 
 /**
  * Response interceptor: Handle errors globally
+ *
+ * Auth Error Scenarios:
+ * 1. HTTP 403 → Clear API key (invalid/expired key)
+ * 2. ERR_NETWORK/ERR_FAILED with API key → Clear API key (CORS-blocked 403)
+ * 3. shouldLogout from classifyError → Clear API key
  */
 apiClient.interceptors.response.use(
     (response: AxiosResponse) => {
@@ -62,26 +75,12 @@ apiClient.interceptors.response.use(
     },
     (error: AxiosError) => {
         const status = error.response?.status;
-        const classification = classifyError(error);
+        const hasApiKey = !!useWebCoreStore.getState().apiKey;
+        const isCorsBlocked403 = !status && hasApiKey && (error.code === 'ERR_NETWORK' || error.code === 'ERR_FAILED');
 
-        // HTTP 403 status → always reset API key
-        if (status === 403) {
-            useWebCoreStore.getState().clearApiKey();
-            clearFlowStorage();
-            // Delay toast to show after dialog appears
-            setTimeout(() => toast.error(i18n.t('errors.authExpired', { ns: 'common' })), 100);
-            return Promise.reject(error);
-        }
-
-        // Note: ERR_NETWORK/ERR_FAILED are NOT treated as 403
-        // - CORS-blocked 403 cannot be reliably detected (browser security)
-        // - Treating network errors as 403 causes false logouts on server downtime
-
-        // Handle other errors that require logout
-        if (classification.shouldLogout) {
-            useWebCoreStore.getState().clearApiKey();
-            clearFlowStorage();
-            setTimeout(() => toast.error(i18n.t('errors.authExpired', { ns: 'common' })), 100);
+        // Handle auth errors: HTTP 403, CORS-blocked 403, or shouldLogout
+        if (status === 403 || isCorsBlocked403 || classifyError(error).shouldLogout) {
+            handleAuthError();
         }
 
         return Promise.reject(error);
