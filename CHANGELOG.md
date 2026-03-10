@@ -1,5 +1,27 @@
 # Changelog
 
+## [2026-03-10] - root@0.4.0, @flows/web@0.4.0
+
+### Features
+
+- add beta label to header
+- add touch support for port connections and node interactions
+- add image processing with config
+- add support for loading workflow with missing port data
+
+### Bug Fixes
+
+- (ui-kit) prevent wheel event propagation
+
+### Refactor
+
+- simplify port data application and propagation
+- extract port hit detection logic
+- (api) simplify error handling logic
+- add flowId check to handleNodeUpdate and handlePortUpdate
+- optimize port update handling
+- simplify node and port update handling
+
 ## [2026-03-06] - root@0.3.0, @flows/web@0.3.0
 
 ### Features
