@@ -642,95 +642,117 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const rawConnections = state.edges ?? state.connections ?? [];
                     const loadedConnections = deduplicateEdges(rawConnections);
 
-                    // Step 0: Fetch missing port data (data: null) via API
-                    // Server returns ports array but some may have data: null
-                    // These need to be fetched individually via GET /nodes/:portId/port
                     const ports = state.ports ?? [];
-                    const nullDataPorts = ports.filter(p => p.data === null && p.portId);
 
-                    if (nullDataPorts.length > 0) {
-                        await Promise.all(
-                            nullDataPorts.map(async p => {
-                                try {
-                                    const direction = p.portId === 'out' ? 'out' : 'in';
-                                    const portData = await getPortData(p.id, direction);
-                                    if (portData.data) {
-                                        // Mutate in place - safe since ports is local to this method
-                                        (p as { data: DataPacket | null }).data = portData.data;
-                                    }
-                                } catch {
-                                    // Silent fail - port stays null, logged for debugging
-                                    console.warn('[WorkflowCanvas] Failed to fetch port:', p.id);
-                                }
-                            })
-                        );
-                    }
+                    // Helper: Apply port data to nodes
+                    const applyPortDataToNodes = (
+                        baseNodes: typeof loadedNodes,
+                        portsToApply: typeof ports
+                    ): typeof loadedNodes => {
+                        if (portsToApply.length === 0) return baseNodes;
 
-                    // Step 1: Apply port data from ports[] array to nodes' outputData
-                    // This populates actual DataPacket values from persisted port data
-                    // Must run BEFORE propagation so source nodes have real data to propagate
-                    const nodesWithPortData = ports.length
-                        ? loadedNodes.map(node => {
-                              // Filter ports for this node that have valid data
-                              // Note: LoadFlowPortData doesn't have direction field, infer from portId
-                              const nodePorts = ports.filter(p => p.nodeId === node.id && p.portId && p.data);
-                              if (nodePorts.length === 0) return node;
+                        return baseNodes.map(node => {
+                            const nodePorts = portsToApply.filter(p => p.nodeId === node.id && p.portId && p.data);
+                            if (nodePorts.length === 0) return node;
 
-                              let inputData = { ...node.inputData };
-                              let outputData = { ...node.outputData };
+                            let inputData = { ...node.inputData };
+                            let outputData = { ...node.outputData };
 
-                              for (const port of nodePorts) {
-                                  const { portId, data } = port;
-                                  if (!portId || !data) continue;
-                                  // Infer direction from portId: "out" = output, otherwise input
-                                  if (portId === 'out') {
-                                      outputData = { ...outputData, [portId]: data };
-                                  } else {
-                                      inputData = { ...inputData, [portId]: data };
-                                  }
-                              }
-
-                              return { ...node, inputData, outputData };
-                          })
-                        : loadedNodes;
-
-                    // Step 2: Propagate outputData to downstream nodes' inputData via edges
-                    // This ensures output nodes (Preview, Debug Log) receive data from connected sources
-                    // Uses nodesWithPortData so source nodes have real DataPackets to propagate
-                    const nodesWithPropagatedData = nodesWithPortData.map(node => {
-                        const incomingConnections = loadedConnections.filter(c => c.targetNodeId === node.id);
-
-                        if (incomingConnections.length === 0) {
-                            return node;
-                        }
-
-                        const propagatedInputData = { ...node.inputData };
-                        let hasNewData = false;
-
-                        incomingConnections.forEach(conn => {
-                            const sourceNode = nodesWithPortData.find(n => n.id === conn.sourceNodeId);
-                            if (sourceNode?.outputData) {
-                                const packet = sourceNode.outputData[conn.sourcePortId];
-                                // Only propagate if it's a DataPacket (has value property), not just a type string
-                                if (packet && typeof packet === 'object' && 'value' in packet) {
-                                    propagatedInputData[conn.targetPortId] = packet;
-                                    hasNewData = true;
+                            for (const port of nodePorts) {
+                                const { portId, data } = port;
+                                if (!portId || !data) continue;
+                                if (portId === 'out') {
+                                    outputData = { ...outputData, [portId]: data };
+                                } else {
+                                    inputData = { ...inputData, [portId]: data };
                                 }
                             }
+
+                            return { ...node, inputData, outputData };
                         });
+                    };
 
-                        if (hasNewData) {
-                            return { ...node, inputData: propagatedInputData };
-                        }
-                        return node;
-                    });
+                    // Helper: Propagate outputData to downstream nodes' inputData via edges
+                    const propagateData = (
+                        baseNodes: typeof loadedNodes,
+                        conns: typeof loadedConnections
+                    ): typeof loadedNodes => {
+                        return baseNodes.map(node => {
+                            const incomingConnections = conns.filter(c => c.targetNodeId === node.id);
+                            if (incomingConnections.length === 0) return node;
 
+                            const propagatedInputData = { ...node.inputData };
+                            let hasNewData = false;
+
+                            incomingConnections.forEach(conn => {
+                                const sourceNode = baseNodes.find(n => n.id === conn.sourceNodeId);
+                                if (sourceNode?.outputData) {
+                                    const packet = sourceNode.outputData[conn.sourcePortId];
+                                    if (packet && typeof packet === 'object' && 'value' in packet) {
+                                        propagatedInputData[conn.targetPortId] = packet;
+                                        hasNewData = true;
+                                    }
+                                }
+                            });
+
+                            return hasNewData ? { ...node, inputData: propagatedInputData } : node;
+                        });
+                    };
+
+                    // Step 1: Apply existing port data (non-null) and display nodes immediately
+                    // This prevents empty state flash while fetching null port data
+                    const portsWithData = ports.filter(p => p.data !== null);
+                    const nodesWithExistingPortData = applyPortDataToNodes(loadedNodes, portsWithData);
+                    const nodesWithPropagatedData = propagateData(nodesWithExistingPortData, loadedConnections);
+
+                    // Display nodes immediately
                     setNodes(nodesWithPropagatedData);
                     setConnections(loadedConnections);
                     pastRef.current = [];
                     futureRef.current = [];
                     handleSelectionChange(null);
                     setSelectedConnectionId(null);
+
+                    // Step 2: Fetch missing port data (data: null) in background
+                    // Each port updates individually when fetched for progressive loading UX
+                    const nullDataPorts = ports.filter(p => p.data === null && p.portId);
+
+                    if (nullDataPorts.length > 0) {
+                        nullDataPorts.forEach(p => {
+                            const direction = p.portId === 'out' ? 'out' : 'in';
+                            getPortData(p.id, direction)
+                                .then(portData => {
+                                    if (portData.data) {
+                                        setNodes(prev => {
+                                            // Apply this single port's data
+                                            const updated = prev.map(node => {
+                                                if (node.id !== p.nodeId) return node;
+
+                                                const { portId } = p;
+                                                if (!portId) return node;
+
+                                                if (portId === 'out') {
+                                                    return {
+                                                        ...node,
+                                                        outputData: { ...node.outputData, [portId]: portData.data },
+                                                    };
+                                                } else {
+                                                    return {
+                                                        ...node,
+                                                        inputData: { ...node.inputData, [portId]: portData.data },
+                                                    };
+                                                }
+                                            });
+                                            // Re-propagate after new data
+                                            return propagateData(updated, loadedConnections);
+                                        });
+                                    }
+                                })
+                                .catch(() => {
+                                    console.warn('[WorkflowCanvas] Failed to fetch port:', p.id);
+                                });
+                        });
+                    }
                 },
                 clearWorkflow: () => {
                     if (readOnly) return;
