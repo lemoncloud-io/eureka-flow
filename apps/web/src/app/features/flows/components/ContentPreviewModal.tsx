@@ -135,7 +135,6 @@ const ImagePreview: React.FC<{ src: string }> = ({ src }) => {
                     ref={imgRef}
                     src={resolvedSrc}
                     alt="Preview"
-                    crossOrigin="anonymous"
                     className="max-w-full max-h-[60vh] object-contain rounded"
                     onLoad={e => setDims(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight}`)}
                 />

@@ -250,7 +250,6 @@ export const ImageEditorDialog: React.FC<ImageEditorDialogProps> = ({ open, onOp
                             alt="Crop"
                             onLoad={handleImageLoad}
                             style={{ maxHeight: 'calc(min(60vh, 450px) - 32px)', maxWidth: '100%', display: 'block' }}
-                            crossOrigin="anonymous"
                         />
                     </ReactCrop>
                 </div>
