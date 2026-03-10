@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-10] - root@0.4.1, @flows/web@0.4.1
+
+### Refactor
+
+- simplify auth error handling
+
 ## [2026-03-10] - root@0.4.0, @flows/web@0.4.0
 
 ### Features
