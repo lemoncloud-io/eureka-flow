@@ -10,6 +10,7 @@ import {
     estimateNodeHeight,
     getEffectiveState,
     getNodeWidth,
+    getPortData,
     loadFlow,
     runNode,
     shouldUpdateState,
@@ -41,18 +42,19 @@ import {
     wouldCreateCycle,
 } from '../utils';
 
-import type { NodeState, PortDataResponse } from '@flows/flows';
+import type { LoadFlowPortData, NodeState } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 /** Extended WorkflowState with optional ports array from LoadFlowResult */
 interface WorkflowStateWithPorts extends WorkflowState {
-    ports?: PortDataResponse[];
+    ports?: LoadFlowPortData[];
 }
 
 export interface WorkflowCanvasRef {
     addNode: (type: string) => void;
     getWorkflow: () => WorkflowState;
-    loadWorkflow: (state: WorkflowStateWithPorts) => void;
+    /** Load workflow from server data. Fetches missing port data (data: null) via API. */
+    loadWorkflow: (state: WorkflowStateWithPorts) => Promise<void>;
     clearWorkflow: () => void;
     newWorkflow: () => void;
     undo: () => void;
@@ -85,6 +87,65 @@ interface WorkflowCanvasProps {
 const GRID_SIZE = 20;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
+
+/** Touch port hit detection threshold in world coordinates */
+const TOUCH_PORT_HIT_THRESHOLD = 50;
+
+/** Port position constants for touch hit detection */
+const TOUCH_PORT_LAYOUT = {
+    /** Input port X offset from node left edge */
+    INPUT_X_OFFSET: -6,
+    /** First port Y offset from node top */
+    FIRST_PORT_Y: 45,
+    /** Vertical spacing between ports */
+    PORT_SPACING: 16,
+    /** Port center offset */
+    PORT_CENTER_OFFSET: 6,
+} as const;
+
+/**
+ * Find the closest input port to a given world position (for touch connection drop)
+ */
+const findClosestInputPort = (
+    worldPos: { x: number; y: number },
+    nodes: NodeData[],
+    blockRegistry: Record<string, { inputs: Array<{ id: string; type: string }> }>,
+    sourceNodeId: string
+): { nodeId: string; portId: string; portType: string; distance: number } | null => {
+    let closestPort: { nodeId: string; portId: string; portType: string; distance: number } | null = null;
+
+    for (const node of nodes) {
+        // Skip source node
+        if (node.id === sourceNodeId) continue;
+
+        const def = blockRegistry[node.type];
+        if (!def) continue;
+
+        // Calculate input port positions (left side of node)
+        const portX = node.position.x + TOUCH_PORT_LAYOUT.INPUT_X_OFFSET;
+        def.inputs.forEach((input, index) => {
+            const portY =
+                node.position.y +
+                TOUCH_PORT_LAYOUT.FIRST_PORT_Y +
+                index * TOUCH_PORT_LAYOUT.PORT_SPACING +
+                TOUCH_PORT_LAYOUT.PORT_CENTER_OFFSET;
+            const distance = Math.hypot(worldPos.x - portX, worldPos.y - portY);
+
+            if (distance < TOUCH_PORT_HIT_THRESHOLD) {
+                if (!closestPort || distance < closestPort.distance) {
+                    closestPort = {
+                        nodeId: node.id,
+                        portId: input.id,
+                        portType: input.type,
+                        distance,
+                    };
+                }
+            }
+        });
+    }
+
+    return closestPort;
+};
 
 interface EmptyStateProps {
     onOpenLibrary: () => void;
@@ -237,6 +298,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             mouseX: number;
             mouseY: number;
         } | null>(null);
+
+        // Ref to track latest connectionDraft for touch events (avoids stale closure)
+        const connectionDraftRef = useRef(connectionDraft);
+        connectionDraftRef.current = connectionDraft;
 
         const isMounted = useRef(false);
         useEffect(() => {
@@ -567,7 +632,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     nodes,
                     edges: connections.filter(c => !pendingEdgeIds.has(c.id)),
                 }),
-                loadWorkflow: (state: WorkflowStateWithPorts) => {
+                loadWorkflow: async (state: WorkflowStateWithPorts) => {
                     // Normalize nodes to ensure config is never undefined
                     const loadedNodes = (state.nodes ?? []).map(n => ({
                         ...n,
@@ -577,71 +642,117 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const rawConnections = state.edges ?? state.connections ?? [];
                     const loadedConnections = deduplicateEdges(rawConnections);
 
-                    // Step 1: Apply port data from ports[] array to nodes' outputData
-                    // This populates actual DataPacket values from persisted port data
-                    // Must run BEFORE propagation so source nodes have real data to propagate
                     const ports = state.ports ?? [];
-                    const nodesWithPortData = ports.length
-                        ? loadedNodes.map(node => {
-                              const nodePorts = ports.filter(
-                                  p => p.nodeId === node.id && p.portId && p.data && p.direction
-                              );
-                              if (nodePorts.length === 0) return node;
 
-                              let inputData = { ...node.inputData };
-                              let outputData = { ...node.outputData };
+                    // Helper: Apply port data to nodes
+                    const applyPortDataToNodes = (
+                        baseNodes: typeof loadedNodes,
+                        portsToApply: typeof ports
+                    ): typeof loadedNodes => {
+                        if (portsToApply.length === 0) return baseNodes;
 
-                              for (const port of nodePorts) {
-                                  const { portId, data, direction } = port;
-                                  if (!portId || !data) continue;
-                                  if (direction === 'in') {
-                                      inputData = { ...inputData, [portId]: data };
-                                  } else {
-                                      outputData = { ...outputData, [portId]: data };
-                                  }
-                              }
+                        return baseNodes.map(node => {
+                            const nodePorts = portsToApply.filter(p => p.nodeId === node.id && p.portId && p.data);
+                            if (nodePorts.length === 0) return node;
 
-                              return { ...node, inputData, outputData };
-                          })
-                        : loadedNodes;
+                            let inputData = { ...node.inputData };
+                            let outputData = { ...node.outputData };
 
-                    // Step 2: Propagate outputData to downstream nodes' inputData via edges
-                    // This ensures output nodes (Preview, Debug Log) receive data from connected sources
-                    // Uses nodesWithPortData so source nodes have real DataPackets to propagate
-                    const nodesWithPropagatedData = nodesWithPortData.map(node => {
-                        const incomingConnections = loadedConnections.filter(c => c.targetNodeId === node.id);
-
-                        if (incomingConnections.length === 0) {
-                            return node;
-                        }
-
-                        const propagatedInputData = { ...node.inputData };
-                        let hasNewData = false;
-
-                        incomingConnections.forEach(conn => {
-                            const sourceNode = nodesWithPortData.find(n => n.id === conn.sourceNodeId);
-                            if (sourceNode?.outputData) {
-                                const packet = sourceNode.outputData[conn.sourcePortId];
-                                // Only propagate if it's a DataPacket (has value property), not just a type string
-                                if (packet && typeof packet === 'object' && 'value' in packet) {
-                                    propagatedInputData[conn.targetPortId] = packet;
-                                    hasNewData = true;
+                            for (const port of nodePorts) {
+                                const { portId, data } = port;
+                                if (!portId || !data) continue;
+                                if (portId === 'out') {
+                                    outputData = { ...outputData, [portId]: data };
+                                } else {
+                                    inputData = { ...inputData, [portId]: data };
                                 }
                             }
+
+                            return { ...node, inputData, outputData };
                         });
+                    };
 
-                        if (hasNewData) {
-                            return { ...node, inputData: propagatedInputData };
-                        }
-                        return node;
-                    });
+                    // Helper: Propagate outputData to downstream nodes' inputData via edges
+                    const propagateData = (
+                        baseNodes: typeof loadedNodes,
+                        conns: typeof loadedConnections
+                    ): typeof loadedNodes => {
+                        return baseNodes.map(node => {
+                            const incomingConnections = conns.filter(c => c.targetNodeId === node.id);
+                            if (incomingConnections.length === 0) return node;
 
+                            const propagatedInputData = { ...node.inputData };
+                            let hasNewData = false;
+
+                            incomingConnections.forEach(conn => {
+                                const sourceNode = baseNodes.find(n => n.id === conn.sourceNodeId);
+                                if (sourceNode?.outputData) {
+                                    const packet = sourceNode.outputData[conn.sourcePortId];
+                                    if (packet && typeof packet === 'object' && 'value' in packet) {
+                                        propagatedInputData[conn.targetPortId] = packet;
+                                        hasNewData = true;
+                                    }
+                                }
+                            });
+
+                            return hasNewData ? { ...node, inputData: propagatedInputData } : node;
+                        });
+                    };
+
+                    // Step 1: Apply existing port data (non-null) and display nodes immediately
+                    // This prevents empty state flash while fetching null port data
+                    const portsWithData = ports.filter(p => p.data !== null);
+                    const nodesWithExistingPortData = applyPortDataToNodes(loadedNodes, portsWithData);
+                    const nodesWithPropagatedData = propagateData(nodesWithExistingPortData, loadedConnections);
+
+                    // Display nodes immediately
                     setNodes(nodesWithPropagatedData);
                     setConnections(loadedConnections);
                     pastRef.current = [];
                     futureRef.current = [];
                     handleSelectionChange(null);
                     setSelectedConnectionId(null);
+
+                    // Step 2: Fetch missing port data (data: null) in background
+                    // Each port updates individually when fetched for progressive loading UX
+                    const nullDataPorts = ports.filter(p => p.data === null && p.portId);
+
+                    if (nullDataPorts.length > 0) {
+                        nullDataPorts.forEach(p => {
+                            const direction = p.portId === 'out' ? 'out' : 'in';
+                            getPortData(p.id, direction)
+                                .then(portData => {
+                                    if (portData.data) {
+                                        setNodes(prev => {
+                                            // Apply this single port's data
+                                            const updated = prev.map(node => {
+                                                if (node.id !== p.nodeId) return node;
+
+                                                const { portId } = p;
+                                                if (!portId) return node;
+
+                                                if (portId === 'out') {
+                                                    return {
+                                                        ...node,
+                                                        outputData: { ...node.outputData, [portId]: portData.data },
+                                                    };
+                                                } else {
+                                                    return {
+                                                        ...node,
+                                                        inputData: { ...node.inputData, [portId]: portData.data },
+                                                    };
+                                                }
+                                            });
+                                            // Re-propagate after new data
+                                            return propagateData(updated, loadedConnections);
+                                        });
+                                    }
+                                })
+                                .catch(() => {
+                                    console.warn('[WorkflowCanvas] Failed to fetch port:', p.id);
+                                });
+                        });
+                    }
                 },
                 clearWorkflow: () => {
                     if (readOnly) return;
@@ -1417,6 +1528,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             // Don't change selection during port connection drag
             if (connectionDraft) return;
 
+            // Skip selection and drag for interactive elements (buttons, inputs, etc.)
+            // This must be checked BEFORE selection logic to prevent node selection
+            // when clicking delete button or other controls
+            // Use closest() to also catch clicks on icons inside buttons (SVG, path, etc.)
+            const target = e.target as HTMLElement;
+            if (
+                ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'LABEL'].includes(target.tagName) ||
+                target.isContentEditable ||
+                target.closest('button')
+            ) {
+                return;
+            }
+
             setSelectedConnectionId(null);
 
             const isMultiSelectKey = e.shiftKey || e.metaKey || e.ctrlKey;
@@ -1431,14 +1555,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 handleSelectionChange(nodeId);
             }
             // If already selected without modifier, keep current selection for group drag
-
-            const target = e.target as HTMLElement;
-            if (
-                ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'LABEL'].includes(target.tagName) ||
-                target.isContentEditable
-            ) {
-                return;
-            }
 
             dragStartSnapshotRef.current = {
                 nodes: JSON.parse(JSON.stringify(nodes)),
@@ -1477,10 +1593,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             setSelectedConnectionId(null);
 
+            // Skip drag for interactive elements (buttons, inputs, etc.)
+            // Use closest() to also catch touches on icons inside buttons (SVG, path, etc.)
             const target = e.target as HTMLElement;
             if (
                 ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'LABEL'].includes(target.tagName) ||
-                target.isContentEditable
+                target.isContentEditable ||
+                target.closest('button')
             ) {
                 return;
             }
@@ -1697,6 +1816,30 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             setSelectedConnectionId(null);
             if (type === 'output') {
                 const worldPos = screenToWorld(e.clientX, e.clientY);
+                setConnectionDraft({
+                    sourceNodeId: nodeId,
+                    sourcePortId: portId,
+                    sourceType: portType,
+                    mouseX: worldPos.x,
+                    mouseY: worldPos.y,
+                });
+            }
+        };
+
+        // Touch version of port drag start for mobile
+        const handlePortTouchStart = (
+            nodeId: string,
+            portId: string,
+            type: 'input' | 'output',
+            portType: string,
+            e: React.TouchEvent
+        ) => {
+            if (readOnly) return;
+            e.stopPropagation();
+            setSelectedConnectionId(null);
+            if (type === 'output') {
+                const touch = e.touches[0];
+                const worldPos = screenToWorld(touch.clientX, touch.clientY);
                 setConnectionDraft({
                     sourceNodeId: nodeId,
                     sourcePortId: portId,
@@ -2026,8 +2169,44 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         } else {
                             handleCanvasTouchMove(e);
                         }
+                        // Update connection draft position during touch drag
+                        if (connectionDraft && !readOnly && e.touches.length > 0) {
+                            const touch = e.touches[0];
+                            const worldPos = screenToWorld(touch.clientX, touch.clientY);
+                            setConnectionDraft(prev =>
+                                prev ? { ...prev, mouseX: worldPos.x, mouseY: worldPos.y } : null
+                            );
+                        }
                     }}
                     onTouchEnd={e => {
+                        // Use ref to get latest connectionDraft (avoids stale closure issue)
+                        const currentDraft = connectionDraftRef.current;
+
+                        // Handle connection drop on touch end
+                        if (currentDraft && e.changedTouches.length > 0) {
+                            const touch = e.changedTouches[0];
+                            const worldPos = screenToWorld(touch.clientX, touch.clientY);
+
+                            const closestPort = findClosestInputPort(
+                                worldPos,
+                                nodes,
+                                blockRegistry,
+                                currentDraft.sourceNodeId
+                            );
+
+                            if (closestPort) {
+                                handlePortMouseUp(
+                                    closestPort.nodeId,
+                                    closestPort.portId,
+                                    'input',
+                                    closestPort.portType
+                                );
+                            }
+
+                            setConnectionDraft(null);
+                            return;
+                        }
+
                         if (dragState) {
                             handleNodeTouchEnd();
                         } else {
@@ -2172,6 +2351,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             portHandlers={{
                                                 onPortMouseDown: handlePortMouseDown,
                                                 onPortMouseUp: handlePortMouseUp,
+                                                onPortTouchStart: handlePortTouchStart,
                                             }}
                                             configHandlers={{
                                                 onConfigChange: (k, v) => handleConfigChange(node.id, k, v),

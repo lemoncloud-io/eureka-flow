@@ -57,6 +57,13 @@ export interface NodePortHandlers {
         e: React.MouseEvent
     ) => void;
     onPortMouseUp: (nodeId: string, portId: string, type: 'input' | 'output', portType: string) => void;
+    onPortTouchStart?: (
+        nodeId: string,
+        portId: string,
+        type: 'input' | 'output',
+        portType: string,
+        e: React.TouchEvent
+    ) => void;
 }
 
 export interface NodeConfigHandlers {
@@ -216,6 +223,13 @@ interface PortItemProps {
         e: React.MouseEvent
     ) => void;
     onMouseUp: (nodeId: string, portId: string, type: 'input' | 'output', portType: string) => void;
+    onTouchStart?: (
+        nodeId: string,
+        portId: string,
+        type: 'input' | 'output',
+        portType: string,
+        e: React.TouchEvent
+    ) => void;
 }
 
 const PortItem: React.FC<PortItemProps> = ({
@@ -229,6 +243,7 @@ const PortItem: React.FC<PortItemProps> = ({
     connectionDraft,
     onMouseDown,
     onMouseUp,
+    onTouchStart,
 }) => {
     // Determine if this input port is a valid drop target for the current connection draft
     const isDraggingConnection = !!connectionDraft;
@@ -267,11 +282,29 @@ const PortItem: React.FC<PortItemProps> = ({
     const portCircle = (
         <div
             className={cn('relative')}
+            data-port-node-id={nodeId}
+            data-port-id={port.id}
+            data-port-type={type}
+            data-port-data-type={port.type}
             onMouseDown={e => {
                 e.stopPropagation();
                 onMouseDown(nodeId, port.id, type, port.type, e);
             }}
             onMouseUp={e => {
+                e.stopPropagation();
+                onMouseUp(nodeId, port.id, type, port.type);
+            }}
+            onTouchStart={e => {
+                e.stopPropagation();
+                onTouchStart?.(nodeId, port.id, type, port.type, e);
+            }}
+            onTouchEnd={e => {
+                // For output ports, let the event bubble to canvas for connection drop handling
+                // Touch events fire touchend on the element where touch STARTED, not where it ended
+                if (type === 'output') {
+                    // Don't stop propagation - let canvas handle the connection drop
+                    return;
+                }
                 e.stopPropagation();
                 onMouseUp(nodeId, port.id, type, port.type);
             }}
@@ -848,7 +881,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
         connectedPortIds = [],
         connectionDraft,
     } = highlightState;
-    const { onPortMouseDown, onPortMouseUp } = portHandlers;
+    const { onPortMouseDown, onPortMouseUp, onPortTouchStart } = portHandlers;
     const { onConfigChange, onLabelChange } = configHandlers;
     const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs, onResize, onResizing } = actions;
 
@@ -1224,6 +1257,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     )}
 
                     <button
+                        onMouseDown={e => e.stopPropagation()}
+                        onTouchStart={e => e.stopPropagation()}
                         onClick={e => {
                             e.stopPropagation();
                             onDelete();
@@ -1251,6 +1286,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         connectionDraft={connectionDraft}
                         onMouseDown={onPortMouseDown}
                         onMouseUp={onPortMouseUp}
+                        onTouchStart={onPortTouchStart}
                     />
                 ))}
             </div>
@@ -1268,6 +1304,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         connectionDraft={connectionDraft}
                         onMouseDown={onPortMouseDown}
                         onMouseUp={onPortMouseUp}
+                        onTouchStart={onPortTouchStart}
                     />
                 ))}
             </div>

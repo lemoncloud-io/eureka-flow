@@ -61,11 +61,6 @@ export const useWebSocketWorker = <TMessage extends BaseWebSocketMessage = BaseW
                     if (messageParser) {
                         const parsed = messageParser(data);
                         if (parsed) {
-                            if (typeof parsed.id == 'string' && typeof parsed.data == 'object' && parsed.data) {
-                                console.log(`${logPrefix} Message[${parsed.id}]:`, parsed.data);
-                            } else {
-                                console.log(`${logPrefix} Message:`, parsed);
-                            }
                             setLastMessage(parsed);
                         }
                     } else {

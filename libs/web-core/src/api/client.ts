@@ -63,7 +63,6 @@ apiClient.interceptors.response.use(
     (error: AxiosError) => {
         const status = error.response?.status;
         const classification = classifyError(error);
-        const hasApiKey = !!useWebCoreStore.getState().apiKey;
 
         // HTTP 403 status → always reset API key
         if (status === 403) {
@@ -74,15 +73,9 @@ apiClient.interceptors.response.use(
             return Promise.reject(error);
         }
 
-        // Network error with API key set → likely CORS-blocked 403, reset API key
-        // (Server returns 403 without CORS headers, browser blocks response)
-        if (!status && hasApiKey && (error.code === 'ERR_NETWORK' || error.code === 'ERR_FAILED')) {
-            useWebCoreStore.getState().clearApiKey();
-            clearFlowStorage();
-            // Delay toast to show after dialog appears
-            setTimeout(() => toast.error(i18n.t('errors.authExpired', { ns: 'common' })), 100);
-            return Promise.reject(error);
-        }
+        // Note: ERR_NETWORK/ERR_FAILED are NOT treated as 403
+        // - CORS-blocked 403 cannot be reliably detected (browser security)
+        // - Treating network errors as 403 causes false logouts on server downtime
 
         // Handle other errors that require logout
         if (classification.shouldLogout) {

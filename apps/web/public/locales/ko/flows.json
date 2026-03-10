@@ -28,6 +28,7 @@
         "socketClickToRetry": "클릭하여 재시도",
         "socketClickToConnect": "클릭하여 연결",
         "apiKeySettings": "API 키 설정",
+        "beta": "베타",
         "menuGroup": {
             "file": "파일",
             "canvas": "캔버스",

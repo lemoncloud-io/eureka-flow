@@ -283,12 +283,18 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                 const isPort = data.id.includes(':');
                 const parentNodeId = isPort ? data.id.split(':')[0] : undefined;
 
-                // Progress-only messages may not have flowId
-                // Process if: has matching flowId OR is a progress update without flowId
-                const isProgressOnlyMessage = data.progress !== undefined && !data.flowId;
-                const isForCurrentFlow = data.flowId === currentFlowId;
+                // Skip if flowId is missing or doesn't match current flow
+                // All node updates should have flowId - reject those without it
+                const isForCurrentFlow = data.flowId && data.flowId === currentFlowId;
+                if (!isForCurrentFlow) {
+                    return;
+                }
 
-                if (onNodeReload && (isForCurrentFlow || isProgressOnlyMessage)) {
+                // Log state transitions with data (e.g., "1004310: IDLE→RUNNING {...}")
+                const stateChange = data.prevState ? `${data.prevState}→${data.state}` : data.state;
+                console.log(`[WS] ${data.id}: ${stateChange}`, data);
+
+                if (onNodeReload) {
                     // Prefer state over status (backward compatibility)
                     const effectiveState = (data.state ?? data.status) as NodeState | undefined;
                     const effectivePrevState = (data.prevState ?? data.prevStatus) as NodeState | undefined;
@@ -317,12 +323,18 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
             // Triggered when port data (input/output) changes
             // Used for real-time data synchronization between browser tabs
             if (isPortUpdateMessage(data)) {
-                // Only process if it's for the current flow
-                if (data.flowId && data.flowId !== currentFlowId) return;
+                // Skip if flowId is missing or doesn't match current flow
+                const isForCurrentFlow = data.flowId && data.flowId === currentFlowId;
+                if (!isForCurrentFlow) {
+                    return;
+                }
 
                 // Parse port ID to extract nodeId, direction, portName
                 const parsed = parsePortId(data.id);
                 if (!parsed) return;
+
+                // Log port updates with data (e.g., "1004310:out updated {...}")
+                console.log(`[WS] ${parsed.nodeId}:${parsed.portName} updated`, data);
 
                 if (onPortUpdate) {
                     onPortUpdate({

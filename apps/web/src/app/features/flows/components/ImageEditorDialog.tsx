@@ -4,7 +4,7 @@ import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
 
 import { RotateCcw } from 'lucide-react';
 
-import { compressImageIfNeeded } from '@flows/flows';
+import { compressImageIfNeeded, getAspectRatioIndex } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Dialog, DialogContent } from '@flows/ui-kit';
 
@@ -36,6 +36,8 @@ interface ImageEditorDialogProps {
     onOpenChange: (open: boolean) => void;
     imageSrc: string;
     onSave: (croppedImageDataUrl: string) => void;
+    /** Initial aspect ratio from config (e.g., "3:4", "16:9") */
+    initialAspectRatio?: string;
 }
 
 /**
@@ -110,13 +112,22 @@ const createInitialCrop = (mediaWidth: number, mediaHeight: number, aspect: numb
     };
 };
 
-export const ImageEditorDialog: React.FC<ImageEditorDialogProps> = ({ open, onOpenChange, imageSrc, onSave }) => {
+export const ImageEditorDialog: React.FC<ImageEditorDialogProps> = ({
+    open,
+    onOpenChange,
+    imageSrc,
+    onSave,
+    initialAspectRatio,
+}) => {
     const { t } = useTranslation(['flows']);
+
+    // Get initial ratio index from config (defaults to 0 = Free)
+    const initialRatioIndex = getAspectRatioIndex(initialAspectRatio);
 
     const imgRef = useRef<HTMLImageElement | null>(null);
     const [crop, setCrop] = useState<Crop>();
     const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
-    const [selectedRatioIndex, setSelectedRatioIndex] = useState(0);
+    const [selectedRatioIndex, setSelectedRatioIndex] = useState(initialRatioIndex);
     const [isProcessing, setIsProcessing] = useState(false);
     const [outputSize, setOutputSize] = useState<{ width: number; height: number } | null>(null);
 
@@ -201,12 +212,12 @@ export const ImageEditorDialog: React.FC<ImageEditorDialogProps> = ({ open, onOp
             if (newOpen) {
                 setCrop(undefined);
                 setCompletedCrop(undefined);
-                setSelectedRatioIndex(0);
+                setSelectedRatioIndex(initialRatioIndex);
                 setOutputSize(null);
             }
             onOpenChange(newOpen);
         },
-        [onOpenChange]
+        [onOpenChange, initialRatioIndex]
     );
 
     return (
@@ -250,7 +261,6 @@ export const ImageEditorDialog: React.FC<ImageEditorDialogProps> = ({ open, onOp
                             alt="Crop"
                             onLoad={handleImageLoad}
                             style={{ maxHeight: 'calc(min(60vh, 450px) - 32px)', maxWidth: '100%', display: 'block' }}
-                            crossOrigin="anonymous"
                         />
                     </ReactCrop>
                 </div>

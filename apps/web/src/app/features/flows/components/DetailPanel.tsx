@@ -25,10 +25,10 @@ import {
 import {
     DEFAULT_TEXTAREA_HEIGHT,
     clampHeight,
-    compressImageIfNeeded,
     downloadImage,
     getEffectiveState,
     getNodeHeight,
+    processImageWithConfig,
     useBlockRegistry,
     useS3Image,
 } from '@flows/flows';
@@ -156,6 +156,11 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
     const { src: resolvedSrc, isLoading } = useS3Image(img || '');
     const [isEditorOpen, setIsEditorOpen] = useState(false);
 
+    // Get config values for image processing
+    const aspectRatio = node.config?.aspectRatio as string | undefined;
+    const maxWidth = node.config?.maxWidth as string | undefined;
+    const bypass = node.config?.bypass as string | undefined;
+
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -163,8 +168,13 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
             reader.onload = async evt => {
                 const dataUrl = evt.target?.result as string;
                 if (dataUrl) {
-                    const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
-                    onConfigChange('imageData', compressed);
+                    // Process image with config (crop/resize based on aspectRatio, maxWidth, bypass)
+                    const processed = await processImageWithConfig(dataUrl, {
+                        aspectRatio,
+                        maxWidth,
+                        bypass,
+                    });
+                    onConfigChange('imageData', processed);
                 }
             };
             reader.readAsDataURL(file);
@@ -273,6 +283,7 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
                     onOpenChange={setIsEditorOpen}
                     imageSrc={resolvedSrc}
                     onSave={handleEditorSave}
+                    initialAspectRatio={aspectRatio}
                 />
             )}
         </div>

@@ -449,20 +449,46 @@ export interface UpsertNodeResult {
 }
 
 /**
+ * LoadFlowPortData - port data from GET /flows/:id/load response
+ *
+ * Unlike PortDataResponse (from GET /nodes/:portId/port), this type
+ * has nullable data field because the server may return data: null
+ * when port data hasn't been populated yet.
+ *
+ * @example
+ * {
+ *   "id": "1004298:in",
+ *   "nodeId": "1004298",
+ *   "portId": "in",
+ *   "data": null  // or { value, type, timestamp }
+ * }
+ */
+export interface LoadFlowPortData {
+    /** Full port ID (e.g., "1004298:in") */
+    id: string;
+    /** Parent node ID (e.g., "1004298") */
+    nodeId: string;
+    /** Port name/key (e.g., "in" or "out") */
+    portId: string;
+    /** Port data - null when not populated, DataPacket when available */
+    data: DataPacket | null;
+}
+
+/**
  * LoadFlowResult - result of loading flow snapshot
  * GET /flows/:id/load returns SaveFlowBody format
  *
  * Uses NodeData/EdgeData from API package to match backend response format.
  * - NodeData: uses object format for config, inputData, outputData
  * - EdgeData: connection data between nodes
- * - PortData: port data with current values (id, nodeId, portId, direction, data)
+ * - LoadFlowPortData: port data with current values (may be null)
  * - channelId: WebSocket channel for real-time updates
  */
 export interface LoadFlowResult extends FlowModel {
     nodes: NodeData[];
     edges: EdgeData[];
-    /** Port data with current values for input/output ports */
-    ports?: PortDataResponse[];
+    /** Port data with current values for input/output ports (data may be null) */
+    ports?: LoadFlowPortData[];
     /** WebSocket channel ID for real-time node status updates */
     channelId?: string;
 }

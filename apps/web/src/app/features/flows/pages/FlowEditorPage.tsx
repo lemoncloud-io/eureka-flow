@@ -1,16 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-    EXECUTE_FUNCTIONS,
-    getEffectiveState,
-    getNode,
-    getPortData,
-    getStatePriority,
-    useBlocks,
-    useCanvasStore,
-    useFlows,
-} from '@flows/flows';
+import { EXECUTE_FUNCTIONS, getNode, getPortData, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { useWebCoreStore } from '@flows/web-core';
@@ -65,7 +56,7 @@ export const FlowEditorPage = () => {
             try {
                 const flowData = await loadFlowById(flowId);
                 if (canvasRef.current && flowData) {
-                    canvasRef.current.loadWorkflow(flowData);
+                    await canvasRef.current.loadWorkflow(flowData);
                     lastSavedStateRef.current = serializeWorkflowState(flowData);
                 }
             } catch (error) {
@@ -80,11 +71,13 @@ export const FlowEditorPage = () => {
 
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
-            const { nodeId, isPort, parentNodeId, state, progress, no, stereo } = info;
+            const { nodeId, flowId, isPort, parentNodeId, state, progress, no } = info;
+
+            // Skip if flowId is missing or doesn't match current flow (socket channel is shared)
+            if (!flowId || flowId !== currentFlowId) return;
 
             // Check if this update is stale based on sequence number (no)
             // Higher 'no' means more recent - skip if we've seen equal or higher number
-            // Consistent with handlePortUpdate logic
             if (no !== undefined) {
                 const prevNo = nodeNoRef.current.get(nodeId);
                 if (prevNo !== undefined && prevNo >= no) {
@@ -94,240 +87,80 @@ export const FlowEditorPage = () => {
                 nodeNoRef.current.set(nodeId, no);
             }
 
-            // When state field exists, update UI directly from socket data (no API fetch needed)
-            // - state=RUNNING/COMPLETED is the execution state from server
-            // - Output data comes separately via node/port messages
-            // - API fetch only needed for isPort (port data) or state-less messages
-            // EXCEPTION: ERROR state requires API fetch to get errorMessage (not sent via WebSocket)
-            // NOTE: state field is preferred, status is deprecated but kept for backward compatibility
-            if (state && !isPort && canvasRef.current) {
-                // Reset executionStats when RUNNING starts, preserve progress if provided
-                const executionStats =
-                    state === 'RUNNING'
-                        ? { startTime: Date.now(), duration: 0, progress: progress ?? 0 }
-                        : progress !== undefined
-                          ? { progress }
-                          : undefined;
+            if (!canvasRef.current) return;
 
-                // ERROR state: fetch node from API to get errorMessage (not sent via WebSocket)
-                if (state === 'ERROR') {
-                    try {
-                        const nodeData = await getNode(nodeId);
-                        canvasRef.current.updateNodeFromServer(nodeId, {
-                            state,
-                            status: state, // Deprecated: kept for backward compatibility
-                            executionStats,
-                            errorMessage: nodeData.errorMessage,
-                        });
-                    } catch {
-                        // Fallback: update state without errorMessage if API fails
-                        canvasRef.current.updateNodeFromServer(nodeId, {
-                            state,
-                            status: state,
-                            executionStats,
-                        });
-                    }
-                    return;
+            // Skip port updates from type:'node' messages (deprecated pattern)
+            // Port updates are handled by type:'node/port' messages via handlePortUpdate
+            if (isPort && parentNodeId) {
+                if (state) {
+                    canvasRef.current.updateNodeFromServer(parentNodeId, {
+                        state,
+                        status: state,
+                    });
                 }
-
-                // COMPLETED state: fetch full node data to get outputData
-                // Server has finished execution and saved results - we need the complete data
-                // EXCEPTION: stereo === 0 means socket already has all necessary data
-                if (state === 'COMPLETED') {
-                    // stereo === 0: Skip API fetch, socket data is sufficient
-                    if (stereo === 0) {
-                        canvasRef.current.updateNodeFromServer(nodeId, {
-                            state,
-                            status: state, // Deprecated: kept for backward compatibility
-                            executionStats,
-                        });
-                        return;
-                    }
-
-                    try {
-                        const nodeData = await getNode(nodeId);
-                        canvasRef.current.updateNodeFromServer(nodeId, {
-                            ...nodeData,
-                            state,
-                            status: state, // Deprecated: kept for backward compatibility
-                            executionStats,
-                        });
-                    } catch {
-                        // Fallback: update state only if API fails
-                        canvasRef.current.updateNodeFromServer(nodeId, {
-                            state,
-                            status: state,
-                            executionStats,
-                        });
-                    }
-                    return;
-                }
-
-                // RUNNING and other states: update state only (data comes via port messages)
-                canvasRef.current.updateNodeFromServer(nodeId, {
-                    state,
-                    status: state, // Deprecated: kept for backward compatibility
-                    executionStats,
-                });
                 return;
             }
 
-            try {
-                if (isPort && parentNodeId) {
-                    // ============================================================
-                    // Port Update Handling
-                    // ============================================================
-                    // When socket notifies about port data changes, the server has
-                    // ALREADY saved the data via propagateDownstreamV2. We only need
-                    // to update the UI - no need to call upsertNode (it would be redundant).
-                    //
-                    // Data flow:
-                    //   1. Server runs node → applyOutputs saves output port
-                    //   2. Server propagateDownstreamV2 → saves to downstream input port
-                    //   3. Socket notification sent to frontend
-                    //   4. Frontend updates canvas UI (this code)
-                    //
-                    // Note: For isFrontend blocks where user enters data directly,
-                    // the save happens in WorkflowCanvas when user finishes input,
-                    // not here in socket handler.
-                    // ============================================================
-
-                    // Fetch port data for UI update only (no upsert needed)
-                    const portData = await getNode(nodeId);
-
-                    if (portData?.data$ && portData.direction && canvasRef.current) {
-                        // Convert PortData to DataPacket format for canvas update
-                        const portValue = portData.data$.S ?? portData.data$.N ?? portData.data$.F ?? portData.data$.M;
-                        const portType = portData.dataType || 'text';
-                        const portTimestamp = portData.data$.timestamp || info.timestamp;
-                        const portKey = portData.name || nodeId.split(':')[1] || 'data';
-
-                        const dataPacket = {
-                            value: portValue,
-                            type: portType,
-                            timestamp: portTimestamp,
-                        };
-
-                        // Update canvas with port data (UI only, no API call)
-                        const partialUpdate = {
-                            inputData: portData.direction === 'in' ? { [portKey]: dataPacket } : undefined,
-                            outputData: portData.direction === 'out' ? { [portKey]: dataPacket } : undefined,
-                        };
-                        canvasRef.current.updateNodeFromServer(parentNodeId, partialUpdate);
-                    }
-                    // Update state if provided (state preferred, status fallback)
-                    else if (canvasRef.current && state) {
-                        canvasRef.current.updateNodeFromServer(parentNodeId, {
-                            state,
-                            status: state, // Deprecated: kept for backward compatibility
-                        });
-                    }
-                } else {
-                    // ============================================================
-                    // Regular Node Update Logic
-                    // ============================================================
-                    // When a socket notification arrives, we fetch full node data from API.
-                    // However, there's a race condition:
-                    //   - Socket delivers real-time state changes instantly
-                    //   - API may return stale data if DB write hasn't committed yet
-                    //
-                    // Solution: Use the MORE COMPLETE state between socket and API
-                    //   Priority: COMPLETED/ERROR > RUNNING > READY > IDLE
-                    //
-                    // Examples:
-                    //   - Socket: COMPLETED, API: RUNNING → Use COMPLETED (socket is fresher)
-                    //   - Socket: RUNNING, API: COMPLETED → Use COMPLETED (API caught up)
-                    //
-                    // OPTIMIZATION: stereo === 0 means socket contains all necessary data
-                    //   - Skip API fetch to reduce network overhead
-                    //   - Use socket state directly for UI update
-                    // ============================================================
-
-                    // stereo === 0: Skip API fetch, use socket data directly
-                    if (stereo === 0 && state && canvasRef.current) {
-                        const executionStats =
-                            state === 'RUNNING'
-                                ? { startTime: Date.now(), duration: 0, progress: progress ?? 0 }
-                                : progress !== undefined
-                                  ? { progress }
-                                  : undefined;
-
-                        canvasRef.current.updateNodeFromServer(nodeId, {
-                            state,
-                            status: state, // Deprecated: kept for backward compatibility
-                            executionStats,
-                        });
-                        return;
-                    }
-
+            // ERROR state: still need API fetch for errorMessage (not sent via WebSocket)
+            if (state === 'ERROR') {
+                try {
                     const nodeData = await getNode(nodeId);
-
-                    // Determine the best state to use (higher priority wins)
-                    // Use getEffectiveState for backward compatibility
-                    const socketState = state;
-                    const apiState = getEffectiveState(nodeData?.state, nodeData?.status);
-                    const socketPriority = getStatePriority(socketState);
-                    const apiPriority = getStatePriority(apiState);
-                    const finalState = socketPriority >= apiPriority ? socketState : apiState;
-
-                    if (canvasRef.current && nodeData) {
-                        // Merge API data with the resolved state
-                        const mergedData = finalState
-                            ? { ...nodeData, state: finalState, status: finalState }
-                            : nodeData;
-                        canvasRef.current.updateNodeFromServer(nodeId, mergedData);
-
-                        // ============================================================
-                        // Auto-execute isFrontend Nodes
-                        // ============================================================
-                        // When server propagates data to a downstream node and sets it
-                        // to READY state, check if it's an isFrontend node that needs
-                        // to be executed on the frontend.
-                        //
-                        // Flow:
-                        //   1. Server executes node → propagateDownstreamV2
-                        //   2. Server sets downstream node to READY (if all inputs ready)
-                        //   3. Server tries to run but isFrontend → stops (checkRunnable returns false)
-                        //   4. Socket notification: node state = READY
-                        //   5. Frontend detects isFrontend + READY → auto-execute
-                        // ============================================================
-                        const effectiveState = finalState ?? getEffectiveState(nodeData?.state, nodeData?.status);
-                        if (effectiveState === 'READY' && nodeData?.type) {
-                            const nodeDef = blockRegistry[nodeData.type];
-                            if (nodeDef?.isFrontend === true && EXECUTE_FUNCTIONS[nodeDef.type]) {
-                                // Auto-execute this isFrontend node
-                                // Use setTimeout to avoid blocking the socket handler
-                                setTimeout(() => {
-                                    canvasRef.current?.executeNode?.(nodeId);
-                                }, 0);
-                            }
-                        }
-                    } else if (canvasRef.current && state) {
-                        // Fallback: No API data, use socket state
-                        canvasRef.current.updateNodeFromServer(nodeId, {
-                            state,
-                            status: state, // Deprecated: kept for backward compatibility
-                        });
-                    }
+                    canvasRef.current.updateNodeFromServer(nodeId, {
+                        state,
+                        status: state,
+                        errorMessage: nodeData.errorMessage,
+                    });
+                } catch {
+                    // Fallback: update state without errorMessage if API fails
+                    canvasRef.current.updateNodeFromServer(nodeId, {
+                        state,
+                        status: state,
+                    });
                 }
-            } catch (error) {
-                // Node reload failed - revert no to allow retry
-                if (no !== undefined) {
-                    const prevNo = nodeNoRef.current.get(nodeId);
-                    if (prevNo === no) {
-                        nodeNoRef.current.delete(nodeId);
-                    }
-                }
-                console.debug('[handleNodeUpdate] Failed to update node:', nodeId, error);
+                return;
             }
+
+            // All other states: use socket data directly (no API fetch needed)
+            const executionStats =
+                state === 'RUNNING'
+                    ? { startTime: Date.now(), duration: 0, progress: progress ?? 0 }
+                    : progress !== undefined
+                      ? { progress }
+                      : undefined;
+
+            canvasRef.current.updateNodeFromServer(nodeId, {
+                state,
+                status: state,
+                executionStats,
+            });
+
+            // Auto-execute isFrontend nodes when READY (if all inputs have data)
+            if (state !== 'READY') return;
+
+            const workflow = canvasRef.current.getWorkflow();
+            const node = workflow?.nodes?.find(n => n.id === nodeId);
+            if (!node?.type) return;
+
+            const nodeDef = blockRegistry[node.type];
+            if (!nodeDef?.isFrontend || !EXECUTE_FUNCTIONS[nodeDef.type]) return;
+
+            // Skip input blocks (require user interaction, no upstream data propagation)
+            if (nodeDef.stereo === 'input') return;
+
+            // Skip if required inputs don't have data (upstream not executed yet)
+            const hasAllInputs = (nodeDef.inputs ?? []).every(input => node.inputData?.[input.id]?.value !== undefined);
+            if (!hasAllInputs) return;
+
+            // Defer execution to next tick to prevent blocking socket handler
+            setTimeout(() => {
+                canvasRef.current?.executeNode(nodeId);
+            }, 0);
         },
-        [blockRegistry]
+        [blockRegistry, currentFlowId]
     );
 
     // Track port sequence numbers to detect stale updates (higher no = newer)
-    // Falls back to timestamp comparison when 'no' is not available
     const portNoRef = useRef<Map<string, number>>(new Map());
-    const portTimestampsRef = useRef<Map<string, number>>(new Map());
 
     // Get port highlight actions from canvas store
     const setUpdatedPort = useCanvasStore(state => state.setUpdatedPort);
@@ -338,17 +171,17 @@ export const FlowEditorPage = () => {
 
     /**
      * Handle port update notification from WebSocket (type: 'node/port')
-     * Fetches port data and updates the parent node's inputData/outputData
-     *
-     * - 'in' direction: updates inputData (data flowing into the node)
-     * - 'out' direction: updates outputData (execution results)
+     * - Output ports: always fetch data and update outputData
+     * - Input ports: only fetch for terminal nodes (output$ is empty)
+     *   - Terminal nodes (미리보기, 디버그 로그): need inputData to display
+     *   - Non-terminal nodes: skip fetch (data same as upstream output)
      */
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
-            const { portId, nodeId, direction, portName, timestamp, no } = info;
+            const { portId, nodeId, flowId, portName, no } = info;
 
-            // Use direction from message, default to 'in' if not specified
-            const effectiveDirection = direction ?? 'in';
+            // Skip if flowId is missing or doesn't match current flow (socket channel is shared)
+            if (!flowId || flowId !== currentFlowId) return;
 
             // Check if this update is stale based on sequence number (no)
             // Higher 'no' means more recent - skip if we've seen equal or higher number
@@ -359,35 +192,54 @@ export const FlowEditorPage = () => {
                     return;
                 }
                 portNoRef.current.set(portId, no);
-            } else {
-                // Fallback: Check if timestamp changed to prevent duplicate fetches
-                const prevTimestamp = portTimestampsRef.current.get(portId);
-                if (prevTimestamp && timestamp && prevTimestamp >= timestamp) return;
+            }
 
-                // Update timestamp before fetch to prevent concurrent fetches
-                if (timestamp) {
-                    portTimestampsRef.current.set(portId, timestamp);
+            // Trigger port highlight
+            const existingTimeout = highlightTimeoutsRef.current.get(portId);
+            if (existingTimeout) {
+                window.clearTimeout(existingTimeout);
+            }
+            setUpdatedPort(portId);
+            const timeoutId = window.setTimeout(() => {
+                clearUpdatedPort(portId);
+                highlightTimeoutsRef.current.delete(portId);
+            }, 500);
+            highlightTimeoutsRef.current.set(portId, timeoutId);
+
+            if (!canvasRef.current) return;
+
+            const isOutputPort = portName === 'out';
+
+            // For input ports, check if this is a terminal node (no outputs)
+            // Terminal nodes need inputData to display, others can skip (data same as upstream)
+            if (!isOutputPort) {
+                const workflow = canvasRef.current.getWorkflow();
+                const nodeInCanvas = workflow?.nodes?.find(n => n.id === nodeId);
+                if (nodeInCanvas?.type) {
+                    const nodeDef = blockRegistry[nodeInCanvas.type];
+                    const isTerminalNode = !nodeDef?.output$ || nodeDef.output$.length === 0;
+                    if (!isTerminalNode) {
+                        // Non-terminal node: skip fetch (data same as upstream output)
+                        return;
+                    }
                 }
             }
 
-            try {
-                // Fetch port data from server
-                const portData = await getPortData(portId, effectiveDirection);
+            const direction = isOutputPort ? 'out' : 'in';
 
-                if (portData?.data && canvasRef.current) {
-                    // API returns data in DataPacket-like format: { value, type, timestamp }
+            try {
+                const portData = await getPortData(portId, direction);
+
+                if (portData?.data) {
                     const dataPacket = {
                         value: portData.data.value,
                         type: portData.data.type,
-                        timestamp: portData.data.timestamp || timestamp,
+                        timestamp: portData.data.timestamp,
                     };
 
-                    // Use portId from response (e.g., "in", "out") as the key
-                    const portKey = portData.portId || portName || 'data';
+                    const portKey = portData.portId || portName || direction;
 
-                    // Update canvas with port data based on direction
-                    // Use API response's direction (more reliable than parsing @ suffix)
-                    if (portData.direction === 'out') {
+                    if (isOutputPort) {
                         canvasRef.current.updateNodeFromServer(nodeId, {
                             outputData: { [portKey]: dataPacket },
                         });
@@ -396,40 +248,19 @@ export const FlowEditorPage = () => {
                             inputData: { [portKey]: dataPacket },
                         });
                     }
-
-                    // Trigger port update highlight on the specific port
-                    // Cancel existing timeout if rapid updates occur on same port
-                    const existingTimeout = highlightTimeoutsRef.current.get(portId);
-                    if (existingTimeout) {
-                        window.clearTimeout(existingTimeout);
-                    }
-
-                    setUpdatedPort(portId);
-                    const timeoutId = window.setTimeout(() => {
-                        clearUpdatedPort(portId);
-                        highlightTimeoutsRef.current.delete(portId);
-                    }, 500);
-                    highlightTimeoutsRef.current.set(portId, timeoutId);
                 }
             } catch (error) {
-                // Port fetch failed - revert no/timestamp to allow retry
+                // Revert no on failure to allow retry
                 if (no !== undefined) {
                     const prevNo = portNoRef.current.get(portId);
-                    // Only revert if we set it (prevNo would be our 'no' value)
                     if (prevNo === no) {
                         portNoRef.current.delete(portId);
-                    }
-                } else {
-                    // Fallback: revert timestamp
-                    const currentTimestamp = portTimestampsRef.current.get(portId);
-                    if (currentTimestamp === timestamp) {
-                        portTimestampsRef.current.delete(portId);
                     }
                 }
                 console.debug('[handlePortUpdate] Failed to fetch port data:', portId, error);
             }
         },
-        [setUpdatedPort, clearUpdatedPort]
+        [setUpdatedPort, clearUpdatedPort, blockRegistry, currentFlowId]
     );
 
     // Cleanup highlight timeouts on unmount
@@ -548,11 +379,15 @@ export const FlowEditorPage = () => {
                 setIsAppReady(true);
 
                 // Wait for canvas to mount after render
-                const waitForCanvas = () => {
+                const waitForCanvas = async () => {
                     if (canvasRef.current) {
                         if (initialFlow) {
-                            canvasRef.current.loadWorkflow(initialFlow);
-                            lastSavedStateRef.current = serializeWorkflowState(initialFlow);
+                            try {
+                                await canvasRef.current.loadWorkflow(initialFlow);
+                                lastSavedStateRef.current = serializeWorkflowState(initialFlow);
+                            } catch (error) {
+                                console.error('[FlowEditor] Failed to load workflow:', error);
+                            }
                         }
                         if (loadedId) {
                             updateUrl(loadedId, nodeIdFromHash);
@@ -711,11 +546,11 @@ export const FlowEditorPage = () => {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = event => {
+        reader.onload = async event => {
             try {
                 const json = JSON.parse(event.target?.result as string);
                 if (canvasRef.current && json.nodes && (json.edges || json.connections)) {
-                    canvasRef.current.loadWorkflow(json);
+                    await canvasRef.current.loadWorkflow(json);
                     lastSavedStateRef.current = null;
                     showNotification(t('flowEditor.workflowImported'), 'success');
                 } else {
