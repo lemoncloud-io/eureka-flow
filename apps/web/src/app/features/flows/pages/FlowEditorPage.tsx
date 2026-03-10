@@ -71,7 +71,10 @@ export const FlowEditorPage = () => {
 
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
-            const { nodeId, isPort, parentNodeId, state, progress, no } = info;
+            const { nodeId, flowId, isPort, parentNodeId, state, progress, no } = info;
+
+            // Skip if not for current flow (socket channel is shared)
+            if (flowId && flowId !== currentFlowId) return;
 
             // Check if this update is stale based on sequence number (no)
             // Higher 'no' means more recent - skip if we've seen equal or higher number
@@ -146,7 +149,7 @@ export const FlowEditorPage = () => {
                 }
             }
         },
-        [blockRegistry]
+        [blockRegistry, currentFlowId]
     );
 
     // Track port sequence numbers to detect stale updates (higher no = newer)
@@ -168,7 +171,10 @@ export const FlowEditorPage = () => {
      */
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
-            const { portId, nodeId, portName, no } = info;
+            const { portId, nodeId, flowId, portName, no } = info;
+
+            // Skip if not for current flow (socket channel is shared)
+            if (flowId && flowId !== currentFlowId) return;
 
             // Check if this update is stale based on sequence number (no)
             // Higher 'no' means more recent - skip if we've seen equal or higher number
@@ -247,7 +253,7 @@ export const FlowEditorPage = () => {
                 console.debug('[handlePortUpdate] Failed to fetch port data:', portId, error);
             }
         },
-        [setUpdatedPort, clearUpdatedPort, blockRegistry]
+        [setUpdatedPort, clearUpdatedPort, blockRegistry, currentFlowId]
     );
 
     // Cleanup highlight timeouts on unmount
