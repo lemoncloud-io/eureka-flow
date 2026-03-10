@@ -10,6 +10,7 @@ import {
     estimateNodeHeight,
     getEffectiveState,
     getNodeWidth,
+    getPortData,
     loadFlow,
     runNode,
     shouldUpdateState,
@@ -41,18 +42,19 @@ import {
     wouldCreateCycle,
 } from '../utils';
 
-import type { NodeState, PortDataResponse } from '@flows/flows';
+import type { LoadFlowPortData, NodeState } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 /** Extended WorkflowState with optional ports array from LoadFlowResult */
 interface WorkflowStateWithPorts extends WorkflowState {
-    ports?: PortDataResponse[];
+    ports?: LoadFlowPortData[];
 }
 
 export interface WorkflowCanvasRef {
     addNode: (type: string) => void;
     getWorkflow: () => WorkflowState;
-    loadWorkflow: (state: WorkflowStateWithPorts) => void;
+    /** Load workflow from server data. Fetches missing port data (data: null) via API. */
+    loadWorkflow: (state: WorkflowStateWithPorts) => Promise<void>;
     clearWorkflow: () => void;
     newWorkflow: () => void;
     undo: () => void;
@@ -567,7 +569,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     nodes,
                     edges: connections.filter(c => !pendingEdgeIds.has(c.id)),
                 }),
-                loadWorkflow: (state: WorkflowStateWithPorts) => {
+                loadWorkflow: async (state: WorkflowStateWithPorts) => {
                     // Normalize nodes to ensure config is never undefined
                     const loadedNodes = (state.nodes ?? []).map(n => ({
                         ...n,
@@ -577,27 +579,51 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const rawConnections = state.edges ?? state.connections ?? [];
                     const loadedConnections = deduplicateEdges(rawConnections);
 
+                    // Step 0: Fetch missing port data (data: null) via API
+                    // Server returns ports array but some may have data: null
+                    // These need to be fetched individually via GET /nodes/:portId/port
+                    const ports = state.ports ?? [];
+                    const nullDataPorts = ports.filter(p => p.data === null && p.portId);
+
+                    if (nullDataPorts.length > 0) {
+                        await Promise.all(
+                            nullDataPorts.map(async p => {
+                                try {
+                                    const direction = p.portId === 'out' ? 'out' : 'in';
+                                    const portData = await getPortData(p.id, direction);
+                                    if (portData.data) {
+                                        // Mutate in place - safe since ports is local to this method
+                                        (p as { data: DataPacket | null }).data = portData.data;
+                                    }
+                                } catch {
+                                    // Silent fail - port stays null, logged for debugging
+                                    console.warn('[WorkflowCanvas] Failed to fetch port:', p.id);
+                                }
+                            })
+                        );
+                    }
+
                     // Step 1: Apply port data from ports[] array to nodes' outputData
                     // This populates actual DataPacket values from persisted port data
                     // Must run BEFORE propagation so source nodes have real data to propagate
-                    const ports = state.ports ?? [];
                     const nodesWithPortData = ports.length
                         ? loadedNodes.map(node => {
-                              const nodePorts = ports.filter(
-                                  p => p.nodeId === node.id && p.portId && p.data && p.direction
-                              );
+                              // Filter ports for this node that have valid data
+                              // Note: LoadFlowPortData doesn't have direction field, infer from portId
+                              const nodePorts = ports.filter(p => p.nodeId === node.id && p.portId && p.data);
                               if (nodePorts.length === 0) return node;
 
                               let inputData = { ...node.inputData };
                               let outputData = { ...node.outputData };
 
                               for (const port of nodePorts) {
-                                  const { portId, data, direction } = port;
+                                  const { portId, data } = port;
                                   if (!portId || !data) continue;
-                                  if (direction === 'in') {
-                                      inputData = { ...inputData, [portId]: data };
-                                  } else {
+                                  // Infer direction from portId: "out" = output, otherwise input
+                                  if (portId === 'out') {
                                       outputData = { ...outputData, [portId]: data };
+                                  } else {
+                                      inputData = { ...inputData, [portId]: data };
                                   }
                               }
 

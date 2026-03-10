@@ -56,7 +56,7 @@ export const FlowEditorPage = () => {
             try {
                 const flowData = await loadFlowById(flowId);
                 if (canvasRef.current && flowData) {
-                    canvasRef.current.loadWorkflow(flowData);
+                    await canvasRef.current.loadWorkflow(flowData);
                     lastSavedStateRef.current = serializeWorkflowState(flowData);
                 }
             } catch (error) {
@@ -372,11 +372,15 @@ export const FlowEditorPage = () => {
                 setIsAppReady(true);
 
                 // Wait for canvas to mount after render
-                const waitForCanvas = () => {
+                const waitForCanvas = async () => {
                     if (canvasRef.current) {
                         if (initialFlow) {
-                            canvasRef.current.loadWorkflow(initialFlow);
-                            lastSavedStateRef.current = serializeWorkflowState(initialFlow);
+                            try {
+                                await canvasRef.current.loadWorkflow(initialFlow);
+                                lastSavedStateRef.current = serializeWorkflowState(initialFlow);
+                            } catch (error) {
+                                console.error('[FlowEditor] Failed to load workflow:', error);
+                            }
                         }
                         if (loadedId) {
                             updateUrl(loadedId, nodeIdFromHash);
@@ -535,11 +539,11 @@ export const FlowEditorPage = () => {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = event => {
+        reader.onload = async event => {
             try {
                 const json = JSON.parse(event.target?.result as string);
                 if (canvasRef.current && json.nodes && (json.edges || json.connections)) {
-                    canvasRef.current.loadWorkflow(json);
+                    await canvasRef.current.loadWorkflow(json);
                     lastSavedStateRef.current = null;
                     showNotification(t('flowEditor.workflowImported'), 'success');
                 } else {

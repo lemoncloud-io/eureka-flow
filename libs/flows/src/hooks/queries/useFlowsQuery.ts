@@ -3,7 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { flowsKeys } from './keys';
 import { createFlow, loadFlow, saveFlow, updateFlowMetadata } from '../../api';
 
-import type { FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../../types';
+import type {
+    FlowView,
+    LoadFlowPortData,
+    LoadFlowResult,
+    SaveFlowBody,
+    SaveFlowView,
+    UpdateFlowBody,
+} from '../../types';
 
 // NOTE: useFlowsListQuery and useFlowQuery are removed because
 // the backend does not support GET /flows or GET /flows/:id endpoints.
@@ -102,4 +109,4 @@ export const useUpdateFlowMutation = () => {
 };
 
 // Re-export types for convenience
-export type { FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody };
+export type { FlowView, LoadFlowPortData, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody };

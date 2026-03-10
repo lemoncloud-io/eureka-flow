@@ -118,4 +118,12 @@ export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'):
 
 // Re-export types for convenience
 export type { BlockDefinition, DataPacket, LogEntry };
-export type { FlowBody, FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../types';
+export type {
+    FlowBody,
+    FlowView,
+    LoadFlowPortData,
+    LoadFlowResult,
+    SaveFlowBody,
+    SaveFlowView,
+    UpdateFlowBody,
+} from '../types';
