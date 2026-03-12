@@ -158,6 +158,11 @@ jobs:
               env:
                   BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
                   PROD_CF_DISTRIBUTION_ID: ${{ secrets.PROD_CF_DISTRIBUTION_ID }}
+                  VITE_ENV: PROD
+                  VITE_PROJECT: FLOWS
+                  VITE_API_URL: ${{ secrets.VITE_PROD_API_URL }}
+                  VITE_WS_ENDPOINT: ${{ secrets.VITE_PROD_WS_ENDPOINT }}
+                  VITE_CODES_URL: ${{ secrets.VITE_PROD_CODES_URL }}
               run: |
                   set -e
                   chmod +x scripts/deploy-${{ matrix.project }}.sh

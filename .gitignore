@@ -17,6 +17,8 @@ build/
 .env.local
 .env.*.local
 *.local
+apps/web/.env.dev
+apps/web/.env.prod
 
 # Editor directories and files
 .vscode/*

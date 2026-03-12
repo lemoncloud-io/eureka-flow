@@ -18,7 +18,7 @@
 
 <img src="https://github.com/user-attachments/assets/placeholder" alt="Eureka Flow Demo" width="800" />
 
-*Drag, connect, and execute - visual workflow building made simple*
+_Drag, connect, and execute - visual workflow building made simple_
 
 </div>
 
@@ -39,6 +39,7 @@
 ## Features
 
 ### Visual Workflow Editor
+
 - **Drag-and-drop** node placement on an infinite canvas
 - **Bezier curve** connections between nodes
 - **Pan, zoom, and multi-select** for intuitive navigation
@@ -47,27 +48,32 @@
 - **Auto-layout** algorithm for automatic node arrangement
 
 ### Block System
+
 - **100+ pre-built blocks** organized by category (input, process, output)
 - **Port-based data flow** with typed connections
 - **Configurable block parameters** with live preview
 - **Extensible block registry** for custom blocks
 
 ### Dual Execution Modes
+
 - **Frontend blocks** — Execute directly in browser for instant feedback
 - **Backend blocks** — Server-side execution for heavy computation
 - **Real-time status tracking** — IDLE → READY → RUNNING → COMPLETED/ERROR
 
 ### Real-Time Updates
+
 - **WebSocket integration** for live node execution notifications
 - **Port data synchronization** with sequence numbering
 - **Self-echo prevention** with smart debouncing
 
 ### Seamless API Key Integration
+
 - **One-click API key generation** via [Eureka Codes Console](https://console.eureka.codes)
 - **Secure postMessage-based** key transfer between console and editor
 - **State validation** for enhanced security
 
 ### Developer Experience
+
 - **Dark/Light theme** with system preference detection
 - **Internationalization (i18n)** — English & Korean
 - **Auto-save** with configurable toggle
@@ -207,12 +213,12 @@ eureka-flow/
 
 Four Zustand stores manage different concerns:
 
-| Store | Purpose |
-|-------|---------|
-| `useCanvasStore` | Canvas UI: nodes, connections, viewport, selection |
-| `useFlowsStore` | Flow metadata: blockRegistry, flowName, saveStatus |
-| `useWebSocketStore` | WebSocket: connectionStatus, subscribers |
-| `useWebCoreStore` | Auth: apiKey, isAuthenticated, profile |
+| Store               | Purpose                                            |
+| ------------------- | -------------------------------------------------- |
+| `useCanvasStore`    | Canvas UI: nodes, connections, viewport, selection |
+| `useFlowsStore`     | Flow metadata: blockRegistry, flowName, saveStatus |
+| `useWebSocketStore` | WebSocket: connectionStatus, subscribers           |
+| `useWebCoreStore`   | Auth: apiKey, isAuthenticated, profile             |
 
 ### Data Flow
 
@@ -304,6 +310,7 @@ yarn graph              # View Nx dependency graph
 ### Import Organization
 
 ESLint enforces strict ordering:
+
 1. React and external libraries
 2. Internal `@flows/*` packages
 3. Relative imports
@@ -315,16 +322,17 @@ ESLint enforces strict ordering:
 
 Eureka Flow requires a backend API for full functionality. Key endpoints:
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /flows/:id/load` | Load flow with nodes, edges, channelId |
-| `POST /flows/:id/save` | Save flow (id='0' creates new) |
-| `POST /nodes/:id/run` | Execute node |
-| `GET /blocks/0/list` | Load block definitions |
+| Endpoint               | Purpose                                |
+| ---------------------- | -------------------------------------- |
+| `GET /flows/:id/load`  | Load flow with nodes, edges, channelId |
+| `POST /flows/:id/save` | Save flow (id='0' creates new)         |
+| `POST /nodes/:id/run`  | Execute node                           |
+| `GET /blocks/0/list`   | Load block definitions                 |
 
 ### Authentication
 
 The app uses API key-based authentication:
+
 - API key is stored in `useWebCoreStore` and localStorage
 - Requests include `x-api-key` header
 - 403 responses trigger API key dialog
@@ -353,22 +361,74 @@ yarn web:build:dev
 yarn web:build:prod
 ```
 
-### Deployment Script
+### Local Deployment Setup
 
-The `scripts/deploy-web.sh` script handles S3 deployment with CloudFront invalidation:
+For local deployment to AWS S3/CloudFront, create environment files from the template:
 
 ```bash
-# Set required environment variables
-export BUCKET_NAME=your-s3-bucket
-export DEV_CF_DISTRIBUTION_ID=your-dev-cloudfront-id
-export PROD_CF_DISTRIBUTION_ID=your-prod-cloudfront-id
+# Copy the example file
+cp apps/web/.env.example apps/web/.env.dev    # For DEV deployment
+cp apps/web/.env.example apps/web/.env.prod   # For PROD deployment
+```
 
+Edit the files with actual values (see `apps/web/.env.example` for reference).
+
+**Required environment variables:**
+
+| Variable           | Description                              |
+| ------------------ | ---------------------------------------- |
+| `VITE_ENV`         | Environment identifier (`DEV` or `PROD`) |
+| `VITE_PROJECT`     | Project name (`FLOWS`)                   |
+| `VITE_API_URL`     | API endpoint URL                         |
+| `VITE_WS_ENDPOINT` | WebSocket endpoint URL                   |
+| `VITE_CODES_URL`   | Eureka Codes console URL                 |
+
+**AWS configuration** (set via environment or AWS profile):
+
+| Variable                  | Description                               |
+| ------------------------- | ----------------------------------------- |
+| `AWS_PROFILE_NAME`        | AWS CLI profile name (default: `default`) |
+| `BUCKET_NAME`             | S3 bucket name for deployment             |
+| `DEV_CF_DISTRIBUTION_ID`  | CloudFront distribution ID for DEV        |
+| `PROD_CF_DISTRIBUTION_ID` | CloudFront distribution ID for PROD       |
+
+### Deployment Commands
+
+```bash
 # Deploy to development
+export BUCKET_NAME=your-s3-bucket
+export DEV_CF_DISTRIBUTION_ID=your-cloudfront-id
 yarn web:deploy:dev
 
 # Deploy to production
+export BUCKET_NAME=your-s3-bucket
+export PROD_CF_DISTRIBUTION_ID=your-cloudfront-id
 yarn web:deploy:prod
 ```
+
+### GitHub Actions Deployment
+
+CI/CD is configured via GitHub Actions. The following secrets must be set in your repository:
+
+| Secret                    | Description            |
+| ------------------------- | ---------------------- |
+| `AWS_ACCESS_KEY_ID`       | AWS access key         |
+| `AWS_SECRET_ACCESS_KEY`   | AWS secret key         |
+| `AWS_DEFAULT_REGION`      | AWS region             |
+| `BUCKET_NAME`             | S3 bucket name         |
+| `DEV_CF_DISTRIBUTION_ID`  | CloudFront ID for DEV  |
+| `PROD_CF_DISTRIBUTION_ID` | CloudFront ID for PROD |
+| `VITE_DEV_API_URL`        | DEV API URL            |
+| `VITE_DEV_WS_ENDPOINT`    | DEV WebSocket URL      |
+| `VITE_DEV_CODES_URL`      | DEV Eureka Codes URL   |
+| `VITE_PROD_API_URL`       | PROD API URL           |
+| `VITE_PROD_WS_ENDPOINT`   | PROD WebSocket URL     |
+| `VITE_PROD_CODES_URL`     | PROD Eureka Codes URL  |
+
+**Deployment triggers:**
+
+- Push to `develop` branch → Deploy to DEV
+- Push to `main` branch → Deploy to PROD
 
 ---
 
