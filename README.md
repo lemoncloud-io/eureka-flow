@@ -1,16 +1,24 @@
 <div align="center">
 
-# Eureka Flows
+# Eureka Flow
 
-**Visual Workflow Editor for Building Data Flow Pipelines**
+### Visual Workflow Editor for Building Data Flow Pipelines
 
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite)](https://vitejs.dev/)
-[![Nx](https://img.shields.io/badge/Nx-22-143055?logo=nx)](https://nx.dev/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-7-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Nx](https://img.shields.io/badge/Nx-22-143055?style=for-the-badge&logo=nx&logoColor=white)](https://nx.dev/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-**[Live Demo](https://flow.eureka.codes)** | [Features](#-features) | [Quick Start](#-quick-start) | [Architecture](#-architecture) | [Documentation](#-documentation)
+<br />
+
+[**Live Demo**](https://flow.eureka.codes) · [Features](#features) · [Quick Start](#quick-start) · [Architecture](#architecture) · [Contributing](#contributing)
+
+<br />
+
+<img src="https://github.com/user-attachments/assets/placeholder" alt="Eureka Flow Demo" width="800" />
+
+*Drag, connect, and execute - visual workflow building made simple*
 
 </div>
 
@@ -18,14 +26,13 @@
 
 ## Overview
 
-Eureka Flows is a powerful, browser-based visual workflow editor for creating and executing data processing pipelines. Build complex workflows by connecting pre-built blocks, execute them in real-time, and monitor execution status through WebSocket-based live updates.
-
-<!-- Screenshot placeholder -->
-<!-- ![Eureka Flows Screenshot](docs/screenshot.png) -->
+**Eureka Flow** is a powerful, browser-based visual workflow editor for creating and executing data processing pipelines. Build complex workflows by connecting pre-built blocks, execute them in real-time, and monitor execution status through WebSocket-based live updates.
 
 ### Try It Now
 
-Visit **[flow.eureka.codes](https://flow.eureka.codes)** to try Eureka Flows instantly. Get your API key from [Eureka Codes Console](https://console.eureka.codes) with just one click.
+> Visit **[flow.eureka.codes](https://flow.eureka.codes)** to try Eureka Flow instantly.
+>
+> Get your API key from [Eureka Codes Console](https://console.eureka.codes) with just one click.
 
 ---
 
@@ -46,9 +53,9 @@ Visit **[flow.eureka.codes](https://flow.eureka.codes)** to try Eureka Flows ins
 - **Extensible block registry** for custom blocks
 
 ### Dual Execution Modes
-- **Frontend blocks**: Execute directly in browser for instant feedback
-- **Backend blocks**: Server-side execution for heavy computation
-- **Real-time status tracking**: IDLE → READY → RUNNING → COMPLETED/ERROR
+- **Frontend blocks** — Execute directly in browser for instant feedback
+- **Backend blocks** — Server-side execution for heavy computation
+- **Real-time status tracking** — IDLE → READY → RUNNING → COMPLETED/ERROR
 
 ### Real-Time Updates
 - **WebSocket integration** for live node execution notifications
@@ -62,7 +69,7 @@ Visit **[flow.eureka.codes](https://flow.eureka.codes)** to try Eureka Flows ins
 
 ### Developer Experience
 - **Dark/Light theme** with system preference detection
-- **Internationalization (i18n)** support (English, Korean)
+- **Internationalization (i18n)** — English & Korean
 - **Auto-save** with configurable toggle
 - **LocalStorage caching** for session continuity
 
@@ -70,16 +77,44 @@ Visit **[flow.eureka.codes](https://flow.eureka.codes)** to try Eureka Flows ins
 
 ## Tech Stack
 
-| Category | Technology |
-|----------|------------|
-| **Framework** | React 19 |
-| **Language** | TypeScript 5.9 |
-| **Build Tool** | Vite 7 |
-| **Monorepo** | Nx 22 |
-| **State Management** | Zustand 5 |
-| **Server State** | TanStack Query 5 |
-| **Styling** | Tailwind CSS + shadcn/ui |
-| **Testing** | Vitest |
+<table>
+<tr>
+<td><b>Category</b></td>
+<td><b>Technology</b></td>
+</tr>
+<tr>
+<td>Framework</td>
+<td><img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" alt="React" /></td>
+</tr>
+<tr>
+<td>Language</td>
+<td><img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></td>
+</tr>
+<tr>
+<td>Build Tool</td>
+<td><img src="https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white" alt="Vite" /></td>
+</tr>
+<tr>
+<td>Monorepo</td>
+<td><img src="https://img.shields.io/badge/Nx-22-143055?logo=nx&logoColor=white" alt="Nx" /></td>
+</tr>
+<tr>
+<td>State Management</td>
+<td><img src="https://img.shields.io/badge/Zustand-5-brown?logo=npm" alt="Zustand" /></td>
+</tr>
+<tr>
+<td>Server State</td>
+<td><img src="https://img.shields.io/badge/TanStack_Query-5-FF4154?logo=reactquery&logoColor=white" alt="TanStack Query" /></td>
+</tr>
+<tr>
+<td>Styling</td>
+<td><img src="https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS" /> <img src="https://img.shields.io/badge/shadcn/ui-black?logo=shadcnui&logoColor=white" alt="shadcn/ui" /></td>
+</tr>
+<tr>
+<td>Testing</td>
+<td><img src="https://img.shields.io/badge/Vitest-green?logo=vitest&logoColor=white" alt="Vitest" /></td>
+</tr>
+</table>
 
 ---
 
@@ -87,8 +122,8 @@ Visit **[flow.eureka.codes](https://flow.eureka.codes)** to try Eureka Flows ins
 
 ### Prerequisites
 
-- Node.js 20+ (check `.nvmrc` for exact version)
-- Yarn 1.22+
+- **Node.js 20+** (check `.nvmrc` for exact version)
+- **Yarn 1.22+**
 
 ### Installation
 
@@ -114,7 +149,7 @@ The app will be available at `http://localhost:3000`.
 1. Visit **[flow.eureka.codes](https://flow.eureka.codes)**
 2. Click "Create New Key" to open the [Eureka Codes Console](https://console.eureka.codes)
 3. Sign in and generate your API key
-4. The key is automatically transferred back to Eureka Flows
+4. The key is automatically transferred back to Eureka Flow
 5. Start building your workflows!
 
 ---
@@ -200,8 +235,8 @@ FlowEditorPage (orchestrator)
 
 ```
 ┌─────────────────────┐     postMessage      ┌──────────────────────┐
-│   Eureka Flows      │ ◄──────────────────► │   Eureka Codes       │
-│   (flow.eureka.codes)│     (API Key)       │  (console.eureka.codes)│
+│    Eureka Flow      │ ◄──────────────────► │   Eureka Codes       │
+│ (flow.eureka.codes) │      (API Key)       │(console.eureka.codes)│
 └─────────────────────┘                       └──────────────────────┘
          │                                              │
          │ 1. Click "Create New Key"                    │
@@ -278,7 +313,7 @@ ESLint enforces strict ordering:
 
 ## API Integration
 
-Eureka Flows requires a backend API for full functionality. Key endpoints:
+Eureka Flow requires a backend API for full functionality. Key endpoints:
 
 | Endpoint | Purpose |
 |----------|---------|
@@ -337,13 +372,6 @@ yarn web:deploy:prod
 
 ---
 
-## Documentation
-
-- **Live Demo**: [flow.eureka.codes](https://flow.eureka.codes)
-- **API Key Console**: [console.eureka.codes](https://console.eureka.codes)
-
----
-
 ## Contributing
 
 We welcome contributions! Please follow these steps:
@@ -375,8 +403,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Related Projects
 
-- **[Eureka Codes](https://console.eureka.codes)** - API key management and developer console
-- **[Eureka Flows API](https://www.npmjs.com/package/@lemoncloud/eureka-flows-api)** - TypeScript types for the Flows API
+- **[Eureka Codes](https://console.eureka.codes)** — API key management and developer console
+- **[Eureka Flows API](https://www.npmjs.com/package/@lemoncloud/eureka-flows-api)** — TypeScript types for the Flows API
 
 ---
 
@@ -384,6 +412,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 Made with :purple_heart: by [LemonCloud](https://github.com/lemoncloud-io)
 
-[Website](https://lemoncloud.io) | [GitHub](https://github.com/lemoncloud-io)
+[Website](https://lemoncloud.io) · [GitHub](https://github.com/lemoncloud-io)
 
 </div>
