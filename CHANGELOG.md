@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-12] - root@0.5.0, @flows/web@0.5.0
+
+### Features
+
+- clean git history
+
 ## [2026-03-10] - root@0.4.1, @flows/web@0.4.1
 
 ### Refactor
