@@ -43,12 +43,20 @@ const htmlEnvInjectionPlugin = (env: Record<string, string>) => {
 };
 
 export default defineConfig(({ mode }) => {
-    // Clear pre-loaded VITE_ vars so loadEnv can properly load mode-specific values
+    // Backup VITE_ vars from process.env (set by GitHub Actions or CI environment)
+    const processEnvViteVars: Record<string, string> = {};
     Object.keys(process.env)
         .filter(key => key.startsWith('VITE_'))
-        .forEach(key => delete process.env[key]);
+        .forEach(key => {
+            processEnvViteVars[key] = process.env[key] as string;
+        });
 
-    const env = loadEnv(mode, import.meta.dirname, '');
+    // Load env from .env files (e.g., .env.dev, .env.prod)
+    const fileEnv = loadEnv(mode, import.meta.dirname, '');
+
+    // Merge: process.env (CI) < fileEnv (local files)
+    // Local .env files take precedence over CI environment variables
+    const env = { ...processEnvViteVars, ...fileEnv };
 
     return {
         root: import.meta.dirname,
