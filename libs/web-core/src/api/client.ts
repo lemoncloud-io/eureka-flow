@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import { API_URL } from '../core';
 import { useWebCoreStore } from '../stores/useWebCoreStore';
+import { getApiEndpointPath } from '../utils/apiEndpoint';
 import { classifyError } from '../utils/error';
 
 import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
@@ -37,11 +38,13 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 /**
- * Request interceptor: Add x-api-key header
+ * Request interceptor: Add x-api-key header and set dynamic baseURL
  */
 apiClient.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
         const apiKey = useWebCoreStore.getState().apiKey;
+        config.baseURL = `${API_URL}${getApiEndpointPath(apiKey)}`;
+
         if (apiKey) {
             config.headers['x-api-key'] = apiKey;
         }
