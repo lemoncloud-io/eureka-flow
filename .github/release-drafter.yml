@@ -32,7 +32,7 @@ replacers:
     - search: 'shy-lemon'
       replace: '샤이'
     - search: '/#(\d+)/g'
-      replace: '[#$1](https://github.com/lemoncloud-io/eureka-flows-front/pull/$1)'
+      replace: '[#$1](https://github.com/lemoncloud-io/eureka-flow/pull/$1)'
 version-resolver:
     major:
         labels:

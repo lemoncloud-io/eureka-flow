@@ -15,8 +15,7 @@ import type { SystemInfo } from '../types';
  * @returns System info including component versions
  */
 export const getSystemInfo = async (): Promise<SystemInfo> => {
-    // API_URL: https://YOUR_API_HOST/flw-d1/_apis
-    // Need to call: https://YOUR_API_HOST/flw-d1
+    // Remove /_apis suffix to get the root endpoint
     const baseUrl = API_URL.replace('/_apis', '');
     const response = await axios.get<string>(baseUrl, {
         responseType: 'text',

@@ -5,9 +5,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 APP_NAME="web"
-BUCKET_NAME="eureka-flows-front"
-DEV_DISTRIBUTION_ID="YOUR_DEV_CF_ID"
-PROD_DISTRIBUTION_ID="YOUR_PROD_CF_ID"
+
+# Configurable via environment variables
+BUCKET_NAME="${BUCKET_NAME:-your-s3-bucket}"
+DEV_DISTRIBUTION_ID="${DEV_CF_DISTRIBUTION_ID:-}"
+PROD_DISTRIBUTION_ID="${PROD_CF_DISTRIBUTION_ID:-}"
 DIST_DIR="${PROJECT_ROOT}/dist/apps/${APP_NAME}"
 CACHE_CONTROL_NO_CACHE="max-age=0,no-cache,no-store,must-revalidate"
 CACHE_CONTROL_LOCALES="max-age=0,s-maxage=0,no-cache,no-store,must-revalidate,proxy-revalidate"
@@ -61,8 +63,10 @@ setup_aws_profile() {
         log_info "Running in GitHub Actions - using default AWS credentials"
         AWS_PROFILE=""
     else
-        log_info "Using AWS profile: default"
-        AWS_PROFILE="--profile lemon"
+        # Set your AWS profile name here or use AWS_PROFILE environment variable
+        local profile_name="${AWS_PROFILE_NAME:-default}"
+        log_info "Using AWS profile: ${profile_name}"
+        AWS_PROFILE="--profile ${profile_name}"
     fi
 }
 

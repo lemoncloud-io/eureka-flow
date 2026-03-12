@@ -155,6 +155,9 @@ jobs:
                   aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
 
             - name: Deploy to PROD
+              env:
+                  BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+                  PROD_CF_DISTRIBUTION_ID: ${{ secrets.PROD_CF_DISTRIBUTION_ID }}
               run: |
                   set -e
                   chmod +x scripts/deploy-${{ matrix.project }}.sh
