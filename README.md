@@ -383,26 +383,27 @@ Edit the files with actual values (see `apps/web/.env.example` for reference).
 | `VITE_WS_ENDPOINT` | WebSocket endpoint URL                   |
 | `VITE_CODES_URL`   | Eureka Codes console URL                 |
 
-**AWS configuration** (set via environment or AWS profile):
+**AWS configuration** (create `.env.deploy` from `.env.deploy.example`):
 
-| Variable                  | Description                               |
-| ------------------------- | ----------------------------------------- |
-| `AWS_PROFILE_NAME`        | AWS CLI profile name (default: `default`) |
-| `BUCKET_NAME`             | S3 bucket name for deployment             |
-| `DEV_CF_DISTRIBUTION_ID`  | CloudFront distribution ID for DEV        |
-| `PROD_CF_DISTRIBUTION_ID` | CloudFront distribution ID for PROD       |
+```bash
+# Copy the example file
+cp .env.deploy.example .env.deploy
+```
+
+| Variable                  | Description                          |
+| ------------------------- | ------------------------------------ |
+| `AWS_PROFILE_NAME`        | AWS CLI profile name (e.g., `lemon`) |
+| `BUCKET_NAME`             | S3 bucket name for deployment        |
+| `DEV_CF_DISTRIBUTION_ID`  | CloudFront distribution ID for DEV   |
+| `PROD_CF_DISTRIBUTION_ID` | CloudFront distribution ID for PROD  |
 
 ### Deployment Commands
 
 ```bash
-# Deploy to development
-export BUCKET_NAME=your-s3-bucket
-export DEV_CF_DISTRIBUTION_ID=your-cloudfront-id
+# Deploy to development (uses .env.deploy for AWS config)
 yarn web:deploy:dev
 
-# Deploy to production
-export BUCKET_NAME=your-s3-bucket
-export PROD_CF_DISTRIBUTION_ID=your-cloudfront-id
+# Deploy to production (uses .env.deploy for AWS config)
 yarn web:deploy:prod
 ```
 
