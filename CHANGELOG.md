@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-03-12] - root@0.6.0, @flows/web@0.6.0
+
+### Features
+
+- (api) add dynamic API endpoint
+
+### Documentation
+
+- update README with new demo image
+- update README and add LICENSE file
+
+### Chores
+
+- add issue templates and contributing guidelines
+- (ci) update github actions and environment variables
+
+### Other
+
+- ci: add local deployment configuration
+
 ## [2026-03-12] - root@0.5.0, @flows/web@0.5.0
 
 ### Features
