@@ -6,6 +6,30 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 APP_NAME="web"
 
+# Load local AWS configuration if running locally (not in GitHub Actions)
+load_local_config() {
+    if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
+        local config_file="${PROJECT_ROOT}/.env.deploy"
+        if [ -f "$config_file" ]; then
+            log_info "Loading local config from ${config_file}"
+            # shellcheck disable=SC1090
+            source "$config_file"
+        else
+            log_info "No local config found at ${config_file}"
+            log_info "Create .env.deploy with BUCKET_NAME, AWS_PROFILE_NAME, etc."
+            log_info "See README.md for details."
+        fi
+    fi
+}
+
+# Simple log function for early use (before main log functions)
+log_info() {
+    echo "[INFO] $1"
+}
+
+# Load config before setting variables
+load_local_config
+
 # Configurable via environment variables
 BUCKET_NAME="${BUCKET_NAME:-your-s3-bucket}"
 DEV_DISTRIBUTION_ID="${DEV_CF_DISTRIBUTION_ID:-}"

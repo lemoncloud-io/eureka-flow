@@ -6,7 +6,7 @@ import type { SystemInfo } from '../types';
 
 /**
  * Fetch system info from backend
- * GET /flw-d1 or /flw-v1 (root endpoint without /_apis)
+ * GET /flw-d1 or /flw-v1 (root endpoint, no /_apis or /_api_ suffix)
  *
  * Response format (plain text):
  * eureka-flows-api/0.26.227b
@@ -15,8 +15,8 @@ import type { SystemInfo } from '../types';
  * @returns System info including component versions
  */
 export const getSystemInfo = async (): Promise<SystemInfo> => {
-    // Remove /_apis suffix to get the root endpoint
-    const baseUrl = API_URL.replace('/_apis', '');
+    // Use API_URL directly (no endpoint path suffix needed for root)
+    const baseUrl = API_URL;
     const response = await axios.get<string>(baseUrl, {
         responseType: 'text',
     });
