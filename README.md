@@ -16,7 +16,7 @@
 
 <br />
 
-<img src="https://github.com/user-attachments/assets/placeholder" alt="Eureka Flow Demo" width="800" />
+<img src="docs/images/eureka-flow-demo.png" alt="Eureka Flow Demo" width="800" />
 
 _Drag, connect, and execute - visual workflow building made simple_
 

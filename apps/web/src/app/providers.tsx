@@ -92,6 +92,7 @@ const ApiKeyGate = ({ children }: { children: ReactNode }) => {
 
     if (!apiKey) {
         const codesUrl = import.meta.env.VITE_CODES_URL;
+        console.log('codesUrl', codesUrl);
         return <ApiKeyDialog open={true} onSubmit={handleApiKeySubmit} error={error} codesUrl={codesUrl} />;
     }
 
