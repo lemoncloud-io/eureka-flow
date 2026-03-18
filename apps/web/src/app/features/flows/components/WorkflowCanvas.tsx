@@ -1152,7 +1152,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         if (flowId) {
                             // Send frontend execution output to server
                             // Server will save outputs to ports and propagate to downstream nodes
-                            await runNode(nodeId, { output: outputs }, { force: true });
+                            // await runNode(nodeId, { output: outputs }, { force: true });
+                            await runNode(nodeId, { config: currentNode.config || {} }, { force: true });
                         }
                     } else {
                         // ============================================================
