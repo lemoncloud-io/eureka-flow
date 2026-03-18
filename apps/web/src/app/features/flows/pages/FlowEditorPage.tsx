@@ -610,7 +610,7 @@ export const FlowEditorPage = () => {
             } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
                 e.preventDefault();
                 canvasRef.current?.redo();
-            } else if (key === 'l') {
+            } else if (key === 'a') {
                 e.preventDefault();
                 canvasRef.current?.autoLayout();
                 handlersRef.current.showNotification(t('flowEditor.autoLayoutApplied'), 'success');

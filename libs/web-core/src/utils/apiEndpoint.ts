@@ -12,6 +12,7 @@ const EUREKA_CODES_PREFIX = 'ec-' as const;
  * @remarks The prefix check is case-sensitive. Only lowercase 'ec-' is matched.
  */
 export const getApiEndpointPath = (apiKey: string | null): string => {
+    if (apiKey == '#') return ''; // no use api (might be local)
     if (apiKey?.startsWith(EUREKA_CODES_PREFIX)) {
         return API_PATH_EUREKA_CODES;
     }

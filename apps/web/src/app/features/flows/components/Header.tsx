@@ -374,7 +374,7 @@ export const Header: React.FC<HeaderProps> = ({
                             onClick={editActions.onAutoLayout}
                             icon={<LayoutGrid className="w-4 h-4" />}
                             tooltip={t('header.autoLayout')}
-                            shortcut="⌘L"
+                            shortcut="⌘A"
                         />
                         {socketState && <SocketDot {...socketState} />}
                     </div>
@@ -446,7 +446,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuItem onClick={editActions.onAutoLayout}>
                                 <LayoutGrid className="w-4 h-4 mr-2" />
                                 {t('header.autoLayout')}
-                                <DropdownMenuShortcut>⌘L</DropdownMenuShortcut>
+                                <DropdownMenuShortcut>⌘A</DropdownMenuShortcut>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={editActions.onClear} className="text-destructive">
                                 <Trash2 className="w-4 h-4 mr-2" />
