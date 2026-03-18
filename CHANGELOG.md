@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-03-18] - root@0.6.2, @flows/web@0.6.1
+
+### Bug Fixes
+
+- opt shortcut
+- run w/ config
+
 ## [2026-03-12] - root@0.6.0, @flows/web@0.6.0
 
 ### Features
