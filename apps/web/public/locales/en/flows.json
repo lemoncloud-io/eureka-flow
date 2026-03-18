@@ -275,7 +275,7 @@
                 },
                 "autoLayout": {
                     "label": "Auto layout",
-                    "keys": ["Cmd/Ctrl", "L"]
+                    "keys": ["Cmd/Ctrl", "A"]
                 },
                 "delete": {
                     "label": "Delete selected",

@@ -275,7 +275,7 @@
                 },
                 "autoLayout": {
                     "label": "자동 정렬",
-                    "keys": ["Cmd/Ctrl", "L"]
+                    "keys": ["Cmd/Ctrl", "A"]
                 },
                 "delete": {
                     "label": "선택 항목 삭제",
