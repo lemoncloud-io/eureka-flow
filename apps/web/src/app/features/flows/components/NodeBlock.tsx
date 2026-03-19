@@ -149,6 +149,10 @@ const getPortTypeIcon = (portType: string): React.ElementType | null => {
  * IMPORTANT: Use complete static class names for Tailwind's static analyzer.
  * Dynamic interpolation like `bg-${color}` will NOT be detected at build time.
  */
+/** Duration badge auto-hide timing (ms) */
+const DURATION_BADGE_VISIBLE_MS = 1000;
+const DURATION_BADGE_FADE_MS = 500;
+
 const PORT_TYPE_STYLES = {
     text: {
         connected: 'bg-port-text border-port-text',
@@ -956,6 +960,31 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const displayDuration =
         duration != null ? (duration > 1000 ? `${(duration / 1000).toFixed(2)}s` : `${duration}ms`) : null;
 
+    // Auto-hide duration badge: visible during RUNNING, fade-out after COMPLETED/ERROR
+    const [durationBadgePhase, setDurationBadgePhase] = useState<'hidden' | 'visible' | 'fading'>('hidden');
+
+    useEffect(() => {
+        if (nodeState === 'RUNNING') {
+            setDurationBadgePhase('visible');
+            return;
+        }
+
+        if (nodeState === 'COMPLETED' || nodeState === 'ERROR') {
+            setDurationBadgePhase('visible');
+            const fadeTimer = window.setTimeout(() => setDurationBadgePhase('fading'), DURATION_BADGE_VISIBLE_MS);
+            const hideTimer = window.setTimeout(
+                () => setDurationBadgePhase('hidden'),
+                DURATION_BADGE_VISIBLE_MS + DURATION_BADGE_FADE_MS
+            );
+            return () => {
+                clearTimeout(fadeTimer);
+                clearTimeout(hideTimer);
+            };
+        }
+
+        setDurationBadgePhase('hidden');
+    }, [nodeState]);
+
     // Resize state
     const [isResizing, setIsResizing] = useState(false);
     const [localWidth, setLocalWidth] = useState<number | undefined>(undefined);
@@ -1380,9 +1409,14 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 </div>
             )}
 
-            {/* Duration Badge */}
-            {displayDuration && (
-                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-[9px] text-white/90 px-1.5 py-0.5 rounded font-mono pointer-events-none">
+            {/* Duration Badge - visible during RUNNING, fade-out after completion */}
+            {displayDuration && durationBadgePhase !== 'hidden' && (
+                <div
+                    className={cn(
+                        'absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-[9px] text-white/90 px-1.5 py-0.5 rounded font-mono pointer-events-none transition-opacity duration-500',
+                        durationBadgePhase === 'fading' ? 'opacity-0' : 'opacity-100'
+                    )}
+                >
                     {displayDuration}
                 </div>
             )}
