@@ -141,7 +141,15 @@
             "success": "Touch 요청이 성공적으로 전송되었습니다",
             "error": "Touch 요청 전송 실패"
         },
-        "editImage": "이미지 편집"
+        "editImage": "이미지 편집",
+        "fileOrImage": "이미지 / 파일",
+        "supportedFormats": "이미지 또는 텍스트 파일 (.txt, .html)",
+        "viewFile": "파일 보기",
+        "editFile": "편집",
+        "saveFile": "저장",
+        "cancelEdit": "취소",
+        "removeFile": "파일 제거",
+        "fileAttached": "파일 첨부됨"
     },
     "imageEditor": {
         "title": "이미지 편집",

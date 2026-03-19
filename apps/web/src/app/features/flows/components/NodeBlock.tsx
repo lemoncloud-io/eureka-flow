@@ -39,9 +39,18 @@ import { cn } from '@flows/lib/utils';
 import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
 import { ContentPreviewModal } from './ContentPreviewModal';
+import { FilePreviewDialog } from './FilePreviewDialog';
 import { S3Image } from './S3Image';
 import { TooltipContentRenderer } from './TooltipContentRenderer';
-import { arePortTypesCompatible, getPortStyleKey, getVisiblePorts, tryParseJson } from '../utils';
+import {
+    INPUT_FILE_ACCEPT,
+    arePortTypesCompatible,
+    clearFileConfig,
+    getPortStyleKey,
+    getVisiblePorts,
+    isTextFile,
+    tryParseJson,
+} from '../utils';
 
 import type { ConnectionDraftInfo } from '../utils';
 import type { BlockDefinitionWithFrontend, DataPacket, NodeData, NodeState, PortDefinition } from '@flows/flows';
@@ -509,26 +518,49 @@ interface EditableVisualizationProps {
 const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({ node, onConfigChange }) => {
     const { t } = useTranslation(['nodes']);
     const [isUploading, setIsUploading] = useState(false);
-    // Server uses 'image' key for input-image config
+    const [isFilePreviewOpen, setIsFilePreviewOpen] = useState(false);
+
     const img = node.config?.imageData as string | undefined;
+    const fileData = node.config?.fileData as string | undefined;
+    const fileName = node.config?.fileName as string | undefined;
     const fileInputId = `inline-image-${node.id}`;
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            setIsUploading(true);
-            const reader = new FileReader();
-            reader.onload = async evt => {
-                const dataUrl = evt.target?.result as string;
-                if (dataUrl) {
-                    const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
-                    onConfigChange('imageData', compressed);
-                }
+        if (!file) return;
+
+        setIsUploading(true);
+        const reader = new FileReader();
+        reader.onload = async evt => {
+            const dataUrl = evt.target?.result as string;
+            if (!dataUrl) {
                 setIsUploading(false);
-            };
-            reader.onerror = () => setIsUploading(false);
-            reader.readAsDataURL(file);
-        }
+                return;
+            }
+
+            if (isTextFile(file)) {
+                onConfigChange('fileData', dataUrl);
+                onConfigChange('fileName', file.name);
+                onConfigChange('fileType', file.type || 'text/plain');
+                onConfigChange('imageData', '');
+            } else {
+                const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
+                onConfigChange('imageData', compressed);
+                clearFileConfig(onConfigChange);
+            }
+            setIsUploading(false);
+        };
+        reader.onerror = () => setIsUploading(false);
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    };
+
+    const handleFileDelete = () => {
+        clearFileConfig(onConfigChange);
+    };
+
+    const handleFileEdit = (newDataUrl: string) => {
+        onConfigChange('fileData', newDataUrl);
     };
 
     return (
@@ -537,14 +569,20 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
             onDoubleClick={e => e.stopPropagation()}
             onWheel={e => e.stopPropagation()}
         >
-            <input type="file" accept="image/*" className="hidden" id={fileInputId} onChange={handleImageUpload} />
+            <input
+                type="file"
+                accept={INPUT_FILE_ACCEPT}
+                className="hidden"
+                id={fileInputId}
+                onChange={handleFileUpload}
+            />
             {isUploading ? (
                 <div className="rounded-lg border border-dashed border-primary/60 overflow-hidden bg-black/20 h-24 flex items-center justify-center">
                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
                         <Loader2 className="w-4 h-4 text-primary animate-spin" />
                     </div>
                 </div>
-            ) : img ? (
+            ) : img && !fileData ? (
                 <div className="relative group rounded-lg border border-border overflow-hidden bg-black/20 min-h-[96px]">
                     <label
                         htmlFor={fileInputId}
@@ -564,6 +602,37 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
                     >
                         <X className="w-3 h-3" />
                     </button>
+                </div>
+            ) : fileData ? (
+                <div className="relative group rounded-lg border border-border overflow-hidden bg-black/20">
+                    <button
+                        type="button"
+                        onClick={() => setIsFilePreviewOpen(true)}
+                        className="w-full flex items-center gap-2 p-3 text-left hover:bg-black/30 transition-colors"
+                    >
+                        <ScrollText className="w-4 h-4 text-primary shrink-0" />
+                        <span className="text-[11px] text-foreground/80 truncate flex-1">{fileName || 'file'}</span>
+                        <Expand className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                    <button
+                        onClick={e => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            handleFileDelete();
+                        }}
+                        className="absolute top-1.5 right-1.5 p-1 bg-black/60 hover:bg-black/80 text-white rounded-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title={t('visualization.removeImage')}
+                    >
+                        <X className="w-3 h-3" />
+                    </button>
+                    <FilePreviewDialog
+                        open={isFilePreviewOpen}
+                        onOpenChange={setIsFilePreviewOpen}
+                        fileData={fileData}
+                        fileName={fileName || 'file'}
+                        onDelete={handleFileDelete}
+                        onEdit={handleFileEdit}
+                    />
                 </div>
             ) : (
                 <label

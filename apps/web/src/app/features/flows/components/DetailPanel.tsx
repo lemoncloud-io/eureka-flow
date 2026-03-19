@@ -36,11 +36,12 @@ import { cn } from '@flows/lib/utils';
 import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
 import { ContentPreviewModal } from './ContentPreviewModal';
+import { FilePreviewDialog } from './FilePreviewDialog';
 import { FrontendBadge } from './FrontendBadge';
 import { ImageEditorDialog } from './ImageEditorDialog';
 import { S3Image } from './S3Image';
 import { TouchDialog } from './TouchDialog';
-import { tryParseJson } from '../utils';
+import { INPUT_FILE_ACCEPT, clearFileConfig, isTextFile, tryParseJson } from '../utils';
 
 import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@flows/flows';
 
@@ -153,32 +154,44 @@ interface InputImageConfigProps {
 
 const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChange, t }) => {
     const img = node.config?.imageData as string | undefined;
+    const fileData = node.config?.fileData as string | undefined;
+    const fileName = node.config?.fileName as string | undefined;
+
     const { src: resolvedSrc, isLoading } = useS3Image(img || '');
     const [isEditorOpen, setIsEditorOpen] = useState(false);
+    const [isFilePreviewOpen, setIsFilePreviewOpen] = useState(false);
 
     // Get config values for image processing
     const aspectRatio = node.config?.aspectRatio as string | undefined;
     const maxWidth = node.config?.maxWidth as string | undefined;
     const bypass = node.config?.bypass as string | undefined;
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = async evt => {
-                const dataUrl = evt.target?.result as string;
-                if (dataUrl) {
-                    // Process image with config (crop/resize based on aspectRatio, maxWidth, bypass)
-                    const processed = await processImageWithConfig(dataUrl, {
-                        aspectRatio,
-                        maxWidth,
-                        bypass,
-                    });
-                    onConfigChange('imageData', processed);
-                }
-            };
-            reader.readAsDataURL(file);
-        }
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async evt => {
+            const dataUrl = evt.target?.result as string;
+            if (!dataUrl) return;
+
+            if (isTextFile(file)) {
+                onConfigChange('fileData', dataUrl);
+                onConfigChange('fileName', file.name);
+                onConfigChange('fileType', file.type || 'text/plain');
+                onConfigChange('imageData', '');
+            } else {
+                const processed = await processImageWithConfig(dataUrl, {
+                    aspectRatio,
+                    maxWidth,
+                    bypass,
+                });
+                onConfigChange('imageData', processed);
+                clearFileConfig(onConfigChange);
+            }
+        };
+        reader.readAsDataURL(file);
+        e.target.value = '';
     };
 
     const handleDownload = (e: React.MouseEvent) => {
@@ -199,20 +212,35 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
         onConfigChange('imageData', croppedImageDataUrl);
     };
 
+    const handleFileDelete = () => {
+        clearFileConfig(onConfigChange);
+    };
+
+    const handleFileEdit = (newDataUrl: string) => {
+        onConfigChange('fileData', newDataUrl);
+    };
+
     const fileInputId = `detail-image-${node.id}`;
 
     return (
         <div>
             <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
-                {t('flows:detailPanel.image')}
+                {t('flows:detailPanel.fileOrImage')}
             </label>
-            <input type="file" accept="image/*" className="hidden" id={fileInputId} onChange={handleImageUpload} />
-            {img ? (
+            <input
+                type="file"
+                accept={INPUT_FILE_ACCEPT}
+                className="hidden"
+                id={fileInputId}
+                onChange={handleFileUpload}
+            />
+
+            {/* Image mode */}
+            {img && !fileData ? (
                 <div className="space-y-2">
                     {/* Image Preview */}
                     <div className="w-full h-28 bg-black/30 rounded-lg border border-border flex items-center justify-center overflow-hidden relative group">
                         <S3Image src={img} alt="Preview" className="max-w-full max-h-full object-contain" />
-                        {/* Quick action overlay (download only) */}
                         <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                                 type="button"
@@ -226,9 +254,8 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
                         </div>
                     </div>
 
-                    {/* Action Buttons - Always visible */}
+                    {/* Action Buttons */}
                     <div className="flex gap-1.5">
-                        {/* Edit Button - Primary action */}
                         <button
                             onClick={handleEditClick}
                             disabled={isLoading || !resolvedSrc}
@@ -241,16 +268,12 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
                             <Pencil className="w-3 h-3" />
                             {t('flows:detailPanel.editImage')}
                         </button>
-
-                        {/* Change Button */}
                         <label
                             htmlFor={fileInputId}
                             className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-md text-[11px] font-medium bg-muted/50 hover:bg-muted text-foreground/70 hover:text-foreground border border-border/50 cursor-pointer transition-colors"
                         >
                             <Upload className="w-3 h-3" />
                         </label>
-
-                        {/* Remove Button */}
                         <button
                             onClick={() => onConfigChange('imageData', '')}
                             className="flex items-center justify-center py-1.5 px-2.5 rounded-md text-[11px] font-medium bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/30 transition-colors"
@@ -260,7 +283,64 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
                         </button>
                     </div>
                 </div>
+            ) : fileData ? (
+                /* File mode */
+                <div className="space-y-2">
+                    {/* File card */}
+                    <button
+                        type="button"
+                        onClick={() => setIsFilePreviewOpen(true)}
+                        className="w-full flex items-center gap-2.5 p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors text-left group"
+                    >
+                        <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                            <FileText className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-foreground truncate">{fileName || 'file'}</div>
+                            <div className="text-[10px] text-muted-foreground">{t('flows:detailPanel.viewFile')}</div>
+                        </div>
+                        <Expand className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-1.5">
+                        <button
+                            onClick={() => setIsFilePreviewOpen(true)}
+                            className={cn(
+                                'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-medium transition-colors',
+                                'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30'
+                            )}
+                        >
+                            <Expand className="w-3 h-3" />
+                            {t('flows:detailPanel.viewFile')}
+                        </button>
+                        <label
+                            htmlFor={fileInputId}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-md text-[11px] font-medium bg-muted/50 hover:bg-muted text-foreground/70 hover:text-foreground border border-border/50 cursor-pointer transition-colors"
+                        >
+                            <Upload className="w-3 h-3" />
+                        </label>
+                        <button
+                            onClick={handleFileDelete}
+                            className="flex items-center justify-center py-1.5 px-2.5 rounded-md text-[11px] font-medium bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/30 transition-colors"
+                            title={t('flows:detailPanel.removeFile')}
+                        >
+                            <X className="w-3 h-3" />
+                        </button>
+                    </div>
+
+                    {/* File Preview Dialog */}
+                    <FilePreviewDialog
+                        open={isFilePreviewOpen}
+                        onOpenChange={setIsFilePreviewOpen}
+                        fileData={fileData}
+                        fileName={fileName || 'file'}
+                        onDelete={handleFileDelete}
+                        onEdit={handleFileEdit}
+                    />
+                </div>
             ) : (
+                /* Empty state */
                 <label
                     htmlFor={fileInputId}
                     className="block rounded-lg border border-dashed border-border overflow-hidden bg-black/20 h-24 cursor-pointer hover:border-primary/60 hover:bg-black/30 transition-all group"
@@ -271,6 +351,9 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
                         </div>
                         <span className="text-[10px] text-muted-foreground/70">
                             {t('flows:detailPanel.clickToUpload')}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground/50">
+                            {t('flows:detailPanel.supportedFormats')}
                         </span>
                     </div>
                 </label>
