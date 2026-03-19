@@ -2414,6 +2414,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         <div
                             className="absolute inset-0 z-50 bg-background/80 flex items-center justify-center p-10 backdrop-blur-sm"
                             onMouseDown={e => e.stopPropagation()}
+                            onWheel={e => e.stopPropagation()}
                         >
                             <div className="bg-surface border border-border w-full h-full rounded shadow-2xl flex flex-col overflow-hidden">
                                 <div className="p-3 border-b border-border flex justify-between items-center bg-muted">

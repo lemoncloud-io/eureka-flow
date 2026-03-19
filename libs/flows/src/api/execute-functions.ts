@@ -2,6 +2,19 @@ import type { BlockDefinition } from '@lemoncloud/eureka-flows-api';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/** Decode base64 data URL to text content */
+const decodeDataUrl = (dataUrl: string): string => {
+    try {
+        const base64 = dataUrl.split(',')[1];
+        if (!base64) return dataUrl;
+        return decodeURIComponent(
+            Array.from(atob(base64), c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
+        );
+    } catch {
+        return dataUrl;
+    }
+};
+
 /**
  * Create a DataPacket helper
  */
@@ -44,7 +57,8 @@ export const EXECUTE_FUNCTIONS: Record<string, ExecuteFunction> = {
     'input-image': async (_inputs, config, onProgress) => {
         if (config.fileData) {
             onProgress?.(100);
-            return { out: createPacket(config.fileData, 'text') };
+            const decoded = decodeDataUrl(String(config.fileData));
+            return { out: createPacket(decoded, 'text') };
         }
         if (!config.imageData) throw new Error('No image data provided');
         onProgress?.(100);
