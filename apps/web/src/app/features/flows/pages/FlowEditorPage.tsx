@@ -71,7 +71,7 @@ export const FlowEditorPage = () => {
 
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
-            const { nodeId, flowId, isPort, parentNodeId, state, progress, no } = info;
+            const { nodeId, flowId, isPort, parentNodeId, state, progress, no, stereo, errorMessage } = info;
 
             // Skip if flowId is missing or doesn't match current flow (socket channel is shared)
             if (!flowId || flowId !== currentFlowId) return;
@@ -101,22 +101,23 @@ export const FlowEditorPage = () => {
                 return;
             }
 
-            // ERROR state: still need API fetch for errorMessage (not sent via WebSocket)
+            // ERROR state: use socket data directly when stereo indicates completeness (0 or ''),
+            // otherwise fetch from API for errorMessage
             if (state === 'ERROR') {
-                try {
-                    const nodeData = await getNode(nodeId);
-                    canvasRef.current.updateNodeFromServer(nodeId, {
-                        state,
-                        status: state,
-                        errorMessage: nodeData.errorMessage,
-                    });
-                } catch {
-                    // Fallback: update state without errorMessage if API fails
-                    canvasRef.current.updateNodeFromServer(nodeId, {
-                        state,
-                        status: state,
-                    });
+                let errMsg = errorMessage;
+                if (stereo !== 0 && stereo !== '') {
+                    try {
+                        const nodeData = await getNode(nodeId);
+                        errMsg = nodeData.errorMessage;
+                    } catch {
+                        // API failed, proceed without errorMessage
+                    }
                 }
+                canvasRef.current.updateNodeFromServer(nodeId, {
+                    state,
+                    status: state,
+                    errorMessage: errMsg,
+                });
                 return;
             }
 
