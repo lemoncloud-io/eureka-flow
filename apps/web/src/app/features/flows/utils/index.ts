@@ -2,6 +2,25 @@ import type { Connection, NodeData, PortDefinition } from '@lemoncloud/eureka-fl
 import type { Dispatch, SetStateAction } from 'react';
 
 // ============================================================
+// Port Type Utilities
+// ============================================================
+
+/** Valid port style keys matching CSS variables (--port-type-*) */
+export type PortStyleKey = 'text' | 'image' | 'number' | 'json' | 'any';
+
+const PORT_STYLE_KEYS: Record<string, PortStyleKey> = {
+    text: 'text',
+    string: 'text',
+    image: 'image',
+    number: 'number',
+    json: 'json',
+    any: 'any',
+};
+
+/** Normalize port type string to a valid style key (e.g., 'string' → 'text') */
+export const getPortStyleKey = (portType: string): PortStyleKey => PORT_STYLE_KEYS[portType.toLowerCase()] ?? 'any';
+
+// ============================================================
 // Port Visibility Utilities
 // ============================================================
 

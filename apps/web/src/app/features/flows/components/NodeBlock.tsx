@@ -41,7 +41,7 @@ import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 import { ContentPreviewModal } from './ContentPreviewModal';
 import { S3Image } from './S3Image';
 import { TooltipContentRenderer } from './TooltipContentRenderer';
-import { arePortTypesCompatible, getVisiblePorts, tryParseJson } from '../utils';
+import { arePortTypesCompatible, getPortStyleKey, getVisiblePorts, tryParseJson } from '../utils';
 
 import type { ConnectionDraftInfo } from '../utils';
 import type { BlockDefinitionWithFrontend, DataPacket, NodeData, NodeState, PortDefinition } from '@flows/flows';
@@ -185,16 +185,6 @@ const PORT_TYPE_STYLES = {
         text: 'text-port-any',
     },
 } as const;
-
-type PortStyleKey = keyof typeof PORT_TYPE_STYLES;
-
-/** Normalize port type string to a valid style key */
-const getPortStyleKey = (portType: string): PortStyleKey => {
-    const normalized = portType.toLowerCase();
-    if (normalized === 'string') return 'text';
-    if (normalized in PORT_TYPE_STYLES) return normalized as PortStyleKey;
-    return 'any';
-};
 
 /** Get Tailwind classes for port type coloring - filled when connected, outline when disconnected */
 const getPortTypeColor = (portType: string, isConnected: boolean): string => {

@@ -2249,6 +2249,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 const targetState = getEffectiveState(targetNode?.state, targetNode?.status);
                                 const isFlowing = sourceState === 'RUNNING' || targetState === 'RUNNING';
 
+                                // Resolve source output port type for edge coloring
+                                const sourceNodeDef = blockRegistry[sourceNode?.type ?? ''];
+                                const sourcePort = sourceNodeDef?.outputs.find(p => p.id === conn.sourcePortId);
+                                const portType = sourcePort?.type ?? 'any';
+
                                 const handleHover = (e: React.MouseEvent) => {
                                     setHoveredConnectionId(conn.id);
                                     if (isActive) {
@@ -2284,6 +2289,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                         isSelected={selectedConnectionId === conn.id}
                                         isHovered={hoveredConnectionId === conn.id}
                                         isFlowing={isFlowing}
+                                        portType={portType}
                                         onMouseEnter={handleHover}
                                         onMouseMove={handleHover}
                                         onMouseLeave={handleLeave}
@@ -2306,6 +2312,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             y2={connectionDraft.mouseY}
                                             isActive={true}
                                             isDraft={true}
+                                            portType={connectionDraft.sourceType}
                                         />
                                     );
                                 })()}
