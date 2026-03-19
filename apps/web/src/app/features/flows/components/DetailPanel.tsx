@@ -41,7 +41,7 @@ import { FrontendBadge } from './FrontendBadge';
 import { ImageEditorDialog } from './ImageEditorDialog';
 import { S3Image } from './S3Image';
 import { TouchDialog } from './TouchDialog';
-import { INPUT_FILE_ACCEPT, clearFileConfig, isTextFile, tryParseJson } from '../utils';
+import { INPUT_FILE_ACCEPT, clearFileConfig, processUploadedFile, tryParseJson } from '../utils';
 
 import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@flows/flows';
 
@@ -170,27 +170,9 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
         const file = e.target.files?.[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = async evt => {
-            const dataUrl = evt.target?.result as string;
-            if (!dataUrl) return;
-
-            if (isTextFile(file)) {
-                onConfigChange('fileData', dataUrl);
-                onConfigChange('fileName', file.name);
-                onConfigChange('fileType', file.type || 'text/plain');
-                onConfigChange('imageData', '');
-            } else {
-                const processed = await processImageWithConfig(dataUrl, {
-                    aspectRatio,
-                    maxWidth,
-                    bypass,
-                });
-                onConfigChange('imageData', processed);
-                clearFileConfig(onConfigChange);
-            }
-        };
-        reader.readAsDataURL(file);
+        await processUploadedFile(file, onConfigChange, dataUrl =>
+            processImageWithConfig(dataUrl, { aspectRatio, maxWidth, bypass })
+        );
         e.target.value = '';
     };
 

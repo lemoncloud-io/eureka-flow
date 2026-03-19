@@ -196,6 +196,8 @@ export interface RunNodeOptions {
     force?: boolean;
     /** If true, propagates to downstream nodes after execution (default: true) */
     propagate?: boolean;
+    /** WebSocket connection ID for streaming execution results back to the caller */
+    connectionId?: string;
 }
 
 /**
@@ -223,6 +225,7 @@ export const runNode = async (nodeId: string, body?: RunNodeBody, options?: RunN
         if (options?.async) queryParams.push('async');
         if (options?.force) queryParams.push('force');
         if (options?.propagate === false) queryParams.push('propagate=0');
+        if (options?.connectionId) queryParams.push(`connectionId=${encodeURIComponent(options.connectionId)}`);
 
         const params = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
         const response = await api.post<NodeView>(`/nodes/${nodeId}/run${params}`, body || {});

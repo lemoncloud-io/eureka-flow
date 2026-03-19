@@ -266,6 +266,41 @@ export const clearFileConfig = (onConfigChange: (key: string, value: unknown) =>
     onConfigChange('fileType', '');
 };
 
+/**
+ * Read uploaded file and update config via onConfigChange.
+ * Text files (txt/html/json) → fileData (base64), image files → processImage callback.
+ */
+export const processUploadedFile = async (
+    file: File,
+    onConfigChange: (key: string, value: unknown) => void,
+    processImage: (dataUrl: string) => Promise<string>
+): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async evt => {
+            const dataUrl = evt.target?.result as string;
+            if (!dataUrl) {
+                resolve();
+                return;
+            }
+
+            if (isTextFile(file)) {
+                onConfigChange('fileData', dataUrl);
+                onConfigChange('fileName', file.name);
+                onConfigChange('fileType', file.type || 'text/plain');
+                onConfigChange('imageData', '');
+            } else {
+                const processed = await processImage(dataUrl);
+                onConfigChange('imageData', processed);
+                clearFileConfig(onConfigChange);
+            }
+            resolve();
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+    });
+};
+
 // ============================================================
 // JSON Parsing Utilities
 // ============================================================

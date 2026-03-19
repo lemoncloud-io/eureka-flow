@@ -48,7 +48,7 @@ import {
     clearFileConfig,
     getPortStyleKey,
     getVisiblePorts,
-    isTextFile,
+    processUploadedFile,
     tryParseJson,
 } from '../utils';
 
@@ -530,28 +530,14 @@ const InputImageVisualizationEditable: React.FC<EditableVisualizationProps> = ({
         if (!file) return;
 
         setIsUploading(true);
-        const reader = new FileReader();
-        reader.onload = async evt => {
-            const dataUrl = evt.target?.result as string;
-            if (!dataUrl) {
-                setIsUploading(false);
-                return;
-            }
-
-            if (isTextFile(file)) {
-                onConfigChange('fileData', dataUrl);
-                onConfigChange('fileName', file.name);
-                onConfigChange('fileType', file.type || 'text/plain');
-                onConfigChange('imageData', '');
-            } else {
+        try {
+            await processUploadedFile(file, onConfigChange, async dataUrl => {
                 const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
-                onConfigChange('imageData', compressed);
-                clearFileConfig(onConfigChange);
-            }
+                return compressed;
+            });
+        } finally {
             setIsUploading(false);
-        };
-        reader.onerror = () => setIsUploading(false);
-        reader.readAsDataURL(file);
+        }
         e.target.value = '';
     };
 

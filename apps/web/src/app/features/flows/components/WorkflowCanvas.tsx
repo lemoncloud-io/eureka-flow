@@ -74,6 +74,8 @@ interface WorkflowCanvasProps {
     initialData?: WorkflowState;
     /** Flow ID for syncing node changes to backend */
     flowId?: string | null;
+    /** WebSocket connection ID for streaming execution results */
+    connectionId?: string;
     onNodeSelect?: (nodeId: string | null) => void;
     onChange?: () => void;
     /** Called when user clicks "Add Node" from empty state */
@@ -197,7 +199,17 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onOpenLibrary }) => {
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
     (
-        { readOnly, initialData, flowId, onNodeSelect, onChange, onOpenLibrary, onConnectionError, onShowNotification },
+        {
+            readOnly,
+            initialData,
+            flowId,
+            connectionId,
+            onNodeSelect,
+            onChange,
+            onOpenLibrary,
+            onConnectionError,
+            onShowNotification,
+        },
         ref
     ) => {
         const { t } = useTranslation(['flows', 'nodes']);
@@ -1153,7 +1165,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             // Send frontend execution output to server
                             // Server will save outputs to ports and propagate to downstream nodes
                             // await runNode(nodeId, { output: outputs }, { force: true });
-                            await runNode(nodeId, { config: currentNode.config || {} }, { force: true });
+                            await runNode(nodeId, { config: currentNode.config || {} }, { force: true, connectionId });
                         }
                     } else {
                         // ============================================================
@@ -1200,9 +1212,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
 
                         // Step 3: Run the node (server will hydrate inputs from saved port nodes)
-                        const result = await runNode(nodeId, {
-                            config: currentNode.config || {},
-                        });
+                        const result = await runNode(
+                            nodeId,
+                            {
+                                config: currentNode.config || {},
+                            },
+                            { connectionId }
+                        );
 
                         // Use state from result if available, fallback to status for backward compatibility
                         const resultState = getEffectiveState(result?.state, result?.status);
@@ -1254,7 +1270,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [readOnly, blockRegistry, t, flowId, connections, flushPendingUpdates]
+            [readOnly, blockRegistry, t, flowId, connectionId, connections, flushPendingUpdates]
         );
 
         executeNodeRef.current = executeNode;

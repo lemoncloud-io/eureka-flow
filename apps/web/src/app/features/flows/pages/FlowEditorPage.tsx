@@ -286,6 +286,7 @@ export const FlowEditorPage = () => {
         reconnect: socketReconnect,
         reconnectAttempts,
         maxReconnectReached,
+        connectionId: socketConnectionId,
     } = useInitFlowSocket({
         channelId,
         currentFlowId,
@@ -659,6 +660,7 @@ export const FlowEditorPage = () => {
                 <WorkflowCanvas
                     ref={canvasRef}
                     flowId={currentFlowId}
+                    connectionId={socketConnectionId ?? undefined}
                     onNodeSelect={handleSelectionChange}
                     onChange={handleCanvasChange}
                     onOpenLibrary={handleOpenLibrary}

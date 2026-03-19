@@ -1,4 +1,5 @@
 export * from './blockUtils';
+export * from './dataUrl';
 export * from './flowStorage';
 export * from './imageCompression';
 export * from './imageProcessing';

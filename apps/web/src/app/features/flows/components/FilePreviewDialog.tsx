@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FileText, Pencil, Trash2, X } from 'lucide-react';
 
+import { decodeDataUrl } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Button,
@@ -26,19 +27,6 @@ export interface FilePreviewDialogProps {
     onDelete: () => void;
     onEdit?: (newDataUrl: string) => void;
 }
-
-/** Decode base64 data URL to text content */
-const decodeDataUrl = (dataUrl: string): string => {
-    try {
-        const base64 = dataUrl.split(',')[1];
-        if (!base64) return dataUrl;
-        return decodeURIComponent(
-            Array.from(atob(base64), c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
-        );
-    } catch {
-        return dataUrl;
-    }
-};
 
 /** Encode text content back to base64 data URL with proper UTF-8 support */
 const encodeToDataUrl = (content: string, mimeType: string): string => {
@@ -65,7 +53,7 @@ export const FilePreviewDialog: React.FC<FilePreviewDialogProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState('');
 
-    const decodedContent = decodeDataUrl(fileData);
+    const decodedContent = useMemo(() => decodeDataUrl(fileData), [fileData]);
 
     const handleStartEdit = () => {
         setEditContent(decodedContent);

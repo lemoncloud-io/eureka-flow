@@ -220,6 +220,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
 
     const {
         id,
+        connectionId,
         connectionStatus,
         lastMessage,
         disconnect,
@@ -385,6 +386,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
     }, [channelId, apiKey]);
 
     return {
+        connectionId,
         connect,
         disconnect,
         reconnect,
