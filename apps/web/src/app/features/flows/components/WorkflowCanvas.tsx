@@ -987,10 +987,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 status: finalState ?? n.status, // Deprecated: kept for backward compatibility
                                 errorMessage: serverData.errorMessage,
                                 // Merge executionStats to preserve existing values (startTime, duration)
-                                // when only progress is being updated
-                                executionStats: serverData.executionStats
-                                    ? { ...n.executionStats, ...serverData.executionStats }
-                                    : n.executionStats,
+                                // when only progress is being updated.
+                                // Auto-calculate duration for terminal states when startTime exists
+                                // but duration wasn't provided (e.g., COMPLETED via WebSocket)
+                                executionStats: (() => {
+                                    if (!serverData.executionStats) return n.executionStats;
+                                    const merged = { ...n.executionStats, ...serverData.executionStats };
+                                    const isTerminal = finalState === 'COMPLETED' || finalState === 'ERROR';
+                                    if (isTerminal && merged.startTime && !serverData.executionStats.duration) {
+                                        merged.duration = Date.now() - merged.startTime;
+                                    }
+                                    return merged;
+                                })(),
                                 position: serverData.position ?? n.position,
                             };
                         })
@@ -1222,11 +1230,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         // Use state from result if available, fallback to status for backward compatibility
                         const resultState = getEffectiveState(result?.state, result?.status);
-                        const isTerminalState = resultState === 'COMPLETED' || resultState === 'ERROR';
-
-                        // Only update UI for terminal states (COMPLETED/ERROR)
-                        // Non-terminal (RUNNING): already set in Step 1, WebSocket delivers final state
-                        if (resultState && isTerminalState) {
+                        if (resultState) {
+                            const isTerminalState = resultState === 'COMPLETED' || resultState === 'ERROR';
                             const duration = Date.now() - startTime;
 
                             setNodes(prev =>
@@ -1240,16 +1245,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             ...n,
                                             state: resultState as NodeState,
                                             status: resultState, // Deprecated: kept for backward compatibility
-                                            executionStats: { startTime, duration, progress: 100 },
+                                            // Terminal: finalize with progress 100
+                                            // Non-terminal (RUNNING): keep existing stats, WebSocket delivers progress
+                                            executionStats: isTerminalState
+                                                ? { startTime, duration, progress: 100 }
+                                                : n.executionStats,
                                         };
                                     }
 
                                     // API state is lower priority (e.g., WebSocket already delivered COMPLETED)
-                                    // Keep current state, but update executionStats
-                                    return {
-                                        ...n,
-                                        executionStats: { startTime, duration, progress: 100 },
-                                    };
+                                    // Only update executionStats for terminal states
+                                    return isTerminalState
+                                        ? { ...n, executionStats: { startTime, duration, progress: 100 } }
+                                        : n;
                                 })
                             );
                         }

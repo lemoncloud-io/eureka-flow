@@ -122,12 +122,15 @@ export const FlowEditorPage = () => {
             }
 
             // All other states: use socket data directly (no API fetch needed)
+            const isTerminal = state === 'COMPLETED' || state === 'ERROR';
             const executionStats =
                 state === 'RUNNING'
                     ? { startTime: Date.now(), duration: 0, progress: progress ?? 0 }
-                    : progress !== undefined
-                      ? { progress }
-                      : undefined;
+                    : isTerminal
+                      ? { progress: progress ?? 100 }
+                      : progress !== undefined
+                        ? { progress }
+                        : undefined;
 
             canvasRef.current.updateNodeFromServer(nodeId, {
                 state,
