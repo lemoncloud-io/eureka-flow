@@ -1222,7 +1222,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         // Use state from result if available, fallback to status for backward compatibility
                         const resultState = getEffectiveState(result?.state, result?.status);
-                        if (resultState) {
+                        const isTerminalState = resultState === 'COMPLETED' || resultState === 'ERROR';
+
+                        // Only update UI for terminal states (COMPLETED/ERROR)
+                        // Non-terminal (RUNNING): already set in Step 1, WebSocket delivers final state
+                        if (resultState && isTerminalState) {
                             const duration = Date.now() - startTime;
 
                             setNodes(prev =>
@@ -1240,7 +1244,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                         };
                                     }
 
-                                    // API state is lower priority (e.g., RUNNING when already COMPLETED)
+                                    // API state is lower priority (e.g., WebSocket already delivered COMPLETED)
                                     // Keep current state, but update executionStats
                                     return {
                                         ...n,
