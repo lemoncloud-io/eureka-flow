@@ -5,10 +5,12 @@ import { MousePointerClick, Plus, X } from 'lucide-react';
 
 import {
     EXECUTE_FUNCTIONS,
+    EXECUTION_FALLBACK_TIMEOUT_MS,
     LAYOUT_CONFIG,
     PORT_LAYOUT,
     estimateNodeHeight,
     getEffectiveState,
+    getNode,
     getNodeWidth,
     getPortData,
     loadFlow,
@@ -1230,8 +1232,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         // Use state from result if available, fallback to status for backward compatibility
                         const resultState = getEffectiveState(result?.state, result?.status);
+                        const isTerminalState = resultState === 'COMPLETED' || resultState === 'ERROR';
+
                         if (resultState) {
-                            const isTerminalState = resultState === 'COMPLETED' || resultState === 'ERROR';
                             const duration = Date.now() - startTime;
 
                             setNodes(prev =>
@@ -1260,6 +1263,42 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                         : n;
                                 })
                             );
+                        }
+
+                        // Fallback: if API returned non-terminal state, poll after timeout
+                        // in case WebSocket doesn't deliver the final state
+                        if (!isTerminalState) {
+                            setTimeout(async () => {
+                                const current = nodesRef.current.find(n => n.id === nodeId);
+                                const currentState = getEffectiveState(current?.state, current?.status);
+                                if (currentState !== 'RUNNING') return; // Already resolved
+
+                                try {
+                                    const nodeData = await getNode(nodeId);
+                                    const serverState = getEffectiveState(nodeData.state, nodeData.status);
+                                    if (serverState === 'COMPLETED' || serverState === 'ERROR') {
+                                        const duration = Date.now() - startTime;
+                                        setNodes(prev =>
+                                            prev.map(n =>
+                                                n.id === nodeId
+                                                    ? {
+                                                          ...n,
+                                                          state: serverState as NodeState,
+                                                          status: serverState,
+                                                          executionStats: { startTime, duration, progress: 100 },
+                                                          errorMessage:
+                                                              serverState === 'ERROR'
+                                                                  ? nodeData.errorMessage
+                                                                  : undefined,
+                                                      }
+                                                    : n
+                                            )
+                                        );
+                                    }
+                                } catch {
+                                    // API failed, node stays in current state
+                                }
+                            }, EXECUTION_FALLBACK_TIMEOUT_MS);
                         }
                     }
                 } catch (e: unknown) {
