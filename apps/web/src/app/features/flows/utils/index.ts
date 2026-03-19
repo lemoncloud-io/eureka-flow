@@ -249,12 +249,15 @@ export { wouldCreateCycle } from './graph';
 // Input File Upload Utilities
 // ============================================================
 
-/** Accepted file types for the input-image block (images + text files) */
-export const INPUT_FILE_ACCEPT = 'image/*,.txt,.text,.html,text/plain,text/html';
+/** Accepted file types for the input-image block (images + text/json files) */
+export const INPUT_FILE_ACCEPT = 'image/*,.txt,.text,.html,.json,text/plain,text/html,application/json';
 
 /** Check if a file is a text-based file (not image) */
 export const isTextFile = (file: File): boolean =>
-    file.type === 'text/plain' || file.type === 'text/html' || /\.(txt|text|html?)$/i.test(file.name);
+    file.type === 'text/plain' ||
+    file.type === 'text/html' ||
+    file.type === 'application/json' ||
+    /\.(txt|text|html?|json)$/i.test(file.name);
 
 /** Clear all file-related config keys */
 export const clearFileConfig = (onConfigChange: (key: string, value: unknown) => void): void => {

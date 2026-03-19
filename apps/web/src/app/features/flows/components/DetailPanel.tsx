@@ -285,48 +285,40 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
                 </div>
             ) : fileData ? (
                 /* File mode */
-                <div className="space-y-2">
-                    {/* File card */}
-                    <button
-                        type="button"
-                        onClick={() => setIsFilePreviewOpen(true)}
-                        className="w-full flex items-center gap-2.5 p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors text-left group"
-                    >
-                        <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                            <FileText className="w-4 h-4 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium text-foreground truncate">{fileName || 'file'}</div>
-                            <div className="text-[10px] text-muted-foreground">{t('flows:detailPanel.viewFile')}</div>
-                        </div>
-                        <Expand className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </button>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-1.5">
+                <div>
+                    <div className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-muted/30 group">
+                        {/* Clickable file info */}
                         <button
+                            type="button"
                             onClick={() => setIsFilePreviewOpen(true)}
-                            className={cn(
-                                'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-medium transition-colors',
-                                'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30'
-                            )}
+                            className="flex items-center gap-2.5 flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
                         >
-                            <Expand className="w-3 h-3" />
-                            {t('flows:detailPanel.viewFile')}
+                            <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                                <FileText className="w-3.5 h-3.5 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="text-xs font-medium text-foreground truncate">{fileName || 'file'}</div>
+                                <div className="text-[10px] text-muted-foreground">
+                                    {t('flows:detailPanel.viewFile')}
+                                </div>
+                            </div>
                         </button>
-                        <label
-                            htmlFor={fileInputId}
-                            className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-md text-[11px] font-medium bg-muted/50 hover:bg-muted text-foreground/70 hover:text-foreground border border-border/50 cursor-pointer transition-colors"
-                        >
-                            <Upload className="w-3 h-3" />
-                        </label>
-                        <button
-                            onClick={handleFileDelete}
-                            className="flex items-center justify-center py-1.5 px-2.5 rounded-md text-[11px] font-medium bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/30 transition-colors"
-                            title={t('flows:detailPanel.removeFile')}
-                        >
-                            <X className="w-3 h-3" />
-                        </button>
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-1 shrink-0">
+                            <label
+                                htmlFor={fileInputId}
+                                className="flex items-center justify-center p-1.5 rounded-md bg-muted/50 hover:bg-muted text-foreground/70 hover:text-foreground border border-border/50 cursor-pointer transition-colors"
+                            >
+                                <Upload className="w-3 h-3" />
+                            </label>
+                            <button
+                                onClick={handleFileDelete}
+                                className="flex items-center justify-center p-1.5 rounded-md bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/30 transition-colors"
+                                title={t('flows:detailPanel.removeFile')}
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </div>
                     </div>
 
                     {/* File Preview Dialog */}
