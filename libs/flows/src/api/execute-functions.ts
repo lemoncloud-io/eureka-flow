@@ -1,3 +1,5 @@
+import { decodeDataUrl } from '../utils/dataUrl';
+
 import type { BlockDefinition } from '@lemoncloud/eureka-flows-api';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -40,8 +42,13 @@ export const EXECUTE_FUNCTIONS: Record<string, ExecuteFunction> = {
         return { out: createPacket(config.text, 'text') };
     },
 
-    // Server type: input-image, config key: imageData
+    // Server type: input-image, config keys: imageData (image) or fileData (text file)
     'input-image': async (_inputs, config, onProgress) => {
+        if (config.fileData) {
+            onProgress?.(100);
+            const decoded = decodeDataUrl(String(config.fileData));
+            return { out: createPacket(decoded, 'text') };
+        }
         if (!config.imageData) throw new Error('No image data provided');
         onProgress?.(100);
         return { out: createPacket(config.imageData, 'image') };

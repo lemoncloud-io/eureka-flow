@@ -141,7 +141,15 @@
             "success": "Touch request sent successfully",
             "error": "Failed to send touch request"
         },
-        "editImage": "Edit Image"
+        "editImage": "Edit Image",
+        "fileOrImage": "Image / File",
+        "supportedFormats": "Image or text file (.txt, .html, .json)",
+        "viewFile": "View File",
+        "editFile": "Edit",
+        "saveFile": "Save",
+        "cancelEdit": "Cancel",
+        "removeFile": "Remove File",
+        "fileAttached": "File attached"
     },
     "imageEditor": {
         "title": "Edit Image",
