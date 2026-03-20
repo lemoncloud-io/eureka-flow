@@ -44,8 +44,24 @@ import {
     wouldCreateCycle,
 } from '../utils';
 
-import type { LoadFlowPortData, NodeState } from '@flows/flows';
+import type { LoadFlowPortData, NodeState, RunNodeBody } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+
+/** Shallow equality for flat string records (key-order independent) */
+const isConfigEqual = (a: Record<string, string>, b: Record<string, string>): boolean => {
+    const keysA = Object.keys(a);
+    if (keysA.length !== Object.keys(b).length) return false;
+    return keysA.every(key => a[key] === b[key]);
+};
+
+/** Build runNode body, skipping config if already synced to server via upsert */
+const buildRunBody = (
+    nodeConfig: Record<string, string>,
+    syncedConfig: Record<string, string> | undefined
+): RunNodeBody => {
+    if (syncedConfig === undefined) return {};
+    return isConfigEqual(nodeConfig, syncedConfig) ? {} : { config: nodeConfig };
+};
 
 /** Extended WorkflowState with optional ports array from LoadFlowResult */
 interface WorkflowStateWithPorts extends WorkflowState {
@@ -237,7 +253,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             return map;
         }, [updatedPortIds]);
 
-        const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId } = useNodeSync({
+        const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId, getSyncedConfig } = useNodeSync({
             flowId: flowId ?? null,
         });
         const { createEdgeAsync, pendingEdgeIds } = useEdgeSync({ flowId: flowId ?? null });
@@ -1174,8 +1190,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         if (flowId) {
                             // Send frontend execution output to server
                             // Server will save outputs to ports and propagate to downstream nodes
-                            // await runNode(nodeId, { output: outputs }, { force: true });
-                            await runNode(nodeId, { config: currentNode.config || {} }, { force: true, connectionId });
+                            const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
+                            await runNode(nodeId, runBody, { force: true, connectionId });
                         }
                     } else {
                         // ============================================================
@@ -1222,13 +1238,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
 
                         // Step 3: Run the node (server will hydrate inputs from saved port nodes)
-                        const result = await runNode(
-                            nodeId,
-                            {
-                                config: currentNode.config || {},
-                            },
-                            { connectionId }
-                        );
+                        const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
+                        const result = await runNode(nodeId, runBody, { connectionId });
 
                         // Use state from result if available, fallback to status for backward compatibility
                         const resultState = getEffectiveState(result?.state, result?.status);
@@ -1321,7 +1332,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [readOnly, blockRegistry, t, flowId, connectionId, connections, flushPendingUpdates]
+            [readOnly, blockRegistry, t, flowId, connectionId, connections, flushPendingUpdates, getSyncedConfig]
         );
 
         executeNodeRef.current = executeNode;
