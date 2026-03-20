@@ -1,5 +1,28 @@
 # Changelog
 
+## [2026-03-20] - root@0.7.0, @flows/web@0.7.0
+
+### Features
+
+- add fallback polling for node state
+- add connectionId params to run api
+- add support for text files
+- add onWheel event to stop propagation
+- support text type
+- add port style classes for connection lines
+- (flows) add auto-hide duration badge and improve auth error handling
+- (flows) enhance error handling in flow editor
+
+### Refactor
+
+- optimize node execution by skipping unchanged config
+- improve execution stats handling for terminal states
+- optimize state update logic
+
+### Chores
+
+- update license from MIT to Apache-2.0
+
 ## [2026-03-18] - root@0.6.2, @flows/web@0.6.1
 
 ### Bug Fixes
