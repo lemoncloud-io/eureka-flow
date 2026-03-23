@@ -70,6 +70,9 @@ interface UseNodeSyncReturn {
      * Returns the server ID when available
      */
     waitForNodeId: (tempId: string) => Promise<string>;
+
+    /** Get the last synced config. undefined means no local upsert tracked (e.g., loaded from server). */
+    getSyncedConfig: (nodeId: string) => Record<string, string> | undefined;
 }
 
 /**
@@ -119,6 +122,9 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
     // Map of tempId -> serverId (for already resolved IDs)
     const resolvedIdsRef = useRef<Map<string, string>>(new Map());
 
+    // Track last successfully synced config per node (for skip-if-unchanged optimization)
+    const syncedConfigRef = useRef<Map<string, Record<string, string>>>(new Map());
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -128,8 +134,14 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
             pendingNodeIdsRef.current.clear();
             pendingResolvers.current.clear();
             resolvedIdsRef.current.clear();
+            syncedConfigRef.current.clear();
         };
     }, []);
+
+    // Clear synced config when flow changes to prevent stale data across flows
+    useEffect(() => {
+        syncedConfigRef.current.clear();
+    }, [flowId]);
 
     /**
      * Sync node updates to backend with debouncing
@@ -165,7 +177,20 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
             const timer = setTimeout(() => {
                 const finalUpdates = pendingUpdates.current.get(nodeId);
                 if (finalUpdates && Object.keys(finalUpdates).length > 0) {
-                    upsertMutation.mutate({ id: nodeId, flowId, body: finalUpdates });
+                    // Cast: NodeView lacks `config` but API uses Record<string, string> (see NodeData.config)
+                    const configSnapshot = finalUpdates.config
+                        ? (finalUpdates.config as Record<string, string>)
+                        : undefined;
+                    upsertMutation.mutate(
+                        { id: nodeId, flowId, body: finalUpdates },
+                        {
+                            onSuccess: () => {
+                                if (configSnapshot) {
+                                    syncedConfigRef.current.set(nodeId, configSnapshot);
+                                }
+                            },
+                        }
+                    );
                     pendingUpdates.current.delete(nodeId);
                 }
                 debounceTimers.current.delete(nodeId);
@@ -241,6 +266,11 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
 
                             // Store mapping for future lookups
                             resolvedIdsRef.current.set(tempId, serverId);
+
+                            // Store synced config for the new server ID
+                            if (node.config && Object.keys(node.config).length > 0) {
+                                syncedConfigRef.current.set(serverId, node.config as Record<string, string>);
+                            }
 
                             // Remove from pending
                             pendingNodeIdsRef.current.delete(tempId);
@@ -355,11 +385,17 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
             console.log('[useNodeSync] Flushing pending updates:', updates.length);
 
             const promises = updates.map(([nodeId, body]) => {
+                const configSnapshot = body.config ? (body.config as Record<string, string>) : undefined;
                 return new Promise<void>((resolve, reject) => {
                     upsertMutation.mutate(
                         { id: nodeId, flowId, body },
                         {
-                            onSuccess: () => resolve(),
+                            onSuccess: () => {
+                                if (configSnapshot) {
+                                    syncedConfigRef.current.set(nodeId, configSnapshot);
+                                }
+                                resolve();
+                            },
                             onError: error => reject(error),
                         }
                     );
@@ -398,6 +434,12 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
         }
     }, [flowId, upsertMutation, createMutation, waitForNodeId]);
 
+    // useCallback with [] deps: stable reference needed for executeNode's dependency array
+    const getSyncedConfig = useCallback(
+        (nodeId: string): Record<string, string> | undefined => syncedConfigRef.current.get(nodeId),
+        []
+    );
+
     return {
         syncNodeUpdate,
         createNodeAsync,
@@ -406,5 +448,6 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
         isPending: upsertMutation.isPending || createMutation.isPending,
         pendingNodeIds: pendingNodeIdsRef.current,
         waitForNodeId,
+        getSyncedConfig,
     };
 };

@@ -6,6 +6,13 @@ import type { NodeState } from '../types';
 const VALID_STATES: ReadonlySet<string> = new Set(['IDLE', 'READY', 'RUNNING', 'COMPLETED', 'ERROR']);
 
 /**
+ * Fallback timeout for polling node state when WebSocket doesn't deliver
+ * the final state (COMPLETED/ERROR) after async execution.
+ * After this duration, the client polls the server API for the actual state.
+ */
+export const EXECUTION_FALLBACK_TIMEOUT_MS = 60 * 1000; // 1 minute
+
+/**
  * Node state priority for comparing state updates
  * Higher number = more "final" state
  * Used to prevent race conditions between frontend/socket/API updates

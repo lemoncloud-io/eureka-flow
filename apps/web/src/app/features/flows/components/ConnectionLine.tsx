@@ -1,6 +1,20 @@
 import React from 'react';
 
-import { getBezierPath } from '../utils';
+import { getBezierPath, getPortStyleKey } from '../utils';
+
+import type { PortStyleKey } from '../utils';
+
+/**
+ * Static stroke class mapping per port type.
+ * IMPORTANT: Use complete static class names for Tailwind's static analyzer.
+ */
+const EDGE_STROKE_STYLES: Record<PortStyleKey, { active: string; muted: string; dim: string }> = {
+    text: { active: 'stroke-port-text', muted: 'stroke-port-text/70', dim: 'stroke-port-text/50' },
+    image: { active: 'stroke-port-image', muted: 'stroke-port-image/70', dim: 'stroke-port-image/50' },
+    number: { active: 'stroke-port-number', muted: 'stroke-port-number/70', dim: 'stroke-port-number/50' },
+    json: { active: 'stroke-port-json', muted: 'stroke-port-json/70', dim: 'stroke-port-json/50' },
+    any: { active: 'stroke-port-any', muted: 'stroke-port-any/70', dim: 'stroke-port-any/50' },
+};
 
 interface ConnectionLineProps {
     x1: number;
@@ -12,6 +26,7 @@ interface ConnectionLineProps {
     isHovered?: boolean;
     isDraft?: boolean;
     isFlowing?: boolean;
+    portType?: string;
     onMouseEnter?: (e: React.MouseEvent) => void;
     onMouseMove?: (e: React.MouseEvent) => void;
     onMouseLeave?: () => void;
@@ -28,6 +43,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
     isHovered,
     isDraft,
     isFlowing,
+    portType,
     onMouseEnter,
     onMouseMove,
     onMouseLeave,
@@ -37,13 +53,14 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
 
     const isInteractive = !!onMouseEnter || !!onMouseMove || !!onMouseLeave;
 
-    const getStrokeClass = () => {
-        if (isDraft) return 'stroke-primary/70';
-        if (isFlowing) return 'stroke-primary';
-        if (isHovered || isSelected) return 'stroke-primary';
-        if (isActive) return 'stroke-muted-foreground/70';
-        return 'stroke-muted-foreground/50';
-    };
+    const styles = EDGE_STROKE_STYLES[portType ? getPortStyleKey(portType) : 'any'];
+    const strokeClass = isDraft
+        ? styles.muted
+        : isFlowing || isHovered || isSelected
+          ? styles.active
+          : isActive
+            ? styles.muted
+            : styles.dim;
 
     const strokeWidth = isFlowing ? 2 : isHovered || isSelected ? 2.5 : isDraft ? 2 : 1.5;
 
@@ -61,7 +78,7 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
             <path
                 d={path}
                 fill="none"
-                className={`${getStrokeClass()} ${isDraft || isFlowing ? '' : 'transition-colors duration-150'}`}
+                className={`${strokeClass} ${isDraft || isFlowing ? '' : 'transition-colors duration-150'}`}
                 strokeWidth={strokeWidth}
                 strokeLinecap="round"
                 style={flowAnimationStyle}

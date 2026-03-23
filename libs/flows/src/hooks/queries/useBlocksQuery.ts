@@ -16,6 +16,7 @@ export const useBlocksListQuery = () => {
         queryKey: blocksKeys.lists(),
         queryFn: listBlocks,
         staleTime: 5 * 60 * 1000, // 5 minutes - block definitions rarely change
+        retry: false, // listBlocks uses withRetry internally
     });
 };
 

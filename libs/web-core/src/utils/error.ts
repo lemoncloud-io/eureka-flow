@@ -116,15 +116,15 @@ const isConnectionRefused = (error: ErrorLike): boolean => {
 };
 
 const isNetworkError = (error: ErrorLike): boolean => {
-    // Skip if it's connection refused (handled separately)
-    if (isConnectionRefused(error)) {
-        return false;
-    }
-
     const code = error?.code;
     const message = error?.message || '';
 
-    // Axios network error (transient issues like DNS, etc.)
+    // Axios network errors: transient failures like DNS, connection issues, proxy errors
+    if (code === 'ERR_NETWORK' || code === 'ERR_FAILED') {
+        return true;
+    }
+
+    // Browser-specific disconnection
     if (code === 'ERR_INTERNET_DISCONNECTED') {
         return true;
     }

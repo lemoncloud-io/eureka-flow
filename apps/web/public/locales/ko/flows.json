@@ -141,7 +141,15 @@
             "success": "Touch 요청이 성공적으로 전송되었습니다",
             "error": "Touch 요청 전송 실패"
         },
-        "editImage": "이미지 편집"
+        "editImage": "이미지 편집",
+        "fileOrImage": "이미지 / 파일",
+        "supportedFormats": "이미지 또는 텍스트 파일 (.txt, .html, .json)",
+        "viewFile": "파일 보기",
+        "editFile": "편집",
+        "saveFile": "저장",
+        "cancelEdit": "취소",
+        "removeFile": "파일 제거",
+        "fileAttached": "파일 첨부됨"
     },
     "imageEditor": {
         "title": "이미지 편집",
@@ -160,6 +168,8 @@
         "initializingFlow": "플로우 초기화 중...",
         "createdNewFlow": "새 플로우 생성됨",
         "errorLoadingApp": "애플리케이션 로딩 오류. 새로고침해 주세요.",
+        "retry": "다시 시도",
+        "resetApiKey": "API 키 재설정",
         "processing": "처리 중...",
         "enterFlowId": "로드할 플로우 ID를 입력하세요:",
         "loadedFlow": "플로우 로드됨: {{flowId}}",

@@ -23,6 +23,7 @@ const SheetOverlay = React.forwardRef<
             'fixed inset-0 z-50 bg-[rgba(34,34,34,0.26)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             className
         )}
+        onWheel={e => e.stopPropagation()}
         {...props}
         ref={ref}
     />
@@ -54,7 +55,12 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
     ({ side = 'right', className, children, ...props }, ref) => (
         <SheetPortal>
             <SheetOverlay />
-            <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
+            <SheetPrimitive.Content
+                ref={ref}
+                className={cn(sheetVariants({ side }), className)}
+                onWheel={e => e.stopPropagation()}
+                {...props}
+            >
                 <SheetPrimitive.Close className="absolute right-6 top-[25px] z-[51] focus:outline-none disabled:pointer-events-none">
                     <X className="h-5 w-5" />
                     <span className="sr-only">Close</span>

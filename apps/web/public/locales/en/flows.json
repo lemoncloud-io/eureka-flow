@@ -141,7 +141,15 @@
             "success": "Touch request sent successfully",
             "error": "Failed to send touch request"
         },
-        "editImage": "Edit Image"
+        "editImage": "Edit Image",
+        "fileOrImage": "Image / File",
+        "supportedFormats": "Image or text file (.txt, .html, .json)",
+        "viewFile": "View File",
+        "editFile": "Edit",
+        "saveFile": "Save",
+        "cancelEdit": "Cancel",
+        "removeFile": "Remove File",
+        "fileAttached": "File attached"
     },
     "imageEditor": {
         "title": "Edit Image",
@@ -160,6 +168,8 @@
         "initializingFlow": "Initializing Flow...",
         "createdNewFlow": "Created new flow",
         "errorLoadingApp": "Error loading application. Please refresh.",
+        "retry": "Retry",
+        "resetApiKey": "Reset API Key",
         "processing": "Processing...",
         "enterFlowId": "Enter flow ID to load:",
         "loadedFlow": "Loaded flow: {{flowId}}",

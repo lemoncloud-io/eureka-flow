@@ -43,20 +43,32 @@ const htmlEnvInjectionPlugin = (env: Record<string, string>) => {
 };
 
 export default defineConfig(({ mode }) => {
-    // Backup VITE_ vars from process.env (set by GitHub Actions or CI environment)
-    const processEnvViteVars: Record<string, string> = {};
-    Object.keys(process.env)
-        .filter(key => key.startsWith('VITE_'))
-        .forEach(key => {
-            processEnvViteVars[key] = process.env[key] as string;
-        });
+    const isCI = process.env.CI === 'true';
+
+    // Capture VITE_ vars from process.env before loadEnv
+    // - In CI: these are GitHub Actions secrets (authoritative)
+    // - Locally: these are Nx auto-loaded from .env (not useful for mode override)
+    const processViteVars: Record<string, string> = {};
+    for (const key of Object.keys(process.env)) {
+        if (key.startsWith('VITE_')) {
+            processViteVars[key] = process.env[key] as string;
+            delete process.env[key];
+        }
+    }
 
     // Load env from .env files (e.g., .env.dev, .env.prod)
+    // With VITE_ cleared from process.env, loadEnv correctly
+    // prioritizes .env.[mode] over .env
     const fileEnv = loadEnv(mode, import.meta.dirname, '');
 
-    // Merge: process.env (CI) < fileEnv (local files)
-    // Local .env files take precedence over CI environment variables
-    const env = { ...processEnvViteVars, ...fileEnv };
+    // Restore process.env
+    for (const [key, value] of Object.entries(processViteVars)) {
+        process.env[key] = value;
+    }
+
+    // In CI: secrets override committed .env files
+    // Locally: .env.[mode] files are the source of truth
+    const env = isCI ? { ...fileEnv, ...processViteVars } : fileEnv;
 
     return {
         root: import.meta.dirname,

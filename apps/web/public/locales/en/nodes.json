@@ -57,8 +57,9 @@
         "clickToEdit": "Click to edit",
         "clickToAddText": "Click to add text...",
         "enterText": "Enter text...",
-        "clickToUpload": "Click to upload image",
-        "removeImage": "Remove"
+        "clickToUpload": "Click to upload",
+        "removeImage": "Remove",
+        "fileAttached": "{{name}}"
     },
     "errors": {
         "executionFailed": "Execution Failed",

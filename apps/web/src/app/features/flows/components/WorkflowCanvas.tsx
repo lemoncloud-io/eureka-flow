@@ -5,10 +5,12 @@ import { MousePointerClick, Plus, X } from 'lucide-react';
 
 import {
     EXECUTE_FUNCTIONS,
+    EXECUTION_FALLBACK_TIMEOUT_MS,
     LAYOUT_CONFIG,
     PORT_LAYOUT,
     estimateNodeHeight,
     getEffectiveState,
+    getNode,
     getNodeWidth,
     getPortData,
     loadFlow,
@@ -42,8 +44,24 @@ import {
     wouldCreateCycle,
 } from '../utils';
 
-import type { LoadFlowPortData, NodeState } from '@flows/flows';
+import type { LoadFlowPortData, NodeState, RunNodeBody } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+
+/** Shallow equality for flat string records (key-order independent) */
+const isConfigEqual = (a: Record<string, string>, b: Record<string, string>): boolean => {
+    const keysA = Object.keys(a);
+    if (keysA.length !== Object.keys(b).length) return false;
+    return keysA.every(key => a[key] === b[key]);
+};
+
+/** Build runNode body, skipping config if already synced to server via upsert */
+const buildRunBody = (
+    nodeConfig: Record<string, string>,
+    syncedConfig: Record<string, string> | undefined
+): RunNodeBody => {
+    if (syncedConfig === undefined) return {};
+    return isConfigEqual(nodeConfig, syncedConfig) ? {} : { config: nodeConfig };
+};
 
 /** Extended WorkflowState with optional ports array from LoadFlowResult */
 interface WorkflowStateWithPorts extends WorkflowState {
@@ -74,6 +92,8 @@ interface WorkflowCanvasProps {
     initialData?: WorkflowState;
     /** Flow ID for syncing node changes to backend */
     flowId?: string | null;
+    /** WebSocket connection ID for streaming execution results */
+    connectionId?: string;
     onNodeSelect?: (nodeId: string | null) => void;
     onChange?: () => void;
     /** Called when user clicks "Add Node" from empty state */
@@ -197,7 +217,17 @@ const EmptyState: React.FC<EmptyStateProps> = ({ onOpenLibrary }) => {
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
     (
-        { readOnly, initialData, flowId, onNodeSelect, onChange, onOpenLibrary, onConnectionError, onShowNotification },
+        {
+            readOnly,
+            initialData,
+            flowId,
+            connectionId,
+            onNodeSelect,
+            onChange,
+            onOpenLibrary,
+            onConnectionError,
+            onShowNotification,
+        },
         ref
     ) => {
         const { t } = useTranslation(['flows', 'nodes']);
@@ -223,7 +253,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             return map;
         }, [updatedPortIds]);
 
-        const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId } = useNodeSync({
+        const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId, getSyncedConfig } = useNodeSync({
             flowId: flowId ?? null,
         });
         const { createEdgeAsync, pendingEdgeIds } = useEdgeSync({ flowId: flowId ?? null });
@@ -975,10 +1005,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 status: finalState ?? n.status, // Deprecated: kept for backward compatibility
                                 errorMessage: serverData.errorMessage,
                                 // Merge executionStats to preserve existing values (startTime, duration)
-                                // when only progress is being updated
-                                executionStats: serverData.executionStats
-                                    ? { ...n.executionStats, ...serverData.executionStats }
-                                    : n.executionStats,
+                                // when only progress is being updated.
+                                // Auto-calculate duration for terminal states when startTime exists
+                                // but duration wasn't provided (e.g., COMPLETED via WebSocket)
+                                executionStats: (() => {
+                                    if (!serverData.executionStats) return n.executionStats;
+                                    const merged = { ...n.executionStats, ...serverData.executionStats };
+                                    const isTerminal = finalState === 'COMPLETED' || finalState === 'ERROR';
+                                    if (isTerminal && merged.startTime && !serverData.executionStats.duration) {
+                                        merged.duration = Date.now() - merged.startTime;
+                                    }
+                                    return merged;
+                                })(),
                                 position: serverData.position ?? n.position,
                             };
                         })
@@ -1152,8 +1190,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         if (flowId) {
                             // Send frontend execution output to server
                             // Server will save outputs to ports and propagate to downstream nodes
-                            // await runNode(nodeId, { output: outputs }, { force: true });
-                            await runNode(nodeId, { config: currentNode.config || {} }, { force: true });
+                            const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
+                            await runNode(nodeId, runBody, { force: true, connectionId });
                         }
                     } else {
                         // ============================================================
@@ -1200,12 +1238,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
 
                         // Step 3: Run the node (server will hydrate inputs from saved port nodes)
-                        const result = await runNode(nodeId, {
-                            config: currentNode.config || {},
-                        });
+                        const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
+                        const result = await runNode(nodeId, runBody, { connectionId });
 
                         // Use state from result if available, fallback to status for backward compatibility
                         const resultState = getEffectiveState(result?.state, result?.status);
+                        const isTerminalState = resultState === 'COMPLETED' || resultState === 'ERROR';
+
                         if (resultState) {
                             const duration = Date.now() - startTime;
 
@@ -1220,18 +1259,57 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             ...n,
                                             state: resultState as NodeState,
                                             status: resultState, // Deprecated: kept for backward compatibility
-                                            executionStats: { startTime, duration, progress: 100 },
+                                            // Terminal: finalize with progress 100
+                                            // Non-terminal (RUNNING): keep existing stats, WebSocket delivers progress
+                                            executionStats: isTerminalState
+                                                ? { startTime, duration, progress: 100 }
+                                                : n.executionStats,
                                         };
                                     }
 
-                                    // API state is lower priority (e.g., RUNNING when already COMPLETED)
-                                    // Keep current state, but update executionStats
-                                    return {
-                                        ...n,
-                                        executionStats: { startTime, duration, progress: 100 },
-                                    };
+                                    // API state is lower priority (e.g., WebSocket already delivered COMPLETED)
+                                    // Only update executionStats for terminal states
+                                    return isTerminalState
+                                        ? { ...n, executionStats: { startTime, duration, progress: 100 } }
+                                        : n;
                                 })
                             );
+                        }
+
+                        // Fallback: if API returned non-terminal state, poll after timeout
+                        // in case WebSocket doesn't deliver the final state
+                        if (!isTerminalState) {
+                            setTimeout(async () => {
+                                const current = nodesRef.current.find(n => n.id === nodeId);
+                                const currentState = getEffectiveState(current?.state, current?.status);
+                                if (currentState !== 'RUNNING') return; // Already resolved
+
+                                try {
+                                    const nodeData = await getNode(nodeId);
+                                    const serverState = getEffectiveState(nodeData.state, nodeData.status);
+                                    if (serverState === 'COMPLETED' || serverState === 'ERROR') {
+                                        const duration = Date.now() - startTime;
+                                        setNodes(prev =>
+                                            prev.map(n =>
+                                                n.id === nodeId
+                                                    ? {
+                                                          ...n,
+                                                          state: serverState as NodeState,
+                                                          status: serverState,
+                                                          executionStats: { startTime, duration, progress: 100 },
+                                                          errorMessage:
+                                                              serverState === 'ERROR'
+                                                                  ? nodeData.errorMessage
+                                                                  : undefined,
+                                                      }
+                                                    : n
+                                            )
+                                        );
+                                    }
+                                } catch {
+                                    // API failed, node stays in current state
+                                }
+                            }, EXECUTION_FALLBACK_TIMEOUT_MS);
                         }
                     }
                 } catch (e: unknown) {
@@ -1254,7 +1332,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [readOnly, blockRegistry, t, flowId, connections, flushPendingUpdates]
+            [readOnly, blockRegistry, t, flowId, connectionId, connections, flushPendingUpdates, getSyncedConfig]
         );
 
         executeNodeRef.current = executeNode;
@@ -2249,6 +2327,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 const targetState = getEffectiveState(targetNode?.state, targetNode?.status);
                                 const isFlowing = sourceState === 'RUNNING' || targetState === 'RUNNING';
 
+                                // Resolve source output port type for edge coloring
+                                const sourceNodeDef = blockRegistry[sourceNode?.type ?? ''];
+                                const sourcePort = sourceNodeDef?.outputs.find(p => p.id === conn.sourcePortId);
+                                const portType = sourcePort?.type ?? 'any';
+
                                 const handleHover = (e: React.MouseEvent) => {
                                     setHoveredConnectionId(conn.id);
                                     if (isActive) {
@@ -2284,6 +2367,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                         isSelected={selectedConnectionId === conn.id}
                                         isHovered={hoveredConnectionId === conn.id}
                                         isFlowing={isFlowing}
+                                        portType={portType}
                                         onMouseEnter={handleHover}
                                         onMouseMove={handleHover}
                                         onMouseLeave={handleLeave}
@@ -2306,6 +2390,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             y2={connectionDraft.mouseY}
                                             isActive={true}
                                             isDraft={true}
+                                            portType={connectionDraft.sourceType}
                                         />
                                     );
                                 })()}
@@ -2407,6 +2492,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         <div
                             className="absolute inset-0 z-50 bg-background/80 flex items-center justify-center p-10 backdrop-blur-sm"
                             onMouseDown={e => e.stopPropagation()}
+                            onWheel={e => e.stopPropagation()}
                         >
                             <div className="bg-surface border border-border w-full h-full rounded shadow-2xl flex flex-col overflow-hidden">
                                 <div className="p-3 border-b border-border flex justify-between items-center bg-muted">

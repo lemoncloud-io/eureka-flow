@@ -2,6 +2,25 @@ import type { Connection, NodeData, PortDefinition } from '@lemoncloud/eureka-fl
 import type { Dispatch, SetStateAction } from 'react';
 
 // ============================================================
+// Port Type Utilities
+// ============================================================
+
+/** Valid port style keys matching CSS variables (--port-type-*) */
+export type PortStyleKey = 'text' | 'image' | 'number' | 'json' | 'any';
+
+const PORT_STYLE_KEYS: Record<string, PortStyleKey> = {
+    text: 'text',
+    string: 'text',
+    image: 'image',
+    number: 'number',
+    json: 'json',
+    any: 'any',
+};
+
+/** Normalize port type string to a valid style key (e.g., 'string' → 'text') */
+export const getPortStyleKey = (portType: string): PortStyleKey => PORT_STYLE_KEYS[portType.toLowerCase()] ?? 'any';
+
+// ============================================================
 // Port Visibility Utilities
 // ============================================================
 
@@ -225,6 +244,62 @@ export const replaceNodeIdInState = (
 };
 
 export { wouldCreateCycle } from './graph';
+
+// ============================================================
+// Input File Upload Utilities
+// ============================================================
+
+/** Accepted file types for the input-image block (images + text/json files) */
+export const INPUT_FILE_ACCEPT = 'image/*,.txt,.text,.html,.json,text/plain,text/html,application/json';
+
+/** Check if a file is a text-based file (not image) */
+export const isTextFile = (file: File): boolean =>
+    file.type === 'text/plain' ||
+    file.type === 'text/html' ||
+    file.type === 'application/json' ||
+    /\.(txt|text|html?|json)$/i.test(file.name);
+
+/** Clear all file-related config keys */
+export const clearFileConfig = (onConfigChange: (key: string, value: unknown) => void): void => {
+    onConfigChange('fileData', '');
+    onConfigChange('fileName', '');
+    onConfigChange('fileType', '');
+};
+
+/**
+ * Read uploaded file and update config via onConfigChange.
+ * Text files (txt/html/json) → fileData (base64), image files → processImage callback.
+ */
+export const processUploadedFile = async (
+    file: File,
+    onConfigChange: (key: string, value: unknown) => void,
+    processImage: (dataUrl: string) => Promise<string>
+): Promise<void> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async evt => {
+            const dataUrl = evt.target?.result as string;
+            if (!dataUrl) {
+                resolve();
+                return;
+            }
+
+            if (isTextFile(file)) {
+                onConfigChange('fileData', dataUrl);
+                onConfigChange('fileName', file.name);
+                onConfigChange('fileType', file.type || 'text/plain');
+                onConfigChange('imageData', '');
+            } else {
+                const processed = await processImage(dataUrl);
+                onConfigChange('imageData', processed);
+                clearFileConfig(onConfigChange);
+            }
+            resolve();
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+    });
+};
 
 // ============================================================
 // JSON Parsing Utilities

@@ -5,23 +5,13 @@ import { toast } from 'sonner';
 import { API_URL } from '../core';
 import { useWebCoreStore } from '../stores/useWebCoreStore';
 import { getApiEndpointPath } from '../utils/apiEndpoint';
-import { classifyError } from '../utils/error';
 
 import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
-/** Clear flow-related localStorage on auth error */
-const clearFlowStorage = (): void => {
-    try {
-        localStorage.removeItem('flows-current-flow-id');
-    } catch {
-        // Silently ignore - non-critical operation
-    }
-};
-
-/** Handle auth error: clear credentials and show toast */
+/** Handle auth error: clear credentials, storage, and show toast */
 const handleAuthError = (): void => {
     useWebCoreStore.getState().clearApiKey();
-    clearFlowStorage();
+    localStorage.removeItem('flows-current-flow-id');
     // Delay toast to show after dialog appears
     setTimeout(() => toast.error(i18n.t('errors.authExpired', { ns: 'common' })), 100);
 };
@@ -53,7 +43,10 @@ apiClient.interceptors.request.use(
     (error: unknown) => Promise.reject(error)
 );
 
-/** Check if response data contains permission error (403 forbidden) */
+/**
+ * Check if response data contains permission error (403 forbidden).
+ * Some API Gateway configurations return HTTP 200 with a 403 error in the body.
+ */
 const hasPermissionError = (data: unknown): boolean => {
     if (!data) return false;
     const str = typeof data === 'string' ? data : JSON.stringify(data);
@@ -63,26 +56,22 @@ const hasPermissionError = (data: unknown): boolean => {
 /**
  * Response interceptor: Handle errors globally
  *
- * Auth Error Scenarios:
- * 1. HTTP 403 → Clear API key (invalid/expired key)
- * 2. ERR_NETWORK/ERR_FAILED with API key → Clear API key (CORS-blocked 403)
- * 3. shouldLogout from classifyError → Clear API key
+ * Auth Error: Only HTTP 403 clears API key (invalid/expired key).
+ * Network errors (ERR_NETWORK, 504, 500) should NOT cause logout.
  */
 apiClient.interceptors.response.use(
     (response: AxiosResponse) => {
-        // Check 200 response for permission error (403 forbidden in body)
+        // Handle 200-wrapped 403 from API Gateway (treat as auth error)
         if (hasPermissionError(response.data)) {
-            toast.error(i18n.t('errors.forbidden', { ns: 'common' }));
+            handleAuthError();
         }
         return response;
     },
     (error: AxiosError) => {
         const status = error.response?.status;
-        const hasApiKey = !!useWebCoreStore.getState().apiKey;
-        const isCorsBlocked403 = !status && hasApiKey && (error.code === 'ERR_NETWORK' || error.code === 'ERR_FAILED');
 
-        // Handle auth errors: HTTP 403, CORS-blocked 403, or shouldLogout
-        if (status === 403 || isCorsBlocked403 || classifyError(error).shouldLogout) {
+        // Only explicit HTTP 403 triggers logout
+        if (status === 403) {
             handleAuthError();
         }
 
