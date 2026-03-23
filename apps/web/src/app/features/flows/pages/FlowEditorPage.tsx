@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AlertCircle } from 'lucide-react';
+
 import { EXECUTE_FUNCTIONS, getNode, getPortData, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
+import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
 import { Header } from '../components/Header';
@@ -301,6 +304,7 @@ export const FlowEditorPage = () => {
 
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('');
+    const [bootError, setBootError] = useState<string | null>(null);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
@@ -348,73 +352,77 @@ export const FlowEditorPage = () => {
         }
     }, []);
 
+    const boot = useCallback(async () => {
+        setBootError(null);
+        setIsAppReady(false);
+        setLoadingText(t('flowEditor.initializingEngine'));
+        try {
+            setLoadingText(t('flowEditor.loadingBlockRegistry'));
+            await loadBlocks();
+
+            const pathParts = window.location.pathname.split('/');
+            const flowIdFromUrl = pathParts.length > 2 && pathParts[1] === 'flows' ? pathParts[2] : null;
+            const nodeIdFromHash = window.location.hash.replace('#', '') || null;
+
+            let loadedId: string | null = null;
+            let initialFlow = null;
+
+            if (flowIdFromUrl) {
+                setLoadingText(t('flowEditor.loadingFlow', { flowId: flowIdFromUrl }));
+                initialFlow = await loadFlowById(flowIdFromUrl);
+                if (!initialFlow) {
+                    throw new Error(t('flowEditor.failedToLoadFlow'));
+                }
+                loadedId = flowIdFromUrl;
+            } else {
+                setLoadingText(t('flowEditor.initializingFlow'));
+                const result = await initializeFlow();
+                loadedId = result.flowId;
+                initialFlow = result.flowData;
+
+                if (result.isNew) {
+                    setLoadingText(t('flowEditor.createdNewFlow'));
+                }
+            }
+
+            setIsAppReady(true);
+
+            // Wait for canvas to mount after render
+            const waitForCanvas = async () => {
+                if (canvasRef.current) {
+                    if (initialFlow) {
+                        try {
+                            await canvasRef.current.loadWorkflow(initialFlow);
+                            lastSavedStateRef.current = serializeWorkflowState(initialFlow);
+                        } catch (error) {
+                            console.error('[FlowEditor] Failed to load workflow:', error);
+                        }
+                    }
+                    if (loadedId) {
+                        updateUrl(loadedId, nodeIdFromHash);
+                    }
+                    if (nodeIdFromHash) {
+                        canvasRef.current.selectNode(nodeIdFromHash);
+                    }
+                } else {
+                    // Canvas not ready yet, retry
+                    requestAnimationFrame(waitForCanvas);
+                }
+            };
+            requestAnimationFrame(waitForCanvas);
+        } catch (e) {
+            console.error('[FlowEditor] Boot failed:', e);
+            setBootError(e instanceof Error ? e.message : t('flowEditor.errorLoadingApp'));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- Boot dependencies are stable singletons
+    }, []);
+
     const bootedRef = useRef(false);
     useEffect(() => {
         if (bootedRef.current) return;
         bootedRef.current = true;
-
-        const boot = async () => {
-            setLoadingText(t('flowEditor.initializingEngine'));
-            try {
-                setLoadingText(t('flowEditor.loadingBlockRegistry'));
-                await loadBlocks();
-
-                const pathParts = window.location.pathname.split('/');
-                const flowIdFromUrl = pathParts.length > 2 && pathParts[1] === 'flows' ? pathParts[2] : null;
-                const nodeIdFromHash = window.location.hash.replace('#', '') || null;
-
-                let loadedId: string | null = null;
-                let initialFlow = null;
-
-                if (flowIdFromUrl) {
-                    setLoadingText(t('flowEditor.loadingFlow', { flowId: flowIdFromUrl }));
-                    initialFlow = await loadFlowById(flowIdFromUrl);
-                    loadedId = flowIdFromUrl;
-                } else {
-                    setLoadingText(t('flowEditor.initializingFlow'));
-                    const result = await initializeFlow();
-                    loadedId = result.flowId;
-                    initialFlow = result.flowData;
-
-                    if (result.isNew) {
-                        setLoadingText(t('flowEditor.createdNewFlow'));
-                    }
-                }
-
-                setIsAppReady(true);
-
-                // Wait for canvas to mount after render
-                const waitForCanvas = async () => {
-                    if (canvasRef.current) {
-                        if (initialFlow) {
-                            try {
-                                await canvasRef.current.loadWorkflow(initialFlow);
-                                lastSavedStateRef.current = serializeWorkflowState(initialFlow);
-                            } catch (error) {
-                                console.error('[FlowEditor] Failed to load workflow:', error);
-                            }
-                        }
-                        if (loadedId) {
-                            updateUrl(loadedId, nodeIdFromHash);
-                        }
-                        if (nodeIdFromHash) {
-                            canvasRef.current.selectNode(nodeIdFromHash);
-                        }
-                    } else {
-                        // Canvas not ready yet, retry
-                        requestAnimationFrame(waitForCanvas);
-                    }
-                };
-                requestAnimationFrame(waitForCanvas);
-            } catch (e) {
-                setLoadingText(t('flowEditor.errorLoadingApp'));
-                console.error(e);
-            }
-        };
-
         boot();
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- Boot runs once on mount, dependencies are stable singletons
-    }, []);
+    }, [boot]);
 
     const triggerAutoSave = useCallback(() => {
         if (!isAutoSaveEnabled) return;
@@ -644,11 +652,35 @@ export const FlowEditorPage = () => {
     if (!isAppReady) {
         return (
             <div className="flex h-screen bg-background text-foreground font-sans items-center justify-center flex-col gap-4">
-                <div className="relative w-16 h-16">
-                    <div className="absolute inset-0 border-4 border-border rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin"></div>
-                </div>
-                <div className="text-muted-foreground font-mono text-sm animate-pulse">{loadingText}</div>
+                {bootError ? (
+                    <>
+                        <AlertCircle className="w-16 h-16 text-destructive/70" />
+                        <div className="text-muted-foreground font-mono text-sm text-center max-w-md">{bootError}</div>
+                        <div className="flex gap-2 mt-2">
+                            <Button variant="default" size="sm" onClick={boot}>
+                                {t('flowEditor.retry')}
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setIsApiKeyDialogOpen(true)}>
+                                {t('flowEditor.resetApiKey')}
+                            </Button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="relative w-16 h-16">
+                            <div className="absolute inset-0 border-4 border-border rounded-full"></div>
+                            <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin"></div>
+                        </div>
+                        <div className="text-muted-foreground font-mono text-sm animate-pulse">{loadingText}</div>
+                    </>
+                )}
+                <ApiKeyDialog
+                    open={isApiKeyDialogOpen}
+                    onSubmit={handleApiKeySubmit}
+                    onOpenChange={setIsApiKeyDialogOpen}
+                    codesUrl={import.meta.env.VITE_CODES_URL}
+                    initialValue={apiKey ?? undefined}
+                />
             </div>
         );
     }

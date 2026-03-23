@@ -87,6 +87,7 @@ export const useFlows = () => {
                 const flowData = await queryClient.fetchQuery({
                     queryKey: flowsKeys.snapshot(savedFlowId),
                     queryFn: () => loadFlow(savedFlowId),
+                    retry: false, // loadFlow uses withRetry internally
                 });
                 setCurrentFlowId(savedFlowId);
                 if (flowData.name) {
@@ -137,6 +138,7 @@ export const useFlows = () => {
                 const flowData = await queryClient.fetchQuery({
                     queryKey: flowsKeys.snapshot(id),
                     queryFn: () => loadFlow(id),
+                    retry: false, // loadFlow uses withRetry internally
                 });
                 if (flowData.name) {
                     setFlowName(flowData.name);
