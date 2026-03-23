@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-03-23] - root@0.8.0, @flows/web@0.8.0
+
+### Features
+
+- add retry and reset API key functionality
+
+### Bug Fixes
+
+- correct env variable precedence logic
+
 ## [2026-03-20] - root@0.7.0, @flows/web@0.7.0
 
 ### Features
