@@ -168,6 +168,8 @@
         "initializingFlow": "플로우 초기화 중...",
         "createdNewFlow": "새 플로우 생성됨",
         "errorLoadingApp": "애플리케이션 로딩 오류. 새로고침해 주세요.",
+        "retry": "다시 시도",
+        "resetApiKey": "API 키 재설정",
         "processing": "처리 중...",
         "enterFlowId": "로드할 플로우 ID를 입력하세요:",
         "loadedFlow": "플로우 로드됨: {{flowId}}",

@@ -51,8 +51,25 @@ export default defineConfig(({ mode }) => {
             processEnvViteVars[key] = process.env[key] as string;
         });
 
+    // Temporarily remove VITE_ vars from process.env so that loadEnv
+    // correctly prioritizes .env.[mode] files over .env values.
+    // (Nx pre-loads .env into process.env, and loadEnv's internal logic
+    // always lets process.env override file-based values.)
+    const savedProcessViteVars: Record<string, string | undefined> = {};
+    Object.keys(process.env)
+        .filter(key => key.startsWith('VITE_'))
+        .forEach(key => {
+            savedProcessViteVars[key] = process.env[key];
+            delete process.env[key];
+        });
+
     // Load env from .env files (e.g., .env.dev, .env.prod)
     const fileEnv = loadEnv(mode, import.meta.dirname, '');
+
+    // Restore process.env
+    Object.entries(savedProcessViteVars).forEach(([key, value]) => {
+        process.env[key] = value;
+    });
 
     // Merge: process.env (CI) < fileEnv (local files)
     // Local .env files take precedence over CI environment variables
