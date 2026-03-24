@@ -8,7 +8,7 @@ import LocalStorageBackend from 'i18next-localstorage-backend';
 
 const I18N_VERSION = process.env.I18N_VERSION || 'fallback';
 const isDevelopment = import.meta.env.DEV;
-const namespaces = ['common', 'flows', 'nodes'];
+const namespaces = ['common', 'flows', 'nodes', 'landing'];
 
 // Clean up old i18n caches (production only)
 if (!isDevelopment) {

@@ -1,0 +1,47 @@
+{
+    "nav": {
+        "logo": "Eureka Flow",
+        "cta": "Get Started"
+    },
+    "hero": {
+        "badge": "Beta",
+        "title": {
+            "line1": "Connect Nodes,",
+            "accent": "Build AI Agents",
+            "line2": "Visually"
+        },
+        "subtitle": "Build AI workflows with drag & drop. No code required. Simpler than n8n, purpose-built for AI.",
+        "cta_primary": "Start for Free",
+        "cta_secondary": "View Demo →"
+    },
+    "screenshot": {
+        "alt": "Eureka Flow canvas screenshot",
+        "url_bar": "flow.eureka.codes"
+    },
+    "features": {
+        "badge": "Features",
+        "title": "Everything you need to build AI workflows",
+        "subtitle": "A visual editor designed from the ground up for AI agent development.",
+        "visual_canvas": {
+            "title": "Visual Canvas",
+            "description": "Drag and connect nodes to build complete AI pipelines. See the entire workflow at a glance."
+        },
+        "ai_nodes": {
+            "title": "AI-Native Nodes",
+            "description": "Text generation, image synthesis, schema extraction — purpose-built nodes for every AI task."
+        },
+        "instant_run": {
+            "title": "Instant Execution",
+            "description": "Run and debug node-by-node directly on the canvas. See results in real time."
+        }
+    },
+    "cta": {
+        "title": "Start building today",
+        "subtitle": "Free during beta. No installation needed — runs entirely in your browser.",
+        "button": "Start for Free"
+    },
+    "footer": {
+        "brand": "Eureka Flow",
+        "copyright": "© 2026 Eureka Flow. All rights reserved."
+    }
+}
