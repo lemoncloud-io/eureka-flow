@@ -339,13 +339,13 @@ export const FlowEditorPage = () => {
 
     const updateUrl = useCallback((flowId: string | null, nodeId?: string | null) => {
         try {
-            let path = '/';
+            let path = '/editor';
             if (flowId) path = `/flows/${flowId}`;
             const hash = nodeId ? `#${nodeId}` : '';
             const url = path + hash;
 
             if (window.location.pathname + window.location.hash !== url) {
-                window.history.pushState({ flowId, nodeId }, '', url);
+                window.history.replaceState({ flowId, nodeId }, '', url);
             }
         } catch {
             // ignore

@@ -21,7 +21,7 @@ export const LanguageSwitcher = (): JSX.Element => {
     };
 
     return (
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                     <Globe className="h-4 w-4" />

@@ -44,16 +44,17 @@ interface ProvidersProps {
 }
 
 /**
- * Check if current path is a demo route that doesn't require authentication
+ * Check if current path is a public route that doesn't require authentication
  */
-const isDemoRoute = (): boolean => {
-    return window.location.pathname.startsWith('/flow/examples');
+const isPublicRoute = (): boolean => {
+    const pathname = window.location.pathname;
+    return pathname === '/' || pathname.startsWith('/flow/examples');
 };
 
 /**
  * API Key gate component
  * Blocks app content until a valid API key is provided
- * Bypasses authentication for demo routes
+ * Bypasses authentication for public routes (landing, demo)
  */
 const ApiKeyGate = ({ children }: { children: ReactNode }) => {
     const { apiKey, setApiKey, initializeApiKey } = useWebCoreStore();
@@ -85,8 +86,8 @@ const ApiKeyGate = ({ children }: { children: ReactNode }) => {
         return false;
     };
 
-    // Bypass authentication for demo routes
-    if (isDemoRoute()) {
+    // Bypass authentication for public routes (landing, demo)
+    if (isPublicRoute()) {
         return children;
     }
 
