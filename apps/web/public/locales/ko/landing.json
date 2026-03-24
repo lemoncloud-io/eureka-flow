@@ -1,0 +1,47 @@
+{
+    "nav": {
+        "logo": "Eureka Flow",
+        "cta": "시작하기"
+    },
+    "hero": {
+        "badge": "베타",
+        "title": {
+            "line1": "노드를 연결해",
+            "accent": "AI 에이전트",
+            "line2": "를 만드세요"
+        },
+        "subtitle": "코딩 없이 드래그&드롭으로 AI 워크플로우를 완성합니다. n8n보다 간단하고, AI에 더 깊게 특화된 비주얼 플로우 빌더.",
+        "cta_primary": "무료로 시작하기",
+        "cta_secondary": "데모 보기 →"
+    },
+    "screenshot": {
+        "alt": "Eureka Flow 캔버스 화면",
+        "url_bar": "flow.eureka.codes"
+    },
+    "features": {
+        "badge": "기능",
+        "title": "AI 워크플로우에 필요한 모든 것",
+        "subtitle": "AI 에이전트 개발을 위해 처음부터 설계된 비주얼 에디터.",
+        "visual_canvas": {
+            "title": "비주얼 캔버스",
+            "description": "노드를 드래그해 연결하면 AI 파이프라인이 완성됩니다. 전체 워크플로우를 한눈에 파악하세요."
+        },
+        "ai_nodes": {
+            "title": "AI 특화 노드",
+            "description": "텍스트 생성, 이미지 합성, 스키마 추출 등 AI 작업에 맞춘 전용 노드."
+        },
+        "instant_run": {
+            "title": "즉시 실행",
+            "description": "캔버스에서 노드별로 직접 실행하고 디버깅하세요. 결과를 실시간으로 확인합니다."
+        }
+    },
+    "cta": {
+        "title": "지금 바로 만들어보세요",
+        "subtitle": "베타 기간 무료. 설치 없이 브라우저에서 바로 시작.",
+        "button": "무료로 시작하기"
+    },
+    "footer": {
+        "brand": "Eureka Flow",
+        "copyright": "© 2026 Eureka Flow. All rights reserved."
+    }
+}

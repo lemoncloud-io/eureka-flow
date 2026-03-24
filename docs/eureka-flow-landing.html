@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Eureka Flow</title>
+        <style>
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            :root {
+                --bg: #0c0c14;
+                --surface: #13131f;
+                --border: rgba(255, 255, 255, 0.08);
+                --text: #e8e8f0;
+                --muted: #666688;
+                --accent: #7c6dfa;
+            }
+
+            body {
+                font-family: -apple-system, 'Helvetica Neue', sans-serif;
+                background: var(--bg);
+                color: var(--text);
+                line-height: 1.6;
+            }
+
+            nav {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 100;
+                padding: 1.25rem 2.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                border-bottom: 1px solid var(--border);
+                background: rgba(12, 12, 20, 0.9);
+                backdrop-filter: blur(12px);
+            }
+            .logo {
+                font-size: 1rem;
+                font-weight: 600;
+                color: var(--text);
+                text-decoration: none;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            .logo-mark {
+                width: 24px;
+                height: 24px;
+                border-radius: 6px;
+                background: var(--accent);
+                display: grid;
+                place-items: center;
+                font-size: 0.75rem;
+            }
+            .nav-cta {
+                padding: 0.45rem 1.1rem;
+                background: var(--accent);
+                color: #fff;
+                border-radius: 7px;
+                font-size: 0.85rem;
+                font-weight: 500;
+                text-decoration: none;
+            }
+            .nav-cta:hover {
+                opacity: 0.85;
+            }
+
+            .hero {
+                padding: 14rem 2.5rem 8rem;
+                max-width: 700px;
+            }
+            .hero-label {
+                display: inline-block;
+                font-size: 0.75rem;
+                color: var(--muted);
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                margin-bottom: 1.75rem;
+            }
+            .hero h1 {
+                font-size: clamp(2.5rem, 5vw, 3.75rem);
+                font-weight: 700;
+                line-height: 1.1;
+                letter-spacing: -0.03em;
+                margin-bottom: 1.5rem;
+            }
+            .hero h1 span {
+                color: var(--accent);
+            }
+            .hero p {
+                font-size: 1.05rem;
+                color: var(--muted);
+                max-width: 460px;
+                line-height: 1.8;
+                margin-bottom: 2.5rem;
+            }
+            .hero-btns {
+                display: flex;
+                gap: 0.75rem;
+                align-items: center;
+            }
+            .btn-main {
+                padding: 0.75rem 1.75rem;
+                background: var(--accent);
+                color: #fff;
+                border-radius: 8px;
+                font-size: 0.95rem;
+                font-weight: 500;
+                text-decoration: none;
+            }
+            .btn-main:hover {
+                opacity: 0.9;
+            }
+            .btn-link {
+                font-size: 0.9rem;
+                color: var(--muted);
+                text-decoration: none;
+            }
+            .btn-link:hover {
+                color: var(--text);
+            }
+
+            .screenshot-wrap {
+                padding: 0 2.5rem 8rem;
+                max-width: 1100px;
+            }
+            .screenshot-frame {
+                border-radius: 14px;
+                border: 1px solid var(--border);
+                overflow: hidden;
+                box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5);
+            }
+            .frame-bar {
+                background: #0f0f1c;
+                padding: 0.65rem 1rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                border-bottom: 1px solid var(--border);
+            }
+            .frame-dots {
+                display: flex;
+                gap: 5px;
+            }
+            .frame-dots span {
+                width: 9px;
+                height: 9px;
+                border-radius: 50%;
+                display: block;
+            }
+            .frame-dots span:nth-child(1) {
+                background: #ff5f57;
+            }
+            .frame-dots span:nth-child(2) {
+                background: #febc2e;
+            }
+            .frame-dots span:nth-child(3) {
+                background: #28c840;
+            }
+            .frame-url {
+                margin: 0 auto;
+                font-size: 0.72rem;
+                color: var(--muted);
+            }
+            .screenshot-frame img {
+                width: 100%;
+                display: block;
+            }
+
+            .features {
+                padding: 8rem 2.5rem;
+                max-width: 700px;
+                border-top: 1px solid var(--border);
+            }
+            .section-label {
+                font-size: 0.72rem;
+                color: var(--muted);
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin-bottom: 3rem;
+            }
+            .feature-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 3rem;
+            }
+            @media (max-width: 600px) {
+                .feature-row {
+                    grid-template-columns: 1fr;
+                    gap: 2rem;
+                }
+            }
+            .feature h3 {
+                font-size: 0.95rem;
+                font-weight: 600;
+                margin-bottom: 0.5rem;
+            }
+            .feature p {
+                font-size: 0.85rem;
+                color: var(--muted);
+                line-height: 1.7;
+            }
+
+            .cta {
+                padding: 8rem 2.5rem;
+                max-width: 700px;
+                border-top: 1px solid var(--border);
+            }
+            .cta h2 {
+                font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+                font-weight: 700;
+                letter-spacing: -0.03em;
+                line-height: 1.1;
+                margin-bottom: 1.25rem;
+            }
+            .cta p {
+                font-size: 1rem;
+                color: var(--muted);
+                margin-bottom: 2rem;
+                line-height: 1.7;
+            }
+
+            footer {
+                border-top: 1px solid var(--border);
+                padding: 2rem 2.5rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 1rem;
+            }
+            footer a {
+                font-size: 0.8rem;
+                color: var(--muted);
+                text-decoration: none;
+            }
+            footer a:hover {
+                color: var(--text);
+            }
+            .footer-copy {
+                font-size: 0.8rem;
+                color: var(--muted);
+            }
+        </style>
+    </head>
+    <body>
+        <nav>
+            <a href="#" class="logo">
+                <div class="logo-mark">⚡</div>
+                Eureka Flow
+            </a>
+            <a href="https://flow.eureka.codes" class="nav-cta">시작하기</a>
+        </nav>
+
+        <section class="hero">
+            <div class="hero-label">Beta · flow.eureka.codes</div>
+            <h1>노드를 연결해<br /><span>AI 에이전트</span>를<br />만드세요</h1>
+            <p>
+                코딩 없이 드래그&드롭으로 AI 워크플로우를 완성합니다. n8n보다 간단하고, AI에 더 깊게 특화된 비주얼
+                플로우 빌더.
+            </p>
+            <div class="hero-btns">
+                <a href="https://flow.eureka.codes" class="btn-main">무료로 시작하기</a>
+                <a href="https://flow.eureka.codes/flows/1000594" class="btn-link">데모 보기 →</a>
+            </div>
+        </section>
+
+        <div class="screenshot-wrap">
+            <div class="screenshot-frame">
+                <div class="frame-bar">
+                    <div class="frame-dots"><span></span><span></span><span></span></div>
+                    <div class="frame-url">flow.eureka.codes</div>
+                </div>
+                <img src="스크린샷_2026-03-24_오후_3_52_42.png" alt="Eureka Flow 캔버스 화면" />
+            </div>
+        </div>
+
+        <section class="features">
+            <div class="section-label">기능</div>
+            <div class="feature-row">
+                <div class="feature">
+                    <h3>비주얼 캔버스</h3>
+                    <p>노드를 드래그해 연결하면 AI 파이프라인이 완성됩니다.</p>
+                </div>
+                <div class="feature">
+                    <h3>AI 특화 노드</h3>
+                    <p>텍스트 생성, 이미지 합성, 스키마 추출 등 AI 작업에 맞춘 노드.</p>
+                </div>
+                <div class="feature">
+                    <h3>즉시 실행</h3>
+                    <p>노드별 결과를 캔버스에서 바로 확인. 디버깅도 한눈에.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta">
+            <h2>지금 바로<br />만들어보세요</h2>
+            <p>베타 기간 무료. 설치 없이 브라우저에서 바로 시작.</p>
+            <a href="https://flow.eureka.codes" class="btn-main">무료로 시작하기</a>
+        </section>
+
+        <footer>
+            <a href="https://flow.eureka.codes">⚡ Eureka Flow</a>
+            <div class="footer-copy">© 2026 Eureka Flow</div>
+        </footer>
+    </body>
+</html>

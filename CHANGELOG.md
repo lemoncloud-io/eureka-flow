@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-24] - root@0.9.0, @flows/web@0.9.0
+
+### Features
+
+- add landing page
+
 ## [2026-03-23] - root@0.8.0, @flows/web@0.8.0
 
 ### Features
