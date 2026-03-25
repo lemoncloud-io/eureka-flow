@@ -208,13 +208,6 @@ jobs:
                           "type": "section",
                           "text": {
                               "type": "mrkdwn",
-                              "text": ":eurekabox: *Eureka Flows 수동 배포 완료*"
-                          }
-                      },
-                      {
-                          "type": "section",
-                          "text": {
-                              "type": "mrkdwn",
                               "text": "*배포 완료:* '"${{ steps.deploy-info.outputs.dev_count }}"'개 (개발) + '"${{ steps.deploy-info.outputs.prod_count }}"'개 (운영)"
                           }
                       },
@@ -293,7 +286,7 @@ jobs:
                   token: ${{ secrets.RELEASE_BOT_TOKEN }}
                   payload: |
                       channel: ${{ secrets.EUREKACODES_CHANNEL }}
-                      text: "Eureka Flows 수동 배포 완료"
+                      text: ":eurekabox: Eureka Flows 수동 배포 완료"
                       unfurl_links: false
                       unfurl_media: false
                       attachments: ${{ steps.slack-blocks.outputs.attachments }}
@@ -337,13 +330,6 @@ jobs:
                   set -e
 
                   BLOCKS='[
-                      {
-                          "type": "section",
-                          "text": {
-                              "type": "mrkdwn",
-                              "text": ":x: *Eureka Flows 수동 배포 실패*"
-                          }
-                      },
                       {
                           "type": "section",
                           "text": {

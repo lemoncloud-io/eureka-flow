@@ -255,18 +255,11 @@ jobs:
                       channel: ${{ secrets.EUREKACODES_CHANNEL }}
                       unfurl_links: false
                       unfurl_media: false
-                      text: "Eureka Flows 개발 배포 알림"
+                      text: ":eurekabox: Eureka Flows 개발 배포 알림"
                       attachments: [
                           {
                               "color": "#6952E0",
                               "blocks": [
-                                  {
-                                      "type": "section",
-                                      "text": {
-                                          "type": "mrkdwn",
-                                          "text": ":eurekabox: *Eureka Flows 개발 환경 배포 완료*"
-                                      }
-                                  },
                                   {
                                       "type": "section",
                                       "text": {
@@ -355,13 +348,6 @@ jobs:
                           {
                               "color": "#ff0000",
                               "blocks": [
-                                  {
-                                      "type": "section",
-                                      "text": {
-                                          "type": "mrkdwn",
-                                          "text": ":x: *Eureka Flows 개발 환경 배포 실패*"
-                                      }
-                                  },
                                   {
                                       "type": "section",
                                       "text": {
