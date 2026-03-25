@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-25] - root@0.11.0, @flows/web@0.11.0
+
+### Features
+
+- update README and landing page
+
 ## [2026-03-25] - root@0.10.0, @flows/web@0.10.0
 
 ### Features
