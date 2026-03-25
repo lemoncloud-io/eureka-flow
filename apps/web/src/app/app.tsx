@@ -1,9 +1,9 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { FlowEditorPage, FlowExamplesPage } from './features/flows';
-import { LandingPage } from './features/landing';
+import { LandingPage, PolicyPage } from './features/landing';
 
-const App = () => {
+export const App = () => {
     return (
         <BrowserRouter>
             <Routes>
@@ -11,9 +11,8 @@ const App = () => {
                 <Route path="/editor" element={<FlowEditorPage />} />
                 <Route path="/flows/:id" element={<FlowEditorPage />} />
                 <Route path="/flow/examples" element={<FlowExamplesPage />} />
+                <Route path="/policy/:type" element={<PolicyPage />} />
             </Routes>
         </BrowserRouter>
     );
 };
-
-export default App;

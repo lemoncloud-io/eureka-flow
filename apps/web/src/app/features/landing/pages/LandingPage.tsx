@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { BrainCircuit, LayoutGrid, Zap } from 'lucide-react';
 
@@ -141,12 +141,27 @@ export const LandingPage = () => {
 
             {/* Footer */}
             <footer className="border-t border-border">
-                <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-8">
-                    <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <img src="/logo/purple-symbol.png" alt="Eureka Flow" className="h-5 w-5" />
-                        {t('footer.brand')}
-                    </span>
-                    <span className="text-sm text-muted-foreground">{t('footer.copyright')}</span>
+                <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <img src="/logo/purple-symbol.png" alt="Eureka Flow" className="h-5 w-5" />
+                            {t('footer.brand')}
+                        </span>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <Link to="/policy/terms" className="hover:text-foreground transition-colors">
+                                {t('footer.terms')}
+                            </Link>
+                            <Link to="/policy/privacy" className="hover:text-foreground transition-colors">
+                                {t('footer.privacy')}
+                            </Link>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">
+                        <a href="mailto:app@lemoncloud.io" className="hover:text-foreground transition-colors">
+                            {t('footer.email')}
+                        </a>
+                        <span>{t('footer.copyright')}</span>
+                    </div>
                 </div>
             </footer>
         </div>
