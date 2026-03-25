@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-25] - root@0.10.0, @flows/web@0.10.0
+
+### Features
+
+- add policy feature
+
 ## [2026-03-24] - root@0.9.0, @flows/web@0.9.0
 
 ### Features
