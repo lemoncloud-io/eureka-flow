@@ -1,7 +1,8 @@
 {
     "nav": {
         "logo": "Eureka Flow",
-        "cta": "Get Started"
+        "cta": "Get Started",
+        "github": "GitHub"
     },
     "hero": {
         "badge": "Beta",
@@ -44,6 +45,7 @@
         "brand": "Eureka Flow",
         "terms": "Terms of Service",
         "privacy": "Privacy Policy",
+        "github": "GitHub",
         "email": "app@lemoncloud.io",
         "copyright": "Copyright 2026 LEMONCLOUD. All rights reserved."
     }

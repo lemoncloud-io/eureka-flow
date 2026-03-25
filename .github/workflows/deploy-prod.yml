@@ -231,20 +231,13 @@ jobs:
                   token: ${{ secrets.RELEASE_BOT_TOKEN }}
                   payload: |
                       channel: ${{ secrets.EUREKACODES_CHANNEL }}
-                      text: "Eureka Flows 운영 배포 알림"
+                      text: ":eurekabox: Eureka Flows 운영 배포 알림"
                       unfurl_links: false
                       unfurl_media: false
                       attachments: [
                           {
                               "color": "#6952E0",
                               "blocks": [
-                                  {
-                                      "type": "section",
-                                      "text": {
-                                          "type": "mrkdwn",
-                                          "text": ":eurekabox: *Eureka Flows 운영 환경 배포 완료*"
-                                      }
-                                  },
                                   {
                                       "type": "section",
                                       "text": {
@@ -343,13 +336,6 @@ jobs:
                           {
                               "color": "#ff0000",
                               "blocks": [
-                                  {
-                                      "type": "section",
-                                      "text": {
-                                          "type": "mrkdwn",
-                                          "text": ":x: *Eureka Flows 운영 환경 배포 실패*"
-                                      }
-                                  },
                                   {
                                       "type": "section",
                                       "text": {
