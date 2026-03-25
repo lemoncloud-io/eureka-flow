@@ -205,11 +205,10 @@ jobs:
 
                   BLOCKS='[
                       {
-                          "type": "header",
+                          "type": "section",
                           "text": {
-                              "type": "plain_text",
-                              "text": ":wrench: Eureka Flows 수동 배포 완료",
-                              "emoji": true
+                              "type": "mrkdwn",
+                              "text": ":eurekabox: *Eureka Flows 수동 배포 완료*"
                           }
                       },
                       {
@@ -272,14 +271,17 @@ jobs:
                       ]
                   }]'
 
-                  echo "$BLOCKS" | jq empty 2>/dev/null || {
-                      echo "Error: Invalid JSON blocks"
+                  # Wrap blocks inside attachments structure
+                  ATTACHMENTS='[{ "color": "#6952E0", "blocks": '"$BLOCKS"' }]'
+
+                  echo "$ATTACHMENTS" | jq empty 2>/dev/null || {
+                      echo "Error: Invalid JSON attachments"
                       exit 1
                   }
 
                   {
-                      echo "blocks<<EOF"
-                      echo "$BLOCKS"
+                      echo "attachments<<EOF"
+                      echo "$ATTACHMENTS"
                       echo "EOF"
                   } >> $GITHUB_OUTPUT
 
@@ -294,7 +296,7 @@ jobs:
                       text: "Eureka Flows 수동 배포 완료"
                       unfurl_links: false
                       unfurl_media: false
-                      blocks: ${{ steps.slack-blocks.outputs.blocks }}
+                      attachments: ${{ steps.slack-blocks.outputs.attachments }}
 
     notify-slack-failure:
         needs: [get-versions, deploy-dev, deploy-prod]
@@ -336,18 +338,17 @@ jobs:
 
                   BLOCKS='[
                       {
-                          "type": "header",
+                          "type": "section",
                           "text": {
-                              "type": "plain_text",
-                              "text": ":x: Eureka Flows 수동 배포 실패",
-                              "emoji": true
+                              "type": "mrkdwn",
+                              "text": ":x: *Eureka Flows 수동 배포 실패*"
                           }
                       },
                       {
                           "type": "section",
                           "text": {
                               "type": "mrkdwn",
-                              "text": ":warning: *배포 중 오류가 발생했습니다*"
+                              "text": "*배포 중 오류가 발생했습니다*"
                           }
                       },
                       {
@@ -420,14 +421,17 @@ jobs:
                       ]
                   }]'
 
-                  echo "$BLOCKS" | jq empty 2>/dev/null || {
-                      echo "Error: Invalid JSON blocks"
+                  # Wrap blocks inside attachments structure
+                  ATTACHMENTS='[{ "color": "#ff0000", "blocks": '"$BLOCKS"' }]'
+
+                  echo "$ATTACHMENTS" | jq empty 2>/dev/null || {
+                      echo "Error: Invalid JSON attachments"
                       exit 1
                   }
 
                   {
-                      echo "blocks<<EOF"
-                      echo "$BLOCKS"
+                      echo "attachments<<EOF"
+                      echo "$ATTACHMENTS"
                       echo "EOF"
                   } >> $GITHUB_OUTPUT
 
@@ -442,4 +446,4 @@ jobs:
                       text: "Eureka Flows 수동 배포 실패"
                       unfurl_links: false
                       unfurl_media: false
-                      blocks: ${{ steps.failure-blocks.outputs.blocks }}
+                      attachments: ${{ steps.failure-blocks.outputs.attachments }}

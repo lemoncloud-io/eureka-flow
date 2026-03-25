@@ -256,46 +256,52 @@ jobs:
                       unfurl_links: false
                       unfurl_media: false
                       text: "Eureka Flows 개발 배포 알림"
-                      blocks: [
+                      attachments: [
                           {
-                              "type": "header",
-                              "text": {
-                                  "type": "plain_text",
-                                  "text": ":rocket: Eureka Flows 개발 환경 배포 완료"
-                              }
-                          },
-                          {
-                              "type": "section",
-                              "text": {
-                                  "type": "mrkdwn",
-                                  "text": ${{ toJSON(steps.slack-message.outputs.deploy_info) }}
-                              }
-                          },
-                          {
-                              "type": "divider"
-                          },
-                          {
-                              "type": "section",
-                              "fields": [
+                              "color": "#6952E0",
+                              "blocks": [
                                   {
-                                      "type": "mrkdwn",
-                                      "text": "*배포 시각:*\n${{ steps.slack-message.outputs.timestamp }}"
+                                      "type": "section",
+                                      "text": {
+                                          "type": "mrkdwn",
+                                          "text": ":eurekabox: *Eureka Flows 개발 환경 배포 완료*"
+                                      }
                                   },
                                   {
-                                      "type": "mrkdwn",
-                                      "text": "*커밋:*\n<https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ steps.slack-message.outputs.commit_sha }}>"
-                                  }
-                              ]
-                          },
-                          {
-                              "type": "context",
-                              "elements": [
+                                      "type": "section",
+                                      "text": {
+                                          "type": "mrkdwn",
+                                          "text": ${{ toJSON(steps.slack-message.outputs.deploy_info) }}
+                                      }
+                                  },
                                   {
-                                      "type": "mrkdwn",
-                                      "text": "by ${{ github.actor }} | <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Actions Run>"
+                                      "type": "divider"
+                                  },
+                                  {
+                                      "type": "section",
+                                      "fields": [
+                                          {
+                                              "type": "mrkdwn",
+                                              "text": "*배포 시각:*\n${{ steps.slack-message.outputs.timestamp }}"
+                                          },
+                                          {
+                                              "type": "mrkdwn",
+                                              "text": "*커밋:*\n<https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ steps.slack-message.outputs.commit_sha }}>"
+                                          }
+                                      ]
+                                  },
+                                  {
+                                      "type": "context",
+                                      "elements": [
+                                          {
+                                              "type": "mrkdwn",
+                                              "text": "by ${{ github.actor }} | <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Actions Run>"
+                                          }
+                                      ]
                                   }
                               ]
-                          }]
+                          }
+                      ]
 
     notify-slack-failure:
         needs: [changes, version-update, create-draft-release, build-and-deploy]
@@ -344,44 +350,50 @@ jobs:
                       channel: ${{ secrets.EUREKACODES_CHANNEL }}
                       unfurl_links: false
                       unfurl_media: false
-                      text: "Eureka Flows 개발 배포 실패"
-                      blocks: [
+                      text: ":x: Eureka Flows 개발 배포 실패"
+                      attachments: [
                           {
-                              "type": "header",
-                              "text": {
-                                  "type": "plain_text",
-                                  "text": ":x: Eureka Flows 개발 환경 배포 실패"
-                              }
-                          },
-                          {
-                              "type": "section",
-                              "text": {
-                                  "type": "mrkdwn",
-                                  "text": ${{ toJSON(steps.slack-message.outputs.deploy_info) }}
-                              }
-                          },
-                          {
-                              "type": "divider"
-                          },
-                          {
-                              "type": "section",
-                              "fields": [
+                              "color": "#ff0000",
+                              "blocks": [
                                   {
-                                      "type": "mrkdwn",
-                                      "text": "*실패 시각:*\n${{ steps.slack-message.outputs.timestamp }}"
+                                      "type": "section",
+                                      "text": {
+                                          "type": "mrkdwn",
+                                          "text": ":x: *Eureka Flows 개발 환경 배포 실패*"
+                                      }
                                   },
                                   {
-                                      "type": "mrkdwn",
-                                      "text": "*커밋:*\n<https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ steps.slack-message.outputs.commit_sha }}>"
-                                  }
-                              ]
-                          },
-                          {
-                              "type": "context",
-                              "elements": [
+                                      "type": "section",
+                                      "text": {
+                                          "type": "mrkdwn",
+                                          "text": ${{ toJSON(steps.slack-message.outputs.deploy_info) }}
+                                      }
+                                  },
                                   {
-                                      "type": "mrkdwn",
-                                      "text": "by ${{ github.actor }} | <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Failed Actions Run>"
+                                      "type": "divider"
+                                  },
+                                  {
+                                      "type": "section",
+                                      "fields": [
+                                          {
+                                              "type": "mrkdwn",
+                                              "text": "*실패 시각:*\n${{ steps.slack-message.outputs.timestamp }}"
+                                          },
+                                          {
+                                              "type": "mrkdwn",
+                                              "text": "*커밋:*\n<https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ steps.slack-message.outputs.commit_sha }}>"
+                                          }
+                                      ]
+                                  },
+                                  {
+                                      "type": "context",
+                                      "elements": [
+                                          {
+                                              "type": "mrkdwn",
+                                              "text": "by ${{ github.actor }} | <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Failed Actions Run>"
+                                          }
+                                      ]
                                   }
                               ]
-                          }]
+                          }
+                      ]
