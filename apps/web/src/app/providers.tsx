@@ -19,7 +19,7 @@ import {
 import { ThemeProvider } from '@flows/theme';
 import { reportError, useWebCoreStore, validateApiKey } from '@flows/web-core';
 
-import i18n from '../i18n';
+import { i18n } from '../i18n';
 
 import type { ErrorInfo, ReactNode } from 'react';
 
@@ -48,7 +48,7 @@ interface ProvidersProps {
  */
 const isPublicRoute = (): boolean => {
     const pathname = window.location.pathname;
-    return pathname === '/' || pathname.startsWith('/flow/examples');
+    return pathname === '/' || pathname.startsWith('/flow/examples') || pathname.startsWith('/policy/');
 };
 
 /**
@@ -93,7 +93,6 @@ const ApiKeyGate = ({ children }: { children: ReactNode }) => {
 
     if (!apiKey) {
         const codesUrl = import.meta.env.VITE_CODES_URL;
-        console.log('codesUrl', codesUrl);
         return <ApiKeyDialog open={true} onSubmit={handleApiKeySubmit} error={error} codesUrl={codesUrl} />;
     }
 

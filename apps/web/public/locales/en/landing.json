@@ -42,6 +42,9 @@
     },
     "footer": {
         "brand": "Eureka Flow",
-        "copyright": "© 2026 Eureka Flow. All rights reserved."
+        "terms": "Terms of Service",
+        "privacy": "Privacy Policy",
+        "email": "app@lemoncloud.io",
+        "copyright": "Copyright 2026 LEMONCLOUD. All rights reserved."
     }
 }

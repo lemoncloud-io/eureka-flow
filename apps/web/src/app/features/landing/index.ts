@@ -1,1 +1,1 @@
-export { LandingPage } from './pages/LandingPage';
+export { LandingPage, PolicyPage } from './pages';
