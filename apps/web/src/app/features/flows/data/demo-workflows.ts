@@ -1,5 +1,5 @@
 /**
- * Demo workflow definitions - hardcoded example workflows for demo mode
+ * Demo workflow definitions - example workflows for demo mode
  */
 
 import type { EdgeData, NodeData } from '@flows/flows';
@@ -14,117 +14,131 @@ export interface DemoWorkflow {
 }
 
 /**
- * Demo workflow with all executable blocks
+ * AI 콘텐츠 생성기 - 템플릿 기반 AI 텍스트 생성 파이프라인
+ *
+ * Flow:
+ *   [프롬프트 템플릿] ──→ [템플릿 변환기] ──→ [AI 텍스트] ──→ [미리보기]
+ *   [주제]           ──↗       ↑
+ *   [스타일]         ──────────↗
+ *
+ * Demonstrates: input → mustache template → AI generation → output
  */
 export const DEMO_WORKFLOWS: DemoWorkflow[] = [
     {
-        id: 'all-blocks',
-        name: 'All Blocks Demo',
-        description: 'Demo workflow with all executable blocks',
-        difficulty: 'beginner',
+        id: 'ai-content-generator',
+        name: 'AI 콘텐츠 생성기',
+        description: '템플릿 기반 AI 텍스트 생성 파이프라인',
+        difficulty: 'intermediate',
         nodes: [
-            // Text flow: Input → Transform → Buffer → Preview
+            // ── Inputs ──
             {
-                id: 'text-input',
+                id: 'prompt-template',
                 type: 'input-text',
-                position: { x: 50, y: 316 },
-                config: { text: 'Hello World!' },
-                customLabel: 'Text Input',
+                blockId: '0004',
+                position: { x: 100, y: 150 },
+                customLabel: '프롬프트 템플릿',
+                config: {
+                    text: '{{topic}}에 대한 {{style}} 형식의 글을 작성하세요.\n\n요구사항:\n- 독자의 흥미를 끌 수 있는 도입부\n- 핵심 내용 3가지 포함\n- 자연스러운 마무리',
+                },
             },
             {
-                id: 'text-transform',
-                type: 'text-transform',
-                position: { x: 350, y: 216 },
-                config: { mode: 'uppercase' },
-                customLabel: 'Transform',
+                id: 'topic-input',
+                type: 'input-text',
+                blockId: '0004',
+                position: { x: 100, y: 400 },
+                customLabel: '주제',
+                config: { text: '한국의 전통 음식 문화' },
             },
             {
-                id: 'buffer',
-                type: 'buffer',
-                position: { x: 650, y: 316 },
-                config: { delayMs: '1000' },
-                customLabel: 'Delay 1s',
+                id: 'style-input',
+                type: 'input-text',
+                blockId: '0004',
+                position: { x: 100, y: 600 },
+                customLabel: '스타일',
+                config: { text: '블로그 포스트' },
+            },
+
+            // ── Process ──
+            {
+                id: 'template-engine',
+                type: 'mustache-text-generator',
+                blockId: '0009',
+                position: { x: 500, y: 300 },
+                customLabel: '템플릿 변환',
+                config: { text0: 'topic', text1: 'style' },
             },
             {
-                id: 'text-preview',
+                id: 'ai-generator',
+                type: 'single-output-generator',
+                blockId: '0003',
+                position: { x: 900, y: 300 },
+                customLabel: 'AI 생성',
+                config: { model: 'gemini-2.5-flash' },
+            },
+
+            // ── Outputs ──
+            {
+                id: 'result-preview',
                 type: 'output-preview',
-                position: { x: 950, y: 336 },
+                blockId: '0007',
+                position: { x: 1300, y: 200 },
+                customLabel: '결과',
                 config: {},
-                customLabel: 'Text Preview',
             },
-            // Image flow: Input → Resize → Preview
-            {
-                id: 'image-input',
-                type: 'input-image',
-                position: { x: 50, y: 50 },
-                config: { imageData: '' },
-                customLabel: 'Image Input',
-            },
-            {
-                id: 'image-resize',
-                type: 'image-resize',
-                position: { x: 350, y: 50 },
-                config: { rotation: '0', flipHorizontal: 'false', flipVertical: 'false' },
-                customLabel: 'Resize',
-            },
-            {
-                id: 'image-preview',
-                type: 'output-preview',
-                position: { x: 650, y: 50 },
-                config: {},
-                customLabel: 'Image Preview',
-            },
-            // Debug: Console log
             {
                 id: 'debug-log',
                 type: 'output-console',
-                position: { x: 950, y: 50 },
-                config: { prefix: 'Debug:' },
-                customLabel: 'Console Log',
+                blockId: '0008',
+                position: { x: 1300, y: 480 },
+                customLabel: '디버그',
+                config: { prefix: '[AI 콘텐츠]' },
             },
         ],
         edges: [
-            // Text flow connections
+            // 템플릿 → 변환기
             {
                 id: 'e1',
-                sourceNodeId: 'text-input',
+                sourceNodeId: 'prompt-template',
                 sourcePortId: 'out',
-                targetNodeId: 'text-transform',
+                targetNodeId: 'template-engine',
                 targetPortId: 'in',
             },
+            // 주제 → 변환기 p0
             {
                 id: 'e2',
-                sourceNodeId: 'text-transform',
+                sourceNodeId: 'topic-input',
                 sourcePortId: 'out',
-                targetNodeId: 'buffer',
-                targetPortId: 'in',
+                targetNodeId: 'template-engine',
+                targetPortId: 'p0',
             },
+            // 스타일 → 변환기 p1
             {
                 id: 'e3',
-                sourceNodeId: 'buffer',
+                sourceNodeId: 'style-input',
                 sourcePortId: 'out',
-                targetNodeId: 'text-preview',
-                targetPortId: 'in',
+                targetNodeId: 'template-engine',
+                targetPortId: 'p1',
             },
-            // Image flow connections
+            // 변환기 → AI 생성 prompt
             {
                 id: 'e4',
-                sourceNodeId: 'image-input',
+                sourceNodeId: 'template-engine',
                 sourcePortId: 'out',
-                targetNodeId: 'image-resize',
-                targetPortId: 'in',
+                targetNodeId: 'ai-generator',
+                targetPortId: 'prompt',
             },
+            // AI 결과 → 미리보기
             {
                 id: 'e5',
-                sourceNodeId: 'image-resize',
+                sourceNodeId: 'ai-generator',
                 sourcePortId: 'out',
-                targetNodeId: 'image-preview',
+                targetNodeId: 'result-preview',
                 targetPortId: 'in',
             },
-            // Debug connection (from buffer output)
+            // AI 결과 → 디버그
             {
                 id: 'e6',
-                sourceNodeId: 'buffer',
+                sourceNodeId: 'ai-generator',
                 sourcePortId: 'out',
                 targetNodeId: 'debug-log',
                 targetPortId: 'in',

@@ -9,8 +9,9 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
-import { Download, FileJson, LayoutGrid, Plus, Upload } from 'lucide-react';
+import { Download, FileJson, Home, LayoutGrid, Plus, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@flows/lib/utils';
@@ -143,6 +144,9 @@ export const FlowExamplesPage = () => {
             {/* Floating Header */}
             <header className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-3 rounded-xl bg-glass-bg backdrop-blur-[24px] border border-glass-border px-4 py-2 shadow-floating">
                 <div className="flex items-center gap-3 border-r border-border pr-3">
+                    <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
+                        <Home className="h-4 w-4" />
+                    </Link>
                     <h1 className="text-sm font-semibold">Flow Examples</h1>
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">Demo</span>
                 </div>

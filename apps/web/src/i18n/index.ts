@@ -56,4 +56,4 @@ i18n.use(ChainedBackend)
         react: { useSuspense: true },
     });
 
-export default i18n;
+export { i18n };

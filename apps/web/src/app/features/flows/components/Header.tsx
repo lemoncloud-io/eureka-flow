@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link as RouterLink } from 'react-router-dom';
 
 import {
     Download,
@@ -14,7 +15,6 @@ import {
     Trash2,
     Undo2,
     Upload,
-    Workflow,
 } from 'lucide-react';
 
 import { useSystemInfoQuery } from '@flows/flows';
@@ -328,11 +328,18 @@ export const Header: React.FC<HeaderProps> = ({
                             'shadow-sm'
                         )}
                     >
-                        <Workflow className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
-                        <span className="text-xs sm:text-sm font-semibold text-foreground hidden sm:inline">Flow</span>
-                        <Badge variant="orange" size="sm" className="hidden sm:inline-flex font-semibold">
-                            {t('header.beta')}
-                        </Badge>
+                        <RouterLink
+                            to="/"
+                            className="flex items-center gap-1.5 sm:gap-2 hover:opacity-70 transition-opacity"
+                        >
+                            <img src="/logo/purple-symbol.png" alt="Eureka Flow" className="h-5 w-5 sm:h-6 sm:w-6" />
+                            <span className="text-xs sm:text-sm font-semibold text-foreground hidden sm:inline">
+                                Flow
+                            </span>
+                            <Badge variant="orange" size="sm" className="hidden sm:inline-flex font-semibold">
+                                {t('header.beta')}
+                            </Badge>
+                        </RouterLink>
                         <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
                         <FlowNameInput {...flowInfo} />
                         <span className="hidden md:inline">
