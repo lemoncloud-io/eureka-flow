@@ -45,7 +45,7 @@ export const BlockDetailPage = () => {
             navigate('/blocks', { replace: true });
             return;
         }
-        const { id: _, createdAt: __, updatedAt: ___, deletedAt: ____, ...rest } = block;
+        const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, deletedAt: _deletedAt, ...rest } = block;
         setFormData(rest);
     }, [block, isNew, navigate]);
 

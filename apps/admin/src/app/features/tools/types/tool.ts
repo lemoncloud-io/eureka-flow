@@ -21,12 +21,4 @@ export interface Tool {
     isEnabled: boolean;
 }
 
-export interface ToolFormData {
-    name: string;
-    label: string;
-    icon: string;
-    category: ToolCategory;
-    description: string;
-    parameters: ToolParameter[];
-    isEnabled: boolean;
-}
+export type ToolFormData = Omit<Tool, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>;

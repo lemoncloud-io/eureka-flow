@@ -2,14 +2,24 @@ import { useEffect, useState } from 'react';
 
 import { toast } from 'sonner';
 
-import { Button } from '@flows/ui-kit';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@flows/ui-kit';
-import { Input } from '@flows/ui-kit';
-import { Label } from '@flows/ui-kit';
-import { ScrollArea } from '@flows/ui-kit';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@flows/ui-kit';
-import { Switch } from '@flows/ui-kit';
-import { Textarea } from '@flows/ui-kit';
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Label,
+    ScrollArea,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+    Switch,
+    Textarea,
+} from '@flows/ui-kit';
 
 import { TOOL_CATEGORY_OPTIONS } from '../consts';
 import { useToolStore } from '../stores';
