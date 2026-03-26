@@ -128,6 +128,8 @@ export interface FlowModel {
     description?: string;
     seq?: number;
     meta?: unknown;
+    /** Node IDs associated with this flow (populated in list responses) */
+    nodeIds$$?: string[];
     createdAt?: string;
     updatedAt?: string;
 }
@@ -589,6 +591,7 @@ export const isFlowExecutionError = (error: unknown): error is FlowExecutionErro
  */
 export interface UpdateFlowBody {
     name?: string;
+    description?: string;
 }
 
 // ============================================================================

@@ -1191,7 +1191,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             // Send frontend execution output to server
                             // Server will save outputs to ports and propagate to downstream nodes
                             const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
-                            await runNode(nodeId, runBody, { force: true, connectionId });
+                            await runNode(nodeId, runBody, { force: true, connection: connectionId });
                         }
                     } else {
                         // ============================================================
@@ -1239,7 +1239,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         // Step 3: Run the node (server will hydrate inputs from saved port nodes)
                         const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
-                        const result = await runNode(nodeId, runBody, { connectionId });
+                        const result = await runNode(nodeId, runBody, { connection: connectionId });
 
                         // Use state from result if available, fallback to status for backward compatibility
                         const resultState = getEffectiveState(result?.state, result?.status);

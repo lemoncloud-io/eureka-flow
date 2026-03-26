@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FileText, Pencil, Trash2, X } from 'lucide-react';
+import { Copy, FileText, Pencil, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { decodeDataUrl } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -49,11 +50,20 @@ export const FilePreviewDialog: React.FC<FilePreviewDialogProps> = ({
     onDelete,
     onEdit,
 }) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'nodes']);
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState('');
 
     const decodedContent = useMemo(() => decodeDataUrl(fileData), [fileData]);
+
+    const handleCopy = useCallback(async () => {
+        try {
+            await navigator.clipboard.writeText(decodedContent);
+            toast.success(t('nodes:preview.copied'));
+        } catch {
+            toast.error(t('nodes:preview.copyFailed'));
+        }
+    }, [decodedContent, t]);
 
     const handleStartEdit = () => {
         setEditContent(decodedContent);
@@ -90,18 +100,24 @@ export const FilePreviewDialog: React.FC<FilePreviewDialogProps> = ({
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
                 className={cn(
-                    'max-w-3xl max-h-[85vh] p-0 gap-0',
+                    'max-w-3xl h-[85vh] p-0 gap-0 flex flex-col',
                     'bg-background/95 backdrop-blur-xl',
                     '[&>button]:hidden'
                 )}
             >
                 {/* Header */}
-                <DialogHeader className="flex flex-row items-center justify-between p-4 border-b border-border space-y-0">
+                <DialogHeader className="flex shrink-0 flex-row items-center justify-between p-4 border-b border-border space-y-0">
                     <DialogTitle className="flex items-center gap-2 text-sm font-medium">
                         <FileText className="w-4 h-4" />
                         <span className="truncate max-w-[300px]">{fileName}</span>
                     </DialogTitle>
                     <div className="flex items-center gap-1">
+                        {!isEditing && (
+                            <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleCopy}>
+                                <Copy className="w-3.5 h-3.5" />
+                                {t('nodes:preview.copy')}
+                            </Button>
+                        )}
                         {onEdit && !isEditing && (
                             <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleStartEdit}>
                                 <Pencil className="w-3.5 h-3.5" />
@@ -137,9 +153,9 @@ export const FilePreviewDialog: React.FC<FilePreviewDialogProps> = ({
                         />
                     </div>
                 ) : (
-                    <ScrollArea className="max-h-[calc(85vh-120px)]">
+                    <ScrollArea className="flex-1 min-h-0">
                         <div className="p-4">
-                            <pre className="font-mono text-sm whitespace-pre-wrap break-words text-foreground/90">
+                            <pre className="font-mono text-sm whitespace-pre-wrap break-all text-foreground/90">
                                 {decodedContent}
                             </pre>
                         </div>

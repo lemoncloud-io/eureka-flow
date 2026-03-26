@@ -12,6 +12,16 @@ on:
                 required: true
                 type: boolean
                 default: false
+            deploy_admin_dev:
+                description: 'Deploy Admin to DEV'
+                required: true
+                type: boolean
+                default: false
+            deploy_admin_prod:
+                description: 'Deploy Admin to PROD'
+                required: true
+                type: boolean
+                default: false
 
 jobs:
     get-versions:
@@ -19,6 +29,7 @@ jobs:
         name: Get Versions
         outputs:
             web-version: ${{ steps.get-web-version.outputs.web-version }}
+            admin-version: ${{ steps.get-admin-version.outputs.admin-version }}
 
         steps:
             - name: Checkout code
@@ -45,29 +56,58 @@ jobs:
                       echo "web-version=${WEB_VERSION}" >> $GITHUB_OUTPUT
                   fi
 
+            - name: Get Admin Version
+              if: ${{ github.event.inputs.deploy_admin_dev == 'true' || github.event.inputs.deploy_admin_prod == 'true' }}
+              id: get-admin-version
+              run: |
+                  if [[ -f "apps/admin/package.json" ]]; then
+                      ADMIN_VERSION=$(node -p "require('./apps/admin/package.json').version")
+                      if ! echo "$ADMIN_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                        echo "Error: Invalid admin version format: $ADMIN_VERSION"
+                        exit 1
+                      fi
+                      echo "admin-version=${ADMIN_VERSION}" >> $GITHUB_OUTPUT
+                  fi
+
     deploy-dev:
         needs: [get-versions]
-        if: ${{ github.event.inputs.deploy_web_dev == 'true' }}
+        if: ${{ github.event.inputs.deploy_web_dev == 'true' || github.event.inputs.deploy_admin_dev == 'true' }}
         runs-on: ubuntu-latest
         name: Deploy to DEV
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - project: web
+                      enabled: ${{ github.event.inputs.deploy_web_dev }}
+                    - project: admin
+                      enabled: ${{ github.event.inputs.deploy_admin_dev }}
 
         steps:
+            - name: Skip if not enabled
+              if: ${{ matrix.enabled != 'true' }}
+              run: echo "Skipping ${{ matrix.project }} deployment" && exit 0
+
             - name: Checkout code
+              if: ${{ matrix.enabled == 'true' }}
               uses: actions/checkout@v4
               with:
                   fetch-depth: 0
                   token: ${{ secrets.LEMON_BOT_TOKEN }}
 
             - name: Setup Node.js
+              if: ${{ matrix.enabled == 'true' }}
               uses: actions/setup-node@v4
               with:
                   node-version-file: '.nvmrc'
 
             - name: Get Yarn cache path
+              if: ${{ matrix.enabled == 'true' }}
               id: yarn-cache-dir-path
               run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
 
             - name: Cache dependencies
+              if: ${{ matrix.enabled == 'true' }}
               id: cache-dependencies
               uses: actions/cache@v4
               with:
@@ -79,10 +119,11 @@ jobs:
                       ${{ runner.os }}-yarn-
 
             - name: Install dependencies
-              if: ${{ steps.cache-dependencies.outputs.cache-hit != 'true' }}
+              if: ${{ matrix.enabled == 'true' && steps.cache-dependencies.outputs.cache-hit != 'true' }}
               run: yarn install --frozen-lockfile
 
             - name: Configure AWS Credentials
+              if: ${{ matrix.enabled == 'true' }}
               uses: aws-actions/configure-aws-credentials@v4
               with:
                   aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -90,9 +131,10 @@ jobs:
                   aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
 
             - name: Deploy to DEV
+              if: ${{ matrix.enabled == 'true' }}
               env:
-                  BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
-                  DEV_CF_DISTRIBUTION_ID: ${{ secrets.DEV_CF_DISTRIBUTION_ID }}
+                  BUCKET_NAME: ${{ matrix.project == 'admin' && secrets.ADMIN_BUCKET_NAME || secrets.BUCKET_NAME }}
+                  DEV_CF_DISTRIBUTION_ID: ${{ matrix.project == 'admin' && secrets.ADMIN_DEV_CF_DISTRIBUTION_ID || secrets.DEV_CF_DISTRIBUTION_ID }}
                   VITE_ENV: DEV
                   VITE_PROJECT: FLOWS
                   VITE_API_URL: ${{ secrets.VITE_DEV_API_URL }}
@@ -100,32 +142,48 @@ jobs:
                   VITE_CODES_URL: ${{ secrets.VITE_DEV_CODES_URL }}
               run: |
                   set -e
-                  chmod +x scripts/deploy-web.sh
-                  NODE_OPTIONS="--max-old-space-size=4096" yarn web:deploy:dev
+                  chmod +x scripts/deploy.sh scripts/deploy-${{ matrix.project }}.sh
+                  NODE_OPTIONS="--max-old-space-size=4096" yarn ${{ matrix.project }}:deploy:dev
 
     deploy-prod:
         needs: [get-versions]
-        if: ${{ github.event.inputs.deploy_web_prod == 'true' }}
+        if: ${{ github.event.inputs.deploy_web_prod == 'true' || github.event.inputs.deploy_admin_prod == 'true' }}
         runs-on: ubuntu-latest
         name: Deploy to PROD
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - project: web
+                      enabled: ${{ github.event.inputs.deploy_web_prod }}
+                    - project: admin
+                      enabled: ${{ github.event.inputs.deploy_admin_prod }}
 
         steps:
+            - name: Skip if not enabled
+              if: ${{ matrix.enabled != 'true' }}
+              run: echo "Skipping ${{ matrix.project }} deployment" && exit 0
+
             - name: Checkout code
+              if: ${{ matrix.enabled == 'true' }}
               uses: actions/checkout@v4
               with:
                   fetch-depth: 0
                   token: ${{ secrets.LEMON_BOT_TOKEN }}
 
             - name: Setup Node.js
+              if: ${{ matrix.enabled == 'true' }}
               uses: actions/setup-node@v4
               with:
                   node-version-file: '.nvmrc'
 
             - name: Get Yarn cache path
+              if: ${{ matrix.enabled == 'true' }}
               id: yarn-cache-dir-path
               run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
 
             - name: Cache dependencies
+              if: ${{ matrix.enabled == 'true' }}
               id: cache-dependencies
               uses: actions/cache@v4
               with:
@@ -137,10 +195,11 @@ jobs:
                       ${{ runner.os }}-yarn-
 
             - name: Install dependencies
-              if: ${{ steps.cache-dependencies.outputs.cache-hit != 'true' }}
+              if: ${{ matrix.enabled == 'true' && steps.cache-dependencies.outputs.cache-hit != 'true' }}
               run: yarn install --frozen-lockfile
 
             - name: Configure AWS Credentials
+              if: ${{ matrix.enabled == 'true' }}
               uses: aws-actions/configure-aws-credentials@v4
               with:
                   aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -148,9 +207,10 @@ jobs:
                   aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
 
             - name: Deploy to PROD
+              if: ${{ matrix.enabled == 'true' }}
               env:
-                  BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
-                  PROD_CF_DISTRIBUTION_ID: ${{ secrets.PROD_CF_DISTRIBUTION_ID }}
+                  BUCKET_NAME: ${{ matrix.project == 'admin' && secrets.ADMIN_BUCKET_NAME || secrets.BUCKET_NAME }}
+                  PROD_CF_DISTRIBUTION_ID: ${{ matrix.project == 'admin' && secrets.ADMIN_PROD_CF_DISTRIBUTION_ID || secrets.PROD_CF_DISTRIBUTION_ID }}
                   VITE_ENV: PROD
                   VITE_PROJECT: FLOWS
                   VITE_API_URL: ${{ secrets.VITE_PROD_API_URL }}
@@ -158,8 +218,8 @@ jobs:
                   VITE_CODES_URL: ${{ secrets.VITE_PROD_CODES_URL }}
               run: |
                   set -e
-                  chmod +x scripts/deploy-web.sh
-                  NODE_OPTIONS="--max-old-space-size=4096" yarn web:deploy:prod
+                  chmod +x scripts/deploy.sh scripts/deploy-${{ matrix.project }}.sh
+                  NODE_OPTIONS="--max-old-space-size=4096" yarn ${{ matrix.project }}:deploy:prod
 
     notify-slack:
         needs: [get-versions, deploy-dev, deploy-prod]
@@ -175,7 +235,10 @@ jobs:
 
                   DEV_WEB="${{ github.event.inputs.deploy_web_dev }}"
                   PROD_WEB="${{ github.event.inputs.deploy_web_prod }}"
+                  DEV_ADMIN="${{ github.event.inputs.deploy_admin_dev }}"
+                  PROD_ADMIN="${{ github.event.inputs.deploy_admin_prod }}"
                   WEB_VER="${{ needs.get-versions.outputs.web-version }}"
+                  ADMIN_VER="${{ needs.get-versions.outputs.admin-version }}"
 
                   TIMESTAMP=$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S')
                   COMMIT_SHA="${GITHUB_SHA:0:7}"
@@ -184,12 +247,17 @@ jobs:
                   PROD_COUNT=0
 
                   [[ "$DEV_WEB" == "true" && "${{ needs.deploy-dev.result }}" == "success" ]] && ((DEV_COUNT++)) || true
+                  [[ "$DEV_ADMIN" == "true" && "${{ needs.deploy-dev.result }}" == "success" ]] && ((DEV_COUNT++)) || true
                   [[ "$PROD_WEB" == "true" && "${{ needs.deploy-prod.result }}" == "success" ]] && ((PROD_COUNT++)) || true
+                  [[ "$PROD_ADMIN" == "true" && "${{ needs.deploy-prod.result }}" == "success" ]] && ((PROD_COUNT++)) || true
 
                   {
                     echo "dev_web=${DEV_WEB}"
                     echo "prod_web=${PROD_WEB}"
+                    echo "dev_admin=${DEV_ADMIN}"
+                    echo "prod_admin=${PROD_ADMIN}"
                     echo "web_version=${WEB_VER}"
+                    echo "admin_version=${ADMIN_VER}"
                     echo "timestamp=${TIMESTAMP}"
                     echo "commit_sha=${COMMIT_SHA}"
                     echo "dev_count=${DEV_COUNT}"
@@ -215,24 +283,42 @@ jobs:
                           "type": "divider"
                       }'
 
+                  # DEV deployments
+                  DEV_ITEMS=""
                   if [[ "${{ steps.deploy-info.outputs.dev_web }}" == "true" && "${{ steps.deploy-info.outputs.dev_success }}" == "true" ]]; then
+                      DEV_ITEMS+="• *Flows* <https://flow-dev.eureka.codes/|개발 서버> \`v${{ steps.deploy-info.outputs.web_version }}\`\n"
+                  fi
+                  if [[ "${{ steps.deploy-info.outputs.dev_admin }}" == "true" && "${{ steps.deploy-info.outputs.dev_success }}" == "true" ]]; then
+                      DEV_ITEMS+="• *Admin* <https://flow-admin-dev.eureka.codes/|개발 서버> \`v${{ steps.deploy-info.outputs.admin_version }}\`\n"
+                  fi
+
+                  if [[ -n "$DEV_ITEMS" ]]; then
                       BLOCKS+=',
                       {
                           "type": "section",
                           "text": {
                               "type": "mrkdwn",
-                              "text": "*개발 환경*\n• *Flows* <https://flow-dev.eureka.codes/|개발 서버> `v'"${{ steps.deploy-info.outputs.web_version }}"'`"
+                              "text": "*개발 환경*\n'"$(echo -e "$DEV_ITEMS")"'"
                           }
                       }'
                   fi
 
+                  # PROD deployments
+                  PROD_ITEMS=""
                   if [[ "${{ steps.deploy-info.outputs.prod_web }}" == "true" && "${{ steps.deploy-info.outputs.prod_success }}" == "true" ]]; then
+                      PROD_ITEMS+="• *Flows* <https://flow.eureka.codes/|운영 서버> \`v${{ steps.deploy-info.outputs.web_version }}\`\n"
+                  fi
+                  if [[ "${{ steps.deploy-info.outputs.prod_admin }}" == "true" && "${{ steps.deploy-info.outputs.prod_success }}" == "true" ]]; then
+                      PROD_ITEMS+="• *Admin* <https://flow-admin.eureka.codes/|운영 서버> \`v${{ steps.deploy-info.outputs.admin_version }}\`\n"
+                  fi
+
+                  if [[ -n "$PROD_ITEMS" ]]; then
                       BLOCKS+=',
                       {
                           "type": "section",
                           "text": {
                               "type": "mrkdwn",
-                              "text": "*운영 환경*\n• *Flows* <https://flow.eureka.codes/|운영 서버> `v'"${{ steps.deploy-info.outputs.web_version }}"'`"
+                              "text": "*운영 환경*\n'"$(echo -e "$PROD_ITEMS")"'"
                           }
                       }'
                   fi
@@ -305,6 +391,8 @@ jobs:
 
                   DEV_WEB="${{ github.event.inputs.deploy_web_dev }}"
                   PROD_WEB="${{ github.event.inputs.deploy_web_prod }}"
+                  DEV_ADMIN="${{ github.event.inputs.deploy_admin_dev }}"
+                  PROD_ADMIN="${{ github.event.inputs.deploy_admin_prod }}"
 
                   TIMESTAMP=$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S')
                   COMMIT_SHA="${GITHUB_SHA:0:7}"
@@ -312,12 +400,14 @@ jobs:
                   DEV_FAILED="false"
                   PROD_FAILED="false"
 
-                  [[ "$DEV_WEB" == "true" && "${{ needs.deploy-dev.result }}" == "failure" ]] && DEV_FAILED="true"
-                  [[ "$PROD_WEB" == "true" && "${{ needs.deploy-prod.result }}" == "failure" ]] && PROD_FAILED="true"
+                  [[ ("$DEV_WEB" == "true" || "$DEV_ADMIN" == "true") && "${{ needs.deploy-dev.result }}" == "failure" ]] && DEV_FAILED="true"
+                  [[ ("$PROD_WEB" == "true" || "$PROD_ADMIN" == "true") && "${{ needs.deploy-prod.result }}" == "failure" ]] && PROD_FAILED="true"
 
                   {
                     echo "dev_web=${DEV_WEB}"
                     echo "prod_web=${PROD_WEB}"
+                    echo "dev_admin=${DEV_ADMIN}"
+                    echo "prod_admin=${PROD_ADMIN}"
                     echo "dev_failed=${DEV_FAILED}"
                     echo "prod_failed=${PROD_FAILED}"
                     echo "timestamp=${TIMESTAMP}"
@@ -342,25 +432,35 @@ jobs:
                       }'
 
                   if [[ "${{ steps.failure-info.outputs.dev_failed }}" == "true" ]]; then
-                      BLOCKS+=',
-                      {
-                          "type": "section",
-                          "text": {
-                              "type": "mrkdwn",
-                              "text": "*개발 환경 배포 실패*\n• *Flows* <https://flow-dev.eureka.codes/|개발 서버>"
-                          }
-                      }'
+                      DEV_ITEMS=""
+                      [[ "${{ steps.failure-info.outputs.dev_web }}" == "true" ]] && DEV_ITEMS+="• *Flows* <https://flow-dev.eureka.codes/|개발 서버>\n"
+                      [[ "${{ steps.failure-info.outputs.dev_admin }}" == "true" ]] && DEV_ITEMS+="• *Admin* <https://flow-admin-dev.eureka.codes/|개발 서버>\n"
+                      if [[ -n "$DEV_ITEMS" ]]; then
+                          BLOCKS+=',
+                          {
+                              "type": "section",
+                              "text": {
+                                  "type": "mrkdwn",
+                                  "text": "*개발 환경 배포 실패*\n'"$(echo -e "$DEV_ITEMS")"'"
+                              }
+                          }'
+                      fi
                   fi
 
                   if [[ "${{ steps.failure-info.outputs.prod_failed }}" == "true" ]]; then
-                      BLOCKS+=',
-                      {
-                          "type": "section",
-                          "text": {
-                              "type": "mrkdwn",
-                              "text": "*운영 환경 배포 실패*\n• *Flows* <https://flow.eureka.codes/|운영 서버>"
-                          }
-                      }'
+                      PROD_ITEMS=""
+                      [[ "${{ steps.failure-info.outputs.prod_web }}" == "true" ]] && PROD_ITEMS+="• *Flows* <https://flow.eureka.codes/|운영 서버>\n"
+                      [[ "${{ steps.failure-info.outputs.prod_admin }}" == "true" ]] && PROD_ITEMS+="• *Admin* <https://flow-admin.eureka.codes/|운영 서버>\n"
+                      if [[ -n "$PROD_ITEMS" ]]; then
+                          BLOCKS+=',
+                          {
+                              "type": "section",
+                              "text": {
+                                  "type": "mrkdwn",
+                                  "text": "*운영 환경 배포 실패*\n'"$(echo -e "$PROD_ITEMS")"'"
+                              }
+                          }'
+                      fi
                   fi
 
                   BLOCKS+=',

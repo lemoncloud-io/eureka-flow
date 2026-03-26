@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --background: 0 0% 100%;
+        --foreground: 240 10% 10%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 10%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 240 10% 10%;
+
+        /* Primary - Soft Violet */
+        --primary: 250 80% 60%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 240 5% 96%;
+        --secondary-foreground: 240 5% 40%;
+        --accent: 250 50% 95%;
+        --accent-foreground: 250 80% 50%;
+
+        --muted: 240 5% 96%;
+        --muted-foreground: 240 5% 50%;
+        --destructive: 0 72% 55%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 240 5% 90%;
+        --input: 240 5% 90%;
+        --ring: 250 80% 60%;
+        --radius: 0.5rem;
+
+        /* Point color */
+        --point: 250 80% 60%;
+
+        /* Semantic Colors */
+        --success: 150 70% 40%;
+        --success-foreground: 0 0% 100%;
+        --warning: 40 95% 50%;
+        --warning-foreground: 0 0% 0%;
+        --info: 210 90% 55%;
+        --info-foreground: 0 0% 100%;
+    }
+
+    .dark {
+        /* Dark Background - Comfortable */
+        --background: 240 5% 13%;
+        --foreground: 0 0% 95%;
+        --card: 240 4% 16%;
+        --card-foreground: 0 0% 95%;
+        --popover: 240 4% 15%;
+        --popover-foreground: 0 0% 95%;
+
+        /* Primary - Soft Violet */
+        --primary: 250 70% 60%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 240 4% 18%;
+        --secondary-foreground: 240 5% 70%;
+        --accent: 250 25% 22%;
+        --accent-foreground: 250 70% 75%;
+
+        --muted: 240 4% 18%;
+        --muted-foreground: 240 5% 60%;
+        --destructive: 0 65% 55%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 240 4% 20%;
+        --input: 240 4% 20%;
+        --ring: 250 70% 60%;
+
+        /* Point color */
+        --point: 250 75% 65%;
+
+        /* Semantic Colors - Dark Mode */
+        --success: 150 60% 45%;
+        --success-foreground: 0 0% 100%;
+        --warning: 40 90% 50%;
+        --warning-foreground: 0 0% 10%;
+        --info: 210 80% 55%;
+        --info-foreground: 0 0% 100%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground antialiased;
+    }
+}
+
+/* Smooth transitions for theme switching */
+html {
+    transition:
+        background-color 0.3s ease,
+        color 0.3s ease;
+}

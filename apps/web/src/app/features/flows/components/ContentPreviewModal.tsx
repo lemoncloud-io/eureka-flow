@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Code2, FileImage, FileText, Type, X } from 'lucide-react';
+import { Code2, Copy, FileImage, FileText, Type, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { downloadImage, useS3Image } from '@flows/flows';
@@ -177,7 +177,8 @@ const CopyButton: React.FC<{ value: string }> = ({ value }) => {
     }, [value, t]);
 
     return (
-        <Button variant="outline" size="sm" onClick={handleCopy} className="h-8 gap-1.5 text-xs">
+        <Button variant="ghost" size="sm" onClick={handleCopy} className="h-8 gap-1.5 text-xs">
+            <Copy className="w-3.5 h-3.5" />
             {t('preview.copy')}
         </Button>
     );
@@ -204,6 +205,19 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
         }
     }, [contentType, t]);
 
+    // Parse JSON once for both copy and render
+    const jsonData = useMemo(
+        () => (contentType === 'json' ? (tryParseJson(content?.value) ?? content?.value) : null),
+        [content?.value, contentType]
+    );
+
+    // Compute copy value for non-image content types
+    const copyValue = useMemo(() => {
+        if (!content || contentType === 'image') return null;
+        if (contentType === 'json' && jsonData != null) return JSON.stringify(jsonData, null, 2);
+        return String(content.value);
+    }, [content, contentType, jsonData]);
+
     if (!content) return null;
 
     const renderContent = () => {
@@ -211,43 +225,24 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
             case 'image':
                 return <ImagePreview src={String(content.value)} />;
 
-            case 'json': {
-                const jsonData = tryParseJson(content.value) ?? content.value;
+            case 'json':
                 return (
-                    <div className="relative">
-                        <div className="absolute top-2 right-2 z-10">
-                            <CopyButton value={JSON.stringify(jsonData, null, 2)} />
-                        </div>
-                        <div className="p-4" onWheel={e => e.stopPropagation()}>
-                            <JsonViewer data={jsonData} collapsed={false} />
-                        </div>
+                    <div className="p-4" onWheel={e => e.stopPropagation()}>
+                        <JsonViewer data={jsonData} collapsed={false} maxHeight="none" />
                     </div>
                 );
-            }
 
             case 'markdown':
                 return (
-                    <div className="relative">
-                        <div className="absolute top-2 right-2 z-10">
-                            <CopyButton value={String(content.value)} />
-                        </div>
-                        <div className="p-4" onWheel={e => e.stopPropagation()}>
-                            <MarkdownViewer content={String(content.value)} />
-                        </div>
+                    <div className="p-4" onWheel={e => e.stopPropagation()}>
+                        <MarkdownViewer content={String(content.value)} />
                     </div>
                 );
 
             case 'text':
             default:
                 return (
-                    <div className="relative">
-                        <div className="absolute top-2 right-2 z-10">
-                            <CopyButton value={String(content.value)} />
-                        </div>
-                        <div className="p-4 font-mono text-sm whitespace-pre-wrap break-words">
-                            {String(content.value)}
-                        </div>
-                    </div>
+                    <div className="p-4 font-mono text-sm whitespace-pre-wrap break-all">{String(content.value)}</div>
                 );
         }
     };
@@ -256,26 +251,29 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 className={cn(
-                    'max-w-4xl max-h-[85vh] p-0 gap-0',
+                    'max-w-4xl h-[85vh] p-0 gap-0 flex flex-col',
                     'bg-background/95 backdrop-blur-xl',
                     '[&>button]:hidden' // Hide default close button
                 )}
             >
-                {/* Header with content type and close button */}
-                <DialogHeader className="flex flex-row items-center justify-between p-4 border-b border-border space-y-0">
+                {/* Header with content type, copy button, and close button */}
+                <DialogHeader className="flex shrink-0 flex-row items-center justify-between p-4 border-b border-border space-y-0">
                     <DialogTitle className="flex items-center gap-2 text-sm font-medium">
                         {getContentTypeIcon(contentType)}
                         <span>{contentTypeLabel}</span>
                     </DialogTitle>
-                    <DialogClose asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted">
-                            <X className="w-4 h-4" />
-                            <span className="sr-only">{t('preview.close')}</span>
-                        </Button>
-                    </DialogClose>
+                    <div className="flex items-center gap-1">
+                        {copyValue && <CopyButton value={copyValue} />}
+                        <DialogClose asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted">
+                                <X className="w-4 h-4" />
+                                <span className="sr-only">{t('preview.close')}</span>
+                            </Button>
+                        </DialogClose>
+                    </div>
                 </DialogHeader>
                 {/* Content */}
-                <ScrollArea className="max-h-[calc(85vh-64px)] p-4">{renderContent()}</ScrollArea>
+                <ScrollArea className="flex-1 min-h-0">{renderContent()}</ScrollArea>
             </DialogContent>
         </Dialog>
     );

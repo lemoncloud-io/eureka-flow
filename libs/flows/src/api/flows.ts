@@ -1,14 +1,21 @@
 import { api, withRetry } from '@flows/web-core';
 
-import type { FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../types';
+import type { ApiListResult, FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../types';
 import type { BlockDefinition, DataPacket, LogEntry } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[flows-api]');
 
-// NOTE: The backend only supports these APIs:
-// - POST /flows/:id/save (create with id='0', or update with existing id)
-// - GET /flows/:id/load (load flow snapshot)
-// - POST /nodes/:id/run (execute node)
+/**
+ * List all flows
+ * GET /flows
+ *
+ * @returns ApiListResult<FlowView> with list of flows and total count
+ */
+export const listFlows = async (): Promise<ApiListResult<FlowView>> => {
+    _log('> listFlows()');
+    const response = await withRetry(() => api.get<ApiListResult<FlowView>>('/flows'), 3, 'listFlows');
+    return response.data;
+};
 
 /**
  * Load flow snapshot (complete state with nodes and edges)
@@ -95,6 +102,22 @@ export const updateFlowMetadata = async (id: string, body: UpdateFlowBody): Prom
     }
     _log(`> updateFlowMetadata(${id})`, body);
     const response = await api.post<FlowView>(`/flows/${id}`, body);
+    return response.data;
+};
+
+/**
+ * Delete flow
+ * DELETE /flows/:id
+ *
+ * @param id - Flow ID to delete
+ * @returns FlowView with deletedAt set
+ */
+export const deleteFlow = async (id: string): Promise<FlowView> => {
+    if (!id) {
+        throw new Error('Flow ID is required');
+    }
+    _log(`> deleteFlow(${id})`);
+    const response = await api.delete<FlowView>(`/flows/${id}`);
     return response.data;
 };
 

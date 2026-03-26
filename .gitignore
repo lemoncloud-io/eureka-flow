@@ -19,6 +19,8 @@ build/
 *.local
 apps/web/.env.dev
 apps/web/.env.prod
+apps/admin/.env.dev
+apps/admin/.env.prod
 .env.deploy
 
 # Editor directories and files
@@ -53,3 +55,5 @@ tmp
 
 # Playwright MCP
 .playwright-mcp
+
+vite.config.*.timestamp*
