@@ -229,7 +229,7 @@ jobs:
                   VITE_CODES_URL: ${{ secrets.VITE_DEV_CODES_URL }}
               run: |
                   set -e
-                  chmod +x scripts/deploy-${{ matrix.project }}.sh
+                  chmod +x scripts/deploy.sh scripts/deploy-${{ matrix.project }}.sh
                   NODE_OPTIONS="--max-old-space-size=4096" yarn ${{ matrix.project }}:deploy:dev
 
     notify-slack:

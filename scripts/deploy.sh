@@ -62,9 +62,14 @@ log_info() {
 load_local_config
 
 # Configurable via environment variables
-BUCKET_NAME="${BUCKET_NAME:-your-s3-bucket}"
-DEV_DISTRIBUTION_ID="${DEV_CF_DISTRIBUTION_ID:-}"
-PROD_DISTRIBUTION_ID="${PROD_CF_DISTRIBUTION_ID:-}"
+# Use app-specific env vars if available (e.g., ADMIN_BUCKET_NAME for admin)
+APP_PREFIX=$(echo "$APP_NAME" | tr '[:lower:]' '[:upper:]')
+BUCKET_VAR="${APP_PREFIX}_BUCKET_NAME"
+DEV_CF_VAR="${APP_PREFIX}_DEV_CF_DISTRIBUTION_ID"
+PROD_CF_VAR="${APP_PREFIX}_PROD_CF_DISTRIBUTION_ID"
+BUCKET_NAME="${!BUCKET_VAR:-${BUCKET_NAME:-your-s3-bucket}}"
+DEV_DISTRIBUTION_ID="${!DEV_CF_VAR:-${DEV_CF_DISTRIBUTION_ID:-}}"
+PROD_DISTRIBUTION_ID="${!PROD_CF_VAR:-${PROD_CF_DISTRIBUTION_ID:-}}"
 DIST_DIR="${PROJECT_ROOT}/dist/apps/${APP_NAME}"
 CACHE_CONTROL_NO_CACHE="max-age=0,no-cache,no-store,must-revalidate"
 CACHE_CONTROL_LOCALES="max-age=0,s-maxage=0,no-cache,no-store,must-revalidate,proxy-revalidate"
