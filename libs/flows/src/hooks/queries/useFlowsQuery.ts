@@ -138,7 +138,7 @@ export const useDeleteFlowMutation = () => {
                 queryClient.setQueryData<ApiListResult<FlowView>>(flowsKeys.lists(), {
                     ...previous,
                     list: previous.list.filter(f => f.id !== id),
-                    total: (previous.total ?? 0) - 1,
+                    total: Math.max((previous.total ?? previous.list.length) - 1, 0),
                 });
             }
             return { previous };
@@ -148,6 +148,9 @@ export const useDeleteFlowMutation = () => {
             if (context?.previous) {
                 queryClient.setQueryData(flowsKeys.lists(), context.previous);
             }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: flowsKeys.lists() });
         },
     });
 };
