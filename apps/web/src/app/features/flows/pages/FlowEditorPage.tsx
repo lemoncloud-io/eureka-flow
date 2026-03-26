@@ -328,15 +328,6 @@ export const FlowEditorPage = () => {
         setIsHelpDialogOpen(true);
     }, []);
 
-    const handleApiKeySubmit = useCallback(
-        async (key: string): Promise<boolean> => {
-            setApiKey(key);
-            setIsApiKeyDialogOpen(false);
-            return true;
-        },
-        [setApiKey]
-    );
-
     const updateUrl = useCallback((flowId: string | null, nodeId?: string | null) => {
         try {
             let path = '/editor';
@@ -355,6 +346,14 @@ export const FlowEditorPage = () => {
     const boot = useCallback(async () => {
         setBootError(null);
         setIsAppReady(false);
+
+        // Check API key before making any API calls
+        const currentApiKey = useWebCoreStore.getState().apiKey;
+        if (!currentApiKey) {
+            setIsApiKeyDialogOpen(true);
+            return;
+        }
+
         setLoadingText(t('flowEditor.initializingEngine'));
         try {
             setLoadingText(t('flowEditor.loadingBlockRegistry'));
@@ -423,6 +422,17 @@ export const FlowEditorPage = () => {
         bootedRef.current = true;
         boot();
     }, [boot]);
+
+    const handleApiKeySubmit = useCallback(
+        async (key: string): Promise<boolean> => {
+            setApiKey(key);
+            setIsApiKeyDialogOpen(false);
+            bootedRef.current = false;
+            setTimeout(() => boot(), 0);
+            return true;
+        },
+        [setApiKey, boot]
+    );
 
     const triggerAutoSave = useCallback(() => {
         if (!isAutoSaveEnabled) return;
@@ -677,7 +687,12 @@ export const FlowEditorPage = () => {
                 <ApiKeyDialog
                     open={isApiKeyDialogOpen}
                     onSubmit={handleApiKeySubmit}
-                    onOpenChange={setIsApiKeyDialogOpen}
+                    onOpenChange={open => {
+                        setIsApiKeyDialogOpen(open);
+                        if (!open && !useWebCoreStore.getState().apiKey) {
+                            window.location.href = '/';
+                        }
+                    }}
                     codesUrl={import.meta.env.VITE_CODES_URL}
                     initialValue={apiKey ?? undefined}
                 />
