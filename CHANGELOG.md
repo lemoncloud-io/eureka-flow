@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-03-26] - root@0.13.0, @flows/web@0.13.0, @flows/admin@0.2.0
+
+### Features
+
+- add skills, tools, blocks feature
+
+### Refactor
+
+- simplify form data types
+- update button sizes and colors
+
 ## [2026-03-26] - root@0.12.0, @flows/web@0.12.0, @flows/admin@0.1.0
 
 ### Features
