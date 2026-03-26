@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FileText, Pencil, Trash2, X } from 'lucide-react';
+import { Copy, FileText, Pencil, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { decodeDataUrl } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -49,11 +50,20 @@ export const FilePreviewDialog: React.FC<FilePreviewDialogProps> = ({
     onDelete,
     onEdit,
 }) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'nodes']);
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState('');
 
     const decodedContent = useMemo(() => decodeDataUrl(fileData), [fileData]);
+
+    const handleCopy = useCallback(async () => {
+        try {
+            await navigator.clipboard.writeText(decodedContent);
+            toast.success(t('nodes:preview.copied'));
+        } catch {
+            toast.error(t('nodes:preview.copyFailed'));
+        }
+    }, [decodedContent, t]);
 
     const handleStartEdit = () => {
         setEditContent(decodedContent);
@@ -102,6 +112,12 @@ export const FilePreviewDialog: React.FC<FilePreviewDialogProps> = ({
                         <span className="truncate max-w-[300px]">{fileName}</span>
                     </DialogTitle>
                     <div className="flex items-center gap-1">
+                        {!isEditing && (
+                            <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleCopy}>
+                                <Copy className="w-3.5 h-3.5" />
+                                {t('nodes:preview.copy')}
+                            </Button>
+                        )}
                         {onEdit && !isEditing && (
                             <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleStartEdit}>
                                 <Pencil className="w-3.5 h-3.5" />
@@ -139,7 +155,7 @@ export const FilePreviewDialog: React.FC<FilePreviewDialogProps> = ({
                 ) : (
                     <ScrollArea className="max-h-[calc(85vh-120px)]">
                         <div className="p-4">
-                            <pre className="font-mono text-sm whitespace-pre-wrap break-words text-foreground/90">
+                            <pre className="font-mono text-sm whitespace-pre-wrap break-all text-foreground/90">
                                 {decodedContent}
                             </pre>
                         </div>
