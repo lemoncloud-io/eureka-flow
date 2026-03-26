@@ -100,13 +100,13 @@ export const FilePreviewDialog: React.FC<FilePreviewDialogProps> = ({
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
                 className={cn(
-                    'max-w-3xl max-h-[85vh] p-0 gap-0',
+                    'max-w-3xl h-[85vh] p-0 gap-0 flex flex-col',
                     'bg-background/95 backdrop-blur-xl',
                     '[&>button]:hidden'
                 )}
             >
                 {/* Header */}
-                <DialogHeader className="flex flex-row items-center justify-between p-4 border-b border-border space-y-0">
+                <DialogHeader className="flex shrink-0 flex-row items-center justify-between p-4 border-b border-border space-y-0">
                     <DialogTitle className="flex items-center gap-2 text-sm font-medium">
                         <FileText className="w-4 h-4" />
                         <span className="truncate max-w-[300px]">{fileName}</span>
@@ -153,7 +153,7 @@ export const FilePreviewDialog: React.FC<FilePreviewDialogProps> = ({
                         />
                     </div>
                 ) : (
-                    <ScrollArea className="max-h-[calc(85vh-120px)]">
+                    <ScrollArea className="flex-1 min-h-0">
                         <div className="p-4">
                             <pre className="font-mono text-sm whitespace-pre-wrap break-all text-foreground/90">
                                 {decodedContent}

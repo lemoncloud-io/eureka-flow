@@ -205,15 +205,18 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
         }
     }, [contentType, t]);
 
+    // Parse JSON once for both copy and render
+    const jsonData = useMemo(
+        () => (contentType === 'json' ? (tryParseJson(content?.value) ?? content?.value) : null),
+        [content?.value, contentType]
+    );
+
     // Compute copy value for non-image content types
     const copyValue = useMemo(() => {
         if (!content || contentType === 'image') return null;
-        if (contentType === 'json') {
-            const jsonData = tryParseJson(content.value) ?? content.value;
-            return JSON.stringify(jsonData, null, 2);
-        }
+        if (contentType === 'json' && jsonData != null) return JSON.stringify(jsonData, null, 2);
         return String(content.value);
-    }, [content, contentType]);
+    }, [content, contentType, jsonData]);
 
     if (!content) return null;
 
@@ -222,14 +225,12 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
             case 'image':
                 return <ImagePreview src={String(content.value)} />;
 
-            case 'json': {
-                const jsonData = tryParseJson(content.value) ?? content.value;
+            case 'json':
                 return (
                     <div className="p-4" onWheel={e => e.stopPropagation()}>
                         <JsonViewer data={jsonData} collapsed={false} maxHeight="none" />
                     </div>
                 );
-            }
 
             case 'markdown':
                 return (
@@ -256,7 +257,7 @@ export const ContentPreviewModal: React.FC<ContentPreviewModalProps> = ({ open, 
                 )}
             >
                 {/* Header with content type, copy button, and close button */}
-                <DialogHeader className="flex flex-row items-center justify-between p-4 border-b border-border space-y-0">
+                <DialogHeader className="flex shrink-0 flex-row items-center justify-between p-4 border-b border-border space-y-0">
                     <DialogTitle className="flex items-center gap-2 text-sm font-medium">
                         {getContentTypeIcon(contentType)}
                         <span>{contentTypeLabel}</span>
