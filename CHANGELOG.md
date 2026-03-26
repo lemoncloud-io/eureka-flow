@@ -1,5 +1,27 @@
 # Changelog
 
+## [2026-03-26] - root@0.12.0, @flows/web@0.12.0, @flows/admin@0.1.0
+
+### Features
+
+- setup admin and load flow list
+- add copy functionality to content preview
+
+### Bug Fixes
+
+- prevent negative total count
+- handle API failure and clear sequence numbers
+- require API key before initializing flow editor
+- simplify deploy script and env loading
+
+### Refactor
+
+- optimize json parsing
+
+### Other
+
+- ci: improve deploy script configuration
+
 ## [2026-03-25] - root@0.11.0, @flows/web@0.11.0
 
 ### Features
