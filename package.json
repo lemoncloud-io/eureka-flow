@@ -21,7 +21,16 @@
         "web:test": "npx nx test web",
         "web:deploy": "./scripts/deploy-web.sh",
         "web:deploy:dev": "./scripts/deploy-web.sh dev",
-        "web:deploy:prod": "./scripts/deploy-web.sh prod"
+        "web:deploy:prod": "./scripts/deploy-web.sh prod",
+        "!admin": "------------- admin scripts -------------",
+        "admin:start": "yarn clean:cache && npx nx serve admin --port 3001",
+        "admin:build": "npx nx build admin",
+        "admin:build:dev": "yarn clean:cache && npx nx build admin -- --mode dev",
+        "admin:build:prod": "yarn clean:cache && npx nx build admin -- --mode prod",
+        "admin:test": "npx nx test admin",
+        "admin:deploy": "./scripts/deploy-admin.sh",
+        "admin:deploy:dev": "./scripts/deploy-admin.sh dev",
+        "admin:deploy:prod": "./scripts/deploy-admin.sh prod"
     },
     "dependencies": {
         "@hookform/resolvers": "^3.9.1",

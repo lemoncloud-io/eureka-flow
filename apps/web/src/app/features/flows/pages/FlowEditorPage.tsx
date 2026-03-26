@@ -9,6 +9,7 @@ import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
+import { FlowListDialog } from '../components/FlowListDialog';
 import { Header } from '../components/Header';
 import { HelpDialog } from '../components/HelpDialog';
 import { Sidebar } from '../components/Sidebar';
@@ -323,6 +324,7 @@ export const FlowEditorPage = () => {
     const [bootError, setBootError] = useState<string | null>(null);
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
+    const [isFlowListOpen, setIsFlowListOpen] = useState(false);
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
     const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
 
@@ -344,6 +346,10 @@ export const FlowEditorPage = () => {
         setIsHelpDialogOpen(true);
     }, []);
 
+    const handleOpenFlowList = useCallback(() => {
+        setIsFlowListOpen(true);
+    }, []);
+
     const updateUrl = useCallback((flowId: string | null, nodeId?: string | null) => {
         try {
             let path = '/editor';
@@ -358,6 +364,23 @@ export const FlowEditorPage = () => {
             // ignore
         }
     }, []);
+
+    const handleSelectFlow = useCallback(
+        async (flowId: string) => {
+            try {
+                const flowData = await loadFlowById(flowId);
+                if (canvasRef.current && flowData) {
+                    await canvasRef.current.loadWorkflow(flowData);
+                    lastSavedStateRef.current = serializeWorkflowState(flowData);
+                }
+                updateUrl(flowId, null);
+            } catch (error) {
+                console.error('[FlowEditor] Failed to load flow:', error);
+                handlersRef.current.showNotification(t('flowEditor.failedToLoadFlow'), 'error');
+            }
+        },
+        [loadFlowById, updateUrl, t]
+    );
 
     const boot = useCallback(async () => {
         setBootError(null);
@@ -609,6 +632,7 @@ export const FlowEditorPage = () => {
         export: handleExport,
         showNotification,
         openHelp: handleOpenHelp,
+        openFlowList: handleOpenFlowList,
     });
     handlersRef.current = {
         save: handleSave,
@@ -616,6 +640,7 @@ export const FlowEditorPage = () => {
         export: handleExport,
         showNotification,
         openHelp: handleOpenHelp,
+        openFlowList: handleOpenFlowList,
     };
 
     useEffect(() => {
@@ -634,7 +659,10 @@ export const FlowEditorPage = () => {
 
             const key = e.key.toLowerCase();
 
-            if (key === 's') {
+            if (key === 'o') {
+                e.preventDefault();
+                handlersRef.current.openFlowList();
+            } else if (key === 's') {
                 e.preventDefault();
                 handlersRef.current.save();
             } else if (key === 'n') {
@@ -780,6 +808,7 @@ export const FlowEditorPage = () => {
                 onShare={handleShare}
                 onApiKeySettings={handleApiKeySettings}
                 onHelp={() => handleOpenHelp('gettingStarted')}
+                onOpenFlowList={handleOpenFlowList}
             />
 
             {/* Floating Sidebar */}
@@ -792,6 +821,15 @@ export const FlowEditorPage = () => {
                 onOpenChange={setIsApiKeyDialogOpen}
                 codesUrl={import.meta.env.VITE_CODES_URL}
                 initialValue={apiKey ?? undefined}
+            />
+
+            {/* Flow List Dialog */}
+            <FlowListDialog
+                open={isFlowListOpen}
+                onOpenChange={setIsFlowListOpen}
+                currentFlowId={currentFlowId}
+                onSelectFlow={handleSelectFlow}
+                onNewFlow={handleNew}
             />
 
             {/* Help Dialog */}

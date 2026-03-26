@@ -28,6 +28,9 @@
         },
         {
             "path": "./libs/policy"
+        },
+        {
+            "path": "./apps/admin"
         }
     ]
 }

@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { flowsKeys } from './keys';
-import { createFlow, loadFlow, saveFlow, updateFlowMetadata } from '../../api';
+import { createFlow, deleteFlow, listFlows, loadFlow, saveFlow, updateFlowMetadata } from '../../api';
 
 import type {
+    ApiListResult,
     FlowView,
     LoadFlowPortData,
     LoadFlowResult,
@@ -12,9 +13,17 @@ import type {
     UpdateFlowBody,
 } from '../../types';
 
-// NOTE: useFlowsListQuery and useFlowQuery are removed because
-// the backend does not support GET /flows or GET /flows/:id endpoints.
-// Only POST /flows/:id/save and GET /flows/:id/load are supported.
+/**
+ * Query hook for listing all flows
+ * GET /flows
+ */
+export const useFlowsListQuery = (enabled = true) => {
+    return useQuery<ApiListResult<FlowView>>({
+        queryKey: flowsKeys.lists(),
+        queryFn: listFlows,
+        enabled,
+    });
+};
 
 /**
  * Query hook for loading flow (full design with nodes and edges)
@@ -102,11 +111,46 @@ export const useUpdateFlowMutation = () => {
                 return {
                     ...old,
                     name: data.name ?? old.name,
+                    description: data.description ?? old.description,
                 };
             });
+            // Refresh the flows list so updated metadata is visible
+            queryClient.invalidateQueries({ queryKey: flowsKeys.lists() });
+        },
+    });
+};
+
+/**
+ * Mutation hook for deleting a flow
+ * DELETE /flows/:id
+ */
+export const useDeleteFlowMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: string) => deleteFlow(id),
+        onMutate: async id => {
+            await queryClient.cancelQueries({ queryKey: flowsKeys.lists() });
+            const previous = queryClient.getQueryData<ApiListResult<FlowView>>(flowsKeys.lists());
+
+            // Optimistically remove from cache
+            if (previous) {
+                queryClient.setQueryData<ApiListResult<FlowView>>(flowsKeys.lists(), {
+                    ...previous,
+                    list: previous.list.filter(f => f.id !== id),
+                    total: (previous.total ?? 0) - 1,
+                });
+            }
+            return { previous };
+        },
+        onError: (_error, _id, context) => {
+            // Rollback on error
+            if (context?.previous) {
+                queryClient.setQueryData(flowsKeys.lists(), context.previous);
+            }
         },
     });
 };
 
 // Re-export types for convenience
-export type { FlowView, LoadFlowPortData, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody };
+export type { ApiListResult, FlowView, LoadFlowPortData, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody };

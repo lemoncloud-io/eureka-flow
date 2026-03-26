@@ -5,6 +5,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import {
     Download,
     FileText,
+    FolderOpen,
     HelpCircle,
     Key,
     LayoutGrid,
@@ -84,6 +85,7 @@ interface HeaderProps {
     onShare: () => void;
     onApiKeySettings?: () => void;
     onHelp?: () => void;
+    onOpenFlowList?: () => void;
 }
 
 const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
@@ -306,6 +308,7 @@ export const Header: React.FC<HeaderProps> = ({
     onShare,
     onApiKeySettings,
     onHelp,
+    onOpenFlowList,
 }) => {
     const { t } = useTranslation(['flows']);
 
@@ -358,6 +361,14 @@ export const Header: React.FC<HeaderProps> = ({
                             'shadow-sm'
                         )}
                     >
+                        {onOpenFlowList && (
+                            <ToolbarButton
+                                onClick={onOpenFlowList}
+                                icon={<FolderOpen className="w-4 h-4" />}
+                                tooltip={t('flowList.openFlows')}
+                                shortcut="⌘O"
+                            />
+                        )}
                         <ToolbarButton
                             onClick={editActions.onSave}
                             icon={<Save className="w-4 h-4" />}
@@ -376,12 +387,6 @@ export const Header: React.FC<HeaderProps> = ({
                             icon={<Redo2 className="w-4 h-4" />}
                             tooltip={t('header.redo')}
                             shortcut="⌘⇧Z"
-                        />
-                        <ToolbarButton
-                            onClick={editActions.onAutoLayout}
-                            icon={<LayoutGrid className="w-4 h-4" />}
-                            tooltip={t('header.autoLayout')}
-                            shortcut="⌘A"
                         />
                         {socketState && <SocketDot {...socketState} />}
                     </div>
