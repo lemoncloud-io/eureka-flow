@@ -113,7 +113,13 @@ export const FlowEditorPage = () => {
                         const nodeData = await getNode(nodeId);
                         errMsg = nodeData.errorMessage;
                     } catch {
-                        // API failed, proceed without errorMessage
+                        // Revert no on failure to allow retry
+                        if (no !== undefined) {
+                            const prevNo = nodeNoRef.current.get(nodeId);
+                            if (prevNo === no) {
+                                nodeNoRef.current.delete(nodeId);
+                            }
+                        }
                     }
                 }
                 canvasRef.current.updateNodeFromServer(nodeId, {
@@ -280,6 +286,16 @@ export const FlowEditorPage = () => {
             timeoutsMap.clear();
         };
     }, []);
+
+    // Clear sequence number tracking and highlight timeouts when flow changes
+    useEffect(() => {
+        nodeNoRef.current.clear();
+        portNoRef.current.clear();
+        highlightTimeoutsRef.current.forEach(timeoutId => {
+            window.clearTimeout(timeoutId);
+        });
+        highlightTimeoutsRef.current.clear();
+    }, [currentFlowId]);
 
     // Track last local update to prevent self-echo from socket (use ref to avoid re-renders)
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
