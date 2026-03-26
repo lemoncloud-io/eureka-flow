@@ -41,39 +41,35 @@
     }
 
     .dark {
-        /* Dark Background - Comfortable */
-        --background: 240 5% 13%;
-        --foreground: 0 0% 95%;
-        --card: 240 4% 16%;
-        --card-foreground: 0 0% 95%;
-        --popover: 240 4% 15%;
-        --popover-foreground: 0 0% 95%;
+        --background: 240 10% 6%;
+        --foreground: 0 0% 96%;
+        --card: 240 8% 10%;
+        --card-foreground: 0 0% 96%;
+        --popover: 240 8% 10%;
+        --popover-foreground: 0 0% 96%;
 
-        /* Primary - Soft Violet */
-        --primary: 250 70% 60%;
+        --primary: 250 85% 70%;
         --primary-foreground: 0 0% 100%;
-        --secondary: 240 4% 18%;
-        --secondary-foreground: 240 5% 70%;
-        --accent: 250 25% 22%;
-        --accent-foreground: 250 70% 75%;
+        --secondary: 240 6% 15%;
+        --secondary-foreground: 0 0% 80%;
+        --accent: 250 30% 18%;
+        --accent-foreground: 250 80% 80%;
 
-        --muted: 240 4% 18%;
-        --muted-foreground: 240 5% 60%;
-        --destructive: 0 65% 55%;
+        --muted: 240 6% 15%;
+        --muted-foreground: 0 0% 64%;
+        --destructive: 0 70% 55%;
         --destructive-foreground: 0 0% 100%;
-        --border: 240 4% 20%;
-        --input: 240 4% 20%;
-        --ring: 250 70% 60%;
+        --border: 240 6% 18%;
+        --input: 240 6% 18%;
+        --ring: 250 85% 70%;
 
-        /* Point color */
-        --point: 250 75% 65%;
+        --point: 250 85% 72%;
 
-        /* Semantic Colors - Dark Mode */
-        --success: 150 60% 45%;
+        --success: 150 60% 50%;
         --success-foreground: 0 0% 100%;
-        --warning: 40 90% 50%;
+        --warning: 40 90% 55%;
         --warning-foreground: 0 0% 10%;
-        --info: 210 80% 55%;
+        --info: 210 80% 60%;
         --info-foreground: 0 0% 100%;
     }
 }

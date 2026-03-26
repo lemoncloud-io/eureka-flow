@@ -1,12 +1,26 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
+import { AdminLayout, AuthGuard } from './components/layout';
+import { LoginPage } from './features/auth';
+import { BlockDetailPage, BlockListPage } from './features/blocks';
 import { DashboardPage } from './features/dashboard';
+import { SkillsPage } from './features/skills';
+import { ToolsPage } from './features/tools';
 
 export const App = () => {
     return (
         <BrowserRouter>
             <Routes>
-                <Route path="/" element={<DashboardPage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route element={<AuthGuard />}>
+                    <Route element={<AdminLayout />}>
+                        <Route path="/" element={<DashboardPage />} />
+                        <Route path="/blocks" element={<BlockListPage />} />
+                        <Route path="/blocks/:id" element={<BlockDetailPage />} />
+                        <Route path="/tools" element={<ToolsPage />} />
+                        <Route path="/skills" element={<SkillsPage />} />
+                    </Route>
+                </Route>
             </Routes>
         </BrowserRouter>
     );
