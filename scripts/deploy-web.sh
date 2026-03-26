@@ -22,6 +22,25 @@ load_local_config() {
     fi
 }
 
+# Load VITE environment variables from .env.{env} file (local only)
+load_vite_env() {
+    local deploy_env="${1:-}"
+    if [ "${GITHUB_ACTIONS:-}" != "true" ] && [ -n "$deploy_env" ]; then
+        local env_file="${PROJECT_ROOT}/apps/${APP_NAME}/.env.${deploy_env}"
+        if [ -f "$env_file" ]; then
+            log_info "Loading VITE env from ${env_file}"
+            set -a
+            # shellcheck disable=SC1090
+            source "$env_file"
+            set +a
+            export DEPLOY_ENV="$deploy_env"
+        else
+            log_error "VITE env file not found: ${env_file}"
+            exit 1
+        fi
+    fi
+}
+
 # Simple log function for early use (before main log functions)
 log_info() {
     echo "[INFO] $1"
@@ -331,6 +350,22 @@ upload_version_json() {
     log_success "version.json uploaded"
 }
 
+build_app() {
+    local deploy_env="${1:-}"
+
+    # Clean dist
+    log_info "Cleaning dist directory..."
+    rm -rf "${DIST_DIR}" || true
+
+    # Load VITE env for local builds
+    load_vite_env "$deploy_env"
+
+    # Build (default to dev mode when no environment specified)
+    local build_mode="${deploy_env:-dev}"
+    log_info "Building web app (mode: ${build_mode})..."
+    yarn "web:build:${build_mode}"
+}
+
 invalidate_cloudfront() {
     local deploy_env="${1:-}"
     local distribution_id="$2"
@@ -362,6 +397,9 @@ main() {
     local distribution_id
 
     log_info "AWS S3 deployment script started"
+
+    # Build app (loads VITE env + builds)
+    build_app "$deploy_env"
 
     # Setup and validation
     setup_aws_profile
