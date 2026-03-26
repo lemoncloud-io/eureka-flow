@@ -76,10 +76,10 @@ export const BlockDetailPage = () => {
                     <h1 className="text-2xl font-bold text-foreground">{isNew ? '새 블록 생성' : formData.name}</h1>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => navigate('/blocks')}>
+                    <Button variant="outline" size="sm" onClick={() => navigate('/blocks')}>
                         취소
                     </Button>
-                    <Button onClick={handleSave}>
+                    <Button size="sm" onClick={handleSave}>
                         <Save className="mr-1.5 h-4 w-4" />
                         저장
                     </Button>
