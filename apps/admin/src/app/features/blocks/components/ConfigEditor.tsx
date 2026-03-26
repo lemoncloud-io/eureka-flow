@@ -1,0 +1,91 @@
+import { Plus, X } from 'lucide-react';
+
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@flows/ui-kit';
+
+import { CONFIG_TYPE_OPTIONS } from '../types';
+
+import type { ConfigItem } from '../types';
+
+interface ConfigEditorProps {
+    configs: ConfigItem[];
+    onChange: (configs: ConfigItem[]) => void;
+}
+
+const EMPTY_CONFIG: ConfigItem = {
+    key: '',
+    type: 'text',
+    label: '',
+};
+
+type EditableConfigField = 'key' | 'type' | 'label' | 'placeholder' | 'defaultValue';
+
+export const ConfigEditor = ({ configs, onChange }: ConfigEditorProps) => {
+    const addConfig = () => {
+        onChange([...configs, { ...EMPTY_CONFIG }]);
+    };
+
+    const updateConfig = (index: number, field: EditableConfigField, value: string) => {
+        const updated = configs.map((cfg, i) => (i === index ? { ...cfg, [field]: value } : cfg));
+        onChange(updated);
+    };
+
+    const removeConfig = (index: number) => {
+        onChange(configs.filter((_, i) => i !== index));
+    };
+
+    return (
+        <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Config</h3>
+                <Button type="button" variant="outline" size="sm" onClick={addConfig}>
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    추가
+                </Button>
+            </div>
+            {configs.length === 0 && <p className="text-sm text-muted-foreground">설정 항목이 없습니다.</p>}
+            {configs.map((cfg, index) => (
+                <div key={index} className="flex flex-wrap items-center gap-2 rounded-md border p-2">
+                    <Input
+                        placeholder="Key"
+                        value={cfg.key}
+                        onChange={e => updateConfig(index, 'key', e.target.value)}
+                        className="w-32"
+                    />
+                    <Select value={cfg.type} onValueChange={v => updateConfig(index, 'type', v)}>
+                        <SelectTrigger className="w-28">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {CONFIG_TYPE_OPTIONS.map(opt => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Input
+                        placeholder="Label"
+                        value={cfg.label}
+                        onChange={e => updateConfig(index, 'label', e.target.value)}
+                        className="flex-1"
+                    />
+                    <Input
+                        placeholder="Default Value"
+                        value={cfg.defaultValue ?? ''}
+                        onChange={e => updateConfig(index, 'defaultValue', e.target.value)}
+                        className="w-40"
+                    />
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => removeConfig(index)}
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+            ))}
+        </div>
+    );
+};
