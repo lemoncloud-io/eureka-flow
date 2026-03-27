@@ -127,8 +127,8 @@ export interface PortUpdateMessage {
  * Trace message from WebSocket (action: 'trace')
  * Received during agent block execution with real-time stage/message updates
  *
- * The server wraps trace data with `id` (nodeId) and `flowId` for routing.
- * If `id` is absent, `traceId` is used as fallback routing key.
+ * The server must include `id` (nodeId) and `flowId` for routing.
+ * Messages without `id` are dropped with a console warning.
  *
  * @example
  * {

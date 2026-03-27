@@ -138,7 +138,7 @@ export const isTraceMessage = (data: unknown): data is TraceMessage => {
  * Used by onTraceUpdate callback for agent block trace display
  */
 export interface TraceUpdateInfo {
-    /** Node ID of the agent block (from server `id` field, or traceId as fallback) */
+    /** Node ID of the agent block (from server `id` field) */
     nodeId: string;
     /** Flow ID */
     flowId?: string;
