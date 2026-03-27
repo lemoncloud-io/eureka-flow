@@ -1,6 +1,7 @@
 export type {
     BlockDefinition,
     BlockView,
+    BoolFlag,
     ConfigField,
     ConfigFieldModel,
     ConfigFieldWithDefault,
@@ -8,20 +9,45 @@ export type {
     Connection,
     DataPacket,
     DataType,
+    doGetImageParam,
+    doGetImageV2Param,
     doPostRunBody,
+    doPostRunParam,
+    doPostStopParam,
     EdgeData,
+    EdgeStereo,
     ExecutionStats,
+    FlowExecutionStatus,
+    FlowState,
+    FlowStereo,
     ListResult,
     LogEntry,
     NodeConfigItem,
     NodeData,
     NodeDataPacketItem,
+    NodeStereo,
     NodeStatus,
-    PortData,
+    NodeStatusType,
     PortDefinition,
+    PortVariant,
+    Position,
     ProcessBody,
     ProcessResult,
     WorkflowState,
+} from '@lemoncloud/eureka-flows-api';
+
+import type {
+    BlockDefinition,
+    DataPacket,
+    EdgeData,
+    EdgeStereo,
+    FlowState,
+    FlowStereo,
+    NodeConfigItem,
+    NodeData,
+    NodeDataPacketItem,
+    NodeStereo,
+    Position,
 } from '@lemoncloud/eureka-flows-api';
 
 // ============================================================================
@@ -29,7 +55,7 @@ export type {
 // ============================================================================
 
 /**
- * NodeState - execution state of a node
+ * NodeState - execution state of a node (frontend subset of NodeStatusType)
  *
  * Values:
  * - IDLE: Initial state, no execution started
@@ -38,16 +64,79 @@ export type {
  * - COMPLETED: Execution finished successfully
  * - ERROR: Execution failed
  *
- * @note This replaces the deprecated `status` field.
- * During migration, use `node.state ?? node.status` for backward compatibility.
+ * @note API package's NodeStatusType also includes WAITING and SKIPPED.
+ * Frontend uses this narrower type for UI state management.
  */
 export type NodeState = 'IDLE' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR';
 
-import type { BlockDefinition, DataPacket, EdgeData, NodeData, PortData } from '@lemoncloud/eureka-flows-api';
+/**
+ * TraceStage - agent block execution stages for trace messages
+ */
+export type TraceStage =
+    | 'run'
+    | 'planner'
+    | 'step'
+    | 'tool'
+    | 'approval'
+    | 'reflector'
+    | 'finalizer'
+    | 'trace'
+    | 'error'
+    | 'runtime';
+
+/**
+ * TraceType - specific event types within agent trace logs
+ * Known types are listed explicitly; string fallback allows forward compatibility
+ */
+export type TraceType =
+    | 'run_start'
+    | 'run_end'
+    | 'skill_selected'
+    | 'planner_call'
+    | 'step_start'
+    | 'step_end'
+    | 'tool_start'
+    | 'tool_end'
+    | 'error'
+    | (string & {});
+
+/**
+ * TraceEntry - a single trace log entry from agent block execution
+ *
+ * @example
+ * {
+ *   "traceId": "f6684e2b-...",
+ *   "seq": 1,
+ *   "ts": 1774517002827,
+ *   "stage": "run",
+ *   "message": "Run started",
+ *   "runId": "f6684e2b-...",
+ *   "type": "run_start",
+ *   "data": { "userInput": "customer check" }
+ * }
+ */
+export interface TraceEntry {
+    traceId: string;
+    seq: number;
+    ts: number;
+    stage: TraceStage;
+    message: string;
+    runId: string;
+    type: TraceType;
+    data?: Record<string, unknown>;
+}
 
 // ============================================================================
 // Block Definition Extension (isFrontend support)
 // ============================================================================
+
+/**
+ * BlockStereo - stereotype of block for categorization (frontend subset)
+ *
+ * NOTE: API package's BlockStereo includes additional values ('' | '#' | '#alias').
+ * Frontend uses this narrower type for UI block categorization in the Sidebar.
+ */
+export type BlockStereo = 'input' | 'process' | 'output';
 
 /**
  * BlockDefinitionWithFrontend - extends BlockDefinition with isFrontend flag
@@ -62,12 +151,6 @@ import type { BlockDefinition, DataPacket, EdgeData, NodeData, PortData } from '
  * - `isFrontend: false` → Execute on server (call POST /nodes/:id/run)
  * - `isFrontend: undefined` → Fallback to legacy BACKEND_PROCESSOR_TYPES check
  */
-/**
- * BlockStereo - stereotype of block for categorization
- * Matches server's BlockStereo type
- */
-export type BlockStereo = 'input' | 'process' | 'output';
-
 export interface BlockDefinitionWithFrontend extends BlockDefinition {
     /**
      * Indicates whether this block should be executed on the frontend (client-side)
@@ -104,19 +187,10 @@ export interface BlockDefinitionWithFrontend extends BlockDefinition {
 }
 
 /**
- * FlowStereo - stereotype of flow model
- */
-export type FlowStereo = '' | '#' | '#template';
-
-/**
- * FlowState - lifecycle state of flow
- */
-export type FlowState = 'draft' | 'active' | 'archived';
-
-/**
  * FlowModel - flow model for CRUD operations
  *
- * NOTE: Execution state (running/completed/error) is managed at NODE level,
+ * NOTE: Uses FlowStereo and FlowState from @lemoncloud/eureka-flows-api.
+ * Execution state (running/completed/error) is managed at NODE level,
  * not flow level. Each node has its own `status` field.
  * Flow only stores lifecycle state (draft/active/archived).
  */
@@ -145,20 +219,9 @@ export interface FlowView extends Partial<FlowModel> {}
 export interface FlowBody extends Partial<FlowView> {}
 
 /**
- * EdgeStereo - stereotype of edge (connection)
- */
-export type EdgeStereo = '' | '#' | '#condition' | '#transform';
-
-/**
- * Position - position on canvas
- */
-export interface Position {
-    x: number;
-    y: number;
-}
-
-/**
  * EdgeModel - model for edge (connection) info
+ *
+ * Uses EdgeStereo and Position from @lemoncloud/eureka-flows-api.
  */
 export interface EdgeModel {
     id?: string;
@@ -189,35 +252,15 @@ export interface EdgeView extends Partial<EdgeModel> {}
 export interface EdgeBody extends Partial<EdgeView> {}
 
 /**
- * NodeStereo - stereotype of node
+ * PortVariantData - DynamoDB-style typed values for port data storage
+ *
+ * NOTE: This is the frontend version of API's PortVariant.
+ * Difference: uses `timestamp` field (frontend convention) vs API's `ts` field.
+ * Server accepts both field names.
+ *
+ * @see PortVariant from @lemoncloud/eureka-flows-api for the server model version
  */
-export type NodeStereo = '' | '#' | '#alias';
-
-/**
- * ConfigItem - config key-value pair for DB serialization
- */
-export interface ConfigItem {
-    key: string;
-    val: string;
-}
-
-/**
- * DataPacketItem - data packet with port id (OpenSearch compatible)
- */
-export interface DataPacketItem {
-    portId: string;
-    packet: {
-        value: unknown;
-        type: string;
-        timestamp?: number;
-    };
-}
-
-/**
- * PortData - data stored in a port node
- * Server uses DynamoDB-style typed values
- */
-export interface PortData {
+export interface PortVariantData {
     /** String value (for text, image types) */
     S?: string;
     /** Number value (integer) */
@@ -266,6 +309,8 @@ export interface PortDataResponse {
 /**
  * NodeModel - extended node model for backend
  *
+ * Uses NodeStereo, NodeConfigItem, NodeDataPacketItem from @lemoncloud/eureka-flows-api.
+ *
  * Execution state is managed at node level:
  * - state: IDLE → READY → RUNNING → COMPLETED/ERROR (new field)
  * - status: IDLE → RUNNING → COMPLETED/ERROR (deprecated, use state)
@@ -273,7 +318,7 @@ export interface PortDataResponse {
  */
 export interface NodeModel {
     id?: string;
-    stereo?: NodeStereo | 'port';
+    stereo?: NodeStereo;
     name?: string;
     url?: string;
     image?: string;
@@ -285,7 +330,7 @@ export interface NodeModel {
     input$$?: Array<{ id: string; label: string; type: string; required?: boolean }>;
     output$$?: Array<{ id: string; label: string; type: string; required?: boolean }>;
     position?: Position;
-    config$$?: ConfigItem[];
+    config$$?: NodeConfigItem[];
     customLabel?: string;
     description?: string;
     /**
@@ -298,8 +343,8 @@ export interface NodeModel {
      */
     status?: string;
     errorMessage?: string;
-    inputData$$?: DataPacketItem[];
-    outputData$$?: DataPacketItem[];
+    inputData$$?: NodeDataPacketItem[];
+    outputData$$?: NodeDataPacketItem[];
     executionStats?: {
         startTime?: number;
         duration?: number;
@@ -307,7 +352,7 @@ export interface NodeModel {
     };
     flowId?: string;
     runId?: string;
-    lastGoodOutput$$?: DataPacketItem[];
+    lastGoodOutput$$?: NodeDataPacketItem[];
     disabled?: boolean;
     /**
      * If true, node auto-executes when inputData.timestamp changes
@@ -327,7 +372,7 @@ export interface NodeModel {
     /** Data type of the port */
     dataType?: string;
     /** Port data (for port nodes) */
-    data$?: PortData;
+    data$?: PortVariantData;
     /** Child number for port node */
     childNo?: number;
 

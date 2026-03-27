@@ -34,6 +34,7 @@ import {
     getNodeHeight,
     getNodeWidth,
     useBlockRegistry,
+    useNodeTraceLogs,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
@@ -53,7 +54,15 @@ import {
 } from '../utils';
 
 import type { ConnectionDraftInfo } from '../utils';
-import type { BlockDefinitionWithFrontend, DataPacket, NodeData, NodeState, PortDefinition } from '@flows/flows';
+import type {
+    BlockDefinitionWithFrontend,
+    DataPacket,
+    NodeData,
+    NodeState,
+    PortDefinition,
+    TraceEntry,
+    TraceStage,
+} from '@flows/flows';
 
 type ConfigValue = string | number | boolean | string[] | null;
 
@@ -792,6 +801,74 @@ const DebugLogVisualization: React.FC<VisualizationProps> = ({ node, definition,
     );
 };
 
+// ============================================================================
+// Agent Trace Log Visualization (shows real-time agent execution stages)
+// ============================================================================
+
+const STAGE_STYLES = {
+    run: { label: 'RUN', color: 'text-blue-400' },
+    planner: { label: 'PLAN', color: 'text-purple-400' },
+    step: { label: 'STEP', color: 'text-cyan-400' },
+    tool: { label: 'TOOL', color: 'text-emerald-400' },
+    approval: { label: 'APPROVE', color: 'text-yellow-400' },
+    reflector: { label: 'REFLECT', color: 'text-indigo-400' },
+    finalizer: { label: 'FINAL', color: 'text-green-400' },
+    trace: { label: 'TRACE', color: 'text-muted-foreground' },
+    error: { label: 'ERROR', color: 'text-red-400' },
+    runtime: { label: 'RUNTIME', color: 'text-orange-400' },
+} satisfies Record<TraceStage, { label: string; color: string }>;
+
+/** Extract contextual detail from trace entry data for inline display */
+const getTraceDetail = (entry: TraceEntry): string | null => {
+    const d = entry.data;
+    if (!d) return null;
+    if (d['toolName']) return String(d['toolName']);
+    if (d['skillName']) return String(d['skillName']);
+    if (d['status']) return String(d['status']);
+    if (d['mode']) return String(d['mode']);
+    return null;
+};
+
+const AgentTraceVisualization: React.FC<{ traceLogs: TraceEntry[]; contentHeight?: number }> = ({
+    traceLogs,
+    contentHeight,
+}) => {
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const maxH = contentHeight ?? 160;
+
+    // Auto-scroll to bottom on new entries
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [traceLogs.length]);
+
+    return (
+        <div
+            ref={scrollRef}
+            className="p-2 bg-muted/10 rounded-lg border border-border/30 overflow-y-auto font-mono text-[10px] leading-relaxed"
+            style={{ maxHeight: `${maxH}px`, minHeight: contentHeight ? `${contentHeight}px` : '80px' }}
+            onWheel={e => e.stopPropagation()}
+        >
+            {traceLogs.map((entry, i) => {
+                const style = STAGE_STYLES[entry.stage] ?? STAGE_STYLES.trace;
+                const detail = getTraceDetail(entry);
+                return (
+                    <div key={`${entry.seq}-${i}`} className="flex gap-1.5 py-0.5">
+                        <span className={cn('shrink-0 font-semibold w-[52px] text-right', style.color)}>
+                            {style.label}
+                        </span>
+                        <span className="text-foreground/70 break-words whitespace-pre-wrap">
+                            {entry.message}
+                            {detail && <span className="text-muted-foreground/50">{` · ${detail}`}</span>}
+                        </span>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
 const VISUALIZATION_COMPONENTS: Record<string, React.FC<VisualizationProps>> = {
     // New type names
     'output-console': DebugLogVisualization,
@@ -946,6 +1023,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
     const isAuto = node.autoExecutionEnabled !== false;
     const isDisabled = (node as NodeData & { disabled?: boolean }).disabled === true;
+
+    // Subscribe to trace logs for this node (agent blocks)
+    const traceLogs = useNodeTraceLogs(node.id);
 
     // Get effective state (state preferred, status fallback for backward compatibility)
     const nodeState = getEffectiveState(node.state, node.status);
@@ -1428,6 +1508,11 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             definition,
                             contentHeight: contentAreaHeight,
                         })}
+
+                    {/* Agent Trace Logs */}
+                    {traceLogs.length > 0 && (
+                        <AgentTraceVisualization traceLogs={traceLogs} contentHeight={contentAreaHeight} />
+                    )}
 
                     {/* Output Preview for process nodes */}
                     <OutputPreview node={node} definition={definition} contentHeight={contentAreaHeight} />

@@ -18,7 +18,7 @@ import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
-import type { NodeUpdateInfo, PortUpdateInfo } from '@flows/socket';
+import type { NodeUpdateInfo, PortUpdateInfo, TraceUpdateInfo } from '@flows/socket';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -73,6 +73,10 @@ export const FlowEditorPage = () => {
     // Track node sequence numbers to detect stale updates (higher no = newer)
     const nodeNoRef = useRef<Map<string, number>>(new Map());
 
+    // Get trace log actions from canvas store (must be before handleNodeUpdate which uses clearTraceLogs)
+    const appendTraceLog = useCanvasStore(state => state.appendTraceLog);
+    const clearTraceLogs = useCanvasStore(state => state.clearTraceLogs);
+
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
             const { nodeId, flowId, isPort, parentNodeId, state, progress, no, stereo, errorMessage } = info;
@@ -92,6 +96,11 @@ export const FlowEditorPage = () => {
             }
 
             if (!canvasRef.current) return;
+
+            // Clear trace logs when node starts a new execution
+            if (state === 'RUNNING' && no !== undefined && no <= 1) {
+                clearTraceLogs(nodeId);
+            }
 
             // Skip port updates from type:'node' messages (deprecated pattern)
             // Port updates are handled by type:'node/port' messages via handlePortUpdate
@@ -170,7 +179,7 @@ export const FlowEditorPage = () => {
                 canvasRef.current?.executeNode(nodeId);
             }, 0);
         },
-        [blockRegistry, currentFlowId]
+        [blockRegistry, currentFlowId, clearTraceLogs]
     );
 
     // Track port sequence numbers to detect stale updates (higher no = newer)
@@ -277,6 +286,17 @@ export const FlowEditorPage = () => {
         [setUpdatedPort, clearUpdatedPort, blockRegistry, currentFlowId]
     );
 
+    // Handle trace update from WebSocket (action: 'trace')
+    // Appends trace entries to canvas store for agent block display
+    // Note: flowId filtering is already done in useInitFlowSocket
+    const handleTraceUpdate = useCallback(
+        (info: TraceUpdateInfo) => {
+            const { nodeId, traceId, seq, ts, stage, message, runId, type, data } = info;
+            appendTraceLog(nodeId, { traceId, seq, ts, stage, message, runId, type, data });
+        },
+        [appendTraceLog]
+    );
+
     // Cleanup highlight timeouts on unmount
     useEffect(() => {
         const timeoutsMap = highlightTimeoutsRef.current;
@@ -317,6 +337,7 @@ export const FlowEditorPage = () => {
         onFlowUpdate: handleFlowUpdate,
         onNodeReload: handleNodeUpdate,
         onPortUpdate: handlePortUpdate,
+        onTraceUpdate: handleTraceUpdate,
     });
 
     const [isAppReady, setIsAppReady] = useState(false);

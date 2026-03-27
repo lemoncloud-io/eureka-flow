@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 
-import type { EdgeView } from '../types';
+import type { EdgeView, TraceEntry } from '../types';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+
+const MAX_TRACE_ENTRIES = 500;
 
 export interface Viewport {
     x: number;
@@ -66,6 +68,9 @@ interface CanvasState {
     // Port Update Highlight (portId format: "nodeId:portName")
     updatedPortIds: Set<string>;
 
+    // Agent Trace Logs (nodeId → trace entries)
+    traceLogs: Map<string, TraceEntry[]>;
+
     // Actions - Core Data
     setNodes: (nodes: NodeData[] | ((prev: NodeData[]) => NodeData[])) => void;
     setConnections: (connections: Connection[] | ((prev: Connection[]) => Connection[])) => void;
@@ -97,6 +102,10 @@ interface CanvasState {
     // Actions - Port Update Highlight
     setUpdatedPort: (portId: string) => void;
     clearUpdatedPort: (portId: string) => void;
+
+    // Actions - Agent Trace Logs
+    appendTraceLog: (nodeId: string, entry: TraceEntry) => void;
+    clearTraceLogs: (nodeId: string) => void;
 
     // Compound Actions
     clearSelection: () => void;
@@ -134,6 +143,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
     logViewerNodeId: null,
     modalFlowId: null,
     updatedPortIds: new Set(),
+    traceLogs: new Map(),
 
     // Core Data Actions
     setNodes: nodes =>
@@ -192,6 +202,23 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             return { updatedPortIds: newSet };
         }),
 
+    // Agent Trace Log Actions
+    appendTraceLog: (nodeId, entry) =>
+        set(state => {
+            const newMap = new Map(state.traceLogs);
+            const existing = newMap.get(nodeId) ?? [];
+            const entries = [...existing, entry];
+            newMap.set(nodeId, entries.length > MAX_TRACE_ENTRIES ? entries.slice(-MAX_TRACE_ENTRIES) : entries);
+            return { traceLogs: newMap };
+        }),
+
+    clearTraceLogs: nodeId =>
+        set(state => {
+            const newMap = new Map(state.traceLogs);
+            newMap.delete(nodeId);
+            return { traceLogs: newMap };
+        }),
+
     // Compound Actions
     clearSelection: () =>
         set({
@@ -210,6 +237,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             flowId: flowId || null,
             selectedNodeId: null,
             selectedConnectionId: null,
+            traceLogs: new Map(),
         });
     },
 
@@ -220,6 +248,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             flowId: null,
             selectedNodeId: null,
             selectedConnectionId: null,
+            traceLogs: new Map(),
         }),
 
     resetCanvas: () =>
@@ -231,6 +260,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             selectedNodeId: null,
             selectedConnectionId: null,
             clipboard: null,
+            traceLogs: new Map(),
         }),
 
     // Node Actions
@@ -282,6 +312,10 @@ export const useCanvasClipboard = () => useCanvasStore(state => state.clipboard)
 export const useCanvasDragState = () => useCanvasStore(state => state.dragState);
 export const useCanvasConnectionDraft = () => useCanvasStore(state => state.connectionDraft);
 export const useUpdatedPortIds = () => useCanvasStore(state => state.updatedPortIds);
+
+const EMPTY_TRACE_ENTRIES: TraceEntry[] = [];
+export const useNodeTraceLogs = (nodeId: string) =>
+    useCanvasStore(state => state.traceLogs.get(nodeId) ?? EMPTY_TRACE_ENTRIES);
 
 /**
  * Selector to get connections as EdgeView format (for API compatibility)

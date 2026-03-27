@@ -5,7 +5,16 @@ import { useWebCoreStore } from '@flows/web-core';
 import { useWebSocketWorker } from './useWebSocketWorker';
 import { useWebSocketStore } from '../stores/useWebSocketStore';
 
-import type { FlowUpdateMessage, NodeState, NodeUpdateMessage, PortUpdateMessage, WebSocketMessage } from '../types';
+import type {
+    FlowUpdateMessage,
+    NodeState,
+    NodeUpdateMessage,
+    PortUpdateMessage,
+    TraceMessage,
+    TraceStage,
+    TraceType,
+    WebSocketMessage,
+} from '../types';
 
 const WS_ENDPOINT = import.meta.env.VITE_WS_ENDPOINT || '';
 
@@ -19,9 +28,10 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
     }
     const msg = data as Record<string, unknown>;
 
-    // Handle wrapped message format: { action: 'message', data: {...} }
+    // Handle wrapped message format: { action: 'message'|'trace', data: {...} }
+    const action = 'action' in msg ? (msg['action'] as string) : undefined;
     const payload =
-        'action' in msg && msg['action'] === 'message' && 'data' in msg && msg['data']
+        (action === 'message' || action === 'trace') && 'data' in msg && msg['data']
             ? (msg['data'] as Record<string, unknown>)
             : msg;
 
@@ -32,7 +42,13 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
         return {
             id: messageId,
             data: payload,
+            action,
         };
+    }
+
+    // Warn when trace message is dropped due to missing id (nodeId)
+    if (action === 'trace') {
+        console.warn('[WS] Trace message dropped: missing id (nodeId). Server must include id field.', payload);
     }
 
     return null;
@@ -100,6 +116,49 @@ const parsePortId = (
 
     return { nodeId, portId, portName, direction };
 };
+
+/**
+ * Type guard for TraceMessage payload
+ * Matches: { traceId: '...', seq: N, stage: '...', runId: '...' }
+ */
+export const isTraceMessage = (data: unknown): data is TraceMessage => {
+    if (typeof data !== 'object' || data === null) return false;
+    const msg = data as Record<string, unknown>;
+    return (
+        typeof msg['traceId'] === 'string' &&
+        typeof msg['seq'] === 'number' &&
+        typeof msg['stage'] === 'string' &&
+        typeof msg['runId'] === 'string' &&
+        typeof msg['type'] === 'string'
+    );
+};
+
+/**
+ * Trace update info parsed from WebSocket message
+ * Used by onTraceUpdate callback for agent block trace display
+ */
+export interface TraceUpdateInfo {
+    /** Node ID of the agent block (from server `id` field) */
+    nodeId: string;
+    /** Flow ID */
+    flowId?: string;
+    /** Trace correlation ID */
+    traceId: string;
+    /** Sequence number for ordering */
+    seq: number;
+    /** Timestamp */
+    ts: number;
+    /** Execution stage */
+    stage: TraceStage;
+    /** Log message */
+    message: string;
+    /** Run correlation ID */
+    runId: string;
+    /** Specific event type (e.g., 'run_start', 'tool_start', 'error') */
+    type: TraceType;
+    /** Structured event data */
+    data?: Record<string, unknown>;
+}
 
 export interface NodeUpdateInfo {
     nodeId: string;
@@ -180,6 +239,8 @@ export interface UseInitFlowSocketOptions {
     onNodeReload?: (info: NodeUpdateInfo) => void;
     /** Callback when port update notification is received - should fetch port data */
     onPortUpdate?: (info: PortUpdateInfo) => void;
+    /** Callback when trace message is received - for agent block execution logs */
+    onTraceUpdate?: (info: TraceUpdateInfo) => void;
 }
 
 /**
@@ -206,7 +267,15 @@ export interface UseInitFlowSocketOptions {
  * });
  */
 export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
-    const { channelId, currentFlowId, getLastLocalUpdateTimestamp, onFlowUpdate, onNodeReload, onPortUpdate } = options;
+    const {
+        channelId,
+        currentFlowId,
+        getLastLocalUpdateTimestamp,
+        onFlowUpdate,
+        onNodeReload,
+        onPortUpdate,
+        onTraceUpdate,
+    } = options;
 
     const apiKey = useWebCoreStore(state => state.apiKey);
     const setId = useWebSocketStore(state => state.setId);
@@ -326,6 +395,32 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                 return;
             }
 
+            // Handle trace message (action: 'trace')
+            // Received during agent block execution with stage/message updates
+            if (lastMessage.action === 'trace' && isTraceMessage(data)) {
+                // Skip if flowId is present and doesn't match current flow
+                // Note: flowId may be absent if server doesn't include it in trace wrapper
+                if (data.flowId && data.flowId !== currentFlowId) {
+                    return;
+                }
+
+                if (onTraceUpdate) {
+                    onTraceUpdate({
+                        nodeId: lastMessage.id,
+                        flowId: data.flowId,
+                        traceId: data.traceId,
+                        seq: data.seq,
+                        ts: data.ts,
+                        stage: data.stage,
+                        message: data.message,
+                        runId: data.runId,
+                        type: data.type,
+                        data: data.data,
+                    });
+                }
+                return;
+            }
+
             // Handle port update notification (type: 'node/port')
             // Triggered when port data (input/output) changes
             // Used for real-time data synchronization between browser tabs
@@ -364,6 +459,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         onFlowUpdate,
         onNodeReload,
         onPortUpdate,
+        onTraceUpdate,
     ]);
 
     // Cleanup on unmount

@@ -3,8 +3,10 @@
  * @packageDocumentation
  */
 
-// Re-export NodeState from flows package (single source of truth)
-export type { NodeState } from '@flows/flows';
+// Re-export from flows package (single source of truth)
+export type { NodeState, TraceStage, TraceType } from '@flows/flows';
+
+import type { NodeState, TraceStage, TraceType } from '@flows/flows';
 
 /**
  * WebSocket connection status
@@ -26,6 +28,8 @@ export interface BaseWebSocketMessage {
 export interface WebSocketMessage {
     id: string;
     data: unknown;
+    /** Original action from raw socket message (e.g., 'message', 'trace') */
+    action?: string;
 }
 
 /**
@@ -44,8 +48,6 @@ export interface FlowUpdateMessage {
     id: string;
     timestamp: number;
 }
-
-import type { NodeState } from '@flows/flows';
 
 /**
  * Node update notification from WebSocket
@@ -122,15 +124,50 @@ export interface PortUpdateMessage {
 }
 
 /**
+ * Trace message from WebSocket (action: 'trace')
+ * Received during agent block execution with real-time stage/message updates
+ *
+ * The server must include `id` (nodeId) and `flowId` for routing.
+ * Messages without `id` are dropped with a console warning.
+ *
+ * @example
+ * {
+ *   "id": "1006358",
+ *   "flowId": "1003299",
+ *   "traceId": "f6684e2b-...",
+ *   "seq": 1,
+ *   "ts": 1774515799013,
+ *   "stage": "planner",
+ *   "message": "Planner invoked",
+ *   "runId": "f6684e2b-...",
+ *   "type": "planner_call",
+ *   "data": {}
+ * }
+ */
+export interface TraceMessage {
+    /** Node ID (from server wrapper, may be absent) */
+    id?: string;
+    flowId?: string;
+    traceId: string;
+    seq: number;
+    ts: number;
+    stage: TraceStage;
+    message: string;
+    runId: string;
+    type: TraceType;
+    data?: Record<string, unknown>;
+}
+
+/**
  * Union type for socket data messages
  */
-export type SocketDataMessage = FlowUpdateMessage | NodeUpdateMessage | PortUpdateMessage;
+export type SocketDataMessage = FlowUpdateMessage | NodeUpdateMessage | PortUpdateMessage | TraceMessage;
 
 /**
  * Raw WebSocket message wrapper from server
  */
 export interface RawSocketMessage {
-    action: 'message' | 'info' | 'ping' | 'pong';
+    action: 'message' | 'trace' | 'info' | 'ping' | 'pong';
     ts?: string;
     data?: SocketDataMessage | unknown;
     channel?: string;
