@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-03-27] - root@0.14.0, @flows/web@0.14.0, @flows/admin@0.3.0
+
+### Features
+
+- enhance agent block trace log display
+- add agent trace log visualization
+
+### Refactor
+
+- simplify message id parsing
+
+### Chores
+
+- clarify trace message requirements
+
 ## [2026-03-26] - root@0.13.0, @flows/web@0.13.0, @flows/admin@0.2.0
 
 ### Features
