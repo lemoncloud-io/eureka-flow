@@ -43,6 +43,31 @@ export type {
  */
 export type NodeState = 'IDLE' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR';
 
+/**
+ * TraceStage - agent block execution stages for trace messages
+ */
+export type TraceStage =
+    | 'run'
+    | 'planner'
+    | 'step'
+    | 'tool'
+    | 'approval'
+    | 'reflector'
+    | 'finalizer'
+    | 'trace'
+    | 'error'
+    | 'runtime';
+
+/**
+ * TraceEntry - a single trace log entry from agent block execution
+ */
+export interface TraceEntry {
+    seq: number;
+    ts: number;
+    stage: TraceStage;
+    message: string;
+}
+
 import type { BlockDefinition, DataPacket, EdgeData, NodeData, PortData } from '@lemoncloud/eureka-flows-api';
 
 // ============================================================================
