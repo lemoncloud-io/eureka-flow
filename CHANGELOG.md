@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-03-27] - root@0.14.1, @flows/web@0.14.1, @flows/admin@0.3.1
+
+### Refactor
+
+- introduce error field for server-side error messages
+- make trace entry properties optional
+
 ## [2026-03-27] - root@0.14.0, @flows/web@0.14.0, @flows/admin@0.3.0
 
 ### Features
