@@ -1523,7 +1523,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 {nodeState === 'ERROR' && (
                     <div className="mt-2 text-destructive text-[10px] bg-destructive/10 p-2 rounded-lg border border-destructive/20 flex items-start gap-1.5">
                         <span className="font-semibold shrink-0">{t('flows:nodeBlock.error')}</span>
-                        <span className="opacity-80">{node.errorMessage || t('errors.executionFailed')}</span>
+                        <span className="opacity-80">
+                            {node.error ?? node.errorMessage ?? t('errors.executionFailed')}
+                        </span>
                     </div>
                 )}
             </div>

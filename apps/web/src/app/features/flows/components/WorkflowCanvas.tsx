@@ -1003,7 +1003,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 outputData: transformedOutputData,
                                 state: finalState ?? n.state,
                                 status: finalState ?? n.status, // Deprecated: kept for backward compatibility
-                                errorMessage: serverData.errorMessage,
+                                errorMessage: serverData.error ?? serverData.errorMessage,
                                 // Merge executionStats to preserve existing values (startTime, duration)
                                 // when only progress is being updated.
                                 // Auto-calculate duration for terminal states when startTime exists
@@ -1259,6 +1259,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             ...n,
                                             state: resultState as NodeState,
                                             status: resultState, // Deprecated: kept for backward compatibility
+                                            errorMessage:
+                                                resultState === 'ERROR'
+                                                    ? (result.error ?? result.errorMessage)
+                                                    : undefined,
                                             // Terminal: finalize with progress 100
                                             // Non-terminal (RUNNING): keep existing stats, WebSocket delivers progress
                                             executionStats: isTerminalState
@@ -1299,7 +1303,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                           executionStats: { startTime, duration, progress: 100 },
                                                           errorMessage:
                                                               serverState === 'ERROR'
-                                                                  ? nodeData.errorMessage
+                                                                  ? (nodeData.error ?? nodeData.errorMessage)
                                                                   : undefined,
                                                       }
                                                     : n

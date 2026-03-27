@@ -82,7 +82,8 @@ export type TraceStage =
     | 'finalizer'
     | 'trace'
     | 'error'
-    | 'runtime';
+    | 'runtime'
+    | (string & {});
 
 /**
  * TraceType - specific event types within agent trace logs
@@ -342,6 +343,9 @@ export interface NodeModel {
      * @deprecated Use `state` instead. Kept for backward compatibility.
      */
     status?: string;
+    /** Server-side error message (preferred) */
+    error?: string;
+    /** @deprecated Use `error` instead. */
     errorMessage?: string;
     inputData$$?: NodeDataPacketItem[];
     outputData$$?: NodeDataPacketItem[];

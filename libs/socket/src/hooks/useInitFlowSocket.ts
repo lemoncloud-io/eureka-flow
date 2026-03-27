@@ -29,11 +29,20 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
     const msg = data as Record<string, unknown>;
 
     // Handle wrapped message format: { action: 'message'|'trace', data: {...} }
+    // Trace messages use SocketResponseTrace format where seq/ts/stage/message
+    // are at top level and data.id contains nodeId — merge for uniform access.
     const action = 'action' in msg ? (msg['action'] as string) : undefined;
-    const payload =
-        (action === 'message' || action === 'trace') && 'data' in msg && msg['data']
-            ? (msg['data'] as Record<string, unknown>)
-            : msg;
+    let payload: Record<string, unknown>;
+
+    if (action === 'trace' && 'data' in msg && msg['data']) {
+        const nestedData = msg['data'] as Record<string, unknown>;
+        const { action: _a, data: _d, ...topLevelFields } = msg;
+        payload = { ...topLevelFields, ...nestedData };
+    } else if (action === 'message' && 'data' in msg && msg['data']) {
+        payload = msg['data'] as Record<string, unknown>;
+    } else {
+        payload = msg;
+    }
 
     // Check for id field (node ID) or nodeId field
     const messageId = (payload['id'] as string) || (payload['nodeId'] as string);
@@ -191,10 +200,9 @@ export interface NodeUpdateInfo {
      * - Other values or undefined: Additional data may be needed via API
      */
     stereo?: number | string;
-    /**
-     * Error message when state is 'ERROR'
-     * Available when stereo indicates message completeness (0 or '')
-     */
+    /** Server-side error message (preferred) */
+    error?: string;
+    /** @deprecated Use `error` instead. */
     errorMessage?: string;
 }
 
@@ -385,6 +393,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         prevState: effectivePrevState,
                         progress: data.progress,
                         stereo: data.stereo,
+                        error: data.error,
                         errorMessage: data.errorMessage,
                     });
                 }
