@@ -79,7 +79,7 @@ export const FlowEditorPage = () => {
 
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
-            const { nodeId, flowId, isPort, parentNodeId, state, progress, no, stereo, errorMessage } = info;
+            const { nodeId, flowId, isPort, parentNodeId, state, progress, no, stereo, error, errorMessage } = info;
 
             // Skip if flowId is missing or doesn't match current flow (socket channel is shared)
             if (!flowId || flowId !== currentFlowId) return;
@@ -115,13 +115,13 @@ export const FlowEditorPage = () => {
             }
 
             // ERROR state: use socket data directly when stereo indicates completeness (0 or ''),
-            // otherwise fetch from API for errorMessage
+            // otherwise fetch from API (error ?? errorMessage for backward compatibility)
             if (state === 'ERROR') {
-                let errMsg = errorMessage;
+                let errMsg = error ?? errorMessage;
                 if (stereo !== 0 && stereo !== '') {
                     try {
                         const nodeData = await getNode(nodeId);
-                        errMsg = nodeData.errorMessage;
+                        errMsg = nodeData.error ?? nodeData.errorMessage;
                     } catch {
                         // Revert no on failure to allow retry
                         if (no !== undefined) {
@@ -135,6 +135,7 @@ export const FlowEditorPage = () => {
                 canvasRef.current.updateNodeFromServer(nodeId, {
                     state,
                     status: state,
+                    error: errMsg,
                     errorMessage: errMsg,
                 });
                 return;

@@ -851,7 +851,8 @@ const AgentTraceVisualization: React.FC<{ traceLogs: TraceEntry[]; contentHeight
             onWheel={e => e.stopPropagation()}
         >
             {traceLogs.map((entry, i) => {
-                const style = STAGE_STYLES[entry.stage] ?? STAGE_STYLES.trace;
+                const stage = entry.stage as TraceStage | undefined;
+                const style = (stage && STAGE_STYLES[stage]) ?? STAGE_STYLES.trace;
                 const detail = getTraceDetail(entry);
                 return (
                     <div key={`${entry.seq}-${i}`} className="flex gap-1.5 py-0.5">
@@ -859,7 +860,7 @@ const AgentTraceVisualization: React.FC<{ traceLogs: TraceEntry[]; contentHeight
                             {style.label}
                         </span>
                         <span className="text-foreground/70 break-words whitespace-pre-wrap">
-                            {entry.message}
+                            {entry.message ?? ''}
                             {detail && <span className="text-muted-foreground/50">{` · ${detail}`}</span>}
                         </span>
                     </div>
@@ -1522,7 +1523,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 {nodeState === 'ERROR' && (
                     <div className="mt-2 text-destructive text-[10px] bg-destructive/10 p-2 rounded-lg border border-destructive/20 flex items-start gap-1.5">
                         <span className="font-semibold shrink-0">{t('flows:nodeBlock.error')}</span>
-                        <span className="opacity-80">{node.errorMessage || t('errors.executionFailed')}</span>
+                        <span className="opacity-80">
+                            {node.error ?? node.errorMessage ?? t('errors.executionFailed')}
+                        </span>
                     </div>
                 )}
             </div>

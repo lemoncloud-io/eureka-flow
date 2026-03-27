@@ -6,7 +6,17 @@
 // Re-export from flows package (single source of truth)
 export type { NodeState, TraceStage, TraceType } from '@flows/flows';
 
+// Re-export from sockets API package
+export type {
+    SocketActionType,
+    SocketModelMeta,
+    SocketPayload,
+    SocketResponse,
+    SocketResponseTrace,
+} from '@lemoncloud/eureka-sockets-api';
+
 import type { NodeState, TraceStage, TraceType } from '@flows/flows';
+import type { SocketResponseTrace } from '@lemoncloud/eureka-sockets-api';
 
 /**
  * WebSocket connection status
@@ -86,10 +96,9 @@ export interface NodeUpdateMessage {
      * - Other values or undefined: Additional data may be needed via API
      */
     stereo?: number | string;
-    /**
-     * Error message when state is 'ERROR'
-     * Available when stereo indicates message completeness (0 or '')
-     */
+    /** Server-side error message (preferred) */
+    error?: string;
+    /** @deprecated Use `error` instead. */
     errorMessage?: string;
 }
 
@@ -124,37 +133,36 @@ export interface PortUpdateMessage {
 }
 
 /**
- * Trace message from WebSocket (action: 'trace')
- * Received during agent block execution with real-time stage/message updates
+ * Trace message payload after parsing from WebSocket
  *
- * The server must include `id` (nodeId) and `flowId` for routing.
- * Messages without `id` are dropped with a console warning.
+ * Server sends `SocketResponseTrace<SocketModelMeta>` format where
+ * trace fields (seq, ts, stage, message) are at top level and
+ * data.id contains the nodeId. `parseWebSocketMessage` merges
+ * top-level fields with nested data for uniform access.
  *
- * @example
+ * @see SocketResponseTrace from `@lemoncloud/eureka-sockets-api`
+ *
+ * @example Server raw format (SocketResponseTrace):
  * {
- *   "id": "1006358",
- *   "flowId": "1003299",
- *   "traceId": "f6684e2b-...",
+ *   "action": "trace",
  *   "seq": 1,
  *   "ts": 1774515799013,
  *   "stage": "planner",
  *   "message": "Planner invoked",
- *   "runId": "f6684e2b-...",
- *   "type": "planner_call",
- *   "data": {}
+ *   "data": { "id": "1006358", "flowId": "1003299" }
  * }
  */
 export interface TraceMessage {
-    /** Node ID (from server wrapper, may be absent) */
+    /** Node ID (from data.id after merge) */
     id?: string;
     flowId?: string;
-    traceId: string;
+    traceId?: string;
     seq: number;
     ts: number;
-    stage: TraceStage;
-    message: string;
-    runId: string;
-    type: TraceType;
+    stage?: TraceStage;
+    message?: string;
+    runId?: string;
+    type?: TraceType;
     data?: Record<string, unknown>;
 }
 
@@ -165,13 +173,11 @@ export type SocketDataMessage = FlowUpdateMessage | NodeUpdateMessage | PortUpda
 
 /**
  * Raw WebSocket message wrapper from server
+ *
+ * @see SocketResponse from `@lemoncloud/eureka-sockets-api`
+ * @see SocketResponseTrace for trace-specific extension (adds seq, stage, message)
  */
-export interface RawSocketMessage {
-    action: 'message' | 'trace' | 'info' | 'ping' | 'pong';
-    ts?: string;
-    data?: SocketDataMessage | unknown;
-    channel?: string;
-}
+export type RawSocketMessage = SocketResponseTrace<SocketDataMessage | unknown>;
 
 /**
  * Configuration for WebSocket worker

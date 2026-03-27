@@ -1755,6 +1755,13 @@
   dependencies:
     lemon-model "^1.1.1"
 
+"@lemoncloud/eureka-sockets-api@^0.26.326":
+  version "0.26.326"
+  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-sockets-api/-/eureka-sockets-api-0.26.326.tgz#94fa877154131562809a8b82930d675f89c8422b"
+  integrity sha512-5kXwzdTj78q4KbOtayoDKlfzfFyks3vmMXhtzGl2dtyzMjQDw5TGGNVMuZbWjSJ9mmaLwIA3vg91eZ4sPotfNw==
+  dependencies:
+    lemon-model "^1.1.1"
+
 "@lemoncloud/lemon-web-core@^1.5.0":
   version "1.5.3"
   resolved "https://registry.npmjs.org/@lemoncloud/lemon-web-core/-/lemon-web-core-1.5.3.tgz"
