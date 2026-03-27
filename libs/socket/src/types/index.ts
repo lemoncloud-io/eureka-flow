@@ -148,13 +148,13 @@ export interface TraceMessage {
     /** Node ID (from server wrapper, may be absent) */
     id?: string;
     flowId?: string;
-    traceId: string;
+    traceId?: string;
     seq: number;
     ts: number;
-    stage: TraceStage;
-    message: string;
-    runId: string;
-    type: TraceType;
+    stage?: TraceStage;
+    message?: string;
+    runId?: string;
+    type?: TraceType;
     data?: Record<string, unknown>;
 }
 

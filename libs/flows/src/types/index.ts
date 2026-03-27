@@ -116,13 +116,13 @@ export type TraceType =
  * }
  */
 export interface TraceEntry {
-    traceId: string;
+    traceId?: string;
     seq: number;
     ts: number;
-    stage: TraceStage;
-    message: string;
-    runId: string;
-    type: TraceType;
+    stage?: TraceStage;
+    message?: string;
+    runId?: string;
+    type?: TraceType;
     data?: Record<string, unknown>;
 }
 

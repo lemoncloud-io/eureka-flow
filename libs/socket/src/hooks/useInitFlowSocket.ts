@@ -119,18 +119,14 @@ const parsePortId = (
 
 /**
  * Type guard for TraceMessage payload
- * Matches: { traceId: '...', seq: N, stage: '...', runId: '...' }
+ * Matches both formats:
+ * - Full: { traceId, seq, stage, runId, type } (existing agent blocks)
+ * - Simple: { seq, ts } (Agent Codex — minimal fields)
  */
 export const isTraceMessage = (data: unknown): data is TraceMessage => {
     if (typeof data !== 'object' || data === null) return false;
     const msg = data as Record<string, unknown>;
-    return (
-        typeof msg['traceId'] === 'string' &&
-        typeof msg['seq'] === 'number' &&
-        typeof msg['stage'] === 'string' &&
-        typeof msg['runId'] === 'string' &&
-        typeof msg['type'] === 'string'
-    );
+    return typeof msg['seq'] === 'number' && typeof msg['ts'] === 'number';
 };
 
 /**
@@ -143,19 +139,19 @@ export interface TraceUpdateInfo {
     /** Flow ID */
     flowId?: string;
     /** Trace correlation ID */
-    traceId: string;
+    traceId?: string;
     /** Sequence number for ordering */
     seq: number;
     /** Timestamp */
     ts: number;
     /** Execution stage */
-    stage: TraceStage;
+    stage?: TraceStage;
     /** Log message */
-    message: string;
+    message?: string;
     /** Run correlation ID */
-    runId: string;
+    runId?: string;
     /** Specific event type (e.g., 'run_start', 'tool_start', 'error') */
-    type: TraceType;
+    type?: TraceType;
     /** Structured event data */
     data?: Record<string, unknown>;
 }
@@ -398,6 +394,11 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
             // Handle trace message (action: 'trace')
             // Received during agent block execution with stage/message updates
             if (lastMessage.action === 'trace' && isTraceMessage(data)) {
+                // Skip completion signals with no stage and no message
+                if (!data.stage && !data.message) {
+                    return;
+                }
+
                 // Skip if flowId is present and doesn't match current flow
                 // Note: flowId may be absent if server doesn't include it in trace wrapper
                 if (data.flowId && data.flowId !== currentFlowId) {

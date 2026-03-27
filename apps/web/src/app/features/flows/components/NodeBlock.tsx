@@ -851,7 +851,8 @@ const AgentTraceVisualization: React.FC<{ traceLogs: TraceEntry[]; contentHeight
             onWheel={e => e.stopPropagation()}
         >
             {traceLogs.map((entry, i) => {
-                const style = STAGE_STYLES[entry.stage] ?? STAGE_STYLES.trace;
+                const stage = entry.stage as TraceStage | undefined;
+                const style = (stage && STAGE_STYLES[stage]) ?? STAGE_STYLES.trace;
                 const detail = getTraceDetail(entry);
                 return (
                     <div key={`${entry.seq}-${i}`} className="flex gap-1.5 py-0.5">
@@ -859,7 +860,7 @@ const AgentTraceVisualization: React.FC<{ traceLogs: TraceEntry[]; contentHeight
                             {style.label}
                         </span>
                         <span className="text-foreground/70 break-words whitespace-pre-wrap">
-                            {entry.message}
+                            {entry.message ?? ''}
                             {detail && <span className="text-muted-foreground/50">{` · ${detail}`}</span>}
                         </span>
                     </div>
