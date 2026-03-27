@@ -36,11 +36,7 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
             : msg;
 
     // Check for id field (node ID) or nodeId field
-    // For trace messages, fall back to traceId if id is absent
-    const messageId =
-        (payload['id'] as string) ||
-        (payload['nodeId'] as string) ||
-        (action === 'trace' ? (payload['traceId'] as string) : undefined);
+    const messageId = (payload['id'] as string) || (payload['nodeId'] as string);
 
     if (messageId) {
         return {
@@ -48,6 +44,11 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
             data: payload,
             action,
         };
+    }
+
+    // Warn when trace message is dropped due to missing id (nodeId)
+    if (action === 'trace') {
+        console.warn('[WS] Trace message dropped: missing id (nodeId). Server must include id field.', payload);
     }
 
     return null;
@@ -404,15 +405,8 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                 }
 
                 if (onTraceUpdate) {
-                    // Warn if server didn't include nodeId - traceId fallback won't match node lookup
-                    if (!data.id) {
-                        console.warn(
-                            '[WS] Trace message missing id (nodeId), using traceId as fallback:',
-                            data.traceId
-                        );
-                    }
                     onTraceUpdate({
-                        nodeId: data.id ?? lastMessage.id,
+                        nodeId: lastMessage.id,
                         flowId: data.flowId,
                         traceId: data.traceId,
                         seq: data.seq,
