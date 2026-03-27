@@ -12,6 +12,7 @@ import type {
     PortUpdateMessage,
     TraceMessage,
     TraceStage,
+    TraceType,
     WebSocketMessage,
 } from '../types';
 
@@ -35,7 +36,11 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
             : msg;
 
     // Check for id field (node ID) or nodeId field
-    const messageId = (payload['id'] as string) || (payload['nodeId'] as string);
+    // For trace messages, fall back to traceId if id is absent
+    const messageId =
+        (payload['id'] as string) ||
+        (payload['nodeId'] as string) ||
+        (action === 'trace' ? (payload['traceId'] as string) : undefined);
 
     if (messageId) {
         return {
@@ -113,12 +118,18 @@ const parsePortId = (
 
 /**
  * Type guard for TraceMessage payload
- * Matches: { id: '...', seq: N, stage: '...', message: '...' }
+ * Matches: { traceId: '...', seq: N, stage: '...', runId: '...' }
  */
 export const isTraceMessage = (data: unknown): data is TraceMessage => {
     if (typeof data !== 'object' || data === null) return false;
     const msg = data as Record<string, unknown>;
-    return typeof msg['id'] === 'string' && typeof msg['seq'] === 'number' && typeof msg['stage'] === 'string';
+    return (
+        typeof msg['traceId'] === 'string' &&
+        typeof msg['seq'] === 'number' &&
+        typeof msg['stage'] === 'string' &&
+        typeof msg['runId'] === 'string' &&
+        typeof msg['type'] === 'string'
+    );
 };
 
 /**
@@ -126,10 +137,12 @@ export const isTraceMessage = (data: unknown): data is TraceMessage => {
  * Used by onTraceUpdate callback for agent block trace display
  */
 export interface TraceUpdateInfo {
-    /** Node ID of the agent block */
+    /** Node ID of the agent block (from server `id` field, or traceId as fallback) */
     nodeId: string;
     /** Flow ID */
     flowId?: string;
+    /** Trace correlation ID */
+    traceId: string;
     /** Sequence number for ordering */
     seq: number;
     /** Timestamp */
@@ -138,6 +151,12 @@ export interface TraceUpdateInfo {
     stage: TraceStage;
     /** Log message */
     message: string;
+    /** Run correlation ID */
+    runId: string;
+    /** Specific event type (e.g., 'run_start', 'tool_start', 'error') */
+    type: TraceType;
+    /** Structured event data */
+    data?: Record<string, unknown>;
 }
 
 export interface NodeUpdateInfo {
@@ -378,20 +397,31 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
             // Handle trace message (action: 'trace')
             // Received during agent block execution with stage/message updates
             if (lastMessage.action === 'trace' && isTraceMessage(data)) {
-                // Skip if flowId is missing or doesn't match current flow
-                const isForCurrentFlow = data.flowId && data.flowId === currentFlowId;
-                if (!isForCurrentFlow) {
+                // Skip if flowId is present and doesn't match current flow
+                // Note: flowId may be absent if server doesn't include it in trace wrapper
+                if (data.flowId && data.flowId !== currentFlowId) {
                     return;
                 }
 
                 if (onTraceUpdate) {
+                    // Warn if server didn't include nodeId - traceId fallback won't match node lookup
+                    if (!data.id) {
+                        console.warn(
+                            '[WS] Trace message missing id (nodeId), using traceId as fallback:',
+                            data.traceId
+                        );
+                    }
                     onTraceUpdate({
-                        nodeId: data.id,
+                        nodeId: data.id ?? lastMessage.id,
                         flowId: data.flowId,
+                        traceId: data.traceId,
                         seq: data.seq,
                         ts: data.ts,
                         stage: data.stage,
                         message: data.message,
+                        runId: data.runId,
+                        type: data.type,
+                        data: data.data,
                     });
                 }
                 return;

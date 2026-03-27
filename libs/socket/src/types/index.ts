@@ -4,9 +4,9 @@
  */
 
 // Re-export from flows package (single source of truth)
-export type { NodeState, TraceStage } from '@flows/flows';
+export type { NodeState, TraceStage, TraceType } from '@flows/flows';
 
-import type { NodeState, TraceStage } from '@flows/flows';
+import type { NodeState, TraceStage, TraceType } from '@flows/flows';
 
 /**
  * WebSocket connection status
@@ -127,23 +127,35 @@ export interface PortUpdateMessage {
  * Trace message from WebSocket (action: 'trace')
  * Received during agent block execution with real-time stage/message updates
  *
+ * The server wraps trace data with `id` (nodeId) and `flowId` for routing.
+ * If `id` is absent, `traceId` is used as fallback routing key.
+ *
  * @example
  * {
  *   "id": "1006358",
  *   "flowId": "1003299",
+ *   "traceId": "f6684e2b-...",
  *   "seq": 1,
  *   "ts": 1774515799013,
  *   "stage": "planner",
- *   "message": "Analyzing user request..."
+ *   "message": "Planner invoked",
+ *   "runId": "f6684e2b-...",
+ *   "type": "planner_call",
+ *   "data": {}
  * }
  */
 export interface TraceMessage {
-    id: string;
+    /** Node ID (from server wrapper, may be absent) */
+    id?: string;
     flowId?: string;
+    traceId: string;
     seq: number;
     ts: number;
     stage: TraceStage;
     message: string;
+    runId: string;
+    type: TraceType;
+    data?: Record<string, unknown>;
 }
 
 /**

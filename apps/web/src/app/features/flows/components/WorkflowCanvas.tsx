@@ -16,7 +16,7 @@ import {
     loadFlow,
     runNode,
     shouldUpdateState,
-    toPortData,
+    toPortVariantData,
     upsertFlow,
     upsertPortNode,
     useBlockRegistry,
@@ -1231,7 +1231,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                         direction: 'in',
                                         name: portName,
                                         dataType: packet.type,
-                                        data$: toPortData(packet),
+                                        data$: toPortVariantData(packet),
                                     })
                                 )
                             );

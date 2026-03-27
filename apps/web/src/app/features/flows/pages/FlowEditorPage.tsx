@@ -291,8 +291,8 @@ export const FlowEditorPage = () => {
     // Note: flowId filtering is already done in useInitFlowSocket
     const handleTraceUpdate = useCallback(
         (info: TraceUpdateInfo) => {
-            const { nodeId, seq, ts, stage, message } = info;
-            appendTraceLog(nodeId, { seq, ts, stage, message });
+            const { nodeId, traceId, seq, ts, stage, message, runId, type, data } = info;
+            appendTraceLog(nodeId, { traceId, seq, ts, stage, message, runId, type, data });
         },
         [appendTraceLog]
     );

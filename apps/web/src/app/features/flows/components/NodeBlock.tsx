@@ -805,7 +805,7 @@ const DebugLogVisualization: React.FC<VisualizationProps> = ({ node, definition,
 // Agent Trace Log Visualization (shows real-time agent execution stages)
 // ============================================================================
 
-const STAGE_STYLES: Record<TraceStage, { label: string; color: string }> = {
+const STAGE_STYLES = {
     run: { label: 'RUN', color: 'text-blue-400' },
     planner: { label: 'PLAN', color: 'text-purple-400' },
     step: { label: 'STEP', color: 'text-cyan-400' },
@@ -816,6 +816,17 @@ const STAGE_STYLES: Record<TraceStage, { label: string; color: string }> = {
     trace: { label: 'TRACE', color: 'text-muted-foreground' },
     error: { label: 'ERROR', color: 'text-red-400' },
     runtime: { label: 'RUNTIME', color: 'text-orange-400' },
+} satisfies Record<TraceStage, { label: string; color: string }>;
+
+/** Extract contextual detail from trace entry data for inline display */
+const getTraceDetail = (entry: TraceEntry): string | null => {
+    const d = entry.data;
+    if (!d) return null;
+    if (d['toolName']) return String(d['toolName']);
+    if (d['skillName']) return String(d['skillName']);
+    if (d['status']) return String(d['status']);
+    if (d['mode']) return String(d['mode']);
+    return null;
 };
 
 const AgentTraceVisualization: React.FC<{ traceLogs: TraceEntry[]; contentHeight?: number }> = ({
@@ -841,12 +852,16 @@ const AgentTraceVisualization: React.FC<{ traceLogs: TraceEntry[]; contentHeight
         >
             {traceLogs.map((entry, i) => {
                 const style = STAGE_STYLES[entry.stage] ?? STAGE_STYLES.trace;
+                const detail = getTraceDetail(entry);
                 return (
                     <div key={`${entry.seq}-${i}`} className="flex gap-1.5 py-0.5">
                         <span className={cn('shrink-0 font-semibold w-[52px] text-right', style.color)}>
                             {style.label}
                         </span>
-                        <span className="text-foreground/70 break-words whitespace-pre-wrap">{entry.message}</span>
+                        <span className="text-foreground/70 break-words whitespace-pre-wrap">
+                            {entry.message}
+                            {detail && <span className="text-muted-foreground/50">{` · ${detail}`}</span>}
+                        </span>
                     </div>
                 );
             })}

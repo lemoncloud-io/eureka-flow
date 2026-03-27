@@ -5,8 +5,8 @@ import type {
     DataPacket,
     NodeBody,
     NodeView,
-    PortData,
     PortDataResponse,
+    PortVariantData,
     S3ImageInfo,
     UpsertNodeResult,
 } from '../types';
@@ -133,7 +133,7 @@ export interface PortNodeBody {
     direction: 'in' | 'out';
     name: string;
     dataType?: string;
-    data$?: PortData;
+    data$?: PortVariantData;
 }
 
 /**
@@ -155,13 +155,13 @@ export const upsertPortNode = async (flowId: string, body: PortNodeBody): Promis
 };
 
 /**
- * Convert DataPacket to PortData format
+ * Convert DataPacket to PortVariantData format
  * @param packet - Frontend DataPacket format
- * @returns Server PortData format (S, N, M fields)
+ * @returns Server PortVariantData format (S, N, M fields)
  */
-export const toPortData = (packet: DataPacket): PortData => {
+export const toPortVariantData = (packet: DataPacket): PortVariantData => {
     const { value, type, timestamp } = packet;
-    const base: PortData = {};
+    const base: PortVariantData = {};
     if (timestamp) base.timestamp = timestamp;
 
     switch (type) {
