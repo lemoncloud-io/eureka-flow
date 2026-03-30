@@ -1,26 +1,29 @@
-<div align="center">
+<p align="center">
+  <img src="docs/images/logo.png" alt="Eureka Flow Logo" width="120" />
+</p>
 
-# Eureka Flow
+<h1 align="center">Eureka Flow</h1>
 
-### Visual Workflow Editor for Building Data Flow Pipelines
+<p align="center">
+  <strong>Visual Workflow Editor for Building Data Flow Pipelines</strong>
+</p>
 
-[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-7-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Nx](https://img.shields.io/badge/Nx-22-143055?style=for-the-badge&logo=nx&logoColor=white)](https://nx.dev/)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white&style=flat-square" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white&style=flat-square" alt="TypeScript 5.9" />
+  <img src="https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white&style=flat-square" alt="Vite 7" />
+  <img src="https://img.shields.io/badge/Nx-22-143055?logo=nx&logoColor=white&style=flat-square" alt="Nx 22" />
+  <img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square" alt="Apache 2.0 License" />
+</p>
 
-<br />
-
-[**Live Demo**](https://flow.eureka.codes) · [Features](#features) · [Quick Start](#quick-start) · [Architecture](#architecture) · [Contributing](#contributing)
-
-<br />
-
-<img src="docs/images/eureka-flow-demo.png" alt="Eureka Flow Demo" width="800" />
-
-_Drag, connect, and execute - visual workflow building made simple_
-
-</div>
+<p align="center">
+  <a href="https://flow.eureka.codes"><strong>Live Demo</strong></a> &middot;
+  <a href="#key-features">Features</a> &middot;
+  <a href="#screenshots">Screenshots</a> &middot;
+  <a href="#getting-started">Getting Started</a> &middot;
+  <a href="#architecture">Architecture</a> &middot;
+  <a href="#contributing">Contributing</a>
+</p>
 
 ---
 
@@ -28,171 +31,94 @@ _Drag, connect, and execute - visual workflow building made simple_
 
 **Eureka Flow** is a powerful, browser-based visual workflow editor for creating and executing data processing pipelines. Build complex workflows by connecting pre-built blocks, execute them in real-time, and monitor execution status through WebSocket-based live updates.
 
-### Try It Now
-
-> Visit **[flow.eureka.codes](https://flow.eureka.codes)** to try Eureka Flow instantly.
->
+> [!TIP]
+> **Try it now** — Visit **[flow.eureka.codes](https://flow.eureka.codes)** to start building workflows instantly.
 > Get your API key from [Eureka Codes Console](https://console.eureka.codes) with just one click.
 
----
+<details>
+<summary><strong>Table of Contents</strong></summary>
 
-## Features
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Screenshots](#screenshots)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Getting Started](#getting-started)
+- [Development](#development)
+- [Building & Deployment](#building--deployment)
+- [Code Style](#code-style)
+- [Contributing](#contributing)
+- [Related Projects](#related-projects)
+- [License](#license)
 
-### Visual Workflow Editor
+</details>
 
-- **Drag-and-drop** node placement on an infinite canvas
-- **Bezier curve** connections between nodes
-- **Pan, zoom, and multi-select** for intuitive navigation
-- **Touch gesture support** for tablet and mobile devices
-- **Undo/Redo** with full history management
-- **Auto-layout** algorithm for automatic node arrangement
+## Key Features
 
-### Block System
+- **Drag-and-drop editor** — Node placement on an infinite canvas with pan, zoom, and multi-select
+- **100+ pre-built blocks** — Organized by category (input, process, output) with configurable parameters
+- **Dual execution modes** — Frontend blocks for instant feedback, backend blocks for heavy computation
+- **Real-time updates** — WebSocket integration for live node execution status tracking
+- **Bezier curve connections** — Port-based typed connections between nodes
+- **Undo/Redo** — Full history management with auto-layout algorithm
+- **Touch gesture support** — Tablet and mobile device compatibility
+- **Dark/Light theme** — System preference detection with manual toggle
+- **i18n** — English & Korean language support
+- **Auto-save** — Configurable toggle with LocalStorage session continuity
+- **One-click API key** — Secure postMessage-based key transfer from [Eureka Codes Console](https://console.eureka.codes)
 
-- **100+ pre-built blocks** organized by category (input, process, output)
-- **Port-based data flow** with typed connections
-- **Configurable block parameters** with live preview
-- **Extensible block registry** for custom blocks
-
-### Dual Execution Modes
-
-- **Frontend blocks** — Execute directly in browser for instant feedback
-- **Backend blocks** — Server-side execution for heavy computation
-- **Real-time status tracking** — IDLE → READY → RUNNING → COMPLETED/ERROR
-
-### Real-Time Updates
-
-- **WebSocket integration** for live node execution notifications
-- **Port data synchronization** with sequence numbering
-- **Self-echo prevention** with smart debouncing
-
-### Seamless API Key Integration
-
-- **One-click API key generation** via [Eureka Codes Console](https://console.eureka.codes)
-- **Secure postMessage-based** key transfer between console and editor
-- **State validation** for enhanced security
-
-### Developer Experience
-
-- **Dark/Light theme** with system preference detection
-- **Internationalization (i18n)** — English & Korean
-- **Auto-save** with configurable toggle
-- **LocalStorage caching** for session continuity
-
----
-
-## Tech Stack
+## Screenshots
 
 <table>
 <tr>
-<td><b>Category</b></td>
-<td><b>Technology</b></td>
+<td align="center"><strong>Dark Mode</strong></td>
+<td align="center"><strong>Light Mode</strong></td>
 </tr>
 <tr>
-<td>Framework</td>
-<td><img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" alt="React" /></td>
-</tr>
-<tr>
-<td>Language</td>
-<td><img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></td>
-</tr>
-<tr>
-<td>Build Tool</td>
-<td><img src="https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white" alt="Vite" /></td>
-</tr>
-<tr>
-<td>Monorepo</td>
-<td><img src="https://img.shields.io/badge/Nx-22-143055?logo=nx&logoColor=white" alt="Nx" /></td>
-</tr>
-<tr>
-<td>State Management</td>
-<td><img src="https://img.shields.io/badge/Zustand-5-brown?logo=npm" alt="Zustand" /></td>
-</tr>
-<tr>
-<td>Server State</td>
-<td><img src="https://img.shields.io/badge/TanStack_Query-5-FF4154?logo=reactquery&logoColor=white" alt="TanStack Query" /></td>
-</tr>
-<tr>
-<td>Styling</td>
-<td><img src="https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS" /> <img src="https://img.shields.io/badge/shadcn/ui-black?logo=shadcnui&logoColor=white" alt="shadcn/ui" /></td>
-</tr>
-<tr>
-<td>Testing</td>
-<td><img src="https://img.shields.io/badge/Vitest-green?logo=vitest&logoColor=white" alt="Vitest" /></td>
+<td><img src="docs/images/screenshot-dark.jpg" alt="Eureka Flow - Dark Mode" width="480" /></td>
+<td><img src="docs/images/screenshot-light.jpg" alt="Eureka Flow - Light Mode" width="480" /></td>
 </tr>
 </table>
 
----
+## Tech Stack
 
-## Quick Start
-
-### Prerequisites
-
-- **Node.js 20+** (check `.nvmrc` for exact version)
-- **Yarn 1.22+**
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/lemoncloud-io/eureka-flow.git
-cd eureka-flow
-
-# Install dependencies
-yarn install
-
-# Copy environment template
-cp .env.example .env.local
-
-# Start development server
-yarn web:start
-```
-
-The app will be available at `http://localhost:3000`.
-
-### Using the Live Service
-
-1. Visit **[flow.eureka.codes](https://flow.eureka.codes)**
-2. Click "Create New Key" to open the [Eureka Codes Console](https://console.eureka.codes)
-3. Sign in and generate your API key
-4. The key is automatically transferred back to Eureka Flow
-5. Start building your workflows!
-
----
-
-## Environment Variables
-
-### Root `.env.local`
-
-```bash
-# Required: API endpoint for the flows backend
-VITE_API_URL=http://localhost:8800
-```
-
-### App-specific `apps/web/.env.*`
-
-```bash
-# Environment identifier (DEV, PROD, LOCAL)
-VITE_ENV=LOCAL
-
-# Project name
-VITE_PROJECT=FLOWS
-
-# API endpoint for the flows backend
-VITE_API_URL=http://localhost:8800
-
-# WebSocket endpoint for real-time updates
-VITE_WS_ENDPOINT=ws://localhost:8801
-
-# Eureka Codes console URL for API key management
-VITE_CODES_URL=https://console.eureka.codes
-```
-
----
+| Category      | Technology                           |
+| ------------- | ------------------------------------ |
+| **Framework** | React 19                             |
+| **Language**  | TypeScript 5.9 (strict mode)         |
+| **Build**     | Vite 7, Nx 22                        |
+| **Styling**   | Tailwind CSS 3, Radix UI (shadcn/ui) |
+| **State**     | Zustand 5, TanStack Query 5          |
+| **Real-time** | WebSocket with self-echo prevention  |
+| **Testing**   | Vitest                               |
 
 ## Architecture
 
-### Monorepo Structure
+```mermaid
+graph TB
+    subgraph App
+        WEB["apps/web<br/>React Web App<br/><i>:3000</i>"]
+    end
+
+    subgraph Core["Core Libraries"]
+        WEBCORE["web-core<br/>Auth & API Client"]
+        UIKIT["ui-kit<br/>33 Radix Components"]
+        SHARED["shared<br/>ErrorFallback, Loader"]
+        THEME["theme<br/>Dark / Light Mode"]
+    end
+
+    subgraph Features["Feature Libraries"]
+        FLOWS["flows<br/>Editor Logic & Stores"]
+        SOCKET["socket<br/>WebSocket Layer"]
+    end
+
+    WEB --> WEBCORE & UIKIT & SHARED & THEME
+    WEB --> FLOWS & SOCKET
+    FLOWS --> WEBCORE
+    SOCKET --> WEBCORE
+```
+
+### Project Structure
 
 ```
 eureka-flow/
@@ -209,7 +135,7 @@ eureka-flow/
 └── .github/                    # CI/CD workflows
 ```
 
-### State Architecture
+### State Management
 
 Four Zustand stores manage different concerns:
 
@@ -231,35 +157,18 @@ FlowEditorPage (orchestrator)
 ├── Header (file operations, save status)
 ├── Sidebar (block library by category)
 ├── WorkflowCanvas (imperative canvas ref)
-│   ├── NodeBlock (execution status display)
+│   ├── NodeBlock (status: IDLE → READY → RUNNING → COMPLETED/ERROR)
 │   ├── ConnectionLine (SVG bezier curves)
 │   └── useCanvasStore (nodes, connections)
 └── DetailPanel (selected node configuration)
 ```
 
-### API Key Flow
+### Node Execution
 
-```
-┌─────────────────────┐     postMessage      ┌──────────────────────┐
-│    Eureka Flow      │ ◄──────────────────► │   Eureka Codes       │
-│ (flow.eureka.codes) │      (API Key)       │(console.eureka.codes)│
-└─────────────────────┘                       └──────────────────────┘
-         │                                              │
-         │ 1. Click "Create New Key"                    │
-         │ ─────────────────────────────────────────────►
-         │                                              │
-         │                          2. User signs in    │
-         │                             & creates key    │
-         │                                              │
-         │ 3. API key sent via postMessage              │
-         │ ◄─────────────────────────────────────────────
-         │                                              │
-         │ 4. State validation for security             │
-         │                                              │
-         ▼
-   Key stored locally
-   Ready to use!
-```
+| Mode         | Description           | Flow                                                  |
+| ------------ | --------------------- | ----------------------------------------------------- |
+| **Frontend** | Executes in browser   | `EXECUTE_FUNCTIONS[type]` → `runNode(id, { output })` |
+| **Backend**  | Server-side execution | `runNode(id)` → WebSocket notification → UI refresh   |
 
 ### Path Aliases
 
@@ -273,107 +182,91 @@ FlowEditorPage (orchestrator)
 @flows/lib/utils  // libs/ui-kit/src/utils/index.ts
 ```
 
----
+## Getting Started
+
+### Prerequisites
+
+| Tool        | Version  | Notes                                |
+| ----------- | -------- | ------------------------------------ |
+| **Node.js** | v22.15.1 | Use `nvm use` — `.nvmrc` is included |
+| **Yarn**    | 1.22+    | Classic Yarn                         |
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/lemoncloud-io/eureka-flow.git
+cd eureka-flow
+
+# Use the correct Node version
+nvm use
+
+# Install dependencies
+yarn install
+
+# Copy environment template
+cp .env.example .env.local
+
+# Start development server
+yarn web:start
+```
+
+The app will be available at `http://localhost:3000`.
+
+### Using the Live Service
+
+1. Visit **[flow.eureka.codes](https://flow.eureka.codes)**
+2. Click "Create New Key" to open the [Eureka Codes Console](https://console.eureka.codes)
+3. Sign in and generate your API key
+4. The key is automatically transferred back to Eureka Flow
+5. Start building your workflows!
 
 ## Development
 
-### Available Commands
-
 ```bash
 # Development
-yarn web:start          # Start dev server on port 3000
-yarn lint               # Run ESLint
-yarn lint:fix           # Run ESLint with auto-fix
-yarn prettier           # Format code with Prettier
-
-# Build
-yarn web:build          # Build for production
-yarn web:build:dev      # Build for development environment
-yarn web:build:prod     # Build for production environment
+yarn web:start              # Start dev server on port 3000
+yarn lint                   # Run ESLint
+yarn lint:fix               # Run ESLint with auto-fix
+yarn prettier               # Format code with Prettier
 
 # Testing
-yarn web:test           # Run tests
+yarn web:test               # Run tests
 
 # Utilities
-yarn clean:cache        # Clear build caches
-yarn graph              # View Nx dependency graph
+yarn clean:cache            # Clear build caches
+yarn graph                  # View Nx dependency graph
 ```
 
-### Code Style
+> [!TIP]
+> Run `yarn graph` to visualize the dependency graph of all libraries.
 
-- **Named exports only** (no default exports)
-- **Arrow functions**: `const fn = (): Type => {}`
-- **4-space indentation**, single quotes, ES5 trailing commas
-- **TypeScript strict mode** enabled
-- **ESLint** enforces import ordering
+## Building & Deployment
 
-### Import Organization
-
-ESLint enforces strict ordering:
-
-1. React and external libraries
-2. Internal `@flows/*` packages
-3. Relative imports
-4. Type imports (separate section)
-
----
-
-## API Integration
-
-Eureka Flow requires a backend API for full functionality. Key endpoints:
-
-| Endpoint               | Purpose                                |
-| ---------------------- | -------------------------------------- |
-| `GET /flows/:id/load`  | Load flow with nodes, edges, channelId |
-| `POST /flows/:id/save` | Save flow (id='0' creates new)         |
-| `POST /nodes/:id/run`  | Execute node                           |
-| `GET /blocks/0/list`   | Load block definitions                 |
-
-### Authentication
-
-The app uses API key-based authentication:
-
-- API key is stored in `useWebCoreStore` and localStorage
-- Requests include `x-api-key` header
-- 403 responses trigger API key dialog
-- Keys can be generated via [Eureka Codes Console](https://console.eureka.codes)
-
----
-
-## Deployment
-
-### Build for Production
+### Build
 
 ```bash
-# Build with production configuration
-yarn web:build:prod
-
-# Output will be in dist/apps/web/
+yarn web:build              # Build web application
+yarn web:build:dev          # Build for development environment
+yarn web:build:prod         # Build for production environment
 ```
 
-### Environment-Specific Builds
+### Deploy
+
+Deployment uses AWS S3 + CloudFront:
 
 ```bash
-# Development build (connects to dev API)
-yarn web:build:dev
-
-# Production build (connects to prod API)
-yarn web:build:prod
+yarn web:deploy:dev         # Deploy to DEV
+yarn web:deploy:prod        # Deploy to PROD
 ```
 
-### Local Deployment Setup
+> [!WARNING]
+> Local deployment requires `.env.deploy` configuration. Copy from `.env.deploy.example` and fill in your AWS settings.
 
-For local deployment to AWS S3/CloudFront, create environment files from the template:
+<details>
+<summary><strong>Environment Variables</strong></summary>
 
-```bash
-# Copy the example file
-cp apps/web/.env.example apps/web/.env.dev    # For DEV deployment
-cp apps/web/.env.example apps/web/.env.prod   # For PROD deployment
-```
-
-Edit the files with actual values (see `apps/web/.env.example` for reference).
-
-**Required environment variables:**
+**App configuration** (`apps/web/.env.*`):
 
 | Variable           | Description                              |
 | ------------------ | ---------------------------------------- |
@@ -383,33 +276,29 @@ Edit the files with actual values (see `apps/web/.env.example` for reference).
 | `VITE_WS_ENDPOINT` | WebSocket endpoint URL                   |
 | `VITE_CODES_URL`   | Eureka Codes console URL                 |
 
-**AWS configuration** (create `.env.deploy` from `.env.deploy.example`):
+**AWS deployment** (`.env.deploy`):
 
-```bash
-# Copy the example file
-cp .env.deploy.example .env.deploy
-```
+| Variable                  | Description                         |
+| ------------------------- | ----------------------------------- |
+| `AWS_PROFILE_NAME`        | AWS CLI profile name                |
+| `BUCKET_NAME`             | S3 bucket name for deployment       |
+| `DEV_CF_DISTRIBUTION_ID`  | CloudFront distribution ID for DEV  |
+| `PROD_CF_DISTRIBUTION_ID` | CloudFront distribution ID for PROD |
 
-| Variable                  | Description                          |
-| ------------------------- | ------------------------------------ |
-| `AWS_PROFILE_NAME`        | AWS CLI profile name (e.g., `lemon`) |
-| `BUCKET_NAME`             | S3 bucket name for deployment        |
-| `DEV_CF_DISTRIBUTION_ID`  | CloudFront distribution ID for DEV   |
-| `PROD_CF_DISTRIBUTION_ID` | CloudFront distribution ID for PROD  |
+</details>
 
-### Deployment Commands
+### CI/CD
 
-```bash
-# Deploy to development (uses .env.deploy for AWS config)
-yarn web:deploy:dev
+GitHub Actions workflows are configured for automated deployment:
 
-# Deploy to production (uses .env.deploy for AWS config)
-yarn web:deploy:prod
-```
+| Workflow           | Trigger           | Description                                   |
+| ------------------ | ----------------- | --------------------------------------------- |
+| `deploy-dev.yml`   | Push to `develop` | Build & deploy to DEV                         |
+| `deploy-prod.yml`  | Push to `main`    | Build, deploy to PROD & create GitHub release |
+| `force-deploy.yml` | Manual dispatch   | Force deploy on demand                        |
 
-### GitHub Actions Deployment
-
-CI/CD is configured via GitHub Actions. The following secrets must be set in your repository:
+<details>
+<summary><strong>Required GitHub Secrets</strong></summary>
 
 | Secret                    | Description            |
 | ------------------------- | ---------------------- |
@@ -426,39 +315,54 @@ CI/CD is configured via GitHub Actions. The following secrets must be set in you
 | `VITE_PROD_WS_ENDPOINT`   | PROD WebSocket URL     |
 | `VITE_PROD_CODES_URL`     | PROD Eureka Codes URL  |
 
-**Deployment triggers:**
+</details>
 
-- Push to `develop` branch → Deploy to DEV
-- Push to `main` branch → Deploy to PROD
+<details>
+<summary><strong>API Key Flow</strong></summary>
 
----
+```
+┌─────────────────────┐     postMessage      ┌──────────────────────┐
+│    Eureka Flow      │ <──────────────────> │   Eureka Codes       │
+│ (flow.eureka.codes) │      (API Key)       │(console.eureka.codes)│
+└─────────────────────┘                       └──────────────────────┘
+         │                                              │
+         │ 1. Click "Create New Key"                    │
+         │ ────────────────────────────────────────────>│
+         │                                              │
+         │                          2. User signs in    │
+         │                             & creates key    │
+         │                                              │
+         │ 3. API key sent via postMessage              │
+         │ <────────────────────────────────────────────│
+         │                                              │
+         │ 4. State validation for security             │
+         │                                              │
+         ▼
+   Key stored locally
+   Ready to use!
+```
+
+</details>
+
+## Code Style
+
+- **Named exports only** (no default exports)
+- **Arrow functions**: `const fn = (): Type => {}`
+- **4-space indentation**, single quotes, ES5 trailing commas
+- **TypeScript strict mode** enabled
+- **ESLint** enforces import ordering (React → `@flows/*` → relative → types)
 
 ## Contributing
 
-We welcome contributions! Please follow these steps:
-
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes using [Conventional Commits](https://www.conventionalcommits.org/)
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes using [Conventional Commits](https://www.conventionalcommits.org/) (`git commit -m 'feat: add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-### Commit Message Format
-
-```
-type(scope): description
-
-# Examples
-feat(canvas): add node grouping functionality
-fix(socket): resolve connection timeout issue
-docs(readme): update installation instructions
-```
-
----
-
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
 
 ---
 
@@ -469,10 +373,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-<div align="center">
+<p align="center">
+  Made with 💜 by <a href="https://github.com/lemoncloud-io">LemonCloud</a>
+</p>
 
-Made with :purple_heart: by [LemonCloud](https://github.com/lemoncloud-io)
-
-[Website](https://lemoncloud.io) · [GitHub](https://github.com/lemoncloud-io)
-
-</div>
+<p align="center">
+  <a href="https://lemoncloud.io">Website</a> &middot;
+  <a href="https://github.com/lemoncloud-io">GitHub</a>
+</p>

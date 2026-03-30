@@ -16,7 +16,7 @@ import {
     loadFlow,
     runNode,
     shouldUpdateState,
-    toPortData,
+    toPortVariantData,
     upsertFlow,
     upsertPortNode,
     useBlockRegistry,
@@ -1003,7 +1003,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 outputData: transformedOutputData,
                                 state: finalState ?? n.state,
                                 status: finalState ?? n.status, // Deprecated: kept for backward compatibility
-                                errorMessage: serverData.errorMessage,
+                                errorMessage: serverData.error ?? serverData.errorMessage,
                                 // Merge executionStats to preserve existing values (startTime, duration)
                                 // when only progress is being updated.
                                 // Auto-calculate duration for terminal states when startTime exists
@@ -1191,7 +1191,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             // Send frontend execution output to server
                             // Server will save outputs to ports and propagate to downstream nodes
                             const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
-                            await runNode(nodeId, runBody, { force: true, connectionId });
+                            await runNode(nodeId, runBody, { force: true, connection: connectionId });
                         }
                     } else {
                         // ============================================================
@@ -1231,7 +1231,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                         direction: 'in',
                                         name: portName,
                                         dataType: packet.type,
-                                        data$: toPortData(packet),
+                                        data$: toPortVariantData(packet),
                                     })
                                 )
                             );
@@ -1239,7 +1239,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         // Step 3: Run the node (server will hydrate inputs from saved port nodes)
                         const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
-                        const result = await runNode(nodeId, runBody, { connectionId });
+                        const result = await runNode(nodeId, runBody, { connection: connectionId });
 
                         // Use state from result if available, fallback to status for backward compatibility
                         const resultState = getEffectiveState(result?.state, result?.status);
@@ -1259,6 +1259,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             ...n,
                                             state: resultState as NodeState,
                                             status: resultState, // Deprecated: kept for backward compatibility
+                                            errorMessage:
+                                                resultState === 'ERROR'
+                                                    ? (result.error ?? result.errorMessage)
+                                                    : undefined,
                                             // Terminal: finalize with progress 100
                                             // Non-terminal (RUNNING): keep existing stats, WebSocket delivers progress
                                             executionStats: isTerminalState
@@ -1299,7 +1303,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                           executionStats: { startTime, duration, progress: 100 },
                                                           errorMessage:
                                                               serverState === 'ERROR'
-                                                                  ? nodeData.errorMessage
+                                                                  ? (nodeData.error ?? nodeData.errorMessage)
                                                                   : undefined,
                                                       }
                                                     : n

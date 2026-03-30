@@ -10,6 +10,7 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             web: ${{ steps.set-matrix.outputs.web }}
+            admin: ${{ steps.set-matrix.outputs.admin }}
             matrix: ${{ steps.set-matrix.outputs.matrix }}
             has-changes: ${{ steps.set-matrix.outputs.has-changes }}
 
@@ -27,12 +28,24 @@ jobs:
                           - 'apps/web/src/**'
                           - 'apps/web/public/**'
                           - 'apps/web/index.html'
-                          - 'apps/web/vite.config.ts'
+                          - 'apps/web/vite.config.mts'
                           - 'apps/web/project.json'
                           - 'apps/web/tsconfig*.json'
                           - 'apps/web/tailwind.config.js'
-                          - 'apps/web/postcss.config.js'
+                          - 'apps/web/postcss.config.cjs'
                           - 'apps/web/.env.*'
+                          - 'libs/**'
+                          - 'package.json'
+                          - 'yarn.lock'
+                      admin:
+                          - 'apps/admin/src/**'
+                          - 'apps/admin/public/**'
+                          - 'apps/admin/index.html'
+                          - 'apps/admin/vite.config.mts'
+                          - 'apps/admin/tsconfig*.json'
+                          - 'apps/admin/tailwind.config.cjs'
+                          - 'apps/admin/postcss.config.cjs'
+                          - 'apps/admin/.env.*'
                           - 'libs/**'
                           - 'package.json'
                           - 'yarn.lock'
@@ -42,10 +55,16 @@ jobs:
               run: |
                   PROJECTS=()
                   WEB_CHANGED="false"
+                  ADMIN_CHANGED="false"
 
                   if [[ "${{ steps.filter.outputs.web }}" == "true" && -d "apps/web" ]]; then
                       PROJECTS+=('"web"')
                       WEB_CHANGED="true"
+                  fi
+
+                  if [[ "${{ steps.filter.outputs.admin }}" == "true" && -d "apps/admin" ]]; then
+                      PROJECTS+=('"admin"')
+                      ADMIN_CHANGED="true"
                   fi
 
                   if [ ${#PROJECTS[@]} -eq 0 ]; then
@@ -58,6 +77,7 @@ jobs:
                   fi
 
                   echo "web=${WEB_CHANGED}" >> $GITHUB_OUTPUT
+                  echo "admin=${ADMIN_CHANGED}" >> $GITHUB_OUTPUT
 
     get-version:
         needs: changes
@@ -70,6 +90,7 @@ jobs:
         outputs:
             root-version: ${{ steps.get-root-version.outputs.root-version }}
             web-version: ${{ steps.get-web-version.outputs.web-version }}
+            admin-version: ${{ steps.get-admin-version.outputs.admin-version }}
 
         steps:
             - name: Check out repository
@@ -104,6 +125,19 @@ jobs:
                         exit 1
                       fi
                       echo "web-version=${WEB_VERSION}" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Get Admin Version
+              if: ${{ needs.changes.outputs.admin == 'true' }}
+              id: get-admin-version
+              run: |
+                  if [[ -f "apps/admin/package.json" ]]; then
+                      ADMIN_VERSION=$(node -p "require('./apps/admin/package.json').version")
+                      if ! echo "$ADMIN_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                        echo "Error: Invalid admin version format: $ADMIN_VERSION"
+                        exit 1
+                      fi
+                      echo "admin-version=${ADMIN_VERSION}" >> $GITHUB_OUTPUT
                   fi
 
     build-and-deploy:
@@ -156,8 +190,8 @@ jobs:
 
             - name: Deploy to PROD
               env:
-                  BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
-                  PROD_CF_DISTRIBUTION_ID: ${{ secrets.PROD_CF_DISTRIBUTION_ID }}
+                  BUCKET_NAME: ${{ matrix.project == 'admin' && secrets.ADMIN_BUCKET_NAME || secrets.BUCKET_NAME }}
+                  PROD_CF_DISTRIBUTION_ID: ${{ matrix.project == 'admin' && secrets.ADMIN_PROD_CF_DISTRIBUTION_ID || secrets.PROD_CF_DISTRIBUTION_ID }}
                   VITE_ENV: PROD
                   VITE_PROJECT: FLOWS
                   VITE_API_URL: ${{ secrets.VITE_PROD_API_URL }}
@@ -165,7 +199,7 @@ jobs:
                   VITE_CODES_URL: ${{ secrets.VITE_PROD_CODES_URL }}
               run: |
                   set -e
-                  chmod +x scripts/deploy-${{ matrix.project }}.sh
+                  chmod +x scripts/deploy.sh scripts/deploy-${{ matrix.project }}.sh
                   NODE_OPTIONS="--max-old-space-size=4096" yarn ${{ matrix.project }}:deploy:prod
 
     notify-slack:
@@ -205,6 +239,10 @@ jobs:
                       DEPLOY_MESSAGES+=("• *Flows* <https://flow.eureka.codes/|운영 서버> \`v${{ needs.get-version.outputs.web-version }}\`")
                   fi
 
+                  if [[ "${{ needs.changes.outputs.admin }}" == "true" ]]; then
+                      DEPLOY_MESSAGES+=("• *Admin* <https://flow-admin.eureka.codes/|운영 서버> \`v${{ needs.get-version.outputs.admin-version }}\`")
+                  fi
+
                   if [ ${#DEPLOY_MESSAGES[@]} -eq 0 ]; then
                       DEPLOY_INFO="*운영 환경 배포가 완료되었습니다.*"
                   else
@@ -231,20 +269,13 @@ jobs:
                   token: ${{ secrets.RELEASE_BOT_TOKEN }}
                   payload: |
                       channel: ${{ secrets.EUREKACODES_CHANNEL }}
-                      text: "Eureka Flows 운영 배포 알림"
+                      text: ":eurekabox: Eureka Flows 운영 배포 알림"
                       unfurl_links: false
                       unfurl_media: false
                       attachments: [
                           {
                               "color": "#6952E0",
                               "blocks": [
-                                  {
-                                      "type": "section",
-                                      "text": {
-                                          "type": "mrkdwn",
-                                          "text": ":eurekabox: *Eureka Flows 운영 환경 배포 완료*"
-                                      }
-                                  },
                                   {
                                       "type": "section",
                                       "text": {
@@ -310,6 +341,10 @@ jobs:
                       DEPLOY_MESSAGES+=("• *Flows* <https://flow.eureka.codes/|운영 서버>")
                   fi
 
+                  if [[ "${{ needs.changes.outputs.admin }}" == "true" ]]; then
+                      DEPLOY_MESSAGES+=("• *Admin* <https://flow-admin.eureka.codes/|운영 서버>")
+                  fi
+
                   if [ ${#DEPLOY_MESSAGES[@]} -eq 0 ]; then
                       DEPLOY_INFO="*운영 환경 배포 중 오류가 발생했습니다.*"
                   else
@@ -343,13 +378,6 @@ jobs:
                           {
                               "color": "#ff0000",
                               "blocks": [
-                                  {
-                                      "type": "section",
-                                      "text": {
-                                          "type": "mrkdwn",
-                                          "text": ":x: *Eureka Flows 운영 환경 배포 실패*"
-                                      }
-                                  },
                                   {
                                       "type": "section",
                                       "text": {

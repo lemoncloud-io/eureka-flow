@@ -1,5 +1,76 @@
 # Changelog
 
+## [2026-03-30] - root@0.14.2, @flows/web@0.14.2, @flows/admin@0.3.2
+
+### Refactor
+
+- improve trace log handling
+
+### Chores
+
+- update stage visualization colors and label width
+
+## [2026-03-27] - root@0.14.1, @flows/web@0.14.1, @flows/admin@0.3.1
+
+### Refactor
+
+- introduce error field for server-side error messages
+- make trace entry properties optional
+
+## [2026-03-27] - root@0.14.0, @flows/web@0.14.0, @flows/admin@0.3.0
+
+### Features
+
+- enhance agent block trace log display
+- add agent trace log visualization
+
+### Refactor
+
+- simplify message id parsing
+
+### Chores
+
+- clarify trace message requirements
+
+## [2026-03-26] - root@0.13.0, @flows/web@0.13.0, @flows/admin@0.2.0
+
+### Features
+
+- add skills, tools, blocks feature
+
+### Refactor
+
+- simplify form data types
+- update button sizes and colors
+
+## [2026-03-26] - root@0.12.0, @flows/web@0.12.0, @flows/admin@0.1.0
+
+### Features
+
+- setup admin and load flow list
+- add copy functionality to content preview
+
+### Bug Fixes
+
+- prevent negative total count
+- handle API failure and clear sequence numbers
+- require API key before initializing flow editor
+- simplify deploy script and env loading
+
+### Refactor
+
+- optimize json parsing
+
+### Other
+
+- ci: improve deploy script configuration
+
+## [2026-03-25] - root@0.11.0, @flows/web@0.11.0
+
+### Features
+
+- update README and landing page
+
 ## [2026-03-25] - root@0.10.0, @flows/web@0.10.0
 
 ### Features

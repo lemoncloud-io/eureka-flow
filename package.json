@@ -1,6 +1,6 @@
 {
   "name": "@flows/source",
-  "version": "0.10.0",
+  "version": "0.14.2",
   "license": "Apache-2.0",
   "private": true,
   "scripts": {
@@ -19,9 +19,18 @@
     "web:build:dev": "yarn clean:cache && npx nx build web -- --mode dev",
     "web:build:prod": "yarn clean:cache && npx nx build web -- --mode prod",
     "web:test": "npx nx test web",
-    "web:deploy": "(rm -rf ./dist/apps/web || true) && yarn web:build:dev && ./scripts/deploy-web.sh",
-    "web:deploy:dev": "(rm -rf ./dist/apps/web || true) && yarn web:build:dev && ./scripts/deploy-web.sh dev",
-    "web:deploy:prod": "(rm -rf ./dist/apps/web || true) && yarn web:build:prod && ./scripts/deploy-web.sh prod"
+    "web:deploy": "./scripts/deploy-web.sh",
+    "web:deploy:dev": "./scripts/deploy-web.sh dev",
+    "web:deploy:prod": "./scripts/deploy-web.sh prod",
+    "!admin": "------------- admin scripts -------------",
+    "admin:start": "yarn clean:cache && npx nx serve admin --port 3001",
+    "admin:build": "npx nx build admin",
+    "admin:build:dev": "yarn clean:cache && npx nx build admin -- --mode dev",
+    "admin:build:prod": "yarn clean:cache && npx nx build admin -- --mode prod",
+    "admin:test": "npx nx test admin",
+    "admin:deploy": "./scripts/deploy-admin.sh",
+    "admin:deploy:dev": "./scripts/deploy-admin.sh dev",
+    "admin:deploy:prod": "./scripts/deploy-admin.sh prod"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -81,7 +90,8 @@
     "@commitlint/cli": "^19.6.0",
     "@commitlint/config-conventional": "^19.6.0",
     "@eslint/js": "^9.8.0",
-    "@lemoncloud/eureka-flows-api": "^0.26.226",
+    "@lemoncloud/eureka-flows-api": "^0.26.319",
+    "@lemoncloud/eureka-sockets-api": "^0.26.327",
     "@nx/eslint": "22.3.3",
     "@nx/eslint-plugin": "22.3.3",
     "@nx/jest": "22.3.3",

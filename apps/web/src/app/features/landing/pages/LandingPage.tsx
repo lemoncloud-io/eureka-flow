@@ -2,32 +2,36 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { BrainCircuit, LayoutGrid, Zap } from 'lucide-react';
+import { BrainCircuit, Github, LayoutGrid, Zap } from 'lucide-react';
 
 import { useTheme } from '@flows/theme';
 import { Badge, Button, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 
-import type { CSSProperties, ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import type { CSSProperties } from 'react';
 
 const STAGGER_DELAY_MS = 100;
+const GITHUB_URL = 'https://github.com/lemoncloud-io/eureka-flow';
 
-const FEATURES: { key: string; icon: ReactNode }[] = [
-    { key: 'visual_canvas', icon: <LayoutGrid size={24} /> },
-    { key: 'ai_nodes', icon: <BrainCircuit size={24} /> },
-    { key: 'instant_run', icon: <Zap size={24} /> },
+const ICON_SIZE_MD = 18;
+const ICON_SIZE_LG = 24;
+
+const FEATURES: { key: string; Icon: LucideIcon }[] = [
+    { key: 'visual_canvas', Icon: LayoutGrid },
+    { key: 'ai_nodes', Icon: BrainCircuit },
+    { key: 'instant_run', Icon: Zap },
 ];
 
 const staggerStyle = (index: number): CSSProperties => ({
     animationDelay: `${STAGGER_DELAY_MS * index}ms`,
-    opacity: 0, // Initial hidden state; animation-fill-mode: forwards sets final opacity to 1
+    opacity: 0,
 });
 
-export const LandingPage = () => {
+export const LandingPage = (): JSX.Element => {
     const navigate = useNavigate();
     const { t } = useTranslation('landing');
     const { isDarkTheme } = useTheme();
 
-    // Flow editor sets overflow: hidden on body; restore scrolling for this page
     useEffect(() => {
         document.documentElement.style.overflowY = 'scroll';
         return () => {
@@ -49,6 +53,11 @@ export const LandingPage = () => {
                         <Badge className="text-[10px]">{t('hero.badge')}</Badge>
                     </span>
                     <div className="flex items-center gap-2">
+                        <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="icon" aria-label={t('nav.github')}>
+                                <Github size={ICON_SIZE_MD} />
+                            </Button>
+                        </a>
                         <LanguageSwitcher />
                         <ThemeToggle />
                         <Button size="sm" onClick={handleStart}>
@@ -98,9 +107,10 @@ export const LandingPage = () => {
                         <div className="mx-auto text-xs text-muted-foreground">{t('screenshot.url_bar')}</div>
                     </div>
                     <img
-                        src={isDarkTheme ? '/images/다크모드_기본_설정.JPG' : '/images/라이트_기본_설정.JPG'}
+                        src={isDarkTheme ? '/images/screenshot-dark.jpg' : '/images/screenshot-light.jpg'}
                         alt={t('screenshot.alt')}
                         className="block w-full"
+                        loading="lazy"
                     />
                 </div>
             </div>
@@ -112,13 +122,13 @@ export const LandingPage = () => {
                     <h2 className="mb-3 text-3xl font-bold tracking-tight md:text-4xl">{t('features.title')}</h2>
                     <p className="mx-auto mb-16 max-w-2xl text-muted-foreground">{t('features.subtitle')}</p>
                     <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-                        {FEATURES.map(({ key, icon }) => (
+                        {FEATURES.map(({ key, Icon }) => (
                             <div
                                 key={key}
                                 className="rounded-xl border border-border bg-card p-8 text-left transition-shadow hover:shadow-lg"
                             >
                                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                    {icon}
+                                    <Icon size={ICON_SIZE_LG} />
                                 </div>
                                 <h3 className="mb-2 text-lg font-semibold">{t(`features.${key}.title`)}</h3>
                                 <p className="text-sm leading-relaxed text-muted-foreground">
@@ -131,7 +141,7 @@ export const LandingPage = () => {
             </section>
 
             {/* CTA */}
-            <section className="py-24 text-center">
+            <section className="border-t border-border bg-muted/30 py-24 text-center">
                 <div className="mx-auto max-w-2xl px-6">
                     <h2 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl">{t('cta.title')}</h2>
                     <p className="mb-8 text-lg text-muted-foreground">{t('cta.subtitle')}</p>
@@ -148,16 +158,24 @@ export const LandingPage = () => {
                             {t('footer.brand')}
                         </span>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <Link to="/policy/terms" className="hover:text-foreground transition-colors">
+                            <a
+                                href={GITHUB_URL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="transition-colors hover:text-foreground"
+                            >
+                                {t('footer.github')}
+                            </a>
+                            <Link to="/policy/terms" className="transition-colors hover:text-foreground">
                                 {t('footer.terms')}
                             </Link>
-                            <Link to="/policy/privacy" className="hover:text-foreground transition-colors">
+                            <Link to="/policy/privacy" className="transition-colors hover:text-foreground">
                                 {t('footer.privacy')}
                             </Link>
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">
-                        <a href="mailto:app@lemoncloud.io" className="hover:text-foreground transition-colors">
+                        <a href="mailto:app@lemoncloud.io" className="transition-colors hover:text-foreground">
                             {t('footer.email')}
                         </a>
                         <span>{t('footer.copyright')}</span>

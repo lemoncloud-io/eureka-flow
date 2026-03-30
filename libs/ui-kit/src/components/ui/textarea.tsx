@@ -28,7 +28,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<'tex
                     if (props.onInput) props.onInput(e); // 기존 onInput도 호출
                 }}
                 className={cn(
-                    'flex min-h-[60px] w-full rounded-md border border-gray-400 bg-transparent px-5 py-4 text-base font-medium resize-none placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+                    'flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-5 py-4 text-base font-medium text-foreground resize-none placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
                     className
                 )}
             />

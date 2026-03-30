@@ -5,7 +5,7 @@ import { cn } from '../../utils/index';
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
     ({ className, ...props }, ref) => (
         <div className="relative w-full">
-            <table ref={ref} className={cn('w-full caption-bottom text-sm text-gray-900', className)} {...props} />
+            <table ref={ref} className={cn('w-full caption-bottom text-sm text-foreground', className)} {...props} />
         </div>
     )
 );
@@ -15,10 +15,7 @@ const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     ({ className, ...props }, ref) => (
         <thead
             ref={ref}
-            className={cn(
-                'sticky top-0 [&_tr]:border-b bg-gray-100 h-[74px] bg-gray-100 z-39 whitespace-nowrap',
-                className
-            )}
+            className={cn('sticky top-0 [&_tr]:border-b bg-muted h-[74px] z-39 whitespace-nowrap', className)}
             {...props}
         />
     )
@@ -62,7 +59,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
         <th
             ref={ref}
             className={cn(
-                ' h-10 py-5 px-6 text-left align-middle text-gray-900 text-[15px] font-medium [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+                ' h-10 py-5 px-6 text-left align-middle text-foreground text-[15px] font-medium [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
                 className
             )}
             {...props}

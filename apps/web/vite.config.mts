@@ -43,11 +43,13 @@ const htmlEnvInjectionPlugin = (env: Record<string, string>) => {
 };
 
 export default defineConfig(({ mode }) => {
-    const isCI = process.env.CI === 'true';
+    // Detect explicit deploy context (CI secrets or local deploy script)
+    const isExplicitDeploy = process.env.CI === 'true' || process.env.DEPLOY_ENV != null;
 
     // Capture VITE_ vars from process.env before loadEnv
     // - In CI: these are GitHub Actions secrets (authoritative)
-    // - Locally: these are Nx auto-loaded from .env (not useful for mode override)
+    // - In local deploy: these are sourced from .env.{env} by deploy script
+    // - In local dev: these are Nx auto-loaded from .env (not useful for mode override)
     const processViteVars: Record<string, string> = {};
     for (const key of Object.keys(process.env)) {
         if (key.startsWith('VITE_')) {
@@ -66,9 +68,9 @@ export default defineConfig(({ mode }) => {
         process.env[key] = value;
     }
 
-    // In CI: secrets override committed .env files
-    // Locally: .env.[mode] files are the source of truth
-    const env = isCI ? { ...fileEnv, ...processViteVars } : fileEnv;
+    // In explicit deploy (CI or local deploy script): process.env overrides .env files
+    // In local dev: .env files are the source of truth
+    const env = isExplicitDeploy ? { ...fileEnv, ...processViteVars } : fileEnv;
 
     return {
         root: import.meta.dirname,

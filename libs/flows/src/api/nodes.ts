@@ -5,8 +5,8 @@ import type {
     DataPacket,
     NodeBody,
     NodeView,
-    PortData,
     PortDataResponse,
+    PortVariantData,
     S3ImageInfo,
     UpsertNodeResult,
 } from '../types';
@@ -133,7 +133,7 @@ export interface PortNodeBody {
     direction: 'in' | 'out';
     name: string;
     dataType?: string;
-    data$?: PortData;
+    data$?: PortVariantData;
 }
 
 /**
@@ -155,13 +155,13 @@ export const upsertPortNode = async (flowId: string, body: PortNodeBody): Promis
 };
 
 /**
- * Convert DataPacket to PortData format
+ * Convert DataPacket to PortVariantData format
  * @param packet - Frontend DataPacket format
- * @returns Server PortData format (S, N, M fields)
+ * @returns Server PortVariantData format (S, N, M fields)
  */
-export const toPortData = (packet: DataPacket): PortData => {
+export const toPortVariantData = (packet: DataPacket): PortVariantData => {
     const { value, type, timestamp } = packet;
-    const base: PortData = {};
+    const base: PortVariantData = {};
     if (timestamp) base.timestamp = timestamp;
 
     switch (type) {
@@ -197,7 +197,7 @@ export interface RunNodeOptions {
     /** If true, propagates to downstream nodes after execution (default: true) */
     propagate?: boolean;
     /** WebSocket connection ID for streaming execution results back to the caller */
-    connectionId?: string;
+    connection?: string;
 }
 
 /**
@@ -225,7 +225,7 @@ export const runNode = async (nodeId: string, body?: RunNodeBody, options?: RunN
         if (options?.async) queryParams.push('async');
         if (options?.force) queryParams.push('force');
         if (options?.propagate === false) queryParams.push('propagate=0');
-        if (options?.connectionId) queryParams.push(`connectionId=${encodeURIComponent(options.connectionId)}`);
+        if (options?.connection) queryParams.push(`connection=${encodeURIComponent(options.connection)}`);
 
         const params = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
         const response = await api.post<NodeView>(`/nodes/${nodeId}/run${params}`, body || {});

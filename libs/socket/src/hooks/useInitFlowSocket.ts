@@ -5,7 +5,16 @@ import { useWebCoreStore } from '@flows/web-core';
 import { useWebSocketWorker } from './useWebSocketWorker';
 import { useWebSocketStore } from '../stores/useWebSocketStore';
 
-import type { FlowUpdateMessage, NodeState, NodeUpdateMessage, PortUpdateMessage, WebSocketMessage } from '../types';
+import type {
+    FlowUpdateMessage,
+    NodeState,
+    NodeUpdateMessage,
+    PortUpdateMessage,
+    TraceMessage,
+    TraceStage,
+    TraceType,
+    WebSocketMessage,
+} from '../types';
 
 const WS_ENDPOINT = import.meta.env.VITE_WS_ENDPOINT || '';
 
@@ -19,11 +28,21 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
     }
     const msg = data as Record<string, unknown>;
 
-    // Handle wrapped message format: { action: 'message', data: {...} }
-    const payload =
-        'action' in msg && msg['action'] === 'message' && 'data' in msg && msg['data']
-            ? (msg['data'] as Record<string, unknown>)
-            : msg;
+    // Handle wrapped message format: { action: 'message'|'trace', data: {...} }
+    // Trace messages use SocketResponseTrace format where seq/ts/stage/message
+    // are at top level and data.id contains nodeId — merge for uniform access.
+    const action = 'action' in msg ? (msg['action'] as string) : undefined;
+    let payload: Record<string, unknown>;
+
+    if (action === 'trace' && 'data' in msg && msg['data']) {
+        const nestedData = msg['data'] as Record<string, unknown>;
+        const { action: _a, data: _d, ...topLevelFields } = msg;
+        payload = { ...topLevelFields, ...nestedData };
+    } else if (action === 'message' && 'data' in msg && msg['data']) {
+        payload = msg['data'] as Record<string, unknown>;
+    } else {
+        payload = msg;
+    }
 
     // Check for id field (node ID) or nodeId field
     const messageId = (payload['id'] as string) || (payload['nodeId'] as string);
@@ -32,7 +51,13 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
         return {
             id: messageId,
             data: payload,
+            action,
         };
+    }
+
+    // Warn when trace message is dropped due to missing id (nodeId)
+    if (action === 'trace') {
+        console.warn('[WS] Trace message dropped: missing id (nodeId). Server must include id field.', payload);
     }
 
     return null;
@@ -101,6 +126,45 @@ const parsePortId = (
     return { nodeId, portId, portName, direction };
 };
 
+/**
+ * Type guard for TraceMessage payload
+ * Matches both formats:
+ * - Full: { traceId, seq, stage, runId, type } (existing agent blocks)
+ * - Simple: { seq, ts } (Agent Codex — minimal fields)
+ */
+export const isTraceMessage = (data: unknown): data is TraceMessage => {
+    if (typeof data !== 'object' || data === null) return false;
+    const msg = data as Record<string, unknown>;
+    return typeof msg['seq'] === 'number' && typeof msg['ts'] === 'number';
+};
+
+/**
+ * Trace update info parsed from WebSocket message
+ * Used by onTraceUpdate callback for agent block trace display
+ */
+export interface TraceUpdateInfo {
+    /** Node ID of the agent block (from server `id` field) */
+    nodeId: string;
+    /** Flow ID */
+    flowId?: string;
+    /** Trace correlation ID */
+    traceId?: string;
+    /** Sequence number for ordering */
+    seq: number;
+    /** Timestamp */
+    ts: number;
+    /** Execution stage */
+    stage?: TraceStage;
+    /** Log message */
+    message?: string;
+    /** Run correlation ID */
+    runId?: string;
+    /** Specific event type (e.g., 'run_start', 'tool_start', 'error') */
+    type?: TraceType;
+    /** Structured event data */
+    data?: Record<string, unknown>;
+}
+
 export interface NodeUpdateInfo {
     nodeId: string;
     flowId?: string;
@@ -136,10 +200,9 @@ export interface NodeUpdateInfo {
      * - Other values or undefined: Additional data may be needed via API
      */
     stereo?: number | string;
-    /**
-     * Error message when state is 'ERROR'
-     * Available when stereo indicates message completeness (0 or '')
-     */
+    /** Server-side error message (preferred) */
+    error?: string;
+    /** @deprecated Use `error` instead. */
     errorMessage?: string;
 }
 
@@ -180,6 +243,8 @@ export interface UseInitFlowSocketOptions {
     onNodeReload?: (info: NodeUpdateInfo) => void;
     /** Callback when port update notification is received - should fetch port data */
     onPortUpdate?: (info: PortUpdateInfo) => void;
+    /** Callback when trace message is received - for agent block execution logs */
+    onTraceUpdate?: (info: TraceUpdateInfo) => void;
 }
 
 /**
@@ -206,7 +271,15 @@ export interface UseInitFlowSocketOptions {
  * });
  */
 export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
-    const { channelId, currentFlowId, getLastLocalUpdateTimestamp, onFlowUpdate, onNodeReload, onPortUpdate } = options;
+    const {
+        channelId,
+        currentFlowId,
+        getLastLocalUpdateTimestamp,
+        onFlowUpdate,
+        onNodeReload,
+        onPortUpdate,
+        onTraceUpdate,
+    } = options;
 
     const apiKey = useWebCoreStore(state => state.apiKey);
     const setId = useWebSocketStore(state => state.setId);
@@ -254,6 +327,38 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
             broadcastMessage(lastMessage);
 
             const data = lastMessage.data;
+
+            // Handle trace message FIRST (before node/flow handlers)
+            // Merged trace payload contains type: "node" from nested data,
+            // which would incorrectly match isNodeUpdateMessage if checked later.
+            if (lastMessage.action === 'trace' && isTraceMessage(data)) {
+                // Skip completion signals with no stage and no message
+                if (!data.stage && !data.message) {
+                    return;
+                }
+
+                // Skip if flowId is present and doesn't match current flow
+                // Note: flowId may be absent if server doesn't include it in trace wrapper
+                if (data.flowId && data.flowId !== currentFlowId) {
+                    return;
+                }
+
+                if (onTraceUpdate) {
+                    onTraceUpdate({
+                        nodeId: lastMessage.id,
+                        flowId: data.flowId,
+                        traceId: data.traceId,
+                        seq: data.seq,
+                        ts: data.ts,
+                        stage: data.stage,
+                        message: data.message,
+                        runId: data.runId,
+                        type: data.type,
+                        data: data.data,
+                    });
+                }
+                return;
+            }
 
             // Self-echo prevention: ignore messages within 3 seconds of our last local change
             const DEBOUNCE_MS = 3000;
@@ -320,6 +425,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         prevState: effectivePrevState,
                         progress: data.progress,
                         stereo: data.stereo,
+                        error: data.error,
                         errorMessage: data.errorMessage,
                     });
                 }
@@ -364,6 +470,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         onFlowUpdate,
         onNodeReload,
         onPortUpdate,
+        onTraceUpdate,
     ]);
 
     // Cleanup on unmount
