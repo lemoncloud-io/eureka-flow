@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-03-30] - root@0.14.2, @flows/web@0.14.2, @flows/admin@0.3.2
+
+### Refactor
+
+- improve trace log handling
+
+### Chores
+
+- update stage visualization colors and label width
+
 ## [2026-03-27] - root@0.14.1, @flows/web@0.14.1, @flows/admin@0.3.1
 
 ### Refactor
