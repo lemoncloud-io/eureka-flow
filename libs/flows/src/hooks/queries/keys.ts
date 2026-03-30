@@ -37,6 +37,11 @@ export const edgesKeys = {
     detail: (id: string) => [...edgesKeys.details(), id] as const,
 };
 
+export const logsKeys = {
+    all: ['logs'] as const,
+    node: (nodeId: string) => [...logsKeys.all, 'node', nodeId] as const,
+};
+
 export const systemKeys = {
     all: ['system'] as const,
     info: () => [...systemKeys.all, 'info'] as const,

@@ -30,6 +30,7 @@ import { ConnectionLine } from './ConnectionLine';
 import { DataTooltip } from './DataTooltip';
 import { DetailPanel } from './DetailPanel';
 import { LogModal } from './LogModal';
+import { Minimap } from './Minimap';
 import { MobileControls } from './MobileControls';
 import { NodeBlock } from './NodeBlock';
 import { ZoomControls } from './ZoomControls';
@@ -143,7 +144,8 @@ const findClosestInputPort = (
 
         // Calculate input port positions (left side of node)
         const portX = node.position.x + TOUCH_PORT_LAYOUT.INPUT_X_OFFSET;
-        def.inputs.forEach((input, index) => {
+        for (let index = 0; index < def.inputs.length; index++) {
+            const input = def.inputs[index];
             const portY =
                 node.position.y +
                 TOUCH_PORT_LAYOUT.FIRST_PORT_Y +
@@ -151,17 +153,15 @@ const findClosestInputPort = (
                 TOUCH_PORT_LAYOUT.PORT_CENTER_OFFSET;
             const distance = Math.hypot(worldPos.x - portX, worldPos.y - portY);
 
-            if (distance < TOUCH_PORT_HIT_THRESHOLD) {
-                if (!closestPort || distance < closestPort.distance) {
-                    closestPort = {
-                        nodeId: node.id,
-                        portId: input.id,
-                        portType: input.type,
-                        distance,
-                    };
-                }
+            if (distance < TOUCH_PORT_HIT_THRESHOLD && (!closestPort || distance < closestPort.distance)) {
+                closestPort = {
+                    nodeId: node.id,
+                    portId: input.id,
+                    portType: input.type,
+                    distance,
+                };
             }
-        });
+        }
     }
 
     return closestPort;
@@ -276,6 +276,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const canvasRef = useRef<HTMLDivElement>(null);
 
         const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
+        const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
         const [isPanning, setIsPanning] = useState(false);
         const lastMousePosRef = useRef({ x: 0, y: 0 });
 
@@ -332,6 +333,17 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         // Ref to track latest connectionDraft for touch events (avoids stale closure)
         const connectionDraftRef = useRef(connectionDraft);
         connectionDraftRef.current = connectionDraft;
+
+        // Measure canvas container size for minimap
+        useEffect(() => {
+            const el = canvasRef.current;
+            if (!el) return;
+            const observer = new ResizeObserver(([entry]) => {
+                setCanvasSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+            });
+            observer.observe(el);
+            return () => observer.disconnect();
+        }, []);
 
         const isMounted = useRef(false);
         useEffect(() => {
@@ -2479,6 +2491,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             onFitToScreen={handleFitToScreen}
                             onReset={handleResetView}
                             className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden sm:flex"
+                        />
+                    )}
+
+                    {/* Minimap - hidden on mobile */}
+                    {!readOnly && nodes.length > 0 && (
+                        <Minimap
+                            nodes={nodes}
+                            connections={connections}
+                            viewport={viewport}
+                            canvasWidth={canvasSize.width}
+                            canvasHeight={canvasSize.height}
+                            onViewportChange={setViewport}
                         />
                     )}
 

@@ -133,11 +133,12 @@ const getStatusStyles = (state: NodeState | undefined, isSelected: boolean): str
     switch (state) {
         case 'RUNNING':
             return 'border-status-running/50 shadow-[0_0_12px_rgba(234,179,8,0.2)]';
+        case 'COMPLETED':
+            return 'border-status-completed/30';
         case 'ERROR':
             return 'border-destructive/50 animate-pulse-error';
         case 'IDLE':
         case 'READY':
-        case 'COMPLETED':
         default:
             return 'border-muted-foreground/20';
     }
