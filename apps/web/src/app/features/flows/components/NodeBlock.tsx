@@ -807,12 +807,12 @@ const DebugLogVisualization: React.FC<VisualizationProps> = ({ node, definition,
 
 const STAGE_STYLES = {
     run: { label: 'RUN', color: 'text-blue-400' },
-    planner: { label: 'PLAN', color: 'text-purple-400' },
+    planner: { label: 'PLAN', color: 'text-violet-400' },
     step: { label: 'STEP', color: 'text-cyan-400' },
-    tool: { label: 'TOOL', color: 'text-emerald-400' },
-    approval: { label: 'APPROVE', color: 'text-yellow-400' },
-    reflector: { label: 'REFLECT', color: 'text-indigo-400' },
-    finalizer: { label: 'FINAL', color: 'text-green-400' },
+    tool: { label: 'TOOL', color: 'text-amber-400' },
+    approval: { label: 'APPROVE', color: 'text-yellow-300' },
+    reflector: { label: 'REFLECT', color: 'text-pink-400' },
+    finalizer: { label: 'FINAL', color: 'text-emerald-400' },
     trace: { label: 'TRACE', color: 'text-muted-foreground' },
     error: { label: 'ERROR', color: 'text-red-400' },
     runtime: { label: 'RUNTIME', color: 'text-orange-400' },
@@ -856,7 +856,7 @@ const AgentTraceVisualization: React.FC<{ traceLogs: TraceEntry[]; contentHeight
                 const detail = getTraceDetail(entry);
                 return (
                     <div key={`${entry.seq}-${i}`} className="flex gap-1.5 py-0.5">
-                        <span className={cn('shrink-0 font-semibold w-[52px] text-right', style.color)}>
+                        <span className={cn('shrink-0 font-semibold min-w-[4rem] text-right', style.color)}>
                             {style.label}
                         </span>
                         <span className="text-foreground/70 break-words whitespace-pre-wrap">
