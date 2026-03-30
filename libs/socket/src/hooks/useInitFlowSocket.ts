@@ -328,6 +328,38 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
 
             const data = lastMessage.data;
 
+            // Handle trace message FIRST (before node/flow handlers)
+            // Merged trace payload contains type: "node" from nested data,
+            // which would incorrectly match isNodeUpdateMessage if checked later.
+            if (lastMessage.action === 'trace' && isTraceMessage(data)) {
+                // Skip completion signals with no stage and no message
+                if (!data.stage && !data.message) {
+                    return;
+                }
+
+                // Skip if flowId is present and doesn't match current flow
+                // Note: flowId may be absent if server doesn't include it in trace wrapper
+                if (data.flowId && data.flowId !== currentFlowId) {
+                    return;
+                }
+
+                if (onTraceUpdate) {
+                    onTraceUpdate({
+                        nodeId: lastMessage.id,
+                        flowId: data.flowId,
+                        traceId: data.traceId,
+                        seq: data.seq,
+                        ts: data.ts,
+                        stage: data.stage,
+                        message: data.message,
+                        runId: data.runId,
+                        type: data.type,
+                        data: data.data,
+                    });
+                }
+                return;
+            }
+
             // Self-echo prevention: ignore messages within 3 seconds of our last local change
             const DEBOUNCE_MS = 3000;
             const now = Date.now();
@@ -395,37 +427,6 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         stereo: data.stereo,
                         error: data.error,
                         errorMessage: data.errorMessage,
-                    });
-                }
-                return;
-            }
-
-            // Handle trace message (action: 'trace')
-            // Received during agent block execution with stage/message updates
-            if (lastMessage.action === 'trace' && isTraceMessage(data)) {
-                // Skip completion signals with no stage and no message
-                if (!data.stage && !data.message) {
-                    return;
-                }
-
-                // Skip if flowId is present and doesn't match current flow
-                // Note: flowId may be absent if server doesn't include it in trace wrapper
-                if (data.flowId && data.flowId !== currentFlowId) {
-                    return;
-                }
-
-                if (onTraceUpdate) {
-                    onTraceUpdate({
-                        nodeId: lastMessage.id,
-                        flowId: data.flowId,
-                        traceId: data.traceId,
-                        seq: data.seq,
-                        ts: data.ts,
-                        stage: data.stage,
-                        message: data.message,
-                        runId: data.runId,
-                        type: data.type,
-                        data: data.data,
                     });
                 }
                 return;
