@@ -1512,7 +1512,9 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
                     {/* Agent Trace Logs */}
                     {traceLogs.length > 0 && (
-                        <AgentTraceVisualization traceLogs={traceLogs} contentHeight={contentAreaHeight} />
+                        <div className="mb-2">
+                            <AgentTraceVisualization traceLogs={traceLogs} contentHeight={contentAreaHeight} />
+                        </div>
                     )}
 
                     {/* Output Preview for process nodes */}
