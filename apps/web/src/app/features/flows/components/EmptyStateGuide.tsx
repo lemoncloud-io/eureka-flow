@@ -77,17 +77,19 @@ export const EmptyStateGuide = ({ onAddBlock }: EmptyStateGuideProps) => {
                         {t('help.emptyState.actions.addBlock')}
                     </button>
 
-                    <RouterLink
-                        to="/flow/examples"
-                        className={cn(
-                            'flex items-center justify-center gap-2 px-5 py-2.5',
-                            'bg-muted hover:bg-muted/80 rounded-lg',
-                            'transition-colors text-sm font-medium'
-                        )}
-                    >
-                        <ArrowRight className="w-4 h-4" />
-                        {t('help.emptyState.actions.browseExamples')}
-                    </RouterLink>
+                    {!window.location.pathname.startsWith('/flow/examples') && (
+                        <RouterLink
+                            to="/flow/examples"
+                            className={cn(
+                                'flex items-center justify-center gap-2 px-5 py-2.5',
+                                'bg-muted hover:bg-muted/80 rounded-lg',
+                                'transition-colors text-sm font-medium'
+                            )}
+                        >
+                            <ArrowRight className="w-4 h-4" />
+                            {t('help.emptyState.actions.browseExamples')}
+                        </RouterLink>
+                    )}
                 </div>
 
                 {/* Keyboard Hint */}
