@@ -7,8 +7,7 @@ import { cn } from '@flows/lib/utils';
 
 import type { Connection, NodeData } from '@lemoncloud/eureka-flows-api';
 
-const MINIMAP_WIDTH = 180;
-const MINIMAP_HEIGHT = 120;
+const MINIMAP_SIZE = 160;
 const WORLD_PADDING = 80;
 const NODE_HEIGHT_ESTIMATE = 60;
 const STORAGE_KEY = 'flows-minimap-visible';
@@ -90,7 +89,7 @@ export const Minimap = ({
     );
     const worldW = bounds.maxX - bounds.minX;
     const worldH = bounds.maxY - bounds.minY;
-    const scale = Math.min(MINIMAP_WIDTH / worldW, MINIMAP_HEIGHT / worldH);
+    const scale = Math.min(MINIMAP_SIZE / worldW, MINIMAP_SIZE / worldH);
 
     const toMinimap = useCallback(
         (wx: number, wy: number) => ({
@@ -162,9 +161,9 @@ export const Minimap = ({
     const vpMiniW = vpWorldW * scale;
     const vpMiniH = vpWorldH * scale;
 
-    // Actual SVG dimensions (may be smaller than constants if world is small)
-    const svgW = Math.min(MINIMAP_WIDTH, worldW * scale);
-    const svgH = Math.min(MINIMAP_HEIGHT, worldH * scale);
+    // SVG dimensions clamped to reasonable size
+    const svgW = Math.min(MINIMAP_SIZE, Math.max(100, worldW * scale));
+    const svgH = Math.min(MINIMAP_SIZE, Math.max(70, worldH * scale));
 
     // Node lookup for connection centers
     const nodeMap = useMemo(() => {
