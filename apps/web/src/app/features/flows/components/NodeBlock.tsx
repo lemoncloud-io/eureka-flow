@@ -5,6 +5,8 @@ import {
     Ban,
     Braces,
     Check,
+    ChevronDown,
+    ChevronUp,
     Copy,
     Expand,
     Hash,
@@ -133,11 +135,12 @@ const getStatusStyles = (state: NodeState | undefined, isSelected: boolean): str
     switch (state) {
         case 'RUNNING':
             return 'border-status-running/50 shadow-[0_0_12px_rgba(234,179,8,0.2)]';
+        case 'COMPLETED':
+            return 'border-status-completed/30';
         case 'ERROR':
             return 'border-destructive/50 animate-pulse-error';
         case 'IDLE':
         case 'READY':
-        case 'COMPLETED':
         default:
             return 'border-muted-foreground/20';
     }
@@ -982,6 +985,8 @@ interface NodeBlockProps {
     onMouseDown: (e: React.MouseEvent) => void;
     onTouchStart?: (e: React.TouchEvent) => void;
     isDragging?: boolean;
+    isCollapsed?: boolean;
+    onToggleCollapsed?: () => void;
 }
 
 export const NodeBlock: React.FC<NodeBlockProps> = ({
@@ -993,6 +998,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     onMouseDown,
     onTouchStart,
     isDragging = false,
+    isCollapsed = false,
+    onToggleCollapsed,
 }) => {
     const { t } = useTranslation(['nodes', 'flows']);
     const blockRegistry = useBlockRegistry();
@@ -1243,7 +1250,10 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             }}
             onMouseDown={onMouseDown}
             onTouchStart={onTouchStart}
-            onDoubleClick={e => e.stopPropagation()}
+            onDoubleClick={e => {
+                e.stopPropagation();
+                onToggleCollapsed?.();
+            }}
         >
             {/* Header */}
             <div
@@ -1396,6 +1406,26 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                         <RefreshCw className="w-3 h-3" /> {t('contextMenu.retry')}
                                     </button>
                                 )}
+                                {onToggleCollapsed && (
+                                    <button
+                                        onClick={e => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            onToggleCollapsed();
+                                        }}
+                                        className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
+                                    >
+                                        {isCollapsed ? (
+                                            <>
+                                                <ChevronDown className="w-3 h-3" /> {t('contextMenu.expand')}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ChevronUp className="w-3 h-3" /> {t('contextMenu.collapse')}
+                                            </>
+                                        )}
+                                    </button>
+                                )}
                                 <div className="border-t border-border/50 my-1" />
                                 <button
                                     onClick={e => {
@@ -1425,115 +1455,172 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 </div>
             </div>
 
-            {/* Ports at node edges - centered on border */}
-            {/* Show only: first port + connected ports + compatible ports during drag */}
-            <div className="absolute left-[-6px] top-[45px] flex flex-col gap-1">
-                {visibleInputPorts.map(p => (
-                    <PortItem
-                        key={p.id}
-                        port={p}
-                        type="input"
-                        nodeId={node.id}
-                        isHighlighted={highlightedPortIds.includes(p.id)}
-                        isConnected={connectedPortIds.includes(p.id)}
-                        isUpdated={updatedPortIds.includes(p.id)}
-                        portData={node.inputData?.[p.id]}
-                        connectionDraft={connectionDraft}
-                        onMouseDown={onPortMouseDown}
-                        onMouseUp={onPortMouseUp}
-                        onTouchStart={onPortTouchStart}
-                    />
-                ))}
-            </div>
-            <div className="absolute right-[-6px] top-[45px] flex flex-col gap-1">
-                {visibleOutputPorts.map(p => (
-                    <PortItem
-                        key={p.id}
-                        port={p}
-                        type="output"
-                        nodeId={node.id}
-                        isHighlighted={highlightedPortIds.includes(p.id)}
-                        isConnected={connectedPortIds.includes(p.id)}
-                        isUpdated={updatedPortIds.includes(p.id)}
-                        portData={node.outputData?.[p.id]}
-                        connectionDraft={connectionDraft}
-                        onMouseDown={onPortMouseDown}
-                        onMouseUp={onPortMouseUp}
-                        onTouchStart={onPortTouchStart}
-                    />
-                ))}
-            </div>
+            {/* Collapsed: single port dots at header center */}
+            {isCollapsed && (
+                <>
+                    <div
+                        className="absolute left-[-6px] flex flex-col gap-0.5"
+                        style={{ top: PORT_LAYOUT.COLLAPSED_PORT_CSS_TOP }}
+                    >
+                        {visibleInputPorts.slice(0, 1).map(p => (
+                            <PortItem
+                                key={p.id}
+                                port={p}
+                                type="input"
+                                nodeId={node.id}
+                                isHighlighted={false}
+                                isConnected={connectedPortIds.includes(p.id)}
+                                isUpdated={false}
+                                portData={node.inputData?.[p.id]}
+                                connectionDraft={connectionDraft}
+                                onMouseDown={onPortMouseDown}
+                                onMouseUp={onPortMouseUp}
+                                onTouchStart={onPortTouchStart}
+                            />
+                        ))}
+                    </div>
+                    <div
+                        className="absolute right-[-6px] flex flex-col gap-0.5"
+                        style={{ top: PORT_LAYOUT.COLLAPSED_PORT_CSS_TOP }}
+                    >
+                        {visibleOutputPorts.slice(0, 1).map(p => (
+                            <PortItem
+                                key={p.id}
+                                port={p}
+                                type="output"
+                                nodeId={node.id}
+                                isHighlighted={false}
+                                isConnected={connectedPortIds.includes(p.id)}
+                                isUpdated={false}
+                                portData={node.outputData?.[p.id]}
+                                connectionDraft={connectionDraft}
+                                onMouseDown={onPortMouseDown}
+                                onMouseUp={onPortMouseUp}
+                                onTouchStart={onPortTouchStart}
+                            />
+                        ))}
+                    </div>
+                </>
+            )}
 
-            {/* Body - min height based on visible port count or custom height */}
-            <div
-                className="px-3 py-3"
-                style={{
-                    minHeight: `${Math.max(
-                        Math.max(visibleInputPorts.length, visibleOutputPorts.length) * PORT_LAYOUT.PORT_SPACING,
-                        currentHeight ?? 0
-                    )}px`,
-                }}
-            >
-                {/* Content Area */}
-                <div>
-                    {/* Force Run button for non-auto nodes (input nodes have Run button in header) */}
-                    {!isAuto && !definition?.type?.startsWith('input-') && (
-                        <button
-                            onClick={handleRun}
-                            disabled={isRunning}
-                            className={cn(
-                                'w-full text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
-                                isRunning
-                                    ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
-                                    : definition.inputs.every(p => node.inputData?.[p.id])
-                                      ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
-                                      : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
-                            )}
-                            onMouseDown={e => e.stopPropagation()}
-                        >
-                            {isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                            {t('actions.forceRun')}
-                        </button>
-                    )}
+            {/* Expanded: full ports at node edges */}
+            {!isCollapsed && (
+                <>
+                    <div className="absolute left-[-6px] top-[45px] flex flex-col gap-1">
+                        {visibleInputPorts.map(p => (
+                            <PortItem
+                                key={p.id}
+                                port={p}
+                                type="input"
+                                nodeId={node.id}
+                                isHighlighted={highlightedPortIds.includes(p.id)}
+                                isConnected={connectedPortIds.includes(p.id)}
+                                isUpdated={updatedPortIds.includes(p.id)}
+                                portData={node.inputData?.[p.id]}
+                                connectionDraft={connectionDraft}
+                                onMouseDown={onPortMouseDown}
+                                onMouseUp={onPortMouseUp}
+                                onTouchStart={onPortTouchStart}
+                            />
+                        ))}
+                    </div>
+                    <div className="absolute right-[-6px] top-[45px] flex flex-col gap-1">
+                        {visibleOutputPorts.map(p => (
+                            <PortItem
+                                key={p.id}
+                                port={p}
+                                type="output"
+                                nodeId={node.id}
+                                isHighlighted={highlightedPortIds.includes(p.id)}
+                                isConnected={connectedPortIds.includes(p.id)}
+                                isUpdated={updatedPortIds.includes(p.id)}
+                                portData={node.outputData?.[p.id]}
+                                connectionDraft={connectionDraft}
+                                onMouseDown={onPortMouseDown}
+                                onMouseUp={onPortMouseUp}
+                                onTouchStart={onPortTouchStart}
+                            />
+                        ))}
+                    </div>
+                </>
+            )}
 
-                    {definition?.type === 'input-text' && (
-                        <InputTextVisualizationEditable node={node} onConfigChange={onConfigChange} />
-                    )}
-                    {definition?.type === 'input-image' && (
-                        <InputImageVisualizationEditable node={node} onConfigChange={onConfigChange} />
-                    )}
-                    {definition?.type &&
-                        VISUALIZATION_COMPONENTS[definition.type] &&
-                        React.createElement(VISUALIZATION_COMPONENTS[definition.type], {
-                            node,
-                            definition,
-                            contentHeight: contentAreaHeight,
-                        })}
+            {/* Body - hidden when collapsed */}
+            {!isCollapsed && (
+                <div
+                    className="px-3 py-3"
+                    style={{
+                        minHeight: `${Math.max(
+                            Math.max(visibleInputPorts.length, visibleOutputPorts.length) * PORT_LAYOUT.PORT_SPACING,
+                            currentHeight ?? 0
+                        )}px`,
+                    }}
+                >
+                    {/* Content Area */}
+                    <div>
+                        {/* Force Run button for non-auto nodes (input nodes have Run button in header) */}
+                        {!isAuto && !definition?.type?.startsWith('input-') && (
+                            <button
+                                onClick={handleRun}
+                                disabled={isRunning}
+                                className={cn(
+                                    'w-full text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
+                                    isRunning
+                                        ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
+                                        : definition.inputs.every(p => node.inputData?.[p.id])
+                                          ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
+                                          : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
+                                )}
+                                onMouseDown={e => e.stopPropagation()}
+                            >
+                                {isRunning ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                    <Play className="w-3 h-3" />
+                                )}
+                                {t('actions.forceRun')}
+                            </button>
+                        )}
 
-                    {/* Agent Trace Logs */}
-                    {traceLogs.length > 0 && (
-                        <div className="mb-2">
-                            <AgentTraceVisualization traceLogs={traceLogs} contentHeight={contentAreaHeight} />
+                        {definition?.type === 'input-text' && (
+                            <InputTextVisualizationEditable node={node} onConfigChange={onConfigChange} />
+                        )}
+                        {definition?.type === 'input-image' && (
+                            <InputImageVisualizationEditable node={node} onConfigChange={onConfigChange} />
+                        )}
+                        {definition?.type &&
+                            VISUALIZATION_COMPONENTS[definition.type] &&
+                            React.createElement(VISUALIZATION_COMPONENTS[definition.type], {
+                                node,
+                                definition,
+                                contentHeight: contentAreaHeight,
+                            })}
+
+                        {/* Agent Trace Logs */}
+                        {traceLogs.length > 0 && (
+                            <div className="mb-2">
+                                <AgentTraceVisualization traceLogs={traceLogs} contentHeight={contentAreaHeight} />
+                            </div>
+                        )}
+
+                        {/* Output Preview for process nodes */}
+                        <OutputPreview node={node} definition={definition} contentHeight={contentAreaHeight} />
+                    </div>
+
+                    {/* Error Message */}
+                    {nodeState === 'ERROR' && (
+                        <div className="mt-2 text-destructive text-[10px] bg-destructive/10 p-2 rounded-lg border border-destructive/20 flex items-start gap-1.5">
+                            <span className="font-semibold shrink-0">{t('flows:nodeBlock.error')}</span>
+                            <span className="opacity-80">
+                                {node.error ?? node.errorMessage ?? t('errors.executionFailed')}
+                            </span>
                         </div>
                     )}
-
-                    {/* Output Preview for process nodes */}
-                    <OutputPreview node={node} definition={definition} contentHeight={contentAreaHeight} />
                 </div>
-
-                {/* Error Message */}
-                {nodeState === 'ERROR' && (
-                    <div className="mt-2 text-destructive text-[10px] bg-destructive/10 p-2 rounded-lg border border-destructive/20 flex items-start gap-1.5">
-                        <span className="font-semibold shrink-0">{t('flows:nodeBlock.error')}</span>
-                        <span className="opacity-80">
-                            {node.error ?? node.errorMessage ?? t('errors.executionFailed')}
-                        </span>
-                    </div>
-                )}
-            </div>
+            )}
 
             {/* Progress Bar */}
-            {nodeState === 'RUNNING' && (
+            {!isCollapsed && nodeState === 'RUNNING' && (
                 <div className="absolute bottom-0 left-0 w-full h-1.5 bg-muted/50 overflow-hidden">
                     <div
                         className="h-full bg-status-running transition-all duration-200 ease-out animate-progress-pulse"
@@ -1545,7 +1632,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             )}
 
             {/* Duration Badge - visible during RUNNING, fade-out after completion */}
-            {displayDuration && durationBadgePhase !== 'hidden' && (
+            {!isCollapsed && displayDuration && durationBadgePhase !== 'hidden' && (
                 <div
                     className={cn(
                         'absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-[9px] text-white/90 px-1.5 py-0.5 rounded font-mono pointer-events-none transition-opacity duration-500',
@@ -1557,7 +1644,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             )}
 
             {/* Resize Handle - Bottom Right Corner */}
-            {onResize && (
+            {!isCollapsed && onResize && (
                 <div
                     className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize group z-10"
                     onMouseDown={handleResizeStart}

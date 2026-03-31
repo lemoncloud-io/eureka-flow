@@ -5,6 +5,7 @@ export * from './DetailPanel';
 export * from './TooltipContentRenderer';
 export * from './EmptyStateGuide';
 export * from './FrontendBadge';
+export * from './Minimap';
 export * from './Header';
 export * from './HelpDialog';
 export * from './NodeBlock';

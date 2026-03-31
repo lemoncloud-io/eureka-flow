@@ -24,6 +24,8 @@
         "retry": "Retry",
         "viewLogs": "View Logs",
         "viewConfig": "View Config",
+        "collapse": "Collapse",
+        "expand": "Expand",
         "delete": "Delete"
     },
     "actions": {

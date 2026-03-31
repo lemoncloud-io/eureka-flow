@@ -1,9 +1,10 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { MousePointerClick, Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 import {
+    COLLAPSED_PORT_Y,
     EXECUTE_FUNCTIONS,
     EXECUTION_FALLBACK_TIMEOUT_MS,
     LAYOUT_CONFIG,
@@ -20,16 +21,19 @@ import {
     upsertFlow,
     upsertPortNode,
     useBlockRegistry,
+    useCanvasStore,
+    useCollapsedNodeIds,
     useEdgeSync,
     useNodeSync,
     useUpdatedPortIds,
 } from '@flows/flows';
-import { cn } from '@flows/lib/utils';
 
 import { ConnectionLine } from './ConnectionLine';
 import { DataTooltip } from './DataTooltip';
 import { DetailPanel } from './DetailPanel';
+import { EmptyStateGuide } from './EmptyStateGuide';
 import { LogModal } from './LogModal';
+import { Minimap } from './Minimap';
 import { MobileControls } from './MobileControls';
 import { NodeBlock } from './NodeBlock';
 import { ZoomControls } from './ZoomControls';
@@ -143,7 +147,8 @@ const findClosestInputPort = (
 
         // Calculate input port positions (left side of node)
         const portX = node.position.x + TOUCH_PORT_LAYOUT.INPUT_X_OFFSET;
-        def.inputs.forEach((input, index) => {
+        for (let index = 0; index < def.inputs.length; index++) {
+            const input = def.inputs[index];
             const portY =
                 node.position.y +
                 TOUCH_PORT_LAYOUT.FIRST_PORT_Y +
@@ -151,69 +156,21 @@ const findClosestInputPort = (
                 TOUCH_PORT_LAYOUT.PORT_CENTER_OFFSET;
             const distance = Math.hypot(worldPos.x - portX, worldPos.y - portY);
 
-            if (distance < TOUCH_PORT_HIT_THRESHOLD) {
-                if (!closestPort || distance < closestPort.distance) {
-                    closestPort = {
-                        nodeId: node.id,
-                        portId: input.id,
-                        portType: input.type,
-                        distance,
-                    };
-                }
+            if (distance < TOUCH_PORT_HIT_THRESHOLD && (!closestPort || distance < closestPort.distance)) {
+                closestPort = {
+                    nodeId: node.id,
+                    portId: input.id,
+                    portType: input.type,
+                    distance,
+                };
             }
-        });
+        }
     }
 
     return closestPort;
 };
 
-interface EmptyStateProps {
-    onOpenLibrary: () => void;
-}
-
-const EmptyState: React.FC<EmptyStateProps> = ({ onOpenLibrary }) => {
-    const { t } = useTranslation(['flows']);
-
-    return (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-5">
-            <div className="flex flex-col items-center gap-6 text-center max-w-md px-8">
-                {/* Icon */}
-                <div className="relative">
-                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
-                        <Plus className="w-10 h-10 text-primary/60" />
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-lg bg-accent flex items-center justify-center border border-accent-foreground/20 animate-bounce">
-                        <MousePointerClick className="w-4 h-4 text-accent-foreground" />
-                    </div>
-                </div>
-
-                {/* Text */}
-                <div className="space-y-2">
-                    <h3 className="text-lg font-semibold text-foreground">{t('canvas.emptyState.title')}</h3>
-                    <p className="text-sm text-muted-foreground">{t('canvas.emptyState.description')}</p>
-                </div>
-
-                {/* CTA Button */}
-                <button
-                    onClick={onOpenLibrary}
-                    className={cn(
-                        'pointer-events-auto px-6 py-3 rounded-xl',
-                        'bg-primary text-primary-foreground font-medium',
-                        'hover:bg-primary/90 transition-all',
-                        'shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30',
-                        'flex items-center gap-2'
-                    )}
-                >
-                    <Plus className="w-4 h-4" />
-                    {t('canvas.emptyState.addFirstNode')}
-                </button>
-
-                {/* Keyboard hint */}
-                <p className="text-xs text-muted-foreground/60">{t('canvas.emptyState.keyboardHint')}</p>
-            </div>
-        </div>
-    );
-};
+// EmptyState is now provided by EmptyStateGuide component
 
 export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(
     (
@@ -233,6 +190,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const { t } = useTranslation(['flows', 'nodes']);
         const blockRegistry = useBlockRegistry();
         const updatedPortIds = useUpdatedPortIds();
+        const collapsedNodeIds = useCollapsedNodeIds();
+        const toggleNodeCollapsed = useCanvasStore(state => state.toggleNodeCollapsed);
 
         // Pre-compute updated ports grouped by nodeId for O(1) lookup per node
         const updatedPortIdsByNode = useMemo(() => {
@@ -276,6 +235,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const canvasRef = useRef<HTMLDivElement>(null);
 
         const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
+        const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
         const [isPanning, setIsPanning] = useState(false);
         const lastMousePosRef = useRef({ x: 0, y: 0 });
 
@@ -332,6 +292,17 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         // Ref to track latest connectionDraft for touch events (avoids stale closure)
         const connectionDraftRef = useRef(connectionDraft);
         connectionDraftRef.current = connectionDraft;
+
+        // Measure canvas container size for minimap
+        useEffect(() => {
+            const el = canvasRef.current;
+            if (!el) return;
+            const observer = new ResizeObserver(([entry]) => {
+                setCanvasSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+            });
+            observer.observe(el);
+            return () => observer.disconnect();
+        }, []);
 
         const isMounted = useRef(false);
         useEffect(() => {
@@ -2071,7 +2042,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             const visibleIndex = visiblePorts.findIndex(p => p.id === portId);
             const safeIndex = visibleIndex !== -1 ? visibleIndex : 0;
 
-            const yOffset = PORT_LAYOUT.FIRST_PORT_Y + safeIndex * PORT_LAYOUT.PORT_SPACING;
+            const isNodeCollapsed = collapsedNodeIds.has(nodeId);
+            const yOffset = isNodeCollapsed
+                ? COLLAPSED_PORT_Y
+                : PORT_LAYOUT.FIRST_PORT_Y + safeIndex * PORT_LAYOUT.PORT_SPACING;
             // Use dynamic node width for output port position
             // If node is being resized, use the resizing width for real-time edge updates
             const nodeWidth = resizingNode?.nodeId === nodeId ? resizingNode.width : getNodeWidth(node);
@@ -2310,7 +2284,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     />
 
                     {/* Empty State */}
-                    {nodes.length === 0 && !readOnly && onOpenLibrary && <EmptyState onOpenLibrary={onOpenLibrary} />}
+                    {nodes.length === 0 && !readOnly && onOpenLibrary && <EmptyStateGuide onAddBlock={onOpenLibrary} />}
 
                     <div
                         className="absolute origin-top-left w-full h-full pointer-events-none z-10"
@@ -2461,6 +2435,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             onMouseDown={e => handleNodeMouseDown(e, node.id)}
                                             onTouchStart={e => handleNodeTouchStart(e, node.id)}
                                             isDragging={dragState?.initialPositions.has(node.id) ?? false}
+                                            isCollapsed={collapsedNodeIds.has(node.id)}
+                                            onToggleCollapsed={() => toggleNodeCollapsed(node.id)}
                                         />
                                     </div>
                                 );
@@ -2479,6 +2455,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             onFitToScreen={handleFitToScreen}
                             onReset={handleResetView}
                             className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden sm:flex"
+                        />
+                    )}
+
+                    {/* Minimap - hidden on mobile */}
+                    {!readOnly && nodes.length > 0 && (
+                        <Minimap
+                            nodes={nodes}
+                            connections={connections}
+                            viewport={viewport}
+                            canvasWidth={canvasSize.width}
+                            canvasHeight={canvasSize.height}
+                            onViewportChange={setViewport}
                         />
                     )}
 

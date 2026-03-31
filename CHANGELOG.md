@@ -1,5 +1,36 @@
 # Changelog
 
+## [2026-03-31] - root@0.16.0, @flows/web@0.16.0
+
+### Features
+
+- update landing page
+
+## [2026-03-31] - root@0.15.0, @flows/web@0.15.0, @flows/admin@0.4.0
+
+### Features
+
+- add node collapse/expand and redesign empty state guide
+- add toast, map
+
+### Bug Fixes
+
+- freeze minimap bounds during drag to prevent feedback loop
+- clamp minimap click position to prevent viewport overshoot
+- use square minimap size to prevent elongated aspect ratio
+- improve minimap UI proportions and visual quality
+- correct collapsed node port Y offset for edge alignment
+- use useLocation instead of window.location in EmptyStateGuide
+- hide Browse Examples button on examples page
+
+### Refactor
+
+- derive COLLAPSED_PORT_Y from CSS_TOP + PORT_WRAPPER_HEIGHT/2
+
+### Other
+
+- test: add useCanvasStore collapse/expand unit tests
+
 ## [2026-03-30] - root@0.14.2, @flows/web@0.14.2, @flows/admin@0.3.2
 
 ### Refactor

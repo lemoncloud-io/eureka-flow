@@ -24,6 +24,8 @@
         "retry": "재시도",
         "viewLogs": "로그 보기",
         "viewConfig": "설정 보기",
+        "collapse": "접기",
+        "expand": "펼치기",
         "delete": "삭제"
     },
     "actions": {

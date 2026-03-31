@@ -373,6 +373,11 @@
     animation: pulse-soft 2s ease-in-out infinite;
 }
 
+/* Landing page scroll override */
+html.landing-scroll {
+    overflow-y: scroll;
+}
+
 /* Smooth transitions for theme switching */
 html {
     transition:

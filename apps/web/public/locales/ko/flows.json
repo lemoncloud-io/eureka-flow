@@ -12,6 +12,8 @@
         "redo": "다시 실행",
         "autoLayout": "자동 정렬",
         "clearCanvas": "캔버스 지우기",
+        "collapseAll": "모두 접기",
+        "expandAll": "모두 펼치기",
         "untitledWorkflow": "제목 없는 워크플로우",
         "toggleAutoSave": "자동 저장 토글",
         "runAll": "전체 실행",
@@ -379,11 +381,17 @@
                 "browseExamples": "예제 둘러보기",
                 "viewHelp": "도움말 보기"
             },
+            "steps": {
+                "addBlocks": "사이드바에서 블록을 추가하세요",
+                "connectNodes": "포트를 드래그하여 노드를 연결하세요",
+                "executeFlow": "Run 버튼으로 워크플로우를 실행하세요"
+            },
             "tips": {
                 "title": "빠른 팁",
                 "search": "라이브러리 아이콘을 클릭하여 블록을 찾아보세요",
                 "connect": "포트 사이를 드래그하여 블록을 연결하세요",
-                "help": "언제든지 ?를 눌러 도움말을 확인하세요"
+                "help": "언제든지 ?를 눌러 도움말을 확인하세요",
+                "keyboard": "팁: Space+드래그로 이동, 스크롤로 확대/축소"
             }
         }
     }

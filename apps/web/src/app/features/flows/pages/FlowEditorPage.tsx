@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { EXECUTE_FUNCTIONS, getNode, getPortData, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
@@ -14,11 +15,11 @@ import { Header } from '../components/Header';
 import { HelpDialog } from '../components/HelpDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
+import { useSocketHandlers } from '../hooks/useSocketHandlers';
 
 import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
-import type { NodeUpdateInfo, PortUpdateInfo, TraceUpdateInfo } from '@flows/socket';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -53,275 +54,23 @@ export const FlowEditorPage = () => {
         updateFlowName,
     } = useFlows();
 
-    // Handle flow update notification from WebSocket (new format)
-    // Fetches entire flow from server and updates canvas
-    const handleFlowUpdate = useCallback(
-        async (flowId: string) => {
-            try {
-                const flowData = await loadFlowById(flowId);
-                if (canvasRef.current && flowData) {
-                    await canvasRef.current.loadWorkflow(flowData);
-                    lastSavedStateRef.current = serializeWorkflowState(flowData);
-                }
-            } catch (error) {
-                console.error('[FlowEditor] Failed to reload flow:', error);
-            }
-        },
-        [loadFlowById]
-    );
+    const lastSavedStateRef = useRef<string | null>(null);
 
-    // Track node sequence numbers to detect stale updates (higher no = newer)
-    const nodeNoRef = useRef<Map<string, number>>(new Map());
-
-    // Get trace log actions from canvas store (must be before handleNodeUpdate which uses clearTraceLogs)
-    const appendTraceLog = useCanvasStore(state => state.appendTraceLog);
-    const clearTraceLogs = useCanvasStore(state => state.clearTraceLogs);
-
-    const handleNodeUpdate = useCallback(
-        async (info: NodeUpdateInfo) => {
-            const { nodeId, flowId, isPort, parentNodeId, state, progress, no, stereo, error, errorMessage } = info;
-
-            // Skip if flowId is missing or doesn't match current flow (socket channel is shared)
-            if (!flowId || flowId !== currentFlowId) return;
-
-            // Check if this update is stale based on sequence number (no)
-            // Higher 'no' means more recent - skip if we've seen equal or higher number
-            if (no !== undefined) {
-                const prevNo = nodeNoRef.current.get(nodeId);
-                if (prevNo !== undefined && prevNo >= no) {
-                    console.debug('[handleNodeUpdate] Skipping stale update:', nodeId, 'prevNo:', prevNo, 'no:', no);
-                    return;
-                }
-                nodeNoRef.current.set(nodeId, no);
-            }
-
-            if (!canvasRef.current) return;
-
-            // Clear trace logs when node starts a new execution
-            if (state === 'RUNNING' && no !== undefined && no <= 1) {
-                clearTraceLogs(nodeId);
-            }
-
-            // Skip port updates from type:'node' messages (deprecated pattern)
-            // Port updates are handled by type:'node/port' messages via handlePortUpdate
-            if (isPort && parentNodeId) {
-                if (state) {
-                    canvasRef.current.updateNodeFromServer(parentNodeId, {
-                        state,
-                        status: state,
-                    });
-                }
-                return;
-            }
-
-            // ERROR state: use socket data directly when stereo indicates completeness (0 or ''),
-            // otherwise fetch from API (error ?? errorMessage for backward compatibility)
-            if (state === 'ERROR') {
-                let errMsg = error ?? errorMessage;
-                if (stereo !== 0 && stereo !== '') {
-                    try {
-                        const nodeData = await getNode(nodeId);
-                        errMsg = nodeData.error ?? nodeData.errorMessage;
-                    } catch {
-                        // Revert no on failure to allow retry
-                        if (no !== undefined) {
-                            const prevNo = nodeNoRef.current.get(nodeId);
-                            if (prevNo === no) {
-                                nodeNoRef.current.delete(nodeId);
-                            }
-                        }
-                    }
-                }
-                canvasRef.current.updateNodeFromServer(nodeId, {
-                    state,
-                    status: state,
-                    error: errMsg,
-                    errorMessage: errMsg,
-                });
-                return;
-            }
-
-            // All other states: use socket data directly (no API fetch needed)
-            const isTerminal = state === 'COMPLETED' || state === 'ERROR';
-            const executionStats =
-                state === 'RUNNING'
-                    ? { startTime: Date.now(), duration: 0, progress: progress ?? 0 }
-                    : isTerminal
-                      ? { progress: progress ?? 100 }
-                      : progress !== undefined
-                        ? { progress }
-                        : undefined;
-
-            canvasRef.current.updateNodeFromServer(nodeId, {
-                state,
-                status: state,
-                executionStats,
-            });
-
-            // Auto-execute isFrontend nodes when READY (if all inputs have data)
-            if (state !== 'READY') return;
-
-            const workflow = canvasRef.current.getWorkflow();
-            const node = workflow?.nodes?.find(n => n.id === nodeId);
-            if (!node?.type) return;
-
-            const nodeDef = blockRegistry[node.type];
-            if (!nodeDef?.isFrontend || !EXECUTE_FUNCTIONS[nodeDef.type]) return;
-
-            // Skip input blocks (require user interaction, no upstream data propagation)
-            if (nodeDef.stereo === 'input') return;
-
-            // Skip if required inputs don't have data (upstream not executed yet)
-            const hasAllInputs = (nodeDef.inputs ?? []).every(input => node.inputData?.[input.id]?.value !== undefined);
-            if (!hasAllInputs) return;
-
-            // Defer execution to next tick to prevent blocking socket handler
-            setTimeout(() => {
-                canvasRef.current?.executeNode(nodeId);
-            }, 0);
-        },
-        [blockRegistry, currentFlowId, clearTraceLogs]
-    );
-
-    // Track port sequence numbers to detect stale updates (higher no = newer)
-    const portNoRef = useRef<Map<string, number>>(new Map());
-
-    // Get port highlight actions from canvas store
-    const setUpdatedPort = useCanvasStore(state => state.setUpdatedPort);
-    const clearUpdatedPort = useCanvasStore(state => state.clearUpdatedPort);
-
-    // Track highlight timeouts per port to cancel previous timeout on rapid updates
-    const highlightTimeoutsRef = useRef<Map<string, number>>(new Map());
-
-    /**
-     * Handle port update notification from WebSocket (type: 'node/port')
-     * - Output ports: always fetch data and update outputData
-     * - Input ports: only fetch for terminal nodes (output$ is empty)
-     *   - Terminal nodes (미리보기, 디버그 로그): need inputData to display
-     *   - Non-terminal nodes: skip fetch (data same as upstream output)
-     */
-    const handlePortUpdate = useCallback(
-        async (info: PortUpdateInfo) => {
-            const { portId, nodeId, flowId, portName, no } = info;
-
-            // Skip if flowId is missing or doesn't match current flow (socket channel is shared)
-            if (!flowId || flowId !== currentFlowId) return;
-
-            // Check if this update is stale based on sequence number (no)
-            // Higher 'no' means more recent - skip if we've seen equal or higher number
-            if (no !== undefined) {
-                const prevNo = portNoRef.current.get(portId);
-                if (prevNo !== undefined && prevNo >= no) {
-                    console.debug('[handlePortUpdate] Skipping stale update:', portId, 'prevNo:', prevNo, 'no:', no);
-                    return;
-                }
-                portNoRef.current.set(portId, no);
-            }
-
-            // Trigger port highlight
-            const existingTimeout = highlightTimeoutsRef.current.get(portId);
-            if (existingTimeout) {
-                window.clearTimeout(existingTimeout);
-            }
-            setUpdatedPort(portId);
-            const timeoutId = window.setTimeout(() => {
-                clearUpdatedPort(portId);
-                highlightTimeoutsRef.current.delete(portId);
-            }, 500);
-            highlightTimeoutsRef.current.set(portId, timeoutId);
-
-            if (!canvasRef.current) return;
-
-            const isOutputPort = portName === 'out';
-
-            // For input ports, check if this is a terminal node (no outputs)
-            // Terminal nodes need inputData to display, others can skip (data same as upstream)
-            if (!isOutputPort) {
-                const workflow = canvasRef.current.getWorkflow();
-                const nodeInCanvas = workflow?.nodes?.find(n => n.id === nodeId);
-                if (nodeInCanvas?.type) {
-                    const nodeDef = blockRegistry[nodeInCanvas.type];
-                    const isTerminalNode = !nodeDef?.output$ || nodeDef.output$.length === 0;
-                    if (!isTerminalNode) {
-                        // Non-terminal node: skip fetch (data same as upstream output)
-                        return;
-                    }
-                }
-            }
-
-            const direction = isOutputPort ? 'out' : 'in';
-
-            try {
-                const portData = await getPortData(portId, direction);
-
-                if (portData?.data) {
-                    const dataPacket = {
-                        value: portData.data.value,
-                        type: portData.data.type,
-                        timestamp: portData.data.timestamp,
-                    };
-
-                    const portKey = portData.portId || portName || direction;
-
-                    if (isOutputPort) {
-                        canvasRef.current.updateNodeFromServer(nodeId, {
-                            outputData: { [portKey]: dataPacket },
-                        });
-                    } else {
-                        canvasRef.current.updateNodeFromServer(nodeId, {
-                            inputData: { [portKey]: dataPacket },
-                        });
-                    }
-                }
-            } catch (error) {
-                // Revert no on failure to allow retry
-                if (no !== undefined) {
-                    const prevNo = portNoRef.current.get(portId);
-                    if (prevNo === no) {
-                        portNoRef.current.delete(portId);
-                    }
-                }
-                console.debug('[handlePortUpdate] Failed to fetch port data:', portId, error);
-            }
-        },
-        [setUpdatedPort, clearUpdatedPort, blockRegistry, currentFlowId]
-    );
-
-    // Handle trace update from WebSocket (action: 'trace')
-    // Appends trace entries to canvas store for agent block display
-    // Note: flowId filtering is already done in useInitFlowSocket
-    const handleTraceUpdate = useCallback(
-        (info: TraceUpdateInfo) => {
-            const { nodeId, traceId, seq, ts, stage, message, runId, type, data } = info;
-            appendTraceLog(nodeId, { traceId, seq, ts, stage, message, runId, type, data });
-        },
-        [appendTraceLog]
-    );
-
-    // Cleanup highlight timeouts on unmount
-    useEffect(() => {
-        const timeoutsMap = highlightTimeoutsRef.current;
-        return () => {
-            timeoutsMap.forEach(timeoutId => {
-                window.clearTimeout(timeoutId);
-            });
-            timeoutsMap.clear();
-        };
-    }, []);
-
-    // Clear sequence number tracking and highlight timeouts when flow changes
-    useEffect(() => {
-        nodeNoRef.current.clear();
-        portNoRef.current.clear();
-        highlightTimeoutsRef.current.forEach(timeoutId => {
-            window.clearTimeout(timeoutId);
-        });
-        highlightTimeoutsRef.current.clear();
-    }, [currentFlowId]);
-
-    // Track last local update to prevent self-echo from socket (use ref to avoid re-renders)
-    const lastLocalUpdateTimestampRef = useRef<number | null>(null);
-    const getLastLocalUpdateTimestamp = useCallback(() => lastLocalUpdateTimestampRef.current, []);
+    const {
+        handleFlowUpdate,
+        handleNodeUpdate,
+        handlePortUpdate,
+        handleTraceUpdate,
+        getLastLocalUpdateTimestamp,
+        lastLocalUpdateTimestampRef,
+    } = useSocketHandlers({
+        canvasRef,
+        blockRegistry,
+        currentFlowId,
+        loadFlowById,
+        lastSavedStateRef,
+        serializeWorkflowState,
+    });
 
     // Initialize WebSocket connection when channelId is available
     const {
@@ -344,7 +93,6 @@ export const FlowEditorPage = () => {
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('');
     const [bootError, setBootError] = useState<string | null>(null);
-    const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
     const [isFlowListOpen, setIsFlowListOpen] = useState(false);
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
@@ -353,7 +101,6 @@ export const FlowEditorPage = () => {
     const { apiKey, setApiKey } = useWebCoreStore();
     const autoSaveTimerRef = useRef<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const lastSavedStateRef = useRef<string | null>(null);
 
     const handleOpenLibrary = useCallback(() => {
         sidebarRef.current?.open();
@@ -514,11 +261,15 @@ export const FlowEditorPage = () => {
                 }
             }
         }, 2000);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- refs are stable, no need to trigger re-creation
     }, [isAutoSaveEnabled, saveCurrentFlow]);
 
     const showNotification = (message: string, type: 'success' | 'error') => {
-        setNotification({ message, type });
-        setTimeout(() => setNotification(null), 3000);
+        if (type === 'success') {
+            toast.success(message);
+        } else {
+            toast.error(message);
+        }
     };
 
     const handleSave = async () => {
@@ -806,6 +557,8 @@ export const FlowEditorPage = () => {
                     },
                     onClear: handleClear,
                     onSave: handleSave,
+                    onCollapseAll: () => useCanvasStore.getState().setAllNodesCollapsed(true),
+                    onExpandAll: () => useCanvasStore.getState().setAllNodesCollapsed(false),
                 }}
                 saveState={{
                     isSaving,
@@ -856,19 +609,6 @@ export const FlowEditorPage = () => {
 
             {/* Help Dialog */}
             <HelpDialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen} defaultTab={helpDialogTab} />
-
-            {/* Notification Toast */}
-            {notification && (
-                <div
-                    className={`absolute top-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full shadow-lg text-sm font-medium animate-in slide-in-from-top-2 fade-in z-50 backdrop-blur-sm ${
-                        notification.type === 'success'
-                            ? 'bg-success/90 text-success-foreground'
-                            : 'bg-destructive/90 text-destructive-foreground'
-                    }`}
-                >
-                    {notification.message}
-                </div>
-            )}
 
             {/* Loading Overlay */}
             {isLoading && (
