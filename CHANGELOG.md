@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-03-31] - root@0.16.0, @flows/web@0.16.0
+
+### Features
+
+- update landing page
+
 ## [2026-03-31] - root@0.15.0, @flows/web@0.15.0, @flows/admin@0.4.0
 
 ### Features
