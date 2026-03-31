@@ -39,7 +39,14 @@ export const PORT_LAYOUT = {
     PORT_SIZE: 12,
     /** Port visual offset from edge (half of port size) */
     PORT_EDGE_OFFSET: 6,
+    /** Collapsed node: CSS top offset for port dots */
+    COLLAPSED_PORT_CSS_TOP: 16,
+    /** Port wrapper height (Tailwind h-6 = 24px) */
+    PORT_WRAPPER_HEIGHT: 24,
 } as const;
+
+/** Collapsed node: port Y offset for edge connections (CSS_TOP + PORT_WRAPPER_HEIGHT/2) */
+export const COLLAPSED_PORT_Y = PORT_LAYOUT.COLLAPSED_PORT_CSS_TOP + PORT_LAYOUT.PORT_WRAPPER_HEIGHT / 2;
 
 /** Node height estimation constants */
 const NODE_HEIGHT = {

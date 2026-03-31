@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { ScrollText, X } from 'lucide-react';
 
-import { fetchBlockLogs } from '@flows/flows';
-
-import type { LogEntry } from '@lemoncloud/eureka-flows-api';
+import { useBlockLogsQuery } from '@flows/flows';
+import { cn } from '@flows/lib/utils';
 
 interface LogModalProps {
     nodeId: string;
@@ -15,27 +14,10 @@ interface LogModalProps {
 
 export const LogModal: React.FC<LogModalProps> = ({ nodeId, onClose }) => {
     const { t } = useTranslation(['flows']);
-    const [logs, setLogs] = useState<LogEntry[]>([]);
-    const [loading, setLoading] = useState(false);
+    const { data: logs = [], isLoading, refetch } = useBlockLogsQuery(nodeId);
     const [filter, setFilter] = useState('');
 
-    useEffect(() => {
-        setLoading(true);
-        fetchBlockLogs(nodeId).then(data => {
-            setLogs(data);
-            setLoading(false);
-        });
-    }, [nodeId]);
-
     const filteredLogs = logs.filter(l => l.message.toLowerCase().includes(filter.toLowerCase()));
-
-    const handleRefresh = () => {
-        setLoading(true);
-        fetchBlockLogs(nodeId).then(data => {
-            setLogs(data);
-            setLoading(false);
-        });
-    };
 
     return createPortal(
         <div
@@ -66,7 +48,7 @@ export const LogModal: React.FC<LogModalProps> = ({ nodeId, onClose }) => {
                         onChange={e => setFilter(e.target.value)}
                     />
                     <button
-                        onClick={handleRefresh}
+                        onClick={() => refetch()}
                         className="px-3 bg-muted hover:bg-accent border border-border rounded text-xs text-muted-foreground"
                     >
                         {t('canvas.refresh')}
@@ -76,7 +58,7 @@ export const LogModal: React.FC<LogModalProps> = ({ nodeId, onClose }) => {
                     className="flex-1 overflow-y-auto p-2 space-y-1 bg-background/30"
                     onWheel={e => e.stopPropagation()}
                 >
-                    {loading ? (
+                    {isLoading ? (
                         <div className="flex justify-center items-center h-full text-muted-foreground text-xs">
                             {t('canvas.loading')}
                         </div>
@@ -94,7 +76,12 @@ export const LogModal: React.FC<LogModalProps> = ({ nodeId, onClose }) => {
                                     {new Date(log.timestamp).toLocaleTimeString()}
                                 </div>
                                 <div
-                                    className={`w-14 shrink-0 font-bold ${log.level === 'ERROR' ? 'text-destructive' : log.level === 'WARN' ? 'text-warning' : 'text-primary'}`}
+                                    className={cn(
+                                        'w-14 shrink-0 font-bold',
+                                        log.level === 'ERROR' && 'text-destructive',
+                                        log.level === 'WARN' && 'text-warning',
+                                        log.level !== 'ERROR' && log.level !== 'WARN' && 'text-primary'
+                                    )}
                                 >
                                     {log.level}
                                 </div>

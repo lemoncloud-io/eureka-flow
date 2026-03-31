@@ -152,7 +152,17 @@ export const Providers = ({ children }: ProvidersProps) => {
                                 <ApiKeyGate>
                                     <AppContent>{children}</AppContent>
                                 </ApiKeyGate>
-                                <Toaster />
+                                <Toaster
+                                    position="bottom-right"
+                                    toastOptions={{
+                                        classNames: {
+                                            toast: 'backdrop-blur-md bg-background/95 border-border/50 shadow-lg',
+                                            title: 'text-foreground text-sm font-medium',
+                                            description: 'text-muted-foreground text-xs',
+                                            actionButton: 'bg-primary text-primary-foreground text-xs',
+                                        },
+                                    }}
+                                />
                             </ThemeProvider>
                             {import.meta.env.DEV && <ReactQueryDevtools />}
                         </QueryClientProvider>
