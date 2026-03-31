@@ -261,6 +261,7 @@ export const FlowEditorPage = () => {
                 }
             }
         }, 2000);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- refs are stable, no need to trigger re-creation
     }, [isAutoSaveEnabled, saveCurrentFlow]);
 
     const showNotification = (message: string, type: 'success' | 'error') => {
