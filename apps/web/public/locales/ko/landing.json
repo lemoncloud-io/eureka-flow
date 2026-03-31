@@ -2,43 +2,62 @@
     "nav": {
         "logo": "Eureka Flow",
         "cta": "시작하기",
-        "github": "GitHub"
+        "github": "GitHub",
+        "star": "Star"
     },
     "hero": {
-        "badge": "베타",
+        "badge": "오픈 베타",
         "title": {
-            "line1": "노드를 연결해",
-            "accent": "AI 에이전트",
-            "line2": "를 만드세요"
+            "line1": "AI 워크플로우를",
+            "accent": "비주얼하게",
+            "line2": "코딩 없이 만드세요"
         },
-        "subtitle": "코딩 없이 드래그&드롭으로 AI 워크플로우를 완성합니다. n8n보다 간단하고, AI에 더 깊게 특화된 비주얼 플로우 빌더.",
+        "subtitle": "드래그하고 연결하고 실행하세요. 설치 없이 브라우저에서 바로 AI 파이프라인을 완성합니다.",
         "cta_primary": "무료로 시작하기",
-        "cta_secondary": "데모 보기 →"
+        "cta_secondary": "데모 보기"
     },
     "screenshot": {
         "alt": "Eureka Flow 캔버스 화면",
         "url_bar": "flow.eureka.codes"
     },
+    "how_it_works": {
+        "badge": "사용 방법",
+        "title": "세 단계로 첫 AI 워크플로우 완성",
+        "subtitle": "설치도 설정도 필요 없습니다. 브라우저에서 바로 시작하세요.",
+        "add_blocks": {
+            "title": "블록 추가",
+            "description": "라이브러리에서 AI 블록을 선택하세요 — 텍스트 생성, 이미지 합성, 스키마 추출."
+        },
+        "connect_flow": {
+            "title": "플로우 연결",
+            "description": "블록 사이를 드래그해 데이터 파이프라인을 구성하세요. 타입 안전 포트가 실수를 방지합니다."
+        },
+        "run_iterate": {
+            "title": "실행 & 반복",
+            "description": "노드별로 실행하거나 전체 플로우를 한 번에 돌리세요. 결과를 실시간으로 확인하고 즉시 디버깅합니다."
+        }
+    },
     "features": {
         "badge": "기능",
-        "title": "AI 워크플로우에 필요한 모든 것",
-        "subtitle": "AI 에이전트 개발을 위해 처음부터 설계된 비주얼 에디터.",
+        "title": "AI 워크플로우 핵심 기능",
+        "subtitle": "AI 워크플로우를 위해 처음부터 설계된 비주얼 에디터.",
         "visual_canvas": {
             "title": "비주얼 캔버스",
-            "description": "노드를 드래그해 연결하면 AI 파이프라인이 완성됩니다. 전체 워크플로우를 한눈에 파악하세요."
+            "description": "노드를 드래그해 연결하면 AI 파이프라인이 완성됩니다. 자동 레이아웃으로 워크플로우를 정리하고, 줌·팬·미니맵으로 전체 흐름을 한눈에 파악하세요."
         },
         "ai_nodes": {
             "title": "AI 특화 노드",
-            "description": "텍스트 생성, 이미지 합성, 스키마 추출 등 AI 작업에 맞춘 전용 노드."
+            "description": "텍스트 생성, 이미지 합성, 스키마 추출 — AI 작업에 맞춘 전용 노드. 각 노드가 I/O 타입을 자동 처리하므로 로직에만 집중하세요."
         },
         "instant_run": {
             "title": "즉시 실행",
-            "description": "캔버스에서 노드별로 직접 실행하고 디버깅하세요. 결과를 실시간으로 확인합니다."
+            "description": "캔버스에서 노드별로 직접 실행하고 디버깅하세요. 에디터를 떠나지 않고 결과를 바로 확인합니다."
         }
     },
     "cta": {
         "title": "지금 바로 만들어보세요",
-        "subtitle": "베타 기간 무료. 설치 없이 브라우저에서 바로 시작.",
+        "subtitle": "오픈 베타 기간 무료. 설치 없이 브라우저에서 바로 시작.",
+        "note": "무료로 시작 가능",
         "button": "무료로 시작하기"
     },
     "footer": {
