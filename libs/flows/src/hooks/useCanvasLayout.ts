@@ -41,8 +41,8 @@ export const PORT_LAYOUT = {
     PORT_EDGE_OFFSET: 6,
     /** Collapsed node: CSS top offset for port dots */
     COLLAPSED_PORT_CSS_TOP: 16,
-    /** Collapsed node: port Y offset for edge connections (CSS_TOP + PORT_EDGE_OFFSET) */
-    COLLAPSED_PORT_Y: 22,
+    /** Collapsed node: port Y offset for edge connections (CSS_TOP + h-6/2 where h-6=24px) */
+    COLLAPSED_PORT_Y: 28,
 } as const;
 
 /** Node height estimation constants */
