@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
 
 import { ArrowRight, Cable, Play, Plus, Sparkles } from 'lucide-react';
 
@@ -17,6 +17,8 @@ const STEPS = [
 
 export const EmptyStateGuide = ({ onAddBlock }: EmptyStateGuideProps) => {
     const { t } = useTranslation(['flows']);
+    const location = useLocation();
+    const isExamplesPage = location.pathname.startsWith('/flow/examples');
 
     return (
         <div className={cn('absolute inset-0 flex items-center justify-center', 'pointer-events-none')}>
@@ -77,7 +79,7 @@ export const EmptyStateGuide = ({ onAddBlock }: EmptyStateGuideProps) => {
                         {t('help.emptyState.actions.addBlock')}
                     </button>
 
-                    {!window.location.pathname.startsWith('/flow/examples') && (
+                    {!isExamplesPage && (
                         <RouterLink
                             to="/flow/examples"
                             className={cn(
