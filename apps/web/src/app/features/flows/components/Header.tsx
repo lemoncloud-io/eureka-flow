@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 
 import {
+    ChevronsDownUp,
+    ChevronsUpDown,
     Download,
     FileText,
     FolderOpen,
@@ -57,6 +59,8 @@ export interface EditActionsProps {
     onAutoLayout: () => void;
     onClear: () => void;
     onSave: () => void;
+    onCollapseAll?: () => void;
+    onExpandAll?: () => void;
 }
 
 export interface SocketStateProps {
@@ -460,6 +464,18 @@ export const Header: React.FC<HeaderProps> = ({
                                 {t('header.autoLayout')}
                                 <DropdownMenuShortcut>⌘A</DropdownMenuShortcut>
                             </DropdownMenuItem>
+                            {editActions.onCollapseAll && (
+                                <DropdownMenuItem onClick={editActions.onCollapseAll}>
+                                    <ChevronsDownUp className="w-4 h-4 mr-2" />
+                                    {t('header.collapseAll')}
+                                </DropdownMenuItem>
+                            )}
+                            {editActions.onExpandAll && (
+                                <DropdownMenuItem onClick={editActions.onExpandAll}>
+                                    <ChevronsUpDown className="w-4 h-4 mr-2" />
+                                    {t('header.expandAll')}
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={editActions.onClear} className="text-destructive">
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 {t('header.clearCanvas')}

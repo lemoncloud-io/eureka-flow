@@ -12,6 +12,8 @@
         "redo": "Redo",
         "autoLayout": "Auto Layout",
         "clearCanvas": "Clear Canvas",
+        "collapseAll": "Collapse All",
+        "expandAll": "Expand All",
         "untitledWorkflow": "Untitled Workflow",
         "toggleAutoSave": "Toggle Auto Save",
         "runAll": "Run All",
@@ -379,11 +381,17 @@
                 "browseExamples": "Browse Examples",
                 "viewHelp": "View Help"
             },
+            "steps": {
+                "addBlocks": "Add blocks from the sidebar library",
+                "connectNodes": "Connect nodes by dragging between ports",
+                "executeFlow": "Click Run to execute your workflow"
+            },
             "tips": {
                 "title": "Quick Tips",
                 "search": "Click the library icon to browse blocks",
                 "connect": "Connect blocks by dragging between ports",
-                "help": "Press ? for help anytime"
+                "help": "Press ? for help anytime",
+                "keyboard": "Tip: Space+drag to pan, scroll to zoom"
             }
         }
     }

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useBlocks, useFlows } from '@flows/flows';
+import { useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
@@ -556,6 +556,8 @@ export const FlowEditorPage = () => {
                     },
                     onClear: handleClear,
                     onSave: handleSave,
+                    onCollapseAll: () => useCanvasStore.getState().setAllNodesCollapsed(true),
+                    onExpandAll: () => useCanvasStore.getState().setAllNodesCollapsed(false),
                 }}
                 saveState={{
                     isSaving,

@@ -71,6 +71,9 @@ interface CanvasState {
     // Agent Trace Logs (nodeId → trace entries)
     traceLogs: Map<string, TraceEntry[]>;
 
+    // Node Collapse State
+    collapsedNodeIds: Set<string>;
+
     // Actions - Core Data
     setNodes: (nodes: NodeData[] | ((prev: NodeData[]) => NodeData[])) => void;
     setConnections: (connections: Connection[] | ((prev: Connection[]) => Connection[])) => void;
@@ -106,6 +109,10 @@ interface CanvasState {
     // Actions - Agent Trace Logs
     appendTraceLog: (nodeId: string, entry: TraceEntry) => void;
     clearTraceLogs: (nodeId: string) => void;
+
+    // Actions - Node Collapse
+    toggleNodeCollapsed: (nodeId: string) => void;
+    setAllNodesCollapsed: (collapsed: boolean) => void;
 
     // Compound Actions
     clearSelection: () => void;
@@ -144,6 +151,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
     modalFlowId: null,
     updatedPortIds: new Set(),
     traceLogs: new Map(),
+    collapsedNodeIds: new Set(),
 
     // Core Data Actions
     setNodes: nodes =>
@@ -219,6 +227,23 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             return { traceLogs: newMap };
         }),
 
+    // Node Collapse Actions
+    toggleNodeCollapsed: nodeId =>
+        set(state => {
+            const newSet = new Set(state.collapsedNodeIds);
+            if (newSet.has(nodeId)) {
+                newSet.delete(nodeId);
+            } else {
+                newSet.add(nodeId);
+            }
+            return { collapsedNodeIds: newSet };
+        }),
+
+    setAllNodesCollapsed: collapsed =>
+        set(state => ({
+            collapsedNodeIds: collapsed ? new Set(state.nodes.map(n => n.id)) : new Set<string>(),
+        })),
+
     // Compound Actions
     clearSelection: () =>
         set({
@@ -238,6 +263,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             selectedNodeId: null,
             selectedConnectionId: null,
             traceLogs: new Map(),
+            collapsedNodeIds: new Set(),
         });
     },
 
@@ -249,6 +275,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             selectedNodeId: null,
             selectedConnectionId: null,
             traceLogs: new Map(),
+            collapsedNodeIds: new Set(),
         }),
 
     resetCanvas: () =>
@@ -261,6 +288,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             selectedConnectionId: null,
             clipboard: null,
             traceLogs: new Map(),
+            collapsedNodeIds: new Set(),
         }),
 
     // Node Actions
@@ -312,6 +340,7 @@ export const useCanvasClipboard = () => useCanvasStore(state => state.clipboard)
 export const useCanvasDragState = () => useCanvasStore(state => state.dragState);
 export const useCanvasConnectionDraft = () => useCanvasStore(state => state.connectionDraft);
 export const useUpdatedPortIds = () => useCanvasStore(state => state.updatedPortIds);
+export const useCollapsedNodeIds = () => useCanvasStore(state => state.collapsedNodeIds);
 
 const EMPTY_TRACE_ENTRIES: TraceEntry[] = [];
 export const useNodeTraceLogs = (nodeId: string) =>
