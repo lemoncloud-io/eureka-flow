@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 
 import {
+    COLLAPSED_PORT_Y,
     EXECUTE_FUNCTIONS,
     EXECUTION_FALLBACK_TIMEOUT_MS,
     LAYOUT_CONFIG,
@@ -2043,7 +2044,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             const isNodeCollapsed = collapsedNodeIds.has(nodeId);
             const yOffset = isNodeCollapsed
-                ? PORT_LAYOUT.COLLAPSED_PORT_Y
+                ? COLLAPSED_PORT_Y
                 : PORT_LAYOUT.FIRST_PORT_Y + safeIndex * PORT_LAYOUT.PORT_SPACING;
             // Use dynamic node width for output port position
             // If node is being resized, use the resizing width for real-time edge updates
