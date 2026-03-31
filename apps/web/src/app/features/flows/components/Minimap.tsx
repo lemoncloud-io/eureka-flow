@@ -7,22 +7,21 @@ import { cn } from '@flows/lib/utils';
 
 import type { Connection, NodeData } from '@lemoncloud/eureka-flows-api';
 
-const MINIMAP_WIDTH = 200;
-const MINIMAP_HEIGHT = 140;
-const MINIMAP_PADDING = 20;
-const ESTIMATED_NODE_HEIGHT = 120;
+const MINIMAP_WIDTH = 180;
+const MINIMAP_HEIGHT = 120;
+const WORLD_PADDING = 80;
+const NODE_HEIGHT_ESTIMATE = 60;
 const STORAGE_KEY = 'flows-minimap-visible';
 
 const STATE_COLORS: Record<string, string> = {
     RUNNING: '#eab308',
     COMPLETED: '#22c55e',
     ERROR: '#ef4444',
-    READY: '#6366f1',
+    READY: '#818cf8',
 };
-const DEFAULT_NODE_COLOR = 'hsl(var(--muted-foreground) / 0.3)';
-const VIEWPORT_FILL = 'hsl(var(--primary) / 0.08)';
-const VIEWPORT_STROKE = 'hsl(var(--primary) / 0.5)';
-const CONNECTION_STROKE = 'hsl(var(--muted-foreground) / 0.15)';
+const DEFAULT_NODE_COLOR = 'hsl(var(--muted-foreground) / 0.4)';
+const VIEWPORT_STROKE = 'hsl(var(--primary) / 0.6)';
+const CONNECTION_STROKE = 'hsl(var(--muted-foreground) / 0.25)';
 
 interface MinimapProps {
     nodes: NodeData[];
@@ -33,25 +32,37 @@ interface MinimapProps {
     onViewportChange: (vp: { x: number; y: number; zoom: number }) => void;
 }
 
-const computeBounds = (nodes: NodeData[]) => {
-    if (nodes.length === 0) return { minX: 0, minY: 0, maxX: 1000, maxY: 700 };
+/** Compute world bounds including both nodes and current viewport */
+const computeBounds = (
+    nodes: NodeData[],
+    viewport: { x: number; y: number; zoom: number },
+    canvasW: number,
+    canvasH: number
+) => {
+    // Viewport in world coords
+    const vpX = -viewport.x / viewport.zoom;
+    const vpY = -viewport.y / viewport.zoom;
+    const vpW = canvasW / viewport.zoom;
+    const vpH = canvasH / viewport.zoom;
 
-    let minX = Infinity,
-        minY = Infinity,
-        maxX = -Infinity,
-        maxY = -Infinity;
+    let minX = vpX;
+    let minY = vpY;
+    let maxX = vpX + vpW;
+    let maxY = vpY + vpH;
+
     for (const n of nodes) {
         const w = getNodeWidth(n);
         minX = Math.min(minX, n.position.x);
         minY = Math.min(minY, n.position.y);
         maxX = Math.max(maxX, n.position.x + w);
-        maxY = Math.max(maxY, n.position.y + ESTIMATED_NODE_HEIGHT);
+        maxY = Math.max(maxY, n.position.y + NODE_HEIGHT_ESTIMATE);
     }
+
     return {
-        minX: minX - MINIMAP_PADDING,
-        minY: minY - MINIMAP_PADDING,
-        maxX: maxX + MINIMAP_PADDING,
-        maxY: maxY + MINIMAP_PADDING,
+        minX: minX - WORLD_PADDING,
+        minY: minY - WORLD_PADDING,
+        maxX: maxX + WORLD_PADDING,
+        maxY: maxY + WORLD_PADDING,
     };
 };
 
@@ -73,7 +84,10 @@ export const Minimap = ({
     const isDraggingRef = useRef(false);
     const svgRef = useRef<SVGSVGElement>(null);
 
-    const bounds = useMemo(() => computeBounds(nodes), [nodes]);
+    const bounds = useMemo(
+        () => computeBounds(nodes, viewport, canvasWidth, canvasHeight),
+        [nodes, viewport, canvasWidth, canvasHeight]
+    );
     const worldW = bounds.maxX - bounds.minX;
     const worldH = bounds.maxY - bounds.minY;
     const scale = Math.min(MINIMAP_WIDTH / worldW, MINIMAP_HEIGHT / worldH);
@@ -139,7 +153,7 @@ export const Minimap = ({
         }
     };
 
-    // Viewport rect in world coords
+    // Viewport rect in minimap coords
     const vpWorldX = -viewport.x / viewport.zoom;
     const vpWorldY = -viewport.y / viewport.zoom;
     const vpWorldW = canvasWidth / viewport.zoom;
@@ -147,6 +161,10 @@ export const Minimap = ({
     const vpMini = toMinimap(vpWorldX, vpWorldY);
     const vpMiniW = vpWorldW * scale;
     const vpMiniH = vpWorldH * scale;
+
+    // Actual SVG dimensions (may be smaller than constants if world is small)
+    const svgW = Math.min(MINIMAP_WIDTH, worldW * scale);
+    const svgH = Math.min(MINIMAP_HEIGHT, worldH * scale);
 
     // Node lookup for connection centers
     const nodeMap = useMemo(() => {
@@ -161,12 +179,12 @@ export const Minimap = ({
                 onClick={toggleVisible}
                 className={cn(
                     'absolute bottom-14 right-4 z-20 hidden sm:flex',
-                    'items-center justify-center w-9 h-9 rounded-xl',
+                    'items-center justify-center w-8 h-8 rounded-lg',
                     'bg-background/80 backdrop-blur-xl border border-border/50 shadow-sm',
                     'text-muted-foreground hover:text-foreground transition-colors'
                 )}
             >
-                <MapIcon className="w-4 h-4" />
+                <MapIcon className="w-3.5 h-3.5" />
             </button>
         );
     }
@@ -175,40 +193,57 @@ export const Minimap = ({
         <div
             className={cn(
                 'absolute bottom-14 right-4 z-20 hidden sm:block',
-                'rounded-xl overflow-hidden',
-                'bg-background/80 backdrop-blur-xl border border-border/50 shadow-sm'
+                'rounded-lg overflow-hidden',
+                'bg-background/90 backdrop-blur-xl border border-border/40 shadow-md'
             )}
         >
             {/* Header */}
-            <div className="flex items-center justify-between px-2 py-1 border-b border-border/30">
-                <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">Map</span>
+            <div className="flex items-center justify-between px-2 py-0.5">
+                <span className="text-[8px] text-muted-foreground/60 font-medium uppercase tracking-widest select-none">
+                    Minimap
+                </span>
                 <button
                     onClick={toggleVisible}
-                    className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                    className="text-muted-foreground/40 hover:text-muted-foreground transition-colors p-0.5"
                 >
-                    <X className="w-3 h-3" />
+                    <X className="w-2.5 h-2.5" />
                 </button>
             </div>
 
             {/* SVG Canvas */}
             <svg
                 ref={svgRef}
-                width={MINIMAP_WIDTH}
-                height={MINIMAP_HEIGHT}
-                className="cursor-crosshair"
+                width={svgW}
+                height={svgH}
+                className="cursor-crosshair block"
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
             >
+                {/* Background */}
+                <rect width={svgW} height={svgH} fill="hsl(var(--muted) / 0.3)" rx={0} />
+
+                {/* Viewport rect (behind nodes) */}
+                <rect
+                    x={vpMini.x}
+                    y={vpMini.y}
+                    width={vpMiniW}
+                    height={vpMiniH}
+                    fill="hsl(var(--primary) / 0.06)"
+                    stroke={VIEWPORT_STROKE}
+                    strokeWidth={1}
+                    rx={1}
+                />
+
                 {/* Connections */}
                 {connections.map(c => {
                     const src = nodeMap.get(c.sourceNodeId);
                     const tgt = nodeMap.get(c.targetNodeId);
                     if (!src || !tgt) return null;
                     const srcW = getNodeWidth(src);
-                    const s = toMinimap(src.position.x + srcW, src.position.y + ESTIMATED_NODE_HEIGHT / 2);
-                    const t = toMinimap(tgt.position.x, tgt.position.y + ESTIMATED_NODE_HEIGHT / 2);
+                    const s = toMinimap(src.position.x + srcW, src.position.y + NODE_HEIGHT_ESTIMATE / 2);
+                    const t = toMinimap(tgt.position.x, tgt.position.y + NODE_HEIGHT_ESTIMATE / 2);
                     return (
                         <line
                             key={c.id}
@@ -225,8 +260,8 @@ export const Minimap = ({
                 {/* Nodes */}
                 {nodes.map(n => {
                     const pos = toMinimap(n.position.x, n.position.y);
-                    const w = getNodeWidth(n) * scale;
-                    const h = ESTIMATED_NODE_HEIGHT * scale;
+                    const w = Math.max(getNodeWidth(n) * scale, 4);
+                    const h = Math.max(NODE_HEIGHT_ESTIMATE * scale, 3);
                     const state = getEffectiveState(n.state, n.status);
                     const fill = (state && STATE_COLORS[state]) || DEFAULT_NODE_COLOR;
                     return (
@@ -234,26 +269,16 @@ export const Minimap = ({
                             key={n.id}
                             x={pos.x}
                             y={pos.y}
-                            width={Math.max(w, 2)}
-                            height={Math.max(h, 2)}
-                            rx={2}
+                            width={w}
+                            height={h}
+                            rx={1.5}
                             fill={fill}
-                            opacity={0.8}
+                            stroke={fill}
+                            strokeWidth={0.5}
+                            strokeOpacity={0.5}
                         />
                     );
                 })}
-
-                {/* Viewport rect */}
-                <rect
-                    x={vpMini.x}
-                    y={vpMini.y}
-                    width={vpMiniW}
-                    height={vpMiniH}
-                    fill={VIEWPORT_FILL}
-                    stroke={VIEWPORT_STROKE}
-                    strokeWidth={1.5}
-                    rx={2}
-                />
             </svg>
         </div>
     );
