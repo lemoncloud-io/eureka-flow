@@ -82,6 +82,8 @@ export const Minimap = ({
     });
     const isDraggingRef = useRef(false);
     const svgRef = useRef<SVGSVGElement>(null);
+    // Snapshot of bounds/scale frozen at drag start to prevent feedback loop
+    const dragSnapshotRef = useRef<{ bounds: ReturnType<typeof computeBounds>; scale: number } | null>(null);
 
     const bounds = useMemo(
         () => computeBounds(nodes, viewport, canvasWidth, canvasHeight),
@@ -99,27 +101,23 @@ export const Minimap = ({
         [bounds, scale]
     );
 
-    const fromMinimap = useCallback(
-        (mx: number, my: number) => ({
-            x: mx / scale + bounds.minX,
-            y: my / scale + bounds.minY,
-        }),
-        [bounds, scale]
-    );
-
     const moveViewportTo = useCallback(
         (mx: number, my: number) => {
-            // Clamp click position within the SVG area
-            const clampedX = Math.max(0, Math.min(mx, worldW * scale));
-            const clampedY = Math.max(0, Math.min(my, worldH * scale));
-            const world = fromMinimap(clampedX, clampedY);
+            // Use frozen snapshot during drag, live values on click
+            const snap = dragSnapshotRef.current ?? { bounds, scale };
+            const snapW = snap.bounds.maxX - snap.bounds.minX;
+            const snapH = snap.bounds.maxY - snap.bounds.minY;
+            const clampedX = Math.max(0, Math.min(mx, snapW * snap.scale));
+            const clampedY = Math.max(0, Math.min(my, snapH * snap.scale));
+            const worldX = clampedX / snap.scale + snap.bounds.minX;
+            const worldY = clampedY / snap.scale + snap.bounds.minY;
             onViewportChange({
-                x: canvasWidth / 2 - world.x * viewport.zoom,
-                y: canvasHeight / 2 - world.y * viewport.zoom,
+                x: canvasWidth / 2 - worldX * viewport.zoom,
+                y: canvasHeight / 2 - worldY * viewport.zoom,
                 zoom: viewport.zoom,
             });
         },
-        [fromMinimap, onViewportChange, canvasWidth, canvasHeight, viewport.zoom, worldW, worldH, scale]
+        [onViewportChange, canvasWidth, canvasHeight, viewport.zoom, bounds, scale]
     );
 
     const getSvgPoint = (e: React.MouseEvent) => {
@@ -131,6 +129,7 @@ export const Minimap = ({
     const handleMouseDown = (e: React.MouseEvent) => {
         e.stopPropagation();
         isDraggingRef.current = true;
+        dragSnapshotRef.current = { bounds, scale };
         const pt = getSvgPoint(e);
         if (pt) moveViewportTo(pt.x, pt.y);
     };
@@ -143,6 +142,7 @@ export const Minimap = ({
 
     const handleMouseUp = () => {
         isDraggingRef.current = false;
+        dragSnapshotRef.current = null;
     };
 
     const toggleVisible = () => {
