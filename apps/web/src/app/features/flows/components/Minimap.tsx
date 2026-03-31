@@ -109,14 +109,17 @@ export const Minimap = ({
 
     const moveViewportTo = useCallback(
         (mx: number, my: number) => {
-            const world = fromMinimap(mx, my);
+            // Clamp click position within the SVG area
+            const clampedX = Math.max(0, Math.min(mx, worldW * scale));
+            const clampedY = Math.max(0, Math.min(my, worldH * scale));
+            const world = fromMinimap(clampedX, clampedY);
             onViewportChange({
                 x: canvasWidth / 2 - world.x * viewport.zoom,
                 y: canvasHeight / 2 - world.y * viewport.zoom,
                 zoom: viewport.zoom,
             });
         },
-        [fromMinimap, onViewportChange, canvasWidth, canvasHeight, viewport.zoom]
+        [fromMinimap, onViewportChange, canvasWidth, canvasHeight, viewport.zoom, worldW, worldH, scale]
     );
 
     const getSvgPoint = (e: React.MouseEvent) => {
