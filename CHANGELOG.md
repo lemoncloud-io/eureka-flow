@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-01] - root@0.17.0, @flows/web@0.17.0, @flows/admin@0.5.0
+
+### Features
+
+- add PNG export and fix collapse/expand all functionality
+
 ## [2026-03-31] - root@0.16.0, @flows/web@0.16.0
 
 ### Features
