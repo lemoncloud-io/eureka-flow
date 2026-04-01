@@ -39,7 +39,7 @@ describe('useCanvasStore - Node Collapse', () => {
 
     describe('setAllNodesCollapsed', () => {
         it('should collapse all nodes', () => {
-            useCanvasStore.getState().setAllNodesCollapsed(true);
+            useCanvasStore.getState().setAllNodesCollapsed(true, ['a', 'b', 'c']);
             const collapsed = useCanvasStore.getState().collapsedNodeIds;
             expect(collapsed.size).toBe(3);
             expect(collapsed.has('a')).toBe(true);
@@ -48,7 +48,7 @@ describe('useCanvasStore - Node Collapse', () => {
         });
 
         it('should expand all nodes', () => {
-            useCanvasStore.getState().setAllNodesCollapsed(true);
+            useCanvasStore.getState().setAllNodesCollapsed(true, ['a', 'b', 'c']);
             useCanvasStore.getState().setAllNodesCollapsed(false);
             expect(useCanvasStore.getState().collapsedNodeIds.size).toBe(0);
         });

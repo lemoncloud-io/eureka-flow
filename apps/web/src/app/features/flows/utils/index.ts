@@ -244,6 +244,7 @@ export const replaceNodeIdInState = (
 };
 
 export { wouldCreateCycle } from './graph';
+export { exportCanvasAsPng } from './exportImage';
 
 // ============================================================
 // Input File Upload Utilities

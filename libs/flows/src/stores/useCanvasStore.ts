@@ -112,7 +112,7 @@ interface CanvasState {
 
     // Actions - Node Collapse
     toggleNodeCollapsed: (nodeId: string) => void;
-    setAllNodesCollapsed: (collapsed: boolean) => void;
+    setAllNodesCollapsed: (collapsed: boolean, nodeIds?: string[]) => void;
 
     // Compound Actions
     clearSelection: () => void;
@@ -239,9 +239,9 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             return { collapsedNodeIds: newSet };
         }),
 
-    setAllNodesCollapsed: collapsed =>
-        set(state => ({
-            collapsedNodeIds: collapsed ? new Set(state.nodes.map(n => n.id)) : new Set<string>(),
+    setAllNodesCollapsed: (collapsed, nodeIds) =>
+        set(() => ({
+            collapsedNodeIds: collapsed ? new Set(nodeIds ?? []) : new Set<string>(),
         })),
 
     // Compound Actions
