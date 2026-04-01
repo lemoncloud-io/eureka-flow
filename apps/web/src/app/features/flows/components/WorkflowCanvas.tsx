@@ -40,6 +40,7 @@ import { ZoomControls } from './ZoomControls';
 import { TOUCH_GESTURE_THRESHOLD, useTouchCanvas } from '../hooks';
 import {
     deduplicateEdges,
+    exportCanvasAsPng,
     generateTempId,
     getVisiblePorts,
     isTempId,
@@ -89,6 +90,12 @@ export interface WorkflowCanvasRef {
     updateNode: (nodeId: string, updates: Partial<NodeData>) => void;
     /** Update node from server data (used for socket node update notifications) */
     updateNodeFromServer: (nodeId: string, serverData: Partial<NodeData>) => void;
+    /** Export canvas as PNG image */
+    exportAsImage: (fileName: string) => Promise<void>;
+    /** Collapse all nodes */
+    collapseAll: () => void;
+    /** Expand all nodes */
+    expandAll: () => void;
 }
 
 interface WorkflowCanvasProps {
@@ -996,6 +1003,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     // Note: Output propagation to downstream nodes is handled by the server
                     // via propagateDownstreamV2. Socket notifications will update downstream
                     // nodes' inputData separately, so we don't need to propagate here.
+                },
+                exportAsImage: async (fileName: string) => {
+                    const element = canvasRef.current;
+                    if (!element) return;
+                    await exportCanvasAsPng(element, fileName);
+                },
+                collapseAll: () => {
+                    const nodeIds = nodesRef.current.map(n => n.id);
+                    useCanvasStore.getState().setAllNodesCollapsed(true, nodeIds);
+                },
+                expandAll: () => {
+                    useCanvasStore.getState().setAllNodesCollapsed(false);
                 },
             }),
             [
@@ -2444,40 +2463,50 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         </div>
                     </div>
 
-                    {tooltip && <DataTooltip tooltip={tooltip} />}
+                    {tooltip && (
+                        <div data-canvas-overlay>
+                            <DataTooltip tooltip={tooltip} />
+                        </div>
+                    )}
 
                     {/* Desktop Zoom Controls - hidden on mobile */}
                     {!readOnly && (
-                        <ZoomControls
-                            zoom={viewport.zoom}
-                            onZoomIn={handleZoomIn}
-                            onZoomOut={handleZoomOut}
-                            onFitToScreen={handleFitToScreen}
-                            onReset={handleResetView}
-                            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden sm:flex"
-                        />
+                        <div data-canvas-overlay>
+                            <ZoomControls
+                                zoom={viewport.zoom}
+                                onZoomIn={handleZoomIn}
+                                onZoomOut={handleZoomOut}
+                                onFitToScreen={handleFitToScreen}
+                                onReset={handleResetView}
+                                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden sm:flex"
+                            />
+                        </div>
                     )}
 
                     {/* Minimap - hidden on mobile */}
                     {!readOnly && nodes.length > 0 && (
-                        <Minimap
-                            nodes={nodes}
-                            connections={connections}
-                            viewport={viewport}
-                            canvasWidth={canvasSize.width}
-                            canvasHeight={canvasSize.height}
-                            onViewportChange={setViewport}
-                        />
+                        <div data-canvas-overlay>
+                            <Minimap
+                                nodes={nodes}
+                                connections={connections}
+                                viewport={viewport}
+                                canvasWidth={canvasSize.width}
+                                canvasHeight={canvasSize.height}
+                                onViewportChange={setViewport}
+                            />
+                        </div>
                     )}
 
                     {/* Mobile Zoom Controls - visible only on mobile */}
                     {!readOnly && (
-                        <MobileControls
-                            onZoomIn={handleZoomIn}
-                            onZoomOut={handleZoomOut}
-                            onFitToScreen={handleFitToScreen}
-                            onReset={handleResetView}
-                        />
+                        <div data-canvas-overlay>
+                            <MobileControls
+                                onZoomIn={handleZoomIn}
+                                onZoomOut={handleZoomOut}
+                                onFitToScreen={handleFitToScreen}
+                                onReset={handleResetView}
+                            />
+                        </div>
                     )}
 
                     {modalFlowId && modalFlowData && (
@@ -2507,30 +2536,32 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                     {logViewerNodeId && <LogModal nodeId={logViewerNodeId} onClose={() => setLogViewerNodeId(null)} />}
 
-                    <DetailPanel
-                        selectedNode={detailNode}
-                        selectedConnection={detailConnection}
-                        nodes={nodes}
-                        connections={connections}
-                        onConfigChange={handleConfigChange}
-                        onDescriptionChange={handleDescriptionChange}
-                        onLabelChange={handleLabelChange}
-                        onToggleAuto={handleToggleAuto}
-                        onViewLogs={() => selectedNodeId && setLogViewerNodeId(selectedNodeId)}
-                        onDeleteNode={deleteNode}
-                        onDeleteConnection={deleteConnection}
-                        onTriggerNode={executeNode}
-                        onSelectNode={id => handleSelectionChange(id)}
-                        onSelectConnection={id => {
-                            setSelectedConnectionId(id);
-                            handleSelectionChange(null);
-                        }}
-                        onClose={() => {
-                            handleSelectionChange(null);
-                            setSelectedConnectionId(null);
-                        }}
-                        onShowNotification={onShowNotification}
-                    />
+                    <div data-canvas-overlay>
+                        <DetailPanel
+                            selectedNode={detailNode}
+                            selectedConnection={detailConnection}
+                            nodes={nodes}
+                            connections={connections}
+                            onConfigChange={handleConfigChange}
+                            onDescriptionChange={handleDescriptionChange}
+                            onLabelChange={handleLabelChange}
+                            onToggleAuto={handleToggleAuto}
+                            onViewLogs={() => selectedNodeId && setLogViewerNodeId(selectedNodeId)}
+                            onDeleteNode={deleteNode}
+                            onDeleteConnection={deleteConnection}
+                            onTriggerNode={executeNode}
+                            onSelectNode={id => handleSelectionChange(id)}
+                            onSelectConnection={id => {
+                                setSelectedConnectionId(id);
+                                handleSelectionChange(null);
+                            }}
+                            onClose={() => {
+                                handleSelectionChange(null);
+                                setSelectedConnectionId(null);
+                            }}
+                            onShowNotification={onShowNotification}
+                        />
+                    </div>
                 </div>
             </div>
         );

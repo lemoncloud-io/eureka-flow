@@ -7,6 +7,7 @@
         "openFlow": "플로우 열기",
         "saveFlow": "플로우 저장",
         "exportJson": "JSON 내보내기",
+        "exportPng": "PNG로 내보내기",
         "importJson": "JSON 가져오기",
         "undo": "실행 취소",
         "redo": "다시 실행",
@@ -216,7 +217,9 @@
         "executionStopped": "실행이 중지되었습니다",
         "savedAs": "\"{{flowName}}\"(으)로 저장됨",
         "failedToSaveWorkflow": "워크플로우 저장 실패",
-        "circularConnectionError": "연결을 생성할 수 없습니다: 순환 연결이 발생합니다"
+        "circularConnectionError": "연결을 생성할 수 없습니다: 순환 연결이 발생합니다",
+        "exportedAsImage": "이미지로 내보내기 완료",
+        "exportImageFailed": "이미지 내보내기 실패"
     },
     "nodeBlock": {
         "inputAlt": "입력",
