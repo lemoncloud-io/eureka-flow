@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { useBlocks, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
@@ -353,6 +353,17 @@ export const FlowEditorPage = () => {
         [t]
     );
 
+    const handleExportPng = async () => {
+        if (!canvasRef.current) return;
+        try {
+            const fileName = `${flowName.replace(/\s+/g, '-').toLowerCase()}-${currentFlowId || Date.now()}`;
+            await canvasRef.current.exportAsImage(fileName);
+            showNotification(t('flowEditor.exportedAsImage'), 'success');
+        } catch {
+            showNotification(t('flowEditor.exportImageFailed'), 'error');
+        }
+    };
+
     const handleExport = () => {
         if (!canvasRef.current) return;
 
@@ -547,6 +558,7 @@ export const FlowEditorPage = () => {
                     onSave: handleSave,
                     onExport: handleExport,
                     onImport: handleImport,
+                    onExportPng: handleExportPng,
                 }}
                 editActions={{
                     onUndo: () => canvasRef.current?.undo(),
@@ -557,8 +569,8 @@ export const FlowEditorPage = () => {
                     },
                     onClear: handleClear,
                     onSave: handleSave,
-                    onCollapseAll: () => useCanvasStore.getState().setAllNodesCollapsed(true),
-                    onExpandAll: () => useCanvasStore.getState().setAllNodesCollapsed(false),
+                    onCollapseAll: () => canvasRef.current?.collapseAll(),
+                    onExpandAll: () => canvasRef.current?.expandAll(),
                 }}
                 saveState={{
                     isSaving,

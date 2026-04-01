@@ -7,6 +7,7 @@
         "openFlow": "Open Flow",
         "saveFlow": "Save Flow",
         "exportJson": "Export JSON",
+        "exportPng": "Export as PNG",
         "importJson": "Import JSON",
         "undo": "Undo",
         "redo": "Redo",
@@ -216,7 +217,9 @@
         "executionStopped": "Execution stopped",
         "savedAs": "Saved as \"{{flowName}}\"",
         "failedToSaveWorkflow": "Failed to save workflow",
-        "circularConnectionError": "Cannot create connection: would create a circular loop"
+        "circularConnectionError": "Cannot create connection: would create a circular loop",
+        "exportedAsImage": "Exported as image",
+        "exportImageFailed": "Failed to export image"
     },
     "nodeBlock": {
         "inputAlt": "Input",

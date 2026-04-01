@@ -9,6 +9,7 @@ import {
     FileText,
     FolderOpen,
     HelpCircle,
+    ImageDown,
     Key,
     LayoutGrid,
     Link,
@@ -51,6 +52,7 @@ export interface FileActionsProps {
     onSave: () => void;
     onExport: () => void;
     onImport: () => void;
+    onExportPng?: () => void;
 }
 
 export interface EditActionsProps {
@@ -433,6 +435,12 @@ export const Header: React.FC<HeaderProps> = ({
                                 {t('header.exportJson')}
                                 <DropdownMenuShortcut>⌘E</DropdownMenuShortcut>
                             </DropdownMenuItem>
+                            {fileActions.onExportPng && (
+                                <DropdownMenuItem onClick={fileActions.onExportPng}>
+                                    <ImageDown className="w-4 h-4 mr-2" />
+                                    {t('header.exportPng')}
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={onShare}>
                                 <Link className="w-4 h-4 mr-2" />
                                 {t('header.share')}
