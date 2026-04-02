@@ -56,7 +56,7 @@ interface DetailPanelProps {
 
     onDeleteNode: (nodeId: string) => void;
     onDeleteConnection: (connectionId: string) => void;
-    onTriggerNode: (nodeId: string) => void;
+    onTriggerNode: (nodeId: string, options?: { propagate?: boolean }) => void;
     onSelectNode: (nodeId: string) => void;
     onSelectConnection: (connectionId: string) => void;
     onClose: () => void;
@@ -1032,14 +1032,32 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 {/* Footer Actions */}
                 <div className="p-3 border-t border-border/50 bg-surface-elevated/30 flex gap-2 flex-shrink-0">
                     {/* Run button: hidden when isRunnable is explicitly false or stereo is 'output' */}
-                    {def?.stereo !== 'output' && def?.isRunnable !== false && (
-                        <button
-                            onClick={() => onTriggerNode(selectedNode.id)}
-                            className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                        >
-                            <Play className="w-3.5 h-3.5" /> {t('flows:detailPanel.runBlock')}
-                        </button>
-                    )}
+                    {/* Process stereo: split button with run-only and run-with-propagation */}
+                    {def?.stereo !== 'output' &&
+                        def?.isRunnable !== false &&
+                        (def?.stereo === 'process' ? (
+                            <div className="flex-1 flex gap-1">
+                                <button
+                                    onClick={() => onTriggerNode(selectedNode.id, { propagate: false })}
+                                    className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                >
+                                    <Play className="w-3.5 h-3.5" /> {t('nodes:actions.runThisOnly')}
+                                </button>
+                                <button
+                                    onClick={() => onTriggerNode(selectedNode.id, { propagate: true })}
+                                    className="flex-1 bg-green-600 hover:bg-green-600/90 text-white text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                >
+                                    <Play className="w-3.5 h-3.5" /> {t('nodes:actions.runAndPropagate')}
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => onTriggerNode(selectedNode.id)}
+                                className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                            >
+                                <Play className="w-3.5 h-3.5" /> {t('flows:detailPanel.runBlock')}
+                            </button>
+                        ))}
                     {import.meta.env.DEV && (
                         <button
                             onClick={() => setIsTouchDialogOpen(true)}

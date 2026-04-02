@@ -31,6 +31,9 @@
     "actions": {
         "run": "실행",
         "forceRun": "강제 실행",
+        "runThisOnly": "이것만 실행",
+        "runAndPropagate": "이후로 실행",
+        "runOptions": "실행 옵션",
         "resize": "드래그하여 크기 조절 ({{min}}-{{max}}px)"
     },
     "status": {

@@ -1032,7 +1032,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         );
 
         const executeNode = useCallback(
-            async (nodeId: string, manualOverrideInputs?: Record<string, DataPacket>) => {
+            async (
+                nodeId: string,
+                manualOverrideInputs?: Record<string, DataPacket>,
+                options?: { propagate?: boolean }
+            ) => {
                 if (readOnly) return;
 
                 // Flush any pending config updates before execution
@@ -1178,7 +1182,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             // Send frontend execution output to server
                             // Server will save outputs to ports and propagate to downstream nodes
                             const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
-                            await runNode(nodeId, runBody, { force: true, connection: connectionId });
+                            await runNode(nodeId, runBody, {
+                                force: true,
+                                propagate: options?.propagate,
+                                connection: connectionId,
+                            });
                         }
                     } else {
                         // ============================================================
@@ -1226,7 +1234,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         // Step 3: Run the node (server will hydrate inputs from saved port nodes)
                         const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
-                        const result = await runNode(nodeId, runBody, { connection: connectionId });
+                        const result = await runNode(nodeId, runBody, {
+                            propagate: options?.propagate,
+                            connection: connectionId,
+                        });
 
                         // Use state from result if available, fallback to status for backward compatibility
                         const resultState = getEffectiveState(result?.state, result?.status);
@@ -2427,7 +2438,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             }}
                                             actions={{
                                                 onDelete: () => deleteNode(node.id),
-                                                onTrigger: () => executeNode(node.id),
+                                                onTrigger: opts => executeNode(node.id, undefined, opts),
                                                 onDuplicate: () => duplicateNode(node.id),
 
                                                 onResize: (w, h) => handleNodeResize(node.id, w, h),
@@ -2529,7 +2540,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             onToggleAuto={handleToggleAuto}
                             onDeleteNode={deleteNode}
                             onDeleteConnection={deleteConnection}
-                            onTriggerNode={executeNode}
+                            onTriggerNode={(nodeId, opts) => executeNode(nodeId, undefined, opts)}
                             onSelectNode={id => handleSelectionChange(id)}
                             onSelectConnection={id => {
                                 setSelectedConnectionId(id);

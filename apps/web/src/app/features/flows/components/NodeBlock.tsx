@@ -93,7 +93,7 @@ export interface NodeConfigHandlers {
 
 export interface NodeActions {
     onDelete: () => void;
-    onTrigger: () => Promise<void> | void;
+    onTrigger: (options?: { propagate?: boolean }) => Promise<void> | void;
     onDuplicate?: () => void;
 
     onResize?: (width: number, height: number) => void;
@@ -1063,15 +1063,18 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
         }
     }, [nodeState]);
 
-    const handleRun = async () => {
+    const handleRun = async (options?: { propagate?: boolean }) => {
         if (isRunning) return;
         setIsRunning(true);
         try {
-            await onTrigger();
+            await onTrigger(options);
         } finally {
             setIsRunning(false);
         }
     };
+
+    const [showRunMenu, setShowRunMenu] = useState(false);
+    const isProcessNode = definition?.stereo === 'process';
 
     const [showMenu, setShowMenu] = useState(false);
     const [isEditingLabel, setIsEditingLabel] = useState(false);
@@ -1309,9 +1312,90 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 <div className="flex items-center gap-0.5 shrink-0">
                     {/* Run button: show for all executable nodes (has execute function or backend execution) */}
                     {/* Hidden when isRunnable is explicitly false or stereo is 'output' */}
+                    {/* Process stereo: split button with propagation dropdown */}
                     {definition?.stereo !== 'output' &&
                         definition?.isRunnable !== false &&
-                        (definition?.execute || !definition?.isFrontend) && (
+                        (definition?.execute || !definition?.isFrontend) &&
+                        (isProcessNode ? (
+                            <div className="relative flex items-center">
+                                <button
+                                    onClick={e => {
+                                        e.stopPropagation();
+                                        handleRun({ propagate: false });
+                                    }}
+                                    onMouseDown={e => e.stopPropagation()}
+                                    disabled={isRunning}
+                                    className={cn(
+                                        'w-5 h-6 rounded-l-md flex items-center justify-center transition-all',
+                                        isRunning
+                                            ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
+                                            : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                                    )}
+                                    title={t('actions.runThisOnly')}
+                                >
+                                    {isRunning ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                        <Play className="w-3 h-3" />
+                                    )}
+                                </button>
+                                <button
+                                    onClick={e => {
+                                        e.stopPropagation();
+                                        setShowRunMenu(prev => !prev);
+                                    }}
+                                    onMouseDown={e => e.stopPropagation()}
+                                    disabled={isRunning}
+                                    className={cn(
+                                        'w-3.5 h-6 rounded-r-md flex items-center justify-center transition-all border-l border-background/30',
+                                        isRunning
+                                            ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
+                                            : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                                    )}
+                                    title={t('actions.runOptions')}
+                                >
+                                    <ChevronDown className="w-2.5 h-2.5" />
+                                </button>
+                                {showRunMenu && (
+                                    <>
+                                        <div
+                                            className="fixed inset-0 z-40"
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setShowRunMenu(false);
+                                            }}
+                                            onMouseDown={e => e.stopPropagation()}
+                                        />
+                                        <div className="absolute top-full right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[140px]">
+                                            <button
+                                                className="w-full px-3 py-1.5 text-[11px] text-left hover:bg-muted/50 flex items-center gap-2 transition-colors"
+                                                onClick={e => {
+                                                    e.stopPropagation();
+                                                    setShowRunMenu(false);
+                                                    handleRun({ propagate: false });
+                                                }}
+                                                onMouseDown={e => e.stopPropagation()}
+                                            >
+                                                <Play className="w-3 h-3 text-primary" />
+                                                {t('actions.runThisOnly')}
+                                            </button>
+                                            <button
+                                                className="w-full px-3 py-1.5 text-[11px] text-left hover:bg-muted/50 flex items-center gap-2 transition-colors"
+                                                onClick={e => {
+                                                    e.stopPropagation();
+                                                    setShowRunMenu(false);
+                                                    handleRun({ propagate: true });
+                                                }}
+                                                onMouseDown={e => e.stopPropagation()}
+                                            >
+                                                <Play className="w-3 h-3 text-green-500" />
+                                                {t('actions.runAndPropagate')}
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        ) : (
                             <button
                                 onClick={e => {
                                     e.stopPropagation();
@@ -1333,7 +1417,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                     <Play className="w-3.5 h-3.5" />
                                 )}
                             </button>
-                        )}
+                        ))}
                     <button
                         onClick={e => {
                             e.stopPropagation();
@@ -1534,28 +1618,68 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     {/* Content Area */}
                     <div>
                         {/* Force Run button for non-auto nodes (input nodes have Run button in header, output nodes have no run) */}
-                        {!isAuto && !definition?.type?.startsWith('input-') && definition?.stereo !== 'output' && (
-                            <button
-                                onClick={handleRun}
-                                disabled={isRunning}
-                                className={cn(
-                                    'w-full text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
-                                    isRunning
-                                        ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
-                                        : definition.inputs.every(p => node.inputData?.[p.id])
-                                          ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
-                                          : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
-                                )}
-                                onMouseDown={e => e.stopPropagation()}
-                            >
-                                {isRunning ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                    <Play className="w-3 h-3" />
-                                )}
-                                {t('actions.forceRun')}
-                            </button>
-                        )}
+                        {!isAuto &&
+                            !definition?.type?.startsWith('input-') &&
+                            definition?.stereo !== 'output' &&
+                            (isProcessNode ? (
+                                <div className="flex gap-1.5" onMouseDown={e => e.stopPropagation()}>
+                                    <button
+                                        onClick={() => handleRun({ propagate: false })}
+                                        disabled={isRunning}
+                                        className={cn(
+                                            'flex-1 text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
+                                            isRunning
+                                                ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
+                                                : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
+                                        )}
+                                    >
+                                        {isRunning ? (
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                            <Play className="w-3 h-3" />
+                                        )}
+                                        {t('actions.runThisOnly')}
+                                    </button>
+                                    <button
+                                        onClick={() => handleRun({ propagate: true })}
+                                        disabled={isRunning}
+                                        className={cn(
+                                            'flex-1 text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
+                                            isRunning
+                                                ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
+                                                : 'bg-green-500/15 hover:bg-green-500/25 text-green-600 dark:text-green-400 border border-green-500/20'
+                                        )}
+                                    >
+                                        {isRunning ? (
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                            <Play className="w-3 h-3" />
+                                        )}
+                                        {t('actions.runAndPropagate')}
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => handleRun()}
+                                    disabled={isRunning}
+                                    className={cn(
+                                        'w-full text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
+                                        isRunning
+                                            ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
+                                            : definition.inputs.every(p => node.inputData?.[p.id])
+                                              ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
+                                              : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
+                                    )}
+                                    onMouseDown={e => e.stopPropagation()}
+                                >
+                                    {isRunning ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                        <Play className="w-3 h-3" />
+                                    )}
+                                    {t('actions.forceRun')}
+                                </button>
+                            ))}
 
                         {definition?.type === 'input-text' && (
                             <InputTextVisualizationEditable node={node} onConfigChange={onConfigChange} />
