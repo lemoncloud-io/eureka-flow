@@ -987,6 +987,24 @@ interface NodeBlockProps {
     onToggleCollapsed?: () => void;
 }
 
+/** Renders status indicator icon for node execution state */
+const StatusIcon: React.FC<{ state: NodeState }> = ({ state }) => {
+    switch (state) {
+        case 'RUNNING':
+            return <Loader2 className="w-4 h-4 text-status-running animate-spin" />;
+        case 'COMPLETED':
+            return <Check className="w-4 h-4 text-status-completed" />;
+        case 'ERROR':
+            return (
+                <div className="w-4 h-4 rounded-full bg-destructive/20 flex items-center justify-center">
+                    <span className="text-destructive font-bold text-[10px]">!</span>
+                </div>
+            );
+        default:
+            return null;
+    }
+};
+
 export const NodeBlock: React.FC<NodeBlockProps> = ({
     node,
     highlightState,
@@ -1207,23 +1225,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
         e.stopPropagation();
     };
 
-    const StatusIcon = () => {
-        switch (nodeState) {
-            case 'RUNNING':
-                return <Loader2 className="w-4 h-4 text-status-running animate-spin" />;
-            case 'COMPLETED':
-                return <Check className="w-4 h-4 text-status-completed" />;
-            case 'ERROR':
-                return (
-                    <div className="w-4 h-4 rounded-full bg-destructive/20 flex items-center justify-center">
-                        <span className="text-destructive font-bold text-[10px]">!</span>
-                    </div>
-                );
-            default:
-                return null;
-        }
-    };
-
     return (
         <div
             ref={nodeRef}
@@ -1287,7 +1288,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         title={t('config.doubleClickRename')}
                     >
                         <div className="w-4 h-4 flex items-center justify-center shrink-0">
-                            <StatusIcon />
+                            <StatusIcon state={nodeState} />
                         </div>
                         <div className="flex flex-col overflow-hidden min-w-0">
                             <div className="flex items-center gap-1.5">
