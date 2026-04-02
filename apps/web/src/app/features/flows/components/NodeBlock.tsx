@@ -1013,7 +1013,7 @@ const ProcessRunButtons: React.FC<{
     variant: 'compact' | 'full';
 }> = ({ isRunning, onRun, t, variant }) => {
     const [showMenu, setShowMenu] = useState(false);
-    const icon = isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />;
+    const icon = isRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />;
 
     if (variant === 'full') {
         return (
