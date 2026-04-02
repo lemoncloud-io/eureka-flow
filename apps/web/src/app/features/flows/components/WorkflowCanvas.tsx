@@ -32,7 +32,6 @@ import { ConnectionLine } from './ConnectionLine';
 import { DataTooltip } from './DataTooltip';
 import { DetailPanel } from './DetailPanel';
 import { EmptyStateGuide } from './EmptyStateGuide';
-import { LogModal } from './LogModal';
 import { Minimap } from './Minimap';
 import { MobileControls } from './MobileControls';
 import { NodeBlock } from './NodeBlock';
@@ -280,8 +279,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         // For single-node operations (detail panel, etc.), use the first selected node
         const selectedNodeId = selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null;
-
-        const [logViewerNodeId, setLogViewerNodeId] = useState<string | null>(null);
 
         const [tooltip, setTooltip] = useState<{ x: number; y: number; content: unknown; type: string } | null>(null);
 
@@ -2432,7 +2429,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 onDelete: () => deleteNode(node.id),
                                                 onTrigger: () => executeNode(node.id),
                                                 onDuplicate: () => duplicateNode(node.id),
-                                                onViewLogs: () => setLogViewerNodeId(node.id),
+
                                                 onResize: (w, h) => handleNodeResize(node.id, w, h),
                                                 onResizing: w =>
                                                     setResizingNode(w !== null ? { nodeId: node.id, width: w } : null),
@@ -2520,8 +2517,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         </div>
                     )}
 
-                    {logViewerNodeId && <LogModal nodeId={logViewerNodeId} onClose={() => setLogViewerNodeId(null)} />}
-
                     <div data-canvas-overlay>
                         <DetailPanel
                             selectedNode={detailNode}
@@ -2532,7 +2527,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             onDescriptionChange={handleDescriptionChange}
                             onLabelChange={handleLabelChange}
                             onToggleAuto={handleToggleAuto}
-                            onViewLogs={() => selectedNodeId && setLogViewerNodeId(selectedNodeId)}
                             onDeleteNode={deleteNode}
                             onDeleteConnection={deleteConnection}
                             onTriggerNode={executeNode}

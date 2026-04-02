@@ -95,7 +95,7 @@ export interface NodeActions {
     onDelete: () => void;
     onTrigger: () => Promise<void> | void;
     onDuplicate?: () => void;
-    onViewLogs: () => void;
+
     onResize?: (width: number, height: number) => void;
     /** Called during resize for real-time edge updates */
     onResizing?: (width: number | null) => void;
@@ -1015,7 +1015,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     } = highlightState;
     const { onPortMouseDown, onPortMouseUp, onPortTouchStart } = portHandlers;
     const { onConfigChange, onLabelChange } = configHandlers;
-    const { onDelete, onTrigger, onDuplicate, onViewLogs, onResize, onResizing } = actions;
+    const { onDelete, onTrigger, onDuplicate, onResize, onResizing } = actions;
 
     // Memoize visible ports to avoid recalculating on every render
     const visibleInputPorts = useMemo(
@@ -1409,17 +1409,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                         )}
                                     </button>
                                 )}
-                                <div className="border-t border-border/50 my-1" />
-                                <button
-                                    onClick={e => {
-                                        e.stopPropagation();
-                                        setShowMenu(false);
-                                        onViewLogs();
-                                    }}
-                                    className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
-                                >
-                                    <ScrollText className="w-3 h-3" /> {t('contextMenu.viewLogs')}
-                                </button>
                             </div>
                         </>
                     )}

@@ -13,7 +13,6 @@ import {
     FileText,
     Pencil,
     Play,
-    ScrollText,
     Settings,
     Trash2,
     Upload,
@@ -54,7 +53,7 @@ interface DetailPanelProps {
     onDescriptionChange: (nodeId: string, description: string) => void;
     onLabelChange: (nodeId: string, label: string) => void;
     onToggleAuto: (nodeId: string) => void;
-    onViewLogs: (nodeId: string) => void;
+
     onDeleteNode: (nodeId: string) => void;
     onDeleteConnection: (connectionId: string) => void;
     onTriggerNode: (nodeId: string) => void;
@@ -458,7 +457,6 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     onDescriptionChange,
     onLabelChange,
     onToggleAuto,
-    onViewLogs,
     onDeleteNode,
     onDeleteConnection,
     onTriggerNode,
@@ -784,13 +782,6 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 </span>
                             );
                         })()}
-                        <button
-                            onClick={() => onViewLogs(selectedNode.id)}
-                            className="ml-auto text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
-                            title={t('flows:detailPanel.viewExecutionLogs')}
-                        >
-                            <ScrollText className="w-3 h-3" /> {t('flows:detailPanel.logs')}
-                        </button>
                     </div>
 
                     {isComponent && subFlowId && (
