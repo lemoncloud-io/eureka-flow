@@ -40,6 +40,7 @@ import {
 import { cn } from '@flows/lib/utils';
 import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
+import { BlockIcon } from './BlockIcon';
 import { ContentPreviewModal } from './ContentPreviewModal';
 import { FilePreviewDialog } from './FilePreviewDialog';
 import { S3Image } from './S3Image';
@@ -1395,7 +1396,15 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         title={t('config.doubleClickRename')}
                     >
                         <div className="w-4 h-4 flex items-center justify-center shrink-0">
-                            <StatusIcon state={nodeState} />
+                            {nodeState === 'RUNNING' || nodeState === 'ERROR' ? (
+                                <StatusIcon state={nodeState} />
+                            ) : (
+                                <BlockIcon
+                                    icon={definition?.icon}
+                                    size={16}
+                                    fallback={<StatusIcon state={nodeState} />}
+                                />
+                            )}
                         </div>
                         <div className="flex flex-col overflow-hidden min-w-0">
                             <div className="flex items-center gap-1.5">
@@ -1489,37 +1498,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                         <Copy className="w-3 h-3" /> {t('contextMenu.duplicate')}
                                     </button>
                                 )}
-                                {/* Run options for process nodes */}
-                                {isProcessNode &&
-                                    definition?.isRunnable !== false &&
-                                    (definition?.execute || !definition?.isFrontend) && (
-                                        <>
-                                            <div className="h-px bg-border/50 my-0.5" />
-                                            <button
-                                                onClick={e => {
-                                                    e.stopPropagation();
-                                                    setShowMenu(false);
-                                                    handleRun({ propagate: false });
-                                                }}
-                                                disabled={isRunning}
-                                                className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors disabled:opacity-50"
-                                            >
-                                                <Play className="w-3 h-3 text-primary" /> {t('actions.runThisOnly')}
-                                            </button>
-                                            <button
-                                                onClick={e => {
-                                                    e.stopPropagation();
-                                                    setShowMenu(false);
-                                                    handleRun({ propagate: true });
-                                                }}
-                                                disabled={isRunning}
-                                                className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors disabled:opacity-50"
-                                            >
-                                                <Play className="w-3 h-3 text-green-500" />{' '}
-                                                {t('actions.runAndPropagate')}
-                                            </button>
-                                        </>
-                                    )}
                                 {nodeState === 'ERROR' && (
                                     <button
                                         onClick={e => {
