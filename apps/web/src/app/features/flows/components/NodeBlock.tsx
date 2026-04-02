@@ -1307,30 +1307,32 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 {/* Compact Actions */}
                 <div className="flex items-center gap-0.5 shrink-0">
                     {/* Run button: show for all executable nodes (has execute function or backend execution) */}
-                    {/* Hidden when isRunnable is explicitly false */}
-                    {definition?.isRunnable !== false && (definition?.execute || !definition?.isFrontend) && (
-                        <button
-                            onClick={e => {
-                                e.stopPropagation();
-                                handleRun();
-                            }}
-                            onMouseDown={e => e.stopPropagation()}
-                            disabled={isRunning}
-                            className={cn(
-                                'w-6 h-6 rounded-md flex items-center justify-center transition-all',
-                                isRunning
-                                    ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
-                                    : 'bg-primary/10 hover:bg-primary/20 text-primary'
-                            )}
-                            title={t('actions.run')}
-                        >
-                            {isRunning ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                                <Play className="w-3.5 h-3.5" />
-                            )}
-                        </button>
-                    )}
+                    {/* Hidden when isRunnable is explicitly false or stereo is 'output' */}
+                    {definition?.stereo !== 'output' &&
+                        definition?.isRunnable !== false &&
+                        (definition?.execute || !definition?.isFrontend) && (
+                            <button
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    handleRun();
+                                }}
+                                onMouseDown={e => e.stopPropagation()}
+                                disabled={isRunning}
+                                className={cn(
+                                    'w-6 h-6 rounded-md flex items-center justify-center transition-all',
+                                    isRunning
+                                        ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
+                                        : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                                )}
+                                title={t('actions.run')}
+                            >
+                                {isRunning ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                    <Play className="w-3.5 h-3.5" />
+                                )}
+                            </button>
+                        )}
                     <button
                         onClick={e => {
                             e.stopPropagation();
@@ -1530,8 +1532,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 >
                     {/* Content Area */}
                     <div>
-                        {/* Force Run button for non-auto nodes (input nodes have Run button in header) */}
-                        {!isAuto && !definition?.type?.startsWith('input-') && (
+                        {/* Force Run button for non-auto nodes (input nodes have Run button in header, output nodes have no run) */}
+                        {!isAuto && !definition?.type?.startsWith('input-') && definition?.stereo !== 'output' && (
                             <button
                                 onClick={handleRun}
                                 disabled={isRunning}
@@ -1618,7 +1620,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             {/* Resize Handle - Bottom Right Corner */}
             {!isCollapsed && onResize && (
                 <div
-                    className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize group z-10"
+                    className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize group"
                     onMouseDown={handleResizeStart}
                     title={t('actions.resize', {
                         min: NODE_WIDTH_BOUNDS.MIN,
