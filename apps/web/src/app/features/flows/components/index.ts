@@ -1,3 +1,4 @@
+export * from './BlockIcon';
 export * from './ConnectionLine';
 export * from './ContentPreviewModal';
 export * from './DataTooltip';

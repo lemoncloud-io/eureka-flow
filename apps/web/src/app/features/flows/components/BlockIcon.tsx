@@ -10,6 +10,9 @@ const isUrl = (value: string): boolean => /^https?:\/\//.test(value);
 
 const isSvg = (value: string): boolean => value.trimStart().startsWith('<svg');
 
+/** Strip inline event handlers (onerror, onload, etc.) from SVG strings */
+const sanitizeSvg = (svg: string): string => svg.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+
 // ============================================================================
 // BlockIcon Component
 // ============================================================================
@@ -46,7 +49,7 @@ export const BlockIcon: React.FC<BlockIconProps> = ({ icon, fallback, className,
             <span
                 style={style}
                 className={cn('inline-flex items-center justify-center [&>svg]:w-full [&>svg]:h-full', className)}
-                dangerouslySetInnerHTML={{ __html: icon }}
+                dangerouslySetInnerHTML={{ __html: sanitizeSvg(icon) }}
             />
         );
     }

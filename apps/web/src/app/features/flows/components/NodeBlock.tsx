@@ -1048,26 +1048,9 @@ const ProcessRunButtons: React.FC<{
         );
     }
 
-    // compact: split button [▶|▾] with dropdown
+    // compact: single button [▶] that opens dropdown on click (same size as input run button)
     return (
-        <div className="relative flex items-center">
-            <button
-                onClick={e => {
-                    e.stopPropagation();
-                    onRun({ propagate: false });
-                }}
-                onMouseDown={e => e.stopPropagation()}
-                disabled={isRunning}
-                className={cn(
-                    'w-5 h-6 rounded-l-md flex items-center justify-center transition-all',
-                    isRunning
-                        ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
-                        : 'bg-primary/10 hover:bg-primary/20 text-primary'
-                )}
-                title={t('actions.runThisOnly')}
-            >
-                {icon}
-            </button>
+        <div className="relative">
             <button
                 onClick={e => {
                     e.stopPropagation();
@@ -1076,14 +1059,14 @@ const ProcessRunButtons: React.FC<{
                 onMouseDown={e => e.stopPropagation()}
                 disabled={isRunning}
                 className={cn(
-                    'w-3.5 h-6 rounded-r-md flex items-center justify-center transition-all border-l border-background/30',
+                    'w-6 h-6 rounded-md flex items-center justify-center transition-all',
                     isRunning
                         ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
                         : 'bg-primary/10 hover:bg-primary/20 text-primary'
                 )}
                 title={t('actions.runOptions')}
             >
-                <ChevronDown className="w-2.5 h-2.5" />
+                {icon}
             </button>
             {showMenu && (
                 <>
@@ -1431,13 +1414,13 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
                 {/* Compact Actions */}
                 <div className="flex items-center gap-0.5 shrink-0">
-                    {/* Run button: hidden for output stereo or isRunnable=false */}
+                    {/* Run buttons: input=single, process=split button, output=none */}
                     {definition?.stereo !== 'output' &&
                         definition?.isRunnable !== false &&
                         (definition?.execute || !definition?.isFrontend) &&
                         (isProcessNode ? (
                             <ProcessRunButtons isRunning={isRunning} onRun={handleRun} t={t} variant="compact" />
-                        ) : (
+                        ) : definition?.stereo === 'input' ? (
                             <button
                                 onClick={e => {
                                     e.stopPropagation();
@@ -1459,7 +1442,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                     <Play className="w-3.5 h-3.5" />
                                 )}
                             </button>
-                        ))}
+                        ) : null)}
                     <button
                         onClick={e => {
                             e.stopPropagation();
@@ -1506,6 +1489,37 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                         <Copy className="w-3 h-3" /> {t('contextMenu.duplicate')}
                                     </button>
                                 )}
+                                {/* Run options for process nodes */}
+                                {isProcessNode &&
+                                    definition?.isRunnable !== false &&
+                                    (definition?.execute || !definition?.isFrontend) && (
+                                        <>
+                                            <div className="h-px bg-border/50 my-0.5" />
+                                            <button
+                                                onClick={e => {
+                                                    e.stopPropagation();
+                                                    setShowMenu(false);
+                                                    handleRun({ propagate: false });
+                                                }}
+                                                disabled={isRunning}
+                                                className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors disabled:opacity-50"
+                                            >
+                                                <Play className="w-3 h-3 text-primary" /> {t('actions.runThisOnly')}
+                                            </button>
+                                            <button
+                                                onClick={e => {
+                                                    e.stopPropagation();
+                                                    setShowMenu(false);
+                                                    handleRun({ propagate: true });
+                                                }}
+                                                disabled={isRunning}
+                                                className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors disabled:opacity-50"
+                                            >
+                                                <Play className="w-3 h-3 text-green-500" />{' '}
+                                                {t('actions.runAndPropagate')}
+                                            </button>
+                                        </>
+                                    )}
                                 {nodeState === 'ERROR' && (
                                     <button
                                         onClick={e => {
