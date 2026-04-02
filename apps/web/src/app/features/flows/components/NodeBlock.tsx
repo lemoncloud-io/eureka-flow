@@ -1005,6 +1005,128 @@ const StatusIcon: React.FC<{ state: NodeState }> = ({ state }) => {
     }
 };
 
+/** Paired run buttons for process nodes: "Run This Only" + "Run & Propagate" */
+const ProcessRunButtons: React.FC<{
+    isRunning: boolean;
+    onRun: (options: { propagate: boolean }) => void;
+    t: (key: string) => string;
+    variant: 'compact' | 'full';
+}> = ({ isRunning, onRun, t, variant }) => {
+    const [showMenu, setShowMenu] = useState(false);
+    const icon = isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />;
+
+    if (variant === 'full') {
+        return (
+            <div className="flex gap-1.5" onMouseDown={e => e.stopPropagation()}>
+                <button
+                    onClick={() => onRun({ propagate: false })}
+                    disabled={isRunning}
+                    className={cn(
+                        'flex-1 text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
+                        isRunning
+                            ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
+                            : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
+                    )}
+                >
+                    {icon}
+                    {t('actions.runThisOnly')}
+                </button>
+                <button
+                    onClick={() => onRun({ propagate: true })}
+                    disabled={isRunning}
+                    className={cn(
+                        'flex-1 text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
+                        isRunning
+                            ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
+                            : 'bg-green-500/15 hover:bg-green-500/25 text-green-600 dark:text-green-400 border border-green-500/20'
+                    )}
+                >
+                    {icon}
+                    {t('actions.runAndPropagate')}
+                </button>
+            </div>
+        );
+    }
+
+    // compact: split button [▶|▾] with dropdown
+    return (
+        <div className="relative flex items-center">
+            <button
+                onClick={e => {
+                    e.stopPropagation();
+                    onRun({ propagate: false });
+                }}
+                onMouseDown={e => e.stopPropagation()}
+                disabled={isRunning}
+                className={cn(
+                    'w-5 h-6 rounded-l-md flex items-center justify-center transition-all',
+                    isRunning
+                        ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
+                        : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                )}
+                title={t('actions.runThisOnly')}
+            >
+                {icon}
+            </button>
+            <button
+                onClick={e => {
+                    e.stopPropagation();
+                    setShowMenu(prev => !prev);
+                }}
+                onMouseDown={e => e.stopPropagation()}
+                disabled={isRunning}
+                className={cn(
+                    'w-3.5 h-6 rounded-r-md flex items-center justify-center transition-all border-l border-background/30',
+                    isRunning
+                        ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
+                        : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                )}
+                title={t('actions.runOptions')}
+            >
+                <ChevronDown className="w-2.5 h-2.5" />
+            </button>
+            {showMenu && (
+                <>
+                    <div
+                        className="fixed inset-0 z-40"
+                        onClick={e => {
+                            e.stopPropagation();
+                            setShowMenu(false);
+                        }}
+                        onMouseDown={e => e.stopPropagation()}
+                    />
+                    <div className="absolute top-full right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[140px]">
+                        <button
+                            className="w-full px-3 py-1.5 text-[11px] text-left hover:bg-muted/50 flex items-center gap-2 transition-colors"
+                            onClick={e => {
+                                e.stopPropagation();
+                                setShowMenu(false);
+                                onRun({ propagate: false });
+                            }}
+                            onMouseDown={e => e.stopPropagation()}
+                        >
+                            <Play className="w-3 h-3 text-primary" />
+                            {t('actions.runThisOnly')}
+                        </button>
+                        <button
+                            className="w-full px-3 py-1.5 text-[11px] text-left hover:bg-muted/50 flex items-center gap-2 transition-colors"
+                            onClick={e => {
+                                e.stopPropagation();
+                                setShowMenu(false);
+                                onRun({ propagate: true });
+                            }}
+                            onMouseDown={e => e.stopPropagation()}
+                        >
+                            <Play className="w-3 h-3 text-green-500" />
+                            {t('actions.runAndPropagate')}
+                        </button>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
 export const NodeBlock: React.FC<NodeBlockProps> = ({
     node,
     highlightState,
@@ -1073,7 +1195,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
         }
     };
 
-    const [showRunMenu, setShowRunMenu] = useState(false);
     const isProcessNode = definition?.stereo === 'process';
 
     const [showMenu, setShowMenu] = useState(false);
@@ -1310,91 +1431,12 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 
                 {/* Compact Actions */}
                 <div className="flex items-center gap-0.5 shrink-0">
-                    {/* Run button: show for all executable nodes (has execute function or backend execution) */}
-                    {/* Hidden when isRunnable is explicitly false or stereo is 'output' */}
-                    {/* Process stereo: split button with propagation dropdown */}
+                    {/* Run button: hidden for output stereo or isRunnable=false */}
                     {definition?.stereo !== 'output' &&
                         definition?.isRunnable !== false &&
                         (definition?.execute || !definition?.isFrontend) &&
                         (isProcessNode ? (
-                            <div className="relative flex items-center">
-                                <button
-                                    onClick={e => {
-                                        e.stopPropagation();
-                                        handleRun({ propagate: false });
-                                    }}
-                                    onMouseDown={e => e.stopPropagation()}
-                                    disabled={isRunning}
-                                    className={cn(
-                                        'w-5 h-6 rounded-l-md flex items-center justify-center transition-all',
-                                        isRunning
-                                            ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
-                                            : 'bg-primary/10 hover:bg-primary/20 text-primary'
-                                    )}
-                                    title={t('actions.runThisOnly')}
-                                >
-                                    {isRunning ? (
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                    ) : (
-                                        <Play className="w-3 h-3" />
-                                    )}
-                                </button>
-                                <button
-                                    onClick={e => {
-                                        e.stopPropagation();
-                                        setShowRunMenu(prev => !prev);
-                                    }}
-                                    onMouseDown={e => e.stopPropagation()}
-                                    disabled={isRunning}
-                                    className={cn(
-                                        'w-3.5 h-6 rounded-r-md flex items-center justify-center transition-all border-l border-background/30',
-                                        isRunning
-                                            ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
-                                            : 'bg-primary/10 hover:bg-primary/20 text-primary'
-                                    )}
-                                    title={t('actions.runOptions')}
-                                >
-                                    <ChevronDown className="w-2.5 h-2.5" />
-                                </button>
-                                {showRunMenu && (
-                                    <>
-                                        <div
-                                            className="fixed inset-0 z-40"
-                                            onClick={e => {
-                                                e.stopPropagation();
-                                                setShowRunMenu(false);
-                                            }}
-                                            onMouseDown={e => e.stopPropagation()}
-                                        />
-                                        <div className="absolute top-full right-0 mt-1 z-50 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[140px]">
-                                            <button
-                                                className="w-full px-3 py-1.5 text-[11px] text-left hover:bg-muted/50 flex items-center gap-2 transition-colors"
-                                                onClick={e => {
-                                                    e.stopPropagation();
-                                                    setShowRunMenu(false);
-                                                    handleRun({ propagate: false });
-                                                }}
-                                                onMouseDown={e => e.stopPropagation()}
-                                            >
-                                                <Play className="w-3 h-3 text-primary" />
-                                                {t('actions.runThisOnly')}
-                                            </button>
-                                            <button
-                                                className="w-full px-3 py-1.5 text-[11px] text-left hover:bg-muted/50 flex items-center gap-2 transition-colors"
-                                                onClick={e => {
-                                                    e.stopPropagation();
-                                                    setShowRunMenu(false);
-                                                    handleRun({ propagate: true });
-                                                }}
-                                                onMouseDown={e => e.stopPropagation()}
-                                            >
-                                                <Play className="w-3 h-3 text-green-500" />
-                                                {t('actions.runAndPropagate')}
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                            <ProcessRunButtons isRunning={isRunning} onRun={handleRun} t={t} variant="compact" />
                         ) : (
                             <button
                                 onClick={e => {
@@ -1622,42 +1664,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             !definition?.type?.startsWith('input-') &&
                             definition?.stereo !== 'output' &&
                             (isProcessNode ? (
-                                <div className="flex gap-1.5" onMouseDown={e => e.stopPropagation()}>
-                                    <button
-                                        onClick={() => handleRun({ propagate: false })}
-                                        disabled={isRunning}
-                                        className={cn(
-                                            'flex-1 text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
-                                            isRunning
-                                                ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
-                                                : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
-                                        )}
-                                    >
-                                        {isRunning ? (
-                                            <Loader2 className="w-3 h-3 animate-spin" />
-                                        ) : (
-                                            <Play className="w-3 h-3" />
-                                        )}
-                                        {t('actions.runThisOnly')}
-                                    </button>
-                                    <button
-                                        onClick={() => handleRun({ propagate: true })}
-                                        disabled={isRunning}
-                                        className={cn(
-                                            'flex-1 text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
-                                            isRunning
-                                                ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
-                                                : 'bg-green-500/15 hover:bg-green-500/25 text-green-600 dark:text-green-400 border border-green-500/20'
-                                        )}
-                                    >
-                                        {isRunning ? (
-                                            <Loader2 className="w-3 h-3 animate-spin" />
-                                        ) : (
-                                            <Play className="w-3 h-3" />
-                                        )}
-                                        {t('actions.runAndPropagate')}
-                                    </button>
-                                </div>
+                                <ProcessRunButtons isRunning={isRunning} onRun={handleRun} t={t} variant="full" />
                             ) : (
                                 <button
                                     onClick={() => handleRun()}
