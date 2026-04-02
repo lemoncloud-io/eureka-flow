@@ -33,7 +33,6 @@ interface TouchDialogProps {
 interface FormData {
     timestamp: string;
     progress: string;
-    disabled: boolean;
     required: boolean;
     modifiedAt: string;
     enterNo: string;
@@ -48,7 +47,6 @@ interface FormData {
 const initialFormData: FormData = {
     timestamp: '',
     progress: '',
-    disabled: false,
     required: false,
     modifiedAt: '',
     enterNo: '',
@@ -65,7 +63,6 @@ const buildTouchBody = (formData: FormData): TouchNodeBody => {
 
     if (formData.timestamp) body.timestamp = formData.timestamp;
     if (formData.progress) body.progress = Number(formData.progress);
-    if (formData.disabled) body.disabled = formData.disabled;
     if (formData.required) body.required = formData.required;
     if (formData.modifiedAt) body.modifiedAt = formData.modifiedAt;
     if (formData.enterNo) body.enterNo = Number(formData.enterNo);
@@ -103,7 +100,6 @@ export const TouchDialog = ({
             return {
                 timestamp: '',
                 progress: initialNode.executionStats?.progress?.toString() ?? '',
-                disabled: initialNode.disabled ?? false,
                 required: initialNode.required ?? false,
                 modifiedAt: '',
                 enterNo: initialNode.enterNo?.toString() ?? '',
@@ -121,7 +117,6 @@ export const TouchDialog = ({
             return {
                 timestamp: '',
                 progress: '',
-                disabled: initialConnection.disabled ?? false,
                 required: false,
                 modifiedAt: '',
                 enterNo: '',
@@ -228,13 +223,6 @@ export const TouchDialog = ({
                                     placeholder="0-100"
                                     className="h-8 text-xs"
                                     onKeyDown={e => e.stopPropagation()}
-                                />
-                            </div>
-                            <div className="flex items-center justify-between py-1">
-                                <Label className="text-xs">disabled</Label>
-                                <Switch
-                                    checked={formData.disabled}
-                                    onCheckedChange={checked => updateField('disabled', checked)}
                                 />
                             </div>
                             <div className="flex items-center justify-between py-1">

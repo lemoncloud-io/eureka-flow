@@ -357,7 +357,6 @@ export interface NodeModel {
     flowId?: string;
     runId?: string;
     lastGoodOutput$$?: NodeDataPacketItem[];
-    disabled?: boolean;
     /**
      * If true, node auto-executes when inputData.timestamp changes
      * This enables reactive chain execution

@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
-    Ban,
     Braces,
     Check,
     ChevronDown,
@@ -95,7 +94,6 @@ export interface NodeConfigHandlers {
 export interface NodeActions {
     onDelete: () => void;
     onTrigger: () => Promise<void> | void;
-    onToggleDisabled?: () => void;
     onDuplicate?: () => void;
     onViewLogs: () => void;
     onResize?: (width: number, height: number) => void;
@@ -1017,7 +1015,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     } = highlightState;
     const { onPortMouseDown, onPortMouseUp, onPortTouchStart } = portHandlers;
     const { onConfigChange, onLabelChange } = configHandlers;
-    const { onDelete, onTrigger, onToggleDisabled, onDuplicate, onViewLogs, onResize, onResizing } = actions;
+    const { onDelete, onTrigger, onDuplicate, onViewLogs, onResize, onResizing } = actions;
 
     // Memoize visible ports to avoid recalculating on every render
     const visibleInputPorts = useMemo(
@@ -1030,7 +1028,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     );
 
     const isAuto = node.autoExecutionEnabled !== false;
-    const isDisabled = (node as NodeData & { disabled?: boolean }).disabled === true;
 
     // Subscribe to trace logs for this node (agent blocks)
     const traceLogs = useNodeTraceLogs(node.id);
@@ -1211,7 +1208,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     };
 
     const StatusIcon = () => {
-        if (isDisabled) return <Ban className="w-4 h-4 text-muted-foreground" />;
         switch (nodeState) {
             case 'RUNNING':
                 return <Loader2 className="w-4 h-4 text-status-running animate-spin" />;
@@ -1234,7 +1230,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
             className={cn(
                 'absolute bg-node-bg rounded-xl border-[1.5px]',
                 !isDragging && !isResizing && 'transition-all duration-200',
-                isDisabled && 'opacity-50',
+                !isAuto && 'opacity-50',
                 !isSelected && !isHighlighted && nodeState === 'IDLE' && 'shadow-node',
                 // Normal highlight/selection states
                 isHighlighted
@@ -1379,19 +1375,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                         className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
                                     >
                                         <Copy className="w-3 h-3" /> {t('contextMenu.duplicate')}
-                                    </button>
-                                )}
-                                {onToggleDisabled && (
-                                    <button
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            setShowMenu(false);
-                                            onToggleDisabled();
-                                        }}
-                                        className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
-                                    >
-                                        <Ban className="w-3 h-3" />{' '}
-                                        {isDisabled ? t('contextMenu.enable') : t('contextMenu.disable')}
                                     </button>
                                 )}
                                 {nodeState === 'ERROR' && (

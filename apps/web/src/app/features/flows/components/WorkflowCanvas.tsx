@@ -1498,19 +1498,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [readOnly, nodes, saveCheckpoint, handleSelectionChange, createNodeAsync]
         );
 
-        const toggleNodeDisabled = useCallback(
-            (nodeId: string) => {
-                if (readOnly) return;
-                saveCheckpoint();
-                setNodes(prev =>
-                    prev.map(n =>
-                        n.id === nodeId ? { ...n, disabled: !(n as NodeData & { disabled?: boolean }).disabled } : n
-                    )
-                );
-            },
-            [readOnly, saveCheckpoint]
-        );
-
         const handleWheel = (e: React.WheelEvent) => {
             const rect = canvasRef.current?.getBoundingClientRect();
             if (!rect) return;
@@ -2444,7 +2431,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             actions={{
                                                 onDelete: () => deleteNode(node.id),
                                                 onTrigger: () => executeNode(node.id),
-                                                onToggleDisabled: () => toggleNodeDisabled(node.id),
                                                 onDuplicate: () => duplicateNode(node.id),
                                                 onViewLogs: () => setLogViewerNodeId(node.id),
                                                 onResize: (w, h) => handleNodeResize(node.id, w, h),
