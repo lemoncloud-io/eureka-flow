@@ -110,19 +110,6 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
         [readOnly, nodes, history, setNodes, handleSelectionChange]
     );
 
-    const toggleNodeDisabled = useCallback(
-        (nodeId: string) => {
-            if (readOnly) return;
-            history.saveCheckpoint();
-            setNodes(prev =>
-                prev.map(n =>
-                    n.id === nodeId ? { ...n, disabled: !(n as NodeData & { disabled?: boolean }).disabled } : n
-                )
-            );
-        },
-        [readOnly, history, setNodes]
-    );
-
     const deleteConnection = useCallback(
         (id: string) => {
             if (readOnly) return;
@@ -340,7 +327,7 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
                 const def = blockRegistry[n.type];
                 return !hasIncoming || (def && def.inputs.length === 0);
             })
-            .filter(n => !(n as NodeData & { disabled?: boolean }).disabled)
+            .filter(n => n.autoExecutionEnabled !== false)
             .map(n => n.id);
 
         setNodes(prev =>
@@ -394,7 +381,6 @@ export const useCanvasEngine = ({ readOnly, onNodeSelect, onChange }: UseCanvasE
         // Node Actions
         deleteNode,
         duplicateNode,
-        toggleNodeDisabled,
         executeNode,
         handleConfigChange,
         handleLabelChange,

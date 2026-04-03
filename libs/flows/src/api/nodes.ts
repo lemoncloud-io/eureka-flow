@@ -224,7 +224,8 @@ export const runNode = async (nodeId: string, body?: RunNodeBody, options?: RunN
         const queryParams: string[] = [];
         if (options?.async) queryParams.push('async');
         if (options?.force) queryParams.push('force');
-        if (options?.propagate === false) queryParams.push('propagate=0');
+        if (options?.propagate === true) queryParams.push('propagate=1');
+        else if (options?.propagate === false) queryParams.push('propagate=0');
         if (options?.connection) queryParams.push(`connection=${encodeURIComponent(options.connection)}`);
 
         const params = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';

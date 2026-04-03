@@ -18,6 +18,7 @@ interface FlowsState {
     isBlocksLoaded: boolean;
     currentFlowId: string | null;
     flowName: string;
+    flowDescription: string;
     flows: FlowView[];
     lastSavedAt: Date | null;
     isAutoSaveEnabled: boolean;
@@ -25,11 +26,14 @@ interface FlowsState {
     saveError: Error | null;
     /** WebSocket channel ID for real-time node status updates */
     channelId: string | null;
+    /** Whether this flow is publicly accessible */
+    isPublic: boolean;
 
     setBlockRegistry: (blocks: BlockDefinitionWithFrontend[]) => void;
     setBlocksLoaded: (loaded: boolean) => void;
     setCurrentFlowId: (id: string | null) => void;
     setFlowName: (name: string) => void;
+    setFlowDescription: (description: string) => void;
     setFlows: (flows: FlowView[]) => void;
     setLastSavedAt: (date: Date | null) => void;
     setAutoSaveEnabled: (enabled: boolean) => void;
@@ -37,6 +41,7 @@ interface FlowsState {
     setSaveStatus: (status: SaveStatus) => void;
     setSaveError: (error: Error | null) => void;
     setChannelId: (channelId: string | null) => void;
+    setIsPublic: (isPublic: boolean) => void;
 }
 
 export const useFlowsStore = create<FlowsState>(set => ({
@@ -44,12 +49,14 @@ export const useFlowsStore = create<FlowsState>(set => ({
     isBlocksLoaded: false,
     currentFlowId: null,
     flowName: 'Untitled Workflow',
+    flowDescription: '',
     flows: [],
     lastSavedAt: null,
     isAutoSaveEnabled: flowStorage.getAutoSaveEnabled(),
     saveStatus: 'idle',
     saveError: null,
     channelId: '0000',
+    isPublic: false,
 
     setBlockRegistry: blocks => {
         const registry = blocks.reduce<Record<string, BlockDefinitionWithFrontend>>((acc, block) => {
@@ -70,6 +77,8 @@ export const useFlowsStore = create<FlowsState>(set => ({
     setCurrentFlowId: id => set({ currentFlowId: id }),
 
     setFlowName: name => set({ flowName: name }),
+
+    setFlowDescription: description => set({ flowDescription: description }),
 
     setFlows: flows => set({ flows }),
 
@@ -92,6 +101,8 @@ export const useFlowsStore = create<FlowsState>(set => ({
     setSaveError: error => set({ saveError: error }),
 
     setChannelId: channelId => set({ channelId }),
+
+    setIsPublic: isPublic => set({ isPublic }),
 }));
 
 export const useBlockRegistry = () => useFlowsStore(state => state.blockRegistry);
@@ -104,3 +115,5 @@ export const useIsAutoSaveEnabled = () => useFlowsStore(state => state.isAutoSav
 export const useSaveStatus = () => useFlowsStore(state => state.saveStatus);
 export const useSaveError = () => useFlowsStore(state => state.saveError);
 export const useChannelId = () => useFlowsStore(state => state.channelId);
+export const useFlowDescription = () => useFlowsStore(state => state.flowDescription);
+export const useIsPublic = () => useFlowsStore(state => state.isPublic);

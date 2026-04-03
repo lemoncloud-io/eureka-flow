@@ -36,6 +36,7 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
 
     if (action === 'trace' && 'data' in msg && msg['data']) {
         const nestedData = msg['data'] as Record<string, unknown>;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructuring to separate action/data from top-level fields
         const { action: _a, data: _d, ...topLevelFields } = msg;
         payload = { ...topLevelFields, ...nestedData };
     } else if (action === 'message' && 'data' in msg && msg['data']) {

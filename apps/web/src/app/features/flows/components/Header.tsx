@@ -6,13 +6,14 @@ import {
     ChevronsDownUp,
     ChevronsUpDown,
     Download,
+    EyeOff,
     FileText,
     FolderOpen,
+    Globe,
     HelpCircle,
     ImageDown,
     Key,
     LayoutGrid,
-    Link,
     Menu,
     Redo2,
     Save,
@@ -88,7 +89,11 @@ interface HeaderProps {
     editActions: EditActionsProps;
     saveState: SaveStateProps;
     socketState?: SocketStateProps;
-    onShare: () => void;
+    isPublic?: boolean;
+    /** Read-only public viewing mode (no API key) */
+    isPublicMode?: boolean;
+    onTogglePublic?: () => void;
+    onPublish?: () => void;
     onApiKeySettings?: () => void;
     onHelp?: () => void;
     onOpenFlowList?: () => void;
@@ -311,7 +316,10 @@ export const Header: React.FC<HeaderProps> = ({
     editActions,
     saveState,
     socketState,
-    onShare,
+    isPublic,
+    isPublicMode,
+    onTogglePublic,
+    onPublish,
     onApiKeySettings,
     onHelp,
     onOpenFlowList,
@@ -350,10 +358,26 @@ export const Header: React.FC<HeaderProps> = ({
                             </Badge>
                         </RouterLink>
                         <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
-                        <FlowNameInput {...flowInfo} />
-                        <span className="hidden md:inline">
-                            <SaveStatusBadge saveStatus={saveState.saveStatus} lastSavedAt={saveState.lastSavedAt} />
-                        </span>
+                        {isPublicMode ? (
+                            <span className="text-xs sm:text-sm text-foreground truncate max-w-[120px] sm:max-w-[200px]">
+                                {flowInfo.flowName}
+                            </span>
+                        ) : (
+                            <FlowNameInput {...flowInfo} />
+                        )}
+                        {!isPublicMode && (
+                            <span className="hidden md:inline">
+                                <SaveStatusBadge
+                                    saveStatus={saveState.saveStatus}
+                                    lastSavedAt={saveState.lastSavedAt}
+                                />
+                            </span>
+                        )}
+                        {isPublicMode && (
+                            <Badge variant="secondary" size="sm" className="text-[10px]">
+                                {t('header.viewOnly', 'View Only')}
+                            </Badge>
+                        )}
                     </div>
                 </div>
 
@@ -367,7 +391,7 @@ export const Header: React.FC<HeaderProps> = ({
                             'shadow-sm'
                         )}
                     >
-                        {onOpenFlowList && (
+                        {!isPublicMode && onOpenFlowList && (
                             <ToolbarButton
                                 onClick={onOpenFlowList}
                                 icon={<FolderOpen className="w-4 h-4" />}
@@ -375,13 +399,15 @@ export const Header: React.FC<HeaderProps> = ({
                                 shortcut="⌘O"
                             />
                         )}
-                        <ToolbarButton
-                            onClick={editActions.onSave}
-                            icon={<Save className="w-4 h-4" />}
-                            tooltip={t('header.saveFlow')}
-                            shortcut="⌘S"
-                            variant={getSaveButtonVariant()}
-                        />
+                        {!isPublicMode && (
+                            <ToolbarButton
+                                onClick={editActions.onSave}
+                                icon={<Save className="w-4 h-4" />}
+                                tooltip={t('header.saveFlow')}
+                                shortcut="⌘S"
+                                variant={getSaveButtonVariant()}
+                            />
+                        )}
                         <ToolbarButton
                             onClick={editActions.onUndo}
                             icon={<Undo2 className="w-4 h-4" />}
@@ -416,20 +442,24 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.file')}
                             </DropdownMenuLabel>
-                            <DropdownMenuItem onClick={fileActions.onNew}>
-                                <FileText className="w-4 h-4 mr-2" />
-                                {t('header.newFlow')}
-                                <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={fileActions.onSave}>
-                                <Save className="w-4 h-4 mr-2" />
-                                {t('header.saveFlow')}
-                                <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={fileActions.onImport}>
-                                <Upload className="w-4 h-4 mr-2" />
-                                {t('header.importJson')}
-                            </DropdownMenuItem>
+                            {!isPublicMode && (
+                                <>
+                                    <DropdownMenuItem onClick={fileActions.onNew}>
+                                        <FileText className="w-4 h-4 mr-2" />
+                                        {t('header.newFlow')}
+                                        <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={fileActions.onSave}>
+                                        <Save className="w-4 h-4 mr-2" />
+                                        {t('header.saveFlow')}
+                                        <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={fileActions.onImport}>
+                                        <Upload className="w-4 h-4 mr-2" />
+                                        {t('header.importJson')}
+                                    </DropdownMenuItem>
+                                </>
+                            )}
                             <DropdownMenuItem onClick={fileActions.onExport}>
                                 <Download className="w-4 h-4 mr-2" />
                                 {t('header.exportJson')}
@@ -441,10 +471,6 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.exportPng')}
                                 </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={onShare}>
-                                <Link className="w-4 h-4 mr-2" />
-                                {t('header.share')}
-                            </DropdownMenuItem>
 
                             <DropdownMenuSeparator />
 
@@ -484,37 +510,74 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.expandAll')}
                                 </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={editActions.onClear} className="text-destructive">
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                {t('header.clearCanvas')}
-                            </DropdownMenuItem>
+                            {!isPublicMode && (
+                                <DropdownMenuItem onClick={editActions.onClear} className="text-destructive">
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    {t('header.clearCanvas')}
+                                </DropdownMenuItem>
+                            )}
 
                             <DropdownMenuSeparator />
+
+                            {/* Share Group */}
+                            {!isPublicMode && (onTogglePublic || onPublish) && (
+                                <>
+                                    <DropdownMenuLabel className="flex items-center justify-between text-xs text-muted-foreground font-normal">
+                                        {t('header.menuGroup.share')}
+                                        {isPublic && (
+                                            <span className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                {t('header.publishedStatus', 'Published')}
+                                            </span>
+                                        )}
+                                    </DropdownMenuLabel>
+                                    {isPublic ? (
+                                        <>
+                                            <DropdownMenuItem onClick={onPublish}>
+                                                <Globe className="w-4 h-4 mr-2" />
+                                                {t('header.editPublishInfo', 'Edit publish info')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={onTogglePublic}>
+                                                <EyeOff className="w-4 h-4 mr-2" />
+                                                {t('header.unpublish', 'Unpublish')}
+                                            </DropdownMenuItem>
+                                        </>
+                                    ) : (
+                                        <DropdownMenuItem onClick={onPublish}>
+                                            <Globe className="w-4 h-4 mr-2" />
+                                            {t('header.publish')}
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                </>
+                            )}
 
                             {/* Settings Group */}
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.settings')}
                             </DropdownMenuLabel>
-                            <div className="flex items-center justify-between px-2 py-1.5">
-                                <span className="text-sm">{t('header.autoSave')}</span>
-                                <button
-                                    onClick={saveState.onToggleAutoSave}
-                                    role="switch"
-                                    aria-checked={saveState.isAutoSaveEnabled}
-                                    aria-label={t('header.toggleAutoSave')}
-                                    className={cn(
-                                        'w-9 h-5 rounded-full p-0.5 transition-colors relative',
-                                        saveState.isAutoSaveEnabled ? 'bg-primary' : 'bg-muted'
-                                    )}
-                                >
-                                    <div
+                            {!isPublicMode && (
+                                <div className="flex items-center justify-between px-2 py-1.5">
+                                    <span className="text-sm">{t('header.autoSave')}</span>
+                                    <button
+                                        onClick={saveState.onToggleAutoSave}
+                                        role="switch"
+                                        aria-checked={saveState.isAutoSaveEnabled}
+                                        aria-label={t('header.toggleAutoSave')}
                                         className={cn(
-                                            'w-4 h-4 bg-white rounded-full shadow-sm transition-transform absolute top-0.5',
-                                            saveState.isAutoSaveEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                                            'w-9 h-5 rounded-full p-0.5 transition-colors relative',
+                                            saveState.isAutoSaveEnabled ? 'bg-primary' : 'bg-muted'
                                         )}
-                                    />
-                                </button>
-                            </div>
+                                    >
+                                        <div
+                                            className={cn(
+                                                'w-4 h-4 bg-white rounded-full shadow-sm transition-transform absolute top-0.5',
+                                                saveState.isAutoSaveEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                                            )}
+                                        />
+                                    </button>
+                                </div>
+                            )}
                             {onApiKeySettings && (
                                 <DropdownMenuItem onClick={onApiKeySettings}>
                                     <Key className="w-4 h-4 mr-2" />

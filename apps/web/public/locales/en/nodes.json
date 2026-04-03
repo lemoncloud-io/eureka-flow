@@ -31,6 +31,9 @@
     "actions": {
         "run": "Run",
         "forceRun": "Force Run",
+        "runThisOnly": "Run This Only",
+        "runAndPropagate": "Run & Propagate",
+        "runOptions": "Run Options",
         "resize": "Drag to resize ({{min}}-{{max}}px)"
     },
     "status": {

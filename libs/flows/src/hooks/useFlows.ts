@@ -15,7 +15,7 @@ import { flowStorage } from '../utils/flowStorage';
 import { getNodeHeight } from '../utils/nodeHeight';
 
 import type { SaveStatus } from '../stores/useFlowsStore';
-import type { LoadFlowResult, SaveFlowBody } from '../types';
+import type { LoadFlowResult, SaveFlowBody, UpdateFlowBody } from '../types';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 /**
@@ -35,6 +35,7 @@ export const useFlows = () => {
     const {
         currentFlowId,
         flowName,
+        flowDescription,
         isAutoSaveEnabled,
         lastSavedAt,
         saveStatus,
@@ -42,11 +43,14 @@ export const useFlows = () => {
         channelId,
         setCurrentFlowId,
         setFlowName,
+        setFlowDescription,
         setLastSavedAt,
         toggleAutoSave,
         setSaveStatus,
         setSaveError,
         setChannelId,
+        isPublic,
+        setIsPublic,
     } = useFlowsStore();
 
     // Cleanup timeout on unmount to prevent memory leaks
@@ -93,9 +97,11 @@ export const useFlows = () => {
                 if (flowData.name) {
                     setFlowName(flowData.name);
                 }
+                setFlowDescription(flowData.description ?? '');
                 if (flowData.channelId) {
                     setChannelId(flowData.channelId);
                 }
+                setIsPublic(!!flowData.isPublic);
                 return { flowId: savedFlowId, flowData, isNew: false };
             } catch (err) {
                 console.warn('[useFlows] Failed to load saved flow, creating new:', err);
@@ -115,8 +121,10 @@ export const useFlows = () => {
         setCurrentFlowId(newFlowId);
         flowStorage.setFlowId(newFlowId);
         setFlowName('Untitled Workflow');
+        setFlowDescription('');
+        setIsPublic(false);
         return { flowId: newFlowId, flowData: null, isNew: true };
-    }, [queryClient, setCurrentFlowId, setFlowName, setChannelId]);
+    }, [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setIsPublic]);
 
     /**
      * Load a specific flow by ID
@@ -143,16 +151,18 @@ export const useFlows = () => {
                 if (flowData.name) {
                     setFlowName(flowData.name);
                 }
+                setFlowDescription(flowData.description ?? '');
                 if (flowData.channelId) {
                     setChannelId(flowData.channelId);
                 }
+                setIsPublic(!!flowData.isPublic);
                 return flowData;
             } catch (err) {
                 console.error('[useFlows] Failed to load flow:', err);
                 return null;
             }
         },
-        [queryClient, setCurrentFlowId, setFlowName, setChannelId]
+        [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setIsPublic]
     );
 
     /**
@@ -290,8 +300,10 @@ export const useFlows = () => {
                 setCurrentFlowId(newFlowId);
                 flowStorage.setFlowId(newFlowId);
                 setFlowName('Untitled Workflow');
+                setFlowDescription('');
                 setLastSavedAt(null);
                 setChannelId(null);
+                setIsPublic(false);
                 return newFlowId;
             }
             return null;
@@ -299,7 +311,15 @@ export const useFlows = () => {
             console.error('[useFlows] Failed to create new flow:', error);
             return null;
         }
-    }, [createFlowMutation, setCurrentFlowId, setFlowName, setLastSavedAt, setChannelId]);
+    }, [
+        createFlowMutation,
+        setCurrentFlowId,
+        setFlowName,
+        setFlowDescription,
+        setLastSavedAt,
+        setChannelId,
+        setIsPublic,
+    ]);
 
     /**
      * Update flow name (metadata only)
@@ -332,6 +352,64 @@ export const useFlows = () => {
         [currentFlowId, updateFlowMutation, setFlowName, setLastSavedAt, updateSaveStatus]
     );
 
+    /**
+     * Publish flow with name/description
+     * POST /flows/:id with { name, description, isPublic }
+     */
+    const publishFlow = useCallback(
+        async (body: UpdateFlowBody): Promise<boolean> => {
+            if (!currentFlowId) return false;
+
+            updateSaveStatus('saving');
+            try {
+                await updateFlowMutation.mutateAsync({
+                    id: currentFlowId,
+                    body,
+                });
+                if (body.name) setFlowName(body.name);
+                if (body.description !== undefined) setFlowDescription(body.description);
+                if (body.isPublic !== undefined) setIsPublic(body.isPublic);
+                setLastSavedAt(new Date());
+                updateSaveStatus('success');
+                return true;
+            } catch (error) {
+                console.error('[useFlows] Failed to publish flow:', error);
+                updateSaveStatus('error', error instanceof Error ? error : new Error('Failed to publish'));
+                return false;
+            }
+        },
+        [
+            currentFlowId,
+            updateFlowMutation,
+            setFlowName,
+            setFlowDescription,
+            setIsPublic,
+            setLastSavedAt,
+            updateSaveStatus,
+        ]
+    );
+
+    /**
+     * Toggle flow public/private state
+     * POST /flows/:id with { isPublic }
+     */
+    const togglePublic = useCallback(async (): Promise<boolean> => {
+        if (!currentFlowId) return false;
+
+        const newIsPublic = !isPublic;
+        try {
+            await updateFlowMutation.mutateAsync({
+                id: currentFlowId,
+                body: { isPublic: newIsPublic },
+            });
+            setIsPublic(newIsPublic);
+            return true;
+        } catch (error) {
+            console.error('[useFlows] Failed to toggle public:', error);
+            return false;
+        }
+    }, [currentFlowId, isPublic, updateFlowMutation, setIsPublic]);
+
     // Derive loading state from TanStack Query (only for initial load)
     const isLoading = loadFlowQuery.isLoading || loadFlowQuery.isFetching;
 
@@ -344,6 +422,7 @@ export const useFlows = () => {
         // State
         currentFlowId,
         flowName,
+        flowDescription,
         isLoading,
         isSaving,
         lastSavedAt,
@@ -372,5 +451,10 @@ export const useFlows = () => {
         // Actions - Metadata
         updateFlowName,
         isUpdatingName: updateFlowMutation.isPending,
+
+        // Actions - Publish
+        isPublic,
+        togglePublic,
+        publishFlow,
     };
 };

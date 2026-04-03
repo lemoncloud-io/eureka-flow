@@ -33,6 +33,7 @@ import {
     TooltipTrigger,
 } from '@flows/ui-kit';
 
+import { BlockIcon } from './BlockIcon';
 import { FrontendBadge } from './FrontendBadge';
 
 interface SidebarProps {
@@ -96,6 +97,7 @@ interface BlockItemProps {
     type: string;
     label: string;
     description: string;
+    icon?: string;
     onAdd: () => void;
     disabled?: boolean;
     inputCount?: number;
@@ -107,6 +109,7 @@ const BlockItem: React.FC<BlockItemProps> = ({
     type,
     label,
     description,
+    icon,
     onAdd,
     disabled,
     inputCount = 0,
@@ -114,7 +117,7 @@ const BlockItem: React.FC<BlockItemProps> = ({
     isFrontend,
 }) => {
     const { t } = useTranslation(['flows']);
-    const Icon = getIcon(type);
+    const FallbackIcon = getIcon(type);
 
     return (
         <TooltipProvider delayDuration={0}>
@@ -131,7 +134,13 @@ const BlockItem: React.FC<BlockItemProps> = ({
             >
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center shrink-0 group-hover:bg-accent/30 transition-colors">
-                        <Icon className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                        <BlockIcon
+                            icon={icon}
+                            size={16}
+                            fallback={
+                                <FallbackIcon className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                            }
+                        />
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
@@ -147,12 +156,13 @@ const BlockItem: React.FC<BlockItemProps> = ({
                                         </span>
                                     </TooltipTrigger>
                                     <TooltipContent
-                                        side="bottom"
-                                        className="max-w-sm bg-popover text-popover-foreground border border-border shadow-lg"
+                                        side="right"
+                                        sideOffset={8}
+                                        className="max-w-xl break-words bg-popover text-popover-foreground border border-border shadow-lg"
                                     >
                                         <MarkdownViewer
                                             content={description}
-                                            className="text-xs [&_h1]:text-sm [&_h2]:text-xs [&_h3]:text-xs [&_p]:m-0 [&_p]:mb-1 [&_ul]:m-0 [&_ol]:m-0 [&_pre]:bg-muted [&_code]:bg-muted/70"
+                                            className="text-xs [&_h1]:text-sm [&_h2]:text-xs [&_h3]:text-xs [&_p]:m-0 [&_p]:mb-1 [&_ul]:m-0 [&_ol]:m-0 [&_pre]:bg-muted [&_pre]:whitespace-pre-wrap [&_pre]:overflow-x-hidden [&_code]:bg-muted/70"
                                         />
                                     </TooltipContent>
                                 </Tooltip>
@@ -165,7 +175,7 @@ const BlockItem: React.FC<BlockItemProps> = ({
                                         {inputCount}→{outputCount}
                                     </span>
                                 </TooltipTrigger>
-                                <TooltipContent side="top" className="text-xs">
+                                <TooltipContent side="right" sideOffset={8} className="text-xs">
                                     {t('sidebar.portsInfo', { inputs: inputCount, outputs: outputCount })}
                                 </TooltipContent>
                             </Tooltip>
@@ -403,6 +413,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                             type={block.id}
                                                             label={block.label}
                                                             description={block.description}
+                                                            icon={block.icon}
                                                             onAdd={() => handleAddNode(block.id)}
                                                             disabled={isLoading}
                                                             inputCount={block.inputs?.length}

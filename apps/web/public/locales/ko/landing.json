@@ -14,7 +14,8 @@
         },
         "subtitle": "드래그하고 연결하고 실행하세요. 설치 없이 브라우저에서 바로 AI 파이프라인을 완성합니다.",
         "cta_primary": "무료로 시작하기",
-        "cta_secondary": "데모 보기"
+        "cta_secondary": "데모 보기",
+        "cta_explore": "공개 플로우 둘러보기"
     },
     "screenshot": {
         "alt": "Eureka Flow 캔버스 화면",
@@ -58,9 +59,16 @@
         "title": "지금 바로 만들어보세요",
         "subtitle": "오픈 베타 기간 무료. 설치 없이 브라우저에서 바로 시작.",
         "note": "무료로 시작 가능",
-        "button": "무료로 시작하기"
+        "button": "무료로 시작하기",
+        "explore": "공개 플로우 둘러보기"
+    },
+    "social_proof": {
+        "open_source": "100% 오픈소스",
+        "tech_stack": "React + TypeScript",
+        "ai_powered": "AI 기반 노드"
     },
     "footer": {
+        "explore": "둘러보기",
         "brand": "Eureka Flow",
         "terms": "이용약관",
         "privacy": "개인정보처리방침",

@@ -88,12 +88,15 @@ export const upsertFlow = async (id: string, body: SaveFlowBody): Promise<SaveFl
 };
 
 /**
- * Update flow metadata (name, etc.)
- * POST /flows/:id
+ * Update flow metadata (name, description, isPublic, etc.)
+ * POST /flows/:id/upsert
+ *
+ * Uses upsert endpoint instead of POST /flows/:id because
+ * the latter is restricted to localhost on the server.
  *
  * @see eureka-flows-api v0.26.126
  * @param id - Flow ID to update
- * @param body - UpdateFlowBody { name?: string }
+ * @param body - UpdateFlowBody { name?, description?, isPublic? }
  * @returns FlowView with updated metadata
  */
 export const updateFlowMetadata = async (id: string, body: UpdateFlowBody): Promise<FlowView> => {
@@ -101,7 +104,7 @@ export const updateFlowMetadata = async (id: string, body: UpdateFlowBody): Prom
         throw new Error('Flow ID is required');
     }
     _log(`> updateFlowMetadata(${id})`, body);
-    const response = await api.post<FlowView>(`/flows/${id}`, body);
+    const response = await api.post<FlowView>(`/flows/${id}/upsert`, body);
     return response.data;
 };
 

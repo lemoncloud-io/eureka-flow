@@ -62,7 +62,6 @@ interface CanvasState {
 
     // UI State
     tooltip: Tooltip | null;
-    logViewerNodeId: string | null;
     modalFlowId: string | null;
 
     // Port Update Highlight (portId format: "nodeId:portName")
@@ -99,7 +98,6 @@ interface CanvasState {
 
     // Actions - UI
     setTooltip: (tooltip: Tooltip | null) => void;
-    setLogViewerNodeId: (id: string | null) => void;
     setModalFlowId: (id: string | null) => void;
 
     // Actions - Port Update Highlight
@@ -147,7 +145,6 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
     dragState: null,
     connectionDraft: null,
     tooltip: null,
-    logViewerNodeId: null,
     modalFlowId: null,
     updatedPortIds: new Set(),
     traceLogs: new Map(),
@@ -192,7 +189,6 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
 
     // UI Actions
     setTooltip: tooltip => set({ tooltip }),
-    setLogViewerNodeId: logViewerNodeId => set({ logViewerNodeId }),
     setModalFlowId: modalFlowId => set({ modalFlowId }),
 
     // Port Update Highlight Actions
