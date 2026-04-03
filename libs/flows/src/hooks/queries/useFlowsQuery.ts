@@ -124,6 +124,8 @@ export const useUpdateFlowMutation = () => {
                     ...old,
                     name: data.name ?? old.name,
                     description: data.description ?? old.description,
+                    thumbnail: data.thumbnail ?? old.thumbnail,
+                    isPublic: data.isPublic ?? old.isPublic,
                 };
             });
             // Refresh the flows list so updated metadata is visible

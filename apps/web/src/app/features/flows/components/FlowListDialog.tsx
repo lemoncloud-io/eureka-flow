@@ -2,8 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Camera, FolderOpen, ImagePlus, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { processImageWithConfig, useDeleteFlowMutation, useFlowsListQuery, useUpdateFlowMutation } from '@flows/flows';
+import {
+    THUMBNAIL_ASPECT_RATIO,
+    THUMBNAIL_MAX_WIDTH,
+    processImageWithConfig,
+    useDeleteFlowMutation,
+    useFlowsListQuery,
+    useUpdateFlowMutation,
+} from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     AlertDialog,
@@ -28,9 +36,6 @@ import {
 import type { FlowView } from '@flows/flows';
 
 type FlowItemData = FlowView & { id: string; nodeCount: number };
-
-const THUMBNAIL_ASPECT_RATIO = '4:3';
-const THUMBNAIL_MAX_WIDTH = '800';
 
 const formatRelativeTime = (
     timestamp: number | string | undefined,
@@ -269,16 +274,20 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
 
             const reader = new FileReader();
             reader.onload = async () => {
-                const dataUrl = reader.result as string;
-                const processed = await processImageWithConfig(dataUrl, {
-                    aspectRatio: THUMBNAIL_ASPECT_RATIO,
-                    maxWidth: THUMBNAIL_MAX_WIDTH,
-                });
-                updateFlowMutation.mutate({ id: flowId, body: { thumbnail: processed } });
+                try {
+                    const dataUrl = reader.result as string;
+                    const processed = await processImageWithConfig(dataUrl, {
+                        aspectRatio: THUMBNAIL_ASPECT_RATIO,
+                        maxWidth: THUMBNAIL_MAX_WIDTH,
+                    });
+                    updateFlowMutation.mutate({ id: flowId, body: { thumbnail: processed } });
+                } catch {
+                    toast.error(t('publish.thumbnailError'));
+                }
             };
             reader.readAsDataURL(file);
         },
-        [updateFlowMutation]
+        [updateFlowMutation, t]
     );
 
     const filteredFlows = useMemo((): FlowItemData[] => {

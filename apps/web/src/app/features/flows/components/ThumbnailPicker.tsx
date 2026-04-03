@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ImagePlus, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { processImageWithConfig } from '@flows/flows';
+import { THUMBNAIL_ASPECT_RATIO, THUMBNAIL_MAX_WIDTH, processImageWithConfig } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Label } from '@flows/ui-kit';
 
@@ -13,15 +13,10 @@ interface ThumbnailPickerProps {
     onChange: (url: string | null) => void;
 }
 
-/** 4:3 landscape aspect ratio */
-const ASPECT_RATIO = '4:3';
-/** Max width to keep file size ~400KB */
-const MAX_WIDTH = '800';
-
 const processThumbnail = async (dataUrl: string): Promise<string> => {
     return processImageWithConfig(dataUrl, {
-        aspectRatio: ASPECT_RATIO,
-        maxWidth: MAX_WIDTH,
+        aspectRatio: THUMBNAIL_ASPECT_RATIO,
+        maxWidth: THUMBNAIL_MAX_WIDTH,
     });
 };
 
