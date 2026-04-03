@@ -15,7 +15,9 @@ export const HeroSection = () => {
     const handleExplore = () => navigate(ROUTES.EXPLORE);
 
     return (
-        <section className="mx-auto max-w-4xl px-6 pt-40 pb-20 text-center">
+        <section className="relative mx-auto max-w-4xl px-6 pt-40 pb-20 text-center">
+            {/* Subtle glow behind hero */}
+            <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-primary/[0.04] rounded-full blur-[120px] pointer-events-none" />
             <h1
                 className="animate-fade-in-up mb-6 text-[clamp(2.5rem,5.5vw,4.5rem)] font-bold leading-[1.1] tracking-tight"
                 style={staggerStyle(1)}

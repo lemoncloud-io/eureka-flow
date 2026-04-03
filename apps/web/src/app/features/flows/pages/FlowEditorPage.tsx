@@ -326,20 +326,6 @@ export const FlowEditorPage = () => {
         await updateFlowName(newName);
     };
 
-    const handleShare = async () => {
-        if (canvasRef.current) {
-            const data = canvasRef.current.getWorkflow();
-            lastLocalUpdateTimestampRef.current = Date.now();
-            await saveCurrentFlow(data);
-        }
-        try {
-            await navigator.clipboard.writeText(window.location.href);
-            showNotification(t('flowEditor.linkCopied'), 'success');
-        } catch {
-            showNotification(t('flowEditor.failedToCopyLink'), 'error');
-        }
-    };
-
     const handleOpenPublish = useCallback(() => {
         setIsPublishDialogOpen(true);
     }, []);
@@ -659,7 +645,6 @@ export const FlowEditorPage = () => {
                 }
                 isPublic={isPublic}
                 isPublicMode={isPublicMode}
-                onShare={handleShare}
                 onTogglePublic={togglePublic}
                 onPublish={handleOpenPublish}
                 onApiKeySettings={handleApiKeySettings}

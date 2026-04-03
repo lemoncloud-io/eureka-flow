@@ -33,11 +33,13 @@
         "public": "공개",
         "togglePublic": "공개 전환",
         "publish": "게시",
+        "viewOnly": "읽기 전용",
         "apiKeySettings": "API 키 설정",
         "beta": "베타",
         "menuGroup": {
             "file": "파일",
             "canvas": "캔버스",
+            "share": "공유",
             "settings": "설정"
         }
     },
@@ -222,7 +224,24 @@
         "failedToSaveWorkflow": "워크플로우 저장 실패",
         "circularConnectionError": "연결을 생성할 수 없습니다: 순환 연결이 발생합니다",
         "exportedAsImage": "이미지로 내보내기 완료",
-        "exportImageFailed": "이미지 내보내기 실패"
+        "exportImageFailed": "이미지 내보내기 실패",
+        "flowNotPublic": "이 플로우는 비공개입니다. API 키로 로그인하여 확인하세요.",
+        "privateFlowTitle": "비공개 플로우",
+        "privateFlowDescription": "이 플로우는 공개되지 않았습니다. API 키로 로그인하면 접근할 수 있습니다.",
+        "loadErrorTitle": "로드 실패",
+        "signInWithApiKey": "API 키로 로그인",
+        "browsePublicFlows": "공개 플로우 둘러보기",
+        "signInToEdit": "로그인하여 편집하기"
+    },
+    "publicFlows": {
+        "title": "공개 플로우",
+        "heroDescription": "커뮤니티가 공유한 워크플로우를 탐색하고 배워보세요. 플로우를 열어 작동 방식을 확인하세요.",
+        "searchPlaceholder": "공개 플로우 검색...",
+        "loading": "플로우 로딩 중...",
+        "noSearchResults": "검색 결과가 없습니다",
+        "empty": "아직 공개된 플로우가 없습니다",
+        "goToEditor": "에디터로 이동",
+        "signIn": "로그인"
     },
     "publish": {
         "title": "플로우 게시",

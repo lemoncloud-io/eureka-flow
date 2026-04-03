@@ -33,11 +33,13 @@
         "public": "Public",
         "togglePublic": "Toggle Public",
         "publish": "Publish",
+        "viewOnly": "View Only",
         "apiKeySettings": "API Key Settings",
         "beta": "Beta",
         "menuGroup": {
             "file": "File",
             "canvas": "Canvas",
+            "share": "Share",
             "settings": "Settings"
         }
     },
@@ -222,7 +224,24 @@
         "failedToSaveWorkflow": "Failed to save workflow",
         "circularConnectionError": "Cannot create connection: would create a circular loop",
         "exportedAsImage": "Exported as image",
-        "exportImageFailed": "Failed to export image"
+        "exportImageFailed": "Failed to export image",
+        "flowNotPublic": "This flow is private. Sign in with an API key to view it.",
+        "privateFlowTitle": "Private Flow",
+        "privateFlowDescription": "This flow is not publicly available. Sign in with your API key to access it.",
+        "loadErrorTitle": "Failed to Load",
+        "signInWithApiKey": "Sign in with API Key",
+        "browsePublicFlows": "Browse public flows",
+        "signInToEdit": "Sign in to edit this flow"
+    },
+    "publicFlows": {
+        "title": "Public Flows",
+        "heroDescription": "Discover and learn from workflows shared by the community. Open any flow to see how it works.",
+        "searchPlaceholder": "Search public flows...",
+        "loading": "Loading flows...",
+        "noSearchResults": "No flows match your search",
+        "empty": "No public flows yet",
+        "goToEditor": "Go to Editor",
+        "signIn": "Sign in"
     },
     "publish": {
         "title": "Publish Flow",

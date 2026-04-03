@@ -3,5 +3,7 @@ export { FeaturesSection } from './FeaturesSection';
 export { FooterSection } from './FooterSection';
 export { HeroSection } from './HeroSection';
 export { HowItWorksSection } from './HowItWorksSection';
+export { IntegrationSection } from './IntegrationSection';
 export { NavBar } from './NavBar';
 export { ScreenshotSection } from './ScreenshotSection';
+export { SocialProofBar } from './SocialProofBar';

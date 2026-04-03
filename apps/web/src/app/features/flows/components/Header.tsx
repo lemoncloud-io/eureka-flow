@@ -16,7 +16,6 @@ import {
     Menu,
     Redo2,
     Save,
-    Share2,
     Trash2,
     Undo2,
     Upload,
@@ -92,7 +91,6 @@ interface HeaderProps {
     isPublic?: boolean;
     /** Read-only public viewing mode (no API key) */
     isPublicMode?: boolean;
-    onShare: () => void;
     onTogglePublic?: () => void;
     onPublish?: () => void;
     onApiKeySettings?: () => void;
@@ -319,7 +317,6 @@ export const Header: React.FC<HeaderProps> = ({
     socketState,
     isPublic,
     isPublicMode,
-    onShare,
     onTogglePublic,
     onPublish,
     onApiKeySettings,
@@ -473,12 +470,6 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.exportPng')}
                                 </DropdownMenuItem>
                             )}
-                            {!isPublicMode && (
-                                <DropdownMenuItem onClick={onShare}>
-                                    <Share2 className="w-4 h-4 mr-2" />
-                                    {t('header.share')}
-                                </DropdownMenuItem>
-                            )}
 
                             <DropdownMenuSeparator />
 
@@ -527,6 +518,42 @@ export const Header: React.FC<HeaderProps> = ({
 
                             <DropdownMenuSeparator />
 
+                            {/* Share Group */}
+                            {!isPublicMode && onTogglePublic && (
+                                <>
+                                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                                        {t('header.menuGroup.share')}
+                                    </DropdownMenuLabel>
+                                    <div className="flex items-center justify-between px-2 py-1.5">
+                                        <span className="text-sm">{t('header.public')}</span>
+                                        <button
+                                            onClick={onTogglePublic}
+                                            role="switch"
+                                            aria-checked={!!isPublic}
+                                            aria-label={t('header.togglePublic')}
+                                            className={cn(
+                                                'w-9 h-5 rounded-full p-0.5 transition-colors relative',
+                                                isPublic ? 'bg-primary' : 'bg-muted'
+                                            )}
+                                        >
+                                            <div
+                                                className={cn(
+                                                    'w-4 h-4 bg-white rounded-full shadow-sm transition-transform absolute top-0.5',
+                                                    isPublic ? 'translate-x-4' : 'translate-x-0.5'
+                                                )}
+                                            />
+                                        </button>
+                                    </div>
+                                    {isPublic && onPublish && (
+                                        <DropdownMenuItem onClick={onPublish}>
+                                            <Globe className="w-4 h-4 mr-2" />
+                                            {t('header.publish')}
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                </>
+                            )}
+
                             {/* Settings Group */}
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.settings')}
@@ -552,36 +579,6 @@ export const Header: React.FC<HeaderProps> = ({
                                         />
                                     </button>
                                 </div>
-                            )}
-                            {/* Public toggle - like Auto Save */}
-                            {!isPublicMode && onTogglePublic && (
-                                <div className="flex items-center justify-between px-2 py-1.5">
-                                    <span className="text-sm">{t('header.public')}</span>
-                                    <button
-                                        onClick={onTogglePublic}
-                                        role="switch"
-                                        aria-checked={!!isPublic}
-                                        aria-label={t('header.togglePublic')}
-                                        className={cn(
-                                            'w-9 h-5 rounded-full p-0.5 transition-colors relative',
-                                            isPublic ? 'bg-primary' : 'bg-muted'
-                                        )}
-                                    >
-                                        <div
-                                            className={cn(
-                                                'w-4 h-4 bg-white rounded-full shadow-sm transition-transform absolute top-0.5',
-                                                isPublic ? 'translate-x-4' : 'translate-x-0.5'
-                                            )}
-                                        />
-                                    </button>
-                                </div>
-                            )}
-                            {/* Publish button - shown when public */}
-                            {!isPublicMode && isPublic && onPublish && (
-                                <DropdownMenuItem onClick={onPublish}>
-                                    <Globe className="w-4 h-4 mr-2" />
-                                    {t('header.publish')}
-                                </DropdownMenuItem>
                             )}
                             {onApiKeySettings && (
                                 <DropdownMenuItem onClick={onApiKeySettings}>
