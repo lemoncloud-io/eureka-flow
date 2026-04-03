@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { ArrowRight, GitFork, Github, Globe, Layers, Search } from 'lucide-react';
 
-import { useFlowsListQuery, useS3Image } from '@flows/flows';
+import { usePublicFlowsListQuery, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { ApiKeyDialog } from '@flows/shared';
 import { Badge, Button, Input, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
@@ -190,7 +190,7 @@ export const PublicFlowsPage = () => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
     const { apiKey, setApiKey } = useWebCoreStore();
-    const { data, isLoading } = useFlowsListQuery(true);
+    const { data, isLoading } = usePublicFlowsListQuery(true);
 
     const [search, setSearch] = useState('');
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);

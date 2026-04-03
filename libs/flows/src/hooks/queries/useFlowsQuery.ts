@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { flowsKeys } from './keys';
-import { createFlow, deleteFlow, listFlows, loadFlow, saveFlow, updateFlowMetadata } from '../../api';
+import { createFlow, deleteFlow, listFlows, listPublicFlows, loadFlow, saveFlow, updateFlowMetadata } from '../../api';
 
 import type {
     ApiListResult,
@@ -21,6 +21,18 @@ export const useFlowsListQuery = (enabled = true) => {
     return useQuery<ApiListResult<FlowView>>({
         queryKey: flowsKeys.lists(),
         queryFn: listFlows,
+        enabled,
+    });
+};
+
+/**
+ * Query hook for listing public flows (always uses /public endpoint)
+ * GET /public/flows
+ */
+export const usePublicFlowsListQuery = (enabled = true) => {
+    return useQuery<ApiListResult<FlowView>>({
+        queryKey: flowsKeys.publicList(),
+        queryFn: listPublicFlows,
         enabled,
     });
 };
