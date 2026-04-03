@@ -1,5 +1,39 @@
 # Changelog
 
+## [2026-04-03] - root@0.18.0, @flows/web@0.18.0, @flows/admin@0.6.0
+
+### Features
+
+- update tools of admin
+- add published status indicator
+- add publish and unpublish functionalities
+- update ui for explore
+- implement share and public
+- add BlockIcon for node state display
+- (flows) improve run button functionality and sanitize SVG icons
+- add run buttons for process nodes
+- add run options for node execution
+- add BlockIcon component for icons
+
+### Bug Fixes
+
+- correct propagate query param
+
+### Refactor
+
+- (flows) temporarily disable thumbnail functionality
+- (api) update flow metadata endpoint
+- rename publishTitle to flowName and update references
+- extract StatusIcon component
+- remove LogModal and related actions
+- (flows) remove node disabled state
+
+### Chores
+
+- update landing
+- temp commit
+- update button icon size for consistency
+
 ## [2026-04-01] - root@0.17.0, @flows/web@0.17.0, @flows/admin@0.5.0
 
 ### Features
