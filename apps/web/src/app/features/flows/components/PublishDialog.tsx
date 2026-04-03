@@ -17,7 +17,6 @@ import {
     Textarea,
 } from '@flows/ui-kit';
 
-import { ThumbnailPicker } from './ThumbnailPicker';
 
 import type { UpdateFlowBody } from '@flows/flows';
 
@@ -79,9 +78,10 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
                 description: description.trim(),
                 isPublic: true,
             };
-            if (thumbnailUrl) {
-                body.thumbnail = thumbnailUrl;
-            }
+            // TODO: enable when server supports thumbnail field
+            // if (thumbnailUrl) {
+            //     body.thumbnail = thumbnailUrl;
+            // }
             const success = await onPublish(body);
             if (success) {
                 // Auto-copy share link
@@ -165,8 +165,8 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
                         />
                     </div>
 
-                    {/* Thumbnail */}
-                    <ThumbnailPicker value={thumbnailUrl} onChange={setThumbnailUrl} />
+                    {/* TODO: enable when server supports thumbnail field */}
+                    {/* <ThumbnailPicker value={thumbnailUrl} onChange={setThumbnailUrl} /> */}
 
                     {/* Share Link */}
                     {flowId && (
