@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-04-03] - root@0.19.0, @flows/web@0.19.0, @flows/admin@0.7.0
+
+### Features
+
+- add error handling for thumbnail upload
+- add query for listing public flows
+- add thumbnail upload feature
+- upload flow thumbnail
+- add thumbnail processing and error handling
+
+### Chores
+
+- remove unused camera icon from FlowCard
+
 ## [2026-04-03] - root@0.18.0, @flows/web@0.18.0, @flows/admin@0.6.0
 
 ### Features
