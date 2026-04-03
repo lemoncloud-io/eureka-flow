@@ -25,9 +25,10 @@ interface PublishDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     flowName: string;
+    flowDescription: string;
     flowId: string | null;
     flowMeta: PublishMeta | null;
-    onPublish: (meta: PublishMeta) => Promise<boolean>;
+    onPublish: (body: { name?: string; description?: string; meta: PublishMeta }) => Promise<boolean>;
 }
 
 const DESCRIPTION_MAX_LENGTH = 500;
@@ -36,6 +37,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
     open,
     onOpenChange,
     flowName,
+    flowDescription,
     flowId,
     flowMeta,
     onPublish,
@@ -43,7 +45,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
     const { t } = useTranslation(['flows']);
 
     const [isPublic, setIsPublic] = useState(false);
-    const [title, setTitle] = useState('');
+    const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
@@ -52,10 +54,10 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
     useEffect(() => {
         if (!open) return;
         setIsPublic(flowMeta?.isPublic ?? false);
-        setTitle(flowMeta?.publishTitle ?? flowName);
-        setDescription(flowMeta?.publishDescription ?? '');
+        setName(flowName);
+        setDescription(flowDescription);
         setLinkCopied(false);
-    }, [open, flowMeta, flowName]);
+    }, [open, flowMeta, flowName, flowDescription]);
 
     const flowUrl = flowId ? `${window.location.origin}/flows/${flowId}` : '';
 
@@ -75,11 +77,13 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
         try {
             const meta: PublishMeta = {
                 isPublic,
-                publishTitle: title.trim() || flowName,
-                publishDescription: description.trim(),
                 publishedAt: isPublic ? (flowMeta?.publishedAt ?? new Date().toISOString()) : undefined,
             };
-            const success = await onPublish(meta);
+            const success = await onPublish({
+                name: name.trim() || flowName,
+                description: description.trim(),
+                meta,
+            });
             if (success) {
                 toast.success(isPublic ? t('publish.published') : t('publish.unpublished'));
                 onOpenChange(false);
@@ -87,7 +91,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
         } finally {
             setIsSubmitting(false);
         }
-    }, [isPublic, title, description, flowName, flowMeta, onPublish, onOpenChange, t]);
+    }, [isPublic, name, description, flowName, flowMeta, onPublish, onOpenChange, t]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -118,19 +122,19 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
                         <Switch checked={isPublic} onCheckedChange={setIsPublic} />
                     </div>
 
-                    {/* Publish Metadata (shown when public) */}
+                    {/* Flow Metadata (shown when public) */}
                     {isPublic && (
                         <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                            {/* Title */}
+                            {/* Name */}
                             <div className="space-y-1.5">
-                                <Label htmlFor="publish-title" className="text-sm">
-                                    {t('publish.publishTitle')}
+                                <Label htmlFor="publish-name" className="text-sm">
+                                    {t('publish.flowName')}
                                 </Label>
                                 <Input
-                                    id="publish-title"
-                                    value={title}
-                                    onChange={e => setTitle(e.target.value)}
-                                    placeholder={flowName}
+                                    id="publish-name"
+                                    value={name}
+                                    onChange={e => setName(e.target.value)}
+                                    placeholder={t('header.untitledWorkflow')}
                                 />
                             </div>
 
@@ -138,7 +142,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
                             <div className="space-y-1.5">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="publish-description" className="text-sm">
-                                        {t('publish.publishDescription')}
+                                        {t('publish.flowDescription')}
                                     </Label>
                                     <span
                                         className={cn(

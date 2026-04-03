@@ -10,6 +10,7 @@ describe('useFlowsStore - Publish Meta', () => {
             flowMeta: null,
             currentFlowId: 'test-flow-1',
             flowName: 'Test Flow',
+            flowDescription: '',
         });
     });
 
@@ -17,8 +18,6 @@ describe('useFlowsStore - Publish Meta', () => {
         it('should set publish meta', () => {
             const meta: PublishMeta = {
                 isPublic: true,
-                publishTitle: 'My Published Flow',
-                publishDescription: 'A test flow',
                 publishedAt: '2026-04-03T00:00:00.000Z',
             };
 
@@ -54,27 +53,26 @@ describe('useFlowsStore - Publish Meta', () => {
         });
 
         it('should allow unpublishing', () => {
-            useFlowsStore.getState().setFlowMeta({ isPublic: true, publishTitle: 'Test' });
-            useFlowsStore.getState().setFlowMeta({ isPublic: false, publishTitle: 'Test' });
+            useFlowsStore.getState().setFlowMeta({ isPublic: true });
+            useFlowsStore.getState().setFlowMeta({ isPublic: false });
             expect(useFlowsStore.getState().flowMeta?.isPublic).toBe(false);
         });
+    });
 
-        it('should preserve publish metadata fields', () => {
-            const meta: PublishMeta = {
-                isPublic: true,
-                publishTitle: 'Custom Title',
-                publishDescription: 'Custom Description',
-                publishImage: 's3://bucket/image.png',
-                publishedAt: '2026-04-03T12:00:00.000Z',
-            };
+    describe('flowDescription', () => {
+        it('should default to empty string', () => {
+            expect(useFlowsStore.getState().flowDescription).toBe('');
+        });
 
-            useFlowsStore.getState().setFlowMeta(meta);
-            const stored = useFlowsStore.getState().flowMeta;
+        it('should set flow description', () => {
+            useFlowsStore.getState().setFlowDescription('A test flow description');
+            expect(useFlowsStore.getState().flowDescription).toBe('A test flow description');
+        });
 
-            expect(stored?.publishTitle).toBe('Custom Title');
-            expect(stored?.publishDescription).toBe('Custom Description');
-            expect(stored?.publishImage).toBe('s3://bucket/image.png');
-            expect(stored?.publishedAt).toBe('2026-04-03T12:00:00.000Z');
+        it('should update independently from flowMeta', () => {
+            useFlowsStore.getState().setFlowDescription('desc');
+            useFlowsStore.getState().setFlowMeta({ isPublic: true });
+            expect(useFlowsStore.getState().flowDescription).toBe('desc');
         });
     });
 });

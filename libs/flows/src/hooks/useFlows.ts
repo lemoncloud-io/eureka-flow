@@ -121,9 +121,10 @@ export const useFlows = () => {
         setCurrentFlowId(newFlowId);
         flowStorage.setFlowId(newFlowId);
         setFlowName('Untitled Workflow');
+        setFlowDescription('');
         setFlowMeta(null);
         return { flowId: newFlowId, flowData: null, isNew: true };
-    }, [queryClient, setCurrentFlowId, setFlowName, setChannelId, setFlowMeta]);
+    }, [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setFlowMeta]);
 
     /**
      * Load a specific flow by ID
@@ -150,6 +151,7 @@ export const useFlows = () => {
                 if (flowData.name) {
                     setFlowName(flowData.name);
                 }
+                setFlowDescription(flowData.description ?? '');
                 if (flowData.channelId) {
                     setChannelId(flowData.channelId);
                 }
@@ -160,7 +162,7 @@ export const useFlows = () => {
                 return null;
             }
         },
-        [queryClient, setCurrentFlowId, setFlowName, setChannelId, setFlowMeta]
+        [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setFlowMeta]
     );
 
     /**
@@ -298,6 +300,7 @@ export const useFlows = () => {
                 setCurrentFlowId(newFlowId);
                 flowStorage.setFlowId(newFlowId);
                 setFlowName('Untitled Workflow');
+                setFlowDescription('');
                 setLastSavedAt(null);
                 setChannelId(null);
                 setFlowMeta(null);
@@ -308,7 +311,15 @@ export const useFlows = () => {
             console.error('[useFlows] Failed to create new flow:', error);
             return null;
         }
-    }, [createFlowMutation, setCurrentFlowId, setFlowName, setLastSavedAt, setChannelId, setFlowMeta]);
+    }, [
+        createFlowMutation,
+        setCurrentFlowId,
+        setFlowName,
+        setFlowDescription,
+        setLastSavedAt,
+        setChannelId,
+        setFlowMeta,
+    ]);
 
     /**
      * Update flow name (metadata only)
@@ -359,6 +370,7 @@ export const useFlows = () => {
                     body,
                 });
                 if (body.name) setFlowName(body.name);
+                if (body.description !== undefined) setFlowDescription(body.description);
                 setFlowMeta(body.meta);
                 setLastSavedAt(new Date());
                 updateSaveStatus('success');
@@ -369,7 +381,15 @@ export const useFlows = () => {
                 return false;
             }
         },
-        [currentFlowId, updateFlowMutation, setFlowName, setFlowMeta, setLastSavedAt, updateSaveStatus]
+        [
+            currentFlowId,
+            updateFlowMutation,
+            setFlowName,
+            setFlowDescription,
+            setFlowMeta,
+            setLastSavedAt,
+            updateSaveStatus,
+        ]
     );
 
     // Derive loading state from TanStack Query (only for initial load)
@@ -384,6 +404,7 @@ export const useFlows = () => {
         // State
         currentFlowId,
         flowName,
+        flowDescription,
         isLoading,
         isSaving,
         lastSavedAt,

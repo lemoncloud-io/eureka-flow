@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { AlertCircle, Globe, KeyRound } from 'lucide-react';
+import { ArrowRight, Globe, KeyRound, Lock, ShieldX } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useBlocks, useFlows } from '@flows/flows';
@@ -40,6 +40,7 @@ export const FlowEditorPage = () => {
     const {
         currentFlowId,
         flowName,
+        flowDescription,
         isLoading,
         isSaving,
         lastSavedAt,
@@ -504,41 +505,62 @@ export const FlowEditorPage = () => {
         return (
             <div className="flex h-screen bg-background text-foreground font-sans items-center justify-center flex-col gap-4">
                 {bootError ? (
-                    <>
-                        <AlertCircle className="w-16 h-16 text-destructive/70" />
-                        <div className="text-muted-foreground font-mono text-sm text-center max-w-md">{bootError}</div>
-                        <div className="flex flex-col items-center gap-3 mt-2">
-                            <div className="flex gap-2">
-                                {isPublicMode ? (
-                                    <Button
-                                        variant="default"
-                                        size="sm"
-                                        className="gap-2"
-                                        onClick={() => setIsApiKeyDialogOpen(true)}
-                                    >
-                                        <KeyRound className="w-4 h-4" />
-                                        {t('flowEditor.signInWithApiKey', 'Sign in with API Key')}
-                                    </Button>
-                                ) : (
-                                    <>
-                                        <Button variant="default" size="sm" onClick={boot}>
-                                            {t('flowEditor.retry')}
-                                        </Button>
-                                        <Button variant="outline" size="sm" onClick={() => setIsApiKeyDialogOpen(true)}>
-                                            {t('flowEditor.resetApiKey')}
-                                        </Button>
-                                    </>
-                                )}
+                    <div className="flex flex-col items-center max-w-sm mx-auto px-4 animate-fade-in-up">
+                        {/* Icon */}
+                        {isPublicMode ? (
+                            <div className="w-16 h-16 rounded-2xl bg-muted/30 border border-border/40 flex items-center justify-center mb-5">
+                                <Lock className="w-7 h-7 text-muted-foreground/50" />
                             </div>
+                        ) : (
+                            <div className="w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center mb-5">
+                                <ShieldX className="w-7 h-7 text-destructive/60" />
+                            </div>
+                        )}
+
+                        {/* Title */}
+                        <h2 className="text-base font-semibold text-foreground mb-1.5 text-center">
+                            {isPublicMode
+                                ? t('flowEditor.privateFlowTitle', 'Private Flow')
+                                : t('flowEditor.loadErrorTitle', 'Failed to Load')}
+                        </h2>
+
+                        {/* Description */}
+                        <p className="text-sm text-muted-foreground text-center mb-6 leading-relaxed">
+                            {isPublicMode
+                                ? t(
+                                      'flowEditor.privateFlowDescription',
+                                      'This flow is not publicly available. Sign in with your API key to access it.'
+                                  )
+                                : bootError}
+                        </p>
+
+                        {/* Actions */}
+                        <div className="flex flex-col items-center gap-2.5">
+                            {isPublicMode ? (
+                                <Button size="sm" className="gap-2" onClick={() => setIsApiKeyDialogOpen(true)}>
+                                    <KeyRound className="w-3.5 h-3.5" />
+                                    {t('flowEditor.signInWithApiKey', 'Sign in with API Key')}
+                                </Button>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <Button size="sm" onClick={boot}>
+                                        {t('flowEditor.retry')}
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={() => setIsApiKeyDialogOpen(true)}>
+                                        {t('flowEditor.resetApiKey')}
+                                    </Button>
+                                </div>
+                            )}
                             <Link
                                 to="/explore"
-                                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                className="group flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-primary transition-colors mt-1"
                             >
                                 <Globe className="w-3.5 h-3.5" />
                                 {t('flowEditor.browsePublicFlows', 'Browse public flows')}
+                                <ArrowRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
                             </Link>
                         </div>
-                    </>
+                    </div>
                 ) : (
                     <>
                         <div className="relative w-16 h-16">
@@ -665,6 +687,7 @@ export const FlowEditorPage = () => {
                 open={isPublishDialogOpen}
                 onOpenChange={setIsPublishDialogOpen}
                 flowName={flowName}
+                flowDescription={flowDescription}
                 flowId={currentFlowId}
                 flowMeta={flowMeta}
                 onPublish={publishFlow}
