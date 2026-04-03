@@ -28,6 +28,8 @@ interface FlowsState {
     channelId: string | null;
     /** Whether this flow is publicly accessible */
     isPublic: boolean;
+    /** Thumbnail URL (http or s3) */
+    flowThumbnail: string;
 
     setBlockRegistry: (blocks: BlockDefinitionWithFrontend[]) => void;
     setBlocksLoaded: (loaded: boolean) => void;
@@ -42,6 +44,7 @@ interface FlowsState {
     setSaveError: (error: Error | null) => void;
     setChannelId: (channelId: string | null) => void;
     setIsPublic: (isPublic: boolean) => void;
+    setFlowThumbnail: (thumbnail: string) => void;
 }
 
 export const useFlowsStore = create<FlowsState>(set => ({
@@ -57,6 +60,7 @@ export const useFlowsStore = create<FlowsState>(set => ({
     saveError: null,
     channelId: '0000',
     isPublic: false,
+    flowThumbnail: '',
 
     setBlockRegistry: blocks => {
         const registry = blocks.reduce<Record<string, BlockDefinitionWithFrontend>>((acc, block) => {
@@ -103,6 +107,8 @@ export const useFlowsStore = create<FlowsState>(set => ({
     setChannelId: channelId => set({ channelId }),
 
     setIsPublic: isPublic => set({ isPublic }),
+
+    setFlowThumbnail: thumbnail => set({ flowThumbnail: thumbnail }),
 }));
 
 export const useBlockRegistry = () => useFlowsStore(state => state.blockRegistry);
@@ -117,3 +123,4 @@ export const useSaveError = () => useFlowsStore(state => state.saveError);
 export const useChannelId = () => useFlowsStore(state => state.channelId);
 export const useFlowDescription = () => useFlowsStore(state => state.flowDescription);
 export const useIsPublic = () => useFlowsStore(state => state.isPublic);
+export const useFlowThumbnail = () => useFlowsStore(state => state.flowThumbnail);

@@ -26,6 +26,7 @@ interface PublishDialogProps {
     onOpenChange: (open: boolean) => void;
     flowName: string;
     flowDescription: string;
+    flowThumbnail: string;
     flowId: string | null;
     onPublish: (body: UpdateFlowBody) => Promise<boolean>;
 }
@@ -38,6 +39,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
     onOpenChange,
     flowName,
     flowDescription,
+    flowThumbnail,
     flowId,
     onPublish,
 }) => {
@@ -55,8 +57,8 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
         setName(flowName);
         setDescription(flowDescription);
         setLinkCopied(false);
-        setThumbnailUrl(null);
-    }, [open, flowName, flowDescription]);
+        setThumbnailUrl(flowThumbnail || null);
+    }, [open, flowName, flowDescription, flowThumbnail]);
 
     const flowUrl = flowId ? `${window.location.origin}/flows/${flowId}` : '';
 
