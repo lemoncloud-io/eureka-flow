@@ -207,7 +207,6 @@ const FlowCard: React.FC<{
                                 onRequestThumbnailUpload();
                             }}
                         >
-                            <Camera className="w-4 h-4 mr-2" />
                             {t('flowList.changeThumbnail')}
                         </DropdownMenuItem>
                         <DropdownMenuItem
