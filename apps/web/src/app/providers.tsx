@@ -44,11 +44,18 @@ interface ProvidersProps {
 }
 
 /**
- * Check if current path is a public route that doesn't require authentication
+ * Check if current path is a public route that doesn't require authentication.
+ * /flows/:id is allowed without API key for read-only public viewing.
  */
 const isPublicRoute = (): boolean => {
     const pathname = window.location.pathname;
-    return pathname === '/' || pathname.startsWith('/flow/examples') || pathname.startsWith('/policy/');
+    return (
+        pathname === '/' ||
+        pathname === '/explore' ||
+        pathname.startsWith('/flows/') ||
+        pathname.startsWith('/flow/examples') ||
+        pathname.startsWith('/policy/')
+    );
 };
 
 /**
@@ -67,11 +74,11 @@ const ApiKeyGate = ({ children }: { children: ReactNode }) => {
         setIsInitialized(true);
     }, [initializeApiKey]);
 
-    // Clear flow ID and redirect to root when no API key on flow pages (only after initialization)
+    // Clear flow ID when no API key on flow pages (only after initialization)
+    // Note: /flows/:id is allowed without API key for public viewing
     useEffect(() => {
         if (isInitialized && !apiKey && window.location.pathname.startsWith('/flows/')) {
             flowStorage.clearFlowId();
-            window.location.href = '/';
         }
     }, [isInitialized, apiKey]);
 

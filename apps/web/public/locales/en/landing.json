@@ -14,7 +14,8 @@
         },
         "subtitle": "Drag, connect, and run AI pipelines on a visual canvas. No installation needed — start building in your browser.",
         "cta_primary": "Start Building Free",
-        "cta_secondary": "View Demo"
+        "cta_secondary": "View Demo",
+        "cta_explore": "Explore Public Flows"
     },
     "screenshot": {
         "alt": "Eureka Flow canvas screenshot",
@@ -58,9 +59,16 @@
         "title": "Start building today",
         "subtitle": "Free during open beta. No installation needed — runs entirely in your browser.",
         "note": "Free to start",
-        "button": "Start Building Free"
+        "button": "Start Building Free",
+        "explore": "Explore Public Flows"
+    },
+    "social_proof": {
+        "open_source": "100% Open Source",
+        "tech_stack": "React + TypeScript",
+        "ai_powered": "AI-Powered Nodes"
     },
     "footer": {
+        "explore": "Explore",
         "brand": "Eureka Flow",
         "terms": "Terms of Service",
         "privacy": "Privacy Policy",

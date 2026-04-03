@@ -32,7 +32,6 @@ import { ConnectionLine } from './ConnectionLine';
 import { DataTooltip } from './DataTooltip';
 import { DetailPanel } from './DetailPanel';
 import { EmptyStateGuide } from './EmptyStateGuide';
-import { LogModal } from './LogModal';
 import { Minimap } from './Minimap';
 import { MobileControls } from './MobileControls';
 import { NodeBlock } from './NodeBlock';
@@ -280,8 +279,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         // For single-node operations (detail panel, etc.), use the first selected node
         const selectedNodeId = selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null;
-
-        const [logViewerNodeId, setLogViewerNodeId] = useState<string | null>(null);
 
         const [tooltip, setTooltip] = useState<{ x: number; y: number; content: unknown; type: string } | null>(null);
 
@@ -1035,7 +1032,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         );
 
         const executeNode = useCallback(
-            async (nodeId: string, manualOverrideInputs?: Record<string, DataPacket>) => {
+            async (
+                nodeId: string,
+                manualOverrideInputs?: Record<string, DataPacket>,
+                options?: { propagate?: boolean }
+            ) => {
                 if (readOnly) return;
 
                 // Flush any pending config updates before execution
@@ -1181,7 +1182,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             // Send frontend execution output to server
                             // Server will save outputs to ports and propagate to downstream nodes
                             const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
-                            await runNode(nodeId, runBody, { force: true, connection: connectionId });
+                            await runNode(nodeId, runBody, {
+                                force: true,
+                                propagate: options?.propagate,
+                                connection: connectionId,
+                            });
                         }
                     } else {
                         // ============================================================
@@ -1229,7 +1234,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                         // Step 3: Run the node (server will hydrate inputs from saved port nodes)
                         const runBody = buildRunBody(currentNode.config || {}, getSyncedConfig(nodeId));
-                        const result = await runNode(nodeId, runBody, { connection: connectionId });
+                        const result = await runNode(nodeId, runBody, {
+                            propagate: options?.propagate,
+                            connection: connectionId,
+                        });
 
                         // Use state from result if available, fallback to status for backward compatibility
                         const resultState = getEffectiveState(result?.state, result?.status);
@@ -1496,19 +1504,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 );
             },
             [readOnly, nodes, saveCheckpoint, handleSelectionChange, createNodeAsync]
-        );
-
-        const toggleNodeDisabled = useCallback(
-            (nodeId: string) => {
-                if (readOnly) return;
-                saveCheckpoint();
-                setNodes(prev =>
-                    prev.map(n =>
-                        n.id === nodeId ? { ...n, disabled: !(n as NodeData & { disabled?: boolean }).disabled } : n
-                    )
-                );
-            },
-            [readOnly, saveCheckpoint]
         );
 
         const handleWheel = (e: React.WheelEvent) => {
@@ -2443,10 +2438,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             }}
                                             actions={{
                                                 onDelete: () => deleteNode(node.id),
-                                                onTrigger: () => executeNode(node.id),
-                                                onToggleDisabled: () => toggleNodeDisabled(node.id),
+                                                onTrigger: opts => executeNode(node.id, undefined, opts),
                                                 onDuplicate: () => duplicateNode(node.id),
-                                                onViewLogs: () => setLogViewerNodeId(node.id),
+
                                                 onResize: (w, h) => handleNodeResize(node.id, w, h),
                                                 onResizing: w =>
                                                     setResizingNode(w !== null ? { nodeId: node.id, width: w } : null),
@@ -2534,8 +2528,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         </div>
                     )}
 
-                    {logViewerNodeId && <LogModal nodeId={logViewerNodeId} onClose={() => setLogViewerNodeId(null)} />}
-
                     <div data-canvas-overlay>
                         <DetailPanel
                             selectedNode={detailNode}
@@ -2546,10 +2538,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             onDescriptionChange={handleDescriptionChange}
                             onLabelChange={handleLabelChange}
                             onToggleAuto={handleToggleAuto}
-                            onViewLogs={() => selectedNodeId && setLogViewerNodeId(selectedNodeId)}
                             onDeleteNode={deleteNode}
                             onDeleteConnection={deleteConnection}
-                            onTriggerNode={executeNode}
+                            onTriggerNode={(nodeId, opts) => executeNode(nodeId, undefined, opts)}
                             onSelectNode={id => handleSelectionChange(id)}
                             onSelectConnection={id => {
                                 setSelectedConnectionId(id);

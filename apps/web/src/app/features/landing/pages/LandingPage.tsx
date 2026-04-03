@@ -8,6 +8,7 @@ import {
     HowItWorksSection,
     NavBar,
     ScreenshotSection,
+    SocialProofBar,
 } from '../components';
 
 export const LandingPage = () => {
@@ -24,6 +25,7 @@ export const LandingPage = () => {
             <main>
                 <HeroSection />
                 <ScreenshotSection />
+                <SocialProofBar />
                 <HowItWorksSection />
                 <FeaturesSection />
                 <CtaSection />

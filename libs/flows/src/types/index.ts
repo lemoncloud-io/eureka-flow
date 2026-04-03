@@ -201,10 +201,13 @@ export interface FlowModel {
     name?: string;
     state?: FlowState;
     description?: string;
+    isPublic?: boolean;
     seq?: number;
     meta?: unknown;
     /** Node IDs associated with this flow (populated in list responses) */
     nodeIds$$?: string[];
+    /** Edge IDs associated with this flow (populated in list responses) */
+    edgeIds$$?: string[];
     createdAt?: string;
     updatedAt?: string;
 }
@@ -357,7 +360,6 @@ export interface NodeModel {
     flowId?: string;
     runId?: string;
     lastGoodOutput$$?: NodeDataPacketItem[];
-    disabled?: boolean;
     /**
      * If true, node auto-executes when inputData.timestamp changes
      * This enables reactive chain execution
@@ -641,6 +643,9 @@ export const isFlowExecutionError = (error: unknown): error is FlowExecutionErro
 export interface UpdateFlowBody {
     name?: string;
     description?: string;
+    isPublic?: boolean;
+    /** Base64 data URL for thumbnail image */
+    thumbnail?: string;
 }
 
 // ============================================================================

@@ -23,6 +23,7 @@ import {
 
 import { TOOL_CATEGORY_OPTIONS } from '../consts';
 import { useToolStore } from '../stores';
+import { SchemaPreview } from './SchemaPreview';
 import { ToolParameterEditor } from './ToolParameterEditor';
 
 import type { Tool, ToolFormData } from '../types';
@@ -89,7 +90,7 @@ export const ToolFormDialog = ({ open, onOpenChange, editTarget }: ToolFormDialo
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>{editTarget ? 'Tool 수정' : '새 Tool 추가'}</DialogTitle>
                 </DialogHeader>
@@ -150,6 +151,13 @@ export const ToolFormDialog = ({ open, onOpenChange, editTarget }: ToolFormDialo
                             <ToolParameterEditor
                                 parameters={form.parameters}
                                 onChange={params => update('parameters', params)}
+                            />
+                        </div>
+                        <div className="col-span-2">
+                            <SchemaPreview
+                                name={form.name}
+                                description={form.description}
+                                parameters={form.parameters}
                             />
                         </div>
                     </div>

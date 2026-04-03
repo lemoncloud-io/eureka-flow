@@ -21,6 +21,9 @@ export const FooterSection = () => {
                         {t('footer.brand')}
                     </span>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <Link to={ROUTES.EXPLORE} className="transition-colors hover:text-foreground">
+                            {t('footer.explore', 'Explore')}
+                        </Link>
                         <a
                             href={GITHUB_URL}
                             target="_blank"
