@@ -645,7 +645,12 @@ export const FlowEditorPage = () => {
                 }
                 isPublic={isPublic}
                 isPublicMode={isPublicMode}
-                onTogglePublic={togglePublic}
+                onTogglePublic={async () => {
+                    const success = await togglePublic();
+                    if (success) {
+                        showNotification(t('publish.unpublished', 'Flow unpublished'), 'success');
+                    }
+                }}
                 onPublish={handleOpenPublish}
                 onApiKeySettings={handleApiKeySettings}
                 onHelp={() => handleOpenHelp('gettingStarted')}

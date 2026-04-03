@@ -27,7 +27,10 @@ const staggerStyle = (index: number): React.CSSProperties => ({
 // Helpers
 // ============================================================================
 
-const formatRelativeTime = (timestamp: string | number | undefined): string => {
+const formatRelativeTime = (
+    timestamp: string | number | undefined,
+    t: (key: string, options?: Record<string, unknown>) => string
+): string => {
     if (!timestamp) return '';
     const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date(timestamp);
     const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -35,10 +38,10 @@ const formatRelativeTime = (timestamp: string | number | undefined): string => {
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    if (seconds < 60) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 30) return `${days}d ago`;
+    if (seconds < 60) return t('flowList.justNow');
+    if (minutes < 60) return t('flowList.minutesAgo', { count: minutes });
+    if (hours < 24) return t('flowList.hoursAgo', { count: hours });
+    if (days < 30) return t('flowList.daysAgo', { count: days });
     return date.toLocaleDateString();
 };
 
@@ -114,11 +117,11 @@ interface PublicFlowCardProps {
 }
 
 const PublicFlowCard: React.FC<PublicFlowCardProps> = ({ flow, index }) => {
-    const title = flow.name || 'Untitled';
+    const { t } = useTranslation(['flows']);
+    const title = flow.name || t('header.untitledWorkflow');
     const description = flow.description;
     const nodeCount = flow.nodeIds$$?.length ?? 0;
-    // edgeIds$$ comes from API but isn't on FlowModel type
-    const edgeCount = (flow as unknown as { edgeIds$$?: string[] }).edgeIds$$?.length ?? 0;
+    const edgeCount = flow.edgeIds$$?.length ?? 0;
 
     return (
         <Link
@@ -147,7 +150,7 @@ const PublicFlowCard: React.FC<PublicFlowCardProps> = ({ flow, index }) => {
                 {description ? (
                     <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">{description}</p>
                 ) : (
-                    <p className="text-xs text-muted-foreground/40 italic">No description</p>
+                    <p className="text-xs text-muted-foreground/40 italic">{t('flowList.noDescription')}</p>
                 )}
 
                 {/* Footer */}
@@ -160,7 +163,7 @@ const PublicFlowCard: React.FC<PublicFlowCardProps> = ({ flow, index }) => {
                         <GitFork className="w-3 h-3" />
                         {edgeCount}
                     </span>
-                    <span className="ml-auto">{formatRelativeTime(flow.updatedAt)}</span>
+                    <span className="ml-auto">{formatRelativeTime(flow.updatedAt, t)}</span>
                 </div>
             </div>
 
@@ -189,13 +192,10 @@ export const PublicFlowsPage = () => {
         if (!data?.list) return [];
         const query = search.trim().toLowerCase();
 
-        // API returns isPublic as a top-level field on each flow
-        type FlowWithPublic = FlowView & { id: string; isPublic?: boolean };
-
         return [...data.list]
-            .filter((f): f is FlowWithPublic => {
+            .filter((f): f is FlowView & { id: string } => {
                 if (!f.id) return false;
-                return (f as FlowWithPublic).isPublic === true;
+                return f.isPublic === true;
             })
             .filter(f => {
                 if (!query) return true;
@@ -281,15 +281,15 @@ export const PublicFlowsPage = () => {
                         style={staggerStyle(0)}
                     >
                         <Globe className="w-3.5 h-3.5" />
-                        Community Workflows
+                        {t('publicFlows.badge', 'Community Workflows')}
                     </div>
                     <h1
                         className="animate-fade-in-up text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-3"
                         style={staggerStyle(1)}
                     >
-                        Explore{' '}
+                        {t('publicFlows.heroTitlePrefix', 'Explore')}{' '}
                         <span className="bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-                            Public Flows
+                            {t('publicFlows.heroTitleHighlight', 'Public Flows')}
                         </span>
                     </h1>
                     <p
@@ -337,17 +337,19 @@ export const PublicFlowsPage = () => {
                         <p className="text-sm font-medium mb-1">
                             {search
                                 ? t('publicFlows.noSearchResults', 'No flows match your search')
-                                : 'No public flows yet'}
+                                : t('publicFlows.empty', 'No public flows yet')}
                         </p>
                         <p className="text-xs text-muted-foreground/60">
-                            {search ? 'Try a different search term' : 'Be the first to publish a workflow'}
+                            {search
+                                ? t('publicFlows.tryDifferent', 'Try a different search term')
+                                : t('publicFlows.beFirst', 'Be the first to publish a workflow')}
                         </p>
                     </div>
                 ) : (
                     <>
                         <div className="flex items-center justify-between mb-4">
                             <span className="text-xs text-muted-foreground/60">
-                                {publicFlows.length} {publicFlows.length === 1 ? 'flow' : 'flows'}
+                                {t('publicFlows.flowCount', '{{count}} flows', { count: publicFlows.length })}
                             </span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

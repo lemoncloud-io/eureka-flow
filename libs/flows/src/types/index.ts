@@ -201,10 +201,13 @@ export interface FlowModel {
     name?: string;
     state?: FlowState;
     description?: string;
+    isPublic?: boolean;
     seq?: number;
     meta?: unknown;
     /** Node IDs associated with this flow (populated in list responses) */
     nodeIds$$?: string[];
+    /** Edge IDs associated with this flow (populated in list responses) */
+    edgeIds$$?: string[];
     createdAt?: string;
     updatedAt?: string;
 }

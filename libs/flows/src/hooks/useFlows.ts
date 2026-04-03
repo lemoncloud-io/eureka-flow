@@ -101,7 +101,7 @@ export const useFlows = () => {
                 if (flowData.channelId) {
                     setChannelId(flowData.channelId);
                 }
-                setIsPublic(!!(flowData as Record<string, unknown>).isPublic);
+                setIsPublic(!!flowData.isPublic);
                 return { flowId: savedFlowId, flowData, isNew: false };
             } catch (err) {
                 console.warn('[useFlows] Failed to load saved flow, creating new:', err);
@@ -155,7 +155,7 @@ export const useFlows = () => {
                 if (flowData.channelId) {
                     setChannelId(flowData.channelId);
                 }
-                setIsPublic(!!(flowData as Record<string, unknown>).isPublic);
+                setIsPublic(!!flowData.isPublic);
                 return flowData;
             } catch (err) {
                 console.error('[useFlows] Failed to load flow:', err);

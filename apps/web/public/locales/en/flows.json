@@ -33,6 +33,8 @@
         "public": "Public",
         "togglePublic": "Toggle Public",
         "publish": "Publish",
+        "editPublishInfo": "Edit publish info",
+        "unpublish": "Unpublish",
         "viewOnly": "View Only",
         "apiKeySettings": "API Key Settings",
         "beta": "Beta",
@@ -235,11 +237,17 @@
     },
     "publicFlows": {
         "title": "Public Flows",
+        "badge": "Community Workflows",
+        "heroTitlePrefix": "Explore",
+        "heroTitleHighlight": "Public Flows",
         "heroDescription": "Discover and learn from workflows shared by the community. Open any flow to see how it works.",
         "searchPlaceholder": "Search public flows...",
         "loading": "Loading flows...",
         "noSearchResults": "No flows match your search",
+        "tryDifferent": "Try a different search term",
         "empty": "No public flows yet",
+        "beFirst": "Be the first to publish a workflow",
+        "flowCount": "{{count}} flows",
         "goToEditor": "Go to Editor",
         "signIn": "Sign in"
     },
@@ -253,7 +261,9 @@
         "cancel": "Cancel",
         "publishButton": "Publish",
         "saving": "Saving...",
-        "published": "Flow published successfully!"
+        "published": "Flow published successfully!",
+        "publishedWithLink": "Published! Link copied to clipboard",
+        "unpublished": "Flow unpublished"
     },
     "nodeBlock": {
         "inputAlt": "Input",

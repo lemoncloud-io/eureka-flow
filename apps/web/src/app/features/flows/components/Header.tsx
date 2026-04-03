@@ -6,6 +6,7 @@ import {
     ChevronsDownUp,
     ChevronsUpDown,
     Download,
+    EyeOff,
     FileText,
     FolderOpen,
     Globe,
@@ -519,32 +520,26 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuSeparator />
 
                             {/* Share Group */}
-                            {!isPublicMode && onTogglePublic && (
+                            {!isPublicMode && (onTogglePublic || onPublish) && (
                                 <>
                                     <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                         {t('header.menuGroup.share')}
                                     </DropdownMenuLabel>
-                                    <div className="flex items-center justify-between px-2 py-1.5">
-                                        <span className="text-sm">{t('header.public')}</span>
-                                        <button
-                                            onClick={onTogglePublic}
-                                            role="switch"
-                                            aria-checked={!!isPublic}
-                                            aria-label={t('header.togglePublic')}
-                                            className={cn(
-                                                'w-9 h-5 rounded-full p-0.5 transition-colors relative',
-                                                isPublic ? 'bg-primary' : 'bg-muted'
-                                            )}
-                                        >
-                                            <div
-                                                className={cn(
-                                                    'w-4 h-4 bg-white rounded-full shadow-sm transition-transform absolute top-0.5',
-                                                    isPublic ? 'translate-x-4' : 'translate-x-0.5'
-                                                )}
-                                            />
-                                        </button>
-                                    </div>
-                                    {isPublic && onPublish && (
+                                    {isPublic ? (
+                                        <>
+                                            <DropdownMenuItem onClick={onPublish}>
+                                                <Globe className="w-4 h-4 mr-2 text-emerald-500" />
+                                                {t('header.editPublishInfo', 'Edit publish info')}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={onTogglePublic}
+                                                className="text-destructive focus:text-destructive"
+                                            >
+                                                <EyeOff className="w-4 h-4 mr-2" />
+                                                {t('header.unpublish', 'Unpublish')}
+                                            </DropdownMenuItem>
+                                        </>
+                                    ) : (
                                         <DropdownMenuItem onClick={onPublish}>
                                             <Globe className="w-4 h-4 mr-2" />
                                             {t('header.publish')}
