@@ -202,6 +202,8 @@ export interface FlowModel {
     state?: FlowState;
     description?: string;
     isPublic?: boolean;
+    /** Thumbnail image URL (s3:// or http) */
+    thumbnail?: string;
     seq?: number;
     meta?: unknown;
     /** Node IDs associated with this flow (populated in list responses) */
