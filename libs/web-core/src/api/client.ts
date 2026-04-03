@@ -53,14 +53,21 @@ const hasPermissionError = (data: unknown): boolean => {
     return str.toUpperCase().includes('403') && str.toUpperCase().includes('FORBIDDEN');
 };
 
+/** Check if request is using the public endpoint (no API key) */
+const isPublicRequest = (config?: InternalAxiosRequestConfig): boolean => config?.baseURL?.includes('/public') ?? false;
+
 /**
  * Response interceptor: Handle errors globally
  *
  * Auth Error: Only HTTP 403 clears API key (invalid/expired key).
  * Network errors (ERR_NETWORK, 504, 500) should NOT cause logout.
+ * Public requests (no API key) never trigger auth error handling.
  */
 apiClient.interceptors.response.use(
     (response: AxiosResponse) => {
+        // Skip auth error handling for public (unauthenticated) requests
+        if (isPublicRequest(response.config)) return response;
+
         // Handle 200-wrapped 403 from API Gateway (treat as auth error)
         if (hasPermissionError(response.data)) {
             handleAuthError();
@@ -68,6 +75,9 @@ apiClient.interceptors.response.use(
         return response;
     },
     (error: AxiosError) => {
+        // Skip auth error handling for public (unauthenticated) requests
+        if (isPublicRequest(error.config)) return Promise.reject(error);
+
         const status = error.response?.status;
 
         // Only explicit HTTP 403 triggers logout

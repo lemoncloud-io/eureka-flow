@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Globe, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useBlocks, useFlows } from '@flows/flows';
@@ -13,6 +14,7 @@ import { useWebCoreStore } from '@flows/web-core';
 import { FlowListDialog } from '../components/FlowListDialog';
 import { Header } from '../components/Header';
 import { HelpDialog } from '../components/HelpDialog';
+import { PublishDialog } from '../components/PublishDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { useSocketHandlers } from '../hooks/useSocketHandlers';
@@ -52,6 +54,9 @@ export const FlowEditorPage = () => {
         retrySave,
         toggleAutoSave,
         updateFlowName,
+        flowMeta,
+        isPublic,
+        publishFlow,
     } = useFlows();
 
     const lastSavedStateRef = useRef<string | null>(null);
@@ -97,8 +102,13 @@ export const FlowEditorPage = () => {
     const [isFlowListOpen, setIsFlowListOpen] = useState(false);
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
     const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
+    const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
 
     const { apiKey, setApiKey } = useWebCoreStore();
+
+    // Public mode: read-only viewing when no API key and viewing an existing flow
+    const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
+
     const autoSaveTimerRef = useRef<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -155,9 +165,12 @@ export const FlowEditorPage = () => {
         setBootError(null);
         setIsAppReady(false);
 
-        // Check API key before making any API calls
         const currentApiKey = useWebCoreStore.getState().apiKey;
-        if (!currentApiKey) {
+        const pathParts = window.location.pathname.split('/');
+        const flowIdFromUrl = pathParts.length > 2 && pathParts[1] === 'flows' ? pathParts[2] : null;
+
+        // Require API key unless viewing an existing flow (public mode)
+        if (!currentApiKey && !flowIdFromUrl) {
             setIsApiKeyDialogOpen(true);
             return;
         }
@@ -167,8 +180,6 @@ export const FlowEditorPage = () => {
             setLoadingText(t('flowEditor.loadingBlockRegistry'));
             await loadBlocks();
 
-            const pathParts = window.location.pathname.split('/');
-            const flowIdFromUrl = pathParts.length > 2 && pathParts[1] === 'flows' ? pathParts[2] : null;
             const nodeIdFromHash = window.location.hash.replace('#', '') || null;
 
             let loadedId: string | null = null;
@@ -178,6 +189,12 @@ export const FlowEditorPage = () => {
                 setLoadingText(t('flowEditor.loadingFlow', { flowId: flowIdFromUrl }));
                 initialFlow = await loadFlowById(flowIdFromUrl);
                 if (!initialFlow) {
+                    // In public mode, failure likely means the flow is private
+                    if (!currentApiKey) {
+                        throw new Error(
+                            t('flowEditor.flowNotPublic', 'This flow is private. Sign in with an API key to view it.')
+                        );
+                    }
                     throw new Error(t('flowEditor.failedToLoadFlow'));
                 }
                 loadedId = flowIdFromUrl;
@@ -243,7 +260,7 @@ export const FlowEditorPage = () => {
     );
 
     const triggerAutoSave = useCallback(() => {
-        if (!isAutoSaveEnabled) return;
+        if (!isAutoSaveEnabled || isPublicMode) return;
 
         if (autoSaveTimerRef.current) {
             window.clearTimeout(autoSaveTimerRef.current);
@@ -308,20 +325,16 @@ export const FlowEditorPage = () => {
         await updateFlowName(newName);
     };
 
-    const handleShare = async () => {
+    const handleShare = useCallback(async () => {
+        // Save first, then open publish dialog
         if (canvasRef.current) {
             const data = canvasRef.current.getWorkflow();
             lastLocalUpdateTimestampRef.current = Date.now();
             await saveCurrentFlow(data);
         }
-
-        try {
-            await navigator.clipboard.writeText(window.location.href);
-            showNotification(t('flowEditor.linkCopied'), 'success');
-        } catch {
-            showNotification(t('flowEditor.failedToCopyLink'), 'error');
-        }
-    };
+        setIsPublishDialogOpen(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- lastLocalUpdateTimestampRef is a stable ref
+    }, [saveCurrentFlow]);
 
     const handleClear = () => {
         if (!canvasRef.current) return;
@@ -494,13 +507,36 @@ export const FlowEditorPage = () => {
                     <>
                         <AlertCircle className="w-16 h-16 text-destructive/70" />
                         <div className="text-muted-foreground font-mono text-sm text-center max-w-md">{bootError}</div>
-                        <div className="flex gap-2 mt-2">
-                            <Button variant="default" size="sm" onClick={boot}>
-                                {t('flowEditor.retry')}
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => setIsApiKeyDialogOpen(true)}>
-                                {t('flowEditor.resetApiKey')}
-                            </Button>
+                        <div className="flex flex-col items-center gap-3 mt-2">
+                            <div className="flex gap-2">
+                                {isPublicMode ? (
+                                    <Button
+                                        variant="default"
+                                        size="sm"
+                                        className="gap-2"
+                                        onClick={() => setIsApiKeyDialogOpen(true)}
+                                    >
+                                        <KeyRound className="w-4 h-4" />
+                                        {t('flowEditor.signInWithApiKey', 'Sign in with API Key')}
+                                    </Button>
+                                ) : (
+                                    <>
+                                        <Button variant="default" size="sm" onClick={boot}>
+                                            {t('flowEditor.retry')}
+                                        </Button>
+                                        <Button variant="outline" size="sm" onClick={() => setIsApiKeyDialogOpen(true)}>
+                                            {t('flowEditor.resetApiKey')}
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                            <Link
+                                to="/explore"
+                                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                <Globe className="w-3.5 h-3.5" />
+                                {t('flowEditor.browsePublicFlows', 'Browse public flows')}
+                            </Link>
                         </div>
                     </>
                 ) : (
@@ -592,14 +628,16 @@ export const FlowEditorPage = () => {
                           }
                         : undefined
                 }
+                isPublic={isPublic}
+                isPublicMode={isPublicMode}
                 onShare={handleShare}
                 onApiKeySettings={handleApiKeySettings}
                 onHelp={() => handleOpenHelp('gettingStarted')}
                 onOpenFlowList={handleOpenFlowList}
             />
 
-            {/* Floating Sidebar */}
-            <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} />
+            {/* Floating Sidebar - hidden in public mode */}
+            {!isPublicMode && <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} />}
 
             {/* API Key Dialog */}
             <ApiKeyDialog
@@ -621,6 +659,31 @@ export const FlowEditorPage = () => {
 
             {/* Help Dialog */}
             <HelpDialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen} defaultTab={helpDialogTab} />
+
+            {/* Publish Dialog */}
+            <PublishDialog
+                open={isPublishDialogOpen}
+                onOpenChange={setIsPublishDialogOpen}
+                flowName={flowName}
+                flowId={currentFlowId}
+                flowMeta={flowMeta}
+                onPublish={publishFlow}
+            />
+
+            {/* Public Mode CTA Banner */}
+            {isPublicMode && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+                    <Button
+                        variant="default"
+                        size="sm"
+                        className="shadow-lg gap-2"
+                        onClick={() => setIsApiKeyDialogOpen(true)}
+                    >
+                        <KeyRound className="w-4 h-4" />
+                        {t('flowEditor.signInToEdit', 'Sign in to edit this flow')}
+                    </Button>
+                </div>
+            )}
 
             {/* Loading Overlay */}
             {isLoading && (

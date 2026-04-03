@@ -221,6 +221,25 @@
         "exportedAsImage": "Exported as image",
         "exportImageFailed": "Failed to export image"
     },
+    "publish": {
+        "title": "Share & Publish",
+        "description": "Control who can view this flow",
+        "public": "Public",
+        "private": "Private",
+        "publicHint": "Anyone with the link can view this flow",
+        "privateHint": "Only you can access this flow",
+        "publishTitle": "Title",
+        "publishDescription": "Description",
+        "descriptionPlaceholder": "Describe what this flow does...",
+        "shareLink": "Share Link",
+        "cancel": "Cancel",
+        "publishButton": "Publish",
+        "saveButton": "Save",
+        "saving": "Saving...",
+        "published": "Flow published successfully!",
+        "unpublished": "Flow set to private",
+        "publicBadge": "Public"
+    },
     "nodeBlock": {
         "inputAlt": "Input",
         "previewAlt": "Preview",

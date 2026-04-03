@@ -10,8 +10,18 @@ const isUrl = (value: string): boolean => /^https?:\/\//.test(value);
 
 const isSvg = (value: string): boolean => value.trimStart().startsWith('<svg');
 
-/** Strip inline event handlers (onerror, onload, etc.) from SVG strings */
-const sanitizeSvg = (svg: string): string => svg.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+/**
+ * Sanitize SVG strings to prevent XSS.
+ * Strips: event handlers (on*), <script>, <foreignObject>, <use>, javascript: protocol
+ */
+const sanitizeSvg = (svg: string): string =>
+    svg
+        .replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '')
+        .replace(/<script[\s>][\s\S]*?<\/script>/gi, '')
+        .replace(/<foreignObject[\s>][\s\S]*?<\/foreignObject>/gi, '')
+        .replace(/<use[\s\S]*?\/?>(?:<\/use>)?/gi, '')
+        .replace(/javascript\s*:/gi, '')
+        .replace(/data\s*:\s*text\/html/gi, '');
 
 // ============================================================================
 // BlockIcon Component

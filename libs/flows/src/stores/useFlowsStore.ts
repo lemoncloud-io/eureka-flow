@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 import { flowStorage } from '../utils/flowStorage';
 
-import type { BlockDefinitionWithFrontend, FlowView } from '../types';
+import type { BlockDefinitionWithFrontend, FlowView, PublishMeta } from '../types';
 
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
@@ -25,6 +25,8 @@ interface FlowsState {
     saveError: Error | null;
     /** WebSocket channel ID for real-time node status updates */
     channelId: string | null;
+    /** Flow publish metadata (isPublic, title, description, etc.) */
+    flowMeta: PublishMeta | null;
 
     setBlockRegistry: (blocks: BlockDefinitionWithFrontend[]) => void;
     setBlocksLoaded: (loaded: boolean) => void;
@@ -37,6 +39,7 @@ interface FlowsState {
     setSaveStatus: (status: SaveStatus) => void;
     setSaveError: (error: Error | null) => void;
     setChannelId: (channelId: string | null) => void;
+    setFlowMeta: (meta: PublishMeta | null) => void;
 }
 
 export const useFlowsStore = create<FlowsState>(set => ({
@@ -50,6 +53,7 @@ export const useFlowsStore = create<FlowsState>(set => ({
     saveStatus: 'idle',
     saveError: null,
     channelId: '0000',
+    flowMeta: null,
 
     setBlockRegistry: blocks => {
         const registry = blocks.reduce<Record<string, BlockDefinitionWithFrontend>>((acc, block) => {
@@ -92,6 +96,8 @@ export const useFlowsStore = create<FlowsState>(set => ({
     setSaveError: error => set({ saveError: error }),
 
     setChannelId: channelId => set({ channelId }),
+
+    setFlowMeta: meta => set({ flowMeta: meta }),
 }));
 
 export const useBlockRegistry = () => useFlowsStore(state => state.blockRegistry);
@@ -104,3 +110,4 @@ export const useIsAutoSaveEnabled = () => useFlowsStore(state => state.isAutoSav
 export const useSaveStatus = () => useFlowsStore(state => state.saveStatus);
 export const useSaveError = () => useFlowsStore(state => state.saveError);
 export const useChannelId = () => useFlowsStore(state => state.channelId);
+export const useFlowMeta = () => useFlowsStore(state => state.flowMeta);

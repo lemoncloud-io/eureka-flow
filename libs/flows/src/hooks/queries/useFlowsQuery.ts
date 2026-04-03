@@ -104,7 +104,7 @@ export const useUpdateFlowMutation = () => {
 
     return useMutation({
         mutationFn: ({ id, body }: { id: string; body: UpdateFlowBody }) => updateFlowMetadata(id, body),
-        onSuccess: (data, { id }) => {
+        onSuccess: (data, { id, body }) => {
             // Update the flow snapshot cache with new metadata
             queryClient.setQueryData<LoadFlowResult>(flowsKeys.snapshot(id), old => {
                 if (!old) return old;
@@ -112,6 +112,7 @@ export const useUpdateFlowMutation = () => {
                     ...old,
                     name: data.name ?? old.name,
                     description: data.description ?? old.description,
+                    ...(body.meta !== undefined ? { meta: body.meta } : {}),
                 };
             });
             // Refresh the flows list so updated metadata is visible

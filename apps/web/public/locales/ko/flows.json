@@ -221,6 +221,25 @@
         "exportedAsImage": "이미지로 내보내기 완료",
         "exportImageFailed": "이미지 내보내기 실패"
     },
+    "publish": {
+        "title": "공유 및 게시",
+        "description": "이 플로우의 공개 범위를 설정합니다",
+        "public": "공개",
+        "private": "비공개",
+        "publicHint": "링크가 있는 누구나 이 플로우를 볼 수 있습니다",
+        "privateHint": "본인만 이 플로우에 접근할 수 있습니다",
+        "publishTitle": "제목",
+        "publishDescription": "설명",
+        "descriptionPlaceholder": "이 플로우가 하는 일을 설명하세요...",
+        "shareLink": "공유 링크",
+        "cancel": "취소",
+        "publishButton": "게시",
+        "saveButton": "저장",
+        "saving": "저장 중...",
+        "published": "플로우가 성공적으로 게시되었습니다!",
+        "unpublished": "플로우가 비공개로 설정되었습니다",
+        "publicBadge": "공개"
+    },
     "nodeBlock": {
         "inputAlt": "입력",
         "previewAlt": "미리보기",

@@ -15,7 +15,7 @@ import { flowStorage } from '../utils/flowStorage';
 import { getNodeHeight } from '../utils/nodeHeight';
 
 import type { SaveStatus } from '../stores/useFlowsStore';
-import type { LoadFlowResult, SaveFlowBody } from '../types';
+import type { LoadFlowResult, PublishMeta, SaveFlowBody } from '../types';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 /**
@@ -47,6 +47,8 @@ export const useFlows = () => {
         setSaveStatus,
         setSaveError,
         setChannelId,
+        flowMeta,
+        setFlowMeta,
     } = useFlowsStore();
 
     // Cleanup timeout on unmount to prevent memory leaks
@@ -96,6 +98,7 @@ export const useFlows = () => {
                 if (flowData.channelId) {
                     setChannelId(flowData.channelId);
                 }
+                setFlowMeta((flowData.meta as PublishMeta) ?? null);
                 return { flowId: savedFlowId, flowData, isNew: false };
             } catch (err) {
                 console.warn('[useFlows] Failed to load saved flow, creating new:', err);
@@ -115,8 +118,9 @@ export const useFlows = () => {
         setCurrentFlowId(newFlowId);
         flowStorage.setFlowId(newFlowId);
         setFlowName('Untitled Workflow');
+        setFlowMeta(null);
         return { flowId: newFlowId, flowData: null, isNew: true };
-    }, [queryClient, setCurrentFlowId, setFlowName, setChannelId]);
+    }, [queryClient, setCurrentFlowId, setFlowName, setChannelId, setFlowMeta]);
 
     /**
      * Load a specific flow by ID
@@ -146,13 +150,14 @@ export const useFlows = () => {
                 if (flowData.channelId) {
                     setChannelId(flowData.channelId);
                 }
+                setFlowMeta((flowData.meta as PublishMeta) ?? null);
                 return flowData;
             } catch (err) {
                 console.error('[useFlows] Failed to load flow:', err);
                 return null;
             }
         },
-        [queryClient, setCurrentFlowId, setFlowName, setChannelId]
+        [queryClient, setCurrentFlowId, setFlowName, setChannelId, setFlowMeta]
     );
 
     /**
@@ -292,6 +297,7 @@ export const useFlows = () => {
                 setFlowName('Untitled Workflow');
                 setLastSavedAt(null);
                 setChannelId(null);
+                setFlowMeta(null);
                 return newFlowId;
             }
             return null;
@@ -299,7 +305,7 @@ export const useFlows = () => {
             console.error('[useFlows] Failed to create new flow:', error);
             return null;
         }
-    }, [createFlowMutation, setCurrentFlowId, setFlowName, setLastSavedAt, setChannelId]);
+    }, [createFlowMutation, setCurrentFlowId, setFlowName, setLastSavedAt, setChannelId, setFlowMeta]);
 
     /**
      * Update flow name (metadata only)
@@ -330,6 +336,33 @@ export const useFlows = () => {
             }
         },
         [currentFlowId, updateFlowMutation, setFlowName, setLastSavedAt, updateSaveStatus]
+    );
+
+    /**
+     * Publish/unpublish flow with metadata
+     * POST /flows/:id with meta field
+     */
+    const publishFlow = useCallback(
+        async (meta: PublishMeta): Promise<boolean> => {
+            if (!currentFlowId) return false;
+
+            updateSaveStatus('saving');
+            try {
+                await updateFlowMutation.mutateAsync({
+                    id: currentFlowId,
+                    body: { meta },
+                });
+                setFlowMeta(meta);
+                setLastSavedAt(new Date());
+                updateSaveStatus('success');
+                return true;
+            } catch (error) {
+                console.error('[useFlows] Failed to publish flow:', error);
+                updateSaveStatus('error', error instanceof Error ? error : new Error('Failed to publish'));
+                return false;
+            }
+        },
+        [currentFlowId, updateFlowMutation, setFlowMeta, setLastSavedAt, updateSaveStatus]
     );
 
     // Derive loading state from TanStack Query (only for initial load)
@@ -372,5 +405,10 @@ export const useFlows = () => {
         // Actions - Metadata
         updateFlowName,
         isUpdatingName: updateFlowMutation.isPending,
+
+        // Actions - Publish
+        flowMeta,
+        isPublic: !!flowMeta?.isPublic,
+        publishFlow,
     };
 };
