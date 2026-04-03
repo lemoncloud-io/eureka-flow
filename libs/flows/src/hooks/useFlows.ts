@@ -15,7 +15,7 @@ import { flowStorage } from '../utils/flowStorage';
 import { getNodeHeight } from '../utils/nodeHeight';
 
 import type { SaveStatus } from '../stores/useFlowsStore';
-import type { LoadFlowResult, PublishMeta, SaveFlowBody } from '../types';
+import type { LoadFlowResult, SaveFlowBody, UpdateFlowBody } from '../types';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 /**
@@ -49,8 +49,8 @@ export const useFlows = () => {
         setSaveStatus,
         setSaveError,
         setChannelId,
-        flowMeta,
-        setFlowMeta,
+        isPublic,
+        setIsPublic,
     } = useFlowsStore();
 
     // Cleanup timeout on unmount to prevent memory leaks
@@ -101,7 +101,7 @@ export const useFlows = () => {
                 if (flowData.channelId) {
                     setChannelId(flowData.channelId);
                 }
-                setFlowMeta((flowData.meta as PublishMeta) ?? null);
+                setIsPublic(!!(flowData as Record<string, unknown>).isPublic);
                 return { flowId: savedFlowId, flowData, isNew: false };
             } catch (err) {
                 console.warn('[useFlows] Failed to load saved flow, creating new:', err);
@@ -122,9 +122,9 @@ export const useFlows = () => {
         flowStorage.setFlowId(newFlowId);
         setFlowName('Untitled Workflow');
         setFlowDescription('');
-        setFlowMeta(null);
+        setIsPublic(false);
         return { flowId: newFlowId, flowData: null, isNew: true };
-    }, [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setFlowMeta]);
+    }, [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setIsPublic]);
 
     /**
      * Load a specific flow by ID
@@ -155,14 +155,14 @@ export const useFlows = () => {
                 if (flowData.channelId) {
                     setChannelId(flowData.channelId);
                 }
-                setFlowMeta((flowData.meta as PublishMeta) ?? null);
+                setIsPublic(!!(flowData as Record<string, unknown>).isPublic);
                 return flowData;
             } catch (err) {
                 console.error('[useFlows] Failed to load flow:', err);
                 return null;
             }
         },
-        [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setFlowMeta]
+        [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setIsPublic]
     );
 
     /**
@@ -303,7 +303,7 @@ export const useFlows = () => {
                 setFlowDescription('');
                 setLastSavedAt(null);
                 setChannelId(null);
-                setFlowMeta(null);
+                setIsPublic(false);
                 return newFlowId;
             }
             return null;
@@ -318,7 +318,7 @@ export const useFlows = () => {
         setFlowDescription,
         setLastSavedAt,
         setChannelId,
-        setFlowMeta,
+        setIsPublic,
     ]);
 
     /**
@@ -353,14 +353,11 @@ export const useFlows = () => {
     );
 
     /**
-     * Publish/unpublish flow
-     * POST /flows/:id with { name, description, meta }
-     *
-     * Uses the flow's own name/description fields (same as FlowListDialog).
-     * Only isPublic state goes into meta.
+     * Publish flow with name/description
+     * POST /flows/:id with { name, description, isPublic }
      */
     const publishFlow = useCallback(
-        async (body: { name?: string; description?: string; meta: PublishMeta }): Promise<boolean> => {
+        async (body: UpdateFlowBody): Promise<boolean> => {
             if (!currentFlowId) return false;
 
             updateSaveStatus('saving');
@@ -371,7 +368,7 @@ export const useFlows = () => {
                 });
                 if (body.name) setFlowName(body.name);
                 if (body.description !== undefined) setFlowDescription(body.description);
-                setFlowMeta(body.meta);
+                if (body.isPublic !== undefined) setIsPublic(body.isPublic);
                 setLastSavedAt(new Date());
                 updateSaveStatus('success');
                 return true;
@@ -386,11 +383,32 @@ export const useFlows = () => {
             updateFlowMutation,
             setFlowName,
             setFlowDescription,
-            setFlowMeta,
+            setIsPublic,
             setLastSavedAt,
             updateSaveStatus,
         ]
     );
+
+    /**
+     * Toggle flow public/private state
+     * POST /flows/:id with { isPublic }
+     */
+    const togglePublic = useCallback(async (): Promise<boolean> => {
+        if (!currentFlowId) return false;
+
+        const newIsPublic = !isPublic;
+        try {
+            await updateFlowMutation.mutateAsync({
+                id: currentFlowId,
+                body: { isPublic: newIsPublic },
+            });
+            setIsPublic(newIsPublic);
+            return true;
+        } catch (error) {
+            console.error('[useFlows] Failed to toggle public:', error);
+            return false;
+        }
+    }, [currentFlowId, isPublic, updateFlowMutation, setIsPublic]);
 
     // Derive loading state from TanStack Query (only for initial load)
     const isLoading = loadFlowQuery.isLoading || loadFlowQuery.isFetching;
@@ -435,8 +453,8 @@ export const useFlows = () => {
         isUpdatingName: updateFlowMutation.isPending,
 
         // Actions - Publish
-        flowMeta,
-        isPublic: !!flowMeta?.isPublic,
+        isPublic,
+        togglePublic,
         publishFlow,
     };
 };

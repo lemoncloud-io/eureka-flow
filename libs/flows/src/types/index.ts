@@ -632,17 +632,6 @@ export const isFlowExecutionError = (error: unknown): error is FlowExecutionErro
 // ============================================================================
 
 /**
- * PublishMeta - publish state stored in FlowModel.meta
- *
- * Only tracks public/private state. Title and description use
- * the flow's own `name` and `description` fields via POST /flows/:id.
- */
-export interface PublishMeta {
-    isPublic?: boolean;
-    publishedAt?: string;
-}
-
-/**
  * UpdateFlowBody - body for updating flow metadata
  * POST /flows/:id
  *
@@ -651,7 +640,7 @@ export interface PublishMeta {
 export interface UpdateFlowBody {
     name?: string;
     description?: string;
-    meta?: PublishMeta;
+    isPublic?: boolean;
 }
 
 // ============================================================================

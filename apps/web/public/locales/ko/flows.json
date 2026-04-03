@@ -30,6 +30,9 @@
         "socketOffline": "오프라인",
         "socketClickToRetry": "클릭하여 재시도",
         "socketClickToConnect": "클릭하여 연결",
+        "public": "공개",
+        "togglePublic": "공개 전환",
+        "publish": "게시",
         "apiKeySettings": "API 키 설정",
         "beta": "베타",
         "menuGroup": {
@@ -222,23 +225,16 @@
         "exportImageFailed": "이미지 내보내기 실패"
     },
     "publish": {
-        "title": "공유 및 게시",
-        "description": "이 플로우의 공개 범위를 설정합니다",
-        "public": "공개",
-        "private": "비공개",
-        "publicHint": "링크가 있는 누구나 이 플로우를 볼 수 있습니다",
-        "privateHint": "본인만 이 플로우에 접근할 수 있습니다",
+        "title": "플로우 게시",
+        "description": "게시할 플로우의 이름과 설명을 설정하세요",
         "flowName": "이름",
         "flowDescription": "설명",
         "descriptionPlaceholder": "이 플로우가 하는 일을 설명하세요...",
         "shareLink": "공유 링크",
         "cancel": "취소",
         "publishButton": "게시",
-        "saveButton": "저장",
         "saving": "저장 중...",
-        "published": "플로우가 성공적으로 게시되었습니다!",
-        "unpublished": "플로우가 비공개로 설정되었습니다",
-        "publicBadge": "공개"
+        "published": "플로우가 성공적으로 게시되었습니다!"
     },
     "nodeBlock": {
         "inputAlt": "입력",

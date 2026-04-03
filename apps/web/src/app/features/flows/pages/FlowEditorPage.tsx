@@ -55,8 +55,8 @@ export const FlowEditorPage = () => {
         retrySave,
         toggleAutoSave,
         updateFlowName,
-        flowMeta,
         isPublic,
+        togglePublic,
         publishFlow,
     } = useFlows();
 
@@ -326,16 +326,23 @@ export const FlowEditorPage = () => {
         await updateFlowName(newName);
     };
 
-    const handleShare = useCallback(async () => {
-        // Save first, then open publish dialog
+    const handleShare = async () => {
         if (canvasRef.current) {
             const data = canvasRef.current.getWorkflow();
             lastLocalUpdateTimestampRef.current = Date.now();
             await saveCurrentFlow(data);
         }
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            showNotification(t('flowEditor.linkCopied'), 'success');
+        } catch {
+            showNotification(t('flowEditor.failedToCopyLink'), 'error');
+        }
+    };
+
+    const handleOpenPublish = useCallback(() => {
         setIsPublishDialogOpen(true);
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- lastLocalUpdateTimestampRef is a stable ref
-    }, [saveCurrentFlow]);
+    }, []);
 
     const handleClear = () => {
         if (!canvasRef.current) return;
@@ -653,6 +660,8 @@ export const FlowEditorPage = () => {
                 isPublic={isPublic}
                 isPublicMode={isPublicMode}
                 onShare={handleShare}
+                onTogglePublic={togglePublic}
+                onPublish={handleOpenPublish}
                 onApiKeySettings={handleApiKeySettings}
                 onHelp={() => handleOpenHelp('gettingStarted')}
                 onOpenFlowList={handleOpenFlowList}
@@ -689,7 +698,6 @@ export const FlowEditorPage = () => {
                 flowName={flowName}
                 flowDescription={flowDescription}
                 flowId={currentFlowId}
-                flowMeta={flowMeta}
                 onPublish={publishFlow}
             />
 

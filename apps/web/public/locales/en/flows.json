@@ -30,6 +30,9 @@
         "socketOffline": "Offline",
         "socketClickToRetry": "Click to retry",
         "socketClickToConnect": "Click to connect",
+        "public": "Public",
+        "togglePublic": "Toggle Public",
+        "publish": "Publish",
         "apiKeySettings": "API Key Settings",
         "beta": "Beta",
         "menuGroup": {
@@ -222,23 +225,16 @@
         "exportImageFailed": "Failed to export image"
     },
     "publish": {
-        "title": "Share & Publish",
-        "description": "Control who can view this flow",
-        "public": "Public",
-        "private": "Private",
-        "publicHint": "Anyone with the link can view this flow",
-        "privateHint": "Only you can access this flow",
+        "title": "Publish Flow",
+        "description": "Set the name and description for your published flow",
         "flowName": "Name",
         "flowDescription": "Description",
         "descriptionPlaceholder": "Describe what this flow does...",
         "shareLink": "Share Link",
         "cancel": "Cancel",
         "publishButton": "Publish",
-        "saveButton": "Save",
         "saving": "Saving...",
-        "published": "Flow published successfully!",
-        "unpublished": "Flow set to private",
-        "publicBadge": "Public"
+        "published": "Flow published successfully!"
     },
     "nodeBlock": {
         "inputAlt": "Input",

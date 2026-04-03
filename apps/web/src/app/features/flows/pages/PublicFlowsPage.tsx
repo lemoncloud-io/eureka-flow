@@ -10,7 +10,7 @@ import { ApiKeyDialog } from '@flows/shared';
 import { Badge, Button, Input, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
-import type { FlowView, PublishMeta } from '@flows/flows';
+import type { FlowView } from '@flows/flows';
 
 // ============================================================================
 // Constants
@@ -110,13 +110,12 @@ const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nod
 
 interface PublicFlowCardProps {
     flow: FlowView & { id: string };
-    meta: PublishMeta | null;
     index: number;
 }
 
-const PublicFlowCard: React.FC<PublicFlowCardProps> = ({ flow, meta, index }) => {
-    const title = meta?.publishTitle || flow.name || 'Untitled';
-    const description = meta?.publishDescription || flow.description;
+const PublicFlowCard: React.FC<PublicFlowCardProps> = ({ flow, index }) => {
+    const title = flow.name || 'Untitled';
+    const description = flow.description;
     const nodeCount = flow.nodeIds$$?.length ?? 0;
     // edgeIds$$ comes from API but isn't on FlowModel type
     const edgeCount = (flow as unknown as { edgeIds$$?: string[] }).edgeIds$$?.length ?? 0;
@@ -200,12 +199,8 @@ export const PublicFlowsPage = () => {
             })
             .filter(f => {
                 if (!query) return true;
-                const fMeta = f.meta as PublishMeta | undefined;
                 return (
-                    (f.name ?? '').toLowerCase().includes(query) ||
-                    (f.description ?? '').toLowerCase().includes(query) ||
-                    (fMeta?.publishTitle ?? '').toLowerCase().includes(query) ||
-                    (fMeta?.publishDescription ?? '').toLowerCase().includes(query)
+                    (f.name ?? '').toLowerCase().includes(query) || (f.description ?? '').toLowerCase().includes(query)
                 );
             })
             .sort((a, b) => {
@@ -357,12 +352,7 @@ export const PublicFlowsPage = () => {
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {publicFlows.map((flow, i) => (
-                                <PublicFlowCard
-                                    key={flow.id}
-                                    flow={flow}
-                                    meta={(flow.meta as PublishMeta) ?? null}
-                                    index={i}
-                                />
+                                <PublicFlowCard key={flow.id} flow={flow} index={i} />
                             ))}
                         </div>
                     </>

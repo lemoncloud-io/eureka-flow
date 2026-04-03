@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { ArrowRight } from 'lucide-react';
+import { Globe } from 'lucide-react';
 
 import { Button } from '@flows/ui-kit';
 
@@ -12,7 +12,7 @@ export const HeroSection = () => {
     const { t } = useTranslation('landing');
 
     const handleStart = () => navigate(ROUTES.EDITOR);
-    const handleDemo = () => navigate(ROUTES.DEMO);
+    const handleExplore = () => navigate(ROUTES.EXPLORE);
 
     return (
         <section className="mx-auto max-w-4xl px-6 pt-40 pb-20 text-center">
@@ -41,9 +41,9 @@ export const HeroSection = () => {
                 <Button size="lg" className="w-full sm:w-auto" onClick={handleStart}>
                     {t('hero.cta_primary')}
                 </Button>
-                <Button variant="outline" size="lg" className="w-full gap-2 sm:w-auto" onClick={handleDemo}>
-                    {t('hero.cta_secondary')}
-                    <ArrowRight size={16} />
+                <Button variant="outline" size="lg" className="w-full gap-2 sm:w-auto" onClick={handleExplore}>
+                    <Globe size={16} />
+                    {t('hero.cta_explore', 'Explore Public Flows')}
                 </Button>
             </div>
         </section>

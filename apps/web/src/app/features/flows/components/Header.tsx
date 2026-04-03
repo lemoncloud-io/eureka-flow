@@ -93,6 +93,8 @@ interface HeaderProps {
     /** Read-only public viewing mode (no API key) */
     isPublicMode?: boolean;
     onShare: () => void;
+    onTogglePublic?: () => void;
+    onPublish?: () => void;
     onApiKeySettings?: () => void;
     onHelp?: () => void;
     onOpenFlowList?: () => void;
@@ -318,6 +320,8 @@ export const Header: React.FC<HeaderProps> = ({
     isPublic,
     isPublicMode,
     onShare,
+    onTogglePublic,
+    onPublish,
     onApiKeySettings,
     onHelp,
     onOpenFlowList,
@@ -471,21 +475,8 @@ export const Header: React.FC<HeaderProps> = ({
                             )}
                             {!isPublicMode && (
                                 <DropdownMenuItem onClick={onShare}>
-                                    {isPublic ? (
-                                        <Globe className="w-4 h-4 mr-2 text-emerald-500" />
-                                    ) : (
-                                        <Share2 className="w-4 h-4 mr-2" />
-                                    )}
+                                    <Share2 className="w-4 h-4 mr-2" />
                                     {t('header.share')}
-                                    {isPublic && (
-                                        <Badge
-                                            variant="default"
-                                            size="sm"
-                                            className="ml-auto text-[10px] px-1.5 py-0 h-4"
-                                        >
-                                            {t('publish.publicBadge')}
-                                        </Badge>
-                                    )}
                                 </DropdownMenuItem>
                             )}
 
@@ -561,6 +552,36 @@ export const Header: React.FC<HeaderProps> = ({
                                         />
                                     </button>
                                 </div>
+                            )}
+                            {/* Public toggle - like Auto Save */}
+                            {!isPublicMode && onTogglePublic && (
+                                <div className="flex items-center justify-between px-2 py-1.5">
+                                    <span className="text-sm">{t('header.public')}</span>
+                                    <button
+                                        onClick={onTogglePublic}
+                                        role="switch"
+                                        aria-checked={!!isPublic}
+                                        aria-label={t('header.togglePublic')}
+                                        className={cn(
+                                            'w-9 h-5 rounded-full p-0.5 transition-colors relative',
+                                            isPublic ? 'bg-primary' : 'bg-muted'
+                                        )}
+                                    >
+                                        <div
+                                            className={cn(
+                                                'w-4 h-4 bg-white rounded-full shadow-sm transition-transform absolute top-0.5',
+                                                isPublic ? 'translate-x-4' : 'translate-x-0.5'
+                                            )}
+                                        />
+                                    </button>
+                                </div>
+                            )}
+                            {/* Publish button - shown when public */}
+                            {!isPublicMode && isPublic && onPublish && (
+                                <DropdownMenuItem onClick={onPublish}>
+                                    <Globe className="w-4 h-4 mr-2" />
+                                    {t('header.publish')}
+                                </DropdownMenuItem>
                             )}
                             {onApiKeySettings && (
                                 <DropdownMenuItem onClick={onApiKeySettings}>
