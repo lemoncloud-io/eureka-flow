@@ -191,6 +191,7 @@
         "addDescription": "설명을 추가하세요...",
         "clickToAddDescription": "클릭하여 설명 추가",
         "editDescription": "설명 편집",
+        "changeThumbnail": "썸네일 변경",
         "delete": "삭제",
         "deleteConfirmTitle": "플로우 삭제",
         "deleteConfirmDescription": "\"{{name}}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
@@ -269,7 +270,9 @@
         "uploadThumbnail": "클릭하여 썸네일 업로드",
         "changeThumbnail": "이미지 변경",
         "removeThumbnail": "삭제",
-        "thumbnailHint": "권장: 16:9 비율"
+        "thumbnailHint": "권장: 4:3 비율, 또는 클립보드에서 붙여넣기",
+        "compressing": "처리 중...",
+        "thumbnailError": "이미지 처리에 실패했습니다"
     },
     "nodeBlock": {
         "inputAlt": "입력",

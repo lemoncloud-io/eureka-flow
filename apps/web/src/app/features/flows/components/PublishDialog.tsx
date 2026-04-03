@@ -17,6 +17,7 @@ import {
     Textarea,
 } from '@flows/ui-kit';
 
+import { ThumbnailPicker } from './ThumbnailPicker';
 
 import type { UpdateFlowBody } from '@flows/flows';
 
@@ -25,6 +26,7 @@ interface PublishDialogProps {
     onOpenChange: (open: boolean) => void;
     flowName: string;
     flowDescription: string;
+    flowThumbnail: string;
     flowId: string | null;
     onPublish: (body: UpdateFlowBody) => Promise<boolean>;
 }
@@ -37,6 +39,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
     onOpenChange,
     flowName,
     flowDescription,
+    flowThumbnail,
     flowId,
     onPublish,
 }) => {
@@ -54,8 +57,8 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
         setName(flowName);
         setDescription(flowDescription);
         setLinkCopied(false);
-        setThumbnailUrl(null);
-    }, [open, flowName, flowDescription]);
+        setThumbnailUrl(flowThumbnail || null);
+    }, [open, flowName, flowDescription, flowThumbnail]);
 
     const flowUrl = flowId ? `${window.location.origin}/flows/${flowId}` : '';
 
@@ -78,10 +81,9 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
                 description: description.trim(),
                 isPublic: true,
             };
-            // TODO: enable when server supports thumbnail field
-            // if (thumbnailUrl) {
-            //     body.thumbnail = thumbnailUrl;
-            // }
+            if (thumbnailUrl) {
+                body.thumbnail = thumbnailUrl;
+            }
             const success = await onPublish(body);
             if (success) {
                 // Auto-copy share link
@@ -165,8 +167,8 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
                         />
                     </div>
 
-                    {/* TODO: enable when server supports thumbnail field */}
-                    {/* <ThumbnailPicker value={thumbnailUrl} onChange={setThumbnailUrl} /> */}
+                    {/* Thumbnail */}
+                    <ThumbnailPicker value={thumbnailUrl} onChange={setThumbnailUrl} />
 
                     {/* Share Link */}
                     {flowId && (

@@ -1,4 +1,4 @@
-import { api, withRetry } from '@flows/web-core';
+import { API_URL, api, withRetry } from '@flows/web-core';
 
 import type { ApiListResult, FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../types';
 import type { BlockDefinition, DataPacket, LogEntry } from '@lemoncloud/eureka-flows-api';
@@ -14,6 +14,20 @@ const _log = console.log.bind(console, '[flows-api]');
 export const listFlows = async (): Promise<ApiListResult<FlowView>> => {
     _log('> listFlows()');
     const response = await withRetry(() => api.get<ApiListResult<FlowView>>('/flows'), 3, 'listFlows');
+    return response.data;
+};
+
+/**
+ * List public flows (always uses /public endpoint regardless of auth state)
+ * GET /public/flows
+ */
+export const listPublicFlows = async (): Promise<ApiListResult<FlowView>> => {
+    _log('> listPublicFlows()');
+    const response = await withRetry(
+        () => api.get<ApiListResult<FlowView>>(`${API_URL}/public/flows`),
+        3,
+        'listPublicFlows'
+    );
     return response.data;
 };
 

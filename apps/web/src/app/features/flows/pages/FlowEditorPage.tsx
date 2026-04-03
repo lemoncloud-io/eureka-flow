@@ -56,6 +56,7 @@ export const FlowEditorPage = () => {
         toggleAutoSave,
         updateFlowName,
         isPublic,
+        flowThumbnail,
         togglePublic,
         publishFlow,
     } = useFlows();
@@ -687,6 +688,7 @@ export const FlowEditorPage = () => {
                 onOpenChange={setIsPublishDialogOpen}
                 flowName={flowName}
                 flowDescription={flowDescription}
+                flowThumbnail={flowThumbnail}
                 flowId={currentFlowId}
                 onPublish={publishFlow}
             />

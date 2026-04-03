@@ -51,6 +51,8 @@ export const useFlows = () => {
         setChannelId,
         isPublic,
         setIsPublic,
+        flowThumbnail,
+        setFlowThumbnail,
     } = useFlowsStore();
 
     // Cleanup timeout on unmount to prevent memory leaks
@@ -102,6 +104,7 @@ export const useFlows = () => {
                     setChannelId(flowData.channelId);
                 }
                 setIsPublic(!!flowData.isPublic);
+                setFlowThumbnail(flowData.thumbnail ?? '');
                 return { flowId: savedFlowId, flowData, isNew: false };
             } catch (err) {
                 console.warn('[useFlows] Failed to load saved flow, creating new:', err);
@@ -123,8 +126,9 @@ export const useFlows = () => {
         setFlowName('Untitled Workflow');
         setFlowDescription('');
         setIsPublic(false);
+        setFlowThumbnail('');
         return { flowId: newFlowId, flowData: null, isNew: true };
-    }, [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setIsPublic]);
+    }, [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setIsPublic, setFlowThumbnail]);
 
     /**
      * Load a specific flow by ID
@@ -156,13 +160,14 @@ export const useFlows = () => {
                     setChannelId(flowData.channelId);
                 }
                 setIsPublic(!!flowData.isPublic);
+                setFlowThumbnail(flowData.thumbnail ?? '');
                 return flowData;
             } catch (err) {
                 console.error('[useFlows] Failed to load flow:', err);
                 return null;
             }
         },
-        [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setIsPublic]
+        [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setIsPublic, setFlowThumbnail]
     );
 
     /**
@@ -304,6 +309,7 @@ export const useFlows = () => {
                 setLastSavedAt(null);
                 setChannelId(null);
                 setIsPublic(false);
+                setFlowThumbnail('');
                 return newFlowId;
             }
             return null;
@@ -319,6 +325,7 @@ export const useFlows = () => {
         setLastSavedAt,
         setChannelId,
         setIsPublic,
+        setFlowThumbnail,
     ]);
 
     /**
@@ -369,6 +376,7 @@ export const useFlows = () => {
                 if (body.name) setFlowName(body.name);
                 if (body.description !== undefined) setFlowDescription(body.description);
                 if (body.isPublic !== undefined) setIsPublic(body.isPublic);
+                if (body.thumbnail !== undefined) setFlowThumbnail(body.thumbnail);
                 setLastSavedAt(new Date());
                 updateSaveStatus('success');
                 return true;
@@ -384,6 +392,7 @@ export const useFlows = () => {
             setFlowName,
             setFlowDescription,
             setIsPublic,
+            setFlowThumbnail,
             setLastSavedAt,
             updateSaveStatus,
         ]
@@ -454,6 +463,7 @@ export const useFlows = () => {
 
         // Actions - Publish
         isPublic,
+        flowThumbnail,
         togglePublic,
         publishFlow,
     };

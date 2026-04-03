@@ -191,6 +191,7 @@
         "addDescription": "Add a description...",
         "clickToAddDescription": "Click to add description",
         "editDescription": "Edit Description",
+        "changeThumbnail": "Change Thumbnail",
         "delete": "Delete",
         "deleteConfirmTitle": "Delete Flow",
         "deleteConfirmDescription": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
@@ -269,7 +270,9 @@
         "uploadThumbnail": "Click to upload thumbnail",
         "changeThumbnail": "Change image",
         "removeThumbnail": "Remove",
-        "thumbnailHint": "Recommended: 16:9 ratio"
+        "thumbnailHint": "Recommended: 4:3 ratio, or paste from clipboard",
+        "compressing": "Processing...",
+        "thumbnailError": "Failed to process image"
     },
     "nodeBlock": {
         "inputAlt": "Input",
