@@ -18,6 +18,7 @@ interface FlowsState {
     isBlocksLoaded: boolean;
     currentFlowId: string | null;
     flowName: string;
+    flowDescription: string;
     flows: FlowView[];
     lastSavedAt: Date | null;
     isAutoSaveEnabled: boolean;
@@ -32,6 +33,7 @@ interface FlowsState {
     setBlocksLoaded: (loaded: boolean) => void;
     setCurrentFlowId: (id: string | null) => void;
     setFlowName: (name: string) => void;
+    setFlowDescription: (description: string) => void;
     setFlows: (flows: FlowView[]) => void;
     setLastSavedAt: (date: Date | null) => void;
     setAutoSaveEnabled: (enabled: boolean) => void;
@@ -47,6 +49,7 @@ export const useFlowsStore = create<FlowsState>(set => ({
     isBlocksLoaded: false,
     currentFlowId: null,
     flowName: 'Untitled Workflow',
+    flowDescription: '',
     flows: [],
     lastSavedAt: null,
     isAutoSaveEnabled: flowStorage.getAutoSaveEnabled(),
@@ -74,6 +77,8 @@ export const useFlowsStore = create<FlowsState>(set => ({
     setCurrentFlowId: id => set({ currentFlowId: id }),
 
     setFlowName: name => set({ flowName: name }),
+
+    setFlowDescription: description => set({ flowDescription: description }),
 
     setFlows: flows => set({ flows }),
 
@@ -110,4 +115,5 @@ export const useIsAutoSaveEnabled = () => useFlowsStore(state => state.isAutoSav
 export const useSaveStatus = () => useFlowsStore(state => state.saveStatus);
 export const useSaveError = () => useFlowsStore(state => state.saveError);
 export const useChannelId = () => useFlowsStore(state => state.channelId);
+export const useFlowDescription = () => useFlowsStore(state => state.flowDescription);
 export const useFlowMeta = () => useFlowsStore(state => state.flowMeta);

@@ -35,6 +35,7 @@ export const useFlows = () => {
     const {
         currentFlowId,
         flowName,
+        flowDescription,
         isAutoSaveEnabled,
         lastSavedAt,
         saveStatus,
@@ -42,6 +43,7 @@ export const useFlows = () => {
         channelId,
         setCurrentFlowId,
         setFlowName,
+        setFlowDescription,
         setLastSavedAt,
         toggleAutoSave,
         setSaveStatus,
@@ -95,6 +97,7 @@ export const useFlows = () => {
                 if (flowData.name) {
                     setFlowName(flowData.name);
                 }
+                setFlowDescription(flowData.description ?? '');
                 if (flowData.channelId) {
                     setChannelId(flowData.channelId);
                 }
@@ -339,20 +342,24 @@ export const useFlows = () => {
     );
 
     /**
-     * Publish/unpublish flow with metadata
-     * POST /flows/:id with meta field
+     * Publish/unpublish flow
+     * POST /flows/:id with { name, description, meta }
+     *
+     * Uses the flow's own name/description fields (same as FlowListDialog).
+     * Only isPublic state goes into meta.
      */
     const publishFlow = useCallback(
-        async (meta: PublishMeta): Promise<boolean> => {
+        async (body: { name?: string; description?: string; meta: PublishMeta }): Promise<boolean> => {
             if (!currentFlowId) return false;
 
             updateSaveStatus('saving');
             try {
                 await updateFlowMutation.mutateAsync({
                     id: currentFlowId,
-                    body: { meta },
+                    body,
                 });
-                setFlowMeta(meta);
+                if (body.name) setFlowName(body.name);
+                setFlowMeta(body.meta);
                 setLastSavedAt(new Date());
                 updateSaveStatus('success');
                 return true;
@@ -362,7 +369,7 @@ export const useFlows = () => {
                 return false;
             }
         },
-        [currentFlowId, updateFlowMutation, setFlowMeta, setLastSavedAt, updateSaveStatus]
+        [currentFlowId, updateFlowMutation, setFlowName, setFlowMeta, setLastSavedAt, updateSaveStatus]
     );
 
     // Derive loading state from TanStack Query (only for initial load)
