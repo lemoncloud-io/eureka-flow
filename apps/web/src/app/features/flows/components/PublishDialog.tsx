@@ -17,6 +17,8 @@ import {
     Textarea,
 } from '@flows/ui-kit';
 
+import { ThumbnailPicker } from './ThumbnailPicker';
+
 import type { UpdateFlowBody } from '@flows/flows';
 
 interface PublishDialogProps {
@@ -29,6 +31,7 @@ interface PublishDialogProps {
 }
 
 const DESCRIPTION_MAX_LENGTH = 500;
+const COPY_FEEDBACK_DURATION_MS = 2000;
 
 export const PublishDialog: React.FC<PublishDialogProps> = ({
     open,
@@ -44,6 +47,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
     const [description, setDescription] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
+    const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
     // Reset form when dialog opens
     useEffect(() => {
@@ -51,6 +55,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
         setName(flowName);
         setDescription(flowDescription);
         setLinkCopied(false);
+        setThumbnailUrl(null);
     }, [open, flowName, flowDescription]);
 
     const flowUrl = flowId ? `${window.location.origin}/flows/${flowId}` : '';
@@ -60,7 +65,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
             await navigator.clipboard.writeText(flowUrl);
             setLinkCopied(true);
             toast.success(t('flowEditor.linkCopied'));
-            setTimeout(() => setLinkCopied(false), 2000);
+            setTimeout(() => setLinkCopied(false), COPY_FEEDBACK_DURATION_MS);
         } catch {
             toast.error(t('flowEditor.failedToCopyLink'));
         }
@@ -69,11 +74,15 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
     const handlePublish = useCallback(async () => {
         setIsSubmitting(true);
         try {
-            const success = await onPublish({
+            const body: UpdateFlowBody = {
                 name: name.trim() || flowName,
                 description: description.trim(),
                 isPublic: true,
-            });
+            };
+            if (thumbnailUrl) {
+                body.thumbnail = thumbnailUrl;
+            }
+            const success = await onPublish(body);
             if (success) {
                 // Auto-copy share link
                 if (flowUrl) {
@@ -91,7 +100,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
         } finally {
             setIsSubmitting(false);
         }
-    }, [name, description, flowName, onPublish, onOpenChange, t]);
+    }, [name, description, thumbnailUrl, flowName, flowUrl, onPublish, onOpenChange, t]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -155,6 +164,9 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
                             className="resize-none text-sm"
                         />
                     </div>
+
+                    {/* Thumbnail */}
+                    <ThumbnailPicker value={thumbnailUrl} onChange={setThumbnailUrl} />
 
                     {/* Share Link */}
                     {flowId && (

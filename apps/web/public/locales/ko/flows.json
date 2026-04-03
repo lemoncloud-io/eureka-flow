@@ -264,7 +264,12 @@
         "saving": "저장 중...",
         "published": "플로우가 성공적으로 게시되었습니다!",
         "publishedWithLink": "게시 완료! 링크가 클립보드에 복사되었습니다",
-        "unpublished": "플로우 게시가 취소되었습니다"
+        "unpublished": "플로우 게시가 취소되었습니다",
+        "thumbnail": "썸네일",
+        "uploadThumbnail": "클릭하여 썸네일 업로드",
+        "changeThumbnail": "이미지 변경",
+        "removeThumbnail": "삭제",
+        "thumbnailHint": "권장: 16:9 비율"
     },
     "nodeBlock": {
         "inputAlt": "입력",

@@ -644,6 +644,8 @@ export interface UpdateFlowBody {
     name?: string;
     description?: string;
     isPublic?: boolean;
+    /** Base64 data URL for thumbnail image */
+    thumbnail?: string;
 }
 
 // ============================================================================

@@ -17,6 +17,7 @@ export * from './NodeBlock';
 export * from './PublishDialog';
 export * from './S3Image';
 export * from './Sidebar';
+export * from './ThumbnailPicker';
 export * from './TooltipContentRenderer';
 export * from './TooltipImage';
 export * from './TouchDialog';

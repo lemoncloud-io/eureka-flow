@@ -264,7 +264,12 @@
         "saving": "Saving...",
         "published": "Flow published successfully!",
         "publishedWithLink": "Published! Link copied to clipboard",
-        "unpublished": "Flow unpublished"
+        "unpublished": "Flow unpublished",
+        "thumbnail": "Thumbnail",
+        "uploadThumbnail": "Click to upload thumbnail",
+        "changeThumbnail": "Change image",
+        "removeThumbnail": "Remove",
+        "thumbnailHint": "Recommended: 16:9 ratio"
     },
     "nodeBlock": {
         "inputAlt": "Input",
