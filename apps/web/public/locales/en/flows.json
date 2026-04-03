@@ -33,6 +33,7 @@
         "public": "Public",
         "togglePublic": "Toggle Public",
         "publish": "Publish",
+        "publishedStatus": "Published",
         "editPublishInfo": "Edit publish info",
         "unpublish": "Unpublish",
         "viewOnly": "View Only",

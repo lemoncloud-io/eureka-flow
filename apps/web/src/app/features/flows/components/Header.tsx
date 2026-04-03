@@ -522,19 +522,22 @@ export const Header: React.FC<HeaderProps> = ({
                             {/* Share Group */}
                             {!isPublicMode && (onTogglePublic || onPublish) && (
                                 <>
-                                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                                    <DropdownMenuLabel className="flex items-center justify-between text-xs text-muted-foreground font-normal">
                                         {t('header.menuGroup.share')}
+                                        {isPublic && (
+                                            <span className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                {t('header.publishedStatus', 'Published')}
+                                            </span>
+                                        )}
                                     </DropdownMenuLabel>
                                     {isPublic ? (
                                         <>
                                             <DropdownMenuItem onClick={onPublish}>
-                                                <Globe className="w-4 h-4 mr-2 text-emerald-500" />
+                                                <Globe className="w-4 h-4 mr-2" />
                                                 {t('header.editPublishInfo', 'Edit publish info')}
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                onClick={onTogglePublic}
-                                                className="text-destructive focus:text-destructive"
-                                            >
+                                            <DropdownMenuItem onClick={onTogglePublic}>
                                                 <EyeOff className="w-4 h-4 mr-2" />
                                                 {t('header.unpublish', 'Unpublish')}
                                             </DropdownMenuItem>

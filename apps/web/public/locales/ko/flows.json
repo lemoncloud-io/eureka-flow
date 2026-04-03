@@ -33,6 +33,7 @@
         "public": "공개",
         "togglePublic": "공개 전환",
         "publish": "게시",
+        "publishedStatus": "게시됨",
         "editPublishInfo": "게시 정보 수정",
         "unpublish": "게시 취소",
         "viewOnly": "읽기 전용",
