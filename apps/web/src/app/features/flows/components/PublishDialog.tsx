@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, Copy, Globe, Link } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { THUMBNAIL_ASPECT_RATIO, THUMBNAIL_MAX_WIDTH, processImageWithConfig } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Button,
@@ -29,6 +30,7 @@ interface PublishDialogProps {
     flowThumbnail: string;
     flowId: string | null;
     onPublish: (body: UpdateFlowBody) => Promise<boolean>;
+    onCaptureCanvas?: () => Promise<string | null>;
 }
 
 const DESCRIPTION_MAX_LENGTH = 500;
@@ -42,6 +44,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
     flowThumbnail,
     flowId,
     onPublish,
+    onCaptureCanvas,
 }) => {
     const { t } = useTranslation(['flows']);
 
@@ -57,8 +60,27 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
         setName(flowName);
         setDescription(flowDescription);
         setLinkCopied(false);
-        setThumbnailUrl(flowThumbnail || null);
-    }, [open, flowName, flowDescription, flowThumbnail]);
+
+        if (flowThumbnail) {
+            setThumbnailUrl(flowThumbnail);
+        } else if (onCaptureCanvas) {
+            // Auto-capture canvas as default thumbnail
+            setThumbnailUrl(null);
+            onCaptureCanvas()
+                .then(dataUrl => {
+                    if (!dataUrl) return;
+                    return processImageWithConfig(dataUrl, {
+                        aspectRatio: THUMBNAIL_ASPECT_RATIO,
+                        maxWidth: THUMBNAIL_MAX_WIDTH,
+                    }).then(setThumbnailUrl);
+                })
+                .catch(() => {
+                    // Silent fail — user can still upload manually
+                });
+        } else {
+            setThumbnailUrl(null);
+        }
+    }, [open, flowName, flowDescription, flowThumbnail, onCaptureCanvas]);
 
     const flowUrl = flowId ? `${window.location.origin}/flows/${flowId}` : '';
 

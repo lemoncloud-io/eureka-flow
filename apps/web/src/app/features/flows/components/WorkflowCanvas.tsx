@@ -38,6 +38,7 @@ import { NodeBlock } from './NodeBlock';
 import { ZoomControls } from './ZoomControls';
 import { TOUCH_GESTURE_THRESHOLD, useTouchCanvas } from '../hooks';
 import {
+    captureCanvasAsDataUrl,
     deduplicateEdges,
     exportCanvasAsPng,
     generateTempId,
@@ -91,6 +92,8 @@ export interface WorkflowCanvasRef {
     updateNodeFromServer: (nodeId: string, serverData: Partial<NodeData>) => void;
     /** Export canvas as PNG image */
     exportAsImage: (fileName: string) => Promise<void>;
+    /** Capture canvas as data URL without downloading */
+    captureAsDataUrl: () => Promise<string | null>;
     /** Collapse all nodes */
     collapseAll: () => void;
     /** Expand all nodes */
@@ -1005,6 +1008,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const element = canvasRef.current;
                     if (!element) return;
                     await exportCanvasAsPng(element, fileName);
+                },
+                captureAsDataUrl: async () => {
+                    const element = canvasRef.current;
+                    if (!element) return null;
+                    return captureCanvasAsDataUrl(element);
                 },
                 collapseAll: () => {
                     const nodeIds = nodesRef.current.map(n => n.id);
