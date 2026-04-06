@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-04-06] - root@0.20.0, @flows/web@0.20.0
+
+### Features
+
+- (flows) add auto-capture canvas as default thumbnail
+
+### Refactor
+
+- extract formatRelativeTime to utils
+
 ## [2026-04-03] - root@0.19.0, @flows/web@0.19.0, @flows/admin@0.7.0
 
 ### Features
