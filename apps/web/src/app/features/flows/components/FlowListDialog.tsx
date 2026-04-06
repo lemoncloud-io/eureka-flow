@@ -33,27 +33,11 @@ import {
     Input,
 } from '@flows/ui-kit';
 
+import { formatRelativeTime } from '../utils';
+
 import type { FlowView } from '@flows/flows';
 
 type FlowItemData = FlowView & { id: string; nodeCount: number };
-
-const formatRelativeTime = (
-    timestamp: number | string | undefined,
-    t: (key: string, options?: Record<string, unknown>) => string
-): string => {
-    if (!timestamp) return '';
-    const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp);
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (seconds < 60) return t('flowList.justNow');
-    if (minutes < 60) return t('flowList.minutesAgo', { count: minutes });
-    if (hours < 24) return t('flowList.hoursAgo', { count: hours });
-    if (days < 30) return t('flowList.daysAgo', { count: days });
-    return date.toLocaleDateString();
-};
 
 interface FlowListDialogProps {
     open: boolean;

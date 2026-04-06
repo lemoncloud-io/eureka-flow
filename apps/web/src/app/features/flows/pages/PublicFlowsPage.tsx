@@ -10,6 +10,8 @@ import { ApiKeyDialog } from '@flows/shared';
 import { Badge, Button, Input, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
+import { formatRelativeTime } from '../utils';
+
 import type { FlowView } from '@flows/flows';
 
 // ============================================================================
@@ -22,28 +24,6 @@ const staggerStyle = (index: number): React.CSSProperties => ({
     animationDelay: `${STAGGER_DELAY_MS * index}ms`,
     opacity: 0,
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-const formatRelativeTime = (
-    timestamp: string | number | undefined,
-    t: (key: string, options?: Record<string, unknown>) => string
-): string => {
-    if (!timestamp) return '';
-    const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date(timestamp);
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (seconds < 60) return t('flowList.justNow');
-    if (minutes < 60) return t('flowList.minutesAgo', { count: minutes });
-    if (hours < 24) return t('flowList.hoursAgo', { count: hours });
-    if (days < 30) return t('flowList.daysAgo', { count: days });
-    return date.toLocaleDateString();
-};
 
 // ============================================================================
 // MiniFlowGraph - visual preview of flow topology

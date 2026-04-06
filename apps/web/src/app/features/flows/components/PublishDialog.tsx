@@ -66,13 +66,17 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
         } else if (onCaptureCanvas) {
             // Auto-capture canvas as default thumbnail
             setThumbnailUrl(null);
-            onCaptureCanvas().then(dataUrl => {
-                if (!dataUrl) return;
-                processImageWithConfig(dataUrl, {
-                    aspectRatio: THUMBNAIL_ASPECT_RATIO,
-                    maxWidth: THUMBNAIL_MAX_WIDTH,
-                }).then(setThumbnailUrl);
-            });
+            onCaptureCanvas()
+                .then(dataUrl => {
+                    if (!dataUrl) return;
+                    return processImageWithConfig(dataUrl, {
+                        aspectRatio: THUMBNAIL_ASPECT_RATIO,
+                        maxWidth: THUMBNAIL_MAX_WIDTH,
+                    }).then(setThumbnailUrl);
+                })
+                .catch(() => {
+                    // Silent fail — user can still upload manually
+                });
         } else {
             setThumbnailUrl(null);
         }
