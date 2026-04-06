@@ -80,28 +80,35 @@ const restoreImages = (originals: Map<HTMLImageElement, string>): void => {
 };
 
 /**
- * Capture the canvas as PNG, filtering out overlay elements, then download.
+ * Capture the canvas as a data URL, filtering out overlay elements.
  * Pre-converts cross-origin images to data URLs to avoid CORS failures.
  */
-export const exportCanvasAsPng = async (canvasElement: HTMLElement, fileName: string): Promise<void> => {
+export const captureCanvasAsDataUrl = async (canvasElement: HTMLElement): Promise<string> => {
     const originals = await inlineCrossOriginImages(canvasElement);
 
     try {
-        const dataUrl = await toPng(canvasElement, {
+        return await toPng(canvasElement, {
             cacheBust: false,
             backgroundColor: undefined,
             pixelRatio: PNG_PIXEL_RATIO,
             filter: (node: HTMLElement) => !node.hasAttribute?.('data-canvas-overlay'),
             imagePlaceholder: TRANSPARENT_PIXEL,
         });
-
-        const link = document.createElement('a');
-        link.download = `${fileName}.png`;
-        link.href = dataUrl;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     } finally {
         restoreImages(originals);
     }
+};
+
+/**
+ * Capture the canvas as PNG and download as file.
+ */
+export const exportCanvasAsPng = async (canvasElement: HTMLElement, fileName: string): Promise<void> => {
+    const dataUrl = await captureCanvasAsDataUrl(canvasElement);
+
+    const link = document.createElement('a');
+    link.download = `${fileName}.png`;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };

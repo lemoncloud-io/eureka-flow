@@ -331,6 +331,10 @@ export const FlowEditorPage = () => {
         setIsPublishDialogOpen(true);
     }, []);
 
+    const handleCaptureCanvas = useCallback(async () => {
+        return canvasRef.current?.captureAsDataUrl() ?? null;
+    }, []);
+
     const handleClear = () => {
         if (!canvasRef.current) return;
         if (window.confirm(t('flowEditor.confirmClearCanvas'))) {
@@ -691,6 +695,7 @@ export const FlowEditorPage = () => {
                 flowThumbnail={flowThumbnail}
                 flowId={currentFlowId}
                 onPublish={publishFlow}
+                onCaptureCanvas={handleCaptureCanvas}
             />
 
             {/* Public Mode CTA Banner */}
