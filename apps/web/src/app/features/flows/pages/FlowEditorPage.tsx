@@ -602,6 +602,7 @@ export const FlowEditorPage = () => {
             <div data-tour="canvas" className="absolute inset-0">
                 <WorkflowCanvas
                     ref={canvasRef}
+                    readOnly={isPublicMode}
                     flowId={currentFlowId}
                     connectionId={socketConnectionId ?? undefined}
                     onNodeSelect={handleSelectionChange}

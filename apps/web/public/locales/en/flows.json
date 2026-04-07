@@ -478,9 +478,13 @@
         "done": "Get Started!",
         "progress": "{{current}} of {{total}}",
         "steps": {
-            "welcome": {
+            "apiKey": {
                 "title": "Welcome to Eureka Flow! 👋",
-                "description": "Let's take a quick tour to help you get started with the visual workflow editor. You can always replay this tour from the menu."
+                "description": "Enter your API key to get started. You can create a new key or paste an existing one. Your key is stored locally in your browser."
+            },
+            "welcome": {
+                "title": "Let's explore the editor!",
+                "description": "Your API key is set. Let's take a quick tour of the workflow editor. You can replay this tour anytime from the menu."
             },
             "sidebar": {
                 "title": "Block Library",
@@ -500,7 +504,7 @@
             },
             "menu": {
                 "title": "Main Menu",
-                "description": "Access file operations (export, import), edit tools (auto layout, clear), publishing, theme settings, and help from this menu."
+                "description": "Access file operations (export, import), edit tools (auto layout, clear), publishing, and help from this menu. You can also manage your API key from API Key Settings."
             },
             "finish": {
                 "title": "You're all set! 🎉",

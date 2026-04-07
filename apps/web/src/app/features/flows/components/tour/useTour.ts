@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { TOUR_STORAGE_KEY } from './consts';
 import { createTourSteps } from './tourSteps';
 
-const TOUR_STORAGE_KEY = 'eureka-flow-tour-completed';
 const TOUR_START_DELAY_MS = 800;
 
 export const useTour = () => {
