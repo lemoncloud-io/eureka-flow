@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, Copy, Globe, Link } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { processThumbnail } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Button,
@@ -17,6 +18,7 @@ import {
     Textarea,
 } from '@flows/ui-kit';
 
+import { ThumbnailPicker } from './ThumbnailPicker';
 
 import type { UpdateFlowBody } from '@flows/flows';
 
@@ -25,8 +27,10 @@ interface PublishDialogProps {
     onOpenChange: (open: boolean) => void;
     flowName: string;
     flowDescription: string;
+    flowThumbnail: string;
     flowId: string | null;
     onPublish: (body: UpdateFlowBody) => Promise<boolean>;
+    onCaptureCanvas?: () => Promise<string | null>;
 }
 
 const DESCRIPTION_MAX_LENGTH = 500;
@@ -37,8 +41,10 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
     onOpenChange,
     flowName,
     flowDescription,
+    flowThumbnail,
     flowId,
     onPublish,
+    onCaptureCanvas,
 }) => {
     const { t } = useTranslation(['flows']);
 
@@ -54,8 +60,24 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
         setName(flowName);
         setDescription(flowDescription);
         setLinkCopied(false);
-        setThumbnailUrl(null);
-    }, [open, flowName, flowDescription]);
+
+        if (flowThumbnail) {
+            setThumbnailUrl(flowThumbnail);
+        } else if (onCaptureCanvas) {
+            // Auto-capture canvas as default thumbnail
+            setThumbnailUrl(null);
+            onCaptureCanvas()
+                .then(dataUrl => {
+                    if (!dataUrl) return;
+                    return processThumbnail(dataUrl).then(setThumbnailUrl);
+                })
+                .catch(() => {
+                    // Silent fail — user can still upload manually
+                });
+        } else {
+            setThumbnailUrl(null);
+        }
+    }, [open, flowName, flowDescription, flowThumbnail, onCaptureCanvas]);
 
     const flowUrl = flowId ? `${window.location.origin}/flows/${flowId}` : '';
 
@@ -78,10 +100,9 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
                 description: description.trim(),
                 isPublic: true,
             };
-            // TODO: enable when server supports thumbnail field
-            // if (thumbnailUrl) {
-            //     body.thumbnail = thumbnailUrl;
-            // }
+            if (thumbnailUrl) {
+                body.thumbnail = thumbnailUrl;
+            }
             const success = await onPublish(body);
             if (success) {
                 // Auto-copy share link
@@ -165,8 +186,8 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
                         />
                     </div>
 
-                    {/* TODO: enable when server supports thumbnail field */}
-                    {/* <ThumbnailPicker value={thumbnailUrl} onChange={setThumbnailUrl} /> */}
+                    {/* Thumbnail */}
+                    <ThumbnailPicker value={thumbnailUrl} onChange={setThumbnailUrl} />
 
                     {/* Share Link */}
                     {flowId && (

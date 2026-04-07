@@ -38,6 +38,7 @@
         "unpublish": "게시 취소",
         "viewOnly": "읽기 전용",
         "apiKeySettings": "API 키 설정",
+        "guidedTour": "가이드 투어",
         "beta": "베타",
         "menuGroup": {
             "file": "파일",
@@ -191,6 +192,7 @@
         "addDescription": "설명을 추가하세요...",
         "clickToAddDescription": "클릭하여 설명 추가",
         "editDescription": "설명 편집",
+        "changeThumbnail": "썸네일 변경",
         "delete": "삭제",
         "deleteConfirmTitle": "플로우 삭제",
         "deleteConfirmDescription": "\"{{name}}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
@@ -269,7 +271,9 @@
         "uploadThumbnail": "클릭하여 썸네일 업로드",
         "changeThumbnail": "이미지 변경",
         "removeThumbnail": "삭제",
-        "thumbnailHint": "권장: 16:9 비율"
+        "thumbnailHint": "권장: 4:3 비율, 또는 클립보드에서 붙여넣기",
+        "compressing": "처리 중...",
+        "thumbnailError": "이미지 처리에 실패했습니다"
     },
     "nodeBlock": {
         "inputAlt": "입력",
@@ -314,6 +318,14 @@
                 "save": {
                     "title": "작업 저장",
                     "description": "Cmd/Ctrl + S를 눌러 저장하거나, 헤더에서 자동 저장을 활성화하세요. 워크플로우는 클라우드에 저장되어 어느 기기에서든 접근할 수 있습니다."
+                },
+                "publish": {
+                    "title": "게시 및 공유",
+                    "description": "헤더의 게시 버튼을 사용하여 워크플로우를 공개하세요. 썸네일을 설정하고, 공개 여부를 전환하며, 탐색 페이지에서 다른 사용자가 발견할 수 있도록 공유할 수 있습니다."
+                },
+                "importExport": {
+                    "title": "가져오기 및 내보내기",
+                    "description": "파일 메뉴에서 워크플로우를 JSON(Cmd/Ctrl + E)이나 PNG 이미지로 내보낼 수 있습니다. JSON 파일을 가져와서 다른 곳에서 만든 워크플로우를 불러올 수도 있습니다."
                 }
             }
         },
@@ -350,6 +362,14 @@
                     "label": "다시 실행",
                     "keys": ["Cmd/Ctrl", "Y"]
                 },
+                "copy": {
+                    "label": "선택한 노드 복사",
+                    "keys": ["Cmd/Ctrl", "C"]
+                },
+                "paste": {
+                    "label": "노드 붙여넣기",
+                    "keys": ["Cmd/Ctrl", "V"]
+                },
                 "save": {
                     "label": "저장",
                     "keys": ["Cmd/Ctrl", "S"]
@@ -361,6 +381,10 @@
                 "export": {
                     "label": "JSON 내보내기",
                     "keys": ["Cmd/Ctrl", "E"]
+                },
+                "openFlowList": {
+                    "label": "플로우 목록 열기",
+                    "keys": ["Cmd/Ctrl", "O"]
                 },
                 "autoLayout": {
                     "label": "자동 정렬",
@@ -445,6 +469,46 @@
                 "connect": "포트 사이를 드래그하여 블록을 연결하세요",
                 "help": "언제든지 ?를 눌러 도움말을 확인하세요",
                 "keyboard": "팁: Space+드래그로 이동, 스크롤로 확대/축소"
+            }
+        }
+    },
+    "tour": {
+        "next": "다음",
+        "prev": "이전",
+        "done": "시작하기!",
+        "progress": "{{current}} / {{total}}",
+        "steps": {
+            "apiKey": {
+                "title": "Eureka Flow에 오신 것을 환영합니다! 👋",
+                "description": "API 키를 입력하여 시작하세요. 새 키를 생성하거나 기존 키를 붙여넣을 수 있습니다. 키는 브라우저에 로컬로 저장됩니다."
+            },
+            "welcome": {
+                "title": "에디터를 둘러볼까요!",
+                "description": "API 키가 설정되었습니다. 워크플로우 에디터를 빠르게 둘러보겠습니다. 이 투어는 메뉴에서 언제든 다시 볼 수 있습니다."
+            },
+            "sidebar": {
+                "title": "블록 라이브러리",
+                "description": "여기를 클릭하여 블록 라이브러리를 여세요. 입력, 처리, 출력 블록을 찾아보고 드래그하거나 클릭하여 캔버스에 추가하세요."
+            },
+            "canvas": {
+                "title": "워크플로우 캔버스",
+                "description": "작업 공간입니다. 블록을 추가하고, 포트 사이를 드래그하여 연결하고, 자동화 플로우를 만드세요. 스크롤로 확대/축소, 빈 공간 드래그로 이동합니다."
+            },
+            "header": {
+                "title": "플로우 정보 및 상태",
+                "description": "플로우 이름, 저장 상태, 연결 상태를 확인하세요. 이름을 클릭하면 워크플로우 이름을 변경할 수 있습니다."
+            },
+            "toolbar": {
+                "title": "빠른 작업",
+                "description": "저장, 실행 취소, 다시 실행, 플로우 목록 열기를 할 수 있습니다. 키보드 단축키로도 빠르게 사용할 수 있습니다."
+            },
+            "menu": {
+                "title": "메인 메뉴",
+                "description": "파일 작업(내보내기, 가져오기), 편집 도구(자동 정렬, 초기화), 게시, 도움말을 이 메뉴에서 사용할 수 있습니다. API 키 설정에서 API 키를 관리할 수도 있습니다."
+            },
+            "finish": {
+                "title": "준비 완료! 🎉",
+                "description": "라이브러리에서 블록을 추가하고 연결하는 것부터 시작하세요. 언제든 ?를 눌러 도움말을 열거나, 메뉴에서 이 투어를 다시 볼 수 있습니다."
             }
         }
     }

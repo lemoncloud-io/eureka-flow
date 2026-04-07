@@ -1,5 +1,40 @@
 # Changelog
 
+## [2026-04-07] - root@0.21.0, @flows/web@0.21.0, @flows/admin@0.8.0
+
+### Features
+
+- update guided tour
+- add guided tour
+
+### Refactor
+
+- simplify codes url handling
+
+## [2026-04-06] - root@0.20.0, @flows/web@0.20.0
+
+### Features
+
+- (flows) add auto-capture canvas as default thumbnail
+
+### Refactor
+
+- extract formatRelativeTime to utils
+
+## [2026-04-03] - root@0.19.0, @flows/web@0.19.0, @flows/admin@0.7.0
+
+### Features
+
+- add error handling for thumbnail upload
+- add query for listing public flows
+- add thumbnail upload feature
+- upload flow thumbnail
+- add thumbnail processing and error handling
+
+### Chores
+
+- remove unused camera icon from FlowCard
+
 ## [2026-04-03] - root@0.18.0, @flows/web@0.18.0, @flows/admin@0.6.0
 
 ### Features

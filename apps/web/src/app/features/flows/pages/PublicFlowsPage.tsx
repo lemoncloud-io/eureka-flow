@@ -4,11 +4,13 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { ArrowRight, GitFork, Github, Globe, Layers, Search } from 'lucide-react';
 
-import { useFlowsListQuery } from '@flows/flows';
+import { usePublicFlowsListQuery, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { ApiKeyDialog } from '@flows/shared';
 import { Badge, Button, Input, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
+
+import { formatRelativeTime } from '../utils';
 
 import type { FlowView } from '@flows/flows';
 
@@ -22,28 +24,6 @@ const staggerStyle = (index: number): React.CSSProperties => ({
     animationDelay: `${STAGGER_DELAY_MS * index}ms`,
     opacity: 0,
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-const formatRelativeTime = (
-    timestamp: string | number | undefined,
-    t: (key: string, options?: Record<string, unknown>) => string
-): string => {
-    if (!timestamp) return '';
-    const date = typeof timestamp === 'number' ? new Date(timestamp) : new Date(timestamp);
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (seconds < 60) return t('flowList.justNow');
-    if (minutes < 60) return t('flowList.minutesAgo', { count: minutes });
-    if (hours < 24) return t('flowList.hoursAgo', { count: hours });
-    if (days < 30) return t('flowList.daysAgo', { count: days });
-    return date.toLocaleDateString();
-};
 
 // ============================================================================
 // MiniFlowGraph - visual preview of flow topology
@@ -118,6 +98,7 @@ interface PublicFlowCardProps {
 
 const PublicFlowCard: React.FC<PublicFlowCardProps> = ({ flow, index }) => {
     const { t } = useTranslation(['flows']);
+    const { src: thumbnailSrc } = useS3Image(flow.thumbnail);
     const title = flow.name || t('header.untitledWorkflow');
     const description = flow.description;
     const nodeCount = flow.nodeIds$$?.length ?? 0;
@@ -134,9 +115,15 @@ const PublicFlowCard: React.FC<PublicFlowCardProps> = ({ flow, index }) => {
             )}
             style={staggerStyle(index + 3)}
         >
-            {/* Graph Preview */}
-            <div className="relative h-20 overflow-hidden rounded-t-2xl bg-muted/20 border-b border-border/20 px-3 pt-3">
-                <MiniFlowGraph nodeCount={nodeCount} edgeCount={edgeCount} />
+            {/* Thumbnail / Graph Preview */}
+            <div className="relative h-20 overflow-hidden rounded-t-2xl bg-muted/20 border-b border-border/20">
+                {thumbnailSrc ? (
+                    <img src={thumbnailSrc} alt={title} className="w-full h-full object-cover" />
+                ) : (
+                    <div className="px-3 pt-3 h-full">
+                        <MiniFlowGraph nodeCount={nodeCount} edgeCount={edgeCount} />
+                    </div>
+                )}
                 {/* Gradient fade */}
                 <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card/80 to-transparent" />
             </div>
@@ -183,7 +170,7 @@ export const PublicFlowsPage = () => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
     const { apiKey, setApiKey } = useWebCoreStore();
-    const { data, isLoading } = useFlowsListQuery(true);
+    const { data, isLoading } = usePublicFlowsListQuery(true);
 
     const [search, setSearch] = useState('');
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);

@@ -8,6 +8,7 @@ export const flowsKeys = {
     all: ['flows'] as const,
     lists: () => [...flowsKeys.all, 'list'] as const,
     list: (filters?: Record<string, unknown>) => [...flowsKeys.lists(), filters] as const,
+    publicList: () => [...flowsKeys.all, 'public-list'] as const,
     details: () => [...flowsKeys.all, 'detail'] as const,
     detail: (id: string) => [...flowsKeys.details(), id] as const,
     snapshot: (id: string) => [...flowsKeys.all, 'snapshot', id] as const,

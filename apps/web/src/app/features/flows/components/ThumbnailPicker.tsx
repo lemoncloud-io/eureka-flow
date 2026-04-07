@@ -1,10 +1,10 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ImagePlus, Trash2 } from 'lucide-react';
+import { ImagePlus, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { compressImageIfNeeded } from '@flows/flows';
+import { processThumbnail } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Label } from '@flows/ui-kit';
 
@@ -16,7 +16,23 @@ interface ThumbnailPickerProps {
 export const ThumbnailPicker = ({ value, onChange }: ThumbnailPickerProps) => {
     const { t } = useTranslation(['flows']);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [isCompressing, setIsCompressing] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const handleImageData = useCallback(
+        async (dataUrl: string) => {
+            try {
+                setIsProcessing(true);
+                const processed = await processThumbnail(dataUrl);
+                onChange(processed);
+            } catch {
+                toast.error(t('publish.thumbnailError', 'Failed to process image'));
+            } finally {
+                setIsProcessing(false);
+            }
+        },
+        [onChange, t]
+    );
 
     const handleSelect = useCallback(
         async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,30 +40,54 @@ export const ThumbnailPicker = ({ value, onChange }: ThumbnailPickerProps) => {
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = async () => {
-                try {
-                    setIsCompressing(true);
-                    const dataUrl = reader.result as string;
-                    const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
-                    onChange(compressed);
-                } catch {
-                    toast.error(t('publish.thumbnailError', 'Failed to process image'));
-                } finally {
-                    setIsCompressing(false);
-                }
+            reader.onload = () => {
+                const dataUrl = reader.result as string;
+                handleImageData(dataUrl);
             };
             reader.readAsDataURL(file);
             e.target.value = '';
         },
-        [onChange, t]
+        [handleImageData]
     );
+
+    const handlePaste = useCallback(
+        (e: ClipboardEvent) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+
+            for (const item of items) {
+                if (!item.type.startsWith('image/')) continue;
+
+                e.preventDefault();
+                const file = item.getAsFile();
+                if (!file) continue;
+
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const dataUrl = reader.result as string;
+                    handleImageData(dataUrl);
+                };
+                reader.readAsDataURL(file);
+                return;
+            }
+        },
+        [handleImageData]
+    );
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        el.addEventListener('paste', handlePaste);
+        return () => el.removeEventListener('paste', handlePaste);
+    }, [handlePaste]);
 
     const handleRemove = useCallback(() => {
         onChange(null);
     }, [onChange]);
 
     return (
-        <div className="space-y-1.5">
+        <div ref={containerRef} className="space-y-1.5" tabIndex={-1}>
             <div className="flex items-center justify-between">
                 <Label className="text-xs font-medium text-muted-foreground">{t('publish.thumbnail')}</Label>
                 {value && (
@@ -67,9 +107,9 @@ export const ThumbnailPicker = ({ value, onChange }: ThumbnailPickerProps) => {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     className="group relative w-full overflow-hidden rounded-lg border"
-                    disabled={isCompressing}
+                    disabled={isProcessing}
                 >
-                    <img src={value} alt="Thumbnail" className="w-full aspect-video object-cover" />
+                    <img src={value} alt="Thumbnail" className="w-full aspect-[4/3] object-cover" />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition-colors">
                         <span className="text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity">
                             {t('publish.changeThumbnail')}
@@ -80,7 +120,7 @@ export const ThumbnailPicker = ({ value, onChange }: ThumbnailPickerProps) => {
                 <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={isCompressing}
+                    disabled={isProcessing}
                     className={cn(
                         'flex w-full flex-col items-center justify-center gap-2',
                         'rounded-lg border border-dashed border-muted-foreground/25',
@@ -88,9 +128,13 @@ export const ThumbnailPicker = ({ value, onChange }: ThumbnailPickerProps) => {
                         'hover:border-muted-foreground/40 hover:bg-muted/30'
                     )}
                 >
-                    <ImagePlus className="w-6 h-6 text-muted-foreground/40" />
+                    {isProcessing ? (
+                        <Loader2 className="w-6 h-6 text-muted-foreground/40 animate-spin" />
+                    ) : (
+                        <ImagePlus className="w-6 h-6 text-muted-foreground/40" />
+                    )}
                     <span className="text-xs text-muted-foreground/60">
-                        {isCompressing ? t('publish.compressing', 'Processing...') : t('publish.uploadThumbnail')}
+                        {isProcessing ? t('publish.compressing', 'Processing...') : t('publish.uploadThumbnail')}
                     </span>
                     <span className="text-[10px] text-muted-foreground/40">{t('publish.thumbnailHint')}</span>
                 </button>

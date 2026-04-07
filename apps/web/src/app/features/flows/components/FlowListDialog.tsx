@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FolderOpen, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react';
+import { Camera, FolderOpen, ImagePlus, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { useDeleteFlowMutation, useFlowsListQuery, useUpdateFlowMutation } from '@flows/flows';
+import { processThumbnail, useDeleteFlowMutation, useFlowsListQuery, useUpdateFlowMutation } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     AlertDialog,
@@ -25,27 +26,13 @@ import {
     Input,
 } from '@flows/ui-kit';
 
+import { formatRelativeTime } from '../utils';
+
 import type { FlowView } from '@flows/flows';
 
 type FlowItemData = FlowView & { id: string; nodeCount: number };
 
-const formatRelativeTime = (
-    timestamp: number | string | undefined,
-    t: (key: string, options?: Record<string, unknown>) => string
-): string => {
-    if (!timestamp) return '';
-    const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp);
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (seconds < 60) return t('flowList.justNow');
-    if (minutes < 60) return t('flowList.minutesAgo', { count: minutes });
-    if (hours < 24) return t('flowList.hoursAgo', { count: hours });
-    if (days < 30) return t('flowList.daysAgo', { count: days });
-    return date.toLocaleDateString();
-};
+const DROPDOWN_CLOSE_DELAY_MS = 100;
 
 interface FlowListDialogProps {
     open: boolean;
@@ -61,7 +48,8 @@ const FlowCard: React.FC<{
     onSelect: () => void;
     onDelete: () => void;
     onUpdateDescription: (description: string) => void;
-}> = ({ flow, isCurrent, onSelect, onDelete, onUpdateDescription }) => {
+    onRequestThumbnailUpload: () => void;
+}> = ({ flow, isCurrent, onSelect, onDelete, onUpdateDescription, onRequestThumbnailUpload }) => {
     const { t } = useTranslation(['flows']);
     const [isEditingDesc, setIsEditingDesc] = useState(false);
     const [descDraft, setDescDraft] = useState(flow.description ?? '');
@@ -89,15 +77,33 @@ const FlowCard: React.FC<{
             )}
             onClick={onSelect}
         >
-            {/* Thumbnail placeholder */}
-            <div
+            {/* Thumbnail */}
+            <button
+                type="button"
                 className={cn(
-                    'shrink-0 w-20 h-14 rounded-md flex items-center justify-center',
-                    'bg-muted/50 border border-border/50'
+                    'group/thumb shrink-0 w-20 h-14 rounded-md overflow-hidden relative',
+                    'bg-muted/50 border border-border/50',
+                    !flow.thumbnail && 'flex items-center justify-center'
                 )}
+                onClick={e => {
+                    e.stopPropagation();
+                    onRequestThumbnailUpload();
+                }}
             >
-                <FolderOpen className="w-6 h-6 text-muted-foreground/40" />
-            </div>
+                {flow.thumbnail ? (
+                    <>
+                        <img src={flow.thumbnail} alt="" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/thumb:bg-black/40 transition-colors">
+                            <Camera className="w-4 h-4 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <FolderOpen className="w-6 h-6 text-muted-foreground/40 group-hover/thumb:hidden" />
+                        <ImagePlus className="w-5 h-5 text-muted-foreground/50 hidden group-hover/thumb:block" />
+                    </>
+                )}
+            </button>
 
             {/* Content */}
             <div className="flex-1 min-w-0">
@@ -173,7 +179,15 @@ const FlowCard: React.FC<{
                             <MoreVertical className="w-4 h-4 text-muted-foreground" />
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem
+                            onClick={e => {
+                                e.stopPropagation();
+                                onRequestThumbnailUpload();
+                            }}
+                        >
+                            {t('flowList.changeThumbnail')}
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={e => {
                                 e.stopPropagation();
@@ -213,6 +227,42 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
     const [search, setSearch] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<FlowItemData | null>(null);
+
+    // Shared file input — lives outside Dialog to avoid focus-stealing issues
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const uploadTargetFlowIdRef = useRef<string | null>(null);
+
+    const handleRequestThumbnailUpload = useCallback((flowId: string) => {
+        uploadTargetFlowIdRef.current = flowId;
+        // Delay to let dropdown menu close before opening file picker
+        setTimeout(() => {
+            fileInputRef.current?.click();
+        }, DROPDOWN_CLOSE_DELAY_MS);
+    }, []);
+
+    const handleFileChange = useCallback(
+        async (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files?.[0];
+            const flowId = uploadTargetFlowIdRef.current;
+            e.target.value = '';
+            uploadTargetFlowIdRef.current = null;
+
+            if (!file || !flowId) return;
+
+            const reader = new FileReader();
+            reader.onload = async () => {
+                try {
+                    const dataUrl = reader.result as string;
+                    const processed = await processThumbnail(dataUrl);
+                    updateFlowMutation.mutate({ id: flowId, body: { thumbnail: processed } });
+                } catch {
+                    toast.error(t('publish.thumbnailError'));
+                }
+            };
+            reader.readAsDataURL(file);
+        },
+        [updateFlowMutation, t]
+    );
 
     const filteredFlows = useMemo((): FlowItemData[] => {
         if (!data?.list) return [];
@@ -261,6 +311,9 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
 
     return (
         <>
+            {/* File input lives OUTSIDE Dialog to avoid focus-stealing close */}
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+
             <Dialog open={open} onOpenChange={onOpenChange}>
                 <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden [&>button:last-child]:hidden">
                     <DialogHeader className="px-5 pt-4 pb-3">
@@ -337,6 +390,7 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
                                         onSelect={() => handleSelect(flow.id)}
                                         onDelete={() => setDeleteTarget(flow)}
                                         onUpdateDescription={desc => handleUpdateDescription(flow.id, desc)}
+                                        onRequestThumbnailUpload={() => handleRequestThumbnailUpload(flow.id)}
                                     />
                                 ))}
                             </div>
@@ -346,7 +400,7 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
             </Dialog>
 
             {/* Delete Confirmation */}
-            <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+            <AlertDialog open={!!deleteTarget} onOpenChange={nextOpen => !nextOpen && setDeleteTarget(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>{t('flowList.deleteConfirmTitle')}</AlertDialogTitle>
