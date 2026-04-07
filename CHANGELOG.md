@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-04-07] - root@0.21.0, @flows/web@0.21.0, @flows/admin@0.8.0
+
+### Features
+
+- update guided tour
+- add guided tour
+
+### Refactor
+
+- simplify codes url handling
+
 ## [2026-04-06] - root@0.20.0, @flows/web@0.20.0
 
 ### Features
