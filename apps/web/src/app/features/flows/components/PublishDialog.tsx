@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, Copy, Globe, Link } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { THUMBNAIL_ASPECT_RATIO, THUMBNAIL_MAX_WIDTH, processImageWithConfig } from '@flows/flows';
+import { processThumbnail } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Button,
@@ -69,10 +69,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
             onCaptureCanvas()
                 .then(dataUrl => {
                     if (!dataUrl) return;
-                    return processImageWithConfig(dataUrl, {
-                        aspectRatio: THUMBNAIL_ASPECT_RATIO,
-                        maxWidth: THUMBNAIL_MAX_WIDTH,
-                    }).then(setThumbnailUrl);
+                    return processThumbnail(dataUrl).then(setThumbnailUrl);
                 })
                 .catch(() => {
                     // Silent fail — user can still upload manually

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ImagePlus, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { THUMBNAIL_ASPECT_RATIO, THUMBNAIL_MAX_WIDTH, processImageWithConfig } from '@flows/flows';
+import { processThumbnail } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Label } from '@flows/ui-kit';
 
@@ -12,13 +12,6 @@ interface ThumbnailPickerProps {
     value: string | null;
     onChange: (url: string | null) => void;
 }
-
-const processThumbnail = async (dataUrl: string): Promise<string> => {
-    return processImageWithConfig(dataUrl, {
-        aspectRatio: THUMBNAIL_ASPECT_RATIO,
-        maxWidth: THUMBNAIL_MAX_WIDTH,
-    });
-};
 
 export const ThumbnailPicker = ({ value, onChange }: ThumbnailPickerProps) => {
     const { t } = useTranslation(['flows']);

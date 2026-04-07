@@ -38,6 +38,7 @@
         "unpublish": "Unpublish",
         "viewOnly": "View Only",
         "apiKeySettings": "API Key Settings",
+        "guidedTour": "Guided Tour",
         "beta": "Beta",
         "menuGroup": {
             "file": "File",
@@ -317,6 +318,14 @@
                 "save": {
                     "title": "Save Your Work",
                     "description": "Press Cmd/Ctrl + S to save, or enable auto-save in the header. Your workflow is saved to the cloud and can be accessed from any device."
+                },
+                "publish": {
+                    "title": "Publish & Share",
+                    "description": "Use the Publish button in the header to make your workflow public. Set a thumbnail, toggle visibility, and share it on the Explore page for others to discover."
+                },
+                "importExport": {
+                    "title": "Import & Export",
+                    "description": "Export your workflow as JSON (Cmd/Ctrl + E) or PNG image from the File menu. You can also import JSON files to load workflows from other sources."
                 }
             }
         },
@@ -353,6 +362,14 @@
                     "label": "Redo",
                     "keys": ["Cmd/Ctrl", "Y"]
                 },
+                "copy": {
+                    "label": "Copy selected nodes",
+                    "keys": ["Cmd/Ctrl", "C"]
+                },
+                "paste": {
+                    "label": "Paste nodes",
+                    "keys": ["Cmd/Ctrl", "V"]
+                },
                 "save": {
                     "label": "Save workflow",
                     "keys": ["Cmd/Ctrl", "S"]
@@ -364,6 +381,10 @@
                 "export": {
                     "label": "Export JSON",
                     "keys": ["Cmd/Ctrl", "E"]
+                },
+                "openFlowList": {
+                    "label": "Open flow list",
+                    "keys": ["Cmd/Ctrl", "O"]
                 },
                 "autoLayout": {
                     "label": "Auto layout",
@@ -448,6 +469,46 @@
                 "connect": "Connect blocks by dragging between ports",
                 "help": "Press ? for help anytime",
                 "keyboard": "Tip: Space+drag to pan, scroll to zoom"
+            }
+        }
+    },
+    "tour": {
+        "next": "Next",
+        "prev": "Back",
+        "done": "Get Started!",
+        "progress": "{{current}} of {{total}}",
+        "steps": {
+            "apiKey": {
+                "title": "Welcome to Eureka Flow! 👋",
+                "description": "Enter your API key to get started. You can create a new key or paste an existing one. Your key is stored locally in your browser."
+            },
+            "welcome": {
+                "title": "Let's explore the editor!",
+                "description": "Your API key is set. Let's take a quick tour of the workflow editor. You can replay this tour anytime from the menu."
+            },
+            "sidebar": {
+                "title": "Block Library",
+                "description": "Click here to open the block library. Browse input, process, and output blocks, then drag or click to add them to your canvas."
+            },
+            "canvas": {
+                "title": "Workflow Canvas",
+                "description": "This is your workspace. Add blocks, connect them by dragging between ports, and build your automation flow. Scroll to zoom, drag empty space to pan."
+            },
+            "header": {
+                "title": "Flow Info & Status",
+                "description": "See your flow name, save status, and connection state. Click the name to rename your workflow."
+            },
+            "toolbar": {
+                "title": "Quick Actions",
+                "description": "Save, undo, redo, and open your flow list. These actions also have keyboard shortcuts for faster workflow."
+            },
+            "menu": {
+                "title": "Main Menu",
+                "description": "Access file operations (export, import), edit tools (auto layout, clear), publishing, and help from this menu. You can also manage your API key from API Key Settings."
+            },
+            "finish": {
+                "title": "You're all set! 🎉",
+                "description": "Start by adding a block from the library and connecting them together. Press ? anytime for help, or replay this tour from the menu."
             }
         }
     }
