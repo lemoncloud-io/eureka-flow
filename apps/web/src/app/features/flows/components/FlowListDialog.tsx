@@ -4,14 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Camera, FolderOpen, ImagePlus, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import {
-    THUMBNAIL_ASPECT_RATIO,
-    THUMBNAIL_MAX_WIDTH,
-    processImageWithConfig,
-    useDeleteFlowMutation,
-    useFlowsListQuery,
-    useUpdateFlowMutation,
-} from '@flows/flows';
+import { processThumbnail, useDeleteFlowMutation, useFlowsListQuery, useUpdateFlowMutation } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     AlertDialog,
@@ -38,6 +31,8 @@ import { formatRelativeTime } from '../utils';
 import type { FlowView } from '@flows/flows';
 
 type FlowItemData = FlowView & { id: string; nodeCount: number };
+
+const DROPDOWN_CLOSE_DELAY_MS = 100;
 
 interface FlowListDialogProps {
     open: boolean;
@@ -239,11 +234,10 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
 
     const handleRequestThumbnailUpload = useCallback((flowId: string) => {
         uploadTargetFlowIdRef.current = flowId;
-        // Use setTimeout to let the dropdown menu close first,
-        // then open the file picker after the dialog regains focus
+        // Delay to let dropdown menu close before opening file picker
         setTimeout(() => {
             fileInputRef.current?.click();
-        }, 100);
+        }, DROPDOWN_CLOSE_DELAY_MS);
     }, []);
 
     const handleFileChange = useCallback(
@@ -259,10 +253,7 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
             reader.onload = async () => {
                 try {
                     const dataUrl = reader.result as string;
-                    const processed = await processImageWithConfig(dataUrl, {
-                        aspectRatio: THUMBNAIL_ASPECT_RATIO,
-                        maxWidth: THUMBNAIL_MAX_WIDTH,
-                    });
+                    const processed = await processThumbnail(dataUrl);
                     updateFlowMutation.mutate({ id: flowId, body: { thumbnail: processed } });
                 } catch {
                     toast.error(t('publish.thumbnailError'));

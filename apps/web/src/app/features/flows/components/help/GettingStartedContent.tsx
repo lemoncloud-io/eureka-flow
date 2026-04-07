@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { GitBranch, MousePointer2, Play, Plus, Save, Settings } from 'lucide-react';
+import { Download, GitBranch, Globe, MousePointer2, Play, Plus, Save, Settings } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 
@@ -11,6 +11,8 @@ const STEPS = [
     { key: 'configure', icon: Settings },
     { key: 'run', icon: Play },
     { key: 'save', icon: Save },
+    { key: 'publish', icon: Globe },
+    { key: 'importExport', icon: Download },
 ] as const;
 
 export const GettingStartedContent = () => {
