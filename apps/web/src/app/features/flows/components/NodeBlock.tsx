@@ -952,6 +952,60 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
         return () => clearInterval(interval);
     }, [nodeState, node.executionStats?.startTime]);
 
+    /*
+     * [추가] 퍼센테이지 진행률 상태
+     *
+     * 원본에는 하단에 얇은 줄(1.5px) 형태의 진행 바만 있었고,
+     * 숫자로 된 퍼센테이지 표시가 전혀 없었습니다.
+     *
+     * simulatedProgress: 화면에 표시할 진행률 숫자 (0~100)
+     * - 백엔드가 실제 progress 값을 보내주면 그 값을 그대로 사용
+     * - 백엔드 값이 없으면 프론트에서 자동으로 애니메이션 (가짜 진행)
+     */
+    const [simulatedProgress, setSimulatedProgress] = useState(0);
+
+    useEffect(() => {
+        // RUNNING 상태가 아니면 진행률을 0으로 초기화하고 종료
+        if (nodeState !== 'RUNNING') {
+            setSimulatedProgress(0);
+            return;
+        }
+
+        // 실행 시작 시 0에서 출발
+        setSimulatedProgress(0);
+
+        // 200ms마다 진행률을 조금씩 올림
+        const interval = window.setInterval(() => {
+            setSimulatedProgress(prev => {
+                const realProgress = node.executionStats?.progress;
+
+                // 백엔드에서 실제 progress 값이 오면 즉시 그 값으로 교체
+                if (realProgress != null && realProgress > 0) return realProgress;
+
+                // 백엔드 값이 없으면: 현재값 + (90 - 현재값) × 4%
+                // → 처음엔 빠르게, 갈수록 느리게 올라가며 최대 89.9%에서 멈춤
+                // → 100%는 절대 자동으로 도달하지 않음 (완료는 오직 서버 COMPLETED 상태로만)
+                const next = prev + (90 - prev) * 0.04;
+                return Math.min(next, 89.9);
+            });
+        }, 200);
+
+        // 컴포넌트 언마운트 또는 상태 변경 시 인터벌 정리
+        return () => clearInterval(interval);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [nodeState]);
+
+    // 백엔드에서 실제 progress 값이 바뀔 때마다 즉시 동기화
+    useEffect(() => {
+        const realProgress = node.executionStats?.progress;
+        if (nodeState === 'RUNNING' && realProgress != null && realProgress > 0) {
+            setSimulatedProgress(realProgress);
+        }
+    }, [nodeState, node.executionStats?.progress]);
+
+    // 소수점 제거 후 화면에 표시할 최종 퍼센테이지 값 (예: 47.3 → 47)
+    const displayProgress = Math.round(simulatedProgress);
+
     const duration = nodeState === 'RUNNING' ? elapsedTime : node.executionStats?.duration;
     const displayDuration =
         duration != null ? (duration > 1000 ? `${(duration / 1000).toFixed(2)}s` : `${duration}ms`) : null;
@@ -1359,29 +1413,78 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     <OutputPreview node={node} definition={definition} contentHeight={contentAreaHeight} />
                 </div>
 
+                {/* State status text */}
+                {(nodeState === 'RUNNING' || nodeState === 'COMPLETED') && (
+                    <div
+                        className={cn(
+                            'mt-2 text-center text-[11px] font-medium py-1.5 rounded-lg border',
+                            nodeState === 'RUNNING' &&
+                                'text-status-running bg-status-running/10 border-status-running/20',
+                            nodeState === 'COMPLETED' &&
+                                'text-status-completed bg-status-completed/10 border-status-completed/20'
+                        )}
+                    >
+                        {nodeState === 'RUNNING' && '실행중'}
+                        {nodeState === 'COMPLETED' && '완료'}
+                    </div>
+                )}
+
                 {/* Error Message */}
                 {nodeState === 'ERROR' && (
                     <div className="mt-2 text-destructive text-[10px] bg-destructive/10 p-2 rounded-lg border border-destructive/20 flex items-start gap-1.5">
-                        <span className="font-semibold shrink-0">{t('flows:nodeBlock.error')}</span>
+                        <span className="font-semibold shrink-0">오류 발생</span>
                         <span className="opacity-80">{node.errorMessage || t('errors.executionFailed')}</span>
                     </div>
                 )}
             </div>
 
-            {/* Progress Bar */}
+            {/*
+             * [변경] Progress Bar (진행률 바)
+             *
+             * 원본: 블록 맨 아래에 1.5px짜리 얇은 줄만 표시 (숫자 없음)
+             * 변경:
+             *   1. 퍼센테이지 텍스트 행 추가 (좌: "47%" 또는 "Running...", 우: "47/100")
+             *   2. 바 모양을 둥글게 변경 (rounded-full)
+             *   3. 배경 영역 추가로 진행률이 더 잘 보이게 개선
+             *
+             * displayProgress가 0이면 "Running..." 텍스트를 보여주고,
+             * 1 이상이면 숫자 퍼센테이지를 보여줍니다.
+             */}
             {nodeState === 'RUNNING' && (
-                <div className="absolute bottom-0 left-0 w-full h-1.5 bg-muted/50 overflow-hidden">
-                    <div
-                        className="h-full bg-status-running transition-all duration-200 ease-out animate-progress-pulse"
-                        style={{ width: `${node.executionStats?.progress || 5}%` }}
-                    />
-                    {/* Animated shimmer effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                <div className="absolute bottom-0 left-0 w-full bg-muted/30 border-t border-border/20 overflow-hidden">
+                    {/* 퍼센테이지 텍스트: 좌측에 "47%", 우측에 "47/100" */}
+                    <div className="flex items-center justify-between px-2 pt-1 pb-0.5">
+                        <span className="text-[9px] font-mono text-status-running/80 leading-none">
+                            {displayProgress > 0 ? `${displayProgress}%` : 'Running...'}
+                        </span>
+                        {/* progress가 0보다 클 때만 우측 "47/100" 표시 */}
+                        {displayProgress > 0 && (
+                            <span className="text-[9px] font-mono text-muted-foreground/60 leading-none">
+                                {displayProgress}
+                                <span className="opacity-60">/100</span>
+                            </span>
+                        )}
+                    </div>
+                    {/* 진행률 바: 최소 3% 너비를 보장해 시작 시 바가 보이도록 함 */}
+                    <div className="h-1 bg-muted/50 mx-2 mb-1.5 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-status-running rounded-full transition-all duration-200 ease-out"
+                            style={{ width: `${Math.max(displayProgress, 3)}%` }}
+                        />
+                        {/* 빛 반사 shimmer 애니메이션 (원본에서 유지) */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                    </div>
                 </div>
             )}
 
-            {/* Duration Badge */}
-            {displayDuration && (
+            {/*
+             * [변경] Duration Badge (경과 시간 배지)
+             *
+             * 원본: 항상 우측 하단에 표시 (RUNNING 중에도 표시)
+             * 변경: RUNNING 중에는 숨김 → Progress Bar 영역과 겹치지 않도록
+             *        실행 완료(COMPLETED/ERROR) 후에만 표시됨
+             */}
+            {displayDuration && nodeState !== 'RUNNING' && (
                 <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-[9px] text-white/90 px-1.5 py-0.5 rounded font-mono pointer-events-none">
                     {displayDuration}
                 </div>

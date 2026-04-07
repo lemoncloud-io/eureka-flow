@@ -6,6 +6,9 @@ import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { useWebCoreStore } from '@flows/web-core';
 
+// [추가] Flow Agent 채팅 패널 컴포넌트 import
+// - 원본에는 없던 컴포넌트로, 우측에 열리는 AI 채팅 패널을 담당합니다.
+import { FlowAgentPanel } from '../components/FlowAgentPanel';
 import { Header } from '../components/Header';
 import { HelpDialog } from '../components/HelpDialog';
 import { Sidebar } from '../components/Sidebar';
@@ -299,6 +302,10 @@ export const FlowEditorPage = () => {
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
+    // [추가] Flow Agent 패널 열림/닫힘 상태
+    // - true: 우측에 채팅 패널이 열림
+    // - false: 패널이 닫히고 우측 하단에 채팅 버튼이 표시됨
+    const [isAgentOpen, setIsAgentOpen] = useState(false);
     const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
 
     const { apiKey, setApiKey } = useWebCoreStore();
@@ -727,6 +734,42 @@ export const FlowEditorPage = () => {
 
             {/* Help Dialog */}
             <HelpDialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen} defaultTab={helpDialogTab} />
+
+            {/*
+             * [추가] Flow Agent 채팅 패널
+             * - isAgentOpen이 true일 때 화면 우측에 채팅 패널이 열립니다.
+             * - open: 패널 열림 여부 전달
+             * - onClose: X 버튼 클릭 시 패널을 닫는 함수 전달
+             */}
+            <FlowAgentPanel open={isAgentOpen} onClose={() => setIsAgentOpen(false)} />
+
+            {/*
+             * [추가] Flow Agent 실행 버튼 (채팅 버튼)
+             * - 패널이 닫혀 있을 때(!isAgentOpen)만 화면 우측 하단에 표시됩니다.
+             * - 클릭하면 isAgentOpen을 true로 바꿔 패널을 엽니다.
+             * - 패널이 열리면 이 버튼은 자동으로 사라집니다(중복 방지).
+             */}
+            {!isAgentOpen && (
+                <button
+                    onClick={() => setIsAgentOpen(true)}
+                    className="absolute bottom-6 right-6 z-30 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors"
+                    title="Flow Agent"
+                >
+                    {/* 말풍선 아이콘 (lucide-react에 없어서 SVG 직접 사용) */}
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-5 h-5"
+                    >
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                </button>
+            )}
 
             {/* Notification Toast */}
             {notification && (

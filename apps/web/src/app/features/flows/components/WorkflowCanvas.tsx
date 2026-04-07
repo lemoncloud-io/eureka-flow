@@ -2393,6 +2393,23 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         />
                     )}
 
+                    {/* Connection type legend */}
+                    {!readOnly && (
+                        <div className="absolute bottom-4 left-4 z-20 hidden sm:flex flex-col gap-1 bg-background/80 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 pointer-events-none">
+                            {[
+                                { label: '텍스트', color: 'bg-port-text' },
+                                { label: '이미지', color: 'bg-port-image' },
+                                { label: '음성', color: 'bg-port-json' },
+                                { label: '영상', color: 'bg-destructive' },
+                            ].map(({ label, color }) => (
+                                <div key={label} className="flex items-center gap-1.5">
+                                    <span className={`w-2 h-2 rounded-full ${color}`} />
+                                    <span className="text-[10px] text-muted-foreground">{label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {/* Mobile Zoom Controls - visible only on mobile */}
                     {!readOnly && (
                         <MobileControls
