@@ -59,9 +59,8 @@ const isPublicRoute = (): boolean => {
     );
 };
 
-/**
- * Renders ApiKeyDialog with guided tour for first-time users
- */
+const CODES_URL = import.meta.env.VITE_CODES_URL;
+
 const ApiKeyGateDialog = ({
     onSubmit,
     error,
@@ -71,7 +70,6 @@ const ApiKeyGateDialog = ({
 }) => {
     useApiKeyTour();
 
-    const codesUrl = import.meta.env.VITE_CODES_URL;
     const handleClose = (open: boolean) => {
         if (!open) {
             window.location.href = '/';
@@ -79,7 +77,7 @@ const ApiKeyGateDialog = ({
     };
 
     return (
-        <ApiKeyDialog open={true} onSubmit={onSubmit} onOpenChange={handleClose} error={error} codesUrl={codesUrl} />
+        <ApiKeyDialog open={true} onSubmit={onSubmit} onOpenChange={handleClose} error={error} codesUrl={CODES_URL} />
     );
 };
 
