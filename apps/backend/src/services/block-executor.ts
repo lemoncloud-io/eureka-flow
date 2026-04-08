@@ -1,28 +1,40 @@
 /**
- * Block executor — runs a single block's logic.
- * Currently fake (Phase 3B); Phase 4 will wire real AI/tool calls.
+ * Block executor — runs a single block's logic via the block registry.
+ * Phase 3C: wired to real per-block executors (dummy output).
+ * Phase 4 will swap dummy executors for real AI/tool calls.
  */
+
+import { blockRegistry } from '../modules/blocks';
+import { log } from '../utils/logger';
 
 export const blockExecutor = {
     /**
-     * Execute a single block.
-     * Returns the output payload and how long it took (ms).
+     * Execute a single block by type.
+     * Returns the output payload, timing, and any produced assets.
      *
-     * @param blockType  The type identifier of the block (e.g. "ai-generate", "parse-document")
+     * @param blockType  The type identifier of the block (e.g. "search", "content")
      * @param input      The resolved input payload for this block
      */
-    async execute(blockType: string, input: unknown): Promise<{ output: Record<string, unknown>; durationMs: number }> {
+    async execute(
+        blockType: string,
+        input: unknown
+    ): Promise<{ output: Record<string, unknown>; durationMs: number; assets?: unknown[] }> {
+        const executor = blockRegistry.get(blockType);
+
+        if (!executor) {
+            log.warn(`Unknown block type: ${blockType}, using fallback`);
+            return {
+                output: { error: `Unknown block type: ${blockType}`, blockType },
+                durationMs: 0,
+            };
+        }
+
         const start = Date.now();
-
-        // Phase 3B: fake output based on blockType
-        const output: Record<string, unknown> = {
-            result: `[fake] ${blockType} completed`,
-            blockType,
-            timestamp: new Date().toISOString(),
-            inputReceived: input !== undefined,
+        const result = await executor.execute(input);
+        return {
+            output: result.output,
+            durationMs: Date.now() - start,
+            assets: result.assets,
         };
-
-        const durationMs = Date.now() - start;
-        return { output, durationMs };
     },
 };
