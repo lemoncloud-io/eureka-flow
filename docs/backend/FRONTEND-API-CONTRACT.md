@@ -574,7 +574,14 @@ lemon-core/4.1.15
 
 ---
 
-## 10. API 전체 목록 (19개 + WebSocket)
+## 10. API 전체 목록
+
+**HTTP 엔드포인트: 21개** (flows 4 + blocks 1 + nodes 10 + edges 5 + system 1)
+**WebSocket 라우트: 3개** ($connect, $disconnect, $default)
+
+> 이전 요약에서 "19개"로 기재한 이유: edges CRUD 4개(GET/POST/POST/DELETE)를
+> 2개로 뭉쳐 셌고, 실제로는 create(POST /edges/0)와 update(POST /edges/{id})가
+> 별도 endpoint. 정확한 집계는 아래 표 기준 21개.
 
 | #   | 메서드 | 경로                                          | Caller 파일                    | 함수명                 | 우선순위 |
 | --- | ------ | --------------------------------------------- | ------------------------------ | ---------------------- | -------- |

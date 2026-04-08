@@ -128,6 +128,45 @@ functions:
                   path: '/_api_/nodes/{id}'
                   method: get
 
+    nodeCreate:
+        handler: src/handlers/http/nodes/create-node.main
+        events:
+            - httpApi:
+                  path: /nodes/0
+                  method: post
+            - httpApi:
+                  path: /_apis/nodes/0
+                  method: post
+            - httpApi:
+                  path: /_api_/nodes/0
+                  method: post
+
+    nodeUpsert:
+        handler: src/handlers/http/nodes/upsert-node.main
+        events:
+            - httpApi:
+                  path: '/nodes/{id}/upsert'
+                  method: post
+            - httpApi:
+                  path: '/_apis/nodes/{id}/upsert'
+                  method: post
+            - httpApi:
+                  path: '/_api_/nodes/{id}/upsert'
+                  method: post
+
+    nodeDelete:
+        handler: src/handlers/http/nodes/delete-node.main
+        events:
+            - httpApi:
+                  path: '/nodes/{id}'
+                  method: delete
+            - httpApi:
+                  path: '/_apis/nodes/{id}'
+                  method: delete
+            - httpApi:
+                  path: '/_api_/nodes/{id}'
+                  method: delete
+
     # ── Edges ──
     edgeList:
         handler: src/handlers/http/edges/list-edges.main
