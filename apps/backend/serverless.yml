@@ -2,7 +2,7 @@ service: eureka-flows-backend
 
 provider:
     name: aws
-    runtime: nodejs22.x
+    runtime: nodejs20.x
     region: ap-northeast-2
     stage: ${opt:stage, 'local'}
     environment:
@@ -444,6 +444,47 @@ functions:
             - httpApi:
                   path: '/_api_/runs/{runId}/nodes/{nodeId}/retry'
                   method: post
+
+    # ── Traces ──
+    traceList:
+        handler: src/handlers/http/traces/list-traces.main
+        events:
+            - httpApi:
+                  path: '/runs/{runId}/traces'
+                  method: get
+            - httpApi:
+                  path: '/_apis/runs/{runId}/traces'
+                  method: get
+            - httpApi:
+                  path: '/_api_/runs/{runId}/traces'
+                  method: get
+
+    # ── Assets ──
+    assetList:
+        handler: src/handlers/http/assets/list-assets.main
+        events:
+            - httpApi:
+                  path: '/runs/{runId}/assets'
+                  method: get
+            - httpApi:
+                  path: '/_apis/runs/{runId}/assets'
+                  method: get
+            - httpApi:
+                  path: '/_api_/runs/{runId}/assets'
+                  method: get
+
+    assetGet:
+        handler: src/handlers/http/assets/get-asset.main
+        events:
+            - httpApi:
+                  path: '/assets/{assetId}'
+                  method: get
+            - httpApi:
+                  path: '/_apis/assets/{assetId}'
+                  method: get
+            - httpApi:
+                  path: '/_api_/assets/{assetId}'
+                  method: get
 
     # ── Workers (future: SQS triggers) ──
     # runWorker:

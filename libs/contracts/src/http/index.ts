@@ -6,4 +6,6 @@ export * from './messages.schema';
 export * from './proposals.schema';
 export * from './runs.schema';
 export * from './queue.schema';
+export * from './traces.schema';
+export * from './assets.schema';
 export { SYSTEM_INFO_FORMAT } from './system.schema';

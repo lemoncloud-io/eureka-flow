@@ -1,4 +1,6 @@
 import { blockExecutor } from './block-executor';
+import { traceService } from './trace-service';
+import { wsService } from './websocket-service';
 import { runRepo } from '../repositories/run-repository';
 
 /**
@@ -88,6 +90,24 @@ export const executionEngine = {
             return;
         }
 
+        // Broadcast run.started + record trace
+        try {
+            await wsService.broadcastToFlow(run.flowId, {
+                type: 'run.started',
+                runId,
+                flowId: run.flowId,
+                status: 'RUNNING',
+                timestamp: Date.now(),
+            });
+        } catch {
+            /* non-fatal */
+        }
+        try {
+            await traceService.record(runId, null, 'STATUS', 'Run started');
+        } catch {
+            /* non-fatal */
+        }
+
         const allNodes = await runRepo.listRunNodes(runId);
         const waves = computeWaves(allNodes.map(n => ({ nodeId: n.nodeId, parentNodeIds: n.parentNodeIds })));
 
@@ -137,18 +157,56 @@ export const executionEngine = {
             }
 
             const failedNode = (await runRepo.listRunNodes(runId)).find(n => n.status === 'FAILED');
+            const failedNodeId = failedNode?.nodeId ?? 'unknown';
             await runRepo.updateRunStatus(runId, 'FAILED', {
                 finalOutputSummary: {
-                    failedNodeId: failedNode?.nodeId ?? 'unknown',
+                    failedNodeId,
                     failedAt: new Date().toISOString(),
                 },
             });
+
+            // Broadcast run.failed + record trace
+            try {
+                await wsService.broadcastToFlow(run.flowId, {
+                    type: 'run.failed',
+                    runId,
+                    flowId: run.flowId,
+                    status: 'FAILED',
+                    failedNodeId,
+                    timestamp: Date.now(),
+                });
+            } catch {
+                /* non-fatal */
+            }
+            try {
+                await traceService.record(runId, null, 'STATUS', `Run failed at node ${failedNodeId}`);
+            } catch {
+                /* non-fatal */
+            }
             return;
         }
 
         await runRepo.updateRunStatus(runId, 'COMPLETED', {
             completedAt: new Date().toISOString(),
         });
+
+        // Broadcast run.completed + record trace
+        try {
+            await wsService.broadcastToFlow(run.flowId, {
+                type: 'run.completed',
+                runId,
+                flowId: run.flowId,
+                status: 'COMPLETED',
+                timestamp: Date.now(),
+            });
+        } catch {
+            /* non-fatal */
+        }
+        try {
+            await traceService.record(runId, null, 'STATUS', 'Run completed');
+        } catch {
+            /* non-fatal */
+        }
     },
 
     /**
@@ -186,6 +244,27 @@ export const executionEngine = {
             return;
         }
 
+        // Broadcast node.started + record trace
+        const runForNode = await runRepo.getRun(runId);
+        if (runForNode) {
+            try {
+                await wsService.broadcastToFlow(runForNode.flowId, {
+                    type: 'node.started',
+                    runId,
+                    nodeId,
+                    status: 'RUNNING',
+                    timestamp: Date.now(),
+                });
+            } catch {
+                /* non-fatal */
+            }
+        }
+        try {
+            await traceService.record(runId, nodeId, 'STATUS', `Node ${nodeId} started`);
+        } catch {
+            /* non-fatal */
+        }
+
         try {
             const { output, durationMs } = await blockExecutor.execute(node.blockType, node.inputPayload ?? null);
 
@@ -194,6 +273,26 @@ export const executionEngine = {
                 progress: 100,
                 outputPayload: { ...output, durationMs },
             });
+
+            // Broadcast node.completed + record trace
+            if (runForNode) {
+                try {
+                    await wsService.broadcastToFlow(runForNode.flowId, {
+                        type: 'node.completed',
+                        runId,
+                        nodeId,
+                        status: 'COMPLETED',
+                        timestamp: Date.now(),
+                    });
+                } catch {
+                    /* non-fatal */
+                }
+            }
+            try {
+                await traceService.record(runId, nodeId, 'STATUS', `Node ${nodeId} completed`);
+            } catch {
+                /* non-fatal */
+            }
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
             console.error(`[execution-engine] node ${nodeId} failed:`, errorMessage);
@@ -202,6 +301,28 @@ export const executionEngine = {
                 errorCode: 'EXECUTION_ERROR',
                 errorMessage,
             });
+
+            // Broadcast node.failed + record trace
+            if (runForNode) {
+                try {
+                    await wsService.broadcastToFlow(runForNode.flowId, {
+                        type: 'node.failed',
+                        runId,
+                        nodeId,
+                        status: 'FAILED',
+                        errorCode: 'EXECUTION_ERROR',
+                        errorMessage,
+                        timestamp: Date.now(),
+                    });
+                } catch {
+                    /* non-fatal */
+                }
+            }
+            try {
+                await traceService.record(runId, nodeId, 'ERROR', `Node ${nodeId} failed: ${errorMessage}`);
+            } catch {
+                /* non-fatal */
+            }
         }
     },
 };
