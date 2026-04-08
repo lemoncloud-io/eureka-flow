@@ -1,0 +1,1711 @@
+<!doctype html>
+<html lang="ko" class="dark">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>튜토리얼 — Eureka Flow</title>
+        <style>
+            /* ── EXACT DESIGN TOKENS FROM APP ── */
+            :root {
+                --background: hsl(240, 5%, 13%);
+                --foreground: hsl(0, 0%, 95%);
+                --card: hsl(240, 4%, 16%);
+                --popover: hsl(240, 4%, 15%);
+                --primary: hsl(250, 70%, 60%);
+                --primary-fg: hsl(0, 0%, 100%);
+                --secondary: hsl(240, 4%, 18%);
+                --secondary-fg: hsl(240, 5%, 70%);
+                --accent: hsl(250, 25%, 22%);
+                --accent-fg: hsl(250, 70%, 75%);
+                --muted: hsl(240, 4%, 18%);
+                --muted-fg: hsl(240, 5%, 60%);
+                --border: hsl(240, 4%, 20%);
+                --success: hsl(150, 60%, 45%);
+                --success-bg: hsl(150, 30%, 15%);
+                --success-border: hsl(150, 50%, 35%);
+                --warning: hsl(40, 90%, 50%);
+                --node-bg: hsl(240, 4%, 15%);
+                --node-border: hsl(240, 4%, 24%);
+                --node-header: hsl(240, 4%, 17%);
+                --canvas-bg: hsl(240, 5%, 11%);
+                --port-text: rgba(48, 140, 232, 0.85);
+                --port-text-solid: rgb(48, 140, 232);
+                --conn-stroke: rgba(48, 140, 232, 0.7);
+                --radius: 0.5rem;
+            }
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            html {
+                font-size: 16px;
+                scroll-behavior: smooth;
+            }
+            body {
+                background: var(--background);
+                color: var(--foreground);
+                font-family: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji';
+                line-height: 1.6;
+                min-height: 100vh;
+            }
+
+            /* ── NAV ── */
+            .nav {
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                height: 48px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 24px;
+                background: hsla(240, 5%, 13%, 0.88);
+                backdrop-filter: blur(12px);
+                border-bottom: 1px solid var(--border);
+            }
+            .nav-logo {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                text-decoration: none;
+                color: var(--foreground);
+                font-weight: 600;
+                font-size: 15px;
+            }
+            .nav-logo-icon {
+                width: 22px;
+                height: 22px;
+                background: var(--primary);
+                border-radius: 6px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .badge-beta {
+                font-size: 10px;
+                font-weight: 600;
+                padding: 1px 7px;
+                border-radius: 999px;
+                background: var(--accent);
+                color: var(--accent-fg);
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+            }
+            .nav-right {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .btn-ghost {
+                background: transparent;
+                border: none;
+                color: var(--muted-fg);
+                font-size: 13px;
+                padding: 6px 12px;
+                border-radius: var(--radius);
+                cursor: pointer;
+                text-decoration: none;
+                transition:
+                    color 0.15s,
+                    background 0.15s;
+            }
+            .btn-ghost:hover {
+                color: var(--foreground);
+                background: var(--secondary);
+            }
+            .btn-primary {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                background: var(--primary);
+                color: var(--primary-fg);
+                font-size: 13px;
+                font-weight: 500;
+                padding: 7px 16px;
+                border-radius: var(--radius);
+                border: none;
+                cursor: pointer;
+                text-decoration: none;
+                transition: opacity 0.15s;
+            }
+            .btn-primary:hover {
+                opacity: 0.9;
+            }
+
+            /* ── LAYOUT ── */
+            .layout {
+                display: grid;
+                grid-template-columns: 260px 1fr;
+                height: calc(100vh - 48px);
+            }
+
+            /* ── SIDEBAR ── */
+            .sidebar {
+                border-right: 1px solid var(--border);
+                background: var(--background);
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            .sidebar-header {
+                padding: 16px 16px 12px;
+                border-bottom: 1px solid var(--border);
+            }
+            .sidebar-title {
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--foreground);
+                margin-bottom: 4px;
+            }
+            .sidebar-sub {
+                font-size: 12px;
+                color: var(--muted-fg);
+            }
+
+            /* progress bar */
+            .progress-track {
+                height: 3px;
+                background: var(--secondary);
+                border-radius: 2px;
+                margin-top: 10px;
+                overflow: hidden;
+            }
+            .progress-fill {
+                height: 100%;
+                background: var(--primary);
+                border-radius: 2px;
+                transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            /* step list */
+            .step-list {
+                padding: 12px 8px;
+                overflow-y: auto;
+                flex: 1;
+            }
+            .step-item {
+                display: flex;
+                gap: 10px;
+                align-items: flex-start;
+                padding: 10px 10px;
+                border-radius: var(--radius);
+                cursor: pointer;
+                transition: background 0.15s;
+                margin-bottom: 2px;
+                border: 1px solid transparent;
+            }
+            .step-item:hover {
+                background: var(--secondary);
+            }
+            .step-item.active {
+                background: var(--accent);
+                border-color: hsl(250, 40%, 35%);
+            }
+            .step-item.done .step-icon {
+                background: var(--success-bg);
+                border-color: var(--success-border);
+            }
+            .step-item.done .step-icon svg {
+                display: block;
+            }
+            .step-item.done .step-icon span {
+                display: none;
+            }
+            .step-icon {
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                flex-shrink: 0;
+                border: 1.5px solid var(--border);
+                background: var(--secondary);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 11px;
+                font-weight: 700;
+                color: var(--muted-fg);
+                transition: all 0.2s;
+                position: relative;
+            }
+            .step-item.active .step-icon {
+                border-color: var(--primary);
+                background: var(--accent);
+            }
+            .step-item.active .step-icon span {
+                color: var(--accent-fg);
+            }
+            .step-icon svg {
+                display: none;
+                position: absolute;
+            }
+            .step-text {
+            }
+            .step-text strong {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--foreground);
+                display: block;
+                line-height: 1.4;
+            }
+            .step-text span {
+                font-size: 11px;
+                color: var(--muted-fg);
+            }
+
+            /* ── MAIN CONTENT ── */
+            .main {
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            /* instruction bar */
+            .instruction-bar {
+                padding: 14px 24px;
+                border-bottom: 1px solid var(--border);
+                background: var(--background);
+                display: flex;
+                align-items: flex-start;
+                gap: 14px;
+            }
+            .instr-num {
+                width: 28px;
+                height: 28px;
+                border-radius: 50%;
+                background: var(--accent);
+                color: var(--accent-fg);
+                font-size: 12px;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                margin-top: 1px;
+            }
+            .instr-body {
+                flex: 1;
+            }
+            .instr-title {
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--foreground);
+                margin-bottom: 3px;
+            }
+            .instr-desc {
+                font-size: 13px;
+                color: var(--muted-fg);
+                line-height: 1.6;
+            }
+            .instr-desc code {
+                font-family: ui-monospace, monospace;
+                font-size: 11px;
+                background: var(--secondary);
+                color: var(--accent-fg);
+                padding: 1px 6px;
+                border-radius: 4px;
+            }
+            .instr-actions {
+                display: flex;
+                gap: 8px;
+                margin-top: 12px;
+                flex-wrap: wrap;
+            }
+            .btn-action {
+                font-size: 12px;
+                font-weight: 500;
+                padding: 6px 14px;
+                border-radius: var(--radius);
+                border: none;
+                cursor: pointer;
+                transition: all 0.15s;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .btn-next {
+                background: var(--primary);
+                color: var(--primary-fg);
+            }
+            .btn-next:hover {
+                opacity: 0.88;
+            }
+            .btn-next:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+            }
+            .btn-skip {
+                background: var(--secondary);
+                color: var(--secondary-fg);
+                border: 1px solid var(--border);
+            }
+            .btn-skip:hover {
+                background: var(--muted);
+            }
+            .btn-reset {
+                background: transparent;
+                color: var(--muted-fg);
+                border: 1px solid var(--border);
+            }
+            .btn-reset:hover {
+                color: var(--foreground);
+                border-color: hsl(240, 4%, 35%);
+            }
+
+            /* ── CANVAS AREA ── */
+            .canvas-wrap {
+                flex: 1;
+                overflow: hidden;
+                position: relative;
+                background: var(--canvas-bg);
+                background-image: radial-gradient(circle, hsl(240, 4%, 22%) 1px, transparent 1px);
+                background-size: 24px 24px;
+            }
+
+            /* ── NODES ── */
+            .node {
+                position: absolute;
+                background: var(--node-bg);
+                border: 1.5px solid var(--node-border);
+                border-radius: 12px;
+                min-width: 200px;
+                transition:
+                    border-color 0.2s,
+                    box-shadow 0.2s,
+                    transform 0.15s;
+                cursor: grab;
+                user-select: none;
+            }
+            .node:hover {
+                border-color: hsl(240, 4%, 35%);
+            }
+            .node.selected {
+                border-color: var(--primary);
+                box-shadow: 0 0 0 2px hsl(250, 70%, 60%, 0.2);
+            }
+            .node.completed {
+                border-color: var(--success-border);
+            }
+            .node.running {
+                border-color: var(--warning);
+            }
+            .node.pulse {
+                animation: nodePulse 0.6s ease-out;
+            }
+            @keyframes nodePulse {
+                0% {
+                    box-shadow: 0 0 0 0 hsl(250, 70%, 60%, 0.5);
+                }
+                100% {
+                    box-shadow: 0 0 0 12px hsl(250, 70%, 60%, 0);
+                }
+            }
+
+            .node-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 10px 8px 12px;
+                border-bottom: 1px solid hsl(240, 4%, 22%);
+                background: hsl(250, 15%, 17%, 0.5);
+                border-radius: 11px 11px 0 0;
+            }
+            .node-icon {
+                width: 18px;
+                height: 18px;
+                border-radius: 5px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 11px;
+                flex-shrink: 0;
+            }
+            .icon-input {
+                background: hsl(250, 25%, 28%);
+            }
+            .icon-process {
+                background: hsl(210, 30%, 22%);
+            }
+            .icon-output {
+                background: hsl(150, 25%, 20%);
+            }
+            .node-title {
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--foreground);
+                flex: 1;
+            }
+            .node-actions {
+                display: flex;
+                gap: 2px;
+            }
+            .node-btn {
+                width: 22px;
+                height: 22px;
+                border-radius: 5px;
+                border: none;
+                background: transparent;
+                color: var(--muted-fg);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 11px;
+                transition:
+                    background 0.12s,
+                    color 0.12s;
+            }
+            .node-btn:hover {
+                background: var(--secondary);
+                color: var(--foreground);
+            }
+            .node-btn.run-btn {
+                color: var(--primary);
+            }
+            .node-btn.run-btn:hover {
+                background: var(--accent);
+            }
+            .node-status {
+                font-size: 9px;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                padding: 2px 6px;
+                border-radius: 4px;
+                margin-left: auto;
+            }
+            .status-completed {
+                background: var(--success-bg);
+                color: hsl(150, 60%, 60%);
+                border: 1px solid var(--success-border);
+            }
+            .status-running {
+                background: hsl(40, 35%, 15%);
+                color: hsl(40, 85%, 65%);
+                border: 1px solid hsl(40, 70%, 40%);
+            }
+
+            .node-body {
+                padding: 10px 12px;
+            }
+            .node-textarea {
+                width: 100%;
+                min-height: 60px;
+                resize: none;
+                background: var(--secondary);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                color: var(--foreground);
+                font-family: inherit;
+                font-size: 12px;
+                padding: 8px 10px;
+                line-height: 1.5;
+                outline: none;
+                transition: border-color 0.15s;
+            }
+            .node-textarea:focus {
+                border-color: var(--primary);
+            }
+            .node-select {
+                width: 100%;
+                padding: 5px 10px;
+                background: var(--secondary);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                color: var(--foreground);
+                font-family: inherit;
+                font-size: 12px;
+                outline: none;
+                cursor: pointer;
+            }
+            .node-label {
+                font-size: 10px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: var(--muted-fg);
+                margin-bottom: 5px;
+            }
+            .node-preview {
+                font-size: 12px;
+                color: var(--foreground);
+                line-height: 1.6;
+                max-height: 120px;
+                overflow-y: auto;
+                background: var(--secondary);
+                border-radius: 6px;
+                padding: 8px 10px;
+                border: 1px solid var(--border);
+            }
+            .node-preview .typing::after {
+                content: '▋';
+                animation: blink 0.7s infinite;
+                color: var(--primary);
+            }
+            @keyframes blink {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0;
+                }
+            }
+
+            /* ── PORTS ── */
+            .port {
+                position: absolute;
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: var(--port-text-solid);
+                border: 2px solid var(--canvas-bg);
+                top: 50%;
+                transform: translateY(-50%);
+                cursor: crosshair;
+                transition:
+                    transform 0.15s,
+                    box-shadow 0.15s;
+                z-index: 10;
+            }
+            .port:hover {
+                transform: translateY(-50%) scale(1.5);
+                box-shadow: 0 0 0 3px hsl(210, 80%, 55%, 0.3);
+            }
+            .port-in {
+                left: -6px;
+            }
+            .port-out {
+                right: -6px;
+            }
+            .port-image {
+                background: hsl(280, 60%, 55%);
+            }
+            .port-json {
+                background: hsl(30, 80%, 50%);
+            }
+
+            /* ── SVG CONNECTIONS ── */
+            #connections {
+                position: absolute;
+                inset: 0;
+                pointer-events: none;
+                z-index: 5;
+                width: 100%;
+                height: 100%;
+                overflow: visible;
+            }
+            .conn-path {
+                stroke: var(--conn-stroke);
+                stroke-width: 1.5;
+                fill: none;
+                stroke-linecap: round;
+            }
+            .conn-path.animated {
+                stroke-dasharray: 6 4;
+                animation: flow 1s linear infinite;
+            }
+            @keyframes flow {
+                from {
+                    stroke-dashoffset: 10;
+                }
+                to {
+                    stroke-dashoffset: 0;
+                }
+            }
+
+            /* ── DRAG GHOST ── */
+            #drag-ghost {
+                position: absolute;
+                pointer-events: none;
+                z-index: 200;
+                background: var(--node-bg);
+                border: 1.5px dashed var(--primary);
+                border-radius: 12px;
+                padding: 8px 14px;
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--accent-fg);
+                display: none;
+                white-space: nowrap;
+                opacity: 0.9;
+            }
+
+            /* ── PALETTE (library drag source) ── */
+            .palette {
+                position: absolute;
+                left: 16px;
+                top: 50%;
+                transform: translateY(-50%);
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                z-index: 20;
+            }
+            .palette-node {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 12px;
+                border-radius: 10px;
+                background: var(--card);
+                border: 1px solid var(--border);
+                cursor: grab;
+                font-size: 12px;
+                font-weight: 500;
+                color: var(--foreground);
+                transition:
+                    border-color 0.15s,
+                    background 0.15s;
+                user-select: none;
+            }
+            .palette-node:hover {
+                border-color: var(--primary);
+                background: var(--accent);
+            }
+            .palette-node:active {
+                cursor: grabbing;
+            }
+
+            /* ── TOOLTIP / HINT ── */
+            .hint {
+                position: absolute;
+                z-index: 50;
+                background: var(--popover);
+                border: 1px solid hsl(250, 30%, 35%);
+                border-radius: 10px;
+                padding: 12px 14px;
+                font-size: 12px;
+                color: var(--foreground);
+                line-height: 1.6;
+                max-width: 220px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+                animation: fadeIn 0.25s ease;
+                pointer-events: none;
+            }
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(4px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            .hint::before {
+                content: '';
+                position: absolute;
+                width: 8px;
+                height: 8px;
+                background: var(--popover);
+                border-left: 1px solid hsl(250, 30%, 35%);
+                border-top: 1px solid hsl(250, 30%, 35%);
+                transform: rotate(45deg);
+            }
+            .hint.hint-right::before {
+                left: -5px;
+                top: 16px;
+            }
+            .hint.hint-bottom::before {
+                top: -5px;
+                left: 16px;
+                transform: rotate(135deg);
+            }
+            .hint strong {
+                color: var(--accent-fg);
+                font-weight: 600;
+            }
+
+            /* ── COMPLETION SCREEN ── */
+            .completion {
+                position: absolute;
+                inset: 0;
+                z-index: 300;
+                background: hsla(240, 5%, 11%, 0.92);
+                backdrop-filter: blur(8px);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 16px;
+                text-align: center;
+                padding: 40px;
+                animation: fadeIn 0.3s ease;
+            }
+            .completion-icon {
+                font-size: 48px;
+                animation: bounce 0.6s ease;
+            }
+            @keyframes bounce {
+                0%,
+                100% {
+                    transform: scale(1);
+                }
+                50% {
+                    transform: scale(1.15);
+                }
+            }
+            .completion h2 {
+                font-size: 22px;
+                font-weight: 700;
+                color: var(--foreground);
+            }
+            .completion p {
+                font-size: 14px;
+                color: var(--muted-fg);
+                max-width: 400px;
+                line-height: 1.7;
+            }
+
+            /* ── BOTTOM STATUS BAR ── */
+            .status-bar {
+                height: 30px;
+                border-top: 1px solid var(--border);
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                padding: 0 16px;
+                font-size: 11px;
+                color: var(--muted-fg);
+                background: var(--background);
+            }
+            .status-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: var(--success);
+            }
+
+            /* ── TOOLTIP ARROW ── */
+            .arrow-hint {
+                position: absolute;
+                z-index: 60;
+                pointer-events: none;
+                animation: arrowBounce 1s ease-in-out infinite;
+            }
+            @keyframes arrowBounce {
+                0%,
+                100% {
+                    transform: translateX(0);
+                }
+                50% {
+                    transform: translateX(6px);
+                }
+            }
+            .arrow-hint svg {
+                filter: drop-shadow(0 0 4px var(--primary));
+            }
+        </style>
+    </head>
+    <body>
+        <!-- NAV -->
+        <nav class="nav">
+            <a href="/" class="nav-logo">
+                <div class="nav-logo-icon">
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                        <polygon points="7,1 13,7 7,13 1,7" fill="white" opacity=".9" />
+                        <circle cx="7" cy="7" r="2.5" fill="white" />
+                    </svg>
+                </div>
+                Eureka Flow
+                <span class="badge-beta">Beta</span>
+            </a>
+            <div class="nav-right">
+                <a href="/" class="btn-ghost">← 홈으로</a>
+                <a href="/editor" class="btn-primary">에디터 열기 →</a>
+            </div>
+        </nav>
+
+        <div class="layout">
+            <!-- SIDEBAR -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <div class="sidebar-title">인터랙티브 튜토리얼</div>
+                    <div class="sidebar-sub">단계별로 첫 AI 플로우를 완성하세요</div>
+                    <div class="progress-track"><div class="progress-fill" id="progress" style="width: 0%"></div></div>
+                </div>
+                <div class="step-list" id="step-list"></div>
+            </aside>
+
+            <!-- MAIN -->
+            <div class="main">
+                <!-- INSTRUCTION BAR -->
+                <div class="instruction-bar" id="instruction-bar">
+                    <div class="instr-num" id="instr-num">1</div>
+                    <div class="instr-body">
+                        <div class="instr-title" id="instr-title">로딩 중...</div>
+                        <div class="instr-desc" id="instr-desc"></div>
+                        <div class="instr-actions">
+                            <button class="btn-action btn-skip" id="btn-show" onclick="showHint()">힌트 보기</button>
+                            <button class="btn-action btn-next" id="btn-next" onclick="nextStep()">다음 단계 →</button>
+                            <button class="btn-action btn-reset" onclick="resetTutorial()">↺ 처음부터</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CANVAS -->
+                <div class="canvas-wrap" id="canvas">
+                    <svg id="connections"></svg>
+                    <div id="drag-ghost"></div>
+                    <!-- nodes injected here -->
+                </div>
+
+                <div class="status-bar">
+                    <div class="status-dot"></div>
+                    <span id="status-text">튜토리얼 모드 · 직접 조작해보세요</span>
+                    <span style="margin-left: auto; color: hsl(240, 4%, 35%)">flow.eureka.codes</span>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            /* ═══════════════════════════════════════
+   TUTORIAL DATA
+═══════════════════════════════════════ */
+            const STEPS = [
+                {
+                    id: 'intro',
+                    title: '캔버스에 오신 것을 환영합니다',
+                    short: '시작',
+                    shortDesc: '캔버스 소개',
+                    desc: '여기가 Eureka Flow의 <strong>캔버스</strong>입니다. 노드를 배치하고 연결해 AI 파이프라인을 만드는 공간이에요. 먼저 <code>다음 단계</code>를 눌러 시작해보세요.',
+                    action: 'auto',
+                    hint: {
+                        text: '<strong>캔버스</strong>는 무한 스크롤 가능한 작업 공간입니다.\n배경의 점 격자가 정렬을 도와줍니다.',
+                        pos: 'center',
+                    },
+                },
+                {
+                    id: 'add_input',
+                    title: '텍스트 입력 노드 추가',
+                    short: '입력 노드',
+                    shortDesc: '드래그하여 추가',
+                    desc: '왼쪽 팔레트에서 <code>📝 텍스트 입력</code> 노드를 캔버스로 <strong>드래그</strong>하세요. 또는 <code>+ 추가</code> 버튼을 클릭하세요.',
+                    action: 'drag_input',
+                    hint: { text: '팔레트 노드를 <strong>캔버스 중앙</strong>으로 드래그하세요.', side: 'right' },
+                },
+                {
+                    id: 'type_prompt',
+                    title: '프롬프트 입력',
+                    short: '프롬프트',
+                    shortDesc: '텍스트 작성',
+                    desc: '추가된 <code>텍스트 입력</code> 노드에 원하는 내용을 입력하세요. 예: <code>레몬클라우드에 대한 소개 블로그 글 써줘</code>',
+                    action: 'type_input',
+                    hint: {
+                        text: '노드 내부 텍스트 영역을 클릭해 <strong>프롬프트</strong>를 입력하세요.',
+                        side: 'right',
+                    },
+                },
+                {
+                    id: 'add_ai',
+                    title: 'AI 텍스트 노드 추가',
+                    short: 'AI 노드',
+                    shortDesc: '처리 노드 연결',
+                    desc: '<code>🧠 AI 텍스트</code> 노드를 팔레트에서 캔버스로 드래그하세요. 텍스트 입력 오른쪽에 배치하면 좋아요.',
+                    action: 'drag_ai',
+                    hint: { text: 'AI 텍스트 노드를 <strong>텍스트 입력 오른쪽</strong>에 배치하세요.', side: 'right' },
+                },
+                {
+                    id: 'connect',
+                    title: '노드 연결하기',
+                    short: '연결',
+                    shortDesc: '포트 드래그',
+                    desc: '<code>텍스트 입력</code> 노드의 오른쪽 파란 포트(●)에서 드래그해 <code>AI 텍스트</code> 노드의 왼쪽 포트에 연결하세요.',
+                    action: 'connect_nodes',
+                    hint: {
+                        text: '<strong>파란 점</strong>에서 드래그를 시작하세요. 포트에 hover하면 크기가 커집니다.',
+                        side: 'right',
+                    },
+                },
+                {
+                    id: 'add_output',
+                    title: '미리보기 노드 추가',
+                    short: '출력 노드',
+                    shortDesc: '결과 확인',
+                    desc: '<code>👁️ 미리보기</code> 노드를 팔레트에서 추가하고, AI 텍스트 노드 오른쪽 포트와 연결하세요.',
+                    action: 'drag_output',
+                    hint: {
+                        text: '미리보기 노드를 추가한 뒤 <strong>AI 텍스트 출력 포트</strong>와 연결하세요.',
+                        side: 'right',
+                    },
+                },
+                {
+                    id: 'run',
+                    title: '플로우 실행하기',
+                    short: '실행',
+                    shortDesc: '▷ 버튼 클릭',
+                    desc: '텍스트 입력 노드의 <code>▷</code> 버튼을 클릭하거나 AI 텍스트 노드 속성 패널의 <code>이후로 실행</code> 버튼을 눌러 전체 플로우를 실행하세요.',
+                    action: 'run_flow',
+                    hint: { text: '노드 헤더 오른쪽 <strong>▷</strong> 버튼을 클릭하세요.', side: 'top' },
+                },
+                {
+                    id: 'done',
+                    title: '첫 플로우 완성! 🎉',
+                    short: '완성',
+                    shortDesc: '튜토리얼 완료',
+                    desc: '축하합니다! 텍스트 입력 → AI 텍스트 → 미리보기 파이프라인을 완성했습니다. 이제 직접 에디터에서 자신만의 AI 워크플로우를 만들어보세요.',
+                    action: 'done',
+                    hint: {
+                        text: '에디터 열기 버튼으로 <strong>실제 Eureka Flow</strong>를 바로 사용해보세요!',
+                        side: 'right',
+                    },
+                },
+            ];
+
+            /* ═══════════════════════════════════════
+   STATE
+═══════════════════════════════════════ */
+            let currentStep = 0;
+            let nodes = {}; // { id: { el, x, y, w, h } }
+            let connections = []; // [ {from, to} ]
+            let hintEl = null;
+            let isDraggingNode = false;
+            let isDraggingConn = false;
+            let connStart = null;
+            let tempLine = null;
+
+            /* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
+            function init() {
+                renderSidebar();
+                goToStep(0);
+                setupPalette();
+            }
+
+            /* ═══════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════ */
+            function renderSidebar() {
+                const list = document.getElementById('step-list');
+                list.innerHTML = STEPS.map(
+                    (s, i) => `
+    <div class="step-item ${i === 0 ? 'active' : ''}" id="sidebar-step-${i}" onclick="goToStep(${i})">
+      <div class="step-icon">
+        <span>${i + 1}</span>
+        <svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2" stroke="hsl(150,60%,60%)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+      </div>
+      <div class="step-text">
+        <strong>${s.short}</strong>
+        <span>${s.shortDesc}</span>
+      </div>
+    </div>
+  `
+                ).join('');
+            }
+
+            function updateSidebar(idx) {
+                document.querySelectorAll('.step-item').forEach((el, i) => {
+                    el.classList.toggle('active', i === idx);
+                    if (i < idx) el.classList.add('done');
+                });
+                const pct = (idx / (STEPS.length - 1)) * 100;
+                document.getElementById('progress').style.width = pct + '%';
+            }
+
+            /* ═══════════════════════════════════════
+   STEP LOGIC
+═══════════════════════════════════════ */
+            function goToStep(idx) {
+                if (idx < 0 || idx >= STEPS.length) return;
+                currentStep = idx;
+                const step = STEPS[idx];
+
+                document.getElementById('instr-num').textContent = idx + 1;
+                document.getElementById('instr-title').textContent = step.title;
+                document.getElementById('instr-desc').innerHTML = step.desc;
+                updateSidebar(idx);
+                removeHint();
+
+                const nextBtn = document.getElementById('btn-next');
+                nextBtn.disabled = false;
+
+                // Per-step setup
+                setupStep(step);
+            }
+
+            function setupStep(step) {
+                const canvas = document.getElementById('canvas');
+                removeAllArrows();
+
+                switch (step.action) {
+                    case 'auto':
+                        showCanvasDot();
+                        break;
+                    case 'drag_input':
+                        showPalette(['input']);
+                        showArrowAt(80, canvas.offsetHeight * 0.5 - 20, 'right');
+                        break;
+                    case 'type_input':
+                        hidePalette();
+                        setTimeout(() => {
+                            const n = nodes['input'];
+                            if (n) focusNodeTextarea(n.el);
+                        }, 300);
+                        break;
+                    case 'drag_ai':
+                        showPalette(['ai']);
+                        break;
+                    case 'connect_nodes':
+                        hidePalette();
+                        showConnectHint();
+                        break;
+                    case 'drag_output':
+                        showPalette(['output']);
+                        break;
+                    case 'run_flow':
+                        hidePalette();
+                        showRunHint();
+                        break;
+                    case 'done':
+                        hidePalette();
+                        showCompletion();
+                        break;
+                }
+            }
+
+            function nextStep() {
+                if (currentStep < STEPS.length - 1) {
+                    // Auto-complete step if not manually done
+                    autoCompleteStep(STEPS[currentStep]);
+                    goToStep(currentStep + 1);
+                }
+            }
+
+            function autoCompleteStep(step) {
+                switch (step.action) {
+                    case 'drag_input':
+                        if (!nodes['input']) spawnNode('input', 220, 160);
+                        break;
+                    case 'type_input':
+                        if (nodes['input']) {
+                            const ta = nodes['input'].el.querySelector('textarea');
+                            if (ta && !ta.value) ta.value = '레몬클라우드에 대한 소개 블로그 글 써줘';
+                        }
+                        break;
+                    case 'drag_ai':
+                        if (!nodes['ai']) spawnNode('ai', 490, 130);
+                        break;
+                    case 'connect_nodes':
+                        if (!connections.find(c => c.from === 'input' && c.to === 'ai')) {
+                            addConnection('input', 'ai');
+                        }
+                        break;
+                    case 'drag_output':
+                        if (!nodes['output']) spawnNode('output', 760, 160);
+                        if (!connections.find(c => c.from === 'ai' && c.to === 'output')) {
+                            addConnection('ai', 'output');
+                        }
+                        break;
+                    case 'run_flow':
+                        runFlow();
+                        break;
+                }
+            }
+
+            function resetTutorial() {
+                // Remove all nodes
+                Object.values(nodes).forEach(n => n.el.remove());
+                nodes = {};
+                connections = [];
+                document.getElementById('connections').innerHTML = '';
+                removeHint();
+                removeAllArrows();
+                hidePalette();
+                const comp = document.getElementById('completion-screen');
+                if (comp) comp.remove();
+                goToStep(0);
+            }
+
+            /* ═══════════════════════════════════════
+   PALETTE
+═══════════════════════════════════════ */
+            const PALETTE_DEFS = {
+                input: { label: '텍스트 입력', icon: '📝', iconClass: 'icon-input', nodeType: 'input' },
+                ai: { label: 'AI 텍스트', icon: '🧠', iconClass: 'icon-process', nodeType: 'ai' },
+                output: { label: '미리보기', icon: '👁️', iconClass: 'icon-output', nodeType: 'output' },
+            };
+
+            let paletteEl = null;
+
+            function showPalette(types) {
+                removePalette();
+                const canvas = document.getElementById('canvas');
+                paletteEl = document.createElement('div');
+                paletteEl.className = 'palette';
+                paletteEl.id = 'palette';
+                paletteEl.style.left = '16px';
+                paletteEl.style.top = '50%';
+                paletteEl.style.transform = 'translateY(-50%)';
+
+                types.forEach(type => {
+                    const def = PALETTE_DEFS[type];
+                    const div = document.createElement('div');
+                    div.className = 'palette-node';
+                    div.dataset.type = type;
+                    div.innerHTML = `<span style="font-size:14px">${def.icon}</span><span>${def.label}</span><span style="font-size:10px;margin-left:auto;color:var(--muted-fg)">드래그</span>`;
+                    div.addEventListener('mousedown', e => startPaletteDrag(e, type));
+                    // click to add
+                    div.addEventListener('click', () => {
+                        if (!nodes[type]) {
+                            const cx = getDefaultX(type);
+                            const cy = 160;
+                            spawnNode(type, cx, cy);
+                            if (type === 'output' && !connections.find(c => c.from === 'ai' && c.to === 'output')) {
+                                setTimeout(() => addConnection('ai', 'output'), 100);
+                            }
+                            advanceIfMatch(STEPS[currentStep].action, type);
+                        }
+                    });
+                    paletteEl.appendChild(div);
+                });
+
+                canvas.appendChild(paletteEl);
+            }
+
+            function getDefaultX(type) {
+                if (type === 'input') return 220;
+                if (type === 'ai') return 490;
+                if (type === 'output') return 760;
+                return 300;
+            }
+
+            function removePalette() {
+                if (paletteEl) {
+                    paletteEl.remove();
+                    paletteEl = null;
+                }
+            }
+            function hidePalette() {
+                removePalette();
+            }
+
+            function advanceIfMatch(action, type) {
+                if (
+                    (action === 'drag_input' && type === 'input') ||
+                    (action === 'drag_ai' && type === 'ai') ||
+                    (action === 'drag_output' && type === 'output')
+                ) {
+                    setTimeout(() => {
+                        if (currentStep < STEPS.length - 1) goToStep(currentStep + 1);
+                    }, 600);
+                }
+            }
+
+            /* ═══════════════════════════════════════
+   PALETTE DRAG
+═══════════════════════════════════════ */
+            function startPaletteDrag(e, type) {
+                e.preventDefault();
+                const ghost = document.getElementById('drag-ghost');
+                const def = PALETTE_DEFS[type];
+                ghost.textContent = def.icon + ' ' + def.label;
+                ghost.style.display = 'block';
+
+                const canvas = document.getElementById('canvas');
+                const rect = canvas.getBoundingClientRect();
+
+                function onMove(ev) {
+                    ghost.style.left = ev.clientX - rect.left - 60 + 'px';
+                    ghost.style.top = ev.clientY - rect.top - 20 + 'px';
+                }
+                function onUp(ev) {
+                    ghost.style.display = 'none';
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+
+                    const x = ev.clientX - rect.left - 100;
+                    const y = ev.clientY - rect.top - 40;
+                    if (x > 0 && y > 0 && !nodes[type]) {
+                        spawnNode(type, x, y);
+                        if (type === 'output') {
+                            setTimeout(() => {
+                                if (!connections.find(c => c.from === 'ai' && c.to === 'output')) {
+                                    addConnection('ai', 'output');
+                                }
+                            }, 100);
+                        }
+                        advanceIfMatch(STEPS[currentStep].action, type);
+                    }
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            }
+
+            /* ═══════════════════════════════════════
+   SPAWN NODE
+═══════════════════════════════════════ */
+            function spawnNode(type, x, y) {
+                const canvas = document.getElementById('canvas');
+                const el = document.createElement('div');
+                el.className = 'node';
+                el.id = 'node-' + type;
+                el.style.left = x + 'px';
+                el.style.top = y + 'px';
+                el.style.width = '200px';
+                el.innerHTML = buildNodeHTML(type);
+                el.classList.add('pulse');
+
+                // input port
+                if (type !== 'input') {
+                    const portIn = document.createElement('div');
+                    portIn.className = 'port port-in';
+                    portIn.dataset.nodeId = type;
+                    portIn.dataset.portType = 'in';
+                    portIn.addEventListener('mouseup', e => {
+                        e.stopPropagation();
+                        onPortDrop(type);
+                    });
+                    el.appendChild(portIn);
+                }
+                // output port
+                if (type !== 'output') {
+                    const portOut = document.createElement('div');
+                    portOut.className = 'port port-out';
+                    portOut.dataset.nodeId = type;
+                    portOut.dataset.portType = 'out';
+                    portOut.addEventListener('mousedown', e => {
+                        e.stopPropagation();
+                        startConnDrag(e, type);
+                    });
+                    el.appendChild(portOut);
+                }
+
+                canvas.appendChild(el);
+                nodes[type] = { el, x, y, w: 200, h: el.offsetHeight || 110 };
+
+                // Make node draggable
+                const header = el.querySelector('.node-header');
+                makeDraggable(el, header, type);
+
+                // Run button
+                const runBtn = el.querySelector('.run-btn');
+                if (runBtn)
+                    runBtn.addEventListener('click', e => {
+                        e.stopPropagation();
+                        runFlow();
+                    });
+
+                setTimeout(() => el.classList.remove('pulse'), 700);
+                updateConnections();
+                return el;
+            }
+
+            function buildNodeHTML(type) {
+                switch (type) {
+                    case 'input':
+                        return `
+      <div class="node-header">
+        <div class="node-icon icon-input">📝</div>
+        <div class="node-title">텍스트 입력</div>
+        <div class="node-actions">
+          <button class="node-btn run-btn" title="실행">▷</button>
+        </div>
+      </div>
+      <div class="node-body">
+        <div class="node-label">프롬프트</div>
+        <textarea class="node-textarea" placeholder="여기에 입력하세요..." rows="3"></textarea>
+      </div>`;
+
+                    case 'ai':
+                        return `
+      <div class="node-header">
+        <div class="node-icon icon-process">🧠</div>
+        <div class="node-title">AI 텍스트</div>
+        <div class="node-actions">
+          <button class="node-btn run-btn" title="실행">▷</button>
+        </div>
+      </div>
+      <div class="node-body">
+        <div class="node-label" style="margin-bottom:5px">모델</div>
+        <select class="node-select">
+          <option>Gemini 2.5 Flash</option>
+          <option>Gemini 1.5 Pro</option>
+          <option>Claude 3.5 Sonnet</option>
+        </select>
+      </div>`;
+
+                    case 'output':
+                        return `
+      <div class="node-header">
+        <div class="node-icon icon-output">👁️</div>
+        <div class="node-title">미리보기</div>
+      </div>
+      <div class="node-body">
+        <div class="node-label">출력</div>
+        <div class="node-preview" id="preview-content" style="min-height:48px;color:var(--muted-fg);font-style:italic;">실행 결과가 여기에 표시됩니다.</div>
+      </div>`;
+                }
+            }
+
+            /* ═══════════════════════════════════════
+   NODE DRAGGING
+═══════════════════════════════════════ */
+            function makeDraggable(el, handle, type) {
+                handle.addEventListener('mousedown', e => {
+                    if (e.target.tagName === 'BUTTON') return;
+                    e.preventDefault();
+                    const startX = e.clientX - nodes[type].x;
+                    const startY = e.clientY - nodes[type].y;
+                    el.style.cursor = 'grabbing';
+
+                    function onMove(ev) {
+                        const nx = ev.clientX - startX;
+                        const ny = ev.clientY - startY;
+                        nodes[type].x = nx;
+                        nodes[type].y = ny;
+                        el.style.left = nx + 'px';
+                        el.style.top = ny + 'px';
+                        updateConnections();
+                    }
+                    function onUp() {
+                        el.style.cursor = '';
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                    }
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                });
+            }
+
+            /* ═══════════════════════════════════════
+   CONNECTION DRAGGING
+═══════════════════════════════════════ */
+            function startConnDrag(e, fromId) {
+                e.preventDefault();
+                connStart = fromId;
+                const svg = document.getElementById('connections');
+                const canvas = document.getElementById('canvas');
+                const rect = canvas.getBoundingClientRect();
+
+                tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                tempLine.setAttribute('stroke', 'hsl(250,70%,65%)');
+                tempLine.setAttribute('stroke-width', '1.5');
+                tempLine.setAttribute('fill', 'none');
+                tempLine.setAttribute('stroke-dasharray', '5 4');
+                svg.appendChild(tempLine);
+
+                function getPortPos(id, side) {
+                    const n = nodes[id];
+                    if (!n) return null;
+                    const ex = n.x + (side === 'out' ? n.w : 0);
+                    const ey = n.y + n.el.offsetHeight / 2;
+                    return { x: ex, y: ey };
+                }
+
+                function onMove(ev) {
+                    const mx = ev.clientX - rect.left;
+                    const my = ev.clientY - rect.top;
+                    const from = getPortPos(fromId, 'out');
+                    if (!from || !tempLine) return;
+                    const cp = (mx - from.x) * 0.5;
+                    tempLine.setAttribute(
+                        'd',
+                        `M${from.x},${from.y} C${from.x + cp},${from.y} ${mx - cp},${my} ${mx},${my}`
+                    );
+                }
+
+                function onUp(ev) {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    if (tempLine) {
+                        tempLine.remove();
+                        tempLine = null;
+                    }
+                    connStart = null;
+                    // Check if dropped near an input port
+                    const mx = ev.clientX - rect.left;
+                    const my = ev.clientY - rect.top;
+                    Object.entries(nodes).forEach(([id, n]) => {
+                        if (id === fromId) return;
+                        if (Math.abs(mx - n.x) < 30 && Math.abs(my - (n.y + n.el.offsetHeight / 2)) < 30) {
+                            if (!connections.find(c => c.from === fromId && c.to === id)) {
+                                addConnection(fromId, id);
+                                checkConnectStep(fromId, id);
+                            }
+                        }
+                    });
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            }
+
+            function onPortDrop(toId) {
+                if (connStart && connStart !== toId) {
+                    if (!connections.find(c => c.from === connStart && c.to === toId)) {
+                        addConnection(connStart, toId);
+                        checkConnectStep(connStart, toId);
+                    }
+                }
+            }
+
+            function checkConnectStep(from, to) {
+                const action = STEPS[currentStep].action;
+                if (action === 'connect_nodes' && from === 'input' && to === 'ai') {
+                    setTimeout(() => goToStep(currentStep + 1), 500);
+                }
+            }
+
+            /* ═══════════════════════════════════════
+   CONNECTIONS (SVG)
+═══════════════════════════════════════ */
+            function addConnection(fromId, toId) {
+                connections.push({ from: fromId, to: toId });
+                updateConnections();
+            }
+
+            function updateConnections() {
+                const svg = document.getElementById('connections');
+                svg.innerHTML = '';
+
+                connections.forEach(c => {
+                    const fn = nodes[c.from];
+                    const tn = nodes[c.to];
+                    if (!fn || !tn) return;
+
+                    const fx = fn.x + fn.w;
+                    const fy = fn.y + fn.el.offsetHeight / 2;
+                    const tx = tn.x;
+                    const ty = tn.y + tn.el.offsetHeight / 2;
+                    const cp = Math.max(40, (tx - fx) * 0.45);
+
+                    // visible line
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('class', 'conn-path');
+                    path.setAttribute('d', `M${fx},${fy} C${fx + cp},${fy} ${tx - cp},${ty} ${tx},${ty}`);
+                    svg.appendChild(path);
+
+                    // wide invisible click zone
+                    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    hit.setAttribute('stroke', 'transparent');
+                    hit.setAttribute('stroke-width', '20');
+                    hit.setAttribute('fill', 'none');
+                    hit.setAttribute('d', `M${fx},${fy} C${fx + cp},${fy} ${tx - cp},${ty} ${tx},${ty}`);
+                    svg.appendChild(hit);
+                });
+
+                // Update node heights
+                Object.entries(nodes).forEach(([id, n]) => {
+                    n.h = n.el.offsetHeight;
+                });
+            }
+
+            /* ═══════════════════════════════════════
+   RUN FLOW
+═══════════════════════════════════════ */
+            function runFlow() {
+                const inputNode = nodes['input'];
+                const aiNode = nodes['ai'];
+                const outNode = nodes['output'];
+
+                if (!inputNode || !aiNode || !outNode) {
+                    document.getElementById('status-text').textContent = '⚠ 모든 노드를 먼저 추가하고 연결하세요';
+                    return;
+                }
+
+                const ta = inputNode.el.querySelector('textarea');
+                const prompt = ta?.value || '안녕하세요';
+
+                // Mark running
+                aiNode.el.classList.add('running');
+                setNodeStatus(aiNode.el, 'running');
+                document.getElementById('status-text').textContent = '⚙ AI 텍스트 노드 실행 중...';
+
+                const preview = document.getElementById('preview-content');
+                preview.innerHTML = '';
+
+                const responses = {
+                    레몬클라우드:
+                        '**레몬클라우드(LemonCloud)**는 서버리스 클라우드 인프라 전문 스타트업입니다.\n\n최신 AI 기반 자동화 플랫폼인 **Eureka Flow**를 통해 코딩 없이도 복잡한 AI 워크플로우를 시각적으로 구성할 수 있습니다.\n\n대구에 본사를 두고 있으며 클라우드 인프라의 민주화를 목표로 하고 있습니다. 🍋',
+                    default: `안녕하세요! "${prompt.substring(0, 20)}..."에 대한 AI 응답입니다.\n\nEureka Flow에서 실제로 실행하면 **Gemini 2.5 Flash** 모델이 응답을 생성합니다. 이 튜토리얼에서는 시뮬레이션으로 진행됩니다.\n\n✅ 노드 연결 완료\n✅ 파이프라인 동작 확인`,
+                };
+
+                const responseText = prompt.includes('레몬') ? responses['레몬클라우드'] : responses['default'];
+
+                setTimeout(() => {
+                    aiNode.el.classList.remove('running');
+                    aiNode.el.classList.add('completed');
+                    setNodeStatus(aiNode.el, 'completed');
+                    document.getElementById('status-text').textContent = '✅ 실행 완료';
+
+                    if (outNode) {
+                        outNode.el.classList.add('completed');
+                        setNodeStatus(outNode.el, 'completed');
+                        typewriterEffect(preview, renderMarkdown(responseText), 18);
+                    }
+
+                    // advance step
+                    if (STEPS[currentStep].action === 'run_flow') {
+                        setTimeout(() => goToStep(currentStep + 1), 1800);
+                    }
+                }, 1400);
+            }
+
+            function setNodeStatus(el, status) {
+                el.querySelector('.node-status')?.remove();
+                const badge = document.createElement('span');
+                badge.className = 'node-status ' + (status === 'completed' ? 'status-completed' : 'status-running');
+                badge.textContent = status === 'completed' ? 'COMPLETED' : 'RUNNING';
+                el.querySelector('.node-header .node-actions')?.prepend(badge);
+            }
+
+            function typewriterEffect(el, html, speed) {
+                const stripped = html.replace(/<[^>]*>/g, '');
+                let i = 0;
+                el.classList.add('typing');
+                el.style.fontStyle = 'normal';
+                el.style.color = 'var(--foreground)';
+                el.textContent = '';
+                function tick() {
+                    if (i <= stripped.length) {
+                        el.textContent = stripped.slice(0, i);
+                        i++;
+                        setTimeout(tick, speed);
+                    } else {
+                        el.classList.remove('typing');
+                        el.innerHTML = html;
+                    }
+                }
+                tick();
+            }
+
+            function renderMarkdown(text) {
+                return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+            }
+
+            /* ═══════════════════════════════════════
+   HINTS & VISUAL AIDS
+═══════════════════════════════════════ */
+            function showHint() {
+                removeHint();
+                const step = STEPS[currentStep];
+                if (!step.hint) return;
+
+                hintEl = document.createElement('div');
+                hintEl.className = 'hint hint-right';
+                hintEl.innerHTML = step.hint.text.replace(/\n/g, '<br>');
+
+                const canvas = document.getElementById('canvas');
+                hintEl.style.left = '120px';
+                hintEl.style.top = '50px';
+                canvas.appendChild(hintEl);
+            }
+
+            function removeHint() {
+                if (hintEl) {
+                    hintEl.remove();
+                    hintEl = null;
+                }
+            }
+
+            function showCanvasDot() {
+                // Animate center focus
+                const canvas = document.getElementById('canvas');
+                const dot = document.createElement('div');
+                dot.style.cssText = `
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:6px;height:6px;border-radius:50%;background:var(--primary);
+    box-shadow:0 0 0 0 hsl(250,70%,60%,.6);
+    animation:ripple 1.5s ease-out 3;pointer-events:none;z-index:10;
+  `;
+                const style = document.createElement('style');
+                style.textContent = `@keyframes ripple{0%{box-shadow:0 0 0 0 hsl(250,70%,60%,.5);}70%{box-shadow:0 0 0 20px hsl(250,70%,60%,0);}100%{box-shadow:0 0 0 0 hsl(250,70%,60%,0);}}`;
+                document.head.appendChild(style);
+                canvas.appendChild(dot);
+                setTimeout(() => dot.remove(), 4600);
+            }
+
+            function showConnectHint() {
+                const inputNode = nodes['input'];
+                if (!inputNode) return;
+                const arrow = document.createElement('div');
+                arrow.className = 'arrow-hint';
+                arrow.id = 'conn-arrow';
+                arrow.style.left = inputNode.x + inputNode.w + 5 + 'px';
+                arrow.style.top = inputNode.y + inputNode.el.offsetHeight / 2 - 10 + 'px';
+                arrow.innerHTML = `<svg width="24" height="20" viewBox="0 0 24 20"><path d="M2 10 H20 M14 4 L20 10 L14 16" stroke="hsl(250,70%,65%)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+                document.getElementById('canvas').appendChild(arrow);
+            }
+
+            function showRunHint() {
+                const inputNode = nodes['input'];
+                if (!inputNode) return;
+                const arrow = document.createElement('div');
+                arrow.className = 'arrow-hint';
+                arrow.id = 'run-arrow';
+                arrow.style.left = inputNode.x + inputNode.w - 50 + 'px';
+                arrow.style.top = inputNode.y - 28 + 'px';
+                arrow.innerHTML = `<svg width="20" height="24" viewBox="0 0 20 24"><path d="M10 2 V20 M4 14 L10 20 L16 14" stroke="hsl(250,70%,65%)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+                document.getElementById('canvas').appendChild(arrow);
+            }
+
+            function removeAllArrows() {
+                ['conn-arrow', 'run-arrow'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.remove();
+                });
+            }
+
+            function focusNodeTextarea(el) {
+                const ta = el.querySelector('textarea');
+                if (ta) {
+                    ta.focus();
+                    ta.addEventListener(
+                        'input',
+                        () => {
+                            if (ta.value.length > 3 && STEPS[currentStep].action === 'type_input') {
+                                document.getElementById('btn-next').disabled = false;
+                            }
+                        },
+                        { once: true }
+                    );
+                }
+            }
+
+            /* ═══════════════════════════════════════
+   COMPLETION
+═══════════════════════════════════════ */
+            function showCompletion() {
+                const canvas = document.getElementById('canvas');
+                let comp = document.getElementById('completion-screen');
+                if (comp) return;
+                comp = document.createElement('div');
+                comp.id = 'completion-screen';
+                comp.className = 'completion';
+                comp.innerHTML = `
+    <div class="completion-icon">🎉</div>
+    <h2>첫 AI 플로우 완성!</h2>
+    <p>텍스트 입력 → AI 텍스트 → 미리보기 파이프라인을 완성했습니다.<br>
+       이제 실제 에디터에서 <strong style="color:var(--accent-fg)">Eureka Flow</strong>를 직접 써보세요.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px;">
+      <a href="/editor" class="btn-primary" style="font-size:14px;padding:10px 22px;">에디터 열기 →</a>
+      <button class="btn-action btn-skip" onclick="resetTutorial()" style="font-size:13px;">다시 해보기</button>
+    </div>
+  `;
+                canvas.appendChild(comp);
+            }
+
+            /* ═══════════════════════════════════════
+   KEYBOARD
+═══════════════════════════════════════ */
+            document.addEventListener('keydown', e => {
+                if (e.key === 'ArrowRight' && !e.target.matches('textarea,input,select')) nextStep();
+                if (e.key === 'Escape') removeHint();
+                if (e.key === 'h' && !e.target.matches('textarea,input,select')) showHint();
+            });
+
+            /* ═══════════════════════════════════════
+   RESIZE: update connections on resize
+═══════════════════════════════════════ */
+            window.addEventListener('resize', updateConnections);
+
+            /* ═══════════════════════════════════════
+   START
+═══════════════════════════════════════ */
+            init();
+        </script>
+    </body>
+</html>
