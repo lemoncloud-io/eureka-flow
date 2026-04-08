@@ -71,3 +71,54 @@ export const ProposalGetResponseSchema = ProposalSchema;
 
 export type ProposalGetParams = z.infer<typeof ProposalGetParamsSchema>;
 export type ProposalGetResponse = z.infer<typeof ProposalGetResponseSchema>;
+
+// ============================================================================
+// POST /proposals/{proposalId}/approve
+// ============================================================================
+
+export const ProposalApproveParamsSchema = z.object({
+    proposalId: z.string().min(1),
+});
+
+export const ProposalApproveRequestSchema = z.object({
+    decisionNote: z.string().optional(),
+});
+
+/**
+ * Approve response includes:
+ * - Updated proposal (status=APPROVED)
+ * - Updated flow (nodes/edges replaced with proposal snapshot)
+ */
+export const ProposalApproveResponseSchema = z.object({
+    proposal: ProposalSchema,
+    flow: z.object({
+        id: z.string(),
+        name: z.string().optional(),
+        state: z.string().optional(),
+        nodes: z.array(z.record(z.unknown())),
+        edges: z.array(z.record(z.unknown())),
+        updatedAt: z.string(),
+    }),
+});
+
+export type ProposalApproveRequest = z.infer<typeof ProposalApproveRequestSchema>;
+export type ProposalApproveResponse = z.infer<typeof ProposalApproveResponseSchema>;
+
+// ============================================================================
+// POST /proposals/{proposalId}/reject
+// ============================================================================
+
+export const ProposalRejectParamsSchema = z.object({
+    proposalId: z.string().min(1),
+});
+
+export const ProposalRejectRequestSchema = z.object({
+    reason: z.string().optional(),
+});
+
+export const ProposalRejectResponseSchema = z.object({
+    proposal: ProposalSchema,
+});
+
+export type ProposalRejectRequest = z.infer<typeof ProposalRejectRequestSchema>;
+export type ProposalRejectResponse = z.infer<typeof ProposalRejectResponseSchema>;

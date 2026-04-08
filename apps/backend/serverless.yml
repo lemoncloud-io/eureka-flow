@@ -327,6 +327,32 @@ functions:
                   path: '/_api_/proposals/{proposalId}'
                   method: get
 
+    proposalApprove:
+        handler: src/handlers/http/proposals/approve-proposal.main
+        events:
+            - httpApi:
+                  path: '/proposals/{proposalId}/approve'
+                  method: post
+            - httpApi:
+                  path: '/_apis/proposals/{proposalId}/approve'
+                  method: post
+            - httpApi:
+                  path: '/_api_/proposals/{proposalId}/approve'
+                  method: post
+
+    proposalReject:
+        handler: src/handlers/http/proposals/reject-proposal.main
+        events:
+            - httpApi:
+                  path: '/proposals/{proposalId}/reject'
+                  method: post
+            - httpApi:
+                  path: '/_apis/proposals/{proposalId}/reject'
+                  method: post
+            - httpApi:
+                  path: '/_api_/proposals/{proposalId}/reject'
+                  method: post
+
     # ── WebSocket ──
     wsConnect:
         handler: src/handlers/ws/connect.main
