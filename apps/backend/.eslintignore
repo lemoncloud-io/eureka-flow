@@ -1,0 +1,4 @@
+.esbuild
+.local-db
+node_modules
+dist

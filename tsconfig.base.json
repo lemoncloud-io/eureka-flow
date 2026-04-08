@@ -31,7 +31,8 @@
             "@flows/theme": ["libs/theme/src/index.ts"],
             "@flows/ui-kit": ["libs/ui-kit/src/index.ts"],
             "@flows/ui-kit/*": ["libs/ui-kit/src/*"],
-            "@flows/web-core": ["libs/web-core/src/index.ts"]
+            "@flows/web-core": ["libs/web-core/src/index.ts"],
+            "@flows/contracts": ["libs/contracts/src/index.ts"]
         }
     },
     "exclude": ["node_modules", "tmp"]

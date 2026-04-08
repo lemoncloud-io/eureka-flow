@@ -1,0 +1,200 @@
+service: eureka-flows-backend
+
+provider:
+    name: aws
+    runtime: nodejs22.x
+    region: ap-northeast-2
+    stage: ${opt:stage, 'local'}
+    environment:
+        STAGE: ${self:provider.stage}
+        DYNAMODB_ENDPOINT: ${env:DYNAMODB_ENDPOINT, ''}
+        FLOWS_TABLE: ${self:service}-flows-${self:provider.stage}
+        CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
+    httpApi:
+        cors: true
+
+plugins:
+    - serverless-esbuild
+    - serverless-offline
+
+custom:
+    esbuild:
+        bundle: true
+        minify: false
+        sourcemap: true
+        target: node22
+        platform: node
+        external:
+            - '@aws-sdk/*'
+        define:
+            'require.resolve': 'undefined'
+    serverless-offline:
+        httpPort: 8800
+        websocketPort: 8801
+        noPrependStageInUrl: true
+
+functions:
+    # ── Health ──
+    health:
+        handler: src/handlers/http/health.main
+        events:
+            - httpApi:
+                  path: /
+                  method: get
+            - httpApi:
+                  path: /_apis
+                  method: get
+            - httpApi:
+                  path: /_api_
+                  method: get
+
+    # ── Flows ──
+    flowLoad:
+        handler: src/handlers/http/flows/load-flow.main
+        events:
+            - httpApi:
+                  path: '/flows/{id}/load'
+                  method: get
+            - httpApi:
+                  path: '/_apis/flows/{id}/load'
+                  method: get
+            - httpApi:
+                  path: '/_api_/flows/{id}/load'
+                  method: get
+
+    flowSave:
+        handler: src/handlers/http/flows/save-flow.main
+        events:
+            - httpApi:
+                  path: '/flows/{id}/save'
+                  method: post
+            - httpApi:
+                  path: '/_apis/flows/{id}/save'
+                  method: post
+            - httpApi:
+                  path: '/_api_/flows/{id}/save'
+                  method: post
+
+    flowUpsert:
+        handler: src/handlers/http/flows/upsert-flow.main
+        events:
+            - httpApi:
+                  path: '/flows/{id}/upsert'
+                  method: post
+            - httpApi:
+                  path: '/_apis/flows/{id}/upsert'
+                  method: post
+            - httpApi:
+                  path: '/_api_/flows/{id}/upsert'
+                  method: post
+
+    flowUpdateMeta:
+        handler: src/handlers/http/flows/update-flow-meta.main
+        events:
+            - httpApi:
+                  path: '/flows/{id}'
+                  method: post
+            - httpApi:
+                  path: '/_apis/flows/{id}'
+                  method: post
+            - httpApi:
+                  path: '/_api_/flows/{id}'
+                  method: post
+
+    # ── Nodes ──
+    nodeList:
+        handler: src/handlers/http/nodes/list-nodes.main
+        events:
+            - httpApi:
+                  path: /nodes/0/list
+                  method: post
+            - httpApi:
+                  path: /_apis/nodes/0/list
+                  method: post
+            - httpApi:
+                  path: /_api_/nodes/0/list
+                  method: post
+
+    nodeGet:
+        handler: src/handlers/http/nodes/get-node.main
+        events:
+            - httpApi:
+                  path: '/nodes/{id}'
+                  method: get
+            - httpApi:
+                  path: '/_apis/nodes/{id}'
+                  method: get
+            - httpApi:
+                  path: '/_api_/nodes/{id}'
+                  method: get
+
+    # ── Edges ──
+    edgeList:
+        handler: src/handlers/http/edges/list-edges.main
+        events:
+            - httpApi:
+                  path: /edges/0/list
+                  method: post
+            - httpApi:
+                  path: /_apis/edges/0/list
+                  method: post
+            - httpApi:
+                  path: /_api_/edges/0/list
+                  method: post
+
+    # ── Blocks ──
+    blockList:
+        handler: src/handlers/http/blocks/list-blocks.main
+        events:
+            - httpApi:
+                  path: /blocks/0/list
+                  method: get
+            - httpApi:
+                  path: /_apis/blocks/0/list
+                  method: get
+            - httpApi:
+                  path: /_api_/blocks/0/list
+                  method: get
+
+    # ── WebSocket ──
+    wsConnect:
+        handler: src/handlers/ws/connect.main
+        events:
+            - websocket: $connect
+    wsDisconnect:
+        handler: src/handlers/ws/disconnect.main
+        events:
+            - websocket: $disconnect
+    wsDefault:
+        handler: src/handlers/ws/default.main
+        events:
+            - websocket: $default
+
+resources:
+    Resources:
+        FlowsTable:
+            Type: AWS::DynamoDB::Table
+            Properties:
+                TableName: ${self:provider.environment.FLOWS_TABLE}
+                BillingMode: PAY_PER_REQUEST
+                AttributeDefinitions:
+                    - AttributeName: id
+                      AttributeType: S
+                KeySchema:
+                    - AttributeName: id
+                      KeyType: HASH
+
+        ConnectionsTable:
+            Type: AWS::DynamoDB::Table
+            Properties:
+                TableName: ${self:provider.environment.CONNECTIONS_TABLE}
+                BillingMode: PAY_PER_REQUEST
+                AttributeDefinitions:
+                    - AttributeName: connectionId
+                      AttributeType: S
+                KeySchema:
+                    - AttributeName: connectionId
+                      KeyType: HASH
+                TimeToLiveSpecification:
+                    AttributeName: ttl
+                    Enabled: true
