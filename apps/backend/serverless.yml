@@ -273,6 +273,60 @@ functions:
                   path: /_api_/blocks/0/list
                   method: get
 
+    # ── Messages ──
+    messageList:
+        handler: src/handlers/http/messages/list-messages.main
+        events:
+            - httpApi:
+                  path: '/flows/{flowId}/messages'
+                  method: get
+            - httpApi:
+                  path: '/_apis/flows/{flowId}/messages'
+                  method: get
+            - httpApi:
+                  path: '/_api_/flows/{flowId}/messages'
+                  method: get
+
+    messageCreate:
+        handler: src/handlers/http/messages/create-message.main
+        events:
+            - httpApi:
+                  path: '/flows/{flowId}/messages'
+                  method: post
+            - httpApi:
+                  path: '/_apis/flows/{flowId}/messages'
+                  method: post
+            - httpApi:
+                  path: '/_api_/flows/{flowId}/messages'
+                  method: post
+
+    # ── Proposals ──
+    proposalList:
+        handler: src/handlers/http/proposals/list-proposals.main
+        events:
+            - httpApi:
+                  path: '/flows/{flowId}/proposals'
+                  method: get
+            - httpApi:
+                  path: '/_apis/flows/{flowId}/proposals'
+                  method: get
+            - httpApi:
+                  path: '/_api_/flows/{flowId}/proposals'
+                  method: get
+
+    proposalGet:
+        handler: src/handlers/http/proposals/get-proposal.main
+        events:
+            - httpApi:
+                  path: '/proposals/{proposalId}'
+                  method: get
+            - httpApi:
+                  path: '/_apis/proposals/{proposalId}'
+                  method: get
+            - httpApi:
+                  path: '/_api_/proposals/{proposalId}'
+                  method: get
+
     # ── WebSocket ──
     wsConnect:
         handler: src/handlers/ws/connect.main
