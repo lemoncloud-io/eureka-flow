@@ -4,4 +4,5 @@ export * from './edges.schema';
 export * from './blocks.schema';
 export * from './messages.schema';
 export * from './proposals.schema';
+export * from './runs.schema';
 export { SYSTEM_INFO_FORMAT } from './system.schema';

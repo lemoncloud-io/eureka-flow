@@ -353,6 +353,98 @@ functions:
                   path: '/_api_/proposals/{proposalId}/reject'
                   method: post
 
+    # ── Runs ──
+    runCreate:
+        handler: src/handlers/http/runs/start-run.main
+        events:
+            - httpApi:
+                  path: '/flows/{flowId}/runs'
+                  method: post
+            - httpApi:
+                  path: '/_apis/flows/{flowId}/runs'
+                  method: post
+            - httpApi:
+                  path: '/_api_/flows/{flowId}/runs'
+                  method: post
+
+    runList:
+        handler: src/handlers/http/runs/list-runs.main
+        events:
+            - httpApi:
+                  path: '/flows/{flowId}/runs'
+                  method: get
+            - httpApi:
+                  path: '/_apis/flows/{flowId}/runs'
+                  method: get
+            - httpApi:
+                  path: '/_api_/flows/{flowId}/runs'
+                  method: get
+
+    runGet:
+        handler: src/handlers/http/runs/get-run.main
+        events:
+            - httpApi:
+                  path: '/runs/{runId}'
+                  method: get
+            - httpApi:
+                  path: '/_apis/runs/{runId}'
+                  method: get
+            - httpApi:
+                  path: '/_api_/runs/{runId}'
+                  method: get
+
+    runNodesList:
+        handler: src/handlers/http/runs/list-run-nodes.main
+        events:
+            - httpApi:
+                  path: '/runs/{runId}/nodes'
+                  method: get
+            - httpApi:
+                  path: '/_apis/runs/{runId}/nodes'
+                  method: get
+            - httpApi:
+                  path: '/_api_/runs/{runId}/nodes'
+                  method: get
+
+    runNodeGet:
+        handler: src/handlers/http/runs/get-run-node.main
+        events:
+            - httpApi:
+                  path: '/runs/{runId}/nodes/{nodeId}'
+                  method: get
+            - httpApi:
+                  path: '/_apis/runs/{runId}/nodes/{nodeId}'
+                  method: get
+            - httpApi:
+                  path: '/_api_/runs/{runId}/nodes/{nodeId}'
+                  method: get
+
+    runCancel:
+        handler: src/handlers/http/runs/cancel-run.main
+        events:
+            - httpApi:
+                  path: '/runs/{runId}/cancel'
+                  method: post
+            - httpApi:
+                  path: '/_apis/runs/{runId}/cancel'
+                  method: post
+            - httpApi:
+                  path: '/_api_/runs/{runId}/cancel'
+                  method: post
+
+    runNodeRetry:
+        handler: src/handlers/http/runs/retry-node.main
+        events:
+            - httpApi:
+                  path: '/runs/{runId}/nodes/{nodeId}/retry'
+                  method: post
+            - httpApi:
+                  path: '/_apis/runs/{runId}/nodes/{nodeId}/retry'
+                  method: post
+            - httpApi:
+                  path: '/_api_/runs/{runId}/nodes/{nodeId}/retry'
+                  method: post
+
     # ── WebSocket ──
     wsConnect:
         handler: src/handlers/ws/connect.main
