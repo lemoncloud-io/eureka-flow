@@ -445,6 +445,15 @@ functions:
                   path: '/_api_/runs/{runId}/nodes/{nodeId}/retry'
                   method: post
 
+    # ── Workers (future: SQS triggers) ──
+    # runWorker:
+    #     handler: src/workers/run-worker.main
+    #     events:
+    #         - sqs:
+    #               arn: !GetAtt ExecutionQueue.Arn
+    #               batchSize: 1
+    #               functionResponseType: ReportBatchItemFailures
+
     # ── WebSocket ──
     wsConnect:
         handler: src/handlers/ws/connect.main
