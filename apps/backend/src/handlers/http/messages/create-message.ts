@@ -1,6 +1,6 @@
 import { MessageCreateParamsSchema, MessageCreateRequestSchema } from '@flows/contracts';
 
-import { mockOrchestrator } from '../../../modules/orchestrator';
+import { getOrchestrator } from '../../../modules/orchestrator';
 import { flowRepo } from '../../../repositories/flow-repository';
 import { messageRepo } from '../../../repositories/message-repository';
 import { proposalRepo } from '../../../repositories/proposal-repository';
@@ -47,8 +47,9 @@ const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResu
     };
     await messageRepo.put(userMessage);
 
-    // 2. Generate proposal (mock orchestrator)
-    const result = await mockOrchestrator.generateProposal(fid, bodyParsed.data.content);
+    // 2. Generate proposal (mock or claude, based on ORCHESTRATOR_MODE env)
+    const orchestrator = await getOrchestrator();
+    const result = await orchestrator.generateProposal(fid, bodyParsed.data.content);
 
     // 3. Save proposal
     const proposalId = generateNumericId();

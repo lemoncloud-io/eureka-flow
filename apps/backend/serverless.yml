@@ -10,6 +10,8 @@ provider:
         DYNAMODB_ENDPOINT: ${env:DYNAMODB_ENDPOINT, ''}
         FLOWS_TABLE: ${self:service}-flows-${self:provider.stage}
         CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
+        ORCHESTRATOR_MODE: ${env:ORCHESTRATOR_MODE, 'mock'}
+        ANTHROPIC_API_KEY: ${env:ANTHROPIC_API_KEY, ''}
     httpApi:
         cors: true
 
