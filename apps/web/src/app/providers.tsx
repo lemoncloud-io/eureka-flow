@@ -51,11 +51,7 @@ interface ProvidersProps {
 const isPublicRoute = (): boolean => {
     const pathname = window.location.pathname;
     return (
-        pathname === '/' ||
-        pathname === '/explore' ||
-        pathname.startsWith('/flows/') ||
-        pathname.startsWith('/flow/examples') ||
-        pathname.startsWith('/policy/')
+        pathname === '/' || pathname === '/explore' || pathname.startsWith('/flows/') || pathname.startsWith('/policy/')
     );
 };
 

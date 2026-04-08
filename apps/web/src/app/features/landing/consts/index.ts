@@ -3,7 +3,6 @@ export const GITHUB_URL = 'https://github.com/lemoncloud-io/eureka-flow';
 export const ROUTES = {
     EDITOR: '/editor',
     EXPLORE: '/explore',
-    DEMO: '/flow/examples',
     TERMS: '/policy/terms',
     PRIVACY: '/policy/privacy',
 } as const;

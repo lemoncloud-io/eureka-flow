@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { Eye, EyeOff } from 'lucide-react';
+import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from '@flows/ui-kit';
 
@@ -15,7 +16,13 @@ interface ApiKeyDialogProps {
     initialValue?: string;
 }
 
+const resolveError = (err: string | null, t: (key: string) => string): string | null => {
+    if (!err) return null;
+    return err === 'POPUP_BLOCKED' ? t('apiKeyDialog.errors.popupBlocked') : err;
+};
+
 export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, initialValue }: ApiKeyDialogProps) => {
+    const { t } = useTranslation(['common']);
     const [apiKey, setApiKey] = useState(initialValue ?? '');
     const [isLoading, setIsLoading] = useState(false);
     const [showApiKey, setShowApiKey] = useState(false);
@@ -33,9 +40,7 @@ export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, in
         error: popupError,
     } = useApiKeyPopup({
         codesUrl: codesUrl || '',
-        onSuccess: (key: string) => {
-            setApiKey(key);
-        },
+        onSuccess: setApiKey,
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -47,12 +52,7 @@ export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, in
         setIsLoading(false);
     };
 
-    const handleCreateKey = () => {
-        if (!codesUrl) return;
-        openPopup();
-    };
-
-    const displayError = error || popupError;
+    const displayError = resolveError(error, t) || resolveError(popupError, t);
     const isDisabled = isLoading || isPopupLoading;
 
     return (
@@ -63,14 +63,14 @@ export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, in
                 onPointerDownOutside={e => !onOpenChange && e.preventDefault()}
             >
                 <DialogHeader className="space-y-1">
-                    <DialogTitle className="text-base">API Key</DialogTitle>
-                    <DialogDescription className="text-xs">Enter your API key to continue.</DialogDescription>
+                    <DialogTitle className="text-base">{t('apiKeyDialog.title')}</DialogTitle>
+                    <DialogDescription className="text-xs">{t('apiKeyDialog.description')}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="flex flex-col gap-3 mt-2">
                     <div className="relative">
                         <Input
                             type={showApiKey ? 'text' : 'password'}
-                            placeholder="API key"
+                            placeholder={t('apiKeyDialog.placeholder')}
                             value={apiKey}
                             onChange={e => setApiKey(e.target.value)}
                             autoFocus
@@ -87,20 +87,28 @@ export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, in
                     </div>
                     {displayError && <p className="text-xs text-destructive">{displayError}</p>}
                     <Button type="submit" size="sm" className="text-xs" disabled={!apiKey.trim() || isDisabled}>
-                        {isLoading ? 'Validating...' : 'Continue'}
+                        {isLoading ? t('apiKeyDialog.validating') : t('apiKeyDialog.continue')}
                     </Button>
                     {codesUrl && (
                         <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="text-xs"
-                            onClick={handleCreateKey}
+                            className="text-xs gap-1.5"
+                            onClick={openPopup}
                             disabled={isDisabled}
                         >
-                            {isPopupLoading ? 'Waiting for key...' : 'Create New Key'}
+                            {isPopupLoading ? (
+                                t('apiKeyDialog.waitingForKey')
+                            ) : (
+                                <>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                    {t('apiKeyDialog.createKey')}
+                                </>
+                            )}
                         </Button>
                     )}
+                    <p className="text-[11px] text-muted-foreground text-center">{t('apiKeyDialog.hint')}</p>
                 </form>
             </DialogContent>
         </Dialog>
