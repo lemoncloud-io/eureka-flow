@@ -167,6 +167,32 @@ functions:
                   path: '/_api_/nodes/{id}'
                   method: delete
 
+    nodePortGet:
+        handler: src/handlers/http/nodes/get-port.main
+        events:
+            - httpApi:
+                  path: '/nodes/{id}/port'
+                  method: get
+            - httpApi:
+                  path: '/_apis/nodes/{id}/port'
+                  method: get
+            - httpApi:
+                  path: '/_api_/nodes/{id}/port'
+                  method: get
+
+    nodeRun:
+        handler: src/handlers/http/nodes/run-node.main
+        events:
+            - httpApi:
+                  path: '/nodes/{id}/run'
+                  method: post
+            - httpApi:
+                  path: '/_apis/nodes/{id}/run'
+                  method: post
+            - httpApi:
+                  path: '/_api_/nodes/{id}/run'
+                  method: post
+
     # ── Edges ──
     edgeList:
         handler: src/handlers/http/edges/list-edges.main
@@ -180,6 +206,58 @@ functions:
             - httpApi:
                   path: /_api_/edges/0/list
                   method: post
+
+    edgeCreate:
+        handler: src/handlers/http/edges/create-edge.main
+        events:
+            - httpApi:
+                  path: /edges/0
+                  method: post
+            - httpApi:
+                  path: /_apis/edges/0
+                  method: post
+            - httpApi:
+                  path: /_api_/edges/0
+                  method: post
+
+    edgeGet:
+        handler: src/handlers/http/edges/get-edge.main
+        events:
+            - httpApi:
+                  path: '/edges/{id}'
+                  method: get
+            - httpApi:
+                  path: '/_apis/edges/{id}'
+                  method: get
+            - httpApi:
+                  path: '/_api_/edges/{id}'
+                  method: get
+
+    edgeUpdate:
+        handler: src/handlers/http/edges/update-edge.main
+        events:
+            - httpApi:
+                  path: '/edges/{id}'
+                  method: post
+            - httpApi:
+                  path: '/_apis/edges/{id}'
+                  method: post
+            - httpApi:
+                  path: '/_api_/edges/{id}'
+                  method: post
+
+    edgeDelete:
+        handler: src/handlers/http/edges/delete-edge.main
+        events:
+            - httpApi:
+                  path: '/edges/{id}'
+                  method: delete
+            - httpApi:
+                  path: '/_apis/edges/{id}'
+                  method: delete
+            - httpApi:
+                  path: '/_api_/edges/{id}'
+                  method: delete
 
     # ── Blocks ──
     blockList:
