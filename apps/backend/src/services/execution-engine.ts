@@ -1,7 +1,9 @@
 import { blockExecutor } from './block-executor';
 import { traceService } from './trace-service';
 import { wsService } from './websocket-service';
+import { assetRepo } from '../repositories/asset-repository';
 import { runRepo } from '../repositories/run-repository';
+import { generateNumericId } from '../utils/id-generator';
 
 /**
  * Execution engine — handles async run/node execution.
@@ -266,13 +268,52 @@ export const executionEngine = {
         }
 
         try {
-            const { output, durationMs } = await blockExecutor.execute(node.blockType, node.inputPayload ?? null);
+            const result = await blockExecutor.execute(node.blockType, node.inputPayload ?? null);
+            const { output, durationMs, assets } = result;
 
             await runRepo.updateRunNodeStatus(runId, nodeId, 'COMPLETED', {
                 completedAt: new Date().toISOString(),
                 progress: 100,
                 outputPayload: { ...output, durationMs },
             });
+
+            // Save assets produced by this node (media blocks)
+            if (assets && assets.length > 0 && runForNode) {
+                for (const asset of assets) {
+                    const assetId = generateNumericId();
+                    const publicUrl =
+                        typeof asset.data === 'string' && asset.data.startsWith('fake://')
+                            ? asset.data
+                            : `s3://${process.env.S3_BUCKET || 'eureka-flows-local'}/${runId}/${nodeId}/${asset.assetType.toLowerCase()}`;
+
+                    try {
+                        await assetRepo.put({
+                            assetId,
+                            runId,
+                            runNodeId: nodeId,
+                            flowId: runForNode.flowId,
+                            assetType: asset.assetType,
+                            mimeType: asset.mimeType,
+                            publicUrl,
+                            metadata: asset.metadata ?? {},
+                            createdAt: new Date().toISOString(),
+                        });
+
+                        // Broadcast asset.created WS event
+                        await wsService.broadcastToFlow(runForNode.flowId, {
+                            type: 'asset.created',
+                            runId,
+                            nodeId,
+                            assetId,
+                            assetType: asset.assetType,
+                            publicUrl,
+                            timestamp: Date.now(),
+                        });
+                    } catch {
+                        /* non-fatal — asset persistence failure should not break node completion */
+                    }
+                }
+            }
 
             // Broadcast node.completed + record trace
             if (runForNode) {

@@ -7,6 +7,8 @@
 import { blockRegistry } from '../modules/blocks';
 import { log } from '../utils/logger';
 
+import type { BlockExecutorResult } from '../modules/blocks/types';
+
 export const blockExecutor = {
     /**
      * Execute a single block by type.
@@ -15,10 +17,7 @@ export const blockExecutor = {
      * @param blockType  The type identifier of the block (e.g. "search", "content")
      * @param input      The resolved input payload for this block
      */
-    async execute(
-        blockType: string,
-        input: unknown
-    ): Promise<{ output: Record<string, unknown>; durationMs: number; assets?: unknown[] }> {
+    async execute(blockType: string, input: unknown): Promise<BlockExecutorResult> {
         const executor = blockRegistry.get(blockType);
 
         if (!executor) {
@@ -34,7 +33,7 @@ export const blockExecutor = {
         return {
             output: result.output,
             durationMs: Date.now() - start,
-            assets: result.assets,
+            assets: result.assets ?? [],
         };
     },
 };
