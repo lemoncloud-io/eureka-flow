@@ -8,4 +8,5 @@ export * from './runs.schema';
 export * from './queue.schema';
 export * from './traces.schema';
 export * from './assets.schema';
+export * from './settings.schema';
 export { SYSTEM_INFO_FORMAT } from './system.schema';

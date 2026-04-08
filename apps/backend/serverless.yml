@@ -488,6 +488,59 @@ functions:
                   path: '/_api_/assets/{assetId}'
                   method: get
 
+    # ── Settings ──
+    settingsList:
+        handler: src/handlers/http/settings/list-api-keys.main
+        events:
+            - httpApi:
+                  path: /settings/api-keys
+                  method: get
+            - httpApi:
+                  path: /_apis/settings/api-keys
+                  method: get
+            - httpApi:
+                  path: /_api_/settings/api-keys
+                  method: get
+
+    settingsPut:
+        handler: src/handlers/http/settings/put-api-key.main
+        events:
+            - httpApi:
+                  path: /settings/api-keys
+                  method: put
+            - httpApi:
+                  path: /_apis/settings/api-keys
+                  method: put
+            - httpApi:
+                  path: /_api_/settings/api-keys
+                  method: put
+
+    settingsDelete:
+        handler: src/handlers/http/settings/delete-api-key.main
+        events:
+            - httpApi:
+                  path: '/settings/api-keys/{provider}'
+                  method: delete
+            - httpApi:
+                  path: '/_apis/settings/api-keys/{provider}'
+                  method: delete
+            - httpApi:
+                  path: '/_api_/settings/api-keys/{provider}'
+                  method: delete
+
+    settingsVerify:
+        handler: src/handlers/http/settings/verify-api-key.main
+        events:
+            - httpApi:
+                  path: '/settings/api-keys/{provider}/verify'
+                  method: post
+            - httpApi:
+                  path: '/_apis/settings/api-keys/{provider}/verify'
+                  method: post
+            - httpApi:
+                  path: '/_api_/settings/api-keys/{provider}/verify'
+                  method: post
+
     # ── Workers (future: SQS triggers) ──
     # runWorker:
     #     handler: src/workers/run-worker.main
