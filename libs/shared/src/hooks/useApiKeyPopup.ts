@@ -56,7 +56,7 @@ export const useApiKeyPopup = ({ codesUrl, onSuccess, onError }: UseApiKeyPopupO
         sessionStorage.setItem(STATE_STORAGE_KEY, state);
 
         const currentOrigin = window.location.origin;
-        const url = new URL(`${codesUrl}/openapi-keys`);
+        const url = new URL(`${codesUrl}/codes-keys`);
         url.searchParams.set('callback', 'flow');
         url.searchParams.set('state', state);
         url.searchParams.set('origin', currentOrigin);
