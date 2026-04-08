@@ -136,12 +136,46 @@ export const MediaVideoOutputSchema = z.object({
     }),
 });
 
-/** integration block */
+/** integration block — final deliverable */
 export const IntegrationOutputSchema = z.object({
     title: z.string(),
     description: z.string(),
     hashtags: z.array(z.string()),
     publicUrl: z.string(),
-    thumbnailUrl: z.string().optional(),
+    video: z
+        .object({
+            url: z.string(),
+            durationSec: z.number(),
+            width: z.number(),
+            height: z.number(),
+            format: z.string(),
+        })
+        .optional(),
+    audio: z
+        .object({
+            url: z.string(),
+            durationSec: z.number(),
+            format: z.string(),
+        })
+        .optional(),
+    thumbnailUrl: z.string().nullable().optional(),
+    sceneCount: z.number(),
+    durationSec: z.number(),
+    qualitySummary: z
+        .object({
+            safetyScore: z.number(),
+            qualityScore: z.number(),
+            approved: z.boolean(),
+        })
+        .optional(),
+    artifacts: z.array(
+        z.object({
+            type: z.string(),
+            url: z.string(),
+            label: z.string().optional(),
+        })
+    ),
+    warnings: z.array(z.string()).optional(),
+    createdAt: z.string(),
     seoMetadata: z.record(z.string()).optional(),
 });
