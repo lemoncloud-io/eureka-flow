@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { toast } from 'sonner';
 
-import { createEdge, deleteEdge, useCanvasConnections, useCanvasNodes, useCanvasStore } from '@flows/flows';
+import { upsertFlow, useCanvasConnections, useCanvasNodes, useCanvasStore } from '@flows/flows';
 
 import { arePortTypesCompatible, generateTempId, wouldCreateCycle } from '../../flows/utils';
 
@@ -45,7 +45,8 @@ interface UseConnectionModeReturn {
 }
 
 export const useConnectionMode = (
-    blockRegistry: Record<string, BlockDefinitionWithFrontend>
+    blockRegistry: Record<string, BlockDefinitionWithFrontend>,
+    flowId: string | null
 ): UseConnectionModeReturn => {
     const [source, setSource] = useState<SourceSelection | null>(null);
     const connections = useCanvasConnections();
@@ -107,7 +108,6 @@ export const useConnectionMode = (
 
             const storeState = useCanvasStore.getState();
             const { connections: currentConnections, addConnection, updateConnection } = storeState;
-            const flowId = storeState.flowId ?? '';
 
             // Check if already connected
             const existing = currentConnections.find(
@@ -134,23 +134,29 @@ export const useConnectionMode = (
 
             addConnection(newConnection);
 
-            // Sync to backend
+            // Sync to backend via upsertFlow (same as desktop editor)
             try {
-                const sourceNode = storeState.nodes.find(n => n.id === source.nodeId);
-                const targetNode = storeState.nodes.find(n => n.id === targetNodeId);
+                if (!flowId) throw new Error('flowId is required');
 
-                const result = await createEdge({
-                    flowId,
+                const edgeData = {
+                    id: '',
                     sourceNodeId: source.nodeId,
                     sourcePortId: source.portId,
                     targetNodeId,
                     targetPortId,
-                    sourceType: sourceNode?.type,
-                    targetType: targetNode?.type,
-                });
+                };
 
-                if (result?.id && result.id !== tempId) {
-                    updateConnection(tempId, { id: result.id });
+                const result = await upsertFlow(flowId, { nodes: [], edges: [edgeData] });
+                const createdEdge = result.edges?.find(
+                    e =>
+                        e.sourceNodeId === edgeData.sourceNodeId &&
+                        e.sourcePortId === edgeData.sourcePortId &&
+                        e.targetNodeId === edgeData.targetNodeId &&
+                        e.targetPortId === edgeData.targetPortId
+                );
+
+                if (createdEdge?.id && createdEdge.id !== tempId) {
+                    updateConnection(tempId, { id: createdEdge.id });
                 }
 
                 toast.success('Connected');
@@ -159,22 +165,28 @@ export const useConnectionMode = (
                 toast.error('Failed to create connection');
             }
         },
-        [source]
+        [source, flowId]
     );
 
     const close = useCallback(() => {
         setSource(null);
     }, []);
 
-    const disconnect = useCallback(async (connectionId: string) => {
-        useCanvasStore.getState().deleteConnection(connectionId);
-        try {
-            await deleteEdge(connectionId);
-            toast.success('Disconnected');
-        } catch {
-            toast.error('Failed to disconnect');
-        }
-    }, []);
+    const disconnect = useCallback(
+        async (connectionId: string) => {
+            useCanvasStore.getState().deleteConnection(connectionId);
+            try {
+                if (!flowId) throw new Error('flowId is required');
+                // Delete edge by prefixing ID with # (same as desktop editor)
+                const edgesToDelete = [{ id: `#${connectionId}` }];
+                await upsertFlow(flowId, { nodes: [], edges: edgesToDelete as never[] });
+                toast.success('Disconnected');
+            } catch {
+                toast.error('Failed to disconnect');
+            }
+        },
+        [flowId]
+    );
 
     return {
         isOpen,

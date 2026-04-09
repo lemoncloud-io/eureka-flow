@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Globe, KeyRound, Lock, Plus, ShieldX } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { EXECUTE_FUNCTIONS, createNode, runNode, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { EXECUTE_FUNCTIONS, runNode, upsertNode, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
@@ -65,7 +65,7 @@ export const MobileFlowEditorPage = () => {
     const { apiKey, setApiKey } = useWebCoreStore();
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
 
-    const connectionMode = useConnectionMode(blockRegistry);
+    const connectionMode = useConnectionMode(blockRegistry, currentFlowId);
 
     // ============================================================
     // Socket handlers (simplified for mobile - no canvasRef)
@@ -359,23 +359,22 @@ export const MobileFlowEditorPage = () => {
 
             // Sync to backend
             try {
-                const flowId = useCanvasStore.getState().flowId;
-                const result = await createNode({
-                    flowId: flowId ?? '',
-                    type,
+                const result = await upsertNode('0', currentFlowId ?? '', {
+                    blockId: type,
                     position: newNode.position,
                     config: newNode.config,
                 });
-                if (result?.id && result.id !== tempNodeId) {
+                const serverId = result?.nodes?.[0]?.id;
+                if (serverId && serverId !== tempNodeId) {
                     useCanvasStore
                         .getState()
-                        .setNodes(prev => prev.map(n => (n.id === tempNodeId ? { ...n, id: result.id } : n)));
+                        .setNodes(prev => prev.map(n => (n.id === tempNodeId ? { ...n, id: serverId } : n)));
                     // Update connections that reference temp ID
                     useCanvasStore.getState().setConnections(prev =>
                         prev.map(c => ({
                             ...c,
-                            sourceNodeId: c.sourceNodeId === tempNodeId ? result.id : c.sourceNodeId,
-                            targetNodeId: c.targetNodeId === tempNodeId ? result.id : c.targetNodeId,
+                            sourceNodeId: c.sourceNodeId === tempNodeId ? serverId : c.sourceNodeId,
+                            targetNodeId: c.targetNodeId === tempNodeId ? serverId : c.targetNodeId,
                         }))
                     );
                 }
@@ -383,7 +382,7 @@ export const MobileFlowEditorPage = () => {
                 toast.error('Failed to create node');
             }
         },
-        [blockRegistry]
+        [blockRegistry, currentFlowId]
     );
 
     const handleTapCard = useCallback((nodeId: string) => {
