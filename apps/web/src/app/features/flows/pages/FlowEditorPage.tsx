@@ -559,7 +559,7 @@ export const FlowEditorPage = () => {
                                 </div>
                             )}
                             <Link
-                                to="/explore"
+                                to="/flows"
                                 className="group flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-primary transition-colors mt-1"
                             >
                                 <Globe className="w-3.5 h-3.5" />
@@ -673,8 +673,8 @@ export const FlowEditorPage = () => {
                 onOpenFlowList={handleOpenFlowList}
             />
 
-            {/* Floating Sidebar - hidden in public mode */}
-            {!isPublicMode && <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} />}
+            {/* Floating Sidebar */}
+            <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} readOnly={isPublicMode} />
 
             {/* API Key Dialog */}
             <ApiKeyDialog

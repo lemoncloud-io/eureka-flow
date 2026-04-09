@@ -52,7 +52,7 @@ const isPublicRoute = (): boolean => {
     const pathname = window.location.pathname;
     return (
         pathname === '/' ||
-        pathname === '/explore' ||
+        pathname === '/flows' ||
         pathname === '/tutorial' ||
         pathname.startsWith('/flows/') ||
         pathname.startsWith('/policy/')

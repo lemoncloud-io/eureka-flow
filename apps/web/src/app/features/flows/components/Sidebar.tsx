@@ -39,6 +39,7 @@ import { FrontendBadge } from './FrontendBadge';
 interface SidebarProps {
     onAddNode: (type: string) => void;
     isLoading?: boolean;
+    readOnly?: boolean;
 }
 
 export interface SidebarRef {
@@ -190,7 +191,7 @@ const BlockItem: React.FC<BlockItemProps> = ({
 
 type CategoryKey = keyof typeof CATEGORY_CONFIG;
 
-export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoading }, ref) => {
+export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoading, readOnly }, ref) => {
     const { t } = useTranslation(['flows']);
     const blockRegistry = useBlockRegistry();
     const [isOpen, setIsOpen] = useState(false);
@@ -260,6 +261,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
     };
 
     const handleAddNode = (type: string) => {
+        if (readOnly) return;
         onAddNode(type);
         setIsOpen(false);
     };
@@ -418,7 +420,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                             description={block.description}
                                                             icon={block.icon}
                                                             onAdd={() => handleAddNode(block.id)}
-                                                            disabled={isLoading}
+                                                            disabled={isLoading || readOnly}
                                                             inputCount={block.inputs?.length}
                                                             outputCount={block.outputs?.length}
                                                             isFrontend={block.isFrontend}
@@ -433,7 +435,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                         </div>
 
                         <div className="mt-3 pt-2 border-t border-glass-border text-[10px] text-muted-foreground text-center">
-                            {t('sidebar.clickToAdd')}
+                            {readOnly ? t('sidebar.readOnlyHint', 'Sign in to add blocks') : t('sidebar.clickToAdd')}
                         </div>
                     </div>
                 </>
