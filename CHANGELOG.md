@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-04-09] - root@0.22.0, @flows/web@0.22.0, @flows/admin@0.9.0
+
+### Features
+
+- add tutorial
+
+### Refactor
+
+- (ui) remove demo mode and enhance API key dialog
+- update API endpoint
+
+### Chores
+
+- temp commit
+
 ## [2026-04-07] - root@0.21.0, @flows/web@0.21.0, @flows/admin@0.8.0
 
 ### Features
