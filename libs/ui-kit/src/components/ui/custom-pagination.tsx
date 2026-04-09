@@ -20,7 +20,7 @@ export const CustomPagination = ({
     currentPage,
     totalPages,
     pageSize,
-    totalItems,
+    totalItems: _totalItems,
     onPageChange,
     onPageSizeChange,
     pageSizeOptions = [10, 20, 30, 50, 100],

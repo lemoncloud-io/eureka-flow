@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { TOUR_STORAGE_KEY } from './consts';
 import { createTourSteps } from './tourSteps';
+import { TUTORIAL_STORAGE_KEY } from '../../../tutorial';
 
 const TOUR_START_DELAY_MS = 800;
 
@@ -42,6 +43,7 @@ export const useTour = () => {
 
     const startTourIfFirstVisit = useCallback(() => {
         if (localStorage.getItem(TOUR_STORAGE_KEY) === 'true') return;
+        if (localStorage.getItem(TUTORIAL_STORAGE_KEY) === 'true') return;
 
         const timer = setTimeout(() => {
             startTour();

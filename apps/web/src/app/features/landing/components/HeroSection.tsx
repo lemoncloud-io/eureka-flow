@@ -6,12 +6,13 @@ import { Globe } from 'lucide-react';
 import { Button } from '@flows/ui-kit';
 
 import { ROUTES, staggerStyle } from '../consts';
+import { shouldShowTutorial } from '../utils';
 
 export const HeroSection = () => {
     const navigate = useNavigate();
     const { t } = useTranslation('landing');
 
-    const handleStart = () => navigate(ROUTES.EDITOR);
+    const handleStart = () => navigate(shouldShowTutorial() ? ROUTES.TUTORIAL : ROUTES.EDITOR);
     const handleExplore = () => navigate(ROUTES.EXPLORE);
 
     return (
@@ -45,7 +46,7 @@ export const HeroSection = () => {
                 </Button>
                 <Button variant="outline" size="lg" className="w-full gap-2 sm:w-auto" onClick={handleExplore}>
                     <Globe size={16} />
-                    {t('hero.cta_explore', 'Explore Public Flows')}
+                    {t('hero.cta_explore')}
                 </Button>
             </div>
         </section>

@@ -53,8 +53,8 @@ const isPublicRoute = (): boolean => {
     return (
         pathname === '/' ||
         pathname === '/explore' ||
+        pathname === '/tutorial' ||
         pathname.startsWith('/flows/') ||
-        pathname.startsWith('/flow/examples') ||
         pathname.startsWith('/policy/')
     );
 };

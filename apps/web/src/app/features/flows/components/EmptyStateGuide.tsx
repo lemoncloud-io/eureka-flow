@@ -18,7 +18,7 @@ const STEPS = [
 export const EmptyStateGuide = ({ onAddBlock }: EmptyStateGuideProps) => {
     const { t } = useTranslation(['flows']);
     const location = useLocation();
-    const isExamplesPage = location.pathname.startsWith('/flow/examples');
+    const isExplorePage = location.pathname === '/explore';
 
     return (
         <div className={cn('absolute inset-0 flex items-center justify-center', 'pointer-events-none')}>
@@ -79,9 +79,9 @@ export const EmptyStateGuide = ({ onAddBlock }: EmptyStateGuideProps) => {
                         {t('help.emptyState.actions.addBlock')}
                     </button>
 
-                    {!isExamplesPage && (
+                    {!isExplorePage && (
                         <RouterLink
-                            to="/flow/examples"
+                            to="/explore"
                             className={cn(
                                 'flex items-center justify-center gap-2 px-5 py-2.5',
                                 'bg-muted hover:bg-muted/80 rounded-lg',

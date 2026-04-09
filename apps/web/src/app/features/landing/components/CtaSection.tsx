@@ -7,13 +7,14 @@ import { Button } from '@flows/ui-kit';
 
 import { ROUTES } from '../consts';
 import { useInView } from '../hooks';
+import { shouldShowTutorial } from '../utils';
 
 export const CtaSection = () => {
     const navigate = useNavigate();
     const { t } = useTranslation('landing');
     const { ref, isInView } = useInView();
 
-    const handleStart = () => navigate(ROUTES.EDITOR);
+    const handleStart = () => navigate(shouldShowTutorial() ? ROUTES.TUTORIAL : ROUTES.EDITOR);
     const handleExplore = () => navigate(ROUTES.EXPLORE);
 
     return (

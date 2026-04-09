@@ -39,6 +39,7 @@
         "viewOnly": "View Only",
         "apiKeySettings": "API Key Settings",
         "guidedTour": "Guided Tour",
+        "replayTutorial": "Replay Tutorial",
         "beta": "Beta",
         "menuGroup": {
             "file": "File",
@@ -455,7 +456,7 @@
             "description": "Drag blocks from the sidebar or use the quick actions below.",
             "actions": {
                 "addBlock": "Add First Block",
-                "browseExamples": "Browse Examples",
+                "browseExamples": "Explore Public Flows",
                 "viewHelp": "View Help"
             },
             "steps": {

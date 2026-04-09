@@ -85,5 +85,18 @@
     "accessibility": {
         "goToHome": "Go to home",
         "tryAgain": "Try again"
+    },
+    "apiKeyDialog": {
+        "title": "API Key Required",
+        "description": "Enter your Eureka Codes API key to start building workflows.",
+        "placeholder": "Enter your API key",
+        "continue": "Continue",
+        "validating": "Validating...",
+        "createKey": "Get Free Key from Codes",
+        "waitingForKey": "Waiting for key...",
+        "hint": "Don't have a key? Click above to create one for free from Eureka Codes.",
+        "errors": {
+            "popupBlocked": "Popup was blocked. Please allow popups and try again."
+        }
     }
 }

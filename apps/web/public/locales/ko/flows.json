@@ -39,6 +39,7 @@
         "viewOnly": "읽기 전용",
         "apiKeySettings": "API 키 설정",
         "guidedTour": "가이드 투어",
+        "replayTutorial": "튜토리얼 다시보기",
         "beta": "베타",
         "menuGroup": {
             "file": "파일",
@@ -455,7 +456,7 @@
             "description": "사이드바에서 블록을 드래그하거나 아래 빠른 작업을 사용하세요.",
             "actions": {
                 "addBlock": "첫 블록 추가",
-                "browseExamples": "예제 둘러보기",
+                "browseExamples": "공개 플로우 둘러보기",
                 "viewHelp": "도움말 보기"
             },
             "steps": {
