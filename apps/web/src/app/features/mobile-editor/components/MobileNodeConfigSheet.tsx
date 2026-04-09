@@ -1,23 +1,26 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 
-import { useBlockRegistry, useCanvasStore } from '@flows/flows';
+import { upsertNode, useBlockRegistry, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Button, Input, Label, Sheet, SheetContent, SheetTitle, Switch, Textarea } from '@flows/ui-kit';
 
 import { BlockIcon } from '../../flows/components/BlockIcon';
+import { isTempId } from '../../flows/utils';
+import { deleteNodeWithSync } from '../utils';
 
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { NodeConfigItem, NodeData } from '@lemoncloud/eureka-flows-api';
 
 interface MobileNodeConfigSheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     nodeId: string | null;
+    flowId: string | null;
 }
 
-export const MobileNodeConfigSheet = ({ open, onOpenChange, nodeId }: MobileNodeConfigSheetProps) => {
+export const MobileNodeConfigSheet = ({ open, onOpenChange, nodeId, flowId }: MobileNodeConfigSheetProps) => {
     const { t } = useTranslation(['flows']);
     const node = useCanvasStore(state => (nodeId ? state.nodes.find(n => n.id === nodeId) : undefined));
     const blockRegistry = useBlockRegistry();
@@ -26,6 +29,27 @@ export const MobileNodeConfigSheet = ({ open, onOpenChange, nodeId }: MobileNode
     const [customLabel, setCustomLabel] = useState('');
 
     const blockDef = node ? blockRegistry[node.type] : undefined;
+    const syncTimerRef = useRef<number | null>(null);
+
+    const syncNodeToServer = useCallback(
+        (updates: Record<string, unknown>) => {
+            if (!nodeId || !flowId || isTempId(nodeId)) return;
+            if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
+            syncTimerRef.current = window.setTimeout(() => {
+                upsertNode(nodeId, flowId, updates).catch(err => {
+                    console.error('[MobileNodeConfigSheet] Failed to sync node:', err);
+                });
+            }, 500);
+        },
+        [nodeId, flowId]
+    );
+
+    useEffect(
+        () => () => {
+            if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
+        },
+        [nodeId]
+    );
 
     // Sync custom label when node changes
     useEffect(() => {
@@ -37,11 +61,13 @@ export const MobileNodeConfigSheet = ({ open, onOpenChange, nodeId }: MobileNode
             if (!nodeId) return;
             const currentNode = useCanvasStore.getState().nodes.find(n => n.id === nodeId);
             if (!currentNode) return;
+            const newConfig = { ...currentNode.config, [key]: value };
             useCanvasStore.getState().updateNodeData(nodeId, {
-                config: { ...currentNode.config, [key]: value },
+                config: newConfig,
             } as Partial<NodeData>);
+            syncNodeToServer({ config: newConfig });
         },
-        [nodeId]
+        [nodeId, syncNodeToServer]
     );
 
     const handleCustomLabelChange = useCallback(
@@ -49,21 +75,22 @@ export const MobileNodeConfigSheet = ({ open, onOpenChange, nodeId }: MobileNode
             setCustomLabel(value);
             if (!nodeId) return;
             useCanvasStore.getState().updateNodeData(nodeId, { customLabel: value } as Partial<NodeData>);
+            syncNodeToServer({ customLabel: value || undefined });
         },
-        [nodeId]
+        [nodeId, syncNodeToServer]
     );
 
     const handleDelete = useCallback(() => {
         if (!nodeId) return;
         if (window.confirm(t('detailPanel.confirmDelete', 'Delete this node?'))) {
-            useCanvasStore.getState().deleteNode(nodeId);
+            deleteNodeWithSync(nodeId, flowId);
             onOpenChange(false);
         }
-    }, [nodeId, onOpenChange, t]);
+    }, [nodeId, onOpenChange, flowId, t]);
 
     if (!node || !blockDef) return null;
 
-    const configFields = blockDef.config$$ ?? node.config$$ ?? [];
+    const configFields: NodeConfigItem[] = blockDef.config$$ ?? node.config$$ ?? [];
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -109,66 +136,56 @@ export const MobileNodeConfigSheet = ({ open, onOpenChange, nodeId }: MobileNode
                     </div>
 
                     {/* Config fields */}
-                    {configFields.map(
-                        (field: {
-                            key: string;
-                            label?: string;
-                            type?: string;
-                            options?: Array<{ label: string; value: string }>;
-                        }) => {
-                            const value = node.config?.[field.key] ?? '';
+                    {configFields.map(field => {
+                        const value = node.config?.[field.key] ?? '';
 
-                            return (
-                                <div key={field.key}>
-                                    <Label className="text-xs text-muted-foreground mb-1.5 block">
-                                        {field.label || field.key}
-                                    </Label>
+                        return (
+                            <div key={field.key}>
+                                <Label className="text-xs text-muted-foreground mb-1.5 block">
+                                    {field.label || field.key}
+                                </Label>
 
-                                    {field.type === 'boolean' || field.type === 'checkbox' ? (
-                                        <Switch
-                                            checked={!!value}
-                                            onCheckedChange={v => handleConfigChange(field.key, v)}
-                                        />
-                                    ) : field.type === 'select' && field.options ? (
-                                        <select
-                                            value={String(value)}
-                                            onChange={e => handleConfigChange(field.key, e.target.value)}
-                                            className={cn(
-                                                'w-full h-10 px-3 rounded-lg border border-border bg-background text-sm',
-                                                'focus:outline-none focus:ring-2 focus:ring-primary/30'
-                                            )}
-                                        >
-                                            {field.options.map(opt => (
-                                                <option key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    ) : field.type === 'textarea' ? (
-                                        <Textarea
-                                            value={String(value)}
-                                            onChange={e => handleConfigChange(field.key, e.target.value)}
-                                            rows={4}
-                                            className="text-sm"
-                                        />
-                                    ) : field.type === 'number' ? (
-                                        <Input
-                                            type="number"
-                                            value={String(value)}
-                                            onChange={e => handleConfigChange(field.key, Number(e.target.value))}
-                                            className="h-10"
-                                        />
-                                    ) : (
-                                        <Input
-                                            value={String(value)}
-                                            onChange={e => handleConfigChange(field.key, e.target.value)}
-                                            className="h-10"
-                                        />
-                                    )}
-                                </div>
-                            );
-                        }
-                    )}
+                                {field.type === 'boolean' || field.type === 'checkbox' ? (
+                                    <Switch checked={!!value} onCheckedChange={v => handleConfigChange(field.key, v)} />
+                                ) : field.type === 'select' && field.options ? (
+                                    <select
+                                        value={String(value)}
+                                        onChange={e => handleConfigChange(field.key, e.target.value)}
+                                        className={cn(
+                                            'w-full h-10 px-3 rounded-lg border border-border bg-background text-sm',
+                                            'focus:outline-none focus:ring-2 focus:ring-primary/30'
+                                        )}
+                                    >
+                                        {field.options.map(opt => (
+                                            <option key={opt.value} value={opt.value}>
+                                                {opt.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : field.type === 'textarea' ? (
+                                    <Textarea
+                                        value={String(value)}
+                                        onChange={e => handleConfigChange(field.key, e.target.value)}
+                                        rows={4}
+                                        className="text-sm"
+                                    />
+                                ) : field.type === 'number' ? (
+                                    <Input
+                                        type="number"
+                                        value={String(value)}
+                                        onChange={e => handleConfigChange(field.key, Number(e.target.value))}
+                                        className="h-10"
+                                    />
+                                ) : (
+                                    <Input
+                                        value={String(value)}
+                                        onChange={e => handleConfigChange(field.key, e.target.value)}
+                                        className="h-10"
+                                    />
+                                )}
+                            </div>
+                        );
+                    })}
 
                     {/* Input Data */}
                     {node.inputData && Object.keys(node.inputData).length > 0 && (

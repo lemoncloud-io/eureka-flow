@@ -22,7 +22,7 @@ import {
     MobileNodeList,
 } from '../components';
 import { useConnectionMode } from '../hooks';
-import { topologicalSort } from '../utils';
+import { hydrateInputPorts, topologicalSort } from '../utils';
 
 import type { NodeState } from '@flows/flows';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
@@ -334,7 +334,7 @@ export const MobileFlowEditorPage = () => {
 
     const handleAddBlock = useCallback(
         async (type: string) => {
-            const { nodes, connections } = useCanvasStore.getState();
+            const { nodes } = useCanvasStore.getState();
             const def = blockRegistry[type];
             if (!def) return;
 
@@ -379,7 +379,7 @@ export const MobileFlowEditorPage = () => {
                     );
                 }
             } catch {
-                toast.error('Failed to create node');
+                toast.error(t('mobile.failedToCreateNode', 'Failed to create node'));
             }
         },
         [blockRegistry, currentFlowId]
@@ -414,7 +414,7 @@ export const MobileFlowEditorPage = () => {
         const total = ordered.length;
         let completed = 0;
 
-        toast.info(`Running ${total} nodes...`);
+        toast.info(t('mobile.runningNodes', { count: total, defaultValue: `Running ${total} nodes...` }));
 
         for (const nodeId of ordered) {
             const node = nodeMap.get(nodeId);
@@ -428,23 +428,40 @@ export const MobileFlowEditorPage = () => {
                     const executeFn = EXECUTE_FUNCTIONS[blockDef.type];
                     const result = await executeFn(node.inputData ?? {}, node.config ?? {});
                     updateNodeData(nodeId, { outputData: result, state: 'COMPLETED' } as Partial<NodeData>);
-                    await runNode(nodeId, { output: result });
+                    await runNode(
+                        nodeId,
+                        { output: result },
+                        { force: true, connection: socketConnectionId ?? undefined }
+                    );
                 } else {
-                    await runNode(nodeId, undefined, { connectionId: socketConnectionId ?? undefined });
+                    if (currentFlowId) {
+                        // Re-read store to capture outputData from previous iterations
+                        const latestNodes = useCanvasStore.getState().nodes;
+                        await hydrateInputPorts(nodeId, currentFlowId, connections, latestNodes, node.inputData ?? {});
+                    }
+                    await runNode(nodeId, undefined, { connection: socketConnectionId ?? undefined });
                 }
                 completed++;
             } catch {
                 updateNodeData(nodeId, { state: 'ERROR' } as Partial<NodeData>);
-                toast.error(`Node ${completed + 1}/${total} failed`);
+                toast.error(
+                    t('mobile.nodeFailed', {
+                        current: completed + 1,
+                        total,
+                        defaultValue: `Node ${completed + 1}/${total} failed`,
+                    })
+                );
                 break;
             }
         }
 
         setIsRunningAll(false);
         if (completed === total) {
-            toast.success(`All ${total} nodes completed`);
+            toast.success(
+                t('mobile.allNodesCompleted', { count: total, defaultValue: `All ${total} nodes completed` })
+            );
         }
-    }, [blockRegistry, socketConnectionId]);
+    }, [blockRegistry, socketConnectionId, currentFlowId]);
 
     const handleNew = useCallback(async () => {
         if (window.confirm(t('flowEditor.confirmNewFlow'))) {
@@ -576,6 +593,7 @@ export const MobileFlowEditorPage = () => {
                         socketConnectionId={socketConnectionId ?? undefined}
                         selectedNodeId={configNodeId}
                         isReadOnly={isPublicMode}
+                        flowId={currentFlowId}
                     />
                 </div>
             </div>
@@ -624,6 +642,7 @@ export const MobileFlowEditorPage = () => {
                     if (!open) setConfigNodeId(null);
                 }}
                 nodeId={configNodeId}
+                flowId={currentFlowId}
             />
 
             {/* Flow List Dialog */}

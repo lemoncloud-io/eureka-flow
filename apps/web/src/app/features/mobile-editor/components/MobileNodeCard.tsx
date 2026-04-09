@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 
 import { AlertCircle, ArrowDownLeft, ArrowUpRight, Check, ChevronRight, Link, Loader2, Play } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { EXECUTE_FUNCTIONS, runNode, useBlockRegistry, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -8,6 +9,7 @@ import { cn } from '@flows/lib/utils';
 import { TYPE_DOT } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
 import { getPortStyleKey } from '../../flows/utils';
+import { hydrateInputPorts } from '../utils';
 
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
 import type { Connection, NodeData, NodeState } from '@lemoncloud/eureka-flows-api';
@@ -61,6 +63,7 @@ interface MobileNodeCardProps {
     onTapOutputPort: (nodeId: string, portId: string, portDataType: string, nodeName: string, portName: string) => void;
     socketConnectionId?: string;
     isSelected?: boolean;
+    flowId: string | null;
 }
 
 export const MobileNodeCard = React.memo(
@@ -72,6 +75,7 @@ export const MobileNodeCard = React.memo(
         onTapOutputPort,
         socketConnectionId,
         isSelected,
+        flowId,
     }: MobileNodeCardProps) => {
         const blockRegistry = useBlockRegistry();
         const blockDef: BlockDefinitionWithFrontend | undefined = blockRegistry[node.type];
@@ -92,7 +96,7 @@ export const MobileNodeCard = React.memo(
         const handleRun = useCallback(
             async (e: React.MouseEvent) => {
                 e.stopPropagation();
-                const updateNodeData = useCanvasStore.getState().updateNodeData;
+                const { updateNodeData, nodes, connections } = useCanvasStore.getState();
                 updateNodeData(node.id, { state: 'RUNNING' } as Partial<NodeData>);
 
                 try {
@@ -100,15 +104,19 @@ export const MobileNodeCard = React.memo(
                         const executeFn = EXECUTE_FUNCTIONS[blockDef.type];
                         const result = await executeFn(node.inputData ?? {}, node.config ?? {});
                         updateNodeData(node.id, { outputData: result, state: 'COMPLETED' } as Partial<NodeData>);
-                        await runNode(node.id, { output: result });
+                        await runNode(node.id, { output: result }, { force: true, connection: socketConnectionId });
                     } else {
-                        await runNode(node.id, undefined, { connectionId: socketConnectionId });
+                        if (flowId) {
+                            await hydrateInputPorts(node.id, flowId, connections, nodes, node.inputData ?? {});
+                        }
+                        await runNode(node.id, undefined, { connection: socketConnectionId });
                     }
-                } catch {
+                } catch (e) {
                     updateNodeData(node.id, { state: 'ERROR' } as Partial<NodeData>);
+                    toast.error(e instanceof Error ? e.message : 'Node execution failed');
                 }
             },
-            [node.id, node.inputData, node.config, blockDef, socketConnectionId]
+            [node.id, node.inputData, node.config, blockDef, socketConnectionId, flowId]
         );
 
         const leftBorder = state !== 'IDLE' ? stateStyle.border : (STEREO_ACCENT[stereo] ?? '');

@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 
 import { ArrowDownRight, ChevronDown, Plus, Workflow } from 'lucide-react';
 
-import { useBlockRegistry, useCanvasConnections, useCanvasNodes, useCanvasStore } from '@flows/flows';
+import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
 
 import { useMobileNodeOrder } from '../hooks';
-import { buildNodeDisplayNames } from '../utils';
+import { buildNodeDisplayNames, deleteNodeWithSync } from '../utils';
 import { MobileNodeCard } from './MobileNodeCard';
 import { SwipeToDelete } from './SwipeToDelete';
+
+const EMPTY_CONNECTIONS = { inputs: [] as never[], outputs: [] as never[] };
 
 interface MobileNodeListProps {
     onTapCard: (nodeId: string) => void;
@@ -16,6 +18,7 @@ interface MobileNodeListProps {
     socketConnectionId?: string;
     selectedNodeId?: string | null;
     isReadOnly?: boolean;
+    flowId: string | null;
 }
 
 export const MobileNodeList = ({
@@ -24,6 +27,7 @@ export const MobileNodeList = ({
     socketConnectionId,
     selectedNodeId,
     isReadOnly,
+    flowId,
 }: MobileNodeListProps) => {
     const { t } = useTranslation(['flows']);
     const nodes = useCanvasNodes();
@@ -67,12 +71,13 @@ export const MobileNodeList = ({
                 const card = (
                     <MobileNodeCard
                         node={node}
-                        nodeConnections={nodeConnectionsMap.get(nodeId) ?? { inputs: [], outputs: [] }}
+                        nodeConnections={nodeConnectionsMap.get(nodeId) ?? EMPTY_CONNECTIONS}
                         displayNames={displayNames}
                         onTapCard={onTapCard}
                         onTapOutputPort={onTapOutputPort}
                         socketConnectionId={socketConnectionId}
                         isSelected={nodeId === selectedNodeId}
+                        flowId={flowId}
                     />
                 );
 
@@ -93,9 +98,7 @@ export const MobileNodeList = ({
                         {isReadOnly ? (
                             card
                         ) : (
-                            <SwipeToDelete onDelete={() => useCanvasStore.getState().deleteNode(nodeId)}>
-                                {card}
-                            </SwipeToDelete>
+                            <SwipeToDelete onDelete={() => deleteNodeWithSync(nodeId, flowId)}>{card}</SwipeToDelete>
                         )}
                     </div>
                 );
