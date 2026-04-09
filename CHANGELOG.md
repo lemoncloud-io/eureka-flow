@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-04-09] - root@0.22.1, @flows/web@0.22.1, @flows/admin@0.9.1
+
+### Refactor
+
+- extract driver config and improve tour steps
+- refactor code
+- remove guided tour feature
+
 ## [2026-04-09] - root@0.22.0, @flows/web@0.22.0, @flows/admin@0.9.0
 
 ### Features
