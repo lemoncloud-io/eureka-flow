@@ -1,23 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-    Download,
-    FileText,
-    HelpCircle,
-    Key,
-    LayoutGrid,
-    Link,
-    Menu,
-    Redo2,
-    Save,
-    Trash2,
-    Undo2,
-    Upload,
-    Workflow,
-} from 'lucide-react';
+import { FileText, LayoutGrid, Menu, Redo2, Save, Trash2, Undo2, Workflow } from 'lucide-react';
 
-import { useSystemInfoQuery } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Badge,
@@ -26,10 +11,7 @@ import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
-    DropdownMenuShortcut,
     DropdownMenuTrigger,
-    LanguageSwitcher,
-    ThemeToggle,
     Tooltip,
     TooltipContent,
     TooltipProvider,
@@ -283,20 +265,6 @@ const SocketDot: React.FC<SocketStateProps> = ({
     );
 };
 
-/**
- * Version info component for dropdown menu
- */
-const VersionInfo: React.FC = () => {
-    const { data: systemInfo } = useSystemInfoQuery();
-    const apiVersion = systemInfo?.components?.find(c => c.name === 'eureka-flows-api')?.version;
-
-    return (
-        <div className="px-2 py-1.5 text-[10px] text-muted-foreground/50 text-center">
-            Web v{__APP_VERSION__} {apiVersion && `/ API v${apiVersion}`}
-        </div>
-    );
-};
-
 export const Header: React.FC<HeaderProps> = ({
     flowInfo,
     fileActions,
@@ -401,112 +369,22 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuItem onClick={fileActions.onNew}>
                                 <FileText className="w-4 h-4 mr-2" />
                                 {t('header.newFlow')}
-                                <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={fileActions.onSave}>
                                 <Save className="w-4 h-4 mr-2" />
                                 {t('header.saveFlow')}
-                                <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={fileActions.onImport}>
-                                <Upload className="w-4 h-4 mr-2" />
-                                {t('header.importJson')}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={fileActions.onExport}>
-                                <Download className="w-4 h-4 mr-2" />
-                                {t('header.exportJson')}
-                                <DropdownMenuShortcut>⌘E</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={onShare}>
-                                <Link className="w-4 h-4 mr-2" />
-                                {t('header.share')}
                             </DropdownMenuItem>
 
                             <DropdownMenuSeparator />
-
-                            {/* Edit actions - visible on mobile */}
-                            <div className="sm:hidden">
-                                <DropdownMenuItem onClick={editActions.onUndo}>
-                                    <Undo2 className="w-4 h-4 mr-2" />
-                                    {t('header.undo')}
-                                    <DropdownMenuShortcut>⌘Z</DropdownMenuShortcut>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={editActions.onRedo}>
-                                    <Redo2 className="w-4 h-4 mr-2" />
-                                    {t('header.redo')}
-                                    <DropdownMenuShortcut>⌘⇧Z</DropdownMenuShortcut>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                            </div>
 
                             {/* Canvas Group */}
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.canvas')}
                             </DropdownMenuLabel>
-                            <DropdownMenuItem onClick={editActions.onAutoLayout}>
-                                <LayoutGrid className="w-4 h-4 mr-2" />
-                                {t('header.autoLayout')}
-                                <DropdownMenuShortcut>⌘A</DropdownMenuShortcut>
-                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={editActions.onClear} className="text-destructive">
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 {t('header.clearCanvas')}
                             </DropdownMenuItem>
-
-                            <DropdownMenuSeparator />
-
-                            {/* Settings Group */}
-                            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                                {t('header.menuGroup.settings')}
-                            </DropdownMenuLabel>
-                            <div className="flex items-center justify-between px-2 py-1.5">
-                                <span className="text-sm">{t('header.autoSave')}</span>
-                                <button
-                                    onClick={saveState.onToggleAutoSave}
-                                    role="switch"
-                                    aria-checked={saveState.isAutoSaveEnabled}
-                                    aria-label={t('header.toggleAutoSave')}
-                                    className={cn(
-                                        'w-9 h-5 rounded-full p-0.5 transition-colors relative',
-                                        saveState.isAutoSaveEnabled ? 'bg-primary' : 'bg-muted'
-                                    )}
-                                >
-                                    <div
-                                        className={cn(
-                                            'w-4 h-4 bg-white rounded-full shadow-sm transition-transform absolute top-0.5',
-                                            saveState.isAutoSaveEnabled ? 'translate-x-4' : 'translate-x-0.5'
-                                        )}
-                                    />
-                                </button>
-                            </div>
-                            {onApiKeySettings && (
-                                <DropdownMenuItem onClick={onApiKeySettings}>
-                                    <Key className="w-4 h-4 mr-2" />
-                                    {t('header.apiKeySettings')}
-                                </DropdownMenuItem>
-                            )}
-
-                            {/* Help */}
-                            {onHelp && (
-                                <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={onHelp}>
-                                        <HelpCircle className="w-4 h-4 mr-2" />
-                                        {t('help.title')}
-                                        <DropdownMenuShortcut>?</DropdownMenuShortcut>
-                                    </DropdownMenuItem>
-                                </>
-                            )}
-
-                            <DropdownMenuSeparator />
-
-                            {/* Theme & Language */}
-                            <div className="flex items-center justify-center gap-4 px-2 py-1.5">
-                                <ThemeToggle />
-                                <LanguageSwitcher />
-                            </div>
-
-                            <VersionInfo />
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>

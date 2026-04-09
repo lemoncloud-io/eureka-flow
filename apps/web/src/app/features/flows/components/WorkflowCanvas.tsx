@@ -569,6 +569,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     if (newConnection) {
                         setConnections(prev => [...prev, newConnection]);
                     }
+                    // Auto-select newly added node to open DetailPanel
+                    setSelectedNodeIds(new Set([tempNodeId]));
 
                     // Store connection info for later edge creation
                     const connectionToCreate = newConnection;

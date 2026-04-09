@@ -307,6 +307,9 @@ export const FlowEditorPage = () => {
     // - false: 패널이 닫히고 우측 하단에 채팅 버튼이 표시됨
     const [isAgentOpen, setIsAgentOpen] = useState(false);
     const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
+    const [agentBtnPos, setAgentBtnPos] = useState<{ x: number; y: number } | null>(null);
+    const agentBtnDragRef = useRef<{ mouseX: number; mouseY: number; btnX: number; btnY: number } | null>(null);
+    const agentBtnIsDraggingRef = useRef(false);
 
     const { apiKey, setApiKey } = useWebCoreStore();
     const autoSaveTimerRef = useRef<number | null>(null);
@@ -751,8 +754,43 @@ export const FlowEditorPage = () => {
              */}
             {!isAgentOpen && (
                 <button
-                    onClick={() => setIsAgentOpen(true)}
-                    className="absolute bottom-6 right-6 z-30 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors"
+                    onMouseDown={e => {
+                        e.preventDefault();
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        agentBtnDragRef.current = {
+                            mouseX: e.clientX,
+                            mouseY: e.clientY,
+                            btnX: rect.left,
+                            btnY: rect.top,
+                        };
+                        agentBtnIsDraggingRef.current = false;
+
+                        const onMouseMove = (mv: MouseEvent) => {
+                            if (!agentBtnDragRef.current) return;
+                            const dx = mv.clientX - agentBtnDragRef.current.mouseX;
+                            const dy = mv.clientY - agentBtnDragRef.current.mouseY;
+                            if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+                                agentBtnIsDraggingRef.current = true;
+                            }
+                            setAgentBtnPos({
+                                x: Math.max(0, Math.min(agentBtnDragRef.current.btnX + dx, window.innerWidth - 48)),
+                                y: Math.max(0, Math.min(agentBtnDragRef.current.btnY + dy, window.innerHeight - 48)),
+                            });
+                        };
+                        const onMouseUp = () => {
+                            agentBtnDragRef.current = null;
+                            window.removeEventListener('mousemove', onMouseMove);
+                            window.removeEventListener('mouseup', onMouseUp);
+                        };
+                        window.addEventListener('mousemove', onMouseMove);
+                        window.addEventListener('mouseup', onMouseUp);
+                    }}
+                    onClick={() => {
+                        if (agentBtnIsDraggingRef.current) return;
+                        setIsAgentOpen(true);
+                    }}
+                    style={agentBtnPos ? { left: agentBtnPos.x, top: agentBtnPos.y } : undefined}
+                    className={`z-30 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 cursor-grab active:cursor-grabbing select-none ${agentBtnPos ? 'fixed' : 'absolute bottom-6 right-6'}`}
                     title="Flow Agent"
                 >
                     {/* 말풍선 아이콘 (lucide-react에 없어서 SVG 직접 사용) */}
