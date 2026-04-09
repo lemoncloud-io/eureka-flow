@@ -8,10 +8,14 @@ import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 import { Sidebar, WorkflowCanvas } from '../../flows';
 import { CompletionScreen } from '../components/CompletionScreen';
 import { TutorialOverlay } from '../components/TutorialOverlay';
+import { createBaseDriverConfig, importDriver } from '../consts/tourSteps';
 import { FALLBACK_BLOCKS, TUTORIAL_WORKFLOW } from '../consts/tutorialSteps';
 import { useTutorialSteps } from '../hooks/useTutorialSteps';
 
 import type { SidebarRef, WorkflowCanvasRef } from '../../flows';
+
+/** Delay before starting mini-tour so canvas DOM settles after loadWorkflow */
+const TOUR_INIT_DELAY_MS = 500;
 
 const noop = () => {
     /* intentionally empty */
@@ -53,28 +57,17 @@ export const TutorialPage = () => {
 
     /** Run driver.js mini-tour (welcome + sidebar + canvas highlight) */
     const runGuidedTour = useCallback(async () => {
-        const { driver } = await import('driver.js');
-        await import('driver.js/dist/driver.css');
+        const driver = await importDriver();
 
         const driverInstance = driver({
-            showProgress: true,
-            animate: true,
-            allowClose: true,
-            overlayColor: 'rgba(0, 0, 0, 0.6)',
-            stagePadding: 8,
-            stageRadius: 12,
-            popoverClass: 'eureka-tour-popover',
-            nextBtnText: t('flows:tour.next'),
-            prevBtnText: t('flows:tour.prev'),
-            doneBtnText: t('flows:tour.done'),
-            progressText: t('flows:tour.progress'),
+            ...createBaseDriverConfig(t),
             steps: [
                 {
                     popover: {
                         title: t('tutorial:steps.welcome.title'),
                         description: t('tutorial:steps.welcome.description'),
-                        side: 'over' as const,
-                        align: 'center' as const,
+                        side: 'over',
+                        align: 'center',
                     },
                 },
                 {
@@ -82,8 +75,8 @@ export const TutorialPage = () => {
                     popover: {
                         title: t('tutorial:steps.sidebar.title'),
                         description: t('tutorial:steps.sidebar.description'),
-                        side: 'right' as const,
-                        align: 'center' as const,
+                        side: 'right',
+                        align: 'center',
                     },
                 },
                 {
@@ -91,8 +84,8 @@ export const TutorialPage = () => {
                     popover: {
                         title: t('tutorial:steps.canvas.title'),
                         description: t('tutorial:steps.canvas.description'),
-                        side: 'over' as const,
-                        align: 'center' as const,
+                        side: 'over',
+                        align: 'center',
                     },
                 },
             ],
@@ -113,7 +106,7 @@ export const TutorialPage = () => {
         if (canvasRef.current) {
             workflowLoadedRef.current = true;
             canvasRef.current.loadWorkflow(TUTORIAL_WORKFLOW);
-            const timer = setTimeout(runGuidedTour, 500);
+            const timer = setTimeout(runGuidedTour, TOUR_INIT_DELAY_MS);
             return () => clearTimeout(timer);
         }
     }, [isReady, runGuidedTour]);

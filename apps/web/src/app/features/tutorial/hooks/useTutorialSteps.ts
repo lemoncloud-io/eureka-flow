@@ -4,6 +4,8 @@ import { useCanvasStore } from '@flows/flows';
 
 import { TUTORIAL_STEPS, TUTORIAL_STORAGE_KEY } from '../consts/tutorialSteps';
 
+const AUTO_ADVANCE_DELAY_MS = 500;
+
 export const useTutorialSteps = () => {
     const [currentStep, setCurrentStep] = useState(0);
 
@@ -42,7 +44,7 @@ export const useTutorialSteps = () => {
     // Auto-advance when canProceed becomes true
     useEffect(() => {
         if (canProceed && step.action !== 'auto' && step.action !== 'done') {
-            const timer = setTimeout(goNext, 500);
+            const timer = setTimeout(goNext, AUTO_ADVANCE_DELAY_MS);
             return () => clearTimeout(timer);
         }
     }, [canProceed, step.action, goNext]);
