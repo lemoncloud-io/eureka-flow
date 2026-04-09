@@ -35,6 +35,7 @@ import {
     getNodeHeight,
     getNodeWidth,
     useBlockRegistry,
+    useCanvasStore,
     useNodeTraceLogs,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -1125,6 +1126,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
 }) => {
     const { t } = useTranslation(['nodes', 'flows']);
     const blockRegistry = useBlockRegistry();
+    const tutorialHint = useCanvasStore(s => s.tutorialHint);
 
     // Try direct lookup first, then fallback to config-based matching
     const definition = getBlockDefinition(node, blockRegistry);
@@ -1441,7 +1443,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                     'w-6 h-6 rounded-md flex items-center justify-center transition-all',
                                     isRunning
                                         ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
-                                        : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                                        : 'bg-primary/10 hover:bg-primary/20 text-primary',
+                                    tutorialHint === 'run-button' && !isRunning && 'tutorial-run-bounce'
                                 )}
                                 title={t('actions.run')}
                             >
@@ -1617,7 +1620,15 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             />
                         ))}
                     </div>
-                    <div className="absolute right-[-6px] top-[45px] flex flex-col gap-1">
+                    <div
+                        className={cn(
+                            'absolute right-[-6px] top-[45px] flex flex-col gap-1',
+                            tutorialHint === 'output-port' &&
+                                visibleOutputPorts.length > 0 &&
+                                !connectedPortIds.length &&
+                                'tutorial-port-pulse'
+                        )}
+                    >
                         {visibleOutputPorts.map(p => (
                             <PortItem
                                 key={p.id}

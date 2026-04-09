@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Globe, KeyRound, Lock, Plus, ShieldX } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { createNode, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { EXECUTE_FUNCTIONS, createNode, runNode, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
@@ -22,6 +22,7 @@ import {
     MobileNodeList,
 } from '../components';
 import { useConnectionMode } from '../hooks';
+import { topologicalSort } from '../utils';
 
 import type { NodeState } from '@flows/flows';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
@@ -59,6 +60,7 @@ export const MobileFlowEditorPage = () => {
     const [isBlockLibraryOpen, setIsBlockLibraryOpen] = useState(false);
     const [isFlowMapOpen, setIsFlowMapOpen] = useState(false);
     const [configNodeId, setConfigNodeId] = useState<string | null>(null);
+    const [isRunningAll, setIsRunningAll] = useState(false);
 
     const { apiKey, setApiKey } = useWebCoreStore();
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
@@ -403,6 +405,48 @@ export const MobileFlowEditorPage = () => {
         toast.success(t('flowEditor.exportedToJson'));
     }, [flowName, currentFlowId, t]);
 
+    const handleRunAll = useCallback(async () => {
+        const { nodes, connections, updateNodeData } = useCanvasStore.getState();
+        if (nodes.length === 0) return;
+
+        setIsRunningAll(true);
+        const ordered = topologicalSort(nodes, connections);
+        const nodeMap = new Map(nodes.map(n => [n.id, n]));
+        const total = ordered.length;
+        let completed = 0;
+
+        toast.info(`Running ${total} nodes...`);
+
+        for (const nodeId of ordered) {
+            const node = nodeMap.get(nodeId);
+            if (!node) continue;
+
+            updateNodeData(nodeId, { state: 'RUNNING' } as Partial<NodeData>);
+
+            try {
+                const blockDef = blockRegistry[node.type];
+                if (blockDef?.isFrontend && EXECUTE_FUNCTIONS[blockDef.type]) {
+                    const executeFn = EXECUTE_FUNCTIONS[blockDef.type];
+                    const result = await executeFn(node.inputData ?? {}, node.config ?? {});
+                    updateNodeData(nodeId, { outputData: result, state: 'COMPLETED' } as Partial<NodeData>);
+                    await runNode(nodeId, { output: result });
+                } else {
+                    await runNode(nodeId, undefined, { connectionId: socketConnectionId ?? undefined });
+                }
+                completed++;
+            } catch {
+                updateNodeData(nodeId, { state: 'ERROR' } as Partial<NodeData>);
+                toast.error(`Node ${completed + 1}/${total} failed`);
+                break;
+            }
+        }
+
+        setIsRunningAll(false);
+        if (completed === total) {
+            toast.success(`All ${total} nodes completed`);
+        }
+    }, [blockRegistry, socketConnectionId]);
+
     const handleNew = useCallback(async () => {
         if (window.confirm(t('flowEditor.confirmNewFlow'))) {
             useCanvasStore.getState().clearWorkflow();
@@ -509,6 +553,8 @@ export const MobileFlowEditorPage = () => {
                 onOpenFlowList={() => setIsFlowListOpen(true)}
                 onOpenFlowMap={() => setIsFlowMapOpen(true)}
                 onExport={handleExport}
+                onRunAll={isPublicMode ? undefined : handleRunAll}
+                isRunning={isRunningAll}
             />
 
             {/* Flow Map overlay */}
@@ -519,6 +565,7 @@ export const MobileFlowEditorPage = () => {
                     setIsFlowMapOpen(false);
                     setConfigNodeId(nodeId);
                 }}
+                selectedNodeId={configNodeId}
             />
 
             {/* Node list — scrollable area */}
@@ -528,6 +575,8 @@ export const MobileFlowEditorPage = () => {
                         onTapCard={handleTapCard}
                         onTapOutputPort={connectionMode.openForPort}
                         socketConnectionId={socketConnectionId ?? undefined}
+                        selectedNodeId={configNodeId}
+                        isReadOnly={isPublicMode}
                     />
                 </div>
             </div>
@@ -536,7 +585,7 @@ export const MobileFlowEditorPage = () => {
             {!isPublicMode && (
                 <button
                     onClick={() => setIsBlockLibraryOpen(true)}
-                    className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+                    className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition-transform mb-[env(safe-area-inset-bottom)]"
                 >
                     <Plus className="w-6 h-6" />
                 </button>
@@ -608,7 +657,7 @@ export const MobileFlowEditorPage = () => {
 
             {/* Public Mode CTA */}
             {isPublicMode && (
-                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30">
+                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 mb-[env(safe-area-inset-bottom)]">
                     <Button size="sm" className="shadow-lg gap-2" onClick={() => setIsApiKeyDialogOpen(true)}>
                         <KeyRound className="w-4 h-4" />
                         {t('flowEditor.signInToEdit', 'Sign in to edit')}

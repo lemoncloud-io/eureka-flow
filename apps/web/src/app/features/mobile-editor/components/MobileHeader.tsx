@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { ArrowLeft, Download, FolderOpen, Loader2, Map as MapIcon, Menu, Save } from 'lucide-react';
+import { ArrowLeft, Download, FolderOpen, Loader2, Map as MapIcon, Menu, Play, Save } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
@@ -19,6 +19,8 @@ interface MobileHeaderProps {
     onOpenFlowList: () => void;
     onOpenFlowMap: () => void;
     onExport?: () => void;
+    onRunAll?: () => void;
+    isRunning?: boolean;
 }
 
 export const MobileHeader = ({
@@ -31,6 +33,8 @@ export const MobileHeader = ({
     onOpenFlowList,
     onOpenFlowMap,
     onExport,
+    onRunAll,
+    isRunning,
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
@@ -133,6 +137,12 @@ export const MobileHeader = ({
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
+                    {onRunAll && (
+                        <DropdownMenuItem onClick={onRunAll} disabled={isRunning} className="gap-2">
+                            {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                            {t('header.runAll', 'Run All Nodes')}
+                        </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={onOpenFlowList} className="gap-2">
                         <FolderOpen className="w-4 h-4" />
                         {t('header.openFlow', 'Open Flow')}

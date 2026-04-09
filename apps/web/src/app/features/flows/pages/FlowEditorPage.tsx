@@ -709,18 +709,19 @@ export const FlowEditorPage = () => {
                 onCaptureCanvas={handleCaptureCanvas}
             />
 
-            {/* Public Mode CTA Banner */}
+            {/* Public Mode Info Card */}
             {isPublicMode && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
-                    <Button
-                        variant="default"
-                        size="sm"
-                        className="shadow-lg gap-2"
-                        onClick={() => setIsApiKeyDialogOpen(true)}
-                    >
-                        <KeyRound className="w-4 h-4" />
-                        {t('flowEditor.signInToEdit', 'Sign in to edit this flow')}
-                    </Button>
+                <div className="absolute bottom-4 left-4 z-30 pointer-events-auto">
+                    <div className="bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-xl p-4 shadow-floating max-w-[280px]">
+                        <h3 className="text-sm font-semibold text-foreground truncate">{flowName}</h3>
+                        {flowDescription && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{flowDescription}</p>
+                        )}
+                        <Button size="sm" className="w-full mt-3 gap-2" onClick={() => setIsApiKeyDialogOpen(true)}>
+                            <KeyRound className="w-3.5 h-3.5" />
+                            {t('flowEditor.signInToEdit', 'Sign in to edit this flow')}
+                        </Button>
+                    </div>
                 </div>
             )}
 

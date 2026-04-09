@@ -2531,21 +2531,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     )}
 
                     {/* Desktop Zoom Controls - hidden on mobile */}
-                    {!readOnly && (
-                        <div data-canvas-overlay>
-                            <ZoomControls
-                                zoom={viewport.zoom}
-                                onZoomIn={handleZoomIn}
-                                onZoomOut={handleZoomOut}
-                                onFitToScreen={handleFitToScreen}
-                                onReset={handleResetView}
-                                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden sm:flex"
-                            />
-                        </div>
-                    )}
+                    <div data-canvas-overlay>
+                        <ZoomControls
+                            zoom={viewport.zoom}
+                            onZoomIn={handleZoomIn}
+                            onZoomOut={handleZoomOut}
+                            onFitToScreen={handleFitToScreen}
+                            onReset={handleResetView}
+                            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 hidden sm:flex"
+                        />
+                    </div>
 
                     {/* Minimap - hidden on mobile */}
-                    {!readOnly && nodes.length > 0 && (
+                    {nodes.length > 0 && (
                         <div data-canvas-overlay>
                             <Minimap
                                 nodes={nodes}

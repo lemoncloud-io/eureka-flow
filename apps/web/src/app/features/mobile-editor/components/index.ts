@@ -5,3 +5,4 @@ export { MobileHeader } from './MobileHeader';
 export { MobileNodeCard } from './MobileNodeCard';
 export { MobileNodeConfigSheet } from './MobileNodeConfigSheet';
 export { MobileNodeList } from './MobileNodeList';
+export { SwipeToDelete } from './SwipeToDelete';

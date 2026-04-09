@@ -52,7 +52,10 @@ export const MobileBlockLibrarySheet = ({ open, onOpenChange, onAddBlock }: Mobi
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="bottom" className="max-h-[85vh] rounded-t-2xl px-4 pb-8">
+            <SheetContent
+                side="bottom"
+                className="max-h-[85vh] rounded-t-2xl px-4 pb-[calc(2rem+env(safe-area-inset-bottom))]"
+            >
                 {/* Drag handle */}
                 <div className="flex justify-center pt-2 pb-3">
                     <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />

@@ -9,11 +9,11 @@ import type { PortStyleKey } from '../utils';
  * IMPORTANT: Use complete static class names for Tailwind's static analyzer.
  */
 const EDGE_STROKE_STYLES: Record<PortStyleKey, { active: string; muted: string; dim: string }> = {
-    text: { active: 'stroke-port-text', muted: 'stroke-port-text/70', dim: 'stroke-port-text/50' },
-    image: { active: 'stroke-port-image', muted: 'stroke-port-image/70', dim: 'stroke-port-image/50' },
-    number: { active: 'stroke-port-number', muted: 'stroke-port-number/70', dim: 'stroke-port-number/50' },
-    json: { active: 'stroke-port-json', muted: 'stroke-port-json/70', dim: 'stroke-port-json/50' },
-    any: { active: 'stroke-port-any', muted: 'stroke-port-any/70', dim: 'stroke-port-any/50' },
+    text: { active: 'stroke-port-text', muted: 'stroke-port-text/60', dim: 'stroke-port-text/30' },
+    image: { active: 'stroke-port-image', muted: 'stroke-port-image/60', dim: 'stroke-port-image/30' },
+    number: { active: 'stroke-port-number', muted: 'stroke-port-number/60', dim: 'stroke-port-number/30' },
+    json: { active: 'stroke-port-json', muted: 'stroke-port-json/60', dim: 'stroke-port-json/30' },
+    any: { active: 'stroke-port-any', muted: 'stroke-port-any/60', dim: 'stroke-port-any/30' },
 };
 
 interface ConnectionLineProps {
@@ -62,14 +62,10 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
             ? styles.muted
             : styles.dim;
 
-    const strokeWidth = isFlowing ? 2 : isHovered || isSelected ? 2.5 : isDraft ? 2 : 1.5;
+    const strokeWidth = isFlowing ? 2 : isHovered || isSelected ? 2.5 : isDraft ? 1.5 : 1.2;
 
-    // Flow animation styles
     const flowAnimationStyle: React.CSSProperties = isFlowing
-        ? {
-              strokeDasharray: '6 14',
-              animation: 'edge-flow 1s linear infinite',
-          }
+        ? { animation: 'edge-pulse 1.5s ease-in-out infinite' }
         : {};
 
     return (

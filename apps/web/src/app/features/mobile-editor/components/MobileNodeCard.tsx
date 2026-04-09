@@ -60,10 +60,19 @@ interface MobileNodeCardProps {
     onTapCard: (nodeId: string) => void;
     onTapOutputPort: (nodeId: string, portId: string, portDataType: string, nodeName: string, portName: string) => void;
     socketConnectionId?: string;
+    isSelected?: boolean;
 }
 
 export const MobileNodeCard = React.memo(
-    ({ node, nodeConnections, displayNames, onTapCard, onTapOutputPort, socketConnectionId }: MobileNodeCardProps) => {
+    ({
+        node,
+        nodeConnections,
+        displayNames,
+        onTapCard,
+        onTapOutputPort,
+        socketConnectionId,
+        isSelected,
+    }: MobileNodeCardProps) => {
         const blockRegistry = useBlockRegistry();
         const blockDef: BlockDefinitionWithFrontend | undefined = blockRegistry[node.type];
 
@@ -112,7 +121,8 @@ export const MobileNodeCard = React.memo(
                 className={cn(
                     'rounded-lg border bg-card shadow-sm border-l-[3px] transition-all duration-200',
                     leftBorder,
-                    state === 'RUNNING' && 'shadow-md'
+                    state === 'RUNNING' && 'shadow-md',
+                    isSelected && 'ring-2 ring-primary/30 shadow-md'
                 )}
             >
                 {/* Header row */}
@@ -125,7 +135,7 @@ export const MobileNodeCard = React.memo(
                         onKeyDown={e => {
                             if (e.key === 'Enter') onTapCard(node.id);
                         }}
-                        className="flex-1 min-w-0 flex items-center gap-2.5 cursor-pointer"
+                        className="flex-1 min-w-0 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform"
                     >
                         <div className="w-8 h-8 rounded-md bg-muted/40 flex items-center justify-center shrink-0">
                             <BlockIcon icon={blockDef?.icon} size={16} />

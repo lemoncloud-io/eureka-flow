@@ -12,7 +12,6 @@ import { getPortStyleKey } from '../../flows/utils';
 
 import type { CompatibleTarget } from '../hooks/useConnectionMode';
 
-
 interface MobileConnectionSheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -64,7 +63,10 @@ export const MobileConnectionSheet = ({
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent side="bottom" className="max-h-[80vh] rounded-t-2xl px-0 pb-8">
+            <SheetContent
+                side="bottom"
+                className="max-h-[80vh] rounded-t-2xl px-0 pb-[calc(2rem+env(safe-area-inset-bottom))]"
+            >
                 {/* Drag handle */}
                 <div className="flex justify-center pt-2 pb-3">
                     <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />

@@ -132,8 +132,7 @@ export const CompletionScreen = ({ step, onSubmitKey, onClose }: CompletionScree
                             className="gap-2 text-xs text-muted-foreground"
                             onClick={() => navigate('/flows')}
                         >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            {t('tutorial:cta.exploreFlows')}
+                            {t('tutorial:cta.later')}
                         </Button>
                     </div>
                 )}
