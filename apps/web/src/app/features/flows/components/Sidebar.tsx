@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useMemo, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -20,7 +20,7 @@ import {
     X,
 } from 'lucide-react';
 
-import { isOutputBlock, useBlockRegistry } from '@flows/flows';
+import { useBlockGroups } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Collapsible,
@@ -193,7 +193,6 @@ type CategoryKey = keyof typeof CATEGORY_CONFIG;
 
 export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoading, readOnly }, ref) => {
     const { t } = useTranslation(['flows']);
-    const blockRegistry = useBlockRegistry();
     const [isOpen, setIsOpen] = useState(false);
     const [expandedCategories, setExpandedCategories] = useState<Set<CategoryKey>>(new Set(CATEGORIES));
     const [searchQuery, setSearchQuery] = useState('');
@@ -207,33 +206,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
         },
     }));
 
-    const blockGroups = useMemo(() => {
-        // Deduplicate: blockRegistry has dual indexing (by type and id)
-        // Only use entries where key === block.type to avoid duplicates
-        const blocks = Object.entries(blockRegistry)
-            .filter(([key, block]) => key === block.type)
-            .map(([, block]) => block);
-
-        // Filter by search query
-        const query = searchQuery.toLowerCase().trim();
-        const filteredBlocks = query
-            ? blocks.filter(
-                  b =>
-                      b.label.toLowerCase().includes(query) ||
-                      b.description.toLowerCase().includes(query) ||
-                      b.type.toLowerCase().includes(query)
-              )
-            : blocks;
-
-        // Group by stereo field from server, with fallback for legacy blocks
-        return {
-            inputs: filteredBlocks.filter(b => b.stereo === 'input' || (!b.stereo && b.type.startsWith('input-'))),
-            process: filteredBlocks.filter(
-                b => b.stereo === 'process' || (!b.stereo && !b.type.startsWith('input-') && !isOutputBlock(b.type))
-            ),
-            outputs: filteredBlocks.filter(b => b.stereo === 'output' || (!b.stereo && isOutputBlock(b.type))),
-        };
-    }, [blockRegistry, searchQuery]);
+    const blockGroups = useBlockGroups(searchQuery);
 
     const handleTogglePanel = () => {
         if (isOpen) {

@@ -1,13 +1,10 @@
 import { useMemo } from 'react';
 
-import { useCanvasConnections, useCanvasNodes } from '@flows/flows';
-
 import { topologicalSort } from '../utils';
 
-export const useMobileNodeOrder = () => {
-    const nodes = useCanvasNodes();
-    const connections = useCanvasConnections();
+import type { Connection, NodeData } from '@lemoncloud/eureka-flows-api';
 
+export const useMobileNodeOrder = (nodes: NodeData[], connections: Connection[]) => {
     const orderedNodeIds = useMemo(() => topologicalSort(nodes, connections), [nodes, connections]);
 
     return { orderedNodeIds };

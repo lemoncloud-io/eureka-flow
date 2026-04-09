@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { ArrowLeft, Download, FolderOpen, Loader2, Menu, Save, Share2 } from 'lucide-react';
+import { ArrowLeft, Download, FolderOpen, Loader2, Map as MapIcon, Menu, Save } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
@@ -17,16 +17,9 @@ interface MobileHeaderProps {
     isSocketConnected?: boolean;
     onSave: () => void;
     onOpenFlowList: () => void;
+    onOpenFlowMap: () => void;
     onExport?: () => void;
-    onPublish?: () => void;
 }
-
-const STATUS_INDICATOR: Record<SaveStatus, string> = {
-    idle: 'bg-muted-foreground/40',
-    saving: 'bg-warning animate-pulse',
-    success: 'bg-success',
-    error: 'bg-destructive',
-};
 
 export const MobileHeader = ({
     flowName,
@@ -36,8 +29,8 @@ export const MobileHeader = ({
     isSocketConnected,
     onSave,
     onOpenFlowList,
+    onOpenFlowMap,
     onExport,
-    onPublish,
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
@@ -53,32 +46,27 @@ export const MobileHeader = ({
 
     const handleFinishEditing = useCallback(() => {
         const trimmed = editValue.trim();
-        if (trimmed && trimmed !== flowName) {
-            onNameChange(trimmed);
-        }
+        if (trimmed && trimmed !== flowName) onNameChange(trimmed);
         setIsEditing(false);
     }, [editValue, flowName, onNameChange]);
-
-    const handleBack = useCallback(() => {
-        navigate('/');
-    }, [navigate]);
 
     return (
         <header
             className={cn(
                 'fixed top-0 left-0 right-0 z-30',
-                'h-14 px-3 flex items-center gap-2',
-                'bg-glass-bg backdrop-blur-[24px] border-b border-glass-border',
+                'h-14 px-2 flex items-center gap-1',
+                'bg-background/95 backdrop-blur-md border-b border-border/60',
                 'pt-[env(safe-area-inset-top)]'
             )}
         >
-            {/* Back button */}
-            <button onClick={handleBack} className="p-2 -ml-1 rounded-lg hover:bg-accent/50 transition-colors shrink-0">
+            <button
+                onClick={() => navigate('/')}
+                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
+            >
                 <ArrowLeft className="w-5 h-5" />
             </button>
 
-            {/* Flow name */}
-            <div className="flex-1 min-w-0 flex items-center gap-2">
+            <div className="flex-1 min-w-0 flex items-center gap-1.5">
                 {isEditing ? (
                     <input
                         ref={inputRef}
@@ -89,42 +77,58 @@ export const MobileHeader = ({
                             if (e.key === 'Enter') handleFinishEditing();
                             if (e.key === 'Escape') setIsEditing(false);
                         }}
-                        className="w-full text-sm font-semibold bg-transparent border-b-2 border-primary outline-none py-0.5"
+                        className="w-full text-sm font-bold bg-transparent border-b-2 border-primary outline-none"
                         autoFocus
                     />
                 ) : (
-                    <button onClick={handleStartEditing} className="truncate text-sm font-semibold text-foreground">
+                    <button
+                        onClick={handleStartEditing}
+                        className="truncate text-sm font-bold text-foreground leading-tight"
+                    >
                         {flowName}
                     </button>
                 )}
 
-                {/* Status indicators */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                    <div className={cn('w-2 h-2 rounded-full', STATUS_INDICATOR[saveStatus])} />
+                <div className="flex items-center gap-1 shrink-0">
+                    <div
+                        className={cn(
+                            'w-1.5 h-1.5 rounded-full',
+                            saveStatus === 'saving' && 'bg-warning animate-pulse',
+                            saveStatus === 'success' && 'bg-success',
+                            saveStatus === 'error' && 'bg-destructive',
+                            saveStatus === 'idle' && 'bg-muted-foreground/30'
+                        )}
+                    />
                     {isSocketConnected !== undefined && (
                         <div
                             className={cn(
-                                'w-2 h-2 rounded-full',
-                                isSocketConnected ? 'bg-success' : 'bg-muted-foreground/30'
+                                'w-1.5 h-1.5 rounded-full',
+                                isSocketConnected ? 'bg-success' : 'bg-muted-foreground/20'
                             )}
                         />
                     )}
                 </div>
             </div>
 
-            {/* Save button */}
+            {/* Flow map toggle */}
+            <button
+                onClick={onOpenFlowMap}
+                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
+            >
+                <MapIcon className="w-[18px] h-[18px]" />
+            </button>
+
             <button
                 onClick={onSave}
                 disabled={isSaving}
-                className="p-2 rounded-lg hover:bg-accent/50 transition-colors shrink-0 disabled:opacity-50"
+                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0 disabled:opacity-40"
             >
                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
             </button>
 
-            {/* Menu */}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <button className="p-2 rounded-lg hover:bg-accent/50 transition-colors shrink-0">
+                    <button className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0">
                         <Menu className="w-5 h-5" />
                     </button>
                 </DropdownMenuTrigger>
@@ -137,12 +141,6 @@ export const MobileHeader = ({
                         <DropdownMenuItem onClick={onExport} className="gap-2">
                             <Download className="w-4 h-4" />
                             {t('header.export', 'Export JSON')}
-                        </DropdownMenuItem>
-                    )}
-                    {onPublish && (
-                        <DropdownMenuItem onClick={onPublish} className="gap-2">
-                            <Share2 className="w-4 h-4" />
-                            {t('header.publish', 'Publish')}
                         </DropdownMenuItem>
                     )}
                 </DropdownMenuContent>

@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Globe, KeyRound, Lock, Plus, ShieldX } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { createNode, deleteEdge, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { createNode, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
@@ -15,7 +15,8 @@ import { FlowListDialog } from '../../flows/components/FlowListDialog';
 import { generateTempId } from '../../flows/utils';
 import {
     MobileBlockLibrarySheet,
-    MobileConnectionBanner,
+    MobileConnectionSheet,
+    MobileFlowMap,
     MobileHeader,
     MobileNodeConfigSheet,
     MobileNodeList,
@@ -56,12 +57,13 @@ export const MobileFlowEditorPage = () => {
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
     const [isFlowListOpen, setIsFlowListOpen] = useState(false);
     const [isBlockLibraryOpen, setIsBlockLibraryOpen] = useState(false);
+    const [isFlowMapOpen, setIsFlowMapOpen] = useState(false);
     const [configNodeId, setConfigNodeId] = useState<string | null>(null);
 
     const { apiKey, setApiKey } = useWebCoreStore();
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
 
-    const connectionMode = useConnectionMode();
+    const connectionMode = useConnectionMode(blockRegistry);
 
     // ============================================================
     // Socket handlers (simplified for mobile - no canvasRef)
@@ -382,16 +384,6 @@ export const MobileFlowEditorPage = () => {
         [blockRegistry]
     );
 
-    const handleDisconnect = useCallback(async (connectionId: string) => {
-        useCanvasStore.getState().deleteConnection(connectionId);
-        try {
-            await deleteEdge(connectionId);
-            toast.success('Disconnected');
-        } catch {
-            toast.error('Failed to delete connection');
-        }
-    }, []);
-
     const handleTapCard = useCallback((nodeId: string) => {
         setConfigNodeId(nodeId);
     }, []);
@@ -515,40 +507,59 @@ export const MobileFlowEditorPage = () => {
                 isSocketConnected={isSocketConnected}
                 onSave={handleSave}
                 onOpenFlowList={() => setIsFlowListOpen(true)}
+                onOpenFlowMap={() => setIsFlowMapOpen(true)}
                 onExport={handleExport}
             />
 
-            {/* Connection mode banner */}
-            {connectionMode.state === 'SOURCE_SELECTED' && connectionMode.source && (
-                <MobileConnectionBanner
-                    sourceNodeName={connectionMode.source.nodeName}
-                    sourcePortName={connectionMode.source.portId}
-                    onCancel={connectionMode.cancel}
-                />
-            )}
+            {/* Flow Map overlay */}
+            <MobileFlowMap
+                open={isFlowMapOpen}
+                onClose={() => setIsFlowMapOpen(false)}
+                onTapNode={nodeId => {
+                    setIsFlowMapOpen(false);
+                    setConfigNodeId(nodeId);
+                }}
+            />
 
-            {/* Node list */}
-            <div
-                className="pt-[calc(env(safe-area-inset-top)+56px)] pb-6 overflow-y-auto"
-                style={{ minHeight: '100vh' }}
-            >
-                {connectionMode.state === 'SOURCE_SELECTED' && <div className="h-12" />}
-                <MobileNodeList
-                    connectionMode={connectionMode}
-                    onTapCard={handleTapCard}
-                    onDisconnect={handleDisconnect}
-                    socketConnectionId={socketConnectionId ?? undefined}
-                />
+            {/* Node list — scrollable area */}
+            <div className="fixed inset-0 overflow-y-auto overscroll-contain pt-14 pb-24">
+                <div className="pt-2">
+                    <MobileNodeList
+                        onTapCard={handleTapCard}
+                        onTapOutputPort={connectionMode.openForPort}
+                        socketConnectionId={socketConnectionId ?? undefined}
+                    />
+                </div>
             </div>
 
             {/* FAB - Add block */}
-            {!isPublicMode && connectionMode.state === 'IDLE' && (
+            {!isPublicMode && (
                 <button
                     onClick={() => setIsBlockLibraryOpen(true)}
                     className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition-transform"
                 >
                     <Plus className="w-6 h-6" />
                 </button>
+            )}
+
+            {/* Connection Sheet */}
+            {connectionMode.source && (
+                <MobileConnectionSheet
+                    open={connectionMode.isOpen}
+                    onOpenChange={open => {
+                        if (!open) connectionMode.close();
+                    }}
+                    sourceNodeName={connectionMode.source.nodeName}
+                    sourcePortName={connectionMode.source.portName}
+                    sourcePortDataType={connectionMode.source.portDataType}
+                    sourceNodeId={connectionMode.source.nodeId}
+                    sourcePortId={connectionMode.source.portId}
+                    compatibleTargets={connectionMode.compatibleTargets}
+                    onConnect={(targetNodeId, targetPortId) => {
+                        connectionMode.connectTo(targetNodeId, targetPortId);
+                    }}
+                    onDisconnect={connectionMode.disconnect}
+                />
             )}
 
             {/* Block Library Sheet */}

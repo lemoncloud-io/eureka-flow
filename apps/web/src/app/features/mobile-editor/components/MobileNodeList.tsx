@@ -2,33 +2,28 @@ import { useMemo } from 'react';
 
 import { ChevronDown } from 'lucide-react';
 
-import { useCanvasConnections, useCanvasNodes } from '@flows/flows';
+import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
 
 import { useMobileNodeOrder } from '../hooks';
+import { buildNodeDisplayNames } from '../utils';
 import { MobileNodeCard } from './MobileNodeCard';
 
-import type { useConnectionMode } from '../hooks';
-
 interface MobileNodeListProps {
-    connectionMode: ReturnType<typeof useConnectionMode>;
     onTapCard: (nodeId: string) => void;
-    onDisconnect: (connectionId: string) => void;
+    onTapOutputPort: (nodeId: string, portId: string, portDataType: string, nodeName: string, portName: string) => void;
     socketConnectionId?: string;
 }
 
-export const MobileNodeList = ({
-    connectionMode,
-    onTapCard,
-    onDisconnect,
-    socketConnectionId,
-}: MobileNodeListProps) => {
+export const MobileNodeList = ({ onTapCard, onTapOutputPort, socketConnectionId }: MobileNodeListProps) => {
     const nodes = useCanvasNodes();
     const connections = useCanvasConnections();
-    const { orderedNodeIds } = useMobileNodeOrder();
+    const blockRegistry = useBlockRegistry();
+    const { orderedNodeIds } = useMobileNodeOrder(nodes, connections);
 
     const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
 
-    // Pre-build connection pair set for O(1) adjacency checks
+    const displayNames = useMemo(() => buildNodeDisplayNames(nodes, blockRegistry), [nodes, blockRegistry]);
+
     const connectionPairs = useMemo(() => {
         const pairs = new Set<string>();
         for (const c of connections) {
@@ -38,38 +33,19 @@ export const MobileNodeList = ({
         return pairs;
     }, [connections]);
 
-    // Pre-filter connections per node for card props
     const nodeConnectionsMap = useMemo(() => {
         const map = new Map<string, { inputs: typeof connections; outputs: typeof connections }>();
-        for (const node of nodes) {
-            map.set(node.id, {
-                inputs: connections.filter(c => c.targetNodeId === node.id),
-                outputs: connections.filter(c => c.sourceNodeId === node.id),
-            });
+        for (const c of connections) {
+            if (!map.has(c.targetNodeId)) map.set(c.targetNodeId, { inputs: [], outputs: [] });
+            if (!map.has(c.sourceNodeId)) map.set(c.sourceNodeId, { inputs: [], outputs: [] });
+            map.get(c.targetNodeId)!.inputs.push(c);
+            map.get(c.sourceNodeId)!.outputs.push(c);
         }
         return map;
-    }, [nodes, connections]);
-
-    const connectionModeProps = useMemo(
-        () => ({
-            isActive: connectionMode.state === 'SOURCE_SELECTED',
-            isPortCompatible: connectionMode.isPortCompatible,
-            sourceNodeId: connectionMode.source?.nodeId ?? null,
-            sourcePortId: connectionMode.source?.portId ?? null,
-            onSelectSource: connectionMode.selectSourcePort,
-            onSelectTarget: connectionMode.selectTargetPort,
-        }),
-        [
-            connectionMode.state,
-            connectionMode.source,
-            connectionMode.isPortCompatible,
-            connectionMode.selectSourcePort,
-            connectionMode.selectTargetPort,
-        ]
-    );
+    }, [connections]);
 
     return (
-        <div className="flex flex-col gap-1 px-4 pb-24">
+        <div className="flex flex-col gap-2 px-3 pb-24">
             {orderedNodeIds.map((nodeId, idx) => {
                 const node = nodeMap.get(nodeId);
                 if (!node) return null;
@@ -79,23 +55,18 @@ export const MobileNodeList = ({
 
                 return (
                     <div key={nodeId}>
-                        {idx > 0 && (
-                            <div className="flex justify-center py-1">
-                                {showConnector ? (
-                                    <ChevronDown className="w-5 h-5 text-primary/40" />
-                                ) : (
-                                    <div className="w-px h-4 bg-border" />
-                                )}
+                        {idx > 0 && showConnector && (
+                            <div className="flex justify-center -my-0.5">
+                                <ChevronDown className="w-4 h-4 text-primary/30" />
                             </div>
                         )}
 
                         <MobileNodeCard
                             node={node}
                             nodeConnections={nodeConnectionsMap.get(nodeId) ?? { inputs: [], outputs: [] }}
-                            nodeMap={nodeMap}
-                            connectionMode={connectionModeProps}
+                            displayNames={displayNames}
                             onTapCard={onTapCard}
-                            onDisconnect={onDisconnect}
+                            onTapOutputPort={onTapOutputPort}
                             socketConnectionId={socketConnectionId}
                         />
                     </div>
@@ -105,7 +76,7 @@ export const MobileNodeList = ({
             {nodes.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                     <p className="text-sm">No nodes yet</p>
-                    <p className="text-xs mt-1">Tap + to add a block</p>
+                    <p className="text-xs mt-1 opacity-60">Tap + to add a block</p>
                 </div>
             )}
         </div>

@@ -121,6 +121,9 @@ const GRID_SIZE = 20;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
 
+/** Mouse movement threshold (px) to distinguish click from drag */
+const CLICK_THRESHOLD = 5;
+
 /** Touch port hit detection threshold in world coordinates */
 const TOUCH_PORT_HIT_THRESHOLD = 50;
 
@@ -294,7 +297,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             sourceType: string;
             mouseX: number;
             mouseY: number;
+            clickMode?: boolean;
         } | null>(null);
+
+        const portMouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
 
         // Ref to track latest connectionDraft for touch events (avoids stale closure)
         const connectionDraftRef = useRef(connectionDraft);
@@ -450,7 +456,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     let sourcePortId: string | undefined;
                     let targetPortId: string | undefined;
 
-                    if (newDef.inputs.length > 0) {
+                    // Auto-connect only when intent is clear:
+                    // - 0-1 nodes: always auto-connect (obvious target)
+                    // - 2+ nodes: only if a node is selected (explicit intent)
+                    const shouldAutoConnect = nodes.length <= 1 || !!selectedNodeId;
+
+                    if (shouldAutoConnect && newDef.inputs.length > 0) {
                         const firstInput = newDef.inputs[0];
                         targetPortId = firstInput.id;
 
@@ -536,7 +547,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     let targetInputPortId: string | undefined;
                     let sourceOutputPortId: string | undefined;
 
-                    if (!newConnection && newDef.outputs.length > 0 && nodes.length > 0) {
+                    if (shouldAutoConnect && !newConnection && newDef.outputs.length > 0) {
                         const firstOutput = newDef.outputs[0];
 
                         for (const existingNode of nodes) {
@@ -1584,6 +1595,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         }, []);
 
         const handleCanvasMouseDown = (e: React.MouseEvent) => {
+            portMouseDownPosRef.current = null;
+
+            if (connectionDraft?.clickMode) {
+                setConnectionDraft(null);
+                return;
+            }
+
             if (e.button === 0 || e.button === 1) {
                 setIsPanning(true);
                 lastMousePosRef.current = { x: e.clientX, y: e.clientY };
@@ -1601,8 +1619,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             if (readOnly) return;
             e.stopPropagation();
 
-            // Don't change selection during port connection drag
-            if (connectionDraft) return;
+            if (connectionDraft) {
+                if (connectionDraft.clickMode) setConnectionDraft(null);
+                return;
+            }
 
             // Skip selection and drag for interactive elements (buttons, inputs, etc.)
             // This must be checked BEFORE selection logic to prevent node selection
@@ -1834,7 +1854,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             }
         };
 
-        const handleMouseUp = () => {
+        const handleMouseUp = (e: React.MouseEvent) => {
             setIsPanning(false);
 
             if (dragState && dragStartSnapshotRef.current) {
@@ -1876,6 +1896,21 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             setDragState(null);
             dragStartSnapshotRef.current = null;
+
+            if (connectionDraft?.clickMode) return;
+
+            if (connectionDraft && portMouseDownPosRef.current) {
+                const dx = e.clientX - portMouseDownPosRef.current.x;
+                const dy = e.clientY - portMouseDownPosRef.current.y;
+
+                if (Math.hypot(dx, dy) < CLICK_THRESHOLD) {
+                    setConnectionDraft(prev => (prev ? { ...prev, clickMode: true } : null));
+                    portMouseDownPosRef.current = null;
+                    return;
+                }
+            }
+
+            portMouseDownPosRef.current = null;
             setConnectionDraft(null);
         };
 
@@ -1887,10 +1922,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             e: React.MouseEvent
         ) => {
             if (readOnly) return;
-            // Don't change node selection when interacting with ports
-            // Port interactions are for creating connections, not for selecting nodes
+
+            if (connectionDraft?.clickMode && type === 'input') {
+                handlePortMouseUp(nodeId, portId, type, portType);
+                return;
+            }
+
             setSelectedConnectionId(null);
             if (type === 'output') {
+                portMouseDownPosRef.current = { x: e.clientX, y: e.clientY };
                 const worldPos = screenToWorld(e.clientX, e.clientY);
                 setConnectionDraft({
                     sourceNodeId: nodeId,
@@ -1933,6 +1973,21 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             targetType: string
         ) => {
             if (readOnly) return;
+
+            // Mouseup on the same output port that started the draft → enter click-connect mode
+            if (
+                connectionDraft &&
+                !connectionDraft.clickMode &&
+                type === 'output' &&
+                targetNodeId === connectionDraft.sourceNodeId &&
+                targetPortId === connectionDraft.sourcePortId &&
+                portMouseDownPosRef.current
+            ) {
+                setConnectionDraft(prev => (prev ? { ...prev, clickMode: true } : null));
+                portMouseDownPosRef.current = null;
+                return;
+            }
+
             if (connectionDraft && type === 'input') {
                 const sourceNode = nodes.find(n => n.id === connectionDraft.sourceNodeId);
                 const targetNode = nodes.find(n => n.id === targetNodeId);
@@ -2201,6 +2256,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 }
 
                 if (e.key === 'Escape') {
+                    if (connectionDraft) {
+                        setConnectionDraft(null);
+                        return;
+                    }
                     handleSelectionChange(null);
                     setSelectedConnectionId(null);
                 }

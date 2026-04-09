@@ -1,67 +1,80 @@
 import React, { useCallback } from 'react';
 
-import { AlertCircle, Check, Loader2, Play } from 'lucide-react';
+import { AlertCircle, ArrowDownLeft, ArrowUpRight, Check, ChevronRight, Link, Loader2, Play } from 'lucide-react';
 
 import { EXECUTE_FUNCTIONS, runNode, useBlockRegistry, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
-import { MobilePortChip } from './MobilePortChip';
+import { TYPE_DOT } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
+import { getPortStyleKey } from '../../flows/utils';
 
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
 import type { Connection, NodeData, NodeState } from '@lemoncloud/eureka-flows-api';
 
-const STATUS_CONFIG: Record<string, { color: string; icon: React.ReactNode }> = {
-    IDLE: { color: 'bg-muted-foreground/40', icon: null },
-    READY: { color: 'bg-primary', icon: null },
-    RUNNING: { color: 'bg-warning animate-pulse', icon: <Loader2 className="w-3.5 h-3.5 animate-spin text-warning" /> },
-    COMPLETED: { color: 'bg-success', icon: <Check className="w-3.5 h-3.5 text-success" /> },
-    ERROR: { color: 'bg-destructive', icon: <AlertCircle className="w-3.5 h-3.5 text-destructive" /> },
+const STATE_STYLES: Record<
+    string,
+    { border: string; badge: string; badgeText: string; label: string; icon: React.ReactNode }
+> = {
+    IDLE: { border: '', badge: 'bg-muted', badgeText: 'text-muted-foreground', label: 'Idle', icon: null },
+    READY: {
+        border: 'border-l-primary',
+        badge: 'bg-primary/15',
+        badgeText: 'text-primary',
+        label: 'Ready',
+        icon: null,
+    },
+    RUNNING: {
+        border: 'border-l-warning',
+        badge: 'bg-warning/15',
+        badgeText: 'text-warning',
+        label: 'Running',
+        icon: <Loader2 className="w-3 h-3 animate-spin" />,
+    },
+    COMPLETED: {
+        border: 'border-l-success',
+        badge: 'bg-success/15',
+        badgeText: 'text-success',
+        label: 'Done',
+        icon: <Check className="w-3 h-3" />,
+    },
+    ERROR: {
+        border: 'border-l-destructive',
+        badge: 'bg-destructive/15',
+        badgeText: 'text-destructive',
+        label: 'Error',
+        icon: <AlertCircle className="w-3 h-3" />,
+    },
+};
+
+const STEREO_ACCENT: Record<string, string> = {
+    input: 'border-l-primary',
+    process: 'border-l-muted-foreground/40',
+    output: 'border-l-success',
 };
 
 interface MobileNodeCardProps {
     node: NodeData;
     nodeConnections: { inputs: Connection[]; outputs: Connection[] };
-    nodeMap: Map<string, NodeData>;
-    connectionMode: {
-        isActive: boolean;
-        isPortCompatible: (nodeId: string, portDataType: string) => boolean;
-        sourceNodeId: string | null;
-        sourcePortId: string | null;
-        onSelectSource: (nodeId: string, portId: string, portDataType: string, nodeName: string) => void;
-        onSelectTarget: (nodeId: string, portId: string) => void;
-    };
+    displayNames: Map<string, string>;
     onTapCard: (nodeId: string) => void;
-    onDisconnect: (connectionId: string) => void;
+    onTapOutputPort: (nodeId: string, portId: string, portDataType: string, nodeName: string, portName: string) => void;
     socketConnectionId?: string;
 }
 
 export const MobileNodeCard = React.memo(
-    ({
-        node,
-        nodeConnections,
-        nodeMap,
-        connectionMode,
-        onTapCard,
-        onDisconnect,
-        socketConnectionId,
-    }: MobileNodeCardProps) => {
+    ({ node, nodeConnections, displayNames, onTapCard, onTapOutputPort, socketConnectionId }: MobileNodeCardProps) => {
         const blockRegistry = useBlockRegistry();
         const blockDef: BlockDefinitionWithFrontend | undefined = blockRegistry[node.type];
 
         const state = (node.state ?? 'IDLE') as NodeState;
-        const status = STATUS_CONFIG[state] ?? STATUS_CONFIG.IDLE;
-        const displayName = node.customLabel || blockDef?.label || node.type;
+        const stateStyle = STATE_STYLES[state] ?? STATE_STYLES.IDLE;
+        const displayName = displayNames.get(node.id) ?? node.type;
+        const stereo = blockDef?.stereo ?? 'process';
 
         const getConnectedNodeName = useCallback(
-            (conn: Connection, direction: 'input' | 'output'): string => {
-                const connectedId = direction === 'input' ? conn.sourceNodeId : conn.targetNodeId;
-                const connectedNode = nodeMap.get(connectedId);
-                if (!connectedNode) return connectedId;
-                const connDef = blockRegistry[connectedNode.type];
-                return connectedNode.customLabel || connDef?.label || connectedNode.type;
-            },
-            [nodeMap, blockRegistry]
+            (connectedId: string): string => displayNames.get(connectedId) ?? connectedId,
+            [displayNames]
         );
 
         const inputPorts = blockDef?.inputs ?? [];
@@ -77,15 +90,10 @@ export const MobileNodeCard = React.memo(
                     if (blockDef?.isFrontend && EXECUTE_FUNCTIONS[blockDef.type]) {
                         const executeFn = EXECUTE_FUNCTIONS[blockDef.type];
                         const result = await executeFn(node.inputData ?? {}, node.config ?? {});
-                        updateNodeData(node.id, {
-                            outputData: result,
-                            state: 'COMPLETED',
-                        } as Partial<NodeData>);
+                        updateNodeData(node.id, { outputData: result, state: 'COMPLETED' } as Partial<NodeData>);
                         await runNode(node.id, { output: result });
                     } else {
-                        await runNode(node.id, undefined, {
-                            connectionId: socketConnectionId,
-                        });
+                        await runNode(node.id, undefined, { connectionId: socketConnectionId });
                     }
                 } catch {
                     updateNodeData(node.id, { state: 'ERROR' } as Partial<NodeData>);
@@ -94,116 +102,142 @@ export const MobileNodeCard = React.memo(
             [node.id, node.inputData, node.config, blockDef, socketConnectionId]
         );
 
+        const leftBorder = state !== 'IDLE' ? stateStyle.border : (STEREO_ACCENT[stereo] ?? '');
+
+        const hasConnections = nodeConnections.inputs.length > 0 || nodeConnections.outputs.length > 0;
+        const hasOutputPorts = outputPorts.length > 0;
+
         return (
             <div
                 className={cn(
-                    'rounded-xl border bg-card shadow-sm transition-all duration-200',
-                    'active:scale-[0.98]',
-                    state === 'RUNNING' && 'border-warning/50 shadow-warning/10',
-                    state === 'COMPLETED' && 'border-success/30',
-                    state === 'ERROR' && 'border-destructive/30'
+                    'rounded-lg border bg-card shadow-sm border-l-[3px] transition-all duration-200',
+                    leftBorder,
+                    state === 'RUNNING' && 'shadow-md'
                 )}
             >
-                {/* Input ports */}
-                {inputPorts.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 px-3 pt-3">
-                        {inputPorts.map(port => {
-                            const conn = nodeConnections.inputs.find(c => c.targetPortId === port.id);
-                            const connectedName = conn ? getConnectedNodeName(conn, 'input') : null;
-
-                            return (
-                                <MobilePortChip
-                                    key={port.id}
-                                    portId={port.id}
-                                    portName={port.label || port.id}
-                                    portDataType={port.type ?? 'any'}
-                                    direction="input"
-                                    connectedNodeName={connectedName}
-                                    connectionId={conn?.id ?? null}
-                                    isConnectionMode={connectionMode.isActive}
-                                    isCompatible={connectionMode.isPortCompatible(node.id, port.type ?? 'any')}
-                                    isSource={false}
-                                    onTap={() => connectionMode.onSelectTarget(node.id, port.id)}
-                                    onDisconnect={onDisconnect}
-                                />
-                            );
-                        })}
-                    </div>
-                )}
-
-                {/* Header - tappable for config */}
-                <button
-                    onClick={() => onTapCard(node.id)}
-                    className="w-full px-3 py-3 flex items-center gap-3 text-left"
-                >
+                {/* Header row */}
+                <div className="w-full px-3 py-2.5 flex items-center gap-2.5">
+                    {/* Tappable area for config — not a button to avoid nesting */}
                     <div
-                        className={cn(
-                            'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
-                            blockDef?.stereo === 'input' && 'bg-primary/10',
-                            blockDef?.stereo === 'process' && 'bg-muted/50',
-                            blockDef?.stereo === 'output' && 'bg-success/10'
-                        )}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onTapCard(node.id)}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter') onTapCard(node.id);
+                        }}
+                        className="flex-1 min-w-0 flex items-center gap-2.5 cursor-pointer"
                     >
-                        <BlockIcon icon={blockDef?.icon} size={18} />
-                    </div>
+                        <div className="w-8 h-8 rounded-md bg-muted/40 flex items-center justify-center shrink-0">
+                            <BlockIcon icon={blockDef?.icon} size={16} />
+                        </div>
 
-                    <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{displayName}</div>
-                        {blockDef?.label && node.customLabel && (
-                            <div className="text-xs text-muted-foreground truncate">{blockDef.label}</div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-semibold truncate leading-tight">{displayName}</div>
+                            {blockDef?.label && node.customLabel && (
+                                <div className="text-[10px] text-muted-foreground truncate leading-tight">
+                                    {blockDef.label}
+                                </div>
+                            )}
+                        </div>
+
+                        {state !== 'IDLE' && (
+                            <div
+                                className={cn(
+                                    'flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium',
+                                    stateStyle.badge,
+                                    stateStyle.badgeText
+                                )}
+                            >
+                                {stateStyle.icon}
+                                <span>{stateStyle.label}</span>
+                            </div>
                         )}
+
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/30 shrink-0" />
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                        {status.icon}
-                        <div className={cn('w-2.5 h-2.5 rounded-full', status.color)} />
-                    </div>
-
+                    {/* Run button — sibling, not nested */}
                     {blockDef?.isRunnable !== false && (
                         <button
                             onClick={handleRun}
                             disabled={state === 'RUNNING'}
                             className={cn(
-                                'p-2 rounded-lg transition-colors shrink-0',
-                                'bg-primary/10 hover:bg-primary/20 text-primary',
-                                'disabled:opacity-50 disabled:cursor-not-allowed'
+                                'w-8 h-8 rounded-md flex items-center justify-center shrink-0 transition-colors',
+                                'bg-primary/10 hover:bg-primary/20 text-primary active:scale-90',
+                                'disabled:opacity-40'
                             )}
                         >
                             {state === 'RUNNING' ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             ) : (
-                                <Play className="w-4 h-4 fill-current" />
+                                <Play className="w-3.5 h-3.5 fill-current" />
                             )}
                         </button>
                     )}
-                </button>
+                </div>
 
-                {/* Output ports */}
-                {outputPorts.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 px-3 pb-3">
-                        {outputPorts.map(port => {
-                            const conn = nodeConnections.outputs.find(c => c.sourcePortId === port.id);
-                            const connectedName = conn ? getConnectedNodeName(conn, 'output') : null;
-                            const isSource =
-                                connectionMode.sourceNodeId === node.id && connectionMode.sourcePortId === port.id;
+                {/* Connections + output ports */}
+                {(hasConnections || hasOutputPorts) && (
+                    <div className="px-3 pb-2.5 space-y-1.5">
+                        {/* Input connections — display only */}
+                        {inputPorts.map(port => {
+                            const conn = nodeConnections.inputs.find(c => c.targetPortId === port.id);
+                            if (!conn) return null;
+                            const connName = getConnectedNodeName(conn.sourceNodeId);
+                            const styleKey = getPortStyleKey(port.type ?? 'any');
 
                             return (
-                                <MobilePortChip
-                                    key={port.id}
-                                    portId={port.id}
-                                    portName={port.label || port.id}
-                                    portDataType={port.type ?? 'any'}
-                                    direction="output"
-                                    connectedNodeName={connectedName}
-                                    connectionId={conn?.id ?? null}
-                                    isConnectionMode={connectionMode.isActive}
-                                    isCompatible={false}
-                                    isSource={isSource}
-                                    onTap={() =>
-                                        connectionMode.onSelectSource(node.id, port.id, port.type ?? 'any', displayName)
+                                <div
+                                    key={`in-${port.id}`}
+                                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                                >
+                                    <ArrowDownLeft className="w-3 h-3 opacity-50 shrink-0" />
+                                    <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', TYPE_DOT[styleKey])} />
+                                    <span className="truncate">{connName}</span>
+                                    <span className="opacity-30">→</span>
+                                    <span className="font-medium text-foreground/70">{port.label || port.id}</span>
+                                </div>
+                            );
+                        })}
+
+                        {/* Output ports — tappable for connection */}
+                        {outputPorts.map(port => {
+                            const conns = nodeConnections.outputs.filter(c => c.sourcePortId === port.id);
+                            const styleKey = getPortStyleKey(port.type ?? 'any');
+                            const connCount = conns.length;
+
+                            return (
+                                <button
+                                    key={`out-${port.id}`}
+                                    onClick={() =>
+                                        onTapOutputPort(
+                                            node.id,
+                                            port.id,
+                                            port.type ?? 'any',
+                                            displayName,
+                                            port.label || port.id
+                                        )
                                     }
-                                    onDisconnect={onDisconnect}
-                                />
+                                    className={cn(
+                                        'w-full flex items-center gap-1.5 text-[11px] px-2 py-1.5 -mx-0.5 rounded-md',
+                                        'transition-colors hover:bg-muted/50 active:bg-muted/70',
+                                        'text-left'
+                                    )}
+                                >
+                                    <ArrowUpRight className="w-3 h-3 opacity-50 shrink-0" />
+                                    <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', TYPE_DOT[styleKey])} />
+                                    <span className="font-medium text-foreground/70">{port.label || port.id}</span>
+
+                                    {connCount > 0 ? (
+                                        <span className="text-muted-foreground truncate flex-1">
+                                            → {conns.map(c => getConnectedNodeName(c.targetNodeId)).join(', ')}
+                                        </span>
+                                    ) : (
+                                        <span className="text-muted-foreground/40 flex-1">not connected</span>
+                                    )}
+
+                                    <Link className="w-3 h-3 text-primary/50 shrink-0" />
+                                </button>
                             );
                         })}
                     </div>

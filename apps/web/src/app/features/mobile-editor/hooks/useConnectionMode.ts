@@ -2,65 +2,106 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { toast } from 'sonner';
 
-import { createEdge, useCanvasConnections, useCanvasNodes, useCanvasStore } from '@flows/flows';
+import { createEdge, deleteEdge, useCanvasConnections, useCanvasNodes, useCanvasStore } from '@flows/flows';
 
 import { arePortTypesCompatible, generateTempId, wouldCreateCycle } from '../../flows/utils';
 
+import type { BlockDefinitionWithFrontend } from '@flows/flows';
 import type { Connection } from '@lemoncloud/eureka-flows-api';
-
-type ConnectionModeState = 'IDLE' | 'SOURCE_SELECTED';
 
 interface SourceSelection {
     nodeId: string;
     portId: string;
     portDataType: string;
     nodeName: string;
+    portName: string;
+}
+
+export interface CompatibleTarget {
+    nodeId: string;
+    nodeName: string;
+    nodeIcon?: string;
+    portId: string;
+    portName: string;
+    portDataType: string;
+    alreadyConnected: boolean;
 }
 
 interface UseConnectionModeReturn {
-    state: ConnectionModeState;
+    /** Whether the connection sheet is open */
+    isOpen: boolean;
+    /** The source port info */
     source: SourceSelection | null;
-    selectSourcePort: (nodeId: string, portId: string, portDataType: string, nodeName: string) => void;
-    selectTargetPort: (nodeId: string, portId: string) => void;
-    cancel: () => void;
-    isPortCompatible: (nodeId: string, portDataType: string) => boolean;
+    /** List of compatible target ports */
+    compatibleTargets: CompatibleTarget[];
+    /** Open connection sheet for an output port */
+    openForPort: (nodeId: string, portId: string, portDataType: string, nodeName: string, portName: string) => void;
+    /** Connect to a target */
+    connectTo: (targetNodeId: string, targetPortId: string) => void;
+    /** Close the sheet */
+    close: () => void;
+    /** Disconnect an existing connection */
+    disconnect: (connectionId: string) => void;
 }
 
-export const useConnectionMode = (): UseConnectionModeReturn => {
-    const [state, setState] = useState<ConnectionModeState>('IDLE');
+export const useConnectionMode = (
+    blockRegistry: Record<string, BlockDefinitionWithFrontend>
+): UseConnectionModeReturn => {
     const [source, setSource] = useState<SourceSelection | null>(null);
     const connections = useCanvasConnections();
     const nodes = useCanvasNodes();
 
-    // Pre-compute which nodes would create a cycle if connected from source
-    const incompatibleNodeIds = useMemo(() => {
-        if (!source) return new Set<string>();
-        const result = new Set<string>();
-        result.add(source.nodeId);
+    const isOpen = source !== null;
+
+    // Compute compatible targets when source is selected
+    const compatibleTargets = useMemo((): CompatibleTarget[] => {
+        if (!source) return [];
+
+        const targets: CompatibleTarget[] = [];
+
         for (const node of nodes) {
             if (node.id === source.nodeId) continue;
-            if (wouldCreateCycle(connections, source.nodeId, node.id)) {
-                result.add(node.id);
+            if (wouldCreateCycle(connections, source.nodeId, node.id)) continue;
+
+            const blockDef = blockRegistry[node.type];
+            if (!blockDef?.inputs) continue;
+
+            const nodeName = node.customLabel || blockDef.label || node.type;
+
+            for (const port of blockDef.inputs) {
+                if (!arePortTypesCompatible(source.portDataType, port.type)) continue;
+
+                const alreadyConnected = connections.some(
+                    c =>
+                        c.sourceNodeId === source.nodeId &&
+                        c.sourcePortId === source.portId &&
+                        c.targetNodeId === node.id &&
+                        c.targetPortId === port.id
+                );
+
+                targets.push({
+                    nodeId: node.id,
+                    nodeName,
+                    nodeIcon: blockDef.icon,
+                    portId: port.id,
+                    portName: port.label || port.id,
+                    portDataType: port.type ?? 'any',
+                    alreadyConnected,
+                });
             }
         }
-        return result;
-    }, [source, connections, nodes]);
 
-    const selectSourcePort = useCallback(
-        (nodeId: string, portId: string, portDataType: string, nodeName: string) => {
-            if (source?.nodeId === nodeId && source?.portId === portId) {
-                setState('IDLE');
-                setSource(null);
-                return;
-            }
+        return targets;
+    }, [source, nodes, connections, blockRegistry]);
 
-            setSource({ nodeId, portId, portDataType, nodeName });
-            setState('SOURCE_SELECTED');
+    const openForPort = useCallback(
+        (nodeId: string, portId: string, portDataType: string, nodeName: string, portName: string) => {
+            setSource({ nodeId, portId, portDataType, nodeName, portName });
         },
-        [source]
+        []
     );
 
-    const selectTargetPort = useCallback(
+    const connectTo = useCallback(
         async (targetNodeId: string, targetPortId: string) => {
             if (!source) return;
 
@@ -68,11 +109,7 @@ export const useConnectionMode = (): UseConnectionModeReturn => {
             const { connections: currentConnections, addConnection, updateConnection } = storeState;
             const flowId = storeState.flowId ?? '';
 
-            if (wouldCreateCycle(currentConnections, source.nodeId, targetNodeId)) {
-                toast.error('Cannot create circular connection');
-                return;
-            }
-
+            // Check if already connected
             const existing = currentConnections.find(
                 c =>
                     c.sourceNodeId === source.nodeId &&
@@ -81,12 +118,11 @@ export const useConnectionMode = (): UseConnectionModeReturn => {
                     c.targetPortId === targetPortId
             );
             if (existing) {
-                toast.info('Connection already exists');
-                setState('IDLE');
-                setSource(null);
+                toast.info('Already connected');
                 return;
             }
 
+            // Create optimistically
             const tempId = generateTempId('edge');
             const newConnection: Connection = {
                 id: tempId,
@@ -97,9 +133,8 @@ export const useConnectionMode = (): UseConnectionModeReturn => {
             };
 
             addConnection(newConnection);
-            setState('IDLE');
-            setSource(null);
 
+            // Sync to backend
             try {
                 const sourceNode = storeState.nodes.find(n => n.id === source.nodeId);
                 const targetNode = storeState.nodes.find(n => n.id === targetNodeId);
@@ -127,26 +162,27 @@ export const useConnectionMode = (): UseConnectionModeReturn => {
         [source]
     );
 
-    const cancel = useCallback(() => {
-        setState('IDLE');
+    const close = useCallback(() => {
         setSource(null);
     }, []);
 
-    const isPortCompatible = useCallback(
-        (nodeId: string, portDataType: string): boolean => {
-            if (!source) return false;
-            if (incompatibleNodeIds.has(nodeId)) return false;
-            return arePortTypesCompatible(source.portDataType, portDataType);
-        },
-        [source, incompatibleNodeIds]
-    );
+    const disconnect = useCallback(async (connectionId: string) => {
+        useCanvasStore.getState().deleteConnection(connectionId);
+        try {
+            await deleteEdge(connectionId);
+            toast.success('Disconnected');
+        } catch {
+            toast.error('Failed to disconnect');
+        }
+    }, []);
 
     return {
-        state,
+        isOpen,
         source,
-        selectSourcePort,
-        selectTargetPort,
-        cancel,
-        isPortCompatible,
+        compatibleTargets,
+        openForPort,
+        connectTo,
+        close,
+        disconnect,
     };
 };
