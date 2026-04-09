@@ -4,6 +4,7 @@ import { AdminLayout, AuthGuard } from './components/layout';
 import { LoginPage } from './features/auth';
 import { BlockDetailPage, BlockListPage } from './features/blocks';
 import { DashboardPage } from './features/dashboard';
+import { I18nPage } from './features/i18n';
 import { SkillsPage } from './features/skills';
 import { ToolsPage } from './features/tools';
 
@@ -19,6 +20,7 @@ export const App = () => {
                         <Route path="/blocks/:id" element={<BlockDetailPage />} />
                         <Route path="/tools" element={<ToolsPage />} />
                         <Route path="/skills" element={<SkillsPage />} />
+                        <Route path="/i18n" element={<I18nPage />} />
                     </Route>
                 </Route>
             </Routes>
