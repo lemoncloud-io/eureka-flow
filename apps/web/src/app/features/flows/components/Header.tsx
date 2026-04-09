@@ -15,6 +15,7 @@ import {
     ImageDown,
     Key,
     LayoutGrid,
+    MapPin,
     Menu,
     Redo2,
     Save,
@@ -97,6 +98,7 @@ interface HeaderProps {
     onPublish?: () => void;
     onApiKeySettings?: () => void;
     onHelp?: () => void;
+    onTour?: () => void;
     onOpenFlowList?: () => void;
 }
 
@@ -323,6 +325,7 @@ export const Header: React.FC<HeaderProps> = ({
     onPublish,
     onApiKeySettings,
     onHelp,
+    onTour,
     onOpenFlowList,
 }) => {
     const { t } = useTranslation(['flows']);
@@ -339,7 +342,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
             <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3">
                 {/* Left: Brand + Flow Info */}
-                <div className="pointer-events-auto">
+                <div data-tour="header-left" className="pointer-events-auto">
                     <div
                         className={cn(
                             'flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-2 sm:px-3 rounded-xl',
@@ -387,6 +390,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
                     {/* Edit Tools - hidden on mobile, shown on tablet+ */}
                     <div
+                        data-tour="header-toolbar"
                         className={cn(
                             'hidden sm:flex items-center h-9 sm:h-10 px-1 rounded-xl',
                             'bg-background/80 backdrop-blur-xl border border-border/50',
@@ -429,6 +433,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button
+                                data-tour="header-menu"
                                 className={cn(
                                     'flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl',
                                     'bg-background/80 backdrop-blur-xl border border-border/50',
@@ -587,13 +592,19 @@ export const Header: React.FC<HeaderProps> = ({
                                 </DropdownMenuItem>
                             )}
 
-                            {/* Help & Tutorial */}
-                            {(onHelp || !isPublicMode) && <DropdownMenuSeparator />}
+                            {/* Help & Tour */}
+                            {(onHelp || onTour || !isPublicMode) && <DropdownMenuSeparator />}
                             {onHelp && (
                                 <DropdownMenuItem onClick={onHelp}>
                                     <HelpCircle className="w-4 h-4 mr-2" />
                                     {t('help.title')}
                                     <DropdownMenuShortcut>?</DropdownMenuShortcut>
+                                </DropdownMenuItem>
+                            )}
+                            {onTour && (
+                                <DropdownMenuItem onClick={onTour}>
+                                    <MapPin className="w-4 h-4 mr-2" />
+                                    {t('header.guidedTour')}
                                 </DropdownMenuItem>
                             )}
                             {!isPublicMode && (

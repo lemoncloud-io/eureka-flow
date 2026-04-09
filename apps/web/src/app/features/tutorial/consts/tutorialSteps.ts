@@ -7,12 +7,6 @@ export interface TutorialStep {
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
     {
-        id: 'welcome',
-        titleKey: 'tutorial:steps.welcome.title',
-        descriptionKey: 'tutorial:steps.welcome.description',
-        action: 'auto',
-    },
-    {
         id: 'connect',
         titleKey: 'tutorial:steps.connect.title',
         descriptionKey: 'tutorial:steps.connect.description',
