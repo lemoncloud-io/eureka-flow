@@ -5,15 +5,13 @@ import { useNavigate } from 'react-router-dom';
 import { useBlocks, useFlowsStore } from '@flows/flows';
 import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 
-import { Sidebar } from '../../flows/components/Sidebar';
-import { WorkflowCanvas } from '../../flows/components/WorkflowCanvas';
+import { Sidebar, WorkflowCanvas } from '../../flows';
 import { CompletionScreen } from '../components/CompletionScreen';
 import { TutorialOverlay } from '../components/TutorialOverlay';
 import { FALLBACK_BLOCKS, TUTORIAL_WORKFLOW } from '../consts/tutorialSteps';
 import { useTutorialSteps } from '../hooks/useTutorialSteps';
 
-import type { SidebarRef } from '../../flows/components/Sidebar';
-import type { WorkflowCanvasRef } from '../../flows/components/WorkflowCanvas';
+import type { SidebarRef, WorkflowCanvasRef } from '../../flows';
 
 const noop = () => {
     /* intentionally empty */
@@ -78,7 +76,6 @@ export const TutorialPage = () => {
             if (isValid) {
                 setApiKey(key);
                 markTutorialDone();
-                console.info('[Tutorial] completed — user authenticated');
                 navigate('/editor');
                 return true;
             }
@@ -101,7 +98,7 @@ export const TutorialPage = () => {
 
     return (
         <div className="relative h-screen overflow-hidden bg-canvas text-foreground">
-            <div data-tour="canvas" className="absolute inset-0">
+            <div className="absolute inset-0">
                 <WorkflowCanvas
                     ref={canvasRef}
                     readOnly={false}

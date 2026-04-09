@@ -5,8 +5,6 @@ import { ArrowLeft, ArrowRight, Check, X } from 'lucide-react';
 import { cn } from '@flows/lib/utils';
 import { Button } from '@flows/ui-kit';
 
-import { TUTORIAL_STEPS } from '../consts/tutorialSteps';
-
 import type { TutorialStep } from '../consts/tutorialSteps';
 
 interface TutorialOverlayProps {
@@ -26,7 +24,7 @@ export const TutorialOverlay = ({ currentStep, step, totalSteps, onNext, onPrev,
             <div className="pointer-events-auto border-b border-border/50 bg-background/95 backdrop-blur-md">
                 <div className="flex items-center gap-4 px-5 py-3">
                     <div className="flex items-center gap-1.5">
-                        {TUTORIAL_STEPS.map((_, i) => {
+                        {Array.from({ length: totalSteps }, (_, i) => {
                             const isDone = i < currentStep;
                             const isActive = i === currentStep;
                             return (

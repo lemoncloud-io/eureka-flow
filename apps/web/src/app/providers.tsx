@@ -20,7 +20,6 @@ import { ThemeProvider } from '@flows/theme';
 import { reportError, useWebCoreStore, validateApiKey } from '@flows/web-core';
 
 import { i18n } from '../i18n';
-import { useApiKeyTour } from './features/flows/components/tour';
 
 import type { ErrorInfo, ReactNode } from 'react';
 
@@ -60,26 +59,6 @@ const isPublicRoute = (): boolean => {
 };
 
 const CODES_URL = import.meta.env.VITE_CODES_URL;
-
-const ApiKeyGateDialog = ({
-    onSubmit,
-    error,
-}: {
-    onSubmit: (key: string) => Promise<boolean>;
-    error: string | null;
-}) => {
-    useApiKeyTour();
-
-    const handleClose = (open: boolean) => {
-        if (!open) {
-            window.location.href = '/';
-        }
-    };
-
-    return (
-        <ApiKeyDialog open={true} onSubmit={onSubmit} onOpenChange={handleClose} error={error} codesUrl={CODES_URL} />
-    );
-};
 
 /**
  * API Key gate component
@@ -122,7 +101,17 @@ const ApiKeyGate = ({ children }: { children: ReactNode }) => {
     }
 
     if (!apiKey) {
-        return <ApiKeyGateDialog onSubmit={handleApiKeySubmit} error={error} />;
+        return (
+            <ApiKeyDialog
+                open={true}
+                onSubmit={handleApiKeySubmit}
+                onOpenChange={open => {
+                    if (!open) window.location.href = '/';
+                }}
+                error={error}
+                codesUrl={CODES_URL}
+            />
+        );
     }
 
     return children;

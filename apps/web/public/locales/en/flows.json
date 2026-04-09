@@ -38,7 +38,6 @@
         "unpublish": "Unpublish",
         "viewOnly": "View Only",
         "apiKeySettings": "API Key Settings",
-        "guidedTour": "Guided Tour",
         "replayTutorial": "Replay Tutorial",
         "beta": "Beta",
         "menuGroup": {
@@ -470,46 +469,6 @@
                 "connect": "Connect blocks by dragging between ports",
                 "help": "Press ? for help anytime",
                 "keyboard": "Tip: Space+drag to pan, scroll to zoom"
-            }
-        }
-    },
-    "tour": {
-        "next": "Next",
-        "prev": "Back",
-        "done": "Get Started!",
-        "progress": "{{current}} of {{total}}",
-        "steps": {
-            "apiKey": {
-                "title": "Welcome to Eureka Flow! 👋",
-                "description": "Enter your API key to get started. You can create a new key or paste an existing one. Your key is stored locally in your browser."
-            },
-            "welcome": {
-                "title": "Let's explore the editor!",
-                "description": "Your API key is set. Let's take a quick tour of the workflow editor. You can replay this tour anytime from the menu."
-            },
-            "sidebar": {
-                "title": "Block Library",
-                "description": "Click here to open the block library. Browse input, process, and output blocks, then drag or click to add them to your canvas."
-            },
-            "canvas": {
-                "title": "Workflow Canvas",
-                "description": "This is your workspace. Add blocks, connect them by dragging between ports, and build your automation flow. Scroll to zoom, drag empty space to pan."
-            },
-            "header": {
-                "title": "Flow Info & Status",
-                "description": "See your flow name, save status, and connection state. Click the name to rename your workflow."
-            },
-            "toolbar": {
-                "title": "Quick Actions",
-                "description": "Save, undo, redo, and open your flow list. These actions also have keyboard shortcuts for faster workflow."
-            },
-            "menu": {
-                "title": "Main Menu",
-                "description": "Access file operations (export, import), edit tools (auto layout, clear), publishing, and help from this menu. You can also manage your API key from API Key Settings."
-            },
-            "finish": {
-                "title": "You're all set! 🎉",
-                "description": "Start by adding a block from the library and connecting them together. Press ? anytime for help, or replay this tour from the menu."
             }
         }
     }

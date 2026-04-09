@@ -16,7 +16,6 @@ import { Header } from '../components/Header';
 import { HelpDialog } from '../components/HelpDialog';
 import { PublishDialog } from '../components/PublishDialog';
 import { Sidebar } from '../components/Sidebar';
-import { useTour } from '../components/tour';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { useSocketHandlers } from '../hooks/useSocketHandlers';
 
@@ -97,8 +96,6 @@ export const FlowEditorPage = () => {
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
     });
-
-    const { startTourIfFirstVisit, startTour } = useTour();
 
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('');
@@ -502,12 +499,6 @@ export const FlowEditorPage = () => {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, []);
 
-    useEffect(() => {
-        if (isAppReady && !isPublicMode && !isLoading) {
-            return startTourIfFirstVisit();
-        }
-    }, [isAppReady, isPublicMode, isLoading, startTourIfFirstVisit]);
-
     if (!isAppReady) {
         return (
             <div className="flex h-screen bg-background text-foreground font-sans items-center justify-center flex-col gap-4">
@@ -599,7 +590,7 @@ export const FlowEditorPage = () => {
             <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFileChange} />
 
             {/* Full-screen Canvas */}
-            <div data-tour="canvas" className="absolute inset-0">
+            <div className="absolute inset-0">
                 <WorkflowCanvas
                     ref={canvasRef}
                     readOnly={isPublicMode}
@@ -669,7 +660,6 @@ export const FlowEditorPage = () => {
                 onPublish={handleOpenPublish}
                 onApiKeySettings={handleApiKeySettings}
                 onHelp={() => handleOpenHelp('gettingStarted')}
-                onTour={startTour}
                 onOpenFlowList={handleOpenFlowList}
             />
 

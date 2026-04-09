@@ -87,5 +87,5 @@ export const TUTORIAL_WORKFLOW = {
             config: {},
         },
     ],
-    edges: [] as unknown[],
+    edges: [] as unknown[], // loadWorkflow accepts WorkflowState from external API package; empty array needs no concrete type
 };

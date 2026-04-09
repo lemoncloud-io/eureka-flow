@@ -57,11 +57,7 @@ export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, in
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent
-                data-tour="apikey-dialog"
-                className="sm:max-w-sm p-5"
-                onPointerDownOutside={e => !onOpenChange && e.preventDefault()}
-            >
+            <DialogContent className="sm:max-w-sm p-5" onPointerDownOutside={e => !onOpenChange && e.preventDefault()}>
                 <DialogHeader className="space-y-1">
                     <DialogTitle className="text-base">{t('apiKeyDialog.title')}</DialogTitle>
                     <DialogDescription className="text-xs">{t('apiKeyDialog.description')}</DialogDescription>

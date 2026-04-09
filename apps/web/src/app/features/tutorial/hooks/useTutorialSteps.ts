@@ -25,7 +25,6 @@ export const useTutorialSteps = () => {
 
     const goNext = useCallback(() => {
         if (currentStep < totalSteps - 1) {
-            console.info('[Tutorial] step completed:', TUTORIAL_STEPS[currentStep].id);
             setCurrentStep(prev => prev + 1);
         }
     }, [currentStep, totalSteps]);
@@ -37,9 +36,8 @@ export const useTutorialSteps = () => {
     }, [currentStep]);
 
     const skipToEnd = useCallback(() => {
-        console.info('[Tutorial] skipped at step:', step.id);
         setCurrentStep(totalSteps - 1);
-    }, [step.id, totalSteps]);
+    }, [totalSteps]);
 
     // Auto-advance when canProceed becomes true
     useEffect(() => {

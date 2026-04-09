@@ -274,10 +274,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
     return (
         <>
             {/* Single Library Button */}
-            <div
-                data-tour="sidebar"
-                className="absolute left-2 sm:left-4 bottom-4 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 z-20 pointer-events-auto"
-            >
+            <div className="absolute left-2 sm:left-4 bottom-4 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 z-20 pointer-events-auto">
                 <div
                     className={cn(
                         'flex flex-col gap-2 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl',
