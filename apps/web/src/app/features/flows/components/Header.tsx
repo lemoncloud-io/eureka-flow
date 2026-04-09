@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
 import {
     ChevronsDownUp,
@@ -10,6 +10,7 @@ import {
     FileText,
     FolderOpen,
     Globe,
+    GraduationCap,
     HelpCircle,
     ImageDown,
     Key,
@@ -328,6 +329,7 @@ export const Header: React.FC<HeaderProps> = ({
     onOpenFlowList,
 }) => {
     const { t } = useTranslation(['flows']);
+    const navigate = useNavigate();
 
     const getSaveButtonVariant = (): 'default' | 'success' | 'warning' | 'error' => {
         if (saveState.saveStatus === 'saving') return 'warning';
@@ -603,6 +605,12 @@ export const Header: React.FC<HeaderProps> = ({
                                 <DropdownMenuItem onClick={onTour}>
                                     <MapPin className="w-4 h-4 mr-2" />
                                     {t('header.guidedTour')}
+                                </DropdownMenuItem>
+                            )}
+                            {!isPublicMode && (
+                                <DropdownMenuItem onClick={() => navigate('/tutorial')}>
+                                    <GraduationCap className="w-4 h-4 mr-2" />
+                                    {t('header.replayTutorial')}
                                 </DropdownMenuItem>
                             )}
 

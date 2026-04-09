@@ -6,13 +6,14 @@ import { Globe } from 'lucide-react';
 import { Button } from '@flows/ui-kit';
 
 import { ROUTES, staggerStyle } from '../consts';
+import { shouldShowTutorial } from '../utils';
 
 export const HeroSection = () => {
     const navigate = useNavigate();
     const { t } = useTranslation('landing');
 
+    const handleStart = () => navigate(shouldShowTutorial() ? ROUTES.TUTORIAL : ROUTES.EDITOR);
     const handleExplore = () => navigate(ROUTES.EXPLORE);
-    const handleStartEditing = () => navigate(ROUTES.EDITOR);
 
     return (
         <section className="relative mx-auto max-w-4xl px-6 pt-40 pb-20 text-center">
@@ -40,12 +41,12 @@ export const HeroSection = () => {
                 className="animate-fade-in-up flex flex-col items-center justify-center gap-3 px-4 sm:flex-row sm:gap-4 sm:px-0"
                 style={staggerStyle(3)}
             >
-                <Button size="lg" className="w-full gap-2 sm:w-auto" onClick={handleExplore}>
+                <Button size="lg" className="w-full sm:w-auto" onClick={handleStart}>
+                    {t('hero.cta_primary')}
+                </Button>
+                <Button variant="outline" size="lg" className="w-full gap-2 sm:w-auto" onClick={handleExplore}>
                     <Globe size={16} />
                     {t('hero.cta_explore')}
-                </Button>
-                <Button variant="outline" size="lg" className="w-full sm:w-auto" onClick={handleStartEditing}>
-                    {t('hero.cta_primary')}
                 </Button>
             </div>
         </section>

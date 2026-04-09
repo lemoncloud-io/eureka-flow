@@ -1,0 +1,34 @@
+{
+    "loading": "Loading tutorial...",
+    "retry": "Retry",
+    "steps": {
+        "welcome": {
+            "title": "Welcome!",
+            "description": "Two blocks are ready on the canvas. Click Next to learn how to connect them."
+        },
+        "connect": {
+            "title": "Connect the blocks",
+            "description": "Drag from the blue dot (●) on the right side of \"My First Input\" to the blue dot on the left side of \"Result\"."
+        },
+        "run": {
+            "title": "Run it!",
+            "description": "Click the ▷ play button on \"My First Input\" to execute. The result will appear in the Preview block."
+        },
+        "done": {
+            "title": "You did it! 🎉",
+            "description": "Get a free API key to save your work and use AI blocks.",
+            "getKey": "Get Free Key from Codes",
+            "enterKey": "I already have a key",
+            "keyPlaceholder": "Paste your API key",
+            "validating": "Validating...",
+            "continue": "Start Building!",
+            "or": "or",
+            "invalidKey": "Invalid key. Please try again."
+        }
+    },
+    "cta": {
+        "next": "Next",
+        "prev": "Back",
+        "exploreFlows": "Explore Public Flows"
+    }
+}

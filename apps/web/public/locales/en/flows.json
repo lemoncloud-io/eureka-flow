@@ -39,6 +39,7 @@
         "viewOnly": "View Only",
         "apiKeySettings": "API Key Settings",
         "guidedTour": "Guided Tour",
+        "replayTutorial": "Replay Tutorial",
         "beta": "Beta",
         "menuGroup": {
             "file": "File",

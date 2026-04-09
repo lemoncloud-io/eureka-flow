@@ -39,6 +39,7 @@
         "viewOnly": "읽기 전용",
         "apiKeySettings": "API 키 설정",
         "guidedTour": "가이드 투어",
+        "replayTutorial": "튜토리얼 다시보기",
         "beta": "베타",
         "menuGroup": {
             "file": "파일",

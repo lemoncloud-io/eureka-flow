@@ -92,7 +92,7 @@
         "placeholder": "API 키를 입력하세요",
         "continue": "계속",
         "validating": "검증 중...",
-        "createKey": "Codes에서 무료 키 받기",
+        "createKey": "Eureka Codes에서 무료 키 받기",
         "waitingForKey": "키 대기 중...",
         "hint": "키가 없으신가요? 위 버튼을 클릭하여 Eureka Codes에서 무료로 생성하세요.",
         "errors": {
