@@ -20,7 +20,7 @@ import { ThemeProvider } from '@flows/theme';
 import { reportError, useWebCoreStore, validateApiKey } from '@flows/web-core';
 
 import { i18n } from '../i18n';
-import { useApiKeyTour } from './features/flows/components/tour';
+import { useApiKeyTour } from './features/tutorial';
 
 import type { ErrorInfo, ReactNode } from 'react';
 

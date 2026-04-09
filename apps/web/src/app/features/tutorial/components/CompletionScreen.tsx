@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { ExternalLink, Eye, EyeOff, KeyRound, Sparkles, X } from 'lucide-react';
+import { ExternalLink, Eye, EyeOff, KeyRound, X } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { useApiKeyPopup } from '@flows/shared';
@@ -72,7 +72,7 @@ export const CompletionScreen = ({ step, onSubmitKey, onClose }: CompletionScree
                     <X className="h-4 w-4" />
                 </button>
                 <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                    <Sparkles className="h-7 w-7 text-primary" />
+                    <img src="/logo/purple-symbol.png" alt="Eureka Flow" className="h-8 w-8" />
                 </div>
                 <h2 className="mb-1 text-lg font-semibold">{t(step.titleKey)}</h2>
                 <p className="mb-6 text-sm leading-relaxed text-muted-foreground">{t(step.descriptionKey)}</p>

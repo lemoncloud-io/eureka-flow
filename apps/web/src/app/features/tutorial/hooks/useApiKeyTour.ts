@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { TOUR_STORAGE_KEY } from './consts';
+import { TOUR_STORAGE_KEY, importDriver } from '../consts/tourSteps';
 
 const TOUR_START_DELAY_MS = 500;
 
@@ -15,8 +15,7 @@ export const useApiKeyTour = () => {
         let cancelled = false;
 
         const timer = setTimeout(async () => {
-            const { driver } = await import('driver.js');
-            await import('driver.js/dist/driver.css');
+            const driver = await importDriver();
 
             if (cancelled) return;
 

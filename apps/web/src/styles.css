@@ -426,17 +426,43 @@ html {
     transition: all 0.15s ease !important;
 }
 
-.eureka-tour-popover .driver-popover-next-btn,
-.eureka-tour-popover .driver-popover-close-btn {
+.eureka-tour-popover .driver-popover-next-btn {
     background-color: var(--djs-primary) !important;
     color: var(--djs-primary-fg) !important;
     border: none !important;
     text-shadow: none !important;
 }
 
-.eureka-tour-popover .driver-popover-next-btn:hover,
-.eureka-tour-popover .driver-popover-close-btn:hover {
+.eureka-tour-popover .driver-popover-next-btn:hover {
     opacity: 0.9 !important;
+}
+
+.eureka-tour-popover .driver-popover-close-btn {
+    position: absolute !important;
+    top: 0.5rem !important;
+    right: 0.5rem !important;
+    padding: 0.25rem !important;
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+    font-size: 0 !important;
+    background-color: transparent !important;
+    color: hsl(var(--muted-foreground)) !important;
+    border: none !important;
+    border-radius: 0.375rem !important;
+    text-shadow: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.eureka-tour-popover .driver-popover-close-btn::after {
+    content: '✕' !important;
+    font-size: 0.75rem !important;
+}
+
+.eureka-tour-popover .driver-popover-close-btn:hover {
+    background-color: hsl(var(--accent)) !important;
+    color: var(--djs-fg) !important;
 }
 
 .eureka-tour-popover .driver-popover-prev-btn {

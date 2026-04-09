@@ -593,7 +593,7 @@ export const Header: React.FC<HeaderProps> = ({
                             )}
 
                             {/* Help & Tour */}
-                            {(onHelp || onTour) && <DropdownMenuSeparator />}
+                            {(onHelp || onTour || !isPublicMode) && <DropdownMenuSeparator />}
                             {onHelp && (
                                 <DropdownMenuItem onClick={onHelp}>
                                     <HelpCircle className="w-4 h-4 mr-2" />

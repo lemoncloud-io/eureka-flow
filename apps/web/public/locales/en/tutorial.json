@@ -4,7 +4,15 @@
     "steps": {
         "welcome": {
             "title": "Welcome!",
-            "description": "Two blocks are ready on the canvas. Click Next to learn how to connect them."
+            "description": "Let's learn the basics of Eureka Flow. Click Next to get started."
+        },
+        "sidebar": {
+            "title": "Block Library",
+            "description": "On the left is the Block Library. Browse input, process, and output blocks, then click to add them to your canvas."
+        },
+        "canvas": {
+            "title": "Workflow Canvas",
+            "description": "This is your workspace. Two blocks are already placed — connect them by dragging between ports. Scroll to zoom, drag empty space to pan."
         },
         "connect": {
             "title": "Connect the blocks",
