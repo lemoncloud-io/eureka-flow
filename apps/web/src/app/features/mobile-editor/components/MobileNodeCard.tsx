@@ -222,7 +222,7 @@ export const MobileNodeCard = React.memo(
                         {outputPorts.map(port => {
                             const conns = nodeConnections.outputs.filter(c => c.sourcePortId === port.id);
                             const styleKey = getPortStyleKey(port.type ?? 'any');
-                            const connCount = conns.length;
+                            const isConnected = conns.length > 0;
 
                             return (
                                 <button
@@ -238,25 +238,36 @@ export const MobileNodeCard = React.memo(
                                     }
                                     className={cn(
                                         'w-full flex items-center gap-1.5 text-[11px] px-2 py-1.5 -mx-0.5 rounded-md',
-                                        'transition-colors hover:bg-muted/50 active:bg-muted/70',
+                                        'transition-colors active:scale-[0.98]',
                                         'text-left',
-                                        connCount === 0 &&
-                                            'border border-dashed border-border/30 hover:border-primary/30'
+                                        isConnected
+                                            ? 'bg-success/5 hover:bg-success/10'
+                                            : 'border border-dashed border-primary/20 bg-primary/[0.02] hover:border-primary/40 hover:bg-primary/5'
                                     )}
                                 >
-                                    <ArrowUpRight className="w-3 h-3 opacity-50 shrink-0" />
+                                    <ArrowUpRight
+                                        className={cn(
+                                            'w-3 h-3 shrink-0',
+                                            isConnected ? 'text-success/50' : 'text-primary/30'
+                                        )}
+                                    />
                                     <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', TYPE_DOT[styleKey])} />
                                     <span className="font-medium text-foreground/70">{port.label || port.id}</span>
 
-                                    {connCount > 0 ? (
-                                        <span className="text-muted-foreground truncate flex-1">
+                                    {isConnected ? (
+                                        <span className="text-success/60 truncate flex-1 font-medium">
                                             → {conns.map(c => getConnectedNodeName(c.targetNodeId)).join(', ')}
                                         </span>
                                     ) : (
-                                        <span className="text-primary/30 flex-1">connect</span>
+                                        <span className="text-primary/40 flex-1 italic">tap to connect</span>
                                     )}
 
-                                    <Link className="w-3 h-3 text-primary/50 shrink-0" />
+                                    <Link
+                                        className={cn(
+                                            'w-3 h-3 shrink-0',
+                                            isConnected ? 'text-success/40' : 'text-primary/30'
+                                        )}
+                                    />
                                 </button>
                             );
                         })}

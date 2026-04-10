@@ -45,6 +45,7 @@ export const I18nPage = () => {
 
     const hasChanges = useMemo(() => isDirty(), [isDirty, edited, originals]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [focusKey, setFocusKey] = useState<string | null>(null);
     const [showPreview, setShowPreview] = useState(true);
 
     const { broadcast } = usePreviewPublisher();
@@ -169,6 +170,7 @@ export const I18nPage = () => {
                 setNamespace(targetNs);
             }
             setSearchQuery(query);
+            setFocusKey(query);
         },
         [findNamespaceForKey, namespace, hasChanges, setNamespace]
     );
@@ -278,6 +280,8 @@ export const I18nPage = () => {
                             onAddKey={addKey}
                             onDeleteKey={deleteKey}
                             searchQuery={searchQuery}
+                            focusKey={focusKey}
+                            onFocusHandled={() => setFocusKey(null)}
                         />
                     )}
                 </div>

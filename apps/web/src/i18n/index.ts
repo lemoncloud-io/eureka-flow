@@ -114,6 +114,31 @@ if (isEmbeddedInIframe) {
         }
     });
 
+    // Key click detection: when showKeys is active, clicking [key.name] text sends it to admin
+    let showKeysActive = false;
+    window.addEventListener('message', (event: MessageEvent) => {
+        if (event.data?.type === 'i18n:showKeys') showKeysActive = true;
+        if (event.data?.type === 'i18n:update') showKeysActive = false;
+    });
+
+    const KEY_PATTERN = /^\[([a-zA-Z0-9_.]+)\]$/;
+    document.addEventListener(
+        'click',
+        (e: MouseEvent) => {
+            if (!showKeysActive) return;
+            const el = e.target as HTMLElement;
+            const text = el.textContent?.trim();
+            if (!text) return;
+            const match = text.match(KEY_PATTERN);
+            if (match) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.parent.postMessage({ type: 'i18n:keyClicked', key: match[1] }, '*');
+            }
+        },
+        true
+    );
+
     // Notify admin that iframe is ready to receive messages
     const sendReady = () => {
         console.log('[i18n-preview] sending i18n:ready');

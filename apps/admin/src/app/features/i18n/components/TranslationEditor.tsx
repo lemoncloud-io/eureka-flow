@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ChevronDown, ChevronRight, Filter, Plus, Trash2, X } from 'lucide-react';
 
@@ -17,6 +17,8 @@ interface TranslationEditorProps {
     onAddKey: (key: string, values: Record<Language, string>) => void;
     onDeleteKey: (key: string) => void;
     searchQuery: string;
+    focusKey?: string | null;
+    onFocusHandled?: () => void;
 }
 
 const ITEMS_PER_PAGE = 50;
@@ -30,7 +32,10 @@ export const TranslationEditor = ({
     onAddKey,
     onDeleteKey,
     searchQuery,
+    focusKey,
+    onFocusHandled,
 }: TranslationEditorProps) => {
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
     const [page, setPage] = useState(0);
     const [addingKey, setAddingKey] = useState(false);
@@ -102,6 +107,26 @@ export const TranslationEditor = ({
         [filteredLeaves, page]
     );
 
+    // Focus key: jump to page, scroll, and focus input
+    useEffect(() => {
+        if (!focusKey) return;
+        const idx = filteredLeaves.findIndex(l => l.fullPath === focusKey);
+        if (idx === -1) return;
+        const targetPage = Math.floor(idx / ITEMS_PER_PAGE);
+        setPage(targetPage);
+        requestAnimationFrame(() => {
+            const row = scrollContainerRef.current?.querySelector(`[data-key="${CSS.escape(focusKey)}"]`);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const input = row.querySelector('input');
+                input?.focus();
+                row.classList.add('ring-2', 'ring-primary');
+                setTimeout(() => row.classList.remove('ring-2', 'ring-primary'), 1500);
+            }
+            onFocusHandled?.();
+        });
+    }, [focusKey, filteredLeaves, onFocusHandled]);
+
     // Pre-compute visible leaf paths for branch visibility checks
     const visibleLeafPaths = useMemo(() => new Set(filteredLeaves.map(l => l.fullPath)), [filteredLeaves]);
 
@@ -148,7 +173,11 @@ export const TranslationEditor = ({
                 }
             } else if (node.values && pagedLeaves.has(node.fullPath)) {
                 result.push(
-                    <tr key={node.fullPath} className="group border-b border-border/50 hover:bg-muted/20">
+                    <tr
+                        key={node.fullPath}
+                        data-key={node.fullPath}
+                        className="group border-b border-border/50 hover:bg-muted/20 transition-shadow"
+                    >
                         <td
                             className="px-3 py-1.5 text-xs font-mono text-muted-foreground whitespace-nowrap align-top"
                             style={{ paddingLeft: `${depth * 16 + 28}px` }}
@@ -187,7 +216,7 @@ export const TranslationEditor = ({
 
     return (
         <div className="flex flex-col gap-3 flex-1 min-h-0">
-            <div className="flex-1 overflow-auto rounded-lg border">
+            <div ref={scrollContainerRef} className="flex-1 overflow-auto rounded-lg border">
                 <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-card z-10">
                         <tr className="border-b">
