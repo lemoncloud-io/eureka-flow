@@ -1,15 +1,31 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { AlertTriangle, Loader2, RotateCcw, Save, Search } from 'lucide-react';
+import {
+    AlertTriangle,
+    ExternalLink,
+    Loader2,
+    Monitor,
+    PanelRightClose,
+    PanelRightOpen,
+    RotateCcw,
+    Save,
+    Search,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button, Input } from '@flows/ui-kit';
 
 import { NamespaceSelector, TranslationEditor, WebPreview } from '../components';
-import { isS3Configured } from '../consts';
+import { I18N_NAMESPACES, fetchTranslation, flattenJson, isS3Configured } from '../consts';
+import { usePreviewPublisher, usePreviewSubscriber } from '../hooks';
 import { useI18nStore } from '../stores';
+import { LANGUAGES } from '../types';
 
 import type { I18nNamespace } from '../consts';
+import type { PreviewMessage } from '../hooks';
+import type { FlatTranslations, Language } from '../types';
+
+type AllNsData = Record<I18nNamespace, Record<Language, FlatTranslations>>;
 
 export const I18nPage = () => {
     const namespace = useI18nStore(s => s.namespace);
@@ -24,50 +40,152 @@ export const I18nPage = () => {
     const isSaving = useI18nStore(s => s.isSaving);
     const error = useI18nStore(s => s.error);
     const isDirty = useI18nStore(s => s.isDirty);
-    const editedEn = useI18nStore(s => s.editedEn);
-    const editedKo = useI18nStore(s => s.editedKo);
-    const originalEn = useI18nStore(s => s.originalEn);
-    const originalKo = useI18nStore(s => s.originalKo);
+    const edited = useI18nStore(s => s.edited);
+    const originals = useI18nStore(s => s.originals);
 
+    const hasChanges = useMemo(() => isDirty(), [isDirty, edited, originals]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [showPreview, setShowPreview] = useState(true);
 
-    // Load translations when namespace changes
+    const { broadcast } = usePreviewPublisher();
+    const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+        broadcastTimerRef.current = setTimeout(() => {
+            broadcast({ type: 'i18n:sync', namespace, edited });
+        }, 300);
+        return () => {
+            if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+        };
+    }, [namespace, edited, broadcast]);
+
+    usePreviewSubscriber((msg: PreviewMessage) => {
+        if (msg.type === 'i18n:keyClicked') handleKeySearch(msg.key);
+    });
+
+    const [allNsData, setAllNsData] = useState<AllNsData | null>(null);
+    const allNsDataLoadedRef = useRef(false);
+
+    useEffect(() => {
+        if (!isS3Configured() || allNsDataLoadedRef.current) return;
+        allNsDataLoadedRef.current = true;
+        const load = async () => {
+            const result = {} as AllNsData;
+            await Promise.all(
+                I18N_NAMESPACES.map(async ns => {
+                    const langData = {} as Record<Language, FlatTranslations>;
+                    await Promise.all(
+                        LANGUAGES.map(async lang => {
+                            try {
+                                const data = await fetchTranslation(lang, ns);
+                                langData[lang] = flattenJson(data);
+                            } catch {
+                                langData[lang] = {};
+                            }
+                        })
+                    );
+                    result[ns] = langData;
+                })
+            );
+            setAllNsData(result);
+        };
+        load();
+    }, []);
+
     useEffect(() => {
         if (isS3Configured()) {
             loadFromS3();
         }
     }, [namespace, loadFromS3]);
 
+    const searchMatchCounts = useMemo(() => {
+        if (!searchQuery || !allNsData) return undefined;
+        const query = searchQuery.toLowerCase();
+        const counts: Partial<Record<I18nNamespace, number>> = {};
+        for (const ns of I18N_NAMESPACES) {
+            const data = ns === namespace ? edited : allNsData[ns];
+            if (!data) continue;
+            let count = 0;
+            const allKeys = new Set<string>();
+            LANGUAGES.forEach(lang => Object.keys(data[lang] || {}).forEach(k => allKeys.add(k)));
+            for (const key of allKeys) {
+                if (key.toLowerCase().includes(query)) {
+                    count++;
+                    continue;
+                }
+                if (LANGUAGES.some(lang => (data[lang]?.[key] ?? '').toLowerCase().includes(query))) count++;
+            }
+            if (count > 0) counts[ns] = count;
+        }
+        return counts;
+    }, [searchQuery, allNsData, edited, namespace]);
+
+    const findNamespaceForKey = useCallback(
+        (key: string): I18nNamespace | null => {
+            if (LANGUAGES.some(lang => key in edited[lang])) return namespace;
+            if (!allNsData) return null;
+            for (const ns of I18N_NAMESPACES) {
+                if (ns === namespace) continue;
+                if (LANGUAGES.some(lang => key in (allNsData[ns]?.[lang] ?? {}))) return ns;
+            }
+            return null;
+        },
+        [edited, namespace, allNsData]
+    );
+
     const handleNamespaceChange = useCallback(
         (ns: I18nNamespace) => {
-            if (isDirty()) {
-                const confirmed = window.confirm('저장하지 않은 변경사항이 있습니다. 이동하시겠습니까?');
+            if (hasChanges) {
+                const confirmed = window.confirm('You have unsaved changes. Continue?');
                 if (!confirmed) return;
             }
             setNamespace(ns);
         },
-        [isDirty, setNamespace]
+        [hasChanges, setNamespace]
     );
 
     const handleSave = useCallback(async () => {
         await saveToS3();
-        toast.success('S3에 저장되었습니다.');
+        toast.success('Saved to S3');
     }, [saveToS3]);
 
     const handleReset = useCallback(() => {
-        const confirmed = window.confirm('변경사항을 모두 되돌리시겠습니까?');
+        const confirmed = window.confirm('Discard all changes?');
         if (confirmed) resetChanges();
     }, [resetChanges]);
+
+    const handleKeySearch = useCallback(
+        (query: string) => {
+            const targetNs = findNamespaceForKey(query);
+            if (targetNs && targetNs !== namespace) {
+                if (hasChanges) {
+                    const confirmed = window.confirm('You have unsaved changes. Switch namespace to find this key?');
+                    if (!confirmed) {
+                        setSearchQuery(query);
+                        return;
+                    }
+                }
+                setNamespace(targetNs);
+            }
+            setSearchQuery(query);
+        },
+        [findNamespaceForKey, namespace, hasChanges, setNamespace]
+    );
+
+    const handleOpenPreviewTab = useCallback(() => {
+        window.open('/i18n/preview', 'i18n-preview');
+    }, []);
 
     if (!isS3Configured()) {
         return (
             <div className="flex flex-col items-center justify-center gap-4 py-20">
                 <AlertTriangle className="h-12 w-12 text-yellow-500" />
-                <h2 className="text-lg font-semibold">S3 설정 필요</h2>
+                <h2 className="text-lg font-semibold">S3 Configuration Required</h2>
                 <p className="text-muted-foreground text-center max-w-md">
-                    VITE_I18N_BUCKET_URL 환경변수를 설정해주세요.
+                    Set the VITE_I18N_BUCKET_URL environment variable.
                     <br />
-                    예:{' '}
+                    Example:{' '}
                     <code className="text-xs bg-muted px-1 rounded">
                         https://bucket.s3.ap-northeast-2.amazonaws.com/i18n
                     </code>
@@ -77,37 +195,59 @@ export const I18nPage = () => {
     }
 
     return (
-        <div className="flex flex-col gap-4 h-[calc(100vh-theme(spacing.14)-theme(spacing.12))]">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-foreground">번역 관리</h1>
+        <div className="flex flex-col gap-3 h-[calc(100vh-theme(spacing.14)-theme(spacing.12))]">
+            {/* Toolbar */}
+            <div className="flex items-end justify-between gap-4">
+                <NamespaceSelector
+                    selected={namespace}
+                    onChange={handleNamespaceChange}
+                    matchCounts={searchMatchCounts}
+                />
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={handleReset} disabled={!isDirty() || isSaving}>
-                        <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                        되돌리기
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                            placeholder="Search all namespaces..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="pl-8 h-8 w-56 text-sm"
+                        />
+                    </div>
+                    <div className="w-px h-6 bg-border" />
+                    <Button
+                        variant={showPreview ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setShowPreview(v => !v)}
+                        title={showPreview ? 'Hide preview' : 'Show preview'}
+                    >
+                        {showPreview ? (
+                            <PanelRightClose className="h-3.5 w-3.5 mr-1" />
+                        ) : (
+                            <PanelRightOpen className="h-3.5 w-3.5 mr-1" />
+                        )}
+                        <Monitor className="h-3.5 w-3.5" />
                     </Button>
-                    <Button size="sm" onClick={handleSave} disabled={!isDirty() || isSaving}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenPreviewTab}
+                        title="Open preview in new tab (dual monitor)"
+                    >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                    <div className="w-px h-6 bg-border" />
+                    <Button variant="outline" size="sm" onClick={handleReset} disabled={!hasChanges || isSaving}>
+                        <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                        Reset
+                    </Button>
+                    <Button size="sm" onClick={handleSave} disabled={!hasChanges || isSaving}>
                         {isSaving ? (
                             <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
                         ) : (
                             <Save className="h-3.5 w-3.5 mr-1" />
                         )}
-                        S3에 저장
+                        Save
                     </Button>
-                </div>
-            </div>
-
-            {/* Namespace tabs + Search */}
-            <div className="flex items-end justify-between gap-4">
-                <NamespaceSelector selected={namespace} onChange={handleNamespaceChange} />
-                <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input
-                        placeholder="키 또는 값 검색..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        className="pl-8 h-8 w-64 text-sm"
-                    />
                 </div>
             </div>
 
@@ -117,44 +257,37 @@ export const I18nPage = () => {
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     <span>{error}</span>
                     <Button variant="outline" size="sm" onClick={loadFromS3} className="ml-auto h-7">
-                        재시도
+                        Retry
                     </Button>
                 </div>
             )}
 
-            {/* Main content: Editor + Preview */}
-            {isLoading ? (
-                <div className="flex items-center justify-center py-20">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    <span className="ml-2 text-muted-foreground">로딩 중...</span>
-                </div>
-            ) : (
-                <div className="flex gap-4 flex-1 min-h-0">
-                    {/* Left: Translation Editor */}
-                    <div className="flex-1 min-w-0">
+            {/* Main content */}
+            <div className="flex gap-4 flex-1 min-h-0">
+                <div className="flex-1 min-w-0 relative">
+                    {isLoading ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-20 rounded-lg">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            <span className="ml-2 text-muted-foreground">Loading...</span>
+                        </div>
+                    ) : (
                         <TranslationEditor
-                            editedEn={editedEn}
-                            editedKo={editedKo}
-                            originalEn={originalEn}
-                            originalKo={originalKo}
+                            edited={edited}
+                            originals={originals}
                             onUpdateValue={updateValue}
                             onAddKey={addKey}
                             onDeleteKey={deleteKey}
                             searchQuery={searchQuery}
                         />
-                    </div>
-
-                    {/* Right: Web Preview */}
-                    <div className="w-[420px] shrink-0">
-                        <WebPreview
-                            namespace={namespace}
-                            editedEn={editedEn}
-                            editedKo={editedKo}
-                            onKeySearch={setSearchQuery}
-                        />
-                    </div>
+                    )}
                 </div>
-            )}
+
+                {showPreview && (
+                    <div className="w-[480px] shrink-0">
+                        <WebPreview onKeySearch={handleKeySearch} />
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

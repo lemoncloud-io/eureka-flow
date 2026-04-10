@@ -1,54 +1,43 @@
 import { create } from 'zustand';
 
 import { fetchTranslation, flattenJson, sortObjectKeys, unflattenJson, uploadTranslation } from '../consts';
+import { LANGUAGES } from '../types';
 
 import type { I18nNamespace } from '../consts';
-import type { FlatTranslations, NestedTranslations } from '../types';
+import type { FlatTranslations, Language, NestedTranslations } from '../types';
+
+const mapByLang = (fn: (lang: Language) => FlatTranslations): Record<Language, FlatTranslations> =>
+    Object.fromEntries(LANGUAGES.map(lang => [lang, fn(lang)])) as Record<Language, FlatTranslations>;
 
 interface I18nState {
-    // Current selection
     namespace: I18nNamespace;
-
-    // Data per language: original (from S3) and edited
-    originalEn: FlatTranslations;
-    originalKo: FlatTranslations;
-    editedEn: FlatTranslations;
-    editedKo: FlatTranslations;
-
-    // Status
+    originals: Record<Language, FlatTranslations>;
+    edited: Record<Language, FlatTranslations>;
     isLoading: boolean;
     isSaving: boolean;
     error: string | null;
 
-    // Computed
     isDirty: () => boolean;
-
-    // Actions
     setNamespace: (ns: I18nNamespace) => void;
     loadFromS3: () => Promise<void>;
     saveToS3: () => Promise<void>;
-    updateValue: (key: string, lang: 'en' | 'ko', value: string) => void;
-    addKey: (key: string, enValue: string, koValue: string) => void;
+    updateValue: (key: string, lang: Language, value: string) => void;
+    addKey: (key: string, values: Record<Language, string>) => void;
     deleteKey: (key: string) => void;
     resetChanges: () => void;
 }
 
 export const useI18nStore = create<I18nState>()((set, get) => ({
     namespace: 'common',
-    originalEn: {},
-    originalKo: {},
-    editedEn: {},
-    editedKo: {},
+    originals: mapByLang(() => ({})),
+    edited: mapByLang(() => ({})),
     isLoading: false,
     isSaving: false,
     error: null,
 
     isDirty: () => {
-        const { originalEn, originalKo, editedEn, editedKo } = get();
-        return (
-            JSON.stringify(originalEn) !== JSON.stringify(editedEn) ||
-            JSON.stringify(originalKo) !== JSON.stringify(editedKo)
-        );
+        const { originals, edited } = get();
+        return LANGUAGES.some(lang => JSON.stringify(originals[lang]) !== JSON.stringify(edited[lang]));
     },
 
     setNamespace: (ns: I18nNamespace) => {
@@ -59,17 +48,14 @@ export const useI18nStore = create<I18nState>()((set, get) => ({
         const { namespace } = get();
         set({ isLoading: true, error: null });
         try {
-            const [enNested, koNested] = await Promise.all([
-                fetchTranslation('en', namespace),
-                fetchTranslation('ko', namespace),
-            ]);
-            const enFlat = flattenJson(enNested);
-            const koFlat = flattenJson(koNested);
+            const results = await Promise.all(LANGUAGES.map(lang => fetchTranslation(lang, namespace)));
+            const flatMap = Object.fromEntries(LANGUAGES.map((lang, i) => [lang, flattenJson(results[i])])) as Record<
+                Language,
+                FlatTranslations
+            >;
             set({
-                originalEn: enFlat,
-                originalKo: koFlat,
-                editedEn: { ...enFlat },
-                editedKo: { ...koFlat },
+                originals: flatMap,
+                edited: mapByLang(lang => ({ ...flatMap[lang] })),
                 isLoading: false,
             });
         } catch (e) {
@@ -78,54 +64,53 @@ export const useI18nStore = create<I18nState>()((set, get) => ({
     },
 
     saveToS3: async () => {
-        const { namespace, editedEn, editedKo } = get();
+        const { namespace, edited } = get();
         set({ isSaving: true, error: null });
         try {
-            const enNested = sortObjectKeys(unflattenJson(editedEn) as NestedTranslations);
-            const koNested = sortObjectKeys(unflattenJson(editedKo) as NestedTranslations);
-            await Promise.all([
-                uploadTranslation('en', namespace, enNested),
-                uploadTranslation('ko', namespace, koNested),
-            ]);
-            set({
-                originalEn: { ...editedEn },
-                originalKo: { ...editedKo },
-                isSaving: false,
-            });
+            await Promise.all(
+                LANGUAGES.map(lang => {
+                    const nested = sortObjectKeys(unflattenJson(edited[lang]) as NestedTranslations);
+                    return uploadTranslation(lang, namespace, nested);
+                })
+            );
+            set({ originals: mapByLang(lang => ({ ...edited[lang] })), isSaving: false });
         } catch (e) {
             set({ isSaving: false, error: e instanceof Error ? e.message : 'Failed to save translations' });
         }
     },
 
-    updateValue: (key: string, lang: 'en' | 'ko', value: string) => {
-        if (lang === 'en') {
-            set(state => ({ editedEn: { ...state.editedEn, [key]: value } }));
-        } else {
-            set(state => ({ editedKo: { ...state.editedKo, [key]: value } }));
-        }
+    updateValue: (key: string, lang: Language, value: string) => {
+        set(state => ({
+            edited: {
+                ...state.edited,
+                [lang]: { ...state.edited[lang], [key]: value },
+            },
+        }));
     },
 
-    addKey: (key: string, enValue: string, koValue: string) => {
-        set(state => ({
-            editedEn: { ...state.editedEn, [key]: enValue },
-            editedKo: { ...state.editedKo, [key]: koValue },
-        }));
+    addKey: (key: string, values: Record<Language, string>) => {
+        set(state => {
+            const newEdited = { ...state.edited };
+            LANGUAGES.forEach(lang => {
+                newEdited[lang] = { ...newEdited[lang], [key]: values[lang] ?? '' };
+            });
+            return { edited: newEdited };
+        });
     },
 
     deleteKey: (key: string) => {
         set(state => {
-            const newEn = { ...state.editedEn };
-            const newKo = { ...state.editedKo };
-            delete newEn[key];
-            delete newKo[key];
-            return { editedEn: newEn, editedKo: newKo };
+            const newEdited = { ...state.edited };
+            LANGUAGES.forEach(lang => {
+                const copy = { ...newEdited[lang] };
+                delete copy[key];
+                newEdited[lang] = copy;
+            });
+            return { edited: newEdited };
         });
     },
 
     resetChanges: () => {
-        set(state => ({
-            editedEn: { ...state.originalEn },
-            editedKo: { ...state.originalKo },
-        }));
+        set(state => ({ edited: mapByLang(lang => ({ ...state.originals[lang] })) }));
     },
 }));

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { ArrowRight, Globe, KeyRound, Lock, Plus, ShieldX } from 'lucide-react';
+import { ArrowRight, Globe, KeyRound, Lock, ShieldX } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { EXECUTE_FUNCTIONS, runNode, upsertNode, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
@@ -15,6 +15,7 @@ import { FlowListDialog } from '../../flows/components/FlowListDialog';
 import { generateTempId } from '../../flows/utils';
 import {
     MobileBlockLibrarySheet,
+    MobileBottomBar,
     MobileConnectionSheet,
     MobileFlowMap,
     MobileHeader,
@@ -60,7 +61,9 @@ export const MobileFlowEditorPage = () => {
     const [isBlockLibraryOpen, setIsBlockLibraryOpen] = useState(false);
     const [isFlowMapOpen, setIsFlowMapOpen] = useState(false);
     const [configNodeId, setConfigNodeId] = useState<string | null>(null);
-    const [isRunningAll, setIsRunningAll] = useState(false);
+    const [runProgress, setRunProgress] = useState<{ current: number; total: number } | null>(null);
+    const isRunningAll = runProgress !== null;
+    const nodeCount = useCanvasStore(state => state.nodes.length);
 
     const { apiKey, setApiKey } = useWebCoreStore();
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
@@ -408,13 +411,12 @@ export const MobileFlowEditorPage = () => {
         const { nodes, connections, updateNodeData } = useCanvasStore.getState();
         if (nodes.length === 0) return;
 
-        setIsRunningAll(true);
         const ordered = topologicalSort(nodes, connections);
         const nodeMap = new Map(nodes.map(n => [n.id, n]));
         const total = ordered.length;
         let completed = 0;
 
-        toast.info(t('mobile.runningNodes', { count: total, defaultValue: `Running ${total} nodes...` }));
+        setRunProgress({ current: 0, total });
 
         for (const nodeId of ordered) {
             const node = nodeMap.get(nodeId);
@@ -442,6 +444,7 @@ export const MobileFlowEditorPage = () => {
                     await runNode(nodeId, undefined, { connection: socketConnectionId ?? undefined });
                 }
                 completed++;
+                setRunProgress({ current: completed, total });
             } catch {
                 updateNodeData(nodeId, { state: 'ERROR' } as Partial<NodeData>);
                 toast.error(
@@ -455,7 +458,7 @@ export const MobileFlowEditorPage = () => {
             }
         }
 
-        setIsRunningAll(false);
+        setRunProgress(null);
         if (completed === total) {
             toast.success(
                 t('mobile.allNodesCompleted', { count: total, defaultValue: `All ${total} nodes completed` })
@@ -474,6 +477,13 @@ export const MobileFlowEditorPage = () => {
             }
         }
     }, [createNewFlow, updateUrl, t]);
+
+    const handleClear = useCallback(() => {
+        if (window.confirm(t('flowEditor.confirmClearCanvas', 'Clear all nodes?'))) {
+            useCanvasStore.getState().clearWorkflow();
+            toast.success(t('flowEditor.canvasCleared', 'Canvas cleared'));
+        }
+    }, [t]);
 
     // ============================================================
     // Loading / Error state
@@ -568,9 +578,10 @@ export const MobileFlowEditorPage = () => {
                 onSave={handleSave}
                 onOpenFlowList={() => setIsFlowListOpen(true)}
                 onOpenFlowMap={() => setIsFlowMapOpen(true)}
-                onExport={handleExport}
-                onRunAll={isPublicMode ? undefined : handleRunAll}
-                isRunning={isRunningAll}
+                onExport={isPublicMode ? undefined : handleExport}
+                onNew={isPublicMode ? undefined : handleNew}
+                onClear={isPublicMode ? undefined : handleClear}
+                onApiKeySettings={() => setIsApiKeyDialogOpen(true)}
             />
 
             {/* Flow Map overlay */}
@@ -581,7 +592,6 @@ export const MobileFlowEditorPage = () => {
                     setIsFlowMapOpen(false);
                     setConfigNodeId(nodeId);
                 }}
-                selectedNodeId={configNodeId}
             />
 
             {/* Node list — scrollable area */}
@@ -598,15 +608,15 @@ export const MobileFlowEditorPage = () => {
                 </div>
             </div>
 
-            {/* FAB - Add block */}
-            {!isPublicMode && (
-                <button
-                    onClick={() => setIsBlockLibraryOpen(true)}
-                    className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition-transform mb-[env(safe-area-inset-bottom)]"
-                >
-                    <Plus className="w-6 h-6" />
-                </button>
-            )}
+            {/* Bottom action bar — Add Block + Run All with progress */}
+            <MobileBottomBar
+                onAddBlock={() => setIsBlockLibraryOpen(true)}
+                onRunAll={handleRunAll}
+                isRunning={isRunningAll}
+                progress={runProgress}
+                isReadOnly={isPublicMode}
+                nodeCount={nodeCount}
+            />
 
             {/* Connection Sheet */}
             {connectionMode.source && (
@@ -643,6 +653,7 @@ export const MobileFlowEditorPage = () => {
                 }}
                 nodeId={configNodeId}
                 flowId={currentFlowId}
+                socketConnectionId={socketConnectionId ?? undefined}
             />
 
             {/* Flow List Dialog */}

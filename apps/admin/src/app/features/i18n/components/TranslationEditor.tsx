@@ -1,32 +1,31 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Filter, Plus, Trash2, X } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { Button, Input } from '@flows/ui-kit';
 
 import { buildTranslationTree } from '../consts';
+import { LANGUAGES, LANGUAGE_LABELS } from '../types';
 
 import type { FlatTranslations, Language, TranslationTreeNode } from '../types';
 
 interface TranslationEditorProps {
-    editedEn: FlatTranslations;
-    editedKo: FlatTranslations;
-    originalEn: FlatTranslations;
-    originalKo: FlatTranslations;
+    edited: Record<Language, FlatTranslations>;
+    originals: Record<Language, FlatTranslations>;
     onUpdateValue: (key: string, lang: Language, value: string) => void;
-    onAddKey: (key: string, enValue: string, koValue: string) => void;
+    onAddKey: (key: string, values: Record<Language, string>) => void;
     onDeleteKey: (key: string) => void;
     searchQuery: string;
 }
 
 const ITEMS_PER_PAGE = 50;
 
+const EMPTY_VALUES = Object.fromEntries(LANGUAGES.map(l => [l, ''])) as Record<Language, string>;
+
 export const TranslationEditor = ({
-    editedEn,
-    editedKo,
-    originalEn,
-    originalKo,
+    edited,
+    originals,
     onUpdateValue,
     onAddKey,
     onDeleteKey,
@@ -36,19 +35,27 @@ export const TranslationEditor = ({
     const [page, setPage] = useState(0);
     const [addingKey, setAddingKey] = useState(false);
     const [newKey, setNewKey] = useState('');
-    const [newEn, setNewEn] = useState('');
-    const [newKo, setNewKo] = useState('');
+    const [newValues, setNewValues] = useState<Record<Language, string>>(() => ({ ...EMPTY_VALUES }));
+    const [changedOnly, setChangedOnly] = useState(false);
 
-    const tree = useMemo(() => buildTranslationTree(editedEn, editedKo), [editedEn, editedKo]);
+    const tree = useMemo(() => buildTranslationTree(edited), [edited]);
 
-    const isChanged = useCallback(
-        (key: string, lang: Language) => {
-            const original = lang === 'en' ? originalEn : originalKo;
-            const edited = lang === 'en' ? editedEn : editedKo;
-            return original[key] !== edited[key];
-        },
-        [originalEn, originalKo, editedEn, editedKo]
-    );
+    const changedKeys = useMemo(() => {
+        const keys = new Set<string>();
+        const walk = (nodes: TranslationTreeNode[]) => {
+            for (const node of nodes) {
+                if (
+                    node.values &&
+                    LANGUAGES.some(lang => originals[lang]?.[node.fullPath] !== edited[lang]?.[node.fullPath])
+                ) {
+                    keys.add(node.fullPath);
+                }
+                if (node.children) walk(node.children);
+            }
+        };
+        walk(tree);
+        return keys;
+    }, [tree, originals, edited]);
 
     const toggleCollapse = (path: string) => {
         setCollapsed(prev => ({ ...prev, [path]: !prev[path] }));
@@ -56,25 +63,27 @@ export const TranslationEditor = ({
 
     const handleAddKey = () => {
         if (!newKey.trim()) return;
-        onAddKey(newKey.trim(), newEn, newKo);
+        onAddKey(newKey.trim(), newValues);
         setNewKey('');
-        setNewEn('');
-        setNewKo('');
+        setNewValues({ ...EMPTY_VALUES });
         setAddingKey(false);
     };
 
-    // Collect all leaf nodes for pagination (filtered by search)
-    const allLeaves = useMemo(() => {
+    // Single pass: collect filtered leaves + count changed
+    const { filteredLeaves, changedCount } = useMemo(() => {
         const leaves: TranslationTreeNode[] = [];
+        let changed = 0;
+        const query = searchQuery.toLowerCase();
         const collect = (nodes: TranslationTreeNode[]) => {
             for (const node of nodes) {
                 if (node.values) {
-                    if (
+                    const isNodeChanged = changedKeys.has(node.fullPath);
+                    if (isNodeChanged) changed++;
+                    const matchesSearch =
                         !searchQuery ||
-                        node.fullPath.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        node.values.en.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        node.values.ko.toLowerCase().includes(searchQuery.toLowerCase())
-                    ) {
+                        node.fullPath.toLowerCase().includes(query) ||
+                        LANGUAGES.some(lang => (node.values?.[lang] ?? '').toLowerCase().includes(query));
+                    if (matchesSearch && (!changedOnly || isNodeChanged)) {
                         leaves.push(node);
                     }
                 }
@@ -82,15 +91,28 @@ export const TranslationEditor = ({
             }
         };
         collect(tree);
-        return leaves;
-    }, [tree, searchQuery]);
+        return { filteredLeaves: leaves, changedCount: changed };
+    }, [tree, searchQuery, changedOnly, changedKeys]);
 
-    const totalPages = Math.ceil(allLeaves.length / ITEMS_PER_PAGE);
-    const pagedLeaves = new Set(
-        allLeaves.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE).map(l => l.fullPath)
+    useEffect(() => setPage(0), [searchQuery, changedOnly]);
+
+    const totalPages = Math.ceil(filteredLeaves.length / ITEMS_PER_PAGE);
+    const pagedLeaves = useMemo(
+        () => new Set(filteredLeaves.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE).map(l => l.fullPath)),
+        [filteredLeaves, page]
     );
 
-    // When searching, show flat list; otherwise show tree
+    // Pre-compute visible leaf paths for branch visibility checks
+    const visibleLeafPaths = useMemo(() => new Set(filteredLeaves.map(l => l.fullPath)), [filteredLeaves]);
+
+    const hasBranchVisible = useCallback(
+        (node: TranslationTreeNode): boolean => {
+            if (node.values) return visibleLeafPaths.has(node.fullPath);
+            return node.children?.some(c => hasBranchVisible(c)) ?? false;
+        },
+        [visibleLeafPaths]
+    );
+
     const renderTree = (nodes: TranslationTreeNode[], depth = 0): React.ReactNode[] => {
         const result: React.ReactNode[] = [];
 
@@ -98,14 +120,12 @@ export const TranslationEditor = ({
             const isCollapsedNode = collapsed[node.fullPath];
 
             if (node.children && node.children.length > 0) {
-                // Branch node
-                const hasVisibleLeaves = searchQuery ? node.children.some(c => hasMatchingLeaf(c)) : true;
-                if (!hasVisibleLeaves) continue;
+                if ((searchQuery || changedOnly) && !node.children.some(c => hasBranchVisible(c))) continue;
 
                 result.push(
-                    <tr key={`branch-${node.fullPath}`} className="bg-muted/30 hover:bg-muted/50">
+                    <tr key={`b-${node.fullPath}`} className="bg-muted/30 hover:bg-muted/50">
                         <td
-                            colSpan={3}
+                            colSpan={LANGUAGES.length + 2}
                             className="px-3 py-1.5 cursor-pointer select-none"
                             onClick={() => toggleCollapse(node.fullPath)}
                             style={{ paddingLeft: `${depth * 16 + 12}px` }}
@@ -127,10 +147,6 @@ export const TranslationEditor = ({
                     result.push(...renderTree(node.children, depth + 1));
                 }
             } else if (node.values && pagedLeaves.has(node.fullPath)) {
-                // Leaf node
-                const enChanged = isChanged(node.fullPath, 'en');
-                const koChanged = isChanged(node.fullPath, 'ko');
-
                 result.push(
                     <tr key={node.fullPath} className="group border-b border-border/50 hover:bg-muted/20">
                         <td
@@ -139,35 +155,27 @@ export const TranslationEditor = ({
                         >
                             {node.segment}
                         </td>
-                        <td className="px-2 py-1">
-                            <input
-                                className={cn(
-                                    'w-full bg-transparent text-sm px-2 py-1 rounded border border-transparent',
-                                    'focus:border-primary focus:outline-none',
-                                    koChanged && 'bg-yellow-500/10 border-yellow-500/30'
-                                )}
-                                value={node.values.ko}
-                                onChange={e => onUpdateValue(node.fullPath, 'ko', e.target.value)}
-                            />
-                        </td>
-                        <td className="px-2 py-1">
-                            <div className="flex items-center gap-1">
+                        {LANGUAGES.map(lang => (
+                            <td key={lang} className="px-2 py-1">
                                 <input
                                     className={cn(
-                                        'flex-1 bg-transparent text-sm px-2 py-1 rounded border border-transparent',
+                                        'w-full bg-transparent text-sm px-2 py-1 rounded border border-transparent',
                                         'focus:border-primary focus:outline-none',
-                                        enChanged && 'bg-yellow-500/10 border-yellow-500/30'
+                                        originals[lang]?.[node.fullPath] !== edited[lang]?.[node.fullPath] &&
+                                            'bg-yellow-500/10 border-yellow-500/30'
                                     )}
-                                    value={node.values.en}
-                                    onChange={e => onUpdateValue(node.fullPath, 'en', e.target.value)}
+                                    value={node.values[lang]}
+                                    onChange={e => onUpdateValue(node.fullPath, lang, e.target.value)}
                                 />
-                                <button
-                                    onClick={() => onDeleteKey(node.fullPath)}
-                                    className="opacity-0 group-hover:opacity-100 p-1 text-destructive hover:bg-destructive/10 rounded transition-opacity"
-                                >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
+                            </td>
+                        ))}
+                        <td className="px-2 py-1 w-8">
+                            <button
+                                onClick={() => onDeleteKey(node.fullPath)}
+                                className="opacity-0 group-hover:opacity-100 p-1 text-destructive hover:bg-destructive/10 rounded transition-opacity"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                         </td>
                     </tr>
                 );
@@ -177,47 +185,53 @@ export const TranslationEditor = ({
         return result;
     };
 
-    const hasMatchingLeaf = (node: TranslationTreeNode): boolean => {
-        if (node.values) {
-            return (
-                node.fullPath.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                node.values.en.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                node.values.ko.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-        }
-        return node.children?.some(c => hasMatchingLeaf(c)) ?? false;
-    };
-
     return (
         <div className="flex flex-col gap-3 flex-1 min-h-0">
-            {/* Table */}
             <div className="flex-1 overflow-auto rounded-lg border">
                 <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-card z-10">
                         <tr className="border-b">
-                            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground w-[240px]">
-                                키
+                            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground w-[200px]">
+                                Key
                             </th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
-                                한국어 (ko)
-                            </th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">영어 (en)</th>
+                            {LANGUAGES.map(lang => (
+                                <th
+                                    key={lang}
+                                    className="px-3 py-2 text-left text-xs font-medium text-muted-foreground"
+                                >
+                                    {LANGUAGE_LABELS[lang]} ({lang})
+                                </th>
+                            ))}
+                            <th className="w-8" />
                         </tr>
                     </thead>
                     <tbody>{renderTree(tree)}</tbody>
                 </table>
             </div>
 
-            {/* Pagination + Add Key */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => setAddingKey(true)} disabled={addingKey}>
-                        <Plus className="h-3.5 w-3.5 mr-1" />키 추가
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Add Key
                     </Button>
-                    <span className="text-xs text-muted-foreground">{allLeaves.length} keys</span>
+                    <Button
+                        variant={changedOnly ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setChangedOnly(v => !v)}
+                    >
+                        <Filter className="h-3.5 w-3.5 mr-1" />
+                        Changed
+                        {changedCount > 0 && (
+                            <span className="ml-1 text-xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-1.5 rounded-full">
+                                {changedCount}
+                            </span>
+                        )}
+                    </Button>
+                    <span className="text-xs text-muted-foreground">{filteredLeaves.length} keys</span>
                 </div>
                 {totalPages > 1 && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                         <Button variant="outline" size="sm" onClick={() => setPage(0)} disabled={page === 0}>
                             |&lt;
                         </Button>
@@ -229,7 +243,7 @@ export const TranslationEditor = ({
                         >
                             &lt;
                         </Button>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-sm text-muted-foreground px-2">
                             {page + 1} / {totalPages}
                         </span>
                         <Button
@@ -252,32 +266,28 @@ export const TranslationEditor = ({
                 )}
             </div>
 
-            {/* Add Key Form */}
             {addingKey && (
                 <div className="flex items-center gap-2 rounded-lg border p-3 bg-muted/20">
                     <Input
-                        placeholder="키 (예: actions.newAction)"
+                        placeholder="Key (e.g. actions.newAction)"
                         value={newKey}
                         onChange={e => setNewKey(e.target.value)}
                         className="flex-[2]"
                     />
-                    <Input
-                        placeholder="한국어"
-                        value={newKo}
-                        onChange={e => setNewKo(e.target.value)}
-                        className="flex-[3]"
-                    />
-                    <Input
-                        placeholder="English"
-                        value={newEn}
-                        onChange={e => setNewEn(e.target.value)}
-                        className="flex-[3]"
-                    />
+                    {LANGUAGES.map(lang => (
+                        <Input
+                            key={lang}
+                            placeholder={LANGUAGE_LABELS[lang]}
+                            value={newValues[lang]}
+                            onChange={e => setNewValues(prev => ({ ...prev, [lang]: e.target.value }))}
+                            className="flex-[3]"
+                        />
+                    ))}
                     <Button size="sm" onClick={handleAddKey}>
-                        추가
+                        Add
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setAddingKey(false)}>
-                        취소
+                        <X className="h-3.5 w-3.5" />
                     </Button>
                 </div>
             )}

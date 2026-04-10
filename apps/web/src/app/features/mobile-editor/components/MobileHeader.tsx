@@ -2,10 +2,31 @@ import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { ArrowLeft, Download, FolderOpen, Loader2, Map as MapIcon, Menu, Play, Save } from 'lucide-react';
+import {
+    ArrowLeft,
+    Download,
+    FilePlus,
+    FolderOpen,
+    Key,
+    Loader2,
+    Map as MapIcon,
+    Menu,
+    Save,
+    Trash2,
+} from 'lucide-react';
 
+import { useSystemInfoQuery } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    LanguageSwitcher,
+    ThemeToggle,
+} from '@flows/ui-kit';
 
 import type { SaveStatus } from '@flows/flows';
 
@@ -19,8 +40,9 @@ interface MobileHeaderProps {
     onOpenFlowList: () => void;
     onOpenFlowMap: () => void;
     onExport?: () => void;
-    onRunAll?: () => void;
-    isRunning?: boolean;
+    onNew?: () => void;
+    onClear?: () => void;
+    onApiKeySettings?: () => void;
 }
 
 export const MobileHeader = ({
@@ -33,14 +55,17 @@ export const MobileHeader = ({
     onOpenFlowList,
     onOpenFlowMap,
     onExport,
-    onRunAll,
-    isRunning,
+    onNew,
+    onClear,
+    onApiKeySettings,
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(flowName);
     const inputRef = useRef<HTMLInputElement>(null);
+    const { data: systemInfo } = useSystemInfoQuery();
+    const apiVersion = systemInfo?.components?.find(c => c.name === 'eureka-flows-api')?.version;
 
     const handleStartEditing = useCallback(() => {
         setEditValue(flowName);
@@ -114,7 +139,6 @@ export const MobileHeader = ({
                 </div>
             </div>
 
-            {/* Flow map toggle */}
             <button
                 onClick={onOpenFlowMap}
                 className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
@@ -136,16 +160,24 @@ export const MobileHeader = ({
                         <Menu className="w-5 h-5" />
                     </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                    {onRunAll && (
-                        <DropdownMenuItem onClick={onRunAll} disabled={isRunning} className="gap-2">
-                            {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                            {t('header.runAll', 'Run All Nodes')}
+                <DropdownMenuContent align="end" className="w-52">
+                    {/* File */}
+                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                        {t('header.menuGroup.file', 'File')}
+                    </DropdownMenuLabel>
+                    {onNew && (
+                        <DropdownMenuItem onClick={onNew} className="gap-2">
+                            <FilePlus className="w-4 h-4" />
+                            {t('header.newFlow', 'New Flow')}
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuItem onClick={onOpenFlowList} className="gap-2">
                         <FolderOpen className="w-4 h-4" />
                         {t('header.openFlow', 'Open Flow')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onSave} className="gap-2">
+                        <Save className="w-4 h-4" />
+                        {t('header.saveFlow', 'Save Flow')}
                     </DropdownMenuItem>
                     {onExport && (
                         <DropdownMenuItem onClick={onExport} className="gap-2">
@@ -153,6 +185,49 @@ export const MobileHeader = ({
                             {t('header.export', 'Export JSON')}
                         </DropdownMenuItem>
                     )}
+
+                    <DropdownMenuSeparator />
+
+                    {/* Canvas */}
+                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                        {t('header.menuGroup.canvas', 'Canvas')}
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem onClick={onOpenFlowMap} className="gap-2">
+                        <MapIcon className="w-4 h-4" />
+                        {t('mobile.flowOverview', 'Flow Overview')}
+                    </DropdownMenuItem>
+                    {onClear && (
+                        <DropdownMenuItem onClick={onClear} className="gap-2 text-destructive">
+                            <Trash2 className="w-4 h-4" />
+                            {t('header.clearCanvas', 'Clear Canvas')}
+                        </DropdownMenuItem>
+                    )}
+
+                    <DropdownMenuSeparator />
+
+                    {/* Settings */}
+                    <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                        {t('header.menuGroup.settings', 'Settings')}
+                    </DropdownMenuLabel>
+                    {onApiKeySettings && (
+                        <DropdownMenuItem onClick={onApiKeySettings} className="gap-2">
+                            <Key className="w-4 h-4" />
+                            {t('header.apiKeySettings', 'API Key Settings')}
+                        </DropdownMenuItem>
+                    )}
+
+                    <DropdownMenuSeparator />
+
+                    {/* Theme & Language */}
+                    <div className="flex items-center justify-center gap-4 px-2 py-1.5">
+                        <ThemeToggle />
+                        <LanguageSwitcher />
+                    </div>
+
+                    {/* Version */}
+                    <div className="px-2 py-1.5 text-[10px] text-muted-foreground/50 text-center">
+                        Web v{__APP_VERSION__} {apiVersion && `/ API v${apiVersion}`}
+                    </div>
                 </DropdownMenuContent>
             </DropdownMenu>
         </header>

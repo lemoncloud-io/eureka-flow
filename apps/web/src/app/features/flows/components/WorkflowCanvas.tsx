@@ -2476,7 +2476,14 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     .map(c => (c.sourceNodeId === node.id ? c.sourcePortId : c.targetPortId));
 
                                 return (
-                                    <div key={node.id}>
+                                    <div key={node.id} className="relative">
+                                        {readOnly && (
+                                            <div
+                                                className="absolute inset-0 z-10 pointer-events-auto cursor-pointer"
+                                                onClick={() => onNodeSelect?.(node.id)}
+                                                onTouchEnd={() => onNodeSelect?.(node.id)}
+                                            />
+                                        )}
                                         <NodeBlock
                                             node={node}
                                             highlightState={{
@@ -2556,17 +2563,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         </div>
                     )}
 
-                    {/* Mobile Zoom Controls - visible only on mobile */}
-                    {!readOnly && (
-                        <div data-canvas-overlay>
-                            <MobileControls
-                                onZoomIn={handleZoomIn}
-                                onZoomOut={handleZoomOut}
-                                onFitToScreen={handleFitToScreen}
-                                onReset={handleResetView}
-                            />
-                        </div>
-                    )}
+                    {/* Mobile Zoom Controls */}
+                    <div data-canvas-overlay>
+                        <MobileControls
+                            onZoomIn={handleZoomIn}
+                            onZoomOut={handleZoomOut}
+                            onFitToScreen={handleFitToScreen}
+                            onReset={handleResetView}
+                        />
+                    </div>
 
                     {modalFlowId && modalFlowData && (
                         <div

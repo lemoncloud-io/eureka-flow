@@ -158,6 +158,17 @@ export const Providers = ({ children }: ProvidersProps) => {
         reportError(error, { componentStack: info.componentStack ?? undefined }, 'web');
     }, []);
 
+    // Force re-render when i18n bundles change via postMessage (iframe preview mode)
+    // react-i18next's useSyncExternalStore doesn't reliably pick up addResourceBundle changes,
+    // so we use React state to guarantee the component tree re-renders
+    const [, setI18nRevision] = useState(0);
+    useEffect(() => {
+        if (window.parent === window) return;
+        const onBundleAdded = () => setI18nRevision(r => r + 1);
+        i18n.store.on('added', onBundleAdded);
+        return () => i18n.store.off('added', onBundleAdded);
+    }, []);
+
     return (
         <Suspense fallback={<LoadingFallback />}>
             <ErrorBoundary FallbackComponent={ErrorFallback} onError={handleError}>

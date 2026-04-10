@@ -37,6 +37,8 @@ const bundledFallback = resourcesToBackend(
     (lng: string, ns: string) => import(`../../public/locales/${lng}/${ns}.json`)
 );
 
+const isEmbeddedInIframe = window.parent !== window;
+
 i18n.use(ChainedBackend)
     .use(LanguageDetector)
     .use(initReactI18next)
@@ -69,38 +71,59 @@ i18n.use(ChainedBackend)
             caches: ['localStorage'],
             lookupLocalStorage: 'flows-language',
         },
-        react: { useSuspense: true },
+        react: {
+            useSuspense: true,
+            // When embedded in iframe, subscribe to store events so addResourceBundle triggers re-renders
+            ...(isEmbeddedInIframe ? { bindI18nStore: 'added removed' } : {}),
+        },
     });
 
-// Listen for postMessage from admin i18n editor
-// Protocol:
-//   { type: 'i18n:update', namespace, language, resources }  → inject translations
-//   { type: 'i18n:changeLanguage', language }                → switch language
-//   { type: 'i18n:showKeys', namespace, keys }               → replace values with keys
-window.addEventListener('message', (event: MessageEvent) => {
-    const { data } = event;
-    if (!data || typeof data.type !== 'string' || !data.type.startsWith('i18n:')) return;
+// Admin i18n editor integration via postMessage (only active when embedded in iframe)
+if (isEmbeddedInIframe) {
+    console.log('[i18n-preview] iframe mode activated');
 
-    switch (data.type) {
-        case 'i18n:update':
-            // Merge edited translations into running i18next instance
-            if (data.namespace && data.language && data.resources) {
-                i18n.addResourceBundle(data.language, data.namespace, data.resources, true, true);
-            }
-            break;
-        case 'i18n:changeLanguage':
-            if (data.language) {
-                i18n.changeLanguage(data.language);
-            }
-            break;
-        case 'i18n:showKeys':
-            // Replace all values with their dot-notation keys for debugging
-            if (data.namespace && data.keys) {
-                i18n.addResourceBundle('en', data.namespace, data.keys, true, true);
-                i18n.addResourceBundle('ko', data.namespace, data.keys, true, true);
-            }
-            break;
+    // Helper: update bundle and force re-render via both store event AND languageChanged
+    const updateBundle = (lng: string, ns: string, resources: Record<string, unknown>) => {
+        i18n.addResourceBundle(lng, ns, resources, true, true);
+        // Belt-and-suspenders: emit languageChanged in case bindI18nStore didn't take effect
+        i18n.emit('languageChanged', i18n.language);
+    };
+
+    window.addEventListener('message', (event: MessageEvent) => {
+        const { data } = event;
+        if (!data || typeof data.type !== 'string' || !data.type.startsWith('i18n:')) return;
+
+        switch (data.type) {
+            case 'i18n:update':
+                if (data.namespace && data.language && data.resources) {
+                    console.log('[i18n-preview] update:', data.language, data.namespace);
+                    updateBundle(data.language, data.namespace, data.resources);
+                }
+                break;
+            case 'i18n:changeLanguage':
+                if (data.language) {
+                    i18n.changeLanguage(data.language);
+                }
+                break;
+            case 'i18n:showKeys':
+                if (data.namespace && data.keys) {
+                    updateBundle('en', data.namespace, data.keys);
+                    updateBundle('ko', data.namespace, data.keys);
+                }
+                break;
+        }
+    });
+
+    // Notify admin that iframe is ready to receive messages
+    const sendReady = () => {
+        console.log('[i18n-preview] sending i18n:ready');
+        window.parent.postMessage({ type: 'i18n:ready' }, '*');
+    };
+    if (i18n.isInitialized) {
+        sendReady();
+    } else {
+        i18n.on('initialized', sendReady);
     }
-});
+}
 
 export { i18n };

@@ -239,7 +239,9 @@ export const MobileNodeCard = React.memo(
                                     className={cn(
                                         'w-full flex items-center gap-1.5 text-[11px] px-2 py-1.5 -mx-0.5 rounded-md',
                                         'transition-colors hover:bg-muted/50 active:bg-muted/70',
-                                        'text-left'
+                                        'text-left',
+                                        connCount === 0 &&
+                                            'border border-dashed border-border/30 hover:border-primary/30'
                                     )}
                                 >
                                     <ArrowUpRight className="w-3 h-3 opacity-50 shrink-0" />
@@ -251,7 +253,7 @@ export const MobileNodeCard = React.memo(
                                             → {conns.map(c => getConnectedNodeName(c.targetNodeId)).join(', ')}
                                         </span>
                                     ) : (
-                                        <span className="text-muted-foreground/40 flex-1">not connected</span>
+                                        <span className="text-primary/30 flex-1">connect</span>
                                     )}
 
                                     <Link className="w-3 h-3 text-primary/50 shrink-0" />
@@ -260,6 +262,57 @@ export const MobileNodeCard = React.memo(
                         })}
                     </div>
                 )}
+
+                {/* Inline error message */}
+                {state === 'ERROR' && 'error' in node && typeof node.error === 'string' && node.error && (
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onTapCard(node.id)}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter') onTapCard(node.id);
+                        }}
+                        className="px-3 pb-2.5 -mt-0.5 cursor-pointer"
+                    >
+                        <div className="flex items-center gap-1.5 rounded-md bg-destructive/5 px-2 py-1 min-w-0">
+                            <AlertCircle className="w-2.5 h-2.5 shrink-0 text-destructive/50" />
+                            <span className="text-[10px] text-destructive/50 truncate">{node.error}</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Inline output preview after completion */}
+                {state === 'COMPLETED' &&
+                    node.outputData &&
+                    (() => {
+                        const entries = Object.entries(node.outputData).slice(0, 2);
+                        if (entries.length === 0) return null;
+                        const preview = entries
+                            .map(([key, data]) => {
+                                const val =
+                                    typeof data?.value === 'string'
+                                        ? data.value.slice(0, 40)
+                                        : JSON.stringify(data?.value)?.slice(0, 40);
+                                return `${key}: ${val}`;
+                            })
+                            .join(' · ');
+                        return (
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => onTapCard(node.id)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') onTapCard(node.id);
+                                }}
+                                className="px-3 pb-2.5 -mt-0.5 cursor-pointer flex items-center gap-1.5 text-[10px] text-success/50 truncate"
+                            >
+                                <div className="flex items-center gap-1.5 rounded-md bg-success/5 px-2 py-1 min-w-0">
+                                    <Check className="w-2.5 h-2.5 shrink-0" />
+                                    <span className="truncate">{preview}</span>
+                                </div>
+                            </div>
+                        );
+                    })()}
             </div>
         );
     }
