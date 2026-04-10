@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-04-10] - root@0.24.0, @flows/web@0.24.0, @flows/admin@0.11.0
+
+### Features
+
+- add S3 bucket URL for i18n translations
+- add node info card and navigation
+- enhance FlowGraphView with role colors
+- (flows) add custom graph themes and layout switcher
+- integrate reagraph
+
+### Refactor
+
+- unify floating bottom toolbar
+
 ## [2026-04-10] - root@0.23.0, @flows/web@0.23.0, @flows/admin@0.10.0
 
 ### Features
