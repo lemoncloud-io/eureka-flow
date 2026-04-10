@@ -135,11 +135,12 @@ const classifyNodeRoles = (nodes: ReagraphNode[], edges: ReagraphEdge[]): Map<st
 const toGraphNodes = (nodes: ReagraphNode[], roles: Map<string, keyof typeof ROLE_FILLS>): GraphNode[] =>
     nodes.map(n => {
         const stateFill = n.state ? STATE_FILLS[n.state] : undefined;
-        const roleFill = ROLE_FILLS[roles.get(n.id) ?? 'orphan'];
+        const role = roles.get(n.id) ?? 'orphan';
         return {
             id: n.id,
             label: n.label,
-            fill: stateFill ?? roleFill,
+            subLabel: ROLE_LABELS[role],
+            fill: stateFill ?? ROLE_FILLS[role],
         };
     });
 
@@ -163,7 +164,6 @@ export const FlowGraphView = ({ flowId, className, onNavigateToNode }: FlowGraph
     const nodes = useMemo(() => (data ? toGraphNodes(data.nodes, roles) : []), [data, roles]);
     const edges = useMemo(() => (data ? toGraphEdges(data.edges) : []), [data]);
 
-    // Find selected node's source data for the info card
     const selectedNodeData = useMemo(
         () => (selectedNodeId && data ? data.nodes.find(n => n.id === selectedNodeId) : null),
         [selectedNodeId, data]
@@ -247,55 +247,14 @@ export const FlowGraphView = ({ flowId, className, onNavigateToNode }: FlowGraph
                 defaultNodeSize={6}
             />
 
-            {/* Selected Node Info Card */}
-            {selectedNodeData && (
-                <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-10 pointer-events-auto animate-in slide-in-from-bottom-2 fade-in duration-200">
-                    <div
-                        className={cn(
-                            'flex items-center gap-3 h-11 pl-4 pr-1.5 rounded-xl',
-                            'bg-background/90 backdrop-blur-xl border border-border/50',
-                            'shadow-floating'
-                        )}
-                    >
-                        {/* Node color dot */}
-                        <div
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                            style={{ backgroundColor: ROLE_FILLS[selectedRole ?? 'orphan'] }}
-                        />
-
-                        {/* Node info */}
-                        <div className="flex items-center gap-2 text-sm">
-                            <span className="font-medium text-foreground max-w-[200px] truncate">
-                                {selectedNodeData.label}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground">
-                                {ROLE_LABELS[selectedRole ?? 'orphan']}
-                            </span>
-                        </div>
-
-                        {/* Go to node button */}
-                        {onNavigateToNode && (
-                            <Button
-                                size="sm"
-                                className="h-7 px-3 rounded-lg gap-1.5 text-xs ml-1"
-                                onClick={handleGoToNode}
-                            >
-                                {t('graphView.goToNode', 'Go to node')}
-                                <ArrowRight className="w-3 h-3" />
-                            </Button>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Floating Bottom Toolbar */}
+            {/* Unified Floating Bottom Toolbar */}
             <TooltipProvider delayDuration={300}>
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
                     <div
                         className={cn(
                             'flex items-center gap-1 h-10 px-1.5 rounded-xl',
                             'bg-background/80 backdrop-blur-xl border border-border/50',
-                            'shadow-floating'
+                            'shadow-floating transition-all duration-200'
                         )}
                     >
                         {/* Layout Switcher */}
@@ -317,7 +276,6 @@ export const FlowGraphView = ({ flowId, className, onNavigateToNode }: FlowGraph
                             </Tooltip>
                         ))}
 
-                        {/* Divider */}
                         <div className="w-px h-5 bg-border/60 mx-0.5" />
 
                         {/* Fit to View */}
@@ -337,15 +295,40 @@ export const FlowGraphView = ({ flowId, className, onNavigateToNode }: FlowGraph
                             </TooltipContent>
                         </Tooltip>
 
-                        {/* Divider */}
                         <div className="w-px h-5 bg-border/60 mx-0.5" />
 
-                        {/* Node/Edge Count */}
-                        <div className="flex items-center gap-1.5 px-2 text-[11px] text-muted-foreground tabular-nums">
-                            <span>{nodes.length} nodes</span>
-                            <span className="text-border">·</span>
-                            <span>{edges.length} edges</span>
-                        </div>
+                        {/* Right section: node info or counts */}
+                        {selectedNodeData ? (
+                            <div className="flex items-center gap-2 pl-1.5 pr-0.5">
+                                <div
+                                    className="w-2 h-2 rounded-full shrink-0"
+                                    style={{ backgroundColor: ROLE_FILLS[selectedRole ?? 'orphan'] }}
+                                />
+                                <span className="text-xs font-medium text-foreground max-w-[140px] truncate">
+                                    {selectedNodeData.label}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                    {ROLE_LABELS[selectedRole ?? 'orphan']}
+                                </span>
+                                {onNavigateToNode && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 rounded-lg gap-1 text-xs text-primary hover:text-primary"
+                                        onClick={handleGoToNode}
+                                    >
+                                        {t('graphView.goToNode', 'Go to node')}
+                                        <ArrowRight className="w-3 h-3" />
+                                    </Button>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-1.5 px-2 text-[11px] text-muted-foreground tabular-nums">
+                                <span>{nodes.length} nodes</span>
+                                <span className="text-border">·</span>
+                                <span>{edges.length} edges</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </TooltipProvider>
