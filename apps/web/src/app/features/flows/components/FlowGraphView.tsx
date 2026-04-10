@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Focus, GitBranch, Orbit, Share2 } from 'lucide-react';
+import { ArrowRight, Focus, GitBranch, Orbit, Share2 } from 'lucide-react';
 import { GraphCanvas, useSelection } from 'reagraph';
 
 import { useFlowGraphQuery } from '@flows/flows';
@@ -30,6 +30,13 @@ const ROLE_FILLS = {
     orphan: '#94a3b8',
 };
 
+const ROLE_LABELS: Record<string, string> = {
+    source: 'Input',
+    sink: 'Output',
+    middle: 'Process',
+    orphan: 'Disconnected',
+};
+
 /** Custom dark theme */
 const flowDarkTheme: Theme = {
     canvas: { background: '#1f2023', fog: null },
@@ -46,7 +53,7 @@ const flowDarkTheme: Theme = {
             strokeWidth: 3,
         },
     },
-    ring: { fill: '#7c3aed40', activeFill: '#a78bfa' },
+    ring: { fill: '#7c3aed15', activeFill: '#a78bfa60' },
     edge: {
         fill: '#52525b',
         activeFill: '#a78bfa',
@@ -75,7 +82,7 @@ const flowLightTheme: Theme = {
             strokeWidth: 3,
         },
     },
-    ring: { fill: '#7c3aed30', activeFill: '#7c3aed' },
+    ring: { fill: '#7c3aed10', activeFill: '#7c3aed50' },
     edge: {
         fill: '#a1a1aa',
         activeFill: '#7c3aed',
@@ -91,7 +98,8 @@ const flowLightTheme: Theme = {
 interface FlowGraphViewProps {
     flowId: string | null;
     className?: string;
-    onNodeClick?: (nodeId: string) => void;
+    /** Called when user confirms navigation to a node via "Go to node" */
+    onNavigateToNode?: (nodeId: string) => void;
 }
 
 const LAYOUT_OPTIONS: { type: LayoutTypes; icon: LucideIcon; label: string }[] = [
@@ -143,22 +151,29 @@ const toGraphEdges = (edges: ReagraphEdge[]): GraphEdge[] =>
         label: e.label,
     }));
 
-export const FlowGraphView = ({ flowId, className, onNodeClick }: FlowGraphViewProps) => {
+export const FlowGraphView = ({ flowId, className, onNavigateToNode }: FlowGraphViewProps) => {
     const { t } = useTranslation(['flows']);
     const graphRef = useRef<GraphCanvasRef>(null);
     const { isDarkTheme } = useTheme();
     const { data, isLoading } = useFlowGraphQuery(flowId);
     const [layout, setLayout] = useState<LayoutTypes>('forceDirected2d');
+    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
     const roles = useMemo(() => (data ? classifyNodeRoles(data.nodes, data.edges) : new Map()), [data]);
     const nodes = useMemo(() => (data ? toGraphNodes(data.nodes, roles) : []), [data, roles]);
     const edges = useMemo(() => (data ? toGraphEdges(data.edges) : []), [data]);
 
+    // Find selected node's source data for the info card
+    const selectedNodeData = useMemo(
+        () => (selectedNodeId && data ? data.nodes.find(n => n.id === selectedNodeId) : null),
+        [selectedNodeId, data]
+    );
+
     const {
         selections,
         actives,
         onNodeClick: selectionNodeClick,
-        onCanvasClick,
+        onCanvasClick: selectionCanvasClick,
     } = useSelection({
         ref: graphRef,
         nodes,
@@ -170,14 +185,28 @@ export const FlowGraphView = ({ flowId, className, onNodeClick }: FlowGraphViewP
     const handleNodeClick = useCallback(
         (node: InternalGraphNode) => {
             selectionNodeClick(node);
-            onNodeClick?.(node.id);
+            setSelectedNodeId(node.id);
         },
-        [selectionNodeClick, onNodeClick]
+        [selectionNodeClick]
+    );
+
+    const handleCanvasClick = useCallback(
+        (event: MouseEvent) => {
+            selectionCanvasClick(event);
+            setSelectedNodeId(null);
+        },
+        [selectionCanvasClick]
     );
 
     const handleFitToView = useCallback(() => {
         graphRef.current?.fitNodesInView();
     }, []);
+
+    const handleGoToNode = useCallback(() => {
+        if (selectedNodeId && onNavigateToNode) {
+            onNavigateToNode(selectedNodeId);
+        }
+    }, [selectedNodeId, onNavigateToNode]);
 
     if (isLoading) {
         return (
@@ -195,6 +224,8 @@ export const FlowGraphView = ({ flowId, className, onNodeClick }: FlowGraphViewP
         );
     }
 
+    const selectedRole = selectedNodeId ? roles.get(selectedNodeId) : null;
+
     return (
         <div className={cn('w-full h-full relative', className)}>
             {/* Graph Canvas */}
@@ -207,7 +238,7 @@ export const FlowGraphView = ({ flowId, className, onNodeClick }: FlowGraphViewP
                 selections={selections}
                 actives={actives}
                 onNodeClick={handleNodeClick}
-                onCanvasClick={onCanvasClick}
+                onCanvasClick={handleCanvasClick}
                 edgeInterpolation="curved"
                 edgeArrowPosition="end"
                 cameraMode="pan"
@@ -215,6 +246,47 @@ export const FlowGraphView = ({ flowId, className, onNodeClick }: FlowGraphViewP
                 labelType="all"
                 defaultNodeSize={6}
             />
+
+            {/* Selected Node Info Card */}
+            {selectedNodeData && (
+                <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-10 pointer-events-auto animate-in slide-in-from-bottom-2 fade-in duration-200">
+                    <div
+                        className={cn(
+                            'flex items-center gap-3 h-11 pl-4 pr-1.5 rounded-xl',
+                            'bg-background/90 backdrop-blur-xl border border-border/50',
+                            'shadow-floating'
+                        )}
+                    >
+                        {/* Node color dot */}
+                        <div
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: ROLE_FILLS[selectedRole ?? 'orphan'] }}
+                        />
+
+                        {/* Node info */}
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="font-medium text-foreground max-w-[200px] truncate">
+                                {selectedNodeData.label}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">
+                                {ROLE_LABELS[selectedRole ?? 'orphan']}
+                            </span>
+                        </div>
+
+                        {/* Go to node button */}
+                        {onNavigateToNode && (
+                            <Button
+                                size="sm"
+                                className="h-7 px-3 rounded-lg gap-1.5 text-xs ml-1"
+                                onClick={handleGoToNode}
+                            >
+                                {t('graphView.goToNode', 'Go to node')}
+                                <ArrowRight className="w-3 h-3" />
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Floating Bottom Toolbar */}
             <TooltipProvider delayDuration={300}>

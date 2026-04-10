@@ -14,7 +14,7 @@ export const MobileFlowMap = ({ open, onClose, onTapNode, flowId }: MobileFlowMa
 
     return (
         <div className="fixed inset-0 z-40 animate-in fade-in duration-200">
-            <FlowGraphView flowId={flowId} className="w-full h-full" onNodeClick={onTapNode} />
+            <FlowGraphView flowId={flowId} className="w-full h-full" onNavigateToNode={onTapNode} />
 
             {/* Floating Close Button */}
             <div className="absolute top-3 right-3 z-10 pt-[env(safe-area-inset-top)]">

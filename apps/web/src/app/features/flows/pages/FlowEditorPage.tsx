@@ -723,7 +723,7 @@ export const FlowEditorPage = () => {
                     <FlowGraphView
                         flowId={currentFlowId}
                         className="w-full h-full"
-                        onNodeClick={handleGraphNodeClick}
+                        onNavigateToNode={handleGraphNodeClick}
                     />
 
                     {/* Floating Close Button */}
