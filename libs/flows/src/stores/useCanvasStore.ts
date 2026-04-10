@@ -73,6 +73,9 @@ interface CanvasState {
     // Node Collapse State
     collapsedNodeIds: Set<string>;
 
+    // Tutorial Hint (set by TutorialPage, read by NodeBlock)
+    tutorialHint: 'output-port' | 'run-button' | null;
+
     // Actions - Core Data
     setNodes: (nodes: NodeData[] | ((prev: NodeData[]) => NodeData[])) => void;
     setConnections: (connections: Connection[] | ((prev: Connection[]) => Connection[])) => void;
@@ -112,6 +115,9 @@ interface CanvasState {
     toggleNodeCollapsed: (nodeId: string) => void;
     setAllNodesCollapsed: (collapsed: boolean, nodeIds?: string[]) => void;
 
+    // Actions - Tutorial
+    setTutorialHint: (hint: 'output-port' | 'run-button' | null) => void;
+
     // Compound Actions
     clearSelection: () => void;
     loadWorkflow: (state: WorkflowState, flowId?: string) => void;
@@ -149,6 +155,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
     updatedPortIds: new Set(),
     traceLogs: new Map(),
     collapsedNodeIds: new Set(),
+    tutorialHint: null,
 
     // Core Data Actions
     setNodes: nodes =>
@@ -239,6 +246,9 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
         set(() => ({
             collapsedNodeIds: collapsed ? new Set(nodeIds ?? []) : new Set<string>(),
         })),
+
+    // Tutorial
+    setTutorialHint: hint => set({ tutorialHint: hint }),
 
     // Compound Actions
     clearSelection: () =>

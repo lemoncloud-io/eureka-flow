@@ -4,7 +4,11 @@
     "steps": {
         "welcome": {
             "title": "환영합니다!",
-            "description": "Eureka Flow의 기본을 알아보겠습니다. 다음을 눌러 시작하세요."
+            "description": "Eureka Flow의 기본을 알아보겠습니다. 블록을 연결하고 워크플로우를 실행해봅시다."
+        },
+        "explore": {
+            "title": "블록 라이브러리 & 캔버스",
+            "description": "왼쪽에 블록 라이브러리가 있습니다. 캔버스에 블록 2개가 이미 배치되어 있습니다 — 연결해볼까요!"
         },
         "sidebar": {
             "title": "블록 라이브러리",
@@ -34,9 +38,15 @@
             "invalidKey": "유효하지 않은 키입니다. 다시 시도해주세요."
         }
     },
+    "feedback": {
+        "great": "잘했어요!",
+        "advancing": "다음 단계로 이동합니다..."
+    },
     "cta": {
         "next": "다음",
         "prev": "이전",
+        "skip": "튜토리얼 건너뛰기",
+        "later": "나중에 하기",
         "exploreFlows": "공개 플로우 둘러보기"
     }
 }

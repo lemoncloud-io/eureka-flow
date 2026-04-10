@@ -1,9 +1,15 @@
+export type TutorialHint = 'output-port' | 'run-button' | null;
+
 export interface TutorialStep {
     id: string;
     titleKey: string;
     descriptionKey: string;
-    action: 'auto' | 'connect' | 'run' | 'done';
+    action: 'connect' | 'run' | 'done';
+    hint?: TutorialHint;
 }
+
+/** Delay before transitioning after user completes a step (connect/run) */
+export const SUCCESS_FEEDBACK_DELAY_MS = 1500;
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
     {
@@ -11,12 +17,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
         titleKey: 'tutorial:steps.connect.title',
         descriptionKey: 'tutorial:steps.connect.description',
         action: 'connect',
+        hint: 'output-port',
     },
     {
         id: 'run',
         titleKey: 'tutorial:steps.run.title',
         descriptionKey: 'tutorial:steps.run.description',
         action: 'run',
+        hint: 'run-button',
     },
     {
         id: 'done',

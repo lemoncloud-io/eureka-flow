@@ -52,7 +52,7 @@ const isPublicRoute = (): boolean => {
     const pathname = window.location.pathname;
     return (
         pathname === '/' ||
-        pathname === '/explore' ||
+        pathname === '/flows' ||
         pathname === '/tutorial' ||
         pathname.startsWith('/flows/') ||
         pathname.startsWith('/policy/')
@@ -156,6 +156,17 @@ export const Providers = ({ children }: ProvidersProps) => {
     const handleError = useCallback((error: Error, info: ErrorInfo): void => {
         console.error('Application Error:', error, info);
         reportError(error, { componentStack: info.componentStack ?? undefined }, 'web');
+    }, []);
+
+    // Force re-render when i18n bundles change via postMessage (iframe preview mode)
+    // react-i18next's useSyncExternalStore doesn't reliably pick up addResourceBundle changes,
+    // so we use React state to guarantee the component tree re-renders
+    const [, setI18nRevision] = useState(0);
+    useEffect(() => {
+        if (window.parent === window) return;
+        const onBundleAdded = () => setI18nRevision(r => r + 1);
+        i18n.store.on('added', onBundleAdded);
+        return () => i18n.store.off('added', onBundleAdded);
     }, []);
 
     return (

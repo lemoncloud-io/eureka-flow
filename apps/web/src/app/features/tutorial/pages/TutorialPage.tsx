@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { useBlocks, useFlowsStore } from '@flows/flows';
+import { useBlocks, useCanvasStore, useFlowsStore } from '@flows/flows';
 import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 
 import { Sidebar, WorkflowCanvas } from '../../flows';
@@ -32,8 +32,19 @@ export const TutorialPage = () => {
     const { setApiKey } = useWebCoreStore();
     const [isReady, setIsReady] = useState(false);
 
-    const { currentStep, step, totalSteps, isLastStep, goNext, goPrev, skipToEnd, markTutorialDone } =
+    const { currentStep, step, totalSteps, isLastStep, isSuccess, goNext, goPrev, skipToEnd, markTutorialDone } =
         useTutorialSteps();
+
+    // Set tutorial hint on canvas store for NodeBlock visual hints
+    const setTutorialHint = useCanvasStore(s => s.setTutorialHint);
+    const currentHint = step.hint ?? null;
+    useEffect(() => {
+        setTutorialHint(currentHint);
+    }, [currentHint, setTutorialHint]);
+
+    useEffect(() => {
+        return () => useCanvasStore.getState().setTutorialHint(null);
+    }, []);
 
     // Boot: load blocks from public API, then pre-load tutorial workflow
     const bootedRef = useRef(false);
@@ -45,7 +56,6 @@ export const TutorialPage = () => {
             try {
                 await loadBlocks();
             } catch {
-                // Fallback: use hardcoded blocks when public API is unavailable
                 const store = useFlowsStore.getState();
                 store.setBlockRegistry(FALLBACK_BLOCKS as Parameters<typeof store.setBlockRegistry>[0]);
                 store.setBlocksLoaded(true);
@@ -126,8 +136,6 @@ export const TutorialPage = () => {
         sidebarRef.current?.open();
     }, []);
 
-    const handleSkip = skipToEnd;
-
     const handleSubmitKey = useCallback(
         async (key: string): Promise<boolean> => {
             const isValid = await validateApiKey(key);
@@ -177,9 +185,10 @@ export const TutorialPage = () => {
                     currentStep={currentStep}
                     step={step}
                     totalSteps={totalSteps}
+                    isSuccess={isSuccess}
                     onNext={goNext}
                     onPrev={goPrev}
-                    onSkip={handleSkip}
+                    onSkip={skipToEnd}
                 />
             )}
         </div>

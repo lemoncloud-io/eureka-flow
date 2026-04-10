@@ -1,4 +1,5 @@
 export * from './useBlocks';
+export * from './useBlockGroups';
 export * from './useCanvasEngine';
 export * from './useCanvasHistory';
 export * from './useCanvasLayout';

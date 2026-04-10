@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 
-import { Blocks, LayoutDashboard, Sparkles, Wrench } from 'lucide-react';
+import { Blocks, Languages, LayoutDashboard, Sparkles, Wrench } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 
@@ -11,6 +11,7 @@ const NAV_ITEMS: { to: string; label: string; icon: LucideIcon }[] = [
     { to: '/blocks', label: '블록 관리', icon: Blocks },
     { to: '/tools', label: 'Tool 관리', icon: Wrench },
     { to: '/skills', label: 'Skill 관리', icon: Sparkles },
+    { to: '/i18n', label: '번역 관리', icon: Languages },
 ];
 
 export const Sidebar = () => {

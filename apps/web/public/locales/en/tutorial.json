@@ -4,7 +4,11 @@
     "steps": {
         "welcome": {
             "title": "Welcome!",
-            "description": "Let's learn the basics of Eureka Flow. Click Next to get started."
+            "description": "Let's learn the basics of Eureka Flow. We'll connect blocks and run a workflow together."
+        },
+        "explore": {
+            "title": "Block Library & Canvas",
+            "description": "On the left is the Block Library. Two blocks are already on your canvas — let's connect them!"
         },
         "sidebar": {
             "title": "Block Library",
@@ -34,9 +38,15 @@
             "invalidKey": "Invalid key. Please try again."
         }
     },
+    "feedback": {
+        "great": "Great!",
+        "advancing": "Moving to the next step..."
+    },
     "cta": {
         "next": "Next",
         "prev": "Back",
+        "skip": "Skip tutorial",
+        "later": "Maybe later",
         "exploreFlows": "Explore Public Flows"
     }
 }

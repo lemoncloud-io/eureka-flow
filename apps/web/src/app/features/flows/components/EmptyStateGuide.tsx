@@ -18,7 +18,7 @@ const STEPS = [
 export const EmptyStateGuide = ({ onAddBlock }: EmptyStateGuideProps) => {
     const { t } = useTranslation(['flows']);
     const location = useLocation();
-    const isExplorePage = location.pathname === '/explore';
+    const isExplorePage = location.pathname === '/flows';
 
     return (
         <div className={cn('absolute inset-0 flex items-center justify-center', 'pointer-events-none')}>
@@ -81,7 +81,7 @@ export const EmptyStateGuide = ({ onAddBlock }: EmptyStateGuideProps) => {
 
                     {!isExplorePage && (
                         <RouterLink
-                            to="/explore"
+                            to="/flows"
                             className={cn(
                                 'flex items-center justify-center gap-2 px-5 py-2.5',
                                 'bg-muted hover:bg-muted/80 rounded-lg',

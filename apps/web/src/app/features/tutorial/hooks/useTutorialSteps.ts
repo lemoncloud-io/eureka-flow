@@ -2,9 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useCanvasStore } from '@flows/flows';
 
-import { TUTORIAL_STEPS, TUTORIAL_STORAGE_KEY } from '../consts/tutorialSteps';
-
-const AUTO_ADVANCE_DELAY_MS = 500;
+import { SUCCESS_FEEDBACK_DELAY_MS, TUTORIAL_STEPS, TUTORIAL_STORAGE_KEY } from '../consts/tutorialSteps';
 
 export const useTutorialSteps = () => {
     const [currentStep, setCurrentStep] = useState(0);
@@ -25,6 +23,9 @@ export const useTutorialSteps = () => {
         }
     });
 
+    // Derived: true during the success feedback window
+    const isSuccess = canProceed && step.action !== 'done';
+
     const goNext = useCallback(() => {
         if (currentStep < totalSteps - 1) {
             setCurrentStep(prev => prev + 1);
@@ -41,13 +42,12 @@ export const useTutorialSteps = () => {
         setCurrentStep(totalSteps - 1);
     }, [totalSteps]);
 
-    // Auto-advance when canProceed becomes true
+    // Auto-advance with success feedback for interactive steps (connect, run)
     useEffect(() => {
-        if (canProceed && step.action !== 'auto' && step.action !== 'done') {
-            const timer = setTimeout(goNext, AUTO_ADVANCE_DELAY_MS);
-            return () => clearTimeout(timer);
-        }
-    }, [canProceed, step.action, goNext]);
+        if (!isSuccess) return;
+        const timer = setTimeout(goNext, SUCCESS_FEEDBACK_DELAY_MS);
+        return () => clearTimeout(timer);
+    }, [isSuccess, goNext]);
 
     const markTutorialDone = useCallback(() => {
         localStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
@@ -58,6 +58,7 @@ export const useTutorialSteps = () => {
         step,
         totalSteps,
         isLastStep,
+        isSuccess,
         goNext,
         goPrev,
         skipToEnd,
