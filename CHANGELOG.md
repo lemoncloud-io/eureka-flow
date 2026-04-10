@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-04-10] - root@0.23.0, @flows/web@0.23.0, @flows/admin@0.10.0
+
+### Features
+
+- update mobile page
+- support i18n management
+- update tutorial, mobile editor
+- add mobile editor
+
+### Refactor
+
+- refactor code
+- update connection mode to use upsertFlow
+- update route paths and add read-only mode
+
+### Chores
+
+- remove images
+- temp commit
+- temp commit
+
 ## [2026-04-09] - root@0.22.1, @flows/web@0.22.1, @flows/admin@0.9.1
 
 ### Refactor
