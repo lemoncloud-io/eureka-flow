@@ -83,7 +83,15 @@ const connectWebSocket = config => {
 
     // Build WebSocket URL with query parameters
     // channels parameter specifies which flow channel to subscribe to
-    let wsUrl = endpoint + '?' + authQueryParam + '=' + token;
+    const tkn =
+        typeof token !== 'string'
+            ? ''
+            : token.startsWith('Bearer ')
+              ? token.slice(7)
+              : token.startsWith('#')
+                ? ''
+                : token;
+    let wsUrl = endpoint + '?' + authQueryParam + '=' + tkn;
     if (!channels) {
         wsUrl += '&default=';
     }
