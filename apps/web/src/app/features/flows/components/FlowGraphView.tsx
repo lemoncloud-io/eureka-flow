@@ -9,10 +9,11 @@ import { cn } from '@flows/lib/utils';
 import { useTheme } from '@flows/theme';
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@flows/ui-kit';
 
+import type { ReagraphEdge, ReagraphNode } from '@flows/flows';
 import type { LucideIcon } from 'lucide-react';
 import type { GraphCanvasRef, GraphEdge, GraphNode, InternalGraphNode, LayoutTypes, Theme } from 'reagraph';
 
-/** Node execution state → fill color mapping (hex required by Three.js) */
+/** Execution state → node fill color */
 const STATE_FILLS: Record<string, string> = {
     IDLE: '#6b7280',
     READY: '#3b82f6',
@@ -21,37 +22,44 @@ const STATE_FILLS: Record<string, string> = {
     ERROR: '#ef4444',
 };
 
-const DEFAULT_FILL = '#6b7280';
+/** Role-based node colors — muted indigo palette */
+const ROLE_FILLS = {
+    source: '#818cf8',
+    sink: '#6366f1',
+    middle: '#a5b4fc',
+    orphan: '#94a3b8',
+};
 
-/** Custom theme matching the app's design system */
+/** Custom dark theme */
 const flowDarkTheme: Theme = {
     canvas: { background: '#1f2023', fog: null },
     node: {
         fill: '#6b7280',
-        activeFill: '#7c3aed',
+        activeFill: '#a78bfa',
         opacity: 1,
         selectedOpacity: 1,
         inactiveOpacity: 0.3,
         label: {
-            color: '#e5e5e5',
+            color: '#d4d4d8',
             activeColor: '#ffffff',
             stroke: '#1f2023',
-            strokeWidth: 2.5,
+            strokeWidth: 3,
         },
     },
-    ring: { fill: '#7c3aed50', activeFill: '#7c3aed' },
+    ring: { fill: '#7c3aed40', activeFill: '#a78bfa' },
     edge: {
-        fill: '#404040',
-        activeFill: '#7c3aed',
-        opacity: 0.7,
+        fill: '#52525b',
+        activeFill: '#a78bfa',
+        opacity: 0.6,
         selectedOpacity: 1,
-        inactiveOpacity: 0.15,
-        label: { color: '#888888', activeColor: '#e5e5e5', stroke: '#1f2023' },
+        inactiveOpacity: 0.12,
+        label: { color: '#71717a', activeColor: '#e5e5e5', stroke: '#1f2023' },
     },
-    arrow: { fill: '#505050', activeFill: '#7c3aed' },
+    arrow: { fill: '#71717a', activeFill: '#a78bfa' },
     lasso: { background: 'rgba(124, 58, 237, 0.08)', border: 'rgba(124, 58, 237, 0.3)' },
 };
 
+/** Custom light theme */
 const flowLightTheme: Theme = {
     canvas: { background: '#f5f5f6', fog: null },
     node: {
@@ -61,29 +69,23 @@ const flowLightTheme: Theme = {
         selectedOpacity: 1,
         inactiveOpacity: 0.3,
         label: {
-            color: '#1a1a2e',
+            color: '#27272a',
             activeColor: '#000000',
             stroke: '#f5f5f6',
-            strokeWidth: 2.5,
+            strokeWidth: 3,
         },
     },
     ring: { fill: '#7c3aed30', activeFill: '#7c3aed' },
     edge: {
-        fill: '#c8c8cc',
+        fill: '#a1a1aa',
         activeFill: '#7c3aed',
-        opacity: 0.6,
+        opacity: 0.5,
         selectedOpacity: 1,
-        inactiveOpacity: 0.12,
-        label: { color: '#888888', activeColor: '#1a1a2e', stroke: '#f5f5f6' },
+        inactiveOpacity: 0.1,
+        label: { color: '#71717a', activeColor: '#27272a', stroke: '#f5f5f6' },
     },
-    arrow: { fill: '#b0b0b8', activeFill: '#7c3aed' },
+    arrow: { fill: '#a1a1aa', activeFill: '#7c3aed' },
     lasso: { background: 'rgba(124, 58, 237, 0.06)', border: 'rgba(124, 58, 237, 0.25)' },
-};
-
-/** Check if string is an emoji (not a URL) */
-const isEmoji = (s?: string): boolean => {
-    if (!s) return false;
-    return !s.startsWith('http') && !s.startsWith('/');
 };
 
 interface FlowGraphViewProps {
@@ -98,15 +100,42 @@ const LAYOUT_OPTIONS: { type: LayoutTypes; icon: LucideIcon; label: string }[] =
     { type: 'hierarchicalLr', icon: Share2, label: 'Hierarchy' },
 ];
 
-const toGraphNodes = (nodes: { id: string; label: string; icon?: string; state?: string }[]): GraphNode[] =>
-    nodes.map(n => ({
-        id: n.id,
-        label: isEmoji(n.icon) ? `${n.icon} ${n.label}` : n.label,
-        icon: isEmoji(n.icon) ? undefined : n.icon,
-        fill: STATE_FILLS[n.state ?? ''] ?? DEFAULT_FILL,
-    }));
+/** Classify node role based on edge connectivity */
+const classifyNodeRoles = (nodes: ReagraphNode[], edges: ReagraphEdge[]): Map<string, keyof typeof ROLE_FILLS> => {
+    const hasIncoming = new Set<string>();
+    const hasOutgoing = new Set<string>();
 
-const toGraphEdges = (edges: { source: string; target: string; id?: string; label?: string }[]): GraphEdge[] =>
+    for (const e of edges) {
+        hasOutgoing.add(e.source);
+        hasIncoming.add(e.target);
+    }
+
+    const roles = new Map<string, keyof typeof ROLE_FILLS>();
+    for (const n of nodes) {
+        const isSource = !hasIncoming.has(n.id) && hasOutgoing.has(n.id);
+        const isSink = hasIncoming.has(n.id) && !hasOutgoing.has(n.id);
+        const isOrphan = !hasIncoming.has(n.id) && !hasOutgoing.has(n.id);
+
+        if (isOrphan) roles.set(n.id, 'orphan');
+        else if (isSource) roles.set(n.id, 'source');
+        else if (isSink) roles.set(n.id, 'sink');
+        else roles.set(n.id, 'middle');
+    }
+    return roles;
+};
+
+const toGraphNodes = (nodes: ReagraphNode[], roles: Map<string, keyof typeof ROLE_FILLS>): GraphNode[] =>
+    nodes.map(n => {
+        const stateFill = n.state ? STATE_FILLS[n.state] : undefined;
+        const roleFill = ROLE_FILLS[roles.get(n.id) ?? 'orphan'];
+        return {
+            id: n.id,
+            label: n.label,
+            fill: stateFill ?? roleFill,
+        };
+    });
+
+const toGraphEdges = (edges: ReagraphEdge[]): GraphEdge[] =>
     edges.map((e, i) => ({
         id: e.id ?? `${e.source}-${e.target}-${i}`,
         source: e.source,
@@ -121,7 +150,8 @@ export const FlowGraphView = ({ flowId, className, onNodeClick }: FlowGraphViewP
     const { data, isLoading } = useFlowGraphQuery(flowId);
     const [layout, setLayout] = useState<LayoutTypes>('forceDirected2d');
 
-    const nodes = useMemo(() => (data ? toGraphNodes(data.nodes) : []), [data]);
+    const roles = useMemo(() => (data ? classifyNodeRoles(data.nodes, data.edges) : new Map()), [data]);
+    const nodes = useMemo(() => (data ? toGraphNodes(data.nodes, roles) : []), [data, roles]);
     const edges = useMemo(() => (data ? toGraphEdges(data.edges) : []), [data]);
 
     const {
