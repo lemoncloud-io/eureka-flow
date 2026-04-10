@@ -100,6 +100,7 @@ interface HeaderProps {
     onHelp?: () => void;
     onTour?: () => void;
     onOpenFlowList?: () => void;
+    onGraphView?: () => void;
 }
 
 const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
@@ -327,6 +328,7 @@ export const Header: React.FC<HeaderProps> = ({
     onHelp,
     onTour,
     onOpenFlowList,
+    onGraphView,
 }) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
@@ -590,6 +592,17 @@ export const Header: React.FC<HeaderProps> = ({
                                     <Key className="w-4 h-4 mr-2" />
                                     {t('header.apiKeySettings')}
                                 </DropdownMenuItem>
+                            )}
+
+                            {/* Graph View */}
+                            {onGraphView && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={onGraphView}>
+                                        <LayoutGrid className="w-4 h-4 mr-2" />
+                                        {t('header.graphView', 'Graph View')}
+                                    </DropdownMenuItem>
+                                </>
                             )}
 
                             {/* Help & Tour */}

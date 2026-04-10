@@ -592,6 +592,7 @@ export const MobileFlowEditorPage = () => {
                     setIsFlowMapOpen(false);
                     setConfigNodeId(nodeId);
                 }}
+                flowId={currentFlowId}
             />
 
             {/* Node list — scrollable area */}

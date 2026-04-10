@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { ArrowRight, Globe, KeyRound, Lock, ShieldX } from 'lucide-react';
+import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useBlocks, useFlows } from '@flows/flows';
@@ -12,6 +12,7 @@ import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
 import { useTour } from '../../tutorial';
+import { FlowGraphView } from '../components/FlowGraphView';
 import { FlowListDialog } from '../components/FlowListDialog';
 import { Header } from '../components/Header';
 import { HelpDialog } from '../components/HelpDialog';
@@ -108,6 +109,7 @@ export const FlowEditorPage = () => {
     const [isHelpDialogOpen, setIsHelpDialogOpen] = useState(false);
     const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
     const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
+    const [isGraphViewOpen, setIsGraphViewOpen] = useState(false);
 
     const { apiKey, setApiKey } = useWebCoreStore();
 
@@ -332,6 +334,11 @@ export const FlowEditorPage = () => {
 
     const handleOpenPublish = useCallback(() => {
         setIsPublishDialogOpen(true);
+    }, []);
+
+    const handleGraphNodeClick = useCallback((nodeId: string) => {
+        setIsGraphViewOpen(false);
+        canvasRef.current?.selectNode(nodeId);
     }, []);
 
     const handleCaptureCanvas = useCallback(async () => {
@@ -671,6 +678,7 @@ export const FlowEditorPage = () => {
                 onHelp={() => handleOpenHelp('gettingStarted')}
                 onTour={startTour}
                 onOpenFlowList={handleOpenFlowList}
+                onGraphView={() => setIsGraphViewOpen(true)}
             />
 
             {/* Floating Sidebar */}
@@ -708,6 +716,28 @@ export const FlowEditorPage = () => {
                 onPublish={publishFlow}
                 onCaptureCanvas={handleCaptureCanvas}
             />
+
+            {/* Graph View Overlay */}
+            {isGraphViewOpen && (
+                <div className="absolute inset-0 z-40 bg-background flex flex-col animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between px-4 h-12 border-b border-border/60 shrink-0">
+                        <span className="text-sm font-semibold">{t('header.graphView', 'Graph View')}</span>
+                        <button
+                            onClick={() => setIsGraphViewOpen(false)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    <div className="flex-1 relative overflow-hidden">
+                        <FlowGraphView
+                            flowId={currentFlowId}
+                            className="w-full h-full"
+                            onNodeClick={handleGraphNodeClick}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Public Mode Info Card */}
             {isPublicMode && (

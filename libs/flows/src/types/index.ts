@@ -1,3 +1,5 @@
+export * from './graph';
+
 export type {
     BlockDefinition,
     BlockView,
