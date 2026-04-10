@@ -1,5 +1,3 @@
-import { useTranslation } from 'react-i18next';
-
 import { X } from 'lucide-react';
 
 import { FlowGraphView } from '../../flows/components/FlowGraphView';
@@ -12,24 +10,20 @@ interface MobileFlowMapProps {
 }
 
 export const MobileFlowMap = ({ open, onClose, onTapNode, flowId }: MobileFlowMapProps) => {
-    const { t } = useTranslation(['flows']);
-
     if (!open) return null;
 
     return (
-        <div className="fixed inset-0 z-40 bg-background flex flex-col animate-in fade-in duration-200">
-            <div className="flex items-center justify-between px-4 h-12 border-b border-border/60 shrink-0 pt-[env(safe-area-inset-top)]">
-                <span className="text-sm font-semibold">{t('header.graphView', 'Graph View')}</span>
+        <div className="fixed inset-0 z-40 animate-in fade-in duration-200">
+            <FlowGraphView flowId={flowId} className="w-full h-full" onNodeClick={onTapNode} />
+
+            {/* Floating Close Button */}
+            <div className="absolute top-3 right-3 z-10 pt-[env(safe-area-inset-top)]">
                 <button
                     onClick={onClose}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors"
+                    className="flex items-center justify-center w-9 h-9 rounded-xl bg-background/80 backdrop-blur-xl border border-border/50 shadow-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
                 >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4" />
                 </button>
-            </div>
-
-            <div className="flex-1 relative overflow-hidden">
-                <FlowGraphView flowId={flowId} className="w-full h-full" onNodeClick={onTapNode} />
             </div>
         </div>
     );
