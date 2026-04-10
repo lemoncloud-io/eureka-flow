@@ -189,7 +189,7 @@ export const I18nPage = () => {
                     <br />
                     Example:{' '}
                     <code className="text-xs bg-muted px-1 rounded">
-                        https://bucket.s3.ap-northeast-2.amazonaws.com/i18n
+                        https://your-bucket.s3.ap-northeast-2.amazonaws.com/i18n
                     </code>
                 </p>
             </div>

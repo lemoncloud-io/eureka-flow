@@ -8,7 +8,7 @@ Browser-based translation editor that reads/writes JSON to S3, with live preview
 ┌─────────────────────────────────────────────────────────┐
 │  S3 Bucket (source of truth)                            │
 │  {bucket_url}/{lang}/{namespace}.json                   │
-│  e.g. https://bucket.s3.amazonaws.com/i18n/en/common.json │
+│  e.g. https://your-bucket.s3.amazonaws.com/i18n/en/common.json │
 └────────────┬──────────────────────────┬─────────────────┘
              │ GET (fetch)              │ PUT (upload)
              ▼                          ▲
@@ -65,14 +65,12 @@ Browser-based translation editor that reads/writes JSON to S3, with live preview
 ### Environment Variables
 
 ```bash
-# Admin app (.env)
+# Admin app & Web app (.env.local) — 로컬 개발용
 VITE_I18N_BUCKET_URL=https://your-bucket.s3.ap-northeast-2.amazonaws.com/i18n
 
-# Web app (.env) — same bucket URL
-VITE_I18N_BUCKET_URL=https://your-bucket.s3.ap-northeast-2.amazonaws.com/i18n
-
-# Web app — cache busting version (set during CI/CD build)
-I18N_VERSION=1.0.0
+# CI/CD GitHub Secrets (dev/prod prefix로 환경 분리):
+# VITE_DEV_I18N_BUCKET_URL=https://your-bucket.s3.ap-northeast-2.amazonaws.com/dev
+# VITE_PROD_I18N_BUCKET_URL=https://your-bucket.s3.ap-northeast-2.amazonaws.com/prod
 ```
 
 ### Dependencies
