@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-04-13] - root@0.26.0, @flows/web@0.26.0, @flows/admin@0.13.0
+
+### Features
+
+- add execution stack (RunContext) UI for tracking node run history
+
+### Refactor
+
+- improve run history handling
+
 ## [2026-04-13] - root@0.25.0, @flows/web@0.25.0, @flows/admin@0.12.0
 
 ### Features
@@ -397,4 +407,3 @@
 - (ui) add version info to header dropdown
 
 All notable changes to this project will be documented in this file.
-

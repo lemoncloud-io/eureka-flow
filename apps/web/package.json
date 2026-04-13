@@ -1,6 +1,6 @@
 {
-  "name": "@flows/web",
-  "version": "0.25.0",
-  "private": true,
-  "type": "module"
+    "name": "@flows/web",
+    "version": "0.26.0",
+    "private": true,
+    "type": "module"
 }
