@@ -10,7 +10,7 @@ const createRunContext = (
     runId: string,
     nodeId: string,
     startedAt: number,
-    seed: Partial<Pick<RunContext, 'traces' | 'portUpdates'>> = {}
+    seed: Partial<Pick<RunContext, 'traces' | 'portUpdates' | 'state' | 'completedAt' | 'error'>> = {}
 ): RunContext => ({
     runId,
     nodeId,
@@ -311,8 +311,18 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
 
     finalizeRun: (runId, nodeId, finalState, timestamp, error) =>
         set(state => {
-            const runs = state.nodeRuns[nodeId];
-            if (!runs) return state;
+            const runs = state.nodeRuns[nodeId] ?? [];
+            if (!runs.some(r => r.runId === runId)) {
+                // enter 없이 final만 도착 — 자동 생성 후 즉시 완료 (메시지 순서 미보장 방어)
+                const newRun = createRunContext(runId, nodeId, timestamp, {
+                    state: finalState,
+                    completedAt: timestamp,
+                    error,
+                });
+                return {
+                    nodeRuns: { ...state.nodeRuns, [nodeId]: [newRun, ...runs].slice(0, MAX_RUNS_PER_NODE) },
+                };
+            }
             return {
                 nodeRuns: {
                     ...state.nodeRuns,

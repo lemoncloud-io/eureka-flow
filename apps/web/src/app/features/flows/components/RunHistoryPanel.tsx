@@ -141,7 +141,7 @@ const RunRow = memo(({ run, isLatest }: { run: RunContext; isLatest: boolean }) 
 });
 RunRow.displayName = 'RunRow';
 
-export const RunHistoryPanel = ({ nodeId, maxHeight = '40%' }: RunHistoryPanelProps) => {
+export const RunHistoryPanel = ({ nodeId, maxHeight = '200px' }: RunHistoryPanelProps) => {
     const runs = useNodeRuns(nodeId);
     const [isOpen, setIsOpen] = useState(false);
     const prevRunCount = useRef(runs.length);
