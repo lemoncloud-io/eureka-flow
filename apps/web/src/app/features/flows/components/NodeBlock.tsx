@@ -4,14 +4,11 @@ import { useTranslation } from 'react-i18next';
 import {
     Braces,
     Check,
-    ChevronDown,
-    ChevronUp,
     Copy,
     Expand,
     Hash,
     Image,
     Loader2,
-    MoreVertical,
     Pencil,
     Play,
     RefreshCw,
@@ -115,7 +112,14 @@ export interface NodeHighlightState {
     connectionDraft?: ConnectionDraftInfo | null;
 }
 
-const getStatusStyles = (state: NodeState | undefined, isSelected: boolean): string => {
+const getStatusStyles = (state: NodeState | undefined, isSelected: boolean, isFrontend = false): string => {
+    // Frontend (input) nodes get green glow when running
+    if (isFrontend && state === 'RUNNING') {
+        return isSelected
+            ? 'border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.35)]'
+            : 'border-green-500/60 shadow-[0_0_14px_rgba(34,197,94,0.25)]';
+    }
+
     // Selected: show colored border with glow effect
     if (isSelected) {
         switch (state) {
@@ -131,6 +135,12 @@ const getStatusStyles = (state: NodeState | undefined, isSelected: boolean): str
                 return 'border-primary shadow-[0_0_20px_rgba(139,92,246,0.25)]';
         }
     }
+
+    // Frontend idle nodes get tinted border
+    if (isFrontend && (state === 'IDLE' || state === 'READY' || !state)) {
+        return 'border-primary/50';
+    }
+
     // Not selected: state-based styling
     switch (state) {
         case 'RUNNING':
@@ -1182,8 +1192,8 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     };
 
     const isProcessNode = definition?.stereo === 'process';
+    const iconBtnBase = 'text-muted-foreground/60 w-6 h-6 flex items-center justify-center rounded-md transition-all';
 
-    const [showMenu, setShowMenu] = useState(false);
     const [isEditingLabel, setIsEditingLabel] = useState(false);
     const [tempLabel, setTempLabel] = useState(node.customLabel || '');
     const labelInputRef = useRef<HTMLInputElement>(null);
@@ -1344,11 +1354,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 !isAuto && 'opacity-50',
                 !isSelected && !isHighlighted && nodeState === 'IDLE' && 'shadow-node',
                 // Normal highlight/selection states
-                isHighlighted
-                    ? 'border-accent/60'
-                    : definition.isFrontend && !isSelected && nodeState === 'IDLE'
-                      ? 'border-primary/50'
-                      : getStatusStyles(nodeState, isSelected)
+                isHighlighted ? 'border-accent/60' : getStatusStyles(nodeState, isSelected, definition.isFrontend)
             )}
             style={{
                 left: node.position.x,
@@ -1458,83 +1464,36 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     <button
                         onClick={e => {
                             e.stopPropagation();
-                            setShowMenu(!showMenu);
+                            setIsEditingLabel(true);
                         }}
-                        className="text-muted-foreground/60 hover:text-foreground w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted/50 transition-all"
+                        className={cn(iconBtnBase, 'hover:text-foreground hover:bg-muted/50')}
+                        title={t('contextMenu.rename')}
                     >
-                        <MoreVertical className="w-3.5 h-3.5" />
+                        <Pencil className="w-3 h-3" />
                     </button>
-
-                    {showMenu && (
-                        <>
-                            <div
-                                className="fixed inset-0 z-40"
-                                onClick={e => {
-                                    e.stopPropagation();
-                                    setShowMenu(false);
-                                }}
-                                onWheel={e => e.stopPropagation()}
-                            />
-                            <div
-                                className="absolute right-0 top-8 w-36 bg-popover/95 backdrop-blur-md border border-border rounded-lg shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100"
-                                onWheel={e => e.stopPropagation()}
-                            >
-                                <button
-                                    onClick={e => {
-                                        e.stopPropagation();
-                                        setShowMenu(false);
-                                        setIsEditingLabel(true);
-                                    }}
-                                    className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
-                                >
-                                    <Pencil className="w-3 h-3" /> {t('contextMenu.rename')}
-                                </button>
-                                {onDuplicate && (
-                                    <button
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            setShowMenu(false);
-                                            onDuplicate();
-                                        }}
-                                        className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
-                                    >
-                                        <Copy className="w-3 h-3" /> {t('contextMenu.duplicate')}
-                                    </button>
-                                )}
-                                {nodeState === 'ERROR' && (
-                                    <button
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            setShowMenu(false);
-                                            onTrigger();
-                                        }}
-                                        className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
-                                    >
-                                        <RefreshCw className="w-3 h-3" /> {t('contextMenu.retry')}
-                                    </button>
-                                )}
-                                {onToggleCollapsed && (
-                                    <button
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            setShowMenu(false);
-                                            onToggleCollapsed();
-                                        }}
-                                        className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
-                                    >
-                                        {isCollapsed ? (
-                                            <>
-                                                <ChevronDown className="w-3 h-3" /> {t('contextMenu.expand')}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <ChevronUp className="w-3 h-3" /> {t('contextMenu.collapse')}
-                                            </>
-                                        )}
-                                    </button>
-                                )}
-                            </div>
-                        </>
+                    {onDuplicate && (
+                        <button
+                            onClick={e => {
+                                e.stopPropagation();
+                                onDuplicate();
+                            }}
+                            className={cn(iconBtnBase, 'hover:text-foreground hover:bg-muted/50')}
+                            title={t('contextMenu.duplicate')}
+                        >
+                            <Copy className="w-3 h-3" />
+                        </button>
+                    )}
+                    {nodeState === 'ERROR' && (
+                        <button
+                            onClick={e => {
+                                e.stopPropagation();
+                                onTrigger();
+                            }}
+                            className={cn(iconBtnBase, 'hover:text-amber-500 hover:bg-amber-500/10')}
+                            title={t('contextMenu.retry')}
+                        >
+                            <RefreshCw className="w-3 h-3" />
+                        </button>
                     )}
 
                     <button
@@ -1544,7 +1503,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                             e.stopPropagation();
                             onDelete();
                         }}
-                        className="text-muted-foreground/60 hover:text-destructive w-6 h-6 flex items-center justify-center rounded-md hover:bg-destructive/10 transition-all"
+                        className={cn(iconBtnBase, 'hover:text-destructive hover:bg-destructive/10')}
                     >
                         <X className="w-3.5 h-3.5" />
                     </button>

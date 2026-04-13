@@ -1758,17 +1758,17 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@lemoncloud/eureka-flows-api@^0.26.319":
-  version "0.26.319"
-  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-flows-api/-/eureka-flows-api-0.26.319.tgz#53e06786b70ac8e2aa429609ab010e52b13c1b85"
-  integrity sha512-FirHJXagvh9LRl0huCQUcT3NJlzhrYUKORlqPr0S6bwC76ma1YL7EfMyFA6w6gb3rpPa+ZVrppJUYsFjgu8ClA==
+"@lemoncloud/eureka-flows-api@^0.26.412":
+  version "0.26.412"
+  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-flows-api/-/eureka-flows-api-0.26.412.tgz#7f2fb174eb1e81ed95571f3e4d2b985b61ad0351"
+  integrity sha512-EP/8aBHkZ2lCjMBgyGXOCF+NKMR2gZgZJ4JaQG93jxIbVJbUnHERYEXIKDbrTVNx+BLRfBfdPzdgEh94gIMmOw==
   dependencies:
     lemon-model "^1.1.1"
 
-"@lemoncloud/eureka-sockets-api@^0.26.327":
-  version "0.26.327"
-  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-sockets-api/-/eureka-sockets-api-0.26.327.tgz#79923f4db27721c4f89808e9641911fc48709a86"
-  integrity sha512-diFxksTnXmDIQavFID9Vb2SD3Fi/cKTz7f2H3RprOEm2TQOrjbK0HEiGXaQWuGatBsBaFjSBk1DEQRb5wzVKqA==
+"@lemoncloud/eureka-sockets-api@^0.26.412":
+  version "0.26.412"
+  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-sockets-api/-/eureka-sockets-api-0.26.412.tgz#bb153933bafd01c2a0ab54253ee2a80a23143f5f"
+  integrity sha512-jVAHKFzG7/4CcQ733t+EyF+NYPcCBCN9Aams2ni6UVD+4h+GNAP5GRZSZlUjJZ8yxJNK8FCXtjZmlnYSmZP04g==
   dependencies:
     lemon-model "^1.1.1"
 
@@ -12320,16 +12320,7 @@ string-length@^4.0.2:
     char-regex "^1.0.2"
     strip-ansi "^6.0.0"
 
-"string-width-cjs@npm:string-width@^4.2.0":
-  version "4.2.3"
-  resolved "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz"
-  integrity sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==
-  dependencies:
-    emoji-regex "^8.0.0"
-    is-fullwidth-code-point "^3.0.0"
-    strip-ansi "^6.0.1"
-
-string-width@^4.1.0, string-width@^4.2.0, string-width@^4.2.3:
+"string-width-cjs@npm:string-width@^4.2.0", string-width@^4.1.0, string-width@^4.2.0, string-width@^4.2.3:
   version "4.2.3"
   resolved "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz"
   integrity sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==
@@ -12439,14 +12430,7 @@ stringify-entities@^4.0.0:
     character-entities-html4 "^2.0.0"
     character-entities-legacy "^3.0.0"
 
-"strip-ansi-cjs@npm:strip-ansi@^6.0.1":
-  version "6.0.1"
-  resolved "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz"
-  integrity sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==
-  dependencies:
-    ansi-regex "^5.0.1"
-
-strip-ansi@^6.0.0, strip-ansi@^6.0.1:
+"strip-ansi-cjs@npm:strip-ansi@^6.0.1", strip-ansi@^6.0.0, strip-ansi@^6.0.1:
   version "6.0.1"
   resolved "https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz"
   integrity sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==
@@ -13556,16 +13540,7 @@ word-wrap@^1.2.5:
   resolved "https://registry.npmjs.org/word-wrap/-/word-wrap-1.2.5.tgz"
   integrity sha512-BN22B5eaMMI9UMtjrGd5g5eCYPpCPDUy0FJXbYsaT5zYxjFOckS53SQDE3pWkVoWpHXVb3BrYcEN4Twa55B5cA==
 
-"wrap-ansi-cjs@npm:wrap-ansi@^7.0.0":
-  version "7.0.0"
-  resolved "https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-7.0.0.tgz"
-  integrity sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==
-  dependencies:
-    ansi-styles "^4.0.0"
-    string-width "^4.1.0"
-    strip-ansi "^6.0.0"
-
-wrap-ansi@^7.0.0:
+"wrap-ansi-cjs@npm:wrap-ansi@^7.0.0", wrap-ansi@^7.0.0:
   version "7.0.0"
   resolved "https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-7.0.0.tgz"
   integrity sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==
