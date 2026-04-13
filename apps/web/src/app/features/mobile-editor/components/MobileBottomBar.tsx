@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { Loader2, Play, Plus } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown, Loader2, Play, Plus } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 
@@ -16,6 +16,8 @@ interface MobileBottomBarProps {
     progress: RunProgress | null;
     isReadOnly?: boolean;
     nodeCount: number;
+    isAllCollapsed?: boolean;
+    onToggleCollapseAll?: () => void;
 }
 
 export const MobileBottomBar = ({
@@ -25,6 +27,8 @@ export const MobileBottomBar = ({
     progress,
     isReadOnly,
     nodeCount,
+    isAllCollapsed,
+    onToggleCollapseAll,
 }: MobileBottomBarProps) => {
     const { t } = useTranslation(['flows']);
 
@@ -42,13 +46,35 @@ export const MobileBottomBar = ({
             )}
         >
             <div className="flex items-center gap-2.5 px-4 py-2.5">
+                {/* Collapse/Expand All */}
+                {nodeCount > 0 && onToggleCollapseAll && (
+                    <button
+                        type="button"
+                        onClick={onToggleCollapseAll}
+                        disabled={isRunning}
+                        aria-label={isAllCollapsed ? 'Expand all' : 'Collapse all'}
+                        className={cn(
+                            'w-11 h-11 rounded-xl flex items-center justify-center shrink-0',
+                            'bg-card border border-border/50',
+                            'active:scale-[0.96] transition-all duration-150',
+                            'disabled:opacity-40'
+                        )}
+                    >
+                        {isAllCollapsed ? (
+                            <ChevronsUpDown className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                            <ChevronsDownUp className="w-4 h-4 text-muted-foreground" />
+                        )}
+                    </button>
+                )}
+
                 {/* Add Block */}
                 <button
                     onClick={onAddBlock}
                     disabled={isRunning}
                     className={cn(
                         'flex items-center gap-2 px-4 h-11 rounded-xl shrink-0',
-                        'bg-card border border-border/50',
+                        'bg-card border border-primary/20 hover:border-primary/40 hover:bg-primary/5',
                         'text-sm font-medium',
                         'active:scale-[0.96] transition-all duration-150',
                         'disabled:opacity-40'
@@ -75,7 +101,7 @@ export const MobileBottomBar = ({
                     {/* Progress fill */}
                     {isRunning && progress && (
                         <div
-                            className="absolute inset-y-0 left-0 bg-warning/10 transition-[width] duration-500 ease-out"
+                            className="absolute inset-y-0 left-0 bg-warning/15 transition-[width] duration-300 ease-out"
                             style={{ width: `${progressPct}%` }}
                         />
                     )}

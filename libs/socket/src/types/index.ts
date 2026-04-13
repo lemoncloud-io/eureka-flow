@@ -18,7 +18,7 @@ export type {
 // Re-export from sockets API package
 export type { SocketActionType, SocketModelMeta, SocketPayload, SocketResponse } from '@lemoncloud/eureka-sockets-api';
 
-import type { SocketNodeEvent, SocketTraceEvent } from '@flows/flows';
+import type { SocketEvent, SocketNodeEvent, SocketTraceEvent } from '@flows/flows';
 import type { SocketResponse } from '@lemoncloud/eureka-sockets-api';
 
 /**
@@ -66,12 +66,14 @@ export interface FlowUpdateMessage {
  * Port update notification from WebSocket
  * Received when port data (input/output) changes
  *
+ * Extends `SocketEvent` for consistent field naming (`ts` instead of `timestamp`).
+ *
  * @example
  * {
  *   "type": "node/port",
  *   "id": "1000637:in@in",
  *   "flowId": "1000088",
- *   "timestamp": 1771810838212,
+ *   "ts": 1771810838212,
  *   "no": 42
  * }
  *
@@ -80,22 +82,12 @@ export interface FlowUpdateMessage {
  * - direction: "in" or "out"
  * - portName: port identifier (e.g., "in", "out", "data")
  */
-export interface PortUpdateMessage {
+export interface PortUpdateMessage extends SocketEvent {
     type: 'node/port';
-    id: string;
+    /** (optional) id of flow */
     flowId?: string;
-    timestamp?: number;
-    /**
-     * Message sequence number (monotonically increasing)
-     * Higher values indicate more recent updates - used for ordering
-     */
-    no?: number;
     /** Run correlation ID — links port update to a specific execution run */
     runId?: string;
-    /** Always empty string for node/port messages (server sends uniformly) */
-    stage?: string;
-    /** Always empty string for node/port messages (server sends uniformly) */
-    state?: string;
 }
 
 /**

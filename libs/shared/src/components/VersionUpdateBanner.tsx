@@ -31,8 +31,8 @@ export const VersionUpdateBanner = ({
         >
             <div className="mx-auto max-w-2xl rounded-lg border border-border bg-background p-4 shadow-lg">
                 <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900">
-                        <RefreshCw className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning/15">
+                        <RefreshCw className="h-4 w-4 text-warning" />
                     </div>
                     <div className="flex-1">
                         <h4 className="text-sm font-semibold text-foreground">{t('common:version.newAvailable')}</h4>
@@ -40,11 +40,7 @@ export const VersionUpdateBanner = ({
                             {t('common:version.newReleased', { latestVersion, currentVersion })}
                         </p>
                         <div className="mt-3 flex gap-2">
-                            <Button
-                                size="sm"
-                                onClick={() => window.location.reload()}
-                                className="bg-orange-500 text-white hover:bg-orange-600"
-                            >
+                            <Button variant="warning" size="sm" onClick={() => window.location.reload()}>
                                 <RefreshCw className="mr-2 h-3 w-3" />
                                 {t('common:actions.refresh')}
                             </Button>

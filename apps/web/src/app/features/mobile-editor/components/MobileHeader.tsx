@@ -90,7 +90,7 @@ export const MobileHeader = ({
         >
             <button
                 onClick={() => navigate('/')}
-                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
+                className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
             >
                 <ArrowLeft className="w-5 h-5" />
             </button>
@@ -141,7 +141,7 @@ export const MobileHeader = ({
 
             <button
                 onClick={onOpenFlowMap}
-                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
+                className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
             >
                 <MapIcon className="w-[18px] h-[18px]" />
             </button>
@@ -149,14 +149,14 @@ export const MobileHeader = ({
             <button
                 onClick={onSave}
                 disabled={isSaving}
-                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0 disabled:opacity-40"
+                className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0 disabled:opacity-40"
             >
                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
             </button>
 
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <button className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0">
+                    <button className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0">
                         <Menu className="w-5 h-5" />
                     </button>
                 </DropdownMenuTrigger>
