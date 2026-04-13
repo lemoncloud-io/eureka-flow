@@ -65,6 +65,13 @@ const STEREO_ACCENT: Record<string, string> = {
     output: 'border-l-success',
 };
 
+/** Category-based icon container background for instant visual recognition */
+const STEREO_ICON_BG: Record<string, string> = {
+    input: 'bg-primary/10',
+    process: 'bg-muted/50',
+    output: 'bg-success/10',
+};
+
 interface MobileNodeCardProps {
     node: NodeData;
     nodeConnections: { inputs: Connection[]; outputs: Connection[] };
@@ -141,7 +148,7 @@ export const MobileNodeCard = React.memo(
         return (
             <div
                 className={cn(
-                    'rounded-lg border bg-card shadow-sm border-l-[3px] transition-all duration-200',
+                    'rounded-lg border bg-card shadow-sm border-l-4 transition-all duration-200',
                     leftBorder,
                     state === 'RUNNING' && 'shadow-md',
                     isSelected && 'ring-2 ring-primary/30 shadow-md'
@@ -155,7 +162,12 @@ export const MobileNodeCard = React.memo(
                         onClick={() => onTapCard(node.id)}
                         className="flex-1 min-w-0 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform text-left"
                     >
-                        <div className="w-9 h-9 rounded-md bg-muted/40 flex items-center justify-center shrink-0">
+                        <div
+                            className={cn(
+                                'w-9 h-9 rounded-md flex items-center justify-center shrink-0 transition-colors duration-200',
+                                STEREO_ICON_BG[stereo] ?? 'bg-muted/50'
+                            )}
+                        >
                             <BlockIcon icon={blockDef?.icon} size={16} />
                         </div>
 
@@ -268,7 +280,7 @@ export const MobileNodeCard = React.memo(
                                     }
                                     className={cn(
                                         'w-full flex items-center gap-1.5 text-[11px] px-3 py-2.5 min-h-[44px] -mx-0.5 rounded-md',
-                                        'transition-colors active:scale-[0.98]',
+                                        'transition-all duration-150 active:scale-[0.98]',
                                         'text-left',
                                         isConnected
                                             ? 'bg-success/5 hover:bg-success/10'

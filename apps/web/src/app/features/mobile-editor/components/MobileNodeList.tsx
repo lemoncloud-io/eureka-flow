@@ -101,8 +101,10 @@ export const MobileNodeList = ({
                                 transition={{ duration: 0.2, ease: 'easeOut' }}
                             >
                                 {idx > 0 && showConnector && (
-                                    <div className="flex justify-center -my-0.5">
-                                        <ChevronDown className="w-4 h-4 text-primary/30" />
+                                    <div className="flex flex-col items-center -my-1 py-0.5">
+                                        <div className="w-px h-1.5 bg-primary/20" />
+                                        <ChevronDown className="w-3.5 h-3.5 text-primary/40 -my-0.5" />
+                                        <div className="w-px h-1.5 bg-primary/20" />
                                     </div>
                                 )}
                                 {isReadOnly ? (

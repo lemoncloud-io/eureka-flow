@@ -74,7 +74,7 @@ export const MobileBottomBar = ({
                     disabled={isRunning}
                     className={cn(
                         'flex items-center gap-2 px-4 h-11 rounded-xl shrink-0',
-                        'bg-card border border-border/50',
+                        'bg-card border border-primary/20 hover:border-primary/40 hover:bg-primary/5',
                         'text-sm font-medium',
                         'active:scale-[0.96] transition-all duration-150',
                         'disabled:opacity-40'
@@ -101,7 +101,7 @@ export const MobileBottomBar = ({
                     {/* Progress fill */}
                     {isRunning && progress && (
                         <div
-                            className="absolute inset-y-0 left-0 bg-warning/10 transition-[width] duration-500 ease-out"
+                            className="absolute inset-y-0 left-0 bg-warning/15 transition-[width] duration-300 ease-out"
                             style={{ width: `${progressPct}%` }}
                         />
                     )}

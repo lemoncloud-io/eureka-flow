@@ -12,9 +12,9 @@ import { BlockIcon } from '../../flows/components/BlockIcon';
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
 
 const CATEGORY_CONFIG = {
-    inputs: { icon: FileInput, label: 'sidebar.inputs', color: 'text-primary' },
-    process: { icon: RefreshCw, label: 'sidebar.process', color: 'text-muted-foreground' },
-    outputs: { icon: Eye, label: 'sidebar.output', color: 'text-success' },
+    inputs: { icon: FileInput, label: 'sidebar.inputs', color: 'text-primary', iconBg: 'bg-primary/10' },
+    process: { icon: RefreshCw, label: 'sidebar.process', color: 'text-muted-foreground', iconBg: 'bg-muted/50' },
+    outputs: { icon: Eye, label: 'sidebar.output', color: 'text-success', iconBg: 'bg-success/10' },
 } as const;
 
 const CATEGORIES = Object.keys(CATEGORY_CONFIG) as Array<keyof typeof CATEGORY_CONFIG>;
@@ -183,7 +183,12 @@ export const MobileBlockLibrarySheet = ({
                                                     )}
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
+                                                        <div
+                                                            className={cn(
+                                                                'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
+                                                                config.iconBg
+                                                            )}
+                                                        >
                                                             <BlockIcon
                                                                 icon={block.icon}
                                                                 size={16}
