@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-13] - root@0.25.0, @flows/web@0.25.0, @flows/admin@0.12.0
+
+### Features
+
+- migrate socket event types and fix WebSocket message processing
+
 ## [2026-04-10] - root@0.24.0, @flows/web@0.24.0, @flows/admin@0.11.0
 
 ### Features
