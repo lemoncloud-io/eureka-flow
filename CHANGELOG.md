@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-04-13] - root@0.27.0, @flows/web@0.27.0, @flows/admin@0.14.0
+
+### Features
+
+- add live trace indicator and run history panel
+- remove dnd
+- improve mobile UI/UX
+
+### Refactor
+
+- improve visual recognition and styling
+
+### Chores
+
+- resolve merge conflict with develop
+
 ## [2026-04-13] - root@0.26.0, @flows/web@0.26.0, @flows/admin@0.13.0
 
 ### Features
