@@ -46,6 +46,10 @@ export const useSocketHandlers = ({
     const clearTraceLogs = useCanvasStore(state => state.clearTraceLogs);
     const setUpdatedPort = useCanvasStore(state => state.setUpdatedPort);
     const clearUpdatedPort = useCanvasStore(state => state.clearUpdatedPort);
+    const beginRun = useCanvasStore(state => state.beginRun);
+    const appendRunTrace = useCanvasStore(state => state.appendRunTrace);
+    const appendRunPortUpdate = useCanvasStore(state => state.appendRunPortUpdate);
+    const finalizeRun = useCanvasStore(state => state.finalizeRun);
 
     const handleFlowUpdate = useCallback(
         async (flowId: string) => {
@@ -90,6 +94,15 @@ export const useSocketHandlers = ({
             // New execution starting: clear trace logs
             if (state === 'RUNNING' && no !== undefined && no <= 1) {
                 clearTraceLogs(nodeId);
+            }
+
+            if (runId) {
+                if (stage === 'enter' || (state === 'RUNNING' && !stage)) {
+                    beginRun(runId, nodeId, Date.now());
+                }
+                if (state === 'COMPLETED' || state === 'ERROR') {
+                    finalizeRun(runId, nodeId, state, Date.now(), error);
+                }
             }
 
             if (isPort && parentNodeId) {
@@ -159,14 +172,23 @@ export const useSocketHandlers = ({
 
             setTimeout(() => canvasRef.current?.executeNode(nodeId), 0);
         },
-        [blockRegistry, currentFlowId, clearTraceLogs, canvasRef]
+        [blockRegistry, currentFlowId, clearTraceLogs, beginRun, finalizeRun, canvasRef]
     );
 
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
-            const { portId, nodeId, flowId, portName, no } = info;
+            const { portId, nodeId, flowId, portName, no, runId } = info;
 
             if (!flowId || flowId !== currentFlowId) return;
+
+            if (runId && no !== undefined) {
+                appendRunPortUpdate(runId, nodeId, {
+                    portId,
+                    portName,
+                    no,
+                    timestamp: Date.now(),
+                });
+            }
 
             if (no !== undefined) {
                 const prevNo = portNoRef.current.get(portId);
@@ -221,15 +243,18 @@ export const useSocketHandlers = ({
                 console.debug('[handlePortUpdate] Failed to fetch port data:', portId, err);
             }
         },
-        [setUpdatedPort, clearUpdatedPort, blockRegistry, currentFlowId, canvasRef]
+        [setUpdatedPort, clearUpdatedPort, appendRunPortUpdate, blockRegistry, currentFlowId, canvasRef]
     );
 
     const handleTraceUpdate = useCallback(
         (info: TraceUpdateInfo) => {
             const { nodeId, seq, ts, stage, message, runId, data } = info;
             appendTraceLog(nodeId, { seq, ts, stage, message, runId, data });
+            if (runId) {
+                appendRunTrace(runId, nodeId, { seq, ts, stage, message, runId, data });
+            }
         },
-        [appendTraceLog]
+        [appendTraceLog, appendRunTrace]
     );
 
     // Cleanup highlight timeouts on unmount

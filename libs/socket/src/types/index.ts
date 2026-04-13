@@ -90,6 +90,12 @@ export interface PortUpdateMessage {
      * Higher values indicate more recent updates - used for ordering
      */
     no?: number;
+    /** Run correlation ID — links port update to a specific execution run */
+    runId?: string;
+    /** Always empty string for node/port messages (server sends uniformly) */
+    stage?: string;
+    /** Always empty string for node/port messages (server sends uniformly) */
+    state?: string;
 }
 
 /**

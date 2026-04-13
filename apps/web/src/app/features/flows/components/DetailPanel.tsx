@@ -38,6 +38,7 @@ import { ContentPreviewModal } from './ContentPreviewModal';
 import { FilePreviewDialog } from './FilePreviewDialog';
 import { FrontendBadge } from './FrontendBadge';
 import { ImageEditorDialog } from './ImageEditorDialog';
+import { RunHistoryPanel } from './RunHistoryPanel';
 import { S3Image } from './S3Image';
 import { TouchDialog } from './TouchDialog';
 import { INPUT_FILE_ACCEPT, clearFileConfig, processUploadedFile, tryParseJson } from '../utils';
@@ -1032,6 +1033,9 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         </div>
                     </CollapsibleSection>
                 </div>
+
+                {/* Execution History */}
+                <RunHistoryPanel nodeId={selectedNode.id} />
 
                 {/* Footer Actions */}
                 <div className="px-2.5 py-2 border-t border-border/40 bg-surface-elevated/20 flex items-center gap-1 flex-shrink-0">

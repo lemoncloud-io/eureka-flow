@@ -213,6 +213,8 @@ export interface PortUpdateInfo {
      * Higher values indicate more recent updates - used for ordering
      */
     no?: number;
+    /** Run correlation ID — links port update to a specific execution run */
+    runId?: string;
 }
 
 export interface UseInitFlowSocketOptions {
@@ -435,6 +437,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         flowId: data.flowId,
                         timestamp: data.timestamp,
                         no: data.no,
+                        runId: data.runId,
                     });
                 }
             }

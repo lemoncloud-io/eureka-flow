@@ -785,3 +785,27 @@ export interface SystemComponent {
 export interface SystemInfo {
     components: SystemComponent[];
 }
+
+// ============================================================================
+// Execution Stack (Run Context)
+// ============================================================================
+
+/** Port update recorded within a run context */
+export interface RunPortUpdate {
+    portId: string;
+    portName: string;
+    no: number;
+    timestamp: number;
+}
+
+/** Single execution context identified by runId */
+export interface RunContext {
+    runId: string;
+    nodeId: string;
+    state: 'RUNNING' | 'COMPLETED' | 'ERROR';
+    startedAt?: number;
+    completedAt?: number;
+    traces: TraceEntry[];
+    portUpdates: RunPortUpdate[];
+    error?: string;
+}
