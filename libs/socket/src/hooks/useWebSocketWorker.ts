@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 
 import type {
     BaseWebSocketMessage,
@@ -61,10 +62,12 @@ export const useWebSocketWorker = <TMessage extends BaseWebSocketMessage = BaseW
                     if (messageParser) {
                         const parsed = messageParser(data);
                         if (parsed) {
-                            setLastMessage(parsed);
+                            // flushSync forces synchronous render + effects before returning,
+                            // preventing React 18 batching from dropping rapid messages
+                            flushSync(() => setLastMessage(parsed));
                         }
                     } else {
-                        setLastMessage(data as TMessage);
+                        flushSync(() => setLastMessage(data as TMessage));
                     }
                     break;
 

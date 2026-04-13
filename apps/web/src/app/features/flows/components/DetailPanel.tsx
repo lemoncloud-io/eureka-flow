@@ -448,6 +448,10 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     );
 };
 
+const playIconCls = 'w-3.5 h-3.5 flex-shrink-0 fill-current';
+const utilBtnCls =
+    'h-8 w-8 rounded-lg transition-all duration-150 active:scale-[0.92] flex items-center justify-center';
+
 export const DetailPanel: React.FC<DetailPanelProps> = ({
     selectedNode,
     selectedConnection,
@@ -1030,50 +1034,62 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-3 border-t border-border/50 bg-surface-elevated/30 flex gap-2 flex-shrink-0">
-                    {/* Run button: hidden when isRunnable is explicitly false or stereo is 'output' */}
-                    {/* Process stereo: split button with run-only and run-with-propagation */}
+                <div className="px-2.5 py-2 border-t border-border/40 bg-surface-elevated/20 flex items-center gap-1 flex-shrink-0">
+                    {/* Run buttons */}
                     {def?.stereo !== 'output' &&
                         def?.isRunnable !== false &&
                         (def?.stereo === 'process' ? (
-                            <div className="flex-1 flex gap-1">
+                            <div className="flex-1 min-w-0 flex gap-1">
                                 <button
                                     onClick={() => onTriggerNode(selectedNode.id, { propagate: false })}
-                                    className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                    className="h-8 flex-1 min-w-0 group bg-primary hover:bg-primary/85 active:scale-[0.98] text-primary-foreground text-xs rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.1)]"
                                 >
-                                    <Play className="w-3.5 h-3.5" /> {t('nodes:actions.runThisOnly')}
+                                    <Play className={playIconCls} />
+                                    <span className="truncate">{t('nodes:actions.runThisOnly')}</span>
                                 </button>
                                 <button
                                     onClick={() => onTriggerNode(selectedNode.id, { propagate: true })}
-                                    className="flex-1 bg-green-600 hover:bg-green-600/90 text-white text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                    className="h-8 flex-1 min-w-0 group border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-[0.98] text-emerald-600 dark:text-emerald-400 text-xs rounded-lg font-medium transition-all duration-150 flex items-center justify-center gap-1.5"
                                 >
-                                    <Play className="w-3.5 h-3.5" /> {t('nodes:actions.runAndPropagate')}
+                                    <Zap className="w-3 h-3 flex-shrink-0" />
+                                    <span className="truncate">{t('nodes:actions.runAndPropagate')}</span>
                                 </button>
                             </div>
                         ) : (
                             <button
                                 onClick={() => onTriggerNode(selectedNode.id)}
-                                className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                className="h-8 flex-1 min-w-0 group bg-primary hover:bg-primary/85 active:scale-[0.98] text-primary-foreground text-xs rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.1)]"
                             >
-                                <Play className="w-3.5 h-3.5" /> {t('flows:detailPanel.runBlock')}
+                                <Play className={playIconCls} />
+                                <span className="truncate">{t('flows:detailPanel.runBlock')}</span>
                             </button>
                         ))}
-                    {import.meta.env.DEV && (
+
+                    {/* Utility icons — fixed width, never shrink */}
+                    <div className="flex-shrink-0 flex items-center">
+                        {import.meta.env.DEV && (
+                            <button
+                                onClick={() => setIsTouchDialogOpen(true)}
+                                className={cn(
+                                    utilBtnCls,
+                                    'text-muted-foreground/40 hover:text-warning hover:bg-warning/10'
+                                )}
+                                title={t('flows:detailPanel.touchDebug')}
+                            >
+                                <Wrench className="w-3.5 h-3.5" />
+                            </button>
+                        )}
                         <button
-                            onClick={() => setIsTouchDialogOpen(true)}
-                            className="px-3 bg-warning/10 border border-warning/30 hover:bg-warning/20 text-warning text-xs rounded-lg transition-colors flex items-center justify-center"
-                            title={t('flows:detailPanel.touchDebug')}
+                            onClick={() => onDeleteNode(selectedNode.id)}
+                            className={cn(
+                                utilBtnCls,
+                                'text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10'
+                            )}
+                            title={t('common:actions.delete')}
                         >
-                            <Wrench className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                    )}
-                    <button
-                        onClick={() => onDeleteNode(selectedNode.id)}
-                        className="px-3 bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs rounded-lg transition-colors flex items-center justify-center"
-                        title={t('common:actions.delete')}
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </div>
                 </div>
 
                 {/* Touch Debug Dialog for Node (Dev only) */}

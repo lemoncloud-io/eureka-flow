@@ -224,7 +224,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             return map;
         }, [updatedPortIds]);
 
-        const { syncNodeUpdate, createNodeAsync, flushPendingUpdates, waitForNodeId, getSyncedConfig } = useNodeSync({
+        const { syncNodeUpdate, createNodeAsync, waitForNodeId, getSyncedConfig } = useNodeSync({
             flowId: flowId ?? null,
         });
         const { createEdgeAsync, pendingEdgeIds } = useEdgeSync({ flowId: flowId ?? null });
@@ -974,12 +974,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             }
 
                             // State priority: only update if server state is more "final"
-                            // EXCEPTION: If RUNNING with progress, force update (active execution)
+                            // EXCEPTION: If RUNNING with progress AND not already terminal, force update
                             // Use getEffectiveState for backward compatibility (state preferred, status fallback)
                             const serverState = getEffectiveState(serverData.state, serverData.status);
                             const currentState = getEffectiveState(n.state, n.status);
+                            const isTerminalCurrent = currentState === 'COMPLETED' || currentState === 'ERROR';
                             const isActiveExecution =
-                                serverState === 'RUNNING' && serverData.executionStats?.progress !== undefined;
+                                serverState === 'RUNNING' &&
+                                serverData.executionStats?.progress !== undefined &&
+                                !isTerminalCurrent;
                             const finalState =
                                 isActiveExecution || shouldUpdateState(currentState, serverState)
                                     ? serverState
@@ -1057,9 +1060,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 options?: { propagate?: boolean }
             ) => {
                 if (readOnly) return;
-
-                // Flush any pending config updates before execution
-                await flushPendingUpdates();
 
                 const startTime = Date.now();
 
@@ -1353,7 +1353,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [readOnly, blockRegistry, t, flowId, connectionId, connections, flushPendingUpdates, getSyncedConfig]
+            [readOnly, blockRegistry, t, flowId, connectionId, connections, getSyncedConfig]
         );
 
         executeNodeRef.current = executeNode;

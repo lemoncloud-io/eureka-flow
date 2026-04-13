@@ -37,6 +37,7 @@ export const useSocketHandlers = ({
     serializeWorkflowState,
 }: UseSocketHandlersParams) => {
     const nodeNoRef = useRef<Map<string, number>>(new Map());
+    const nodeRunIdRef = useRef<Map<string, string>>(new Map());
     const portNoRef = useRef<Map<string, number>>(new Map());
     const highlightTimeoutsRef = useRef<Map<string, number>>(new Map());
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
@@ -63,9 +64,20 @@ export const useSocketHandlers = ({
 
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
-            const { nodeId, flowId, isPort, parentNodeId, state, progress, no, stereo, error, errorMessage } = info;
+            const { nodeId, flowId, isPort, parentNodeId, state, progress, no, stage, error } = info;
 
-            if (!flowId || flowId !== currentFlowId) return;
+            // Node messages may omit flowId — channel subscription already filters by flow
+            if (flowId && flowId !== currentFlowId) return;
+
+            // Reset sequence tracking when runId changes (new execution run)
+            const { runId } = info;
+            if (runId) {
+                const prevRunId = nodeRunIdRef.current.get(nodeId);
+                if (prevRunId && prevRunId !== runId) {
+                    nodeNoRef.current.delete(nodeId);
+                }
+                nodeRunIdRef.current.set(nodeId, runId);
+            }
 
             if (no !== undefined) {
                 const prevNo = nodeNoRef.current.get(nodeId);
@@ -75,6 +87,7 @@ export const useSocketHandlers = ({
 
             if (!canvasRef.current) return;
 
+            // New execution starting: clear trace logs
             if (state === 'RUNNING' && no !== undefined && no <= 1) {
                 clearTraceLogs(nodeId);
             }
@@ -87,8 +100,8 @@ export const useSocketHandlers = ({
             }
 
             if (state === 'ERROR') {
-                let errMsg = error ?? errorMessage;
-                if (stereo !== 0 && stereo !== '') {
+                let errMsg = error;
+                if (stage !== 'final') {
                     try {
                         const nodeData = await getNode(nodeId);
                         errMsg = nodeData.error ?? nodeData.errorMessage;
@@ -213,8 +226,8 @@ export const useSocketHandlers = ({
 
     const handleTraceUpdate = useCallback(
         (info: TraceUpdateInfo) => {
-            const { nodeId, traceId, seq, ts, stage, message, runId, type, data } = info;
-            appendTraceLog(nodeId, { traceId, seq, ts, stage, message, runId, type, data });
+            const { nodeId, seq, ts, stage, message, runId, data } = info;
+            appendTraceLog(nodeId, { seq, ts, stage, message, runId, data });
         },
         [appendTraceLog]
     );
@@ -231,6 +244,7 @@ export const useSocketHandlers = ({
     // Clear sequence tracking when flow changes
     useEffect(() => {
         nodeNoRef.current.clear();
+        nodeRunIdRef.current.clear();
         portNoRef.current.clear();
         highlightTimeoutsRef.current.forEach(id => window.clearTimeout(id));
         highlightTimeoutsRef.current.clear();
