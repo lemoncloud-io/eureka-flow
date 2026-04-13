@@ -3,8 +3,8 @@ import type { Connection, NodeData } from '@lemoncloud/eureka-flows-api';
 /**
  * Topological sort of nodes using Kahn's algorithm.
  * Nodes with no incoming edges come first.
- * Tiebreaker: position.y (preserves desktop vertical order).
- * Disconnected nodes are appended at the end.
+ * Tiebreaker: original array index (preserves user-defined order from drag reorder).
+ * Disconnected nodes are appended in their original array order.
  */
 export const topologicalSort = (nodes: NodeData[], connections: Connection[]): string[] => {
     if (nodes.length === 0) return [];
@@ -12,12 +12,13 @@ export const topologicalSort = (nodes: NodeData[], connections: Connection[]): s
     const nodeIds = new Set(nodes.map(n => n.id));
     const inDegree = new Map<string, number>();
     const adjacency = new Map<string, string[]>();
-    const positionY = new Map<string, number>();
+    const arrayIndex = new Map<string, number>();
 
-    for (const node of nodes) {
+    for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
         inDegree.set(node.id, 0);
         adjacency.set(node.id, []);
-        positionY.set(node.id, node.position?.y ?? 0);
+        arrayIndex.set(node.id, i);
     }
 
     for (const conn of connections) {
@@ -26,12 +27,12 @@ export const topologicalSort = (nodes: NodeData[], connections: Connection[]): s
         inDegree.set(conn.targetNodeId, (inDegree.get(conn.targetNodeId) ?? 0) + 1);
     }
 
-    // Collect nodes with zero in-degree, sorted by position.y
+    // Collect nodes with zero in-degree, sorted by array index
     const queue: string[] = [];
     for (const [id, degree] of inDegree) {
         if (degree === 0) queue.push(id);
     }
-    queue.sort((a, b) => (positionY.get(a) ?? 0) - (positionY.get(b) ?? 0));
+    queue.sort((a, b) => (arrayIndex.get(a) ?? 0) - (arrayIndex.get(b) ?? 0));
 
     const result: string[] = [];
     const visited = new Set<string>();
@@ -53,12 +54,11 @@ export const topologicalSort = (nodes: NodeData[], connections: Connection[]): s
             }
         }
 
-        // Sort newly ready neighbors by position.y before adding
-        readyNeighbors.sort((a, b) => (positionY.get(a) ?? 0) - (positionY.get(b) ?? 0));
+        readyNeighbors.sort((a, b) => (arrayIndex.get(a) ?? 0) - (arrayIndex.get(b) ?? 0));
         queue.push(...readyNeighbors);
     }
 
-    // Append any remaining nodes (cycles or disconnected)
+    // Append any remaining nodes (cycles or disconnected) in original order
     for (const node of nodes) {
         if (!visited.has(node.id)) {
             result.push(node.id);

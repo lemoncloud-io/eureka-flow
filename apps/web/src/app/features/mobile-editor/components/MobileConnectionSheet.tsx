@@ -81,8 +81,10 @@ export const MobileConnectionSheet = ({
                             Connect output
                         </SheetTitle>
                         <button
+                            type="button"
+                            aria-label="Close"
                             onClick={() => onOpenChange(false)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors"
+                            className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors"
                         >
                             <X className="w-4 h-4 text-muted-foreground" />
                         </button>
@@ -164,7 +166,7 @@ export const MobileConnectionSheet = ({
                                             key={`${target.nodeId}-${target.portId}`}
                                             onClick={() => onConnect(target.nodeId, target.portId)}
                                             className={cn(
-                                                'w-full flex items-center gap-2.5 px-3 py-2 rounded-xl',
+                                                'w-full flex items-center gap-2.5 px-3 py-2 min-h-[44px] rounded-xl',
                                                 'border border-border/40 bg-card',
                                                 'hover:border-primary/30 hover:bg-primary/5',
                                                 'active:scale-[0.97] transition-all duration-150',

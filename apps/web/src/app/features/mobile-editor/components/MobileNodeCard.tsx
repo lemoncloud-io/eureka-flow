@@ -1,6 +1,16 @@
 import React, { useCallback } from 'react';
 
-import { AlertCircle, ArrowDownLeft, ArrowUpRight, Check, ChevronRight, Link, Loader2, Play } from 'lucide-react';
+import {
+    AlertCircle,
+    ArrowDownLeft,
+    ArrowUpRight,
+    Check,
+    ChevronDown,
+    ChevronRight,
+    Link,
+    Loader2,
+    Play,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { EXECUTE_FUNCTIONS, runNode, useBlockRegistry, useCanvasStore } from '@flows/flows';
@@ -64,6 +74,8 @@ interface MobileNodeCardProps {
     socketConnectionId?: string;
     isSelected?: boolean;
     flowId: string | null;
+    isCollapsed?: boolean;
+    onToggleCollapse?: (nodeId: string) => void;
 }
 
 export const MobileNodeCard = React.memo(
@@ -76,6 +88,8 @@ export const MobileNodeCard = React.memo(
         socketConnectionId,
         isSelected,
         flowId,
+        isCollapsed,
+        onToggleCollapse,
     }: MobileNodeCardProps) => {
         const blockRegistry = useBlockRegistry();
         const blockDef: BlockDefinitionWithFrontend | undefined = blockRegistry[node.type];
@@ -134,18 +148,14 @@ export const MobileNodeCard = React.memo(
                 )}
             >
                 {/* Header row */}
-                <div className="w-full px-3 py-2.5 flex items-center gap-2.5">
-                    {/* Tappable area for config — not a button to avoid nesting */}
-                    <div
-                        role="button"
-                        tabIndex={0}
+                <div className="w-full px-3 py-3 min-h-[44px] flex items-center gap-2.5">
+                    {/* Tappable area for config */}
+                    <button
+                        type="button"
                         onClick={() => onTapCard(node.id)}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter') onTapCard(node.id);
-                        }}
-                        className="flex-1 min-w-0 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform"
+                        className="flex-1 min-w-0 flex items-center gap-2.5 cursor-pointer active:scale-[0.98] transition-transform text-left"
                     >
-                        <div className="w-8 h-8 rounded-md bg-muted/40 flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 rounded-md bg-muted/40 flex items-center justify-center shrink-0">
                             <BlockIcon icon={blockDef?.icon} size={16} />
                         </div>
 
@@ -159,7 +169,8 @@ export const MobileNodeCard = React.memo(
                         </div>
 
                         {state !== 'IDLE' && (
-                            <div
+                            <span
+                                aria-label={`Node status: ${stateStyle.label}`}
                                 className={cn(
                                     'flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium',
                                     stateStyle.badge,
@@ -168,19 +179,38 @@ export const MobileNodeCard = React.memo(
                             >
                                 {stateStyle.icon}
                                 <span>{stateStyle.label}</span>
-                            </div>
+                            </span>
                         )}
 
-                        <ChevronRight className="w-4 h-4 text-muted-foreground/30 shrink-0" />
-                    </div>
+                        {!onToggleCollapse && <ChevronRight className="w-4 h-4 text-muted-foreground/30 shrink-0" />}
+                    </button>
 
-                    {/* Run button — sibling, not nested */}
+                    {/* Collapse toggle */}
+                    {onToggleCollapse && (
+                        <button
+                            type="button"
+                            onClick={() => onToggleCollapse(node.id)}
+                            aria-label={isCollapsed ? 'Expand node' : 'Collapse node'}
+                            className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-md flex items-center justify-center shrink-0 hover:bg-accent/50 transition-colors"
+                        >
+                            <ChevronDown
+                                className={cn(
+                                    'w-4 h-4 text-muted-foreground/50 transition-transform duration-200',
+                                    isCollapsed && '-rotate-90'
+                                )}
+                            />
+                        </button>
+                    )}
+
+                    {/* Run button */}
                     {blockDef?.isRunnable !== false && (
                         <button
+                            type="button"
                             onClick={handleRun}
                             disabled={state === 'RUNNING'}
+                            aria-label="Run node"
                             className={cn(
-                                'w-8 h-8 rounded-md flex items-center justify-center shrink-0 transition-colors',
+                                'min-w-[44px] min-h-[44px] w-11 h-11 rounded-md flex items-center justify-center shrink-0 transition-colors',
                                 'bg-primary/10 hover:bg-primary/20 text-primary active:scale-90',
                                 'disabled:opacity-40'
                             )}
@@ -194,8 +224,8 @@ export const MobileNodeCard = React.memo(
                     )}
                 </div>
 
-                {/* Connections + output ports */}
-                {(hasConnections || hasOutputPorts) && (
+                {/* Connections + output ports — hidden when collapsed */}
+                {!isCollapsed && (hasConnections || hasOutputPorts) && (
                     <div className="px-3 pb-2.5 space-y-1.5">
                         {/* Input connections — display only */}
                         {inputPorts.map(port => {
@@ -237,7 +267,7 @@ export const MobileNodeCard = React.memo(
                                         )
                                     }
                                     className={cn(
-                                        'w-full flex items-center gap-1.5 text-[11px] px-2 py-1.5 -mx-0.5 rounded-md',
+                                        'w-full flex items-center gap-1.5 text-[11px] px-3 py-2.5 min-h-[44px] -mx-0.5 rounded-md',
                                         'transition-colors active:scale-[0.98]',
                                         'text-left',
                                         isConnected
@@ -274,26 +304,27 @@ export const MobileNodeCard = React.memo(
                     </div>
                 )}
 
-                {/* Inline error message */}
-                {state === 'ERROR' && 'error' in node && typeof node.error === 'string' && node.error && (
-                    <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => onTapCard(node.id)}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter') onTapCard(node.id);
-                        }}
-                        className="px-3 pb-2.5 -mt-0.5 cursor-pointer"
-                    >
-                        <div className="flex items-center gap-1.5 rounded-md bg-destructive/5 px-2 py-1 min-w-0">
-                            <AlertCircle className="w-2.5 h-2.5 shrink-0 text-destructive/50" />
-                            <span className="text-[10px] text-destructive/50 truncate">{node.error}</span>
-                        </div>
-                    </div>
-                )}
+                {/* Inline error message — hidden when collapsed */}
+                {!isCollapsed &&
+                    state === 'ERROR' &&
+                    'error' in node &&
+                    typeof node.error === 'string' &&
+                    node.error && (
+                        <button
+                            type="button"
+                            onClick={() => onTapCard(node.id)}
+                            className="w-full px-3 pb-2.5 -mt-0.5 cursor-pointer text-left"
+                        >
+                            <div className="flex items-center gap-1.5 rounded-md bg-destructive/5 px-2 py-1 min-w-0">
+                                <AlertCircle className="w-2.5 h-2.5 shrink-0 text-destructive/50" />
+                                <span className="text-[10px] text-destructive/50 truncate">{node.error}</span>
+                            </div>
+                        </button>
+                    )}
 
-                {/* Inline output preview after completion */}
-                {state === 'COMPLETED' &&
+                {/* Inline output preview — hidden when collapsed */}
+                {!isCollapsed &&
+                    state === 'COMPLETED' &&
                     node.outputData &&
                     (() => {
                         const entries = Object.entries(node.outputData).slice(0, 2);
@@ -308,20 +339,16 @@ export const MobileNodeCard = React.memo(
                             })
                             .join(' · ');
                         return (
-                            <div
-                                role="button"
-                                tabIndex={0}
+                            <button
+                                type="button"
                                 onClick={() => onTapCard(node.id)}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter') onTapCard(node.id);
-                                }}
-                                className="px-3 pb-2.5 -mt-0.5 cursor-pointer flex items-center gap-1.5 text-[10px] text-success/50 truncate"
+                                className="w-full px-3 pb-2.5 -mt-0.5 cursor-pointer flex items-center gap-1.5 text-[10px] text-success/50 truncate text-left"
                             >
                                 <div className="flex items-center gap-1.5 rounded-md bg-success/5 px-2 py-1 min-w-0">
                                     <Check className="w-2.5 h-2.5 shrink-0" />
                                     <span className="truncate">{preview}</span>
                                 </div>
-                            </div>
+                            </button>
                         );
                     })()}
             </div>

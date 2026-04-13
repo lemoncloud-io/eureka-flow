@@ -207,7 +207,7 @@ export interface PortUpdateInfo {
     /** Flow ID */
     flowId?: string;
     /** Timestamp when port data changed */
-    timestamp?: number;
+    ts?: number;
     /**
      * Message sequence number (monotonically increasing)
      * Higher values indicate more recent updates - used for ordering
@@ -415,9 +415,9 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
             // Triggered when port data (input/output) changes
             // Used for real-time data synchronization between browser tabs
             if (isPortUpdateMessage(data)) {
-                // Skip if flowId is missing or doesn't match current flow
-                const isForCurrentFlow = data.flowId && data.flowId === currentFlowId;
-                if (!isForCurrentFlow) {
+                // Skip if flowId is present but doesn't match current flow
+                // Port messages may omit flowId — channel subscription already filters by flow
+                if (data.flowId && data.flowId !== currentFlowId) {
                     return;
                 }
 
@@ -435,7 +435,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         portName: parsed.portName,
                         direction: parsed.direction, // from @suffix
                         flowId: data.flowId,
-                        timestamp: data.timestamp,
+                        ts: data.ts,
                         no: data.no,
                         runId: data.runId,
                     });

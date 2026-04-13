@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChevronDown, ChevronRight, Eye, FileInput, Puzzle, RefreshCw, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Clock, Eye, FileInput, Puzzle, RefreshCw, Search, X } from 'lucide-react';
 
-import { useBlockGroups } from '@flows/flows';
+import { useBlockGroups, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Sheet, SheetContent, SheetTitle } from '@flows/ui-kit';
 
@@ -23,9 +23,15 @@ interface MobileBlockLibrarySheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onAddBlock: (type: string) => void;
+    recentBlockIds?: string[];
 }
 
-export const MobileBlockLibrarySheet = ({ open, onOpenChange, onAddBlock }: MobileBlockLibrarySheetProps) => {
+export const MobileBlockLibrarySheet = ({
+    open,
+    onOpenChange,
+    onAddBlock,
+    recentBlockIds,
+}: MobileBlockLibrarySheetProps) => {
     const { t } = useTranslation(['flows']);
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedCategories, setExpandedCategories] = useState<Set<keyof typeof CATEGORY_CONFIG>>(
@@ -34,6 +40,11 @@ export const MobileBlockLibrarySheet = ({ open, onOpenChange, onAddBlock }: Mobi
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     const blockGroups = useBlockGroups(searchQuery);
+    const blockRegistry = useBlockRegistry();
+    const recentBlocks = useMemo(
+        () => (recentBlockIds ?? []).map(id => blockRegistry[id]).filter(Boolean),
+        [recentBlockIds, blockRegistry]
+    );
 
     const handleAddBlock = (block: BlockDefinitionWithFrontend) => {
         onAddBlock(block.id);
@@ -90,6 +101,38 @@ export const MobileBlockLibrarySheet = ({ open, onOpenChange, onAddBlock }: Mobi
                         </button>
                     )}
                 </div>
+
+                {/* Recent blocks — hidden during search or when empty */}
+                {!searchQuery && recentBlocks.length > 0 && (
+                    <div className="mb-4">
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <Clock className="w-3.5 h-3.5 text-muted-foreground/60" />
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                {t('sidebar.recent', 'Recent')}
+                            </span>
+                        </div>
+                        <div className="flex overflow-x-auto gap-2 pb-2 -mx-1 px-1">
+                            {recentBlocks.map(block => (
+                                <button
+                                    key={block.id}
+                                    onClick={() => handleAddBlock(block)}
+                                    className={cn(
+                                        'flex flex-col items-center gap-1.5 p-2.5 rounded-xl min-w-[72px] shrink-0',
+                                        'border border-border/50 bg-card',
+                                        'hover:bg-accent/50 active:scale-[0.96] transition-all'
+                                    )}
+                                >
+                                    <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center">
+                                        <BlockIcon icon={block.icon} size={14} />
+                                    </div>
+                                    <span className="text-[10px] font-medium text-foreground/70 truncate max-w-[64px]">
+                                        {block.label}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Categories */}
                 <div className="space-y-2 overflow-y-auto max-h-[60vh] pb-4">
