@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import { toast } from 'sonner';
 
-import { getPortData, useCanvasStore, useFlows } from '@flows/flows';
+import { getPortData, useCanvasStore, useFlows, useFlowsStore } from '@flows/flows';
 import { useInitFlowSocket } from '@flows/socket';
 
 import type { SerializeWorkflowFn } from './types';
@@ -83,7 +83,7 @@ export const useMobileSocketSync = ({
 
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
-            const { portId, nodeId, flowId, portName, no } = info;
+            const { portId, nodeId, flowId, portName, direction, no } = info;
 
             // Port messages may omit flowId — channel subscription already filters by flow
             if (flowId && flowId !== currentFlowId) return;
@@ -95,22 +95,30 @@ export const useMobileSocketSync = ({
                 portNoRef.current.set(portId, no);
             }
 
-            // Fetch port data and update node in canvas store
-            const isOutputPort = portName === 'out';
-            const direction = isOutputPort ? 'out' : 'in';
+            const isOutputPort = direction === 'out' || portName === 'out';
+
+            // Skip input ports on non-terminal nodes — intermediate data will be overwritten
+            if (!isOutputPort) {
+                const node = useCanvasStore.getState().nodes.find(n => n.id === nodeId);
+                if (node?.type) {
+                    const blockDef = useFlowsStore.getState().blockRegistry[node.type];
+                    if (blockDef?.output$ && blockDef.output$.length > 0) return;
+                }
+            }
+
+            const dir = isOutputPort ? 'out' : 'in';
 
             try {
-                const portData = await getPortData(portId, direction);
+                const portData = await getPortData(portId, dir);
+
+                // Last-write-wins: skip if a newer message arrived while fetching
+                if (no !== undefined && portNoRef.current.get(portId) !== no) return;
+
                 if (portData?.data) {
-                    const dataPacket = {
-                        value: portData.data.value,
-                        type: portData.data.type,
-                        timestamp: portData.data.timestamp,
-                    };
-                    const portKey = portData.portId || portName || direction;
+                    const portKey = portData.portId || portName || dir;
                     const updates = isOutputPort
-                        ? { outputData: { [portKey]: dataPacket } }
-                        : { inputData: { [portKey]: dataPacket } };
+                        ? { outputData: { [portKey]: portData.data } }
+                        : { inputData: { [portKey]: portData.data } };
                     useCanvasStore.getState().updateNodeData(nodeId, updates as Partial<NodeData>);
                 }
             } catch (err) {
@@ -126,14 +134,9 @@ export const useMobileSocketSync = ({
     );
 
     const handleTraceUpdate = useCallback((info: TraceUpdateInfo) => {
-        useCanvasStore.getState().appendTraceLog(info.nodeId, {
-            seq: info.seq,
-            ts: info.ts,
-            stage: info.stage,
-            message: info.message,
-            runId: info.runId,
-            data: info.data,
-        });
+         
+        const { nodeId, flowId: _flowId, state: _state, ...entry } = info;
+        useCanvasStore.getState().appendTraceLog(nodeId, entry);
     }, []);
 
     const getLastLocalUpdateTimestamp = useCallback(

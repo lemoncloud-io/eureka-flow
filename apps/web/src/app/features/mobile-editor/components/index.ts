@@ -1,4 +1,3 @@
-export { DragHandle } from './DragHandle';
 export { MobileBlockLibrarySheet } from './MobileBlockLibrarySheet';
 export { MobileBottomBar } from './MobileBottomBar';
 export { MobileConnectionSheet } from './MobileConnectionSheet';
