@@ -15,6 +15,7 @@ export * from './Minimap';
 export * from './MobileControls';
 export * from './NodeBlock';
 export * from './PublishDialog';
+export * from './RunHistoryPanel';
 export * from './S3Image';
 export * from './Sidebar';
 export * from './ThumbnailPicker';
