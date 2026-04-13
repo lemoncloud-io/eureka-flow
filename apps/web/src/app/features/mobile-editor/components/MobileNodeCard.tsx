@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { EXECUTE_FUNCTIONS, runNode, useBlockRegistry, useCanvasStore } from '@flows/flows';
+import { EXECUTE_FUNCTIONS, runNode, useBlockRegistry, useCanvasStore, useNodeTraceLogs } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { TYPE_DOT } from './consts';
@@ -70,6 +70,25 @@ const STEREO_ICON_BG: Record<string, string> = {
     input: 'bg-primary/10',
     process: 'bg-muted/50',
     output: 'bg-success/10',
+};
+
+/** Shows the latest trace message when a node is running */
+const LiveTraceIndicator = ({ nodeId }: { nodeId: string }) => {
+    const traces = useNodeTraceLogs(nodeId);
+    const latest = traces.length > 0 ? traces[traces.length - 1] : null;
+    if (!latest?.message) return null;
+
+    return (
+        <div className="px-3 pb-2 -mt-0.5">
+            <div className="flex items-center gap-1.5 rounded-md bg-warning/5 px-2 py-1.5 min-w-0 overflow-hidden">
+                <Loader2 className="w-2.5 h-2.5 shrink-0 text-warning/60 animate-spin" />
+                <span className="text-[10px] text-warning/70 truncate">
+                    {latest.stage && <span className="font-medium mr-1">{latest.stage}:</span>}
+                    {latest.message}
+                </span>
+            </div>
+        </div>
+    );
 };
 
 interface MobileNodeCardProps {
@@ -315,6 +334,9 @@ export const MobileNodeCard = React.memo(
                         })}
                     </div>
                 )}
+
+                {/* Live trace indicator — visible when running and not collapsed */}
+                {!isCollapsed && state === 'RUNNING' && <LiveTraceIndicator nodeId={node.id} />}
 
                 {/* Inline error message — hidden when collapsed */}
                 {!isCollapsed &&

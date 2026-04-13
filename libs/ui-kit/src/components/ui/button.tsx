@@ -13,6 +13,8 @@ const buttonVariants = cva(
                 default:
                     'bg-primary text-primary-foreground rounded-full hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground',
                 destructive: 'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
+                warning:
+                    'bg-warning text-warning-foreground rounded-full shadow-sm hover:bg-warning/90 disabled:opacity-50',
                 outline:
                     'border border-border rounded-full bg-background hover:bg-accent disabled:border-muted disabled:text-muted-foreground',
                 secondary:

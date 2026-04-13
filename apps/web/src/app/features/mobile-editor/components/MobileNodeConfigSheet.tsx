@@ -31,6 +31,7 @@ import { cn } from '@flows/lib/utils';
 import { Button, Input, Label, Sheet, SheetContent, SheetTitle, Switch, Textarea } from '@flows/ui-kit';
 
 import { BlockIcon } from '../../flows/components/BlockIcon';
+import { RunHistoryPanel } from '../../flows/components/RunHistoryPanel';
 import { S3Image } from '../../flows/components/S3Image';
 import { INPUT_FILE_ACCEPT, clearFileConfig, isTempId, processUploadedFile } from '../../flows/utils';
 import { deleteNodeWithSync, hydrateInputPorts } from '../utils';
@@ -763,6 +764,9 @@ export const MobileNodeConfigSheet = ({
                             )}
                         </div>
                     )}
+
+                    {/* Execution History */}
+                    {node && <RunHistoryPanel nodeId={node.id} maxHeight="240px" />}
 
                     {/* Delete button */}
                     <div className="pt-4 border-t border-border">

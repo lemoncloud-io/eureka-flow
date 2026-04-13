@@ -28,7 +28,16 @@ export const useMobileSocketSync = ({
 }: UseMobileSocketSyncParams): UseMobileSocketSyncReturn => {
     const { currentFlowId, channelId, loadFlowById } = useFlows();
 
+    // RunContext store actions
+    const beginRun = useCanvasStore(state => state.beginRun);
+    const appendRunTrace = useCanvasStore(state => state.appendRunTrace);
+    const appendRunPortUpdate = useCanvasStore(state => state.appendRunPortUpdate);
+    const finalizeRun = useCanvasStore(state => state.finalizeRun);
+    const appendTraceLog = useCanvasStore(state => state.appendTraceLog);
+    const clearTraceLogs = useCanvasStore(state => state.clearTraceLogs);
+
     const nodeNoRef = useRef<Map<string, number>>(new Map());
+    const nodeRunIdRef = useRef<Map<string, string>>(new Map());
     const portNoRef = useRef<Map<string, number>>(new Map());
 
     const handleFlowUpdate = useCallback(
@@ -48,15 +57,38 @@ export const useMobileSocketSync = ({
 
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
-            const { nodeId, flowId, state, no, error } = info;
+            const { nodeId, flowId, state, no, stage, error, runId } = info;
 
-            // Node messages may omit flowId — channel subscription already filters by flow
             if (flowId && flowId !== currentFlowId) return;
+
+            // Reset sequence tracking when runId changes (new execution run)
+            if (runId) {
+                const prevRunId = nodeRunIdRef.current.get(nodeId);
+                if (prevRunId && prevRunId !== runId) {
+                    nodeNoRef.current.delete(nodeId);
+                }
+                nodeRunIdRef.current.set(nodeId, runId);
+            }
 
             if (no !== undefined) {
                 const prevNo = nodeNoRef.current.get(nodeId);
                 if (prevNo !== undefined && prevNo >= no) return;
                 nodeNoRef.current.set(nodeId, no);
+            }
+
+            // Clear trace logs on new execution start
+            if (state === 'RUNNING' && no !== undefined && no <= 1) {
+                clearTraceLogs(nodeId);
+            }
+
+            // Track execution history via RunContext
+            if (runId) {
+                if (stage === 'enter' || (state === 'RUNNING' && !stage)) {
+                    beginRun(runId, nodeId, Date.now());
+                }
+                if (state === 'COMPLETED' || state === 'ERROR') {
+                    finalizeRun(runId, nodeId, state, Date.now(), error);
+                }
             }
 
             const { updateNodeData } = useCanvasStore.getState();
@@ -78,15 +110,24 @@ export const useMobileSocketSync = ({
                 toast.success(`Node completed`, { duration: 3000 });
             }
         },
-        [currentFlowId]
+        [currentFlowId, clearTraceLogs, beginRun, finalizeRun]
     );
 
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
-            const { portId, nodeId, flowId, portName, direction, no } = info;
+            const { portId, nodeId, flowId, portName, direction, no, runId } = info;
 
-            // Port messages may omit flowId — channel subscription already filters by flow
             if (flowId && flowId !== currentFlowId) return;
+
+            // Record port update in RunContext before sequence dedup
+            if (runId && no !== undefined) {
+                appendRunPortUpdate(runId, nodeId, {
+                    portId,
+                    portName,
+                    no,
+                    timestamp: Date.now(),
+                });
+            }
 
             // Sequence dedup
             if (no !== undefined) {
@@ -97,7 +138,7 @@ export const useMobileSocketSync = ({
 
             const isOutputPort = direction === 'out' || portName === 'out';
 
-            // Skip input ports on non-terminal nodes — intermediate data will be overwritten
+            // Skip input ports on non-terminal nodes
             if (!isOutputPort) {
                 const node = useCanvasStore.getState().nodes.find(n => n.id === nodeId);
                 if (node?.type) {
@@ -122,7 +163,6 @@ export const useMobileSocketSync = ({
                     useCanvasStore.getState().updateNodeData(nodeId, updates as Partial<NodeData>);
                 }
             } catch (err) {
-                // Roll back sequence tracking so retry can succeed
                 if (no !== undefined) {
                     const prevNo = portNoRef.current.get(portId);
                     if (prevNo === no) portNoRef.current.delete(portId);
@@ -130,14 +170,19 @@ export const useMobileSocketSync = ({
                 console.debug('[MobileSocketSync] Failed to fetch port data:', portId, err);
             }
         },
-        [currentFlowId]
+        [currentFlowId, appendRunPortUpdate]
     );
 
-    const handleTraceUpdate = useCallback((info: TraceUpdateInfo) => {
-         
-        const { nodeId, flowId: _flowId, state: _state, ...entry } = info;
-        useCanvasStore.getState().appendTraceLog(nodeId, entry);
-    }, []);
+    const handleTraceUpdate = useCallback(
+        (info: TraceUpdateInfo) => {
+            const { nodeId, seq, ts, stage, message, runId, data } = info;
+            appendTraceLog(nodeId, { seq, ts, stage, message, runId, data });
+            if (runId) {
+                appendRunTrace(runId, nodeId, { seq, ts, stage, message, runId, data });
+            }
+        },
+        [appendTraceLog, appendRunTrace]
+    );
 
     const getLastLocalUpdateTimestamp = useCallback(
         () => lastLocalUpdateTimestampRef.current,
@@ -157,6 +202,7 @@ export const useMobileSocketSync = ({
     // Clear sequence tracking on flow change
     useEffect(() => {
         nodeNoRef.current.clear();
+        nodeRunIdRef.current.clear();
         portNoRef.current.clear();
     }, [currentFlowId]);
 
