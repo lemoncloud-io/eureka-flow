@@ -4,11 +4,14 @@ import { useTranslation } from 'react-i18next';
 import {
     Braces,
     Check,
+    ChevronDown,
+    ChevronUp,
     Copy,
     Expand,
     Hash,
     Image,
     Loader2,
+    MoreVertical,
     Pencil,
     Play,
     RefreshCw,
@@ -1194,6 +1197,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
     const isProcessNode = definition?.stereo === 'process';
     const iconBtnBase = 'text-muted-foreground/60 w-6 h-6 flex items-center justify-center rounded-md transition-all';
 
+    const [showMenu, setShowMenu] = useState(false);
     const [isEditingLabel, setIsEditingLabel] = useState(false);
     const [tempLabel, setTempLabel] = useState(node.customLabel || '');
     const labelInputRef = useRef<HTMLInputElement>(null);
@@ -1464,36 +1468,83 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                     <button
                         onClick={e => {
                             e.stopPropagation();
-                            setIsEditingLabel(true);
+                            setShowMenu(!showMenu);
                         }}
                         className={cn(iconBtnBase, 'hover:text-foreground hover:bg-muted/50')}
-                        title={t('contextMenu.rename')}
                     >
-                        <Pencil className="w-3 h-3" />
+                        <MoreVertical className="w-3.5 h-3.5" />
                     </button>
-                    {onDuplicate && (
-                        <button
-                            onClick={e => {
-                                e.stopPropagation();
-                                onDuplicate();
-                            }}
-                            className={cn(iconBtnBase, 'hover:text-foreground hover:bg-muted/50')}
-                            title={t('contextMenu.duplicate')}
-                        >
-                            <Copy className="w-3 h-3" />
-                        </button>
-                    )}
-                    {nodeState === 'ERROR' && (
-                        <button
-                            onClick={e => {
-                                e.stopPropagation();
-                                onTrigger();
-                            }}
-                            className={cn(iconBtnBase, 'hover:text-amber-500 hover:bg-amber-500/10')}
-                            title={t('contextMenu.retry')}
-                        >
-                            <RefreshCw className="w-3 h-3" />
-                        </button>
+
+                    {showMenu && (
+                        <>
+                            <div
+                                className="fixed inset-0 z-40"
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    setShowMenu(false);
+                                }}
+                                onWheel={e => e.stopPropagation()}
+                            />
+                            <div
+                                className="absolute right-0 top-8 w-36 bg-popover/95 backdrop-blur-md border border-border rounded-lg shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100"
+                                onWheel={e => e.stopPropagation()}
+                            >
+                                <button
+                                    onClick={e => {
+                                        e.stopPropagation();
+                                        setShowMenu(false);
+                                        setIsEditingLabel(true);
+                                    }}
+                                    className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
+                                >
+                                    <Pencil className="w-3 h-3" /> {t('contextMenu.rename')}
+                                </button>
+                                {onDuplicate && (
+                                    <button
+                                        onClick={e => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            onDuplicate();
+                                        }}
+                                        className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
+                                    >
+                                        <Copy className="w-3 h-3" /> {t('contextMenu.duplicate')}
+                                    </button>
+                                )}
+                                {nodeState === 'ERROR' && (
+                                    <button
+                                        onClick={e => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            onTrigger();
+                                        }}
+                                        className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
+                                    >
+                                        <RefreshCw className="w-3 h-3" /> {t('contextMenu.retry')}
+                                    </button>
+                                )}
+                                {onToggleCollapsed && (
+                                    <button
+                                        onClick={e => {
+                                            e.stopPropagation();
+                                            setShowMenu(false);
+                                            onToggleCollapsed();
+                                        }}
+                                        className="text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent/50 flex items-center gap-2 transition-colors"
+                                    >
+                                        {isCollapsed ? (
+                                            <>
+                                                <ChevronDown className="w-3 h-3" /> {t('contextMenu.expand')}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ChevronUp className="w-3 h-3" /> {t('contextMenu.collapse')}
+                                            </>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
+                        </>
                     )}
 
                     <button
