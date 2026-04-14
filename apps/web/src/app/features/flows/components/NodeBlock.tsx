@@ -1076,7 +1076,7 @@ const ProcessRunButtons: React.FC<{
                     'w-6 h-6 rounded-md flex items-center justify-center transition-all',
                     isRunning
                         ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
-                        : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                        : 'bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400'
                 )}
                 title={t('actions.runOptions')}
             >
