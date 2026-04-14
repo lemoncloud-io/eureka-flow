@@ -55,6 +55,9 @@ import {
 import type { FlowRole, LoadFlowPortData, NodeState, RunNodeBody } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
+/** Stable empty array to avoid new references in render loop */
+const EMPTY_STRING_ARRAY: string[] = [];
+
 /** Shallow equality for flat string records (key-order independent) */
 const isConfigEqual = (a: Record<string, string>, b: Record<string, string>): boolean => {
     const keysA = Object.keys(a);
@@ -258,7 +261,35 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         const canvasRef = useRef<HTMLDivElement>(null);
 
-        const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
+        // Viewport lives in a ref to avoid re-rendering the entire node tree on every wheel tick.
+        // DOM elements (transform container, grid) are updated directly; displayViewport is
+        // debounced so ZoomControls/Minimap only re-render after interaction settles.
+        const viewportRef = useRef({ x: 0, y: 0, zoom: 1 });
+        const transformRef = useRef<HTMLDivElement>(null);
+        const gridRef = useRef<HTMLDivElement>(null);
+        const [displayViewport, setDisplayViewport] = useState({ x: 0, y: 0, zoom: 1 });
+        const displayTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+        useEffect(() => {
+            return () => clearTimeout(displayTimerRef.current);
+        }, []);
+
+        const updateViewport = useCallback((vp: { x: number; y: number; zoom: number }) => {
+            viewportRef.current = vp;
+            if (transformRef.current) {
+                transformRef.current.style.transform = `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`;
+            }
+            if (gridRef.current) {
+                const size = GRID_SIZE * vp.zoom;
+                gridRef.current.style.backgroundSize = `${size}px ${size}px`;
+                gridRef.current.style.backgroundPosition = `${vp.x}px ${vp.y}px`;
+            }
+            clearTimeout(displayTimerRef.current);
+            displayTimerRef.current = setTimeout(() => {
+                setDisplayViewport(vp);
+            }, 150);
+        }, []);
+
         const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
         const [isPanning, setIsPanning] = useState(false);
         const lastMousePosRef = useRef({ x: 0, y: 0 });
@@ -281,8 +312,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             handleTouchMove: handleCanvasTouchMove,
             handleTouchEnd: handleCanvasTouchEnd,
         } = useTouchCanvas({
-            viewport,
-            setViewport,
+            viewportRef,
+            updateViewport,
             minZoom: MIN_ZOOM,
             maxZoom: MAX_ZOOM,
             canvasRef,
@@ -449,17 +480,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [onNodeSelect]
         );
 
-        const screenToWorld = useCallback(
-            (clientX: number, clientY: number) => {
-                const rect = canvasRef.current?.getBoundingClientRect();
-                if (!rect) return { x: 0, y: 0 };
-                return {
-                    x: (clientX - rect.left - viewport.x) / viewport.zoom,
-                    y: (clientY - rect.top - viewport.y) / viewport.zoom,
-                };
-            },
-            [viewport]
-        );
+        const screenToWorld = useCallback((clientX: number, clientY: number) => {
+            const rect = canvasRef.current?.getBoundingClientRect();
+            if (!rect) return { x: 0, y: 0 };
+            const vp = viewportRef.current;
+            return {
+                x: (clientX - rect.left - vp.x) / vp.zoom,
+                y: (clientY - rect.top - vp.y) / vp.zoom,
+            };
+        }, []);
 
         // eslint-disable-next-line @typescript-eslint/no-empty-function -- initialized before useImperativeHandle sets the real function
         const addNodeRef = useRef<(type: string, position?: { x: number; y: number }) => void>(() => {});
@@ -525,8 +554,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     startY = sourceNode.position.y;
                 } else {
                     const rect = canvasRef.current?.getBoundingClientRect();
-                    const centerX = rect ? (rect.width / 2 - viewport.x) / viewport.zoom : 100;
-                    const centerY = rect ? (rect.height / 2 - viewport.y) / viewport.zoom : 100;
+                    const vp = viewportRef.current;
+                    const centerX = rect ? (rect.width / 2 - vp.x) / vp.zoom : 100;
+                    const centerY = rect ? (rect.height / 2 - vp.y) / vp.zoom : 100;
                     startX = centerX - 100 + (Math.random() * 40 - 20);
                     startY = centerY - 50 + (Math.random() * 40 - 20);
                 }
@@ -812,7 +842,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     setConnections([]);
                     pastRef.current = [];
                     futureRef.current = [];
-                    setViewport({ x: 0, y: 0, zoom: 1 });
+                    updateViewport({ x: 0, y: 0, zoom: 1 });
                     handleSelectionChange(null);
                 },
                 undo,
@@ -927,7 +957,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     });
 
                     setNodes(positionedNodes);
-                    setViewport({ x: 20, y: 20, zoom: 1 });
+                    updateViewport({ x: 20, y: 20, zoom: 1 });
                 },
                 executeNode: async (nodeId: string) => {
                     if (executeNodeRef.current) {
@@ -1099,7 +1129,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         }, [
             nodes,
             connections,
-            viewport,
             permissions,
             flowId,
             undo,
@@ -1617,28 +1646,31 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const handleWheel = (e: React.WheelEvent) => {
             const rect = canvasRef.current?.getBoundingClientRect();
             if (!rect) return;
+            const vp = viewportRef.current;
             const delta = -e.deltaY * 0.001;
-            const newZoom = Math.min(Math.max(viewport.zoom + delta, MIN_ZOOM), MAX_ZOOM);
+            const newZoom = Math.min(Math.max(vp.zoom + delta, MIN_ZOOM), MAX_ZOOM);
 
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
 
-            const worldX = (mouseX - viewport.x) / viewport.zoom;
-            const worldY = (mouseY - viewport.y) / viewport.zoom;
+            const worldX = (mouseX - vp.x) / vp.zoom;
+            const worldY = (mouseY - vp.y) / vp.zoom;
 
             const newX = mouseX - worldX * newZoom;
             const newY = mouseY - worldY * newZoom;
 
-            setViewport({ x: newX, y: newY, zoom: newZoom });
+            updateViewport({ x: newX, y: newY, zoom: newZoom });
         };
 
         const handleZoomIn = useCallback(() => {
-            setViewport(prev => ({ ...prev, zoom: Math.min(prev.zoom * 1.2, MAX_ZOOM) }));
-        }, []);
+            const vp = viewportRef.current;
+            updateViewport({ ...vp, zoom: Math.min(vp.zoom * 1.2, MAX_ZOOM) });
+        }, [updateViewport]);
 
         const handleZoomOut = useCallback(() => {
-            setViewport(prev => ({ ...prev, zoom: Math.max(prev.zoom / 1.2, MIN_ZOOM) }));
-        }, []);
+            const vp = viewportRef.current;
+            updateViewport({ ...vp, zoom: Math.max(vp.zoom / 1.2, MIN_ZOOM) });
+        }, [updateViewport]);
 
         const handleFitToScreen = useCallback(() => {
             if (nodes.length === 0) return;
@@ -1676,12 +1708,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             const newX = rect.width / 2 - centerX * newZoom;
             const newY = rect.height / 2 - centerY * newZoom;
 
-            setViewport({ x: newX, y: newY, zoom: newZoom });
-        }, [nodes]);
+            updateViewport({ x: newX, y: newY, zoom: newZoom });
+        }, [nodes, updateViewport]);
 
         const handleResetView = useCallback(() => {
-            setViewport({ x: 0, y: 0, zoom: 1 });
-        }, []);
+            updateViewport({ x: 0, y: 0, zoom: 1 });
+        }, [updateViewport]);
 
         const handleCanvasMouseDown = (e: React.MouseEvent) => {
             portMouseDownPosRef.current = null;
@@ -1840,8 +1872,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                 const screenDx = touch.clientX - dragState.startX;
                 const screenDy = touch.clientY - dragState.startY;
-                const dx = screenDx / viewport.zoom;
-                const dy = screenDy / viewport.zoom;
+                const dx = screenDx / viewportRef.current.zoom;
+                const dy = screenDy / viewportRef.current.zoom;
 
                 // Move all nodes that are being dragged
                 setNodes(prev =>
@@ -1860,7 +1892,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                 lastTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
             },
-            [dragState, permissions.canDragNodes, viewport.zoom]
+            [dragState, permissions.canDragNodes]
         );
 
         // Touch end handler for node dragging
@@ -1921,7 +1953,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             if (isPanning) {
                 const dx = e.clientX - lastMousePosRef.current.x;
                 const dy = e.clientY - lastMousePosRef.current.y;
-                setViewport(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+                const vp = viewportRef.current;
+                updateViewport({ ...vp, x: vp.x + dx, y: vp.y + dy });
                 lastMousePosRef.current = { x: e.clientX, y: e.clientY };
                 return;
             }
@@ -1929,8 +1962,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             if (dragState && permissions.canDragNodes) {
                 const screenDx = e.clientX - dragState.startX;
                 const screenDy = e.clientY - dragState.startY;
-                const dx = screenDx / viewport.zoom;
-                const dy = screenDy / viewport.zoom;
+                const dx = screenDx / viewportRef.current.zoom;
+                const dy = screenDy / viewportRef.current.zoom;
 
                 // Move all nodes that are being dragged
                 setNodes(prev =>
@@ -2374,12 +2407,26 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             hoveredConnectionId,
             clipboard,
             permissions.canEdit,
-            viewport,
             saveCheckpoint,
             handleSelectionChange,
             createNodeAsync,
             flowId,
         ]);
+
+        // Pre-compute connected ports per node — avoids O(connections) per node per render
+        const connectedPortsByNodeId = useMemo(() => {
+            const map = new Map<string, string[]>();
+            connections.forEach(c => {
+                const src = map.get(c.sourceNodeId) ?? [];
+                src.push(c.sourcePortId);
+                map.set(c.sourceNodeId, src);
+
+                const tgt = map.get(c.targetNodeId) ?? [];
+                tgt.push(c.targetPortId);
+                map.set(c.targetNodeId, tgt);
+            });
+            return map;
+        }, [connections]);
 
         const activeConnectionId = selectedConnectionId || hoveredConnectionId;
         const activeConnection = activeConnectionId ? connections.find(c => c.id === activeConnectionId) : null;
@@ -2456,12 +2503,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 >
                     {/* Background Grid - always visible with subtle opacity */}
                     <div
+                        ref={gridRef}
                         className="absolute inset-0 pointer-events-none transition-opacity duration-300 ease-in-out z-0"
                         style={{
                             opacity: dragState ? 0.4 : 0.15,
                             backgroundImage: 'radial-gradient(hsl(var(--muted-foreground) / 0.5) 1px, transparent 1px)',
-                            backgroundSize: `${GRID_SIZE * viewport.zoom}px ${GRID_SIZE * viewport.zoom}px`,
-                            backgroundPosition: `${viewport.x}px ${viewport.y}px`,
+                            backgroundSize: `${GRID_SIZE * viewportRef.current.zoom}px ${GRID_SIZE * viewportRef.current.zoom}px`,
+                            backgroundPosition: `${viewportRef.current.x}px ${viewportRef.current.y}px`,
                         }}
                     />
 
@@ -2471,9 +2519,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     )}
 
                     <div
+                        ref={transformRef}
                         className="absolute origin-top-left w-full h-full pointer-events-none z-10"
                         style={{
-                            transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+                            transform: `translate(${viewportRef.current.x}px, ${viewportRef.current.y}px) scale(${viewportRef.current.zoom})`,
                         }}
                     >
                         <svg className="absolute overflow-visible top-0 left-0 w-full h-full">
@@ -2573,10 +2622,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     highlightedPorts.push(activeConnection.targetPortId);
                                 }
 
-                                // Calculate connected ports for this node
-                                const connectedPorts = connections
-                                    .filter(c => c.sourceNodeId === node.id || c.targetNodeId === node.id)
-                                    .map(c => (c.sourceNodeId === node.id ? c.sourcePortId : c.targetPortId));
+                                const connectedPorts = connectedPortsByNodeId.get(node.id) ?? EMPTY_STRING_ARRAY;
 
                                 return (
                                     <div key={node.id} className="relative">
@@ -2643,7 +2689,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     {/* Desktop Zoom Controls - hidden on mobile */}
                     <div data-canvas-overlay>
                         <ZoomControls
-                            zoom={viewport.zoom}
+                            zoom={displayViewport.zoom}
                             onZoomIn={handleZoomIn}
                             onZoomOut={handleZoomOut}
                             onFitToScreen={handleFitToScreen}
@@ -2658,10 +2704,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             <Minimap
                                 nodes={nodes}
                                 connections={connections}
-                                viewport={viewport}
+                                viewport={displayViewport}
                                 canvasWidth={canvasSize.width}
                                 canvasHeight={canvasSize.height}
-                                onViewportChange={setViewport}
+                                onViewportChange={updateViewport}
                             />
                         </div>
                     )}
