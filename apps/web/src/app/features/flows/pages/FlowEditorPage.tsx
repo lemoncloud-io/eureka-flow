@@ -356,6 +356,14 @@ export const FlowEditorPage = () => {
         canvasRef.current?.addNode(type);
     }, []);
 
+    const handleRunAll = useCallback(async () => {
+        try {
+            await canvasRef.current?.runAll();
+        } catch {
+            showNotification(t('flowEditor.failedToRunFlow', 'Failed to run flow'), 'error');
+        }
+    }, [t]);
+
     const handleSelectionChange = (nodeId: string | null) => {
         updateUrl(currentFlowId, nodeId);
     };
@@ -616,6 +624,7 @@ export const FlowEditorPage = () => {
                     onSave: handleSave,
                     onCollapseAll: () => canvasRef.current?.collapseAll(),
                     onExpandAll: () => canvasRef.current?.expandAll(),
+                    onRunAll: handleRunAll,
                 }}
                 saveState={{
                     isSaving,

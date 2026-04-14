@@ -17,6 +17,7 @@ import {
     LayoutGrid,
     MapPin,
     Menu,
+    Play,
     Redo2,
     Save,
     Trash2,
@@ -64,6 +65,7 @@ export interface EditActionsProps {
     onSave: () => void;
     onCollapseAll?: () => void;
     onExpandAll?: () => void;
+    onRunAll?: () => void;
 }
 
 export interface SocketStateProps {
@@ -412,6 +414,13 @@ export const Header: React.FC<HeaderProps> = ({
                                 tooltip={t('header.saveFlow')}
                                 shortcut="⌘S"
                                 variant={getSaveButtonVariant()}
+                            />
+                        )}
+                        {!isPublicMode && editActions.onRunAll && (
+                            <ToolbarButton
+                                onClick={editActions.onRunAll}
+                                icon={<Play className="w-4 h-4" />}
+                                tooltip={t('header.runAll')}
                             />
                         )}
                         <ToolbarButton

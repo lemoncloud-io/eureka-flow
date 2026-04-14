@@ -15,6 +15,7 @@ import {
     getNodeWidth,
     getPortData,
     loadFlow,
+    runFlow,
     runNode,
     shouldUpdateState,
     toPortVariantData,
@@ -99,6 +100,8 @@ export interface WorkflowCanvasRef {
     collapseAll: () => void;
     /** Expand all nodes */
     expandAll: () => void;
+    /** Run all input nodes with auto-execution enabled */
+    runAll: () => Promise<void>;
 }
 
 interface WorkflowCanvasProps {
@@ -1050,12 +1053,46 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 expandAll: () => {
                     useCanvasStore.getState().setAllNodesCollapsed(false);
                 },
+                runAll: async () => {
+                    if (readOnly || !flowId) return;
+
+                    const inputNodeIdSet = new Set(
+                        nodesRef.current
+                            .filter(n => {
+                                const def = blockRegistry[n.type];
+                                return def?.stereo === 'input' && n.autoExecutionEnabled !== false;
+                            })
+                            .map(n => n.id)
+                    );
+
+                    if (inputNodeIdSet.size === 0) return;
+
+                    const setInputNodeStates = (state: NodeState) => {
+                        setNodes(prev =>
+                            prev.map(n =>
+                                inputNodeIdSet.has(n.id)
+                                    ? { ...n, state, status: state } // status: deprecated, kept for backward compatibility
+                                    : n
+                            )
+                        );
+                    };
+
+                    setInputNodeStates('RUNNING' as NodeState);
+
+                    try {
+                        await runFlow(flowId, [...inputNodeIdSet]);
+                    } catch (error) {
+                        setInputNodeStates('IDLE' as NodeState);
+                        throw error;
+                    }
+                },
             };
         }, [
             nodes,
             connections,
             viewport,
             readOnly,
+            flowId,
             undo,
             redo,
             saveCheckpoint,
