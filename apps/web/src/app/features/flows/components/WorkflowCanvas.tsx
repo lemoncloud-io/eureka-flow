@@ -28,6 +28,7 @@ import {
     useUpdatedPortIds,
 } from '@flows/flows';
 
+import { CanvasContextMenu } from './CanvasContextMenu';
 import { ConnectionLine } from './ConnectionLine';
 import { DataTooltip } from './DataTooltip';
 import { DetailPanel } from './DetailPanel';
@@ -74,7 +75,7 @@ interface WorkflowStateWithPorts extends WorkflowState {
 }
 
 export interface WorkflowCanvasRef {
-    addNode: (type: string) => void;
+    addNode: (type: string, position?: { x: number; y: number }) => void;
     getWorkflow: () => WorkflowState;
     /** Load workflow from server data. Fetches missing port data (data: null) via API. */
     loadWorkflow: (state: WorkflowStateWithPorts) => Promise<void>;
@@ -300,6 +301,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             clickMode?: boolean;
         } | null>(null);
 
+        const [contextMenu, setContextMenu] = useState<{
+            screenX: number;
+            screenY: number;
+            worldX: number;
+            worldY: number;
+        } | null>(null);
+
         const portMouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
 
         // Ref to track latest connectionDraft for touch events (avoids stale closure)
@@ -442,211 +450,218 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [viewport]
         );
 
-        useImperativeHandle(
-            ref,
-            () => ({
-                addNode: (type: string) => {
-                    if (readOnly) return;
-                    saveCheckpoint();
+        // eslint-disable-next-line @typescript-eslint/no-empty-function -- initialized before useImperativeHandle sets the real function
+        const addNodeRef = useRef<(type: string, position?: { x: number; y: number }) => void>(() => {});
 
-                    const newDef = blockRegistry[type];
-                    if (!newDef) return;
+        useImperativeHandle(ref, () => {
+            const addNode = (type: string, position?: { x: number; y: number }) => {
+                if (readOnly) return;
+                saveCheckpoint();
 
-                    let sourceNode: NodeData | undefined;
-                    let sourcePortId: string | undefined;
-                    let targetPortId: string | undefined;
+                const newDef = blockRegistry[type];
+                if (!newDef) return;
 
-                    // Auto-connect only when intent is clear:
-                    // - 0-1 nodes: always auto-connect (obvious target)
-                    // - 2+ nodes: only if a node is selected (explicit intent)
-                    const shouldAutoConnect = nodes.length <= 1 || !!selectedNodeId;
+                let sourceNode: NodeData | undefined;
+                let sourcePortId: string | undefined;
+                let targetPortId: string | undefined;
 
-                    if (shouldAutoConnect && newDef.inputs.length > 0) {
-                        const firstInput = newDef.inputs[0];
-                        targetPortId = firstInput.id;
+                // Auto-connect only when intent is clear:
+                // - 0-1 nodes: always auto-connect (obvious target)
+                // - 2+ nodes: only if a node is selected (explicit intent)
+                const shouldAutoConnect = nodes.length <= 1 || !!selectedNodeId;
 
-                        const findCompatibleOutput = (n: NodeData) => {
-                            const def = blockRegistry[n.type];
-                            if (!def) return undefined;
-                            return def.outputs.find(
-                                out => out.type === firstInput.type || out.type === 'any' || firstInput.type === 'any'
-                            );
-                        };
+                if (shouldAutoConnect && newDef.inputs.length > 0) {
+                    const firstInput = newDef.inputs[0];
+                    targetPortId = firstInput.id;
 
-                        if (selectedNodeId) {
-                            const selected = nodes.find(n => n.id === selectedNodeId);
-                            if (selected) {
-                                const out = findCompatibleOutput(selected);
-                                if (out) {
-                                    sourceNode = selected;
-                                    sourcePortId = out.id;
-                                }
-                            }
-                        }
+                    const findCompatibleOutput = (n: NodeData) => {
+                        const def = blockRegistry[n.type];
+                        if (!def) return undefined;
+                        return def.outputs.find(
+                            out => out.type === firstInput.type || out.type === 'any' || firstInput.type === 'any'
+                        );
+                    };
 
-                        if (!sourceNode && nodes.length > 0) {
-                            const lastNode = nodes[nodes.length - 1];
-                            const out = findCompatibleOutput(lastNode);
+                    if (selectedNodeId) {
+                        const selected = nodes.find(n => n.id === selectedNodeId);
+                        if (selected) {
+                            const out = findCompatibleOutput(selected);
                             if (out) {
-                                sourceNode = lastNode;
+                                sourceNode = selected;
                                 sourcePortId = out.id;
                             }
                         }
                     }
 
-                    let startX = 0;
-                    let startY = 0;
+                    if (!sourceNode && nodes.length > 0) {
+                        const lastNode = nodes[nodes.length - 1];
+                        const out = findCompatibleOutput(lastNode);
+                        if (out) {
+                            sourceNode = lastNode;
+                            sourcePortId = out.id;
+                        }
+                    }
+                }
 
-                    if (sourceNode) {
-                        startX = sourceNode.position.x + 300;
-                        startY = sourceNode.position.y;
-                    } else {
-                        const rect = canvasRef.current?.getBoundingClientRect();
-                        const centerX = rect ? (rect.width / 2 - viewport.x) / viewport.zoom : 100;
-                        const centerY = rect ? (rect.height / 2 - viewport.y) / viewport.zoom : 100;
-                        startX = centerX - 100 + (Math.random() * 40 - 20);
-                        startY = centerY - 50 + (Math.random() * 40 - 20);
+                let startX = 0;
+                let startY = 0;
+
+                if (position) {
+                    startX = position.x;
+                    startY = position.y;
+                } else if (sourceNode) {
+                    startX = sourceNode.position.x + 300;
+                    startY = sourceNode.position.y;
+                } else {
+                    const rect = canvasRef.current?.getBoundingClientRect();
+                    const centerX = rect ? (rect.width / 2 - viewport.x) / viewport.zoom : 100;
+                    const centerY = rect ? (rect.height / 2 - viewport.y) / viewport.zoom : 100;
+                    startX = centerX - 100 + (Math.random() * 40 - 20);
+                    startY = centerY - 50 + (Math.random() * 40 - 20);
+                }
+
+                const snappedX = Math.round(startX / GRID_SIZE) * GRID_SIZE;
+                const snappedY = Math.round(startY / GRID_SIZE) * GRID_SIZE;
+
+                // Generate temp ID for optimistic UI
+                const tempNodeId = generateTempId('node');
+
+                const newNode: NodeData = {
+                    id: tempNodeId,
+                    type,
+                    position: { x: snappedX, y: snappedY },
+                    config: { ...blockRegistry[type].defaultConfig },
+                    state: 'IDLE' as NodeState,
+                    status: 'IDLE', // Deprecated: kept for backward compatibility
+                    inputData: {},
+                    outputData: {},
+                    autoExecutionEnabled: true,
+                };
+
+                // Generate temp edge ID if connection will be created
+                const tempEdgeId = generateTempId('edge');
+                let newConnection: Connection | null = null;
+                if (sourceNode && sourcePortId && targetPortId) {
+                    newConnection = {
+                        id: tempEdgeId,
+                        sourceNodeId: sourceNode.id,
+                        sourcePortId: sourcePortId,
+                        targetNodeId: tempNodeId,
+                        targetPortId: targetPortId,
+                    };
+
+                    if (sourceNode.outputData?.[sourcePortId]) {
+                        newNode.inputData[targetPortId] = sourceNode.outputData[sourcePortId];
+                    }
+                }
+
+                let targetNode: NodeData | undefined;
+                let targetInputPortId: string | undefined;
+                let sourceOutputPortId: string | undefined;
+
+                if (shouldAutoConnect && !newConnection && newDef.outputs.length > 0) {
+                    const firstOutput = newDef.outputs[0];
+
+                    for (const existingNode of nodes) {
+                        const existingDef = blockRegistry[existingNode.type];
+                        if (!existingDef || existingDef.inputs.length === 0) continue;
+
+                        const compatibleInput = existingDef.inputs.find(inp => {
+                            const isConnected = connections.some(
+                                c => c.targetNodeId === existingNode.id && c.targetPortId === inp.id
+                            );
+                            if (isConnected) return false;
+                            return inp.type === firstOutput.type || inp.type === 'any' || firstOutput.type === 'any';
+                        });
+
+                        if (compatibleInput) {
+                            targetNode = existingNode;
+                            targetInputPortId = compatibleInput.id;
+                            sourceOutputPortId = firstOutput.id;
+                            break;
+                        }
                     }
 
-                    const snappedX = Math.round(startX / GRID_SIZE) * GRID_SIZE;
-                    const snappedY = Math.round(startY / GRID_SIZE) * GRID_SIZE;
+                    if (targetNode && targetInputPortId && sourceOutputPortId) {
+                        newConnection = {
+                            id: tempEdgeId,
+                            sourceNodeId: tempNodeId,
+                            sourcePortId: sourceOutputPortId,
+                            targetNodeId: targetNode.id,
+                            targetPortId: targetInputPortId,
+                        };
+                    }
+                }
 
-                    // Generate temp ID for optimistic UI
-                    const tempNodeId = generateTempId('node');
+                // Optimistic UI update
+                setNodes(prev => [...prev, newNode]);
+                if (newConnection) {
+                    setConnections(prev => [...prev, newConnection]);
+                }
 
-                    const newNode: NodeData = {
-                        id: tempNodeId,
+                // Store connection info for later edge creation
+                const connectionToCreate = newConnection;
+
+                // Create node on backend with server-assigned ID
+                createNodeAsync(
+                    tempNodeId,
+                    {
                         type,
                         position: { x: snappedX, y: snappedY },
                         config: { ...blockRegistry[type].defaultConfig },
-                        state: 'IDLE' as NodeState,
-                        status: 'IDLE', // Deprecated: kept for backward compatibility
-                        inputData: {},
-                        outputData: {},
                         autoExecutionEnabled: true,
-                    };
+                    },
+                    (oldTempId, newServerId) => {
+                        replaceNodeIdInState(oldTempId, newServerId, setNodes, setConnections, setSelectedNodeIds);
 
-                    // Generate temp edge ID if connection will be created
-                    const tempEdgeId = generateTempId('edge');
-                    let newConnection: Connection | null = null;
-                    if (sourceNode && sourcePortId && targetPortId) {
-                        newConnection = {
-                            id: tempEdgeId,
-                            sourceNodeId: sourceNode.id,
-                            sourcePortId: sourcePortId,
-                            targetNodeId: tempNodeId,
-                            targetPortId: targetPortId,
-                        };
-
-                        if (sourceNode.outputData?.[sourcePortId]) {
-                            newNode.inputData[targetPortId] = sourceNode.outputData[sourcePortId];
-                        }
-                    }
-
-                    let targetNode: NodeData | undefined;
-                    let targetInputPortId: string | undefined;
-                    let sourceOutputPortId: string | undefined;
-
-                    if (shouldAutoConnect && !newConnection && newDef.outputs.length > 0) {
-                        const firstOutput = newDef.outputs[0];
-
-                        for (const existingNode of nodes) {
-                            const existingDef = blockRegistry[existingNode.type];
-                            if (!existingDef || existingDef.inputs.length === 0) continue;
-
-                            const compatibleInput = existingDef.inputs.find(inp => {
-                                const isConnected = connections.some(
-                                    c => c.targetNodeId === existingNode.id && c.targetPortId === inp.id
-                                );
-                                if (isConnected) return false;
-                                return (
-                                    inp.type === firstOutput.type || inp.type === 'any' || firstOutput.type === 'any'
-                                );
-                            });
-
-                            if (compatibleInput) {
-                                targetNode = existingNode;
-                                targetInputPortId = compatibleInput.id;
-                                sourceOutputPortId = firstOutput.id;
-                                break;
-                            }
-                        }
-
-                        if (targetNode && targetInputPortId && sourceOutputPortId) {
-                            newConnection = {
-                                id: tempEdgeId,
-                                sourceNodeId: tempNodeId,
-                                sourcePortId: sourceOutputPortId,
-                                targetNodeId: targetNode.id,
-                                targetPortId: targetInputPortId,
+                        // Now create the edge on the server if there was a connection
+                        if (connectionToCreate) {
+                            const resolvedConnection = {
+                                ...connectionToCreate,
+                                sourceNodeId:
+                                    connectionToCreate.sourceNodeId === oldTempId
+                                        ? newServerId
+                                        : connectionToCreate.sourceNodeId,
+                                targetNodeId:
+                                    connectionToCreate.targetNodeId === oldTempId
+                                        ? newServerId
+                                        : connectionToCreate.targetNodeId,
                             };
+
+                            // Prepare node data with server ID for upsert
+                            const nodeForServer: NodeData = {
+                                ...newNode,
+                                id: newServerId,
+                            };
+
+                            createEdgeAsync(
+                                tempEdgeId,
+                                {
+                                    sourceNodeId: resolvedConnection.sourceNodeId,
+                                    sourcePortId: resolvedConnection.sourcePortId,
+                                    targetNodeId: resolvedConnection.targetNodeId,
+                                    targetPortId: resolvedConnection.targetPortId,
+                                },
+                                (oldEdgeTempId, newEdgeServerId) => {
+                                    // Replace temp edge ID with server ID
+                                    setConnections(prev =>
+                                        prev.map(c => (c.id === oldEdgeTempId ? { ...c, id: newEdgeServerId } : c))
+                                    );
+                                },
+                                [nodeForServer]
+                            );
                         }
                     }
+                );
 
-                    // Optimistic UI update
-                    setNodes(prev => [...prev, newNode]);
-                    if (newConnection) {
-                        setConnections(prev => [...prev, newConnection]);
-                    }
+                handleSelectionChange(tempNodeId);
+                setSelectedConnectionId(null);
+            };
 
-                    // Store connection info for later edge creation
-                    const connectionToCreate = newConnection;
+            addNodeRef.current = addNode;
 
-                    // Create node on backend with server-assigned ID
-                    createNodeAsync(
-                        tempNodeId,
-                        {
-                            type,
-                            position: { x: snappedX, y: snappedY },
-                            config: { ...blockRegistry[type].defaultConfig },
-                            autoExecutionEnabled: true,
-                        },
-                        (oldTempId, newServerId) => {
-                            replaceNodeIdInState(oldTempId, newServerId, setNodes, setConnections, setSelectedNodeIds);
-
-                            // Now create the edge on the server if there was a connection
-                            if (connectionToCreate) {
-                                const resolvedConnection = {
-                                    ...connectionToCreate,
-                                    sourceNodeId:
-                                        connectionToCreate.sourceNodeId === oldTempId
-                                            ? newServerId
-                                            : connectionToCreate.sourceNodeId,
-                                    targetNodeId:
-                                        connectionToCreate.targetNodeId === oldTempId
-                                            ? newServerId
-                                            : connectionToCreate.targetNodeId,
-                                };
-
-                                // Prepare node data with server ID for upsert
-                                const nodeForServer: NodeData = {
-                                    ...newNode,
-                                    id: newServerId,
-                                };
-
-                                createEdgeAsync(
-                                    tempEdgeId,
-                                    {
-                                        sourceNodeId: resolvedConnection.sourceNodeId,
-                                        sourcePortId: resolvedConnection.sourcePortId,
-                                        targetNodeId: resolvedConnection.targetNodeId,
-                                        targetPortId: resolvedConnection.targetPortId,
-                                    },
-                                    (oldEdgeTempId, newEdgeServerId) => {
-                                        // Replace temp edge ID with server ID
-                                        setConnections(prev =>
-                                            prev.map(c => (c.id === oldEdgeTempId ? { ...c, id: newEdgeServerId } : c))
-                                        );
-                                    },
-                                    [nodeForServer]
-                                );
-                            }
-                        }
-                    );
-
-                    handleSelectionChange(tempNodeId);
-                    setSelectedConnectionId(null);
-                },
+            return {
+                addNode,
                 getWorkflow: () => ({
                     nodes,
                     edges: connections.filter(c => !pendingEdgeIds.has(c.id)),
@@ -1035,23 +1050,22 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 expandAll: () => {
                     useCanvasStore.getState().setAllNodesCollapsed(false);
                 },
-            }),
-            [
-                nodes,
-                connections,
-                viewport,
-                readOnly,
-                undo,
-                redo,
-                saveCheckpoint,
-                selectedNodeId,
-                handleSelectionChange,
-                blockRegistry,
-                createNodeAsync,
-                createEdgeAsync,
-                pendingEdgeIds,
-            ]
-        );
+            };
+        }, [
+            nodes,
+            connections,
+            viewport,
+            readOnly,
+            undo,
+            redo,
+            saveCheckpoint,
+            selectedNodeId,
+            handleSelectionChange,
+            blockRegistry,
+            createNodeAsync,
+            createEdgeAsync,
+            pendingEdgeIds,
+        ]);
 
         const executeNode = useCallback(
             async (
@@ -1603,11 +1617,21 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             }
 
             if (e.button === 0 || e.button === 1) {
+                setContextMenu(null);
                 setIsPanning(true);
                 lastMousePosRef.current = { x: e.clientX, y: e.clientY };
                 handleSelectionChange(null);
                 setSelectedConnectionId(null);
             }
+        };
+
+        const handleCloseContextMenu = useCallback(() => setContextMenu(null), []);
+
+        const handleCanvasContextMenu = (e: React.MouseEvent) => {
+            e.preventDefault();
+            if (readOnly) return;
+            const worldPos = screenToWorld(e.clientX, e.clientY);
+            setContextMenu({ screenX: e.clientX, screenY: e.clientY, worldX: worldPos.x, worldY: worldPos.y });
         };
 
         const handleDoubleClick = () => {
@@ -1618,6 +1642,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string) => {
             if (readOnly) return;
             e.stopPropagation();
+            setContextMenu(null);
 
             if (connectionDraft) {
                 if (connectionDraft.clickMode) setConnectionDraft(null);
@@ -2300,6 +2325,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     className={`relative flex-1 bg-canvas overflow-hidden outline-none ${readOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                     onMouseMove={handleMouseMove}
                     onMouseDown={handleCanvasMouseDown}
+                    onContextMenu={handleCanvasContextMenu}
                     onTouchStart={handleCanvasTouchStart}
                     onTouchMove={e => {
                         if (dragState) {
@@ -2623,6 +2649,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             onShowNotification={onShowNotification}
                         />
                     </div>
+
+                    {contextMenu && (
+                        <CanvasContextMenu
+                            screenX={contextMenu.screenX}
+                            screenY={contextMenu.screenY}
+                            onSelect={type => {
+                                addNodeRef.current(type, { x: contextMenu.worldX, y: contextMenu.worldY });
+                                setContextMenu(null);
+                            }}
+                            onClose={handleCloseContextMenu}
+                        />
+                    )}
                 </div>
             </div>
         );
