@@ -15,7 +15,7 @@ interface GuideTourProps {
     steps?: TourStep[];
 }
 
-const OVERLAY_OPACITY = 0.84;
+const OVERLAY_OPACITY = 0.46;
 const TOOLTIP_WIDTH = 360;
 
 export const GuideTour: React.FC<GuideTourProps> = ({ onClose, onComplete, steps }) => {

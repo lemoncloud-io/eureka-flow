@@ -39,6 +39,7 @@ export const useTooltipPosition = (targetSelector?: string, arrowDirection: Arro
             return;
         }
 
+        el.scrollIntoView({ block: 'nearest' });
         const r = el.getBoundingClientRect();
         const s: React.CSSProperties = { position: 'fixed' };
 

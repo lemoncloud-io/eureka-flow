@@ -6,6 +6,7 @@ import { useBlocks, useCanvasStore, useFlowsStore } from '@flows/flows';
 import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 
 import { Header, Sidebar, WorkflowCanvas } from '../../flows';
+import { BlockTutorial } from '../components/BlockTutorial';
 import { CompletionScreen } from '../components/CompletionScreen';
 import { GuideTour } from '../components/GuideTour';
 import { TutorialOverlay } from '../components/TutorialOverlay';
@@ -13,6 +14,8 @@ import { FALLBACK_BLOCKS, TUTORIAL_WORKFLOW } from '../consts/tutorialSteps';
 import { useTutorialSteps } from '../hooks/useTutorialSteps';
 
 import type { SidebarRef, WorkflowCanvasRef } from '../../flows';
+
+type TourPhase = 'guide' | 'block' | 'none';
 
 const noop = () => {
     /* intentionally empty */
@@ -27,7 +30,7 @@ export const TutorialPage = () => {
     const { loadBlocks } = useBlocks();
     const { setApiKey } = useWebCoreStore();
     const [isReady, setIsReady] = useState(false);
-    const [showGuideTour, setShowGuideTour] = useState(false);
+    const [tourPhase, setTourPhase] = useState<TourPhase>('none');
 
     const { currentStep, step, totalSteps, isLastStep, isSuccess, goNext, goPrev, skipToEnd, markTutorialDone } =
         useTutorialSteps();
@@ -69,10 +72,26 @@ export const TutorialPage = () => {
         if (canvasRef.current) {
             workflowLoadedRef.current = true;
             canvasRef.current.loadWorkflow(TUTORIAL_WORKFLOW);
-            const timer = setTimeout(() => setShowGuideTour(true), 500);
+            const timer = setTimeout(() => setTourPhase('guide'), 500);
             return () => clearTimeout(timer);
         }
     }, [isReady]);
+
+    // When block tutorial starts, open the sidebar so block categories are visible
+    useEffect(() => {
+        if (tourPhase === 'block') {
+            sidebarRef.current?.open();
+        }
+    }, [tourPhase]);
+
+    const handleGuideTourClose = useCallback(() => {
+        // Guide tour done → start block tutorial
+        setTourPhase('block');
+    }, []);
+
+    const handleBlockTutorialClose = useCallback(() => {
+        setTourPhase('none');
+    }, []);
 
     const handleAddNode = useCallback((type: string) => {
         canvasRef.current?.addNode(type);
@@ -108,6 +127,8 @@ export const TutorialPage = () => {
         );
     }
 
+    const isTourActive = tourPhase !== 'none';
+
     return (
         <div className="relative h-screen overflow-hidden bg-canvas text-foreground">
             <div data-tour="canvas" className="absolute inset-0">
@@ -122,7 +143,6 @@ export const TutorialPage = () => {
                 />
             </div>
 
-            {/* Header for guide tour targeting (header-left, header-toolbar, header-menu) */}
             <Header
                 flowInfo={{ flowName: t('tutorial:flowName', '모델 합성'), onNameChange: noop }}
                 fileActions={{ onNew: noop, onSave: noop, onExport: noop, onExportPng: noop }}
@@ -147,10 +167,10 @@ export const TutorialPage = () => {
 
             <Sidebar ref={sidebarRef} onAddNode={handleAddNode} />
 
-            {isLastStep ? (
-                <CompletionScreen step={step} onSubmitKey={handleSubmitKey} onClose={goPrev} />
-            ) : (
-                !showGuideTour && (
+            {!isTourActive &&
+                (isLastStep ? (
+                    <CompletionScreen step={step} onSubmitKey={handleSubmitKey} onClose={goPrev} />
+                ) : (
                     <TutorialOverlay
                         currentStep={currentStep}
                         step={step}
@@ -160,10 +180,10 @@ export const TutorialPage = () => {
                         onPrev={goPrev}
                         onSkip={skipToEnd}
                     />
-                )
-            )}
+                ))}
 
-            {showGuideTour && <GuideTour onClose={() => setShowGuideTour(false)} />}
+            {tourPhase === 'guide' && <GuideTour onClose={handleGuideTourClose} />}
+            {tourPhase === 'block' && <BlockTutorial onClose={handleBlockTutorialClose} />}
         </div>
     );
 };

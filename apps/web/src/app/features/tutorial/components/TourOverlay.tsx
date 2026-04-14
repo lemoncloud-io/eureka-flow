@@ -35,6 +35,8 @@ const useHighlightRect = (selector?: string, padding = 8): HighlightRect | null 
                 setRect(null);
                 return;
             }
+            // Scroll element into view within its scroll container (e.g. sidebar)
+            el.scrollIntoView({ block: 'nearest' });
             const r = el.getBoundingClientRect();
             setRect({
                 top: r.top - padding,
