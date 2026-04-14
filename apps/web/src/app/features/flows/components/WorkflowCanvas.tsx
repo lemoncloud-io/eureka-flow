@@ -233,11 +233,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             return map;
         }, [updatedPortIds]);
 
-        const { syncNodeUpdate, createNodeAsync, waitForNodeId, getSyncedConfig } = useNodeSync({
+        const { syncNodeUpdate, createNodeAsync, waitForNodeId, getSyncedConfig, flushPendingUpdates } = useNodeSync({
             flowId: flowId ?? null,
             disabled: !permissions.canUpsert,
         });
-        const { createEdgeAsync, pendingEdgeIds } = useEdgeSync({ flowId: flowId ?? null });
+        const { createEdgeAsync, pendingEdgeIds, flushPendingEdges } = useEdgeSync({
+            flowId: flowId ?? null,
+        });
 
         const [nodes, setNodes] = useState<NodeData[]>([]);
         const [connections, setConnections] = useState<Connection[]>([]);
@@ -1084,6 +1086,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     };
 
                     setInputNodeStates('RUNNING' as NodeState);
+                    await Promise.all([flushPendingUpdates(), flushPendingEdges()]);
 
                     try {
                         await runFlow(flowId, [...inputNodeIdSet]);
@@ -1108,6 +1111,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             createNodeAsync,
             createEdgeAsync,
             pendingEdgeIds,
+            flushPendingUpdates,
+            flushPendingEdges,
         ]);
 
         const executeNode = useCallback(
@@ -1133,6 +1138,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             : n
                     )
                 );
+
+                await Promise.all([flushPendingUpdates(), flushPendingEdges()]);
 
                 const currentNode = nodesRef.current.find(n => n.id === nodeId);
                 if (!currentNode) return;
@@ -1411,7 +1418,17 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     );
                 }
             },
-            [permissions, blockRegistry, t, flowId, connectionId, connections, getSyncedConfig]
+            [
+                permissions,
+                blockRegistry,
+                t,
+                flowId,
+                connectionId,
+                connections,
+                getSyncedConfig,
+                flushPendingUpdates,
+                flushPendingEdges,
+            ]
         );
 
         executeNodeRef.current = executeNode;
