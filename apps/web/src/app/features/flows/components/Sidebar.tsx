@@ -5,7 +5,6 @@ import {
     ChevronDown,
     ChevronRight,
     Eye,
-    FileInput,
     Image,
     LayoutGrid,
     Package,
@@ -20,7 +19,7 @@ import {
     X,
 } from 'lucide-react';
 
-import { useBlockGroups } from '@flows/flows';
+import { BLOCK_CATEGORIES, BLOCK_CATEGORY_CONFIG, useBlockGroups } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Collapsible,
@@ -36,35 +35,17 @@ import {
 import { BlockIcon } from './BlockIcon';
 import { FrontendBadge } from './FrontendBadge';
 
+import type { FlowRole } from '@flows/flows';
+
 interface SidebarProps {
     onAddNode: (type: string) => void;
     isLoading?: boolean;
-    readOnly?: boolean;
+    role?: FlowRole;
 }
 
 export interface SidebarRef {
     open: () => void;
 }
-
-const CATEGORY_CONFIG = {
-    inputs: {
-        icon: FileInput,
-        label: 'sidebar.inputs',
-        color: 'text-primary',
-    },
-    process: {
-        icon: RefreshCw,
-        label: 'sidebar.process',
-        color: 'text-muted-foreground',
-    },
-    outputs: {
-        icon: Eye,
-        label: 'sidebar.output',
-        color: 'text-success',
-    },
-} as const;
-
-const CATEGORIES = Object.keys(CATEGORY_CONFIG) as Array<keyof typeof CATEGORY_CONFIG>;
 
 const iconMap: Record<string, React.ElementType> = {
     'input-text': Type,
@@ -189,19 +170,20 @@ const BlockItem: React.FC<BlockItemProps> = ({
     );
 };
 
-type CategoryKey = keyof typeof CATEGORY_CONFIG;
+type CategoryKey = keyof typeof BLOCK_CATEGORY_CONFIG;
 
-export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoading, readOnly }, ref) => {
+export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoading, role = 'owner' }, ref) => {
+    const isReadOnly = role !== 'owner';
     const { t } = useTranslation(['flows']);
     const [isOpen, setIsOpen] = useState(false);
-    const [expandedCategories, setExpandedCategories] = useState<Set<CategoryKey>>(new Set(CATEGORIES));
+    const [expandedCategories, setExpandedCategories] = useState<Set<CategoryKey>>(new Set(BLOCK_CATEGORIES));
     const [searchQuery, setSearchQuery] = useState('');
     const searchInputRef = React.useRef<HTMLInputElement>(null);
 
     useImperativeHandle(ref, () => ({
         open: () => {
             setIsOpen(true);
-            setExpandedCategories(new Set(CATEGORIES));
+            setExpandedCategories(new Set(BLOCK_CATEGORIES));
             setTimeout(() => searchInputRef.current?.focus(), 100);
         },
     }));
@@ -215,7 +197,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
         } else {
             setIsOpen(true);
             // Open with all categories expanded
-            setExpandedCategories(new Set(CATEGORIES));
+            setExpandedCategories(new Set(BLOCK_CATEGORIES));
             // Focus search input after panel opens
             setTimeout(() => searchInputRef.current?.focus(), 100);
         }
@@ -234,7 +216,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
     };
 
     const handleAddNode = (type: string) => {
-        if (readOnly) return;
+        if (isReadOnly) return;
         onAddNode(type);
         setIsOpen(false);
     };
@@ -345,8 +327,8 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                         )}
 
                         <div className="space-y-2 max-h-[50vh] sm:max-h-[60vh] overflow-y-auto pr-1">
-                            {CATEGORIES.map(category => {
-                                const config = CATEGORY_CONFIG[category];
+                            {BLOCK_CATEGORIES.map(category => {
+                                const config = BLOCK_CATEGORY_CONFIG[category];
                                 const Icon = config.icon;
                                 const blocks = blockGroups[category];
                                 const isExpanded = expandedCategories.has(category);
@@ -393,7 +375,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                             description={block.description}
                                                             icon={block.icon}
                                                             onAdd={() => handleAddNode(block.id)}
-                                                            disabled={isLoading || readOnly}
+                                                            disabled={isLoading || isReadOnly}
                                                             inputCount={block.inputs?.length}
                                                             outputCount={block.outputs?.length}
                                                             isFrontend={block.isFrontend}
@@ -408,7 +390,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                         </div>
 
                         <div className="mt-3 pt-2 border-t border-glass-border text-[10px] text-muted-foreground text-center">
-                            {readOnly ? t('sidebar.readOnlyHint', 'Sign in to add blocks') : t('sidebar.clickToAdd')}
+                            {isReadOnly ? t('sidebar.readOnlyHint', 'Sign in to add blocks') : t('sidebar.clickToAdd')}
                         </div>
                     </div>
                 </>

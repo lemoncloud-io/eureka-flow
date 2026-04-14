@@ -21,7 +21,7 @@ import { BlockIcon } from '../../flows/components/BlockIcon';
 import { getPortStyleKey } from '../../flows/utils';
 import { hydrateInputPorts } from '../utils';
 
-import type { BlockDefinitionWithFrontend } from '@flows/flows';
+import type { BlockDefinitionWithFrontend, FlowRole } from '@flows/flows';
 import type { Connection, NodeData, NodeState } from '@lemoncloud/eureka-flows-api';
 
 const STATE_STYLES: Record<
@@ -102,6 +102,7 @@ interface MobileNodeCardProps {
     flowId: string | null;
     isCollapsed?: boolean;
     onToggleCollapse?: (nodeId: string) => void;
+    role?: FlowRole;
 }
 
 export const MobileNodeCard = React.memo(
@@ -116,6 +117,7 @@ export const MobileNodeCard = React.memo(
         flowId,
         isCollapsed,
         onToggleCollapse,
+        role = 'owner',
     }: MobileNodeCardProps) => {
         const blockRegistry = useBlockRegistry();
         const blockDef: BlockDefinitionWithFrontend | undefined = blockRegistry[node.type];
@@ -234,7 +236,7 @@ export const MobileNodeCard = React.memo(
                     )}
 
                     {/* Run button */}
-                    {blockDef?.isRunnable !== false && (
+                    {role !== 'anonymous' && blockDef?.isRunnable !== false && (
                         <button
                             type="button"
                             onClick={handleRun}

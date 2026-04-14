@@ -8,7 +8,8 @@ const AUTO_SAVE_DELAY = 2000;
 
 interface UseMobileAutoSaveParams {
     isAppReady: boolean;
-    isPublicMode: boolean;
+    /** Whether the current user can save (false for guest/anonymous) */
+    canSave: boolean;
     serializeWorkflowState: SerializeWorkflowFn;
     lastSavedStateRef: React.MutableRefObject<string | null>;
     lastLocalUpdateTimestampRef: React.MutableRefObject<number | null>;
@@ -16,7 +17,7 @@ interface UseMobileAutoSaveParams {
 
 export const useMobileAutoSave = ({
     isAppReady,
-    isPublicMode,
+    canSave,
     serializeWorkflowState,
     lastSavedStateRef,
     lastLocalUpdateTimestampRef,
@@ -25,7 +26,7 @@ export const useMobileAutoSave = ({
     const autoSaveTimerRef = useRef<number | null>(null);
 
     useEffect(() => {
-        if (isPublicMode || !isAppReady) return;
+        if (!canSave || !isAppReady) return;
 
         const unsub = useCanvasStore.subscribe((state, prevState) => {
             if (state.nodes !== prevState.nodes || state.connections !== prevState.connections) {
@@ -48,12 +49,5 @@ export const useMobileAutoSave = ({
             unsub();
             if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
         };
-    }, [
-        isPublicMode,
-        isAppReady,
-        saveCurrentFlow,
-        serializeWorkflowState,
-        lastSavedStateRef,
-        lastLocalUpdateTimestampRef,
-    ]);
+    }, [canSave, isAppReady, saveCurrentFlow, serializeWorkflowState, lastSavedStateRef, lastLocalUpdateTimestampRef]);
 };

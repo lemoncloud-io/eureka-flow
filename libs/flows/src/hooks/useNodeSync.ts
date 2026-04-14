@@ -18,6 +18,8 @@ export type OnNodeIdAssigned = (tempId: string, serverId: string) => void;
 interface UseNodeSyncOptions {
     /** Flow ID for creating new nodes */
     flowId: string | null;
+    /** When true, all sync operations are no-ops (guest mode) */
+    disabled?: boolean;
 }
 
 interface UseNodeSyncReturn {
@@ -101,7 +103,7 @@ interface UseNodeSyncReturn {
  * syncNodeUpdate(nodeId, { config: newConfig });
  * ```
  */
-export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn => {
+export const useNodeSync = ({ flowId, disabled }: UseNodeSyncOptions): UseNodeSyncReturn => {
     const upsertMutation = useUpsertNodeMutation();
     const createMutation = useCreateNodeMutation();
 
@@ -150,6 +152,7 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
      */
     const syncNodeUpdate = useCallback(
         (nodeId: string, updates: Partial<NodeView>) => {
+            if (disabled) return;
             if (!flowId) {
                 console.warn('[useNodeSync] Cannot sync node: flowId is null');
                 return;
@@ -198,7 +201,7 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
 
             debounceTimers.current.set(nodeId, timer);
         },
-        [upsertMutation, flowId]
+        [disabled, upsertMutation, flowId]
     );
 
     /**
@@ -223,6 +226,7 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
             },
             onIdAssigned: OnNodeIdAssigned
         ) => {
+            if (disabled) return;
             if (!flowId) {
                 console.warn('[useNodeSync] Cannot create node: flowId is null');
                 return;
@@ -310,7 +314,7 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
                 }
             );
         },
-        [flowId, createMutation]
+        [disabled, flowId, createMutation]
     );
 
     /**
@@ -368,7 +372,7 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
      * Call this before executing nodes to ensure all config changes are saved
      */
     const flushPendingUpdates = useCallback(async (): Promise<void> => {
-        if (!flowId) {
+        if (disabled || !flowId) {
             return;
         }
 
@@ -432,7 +436,7 @@ export const useNodeSync = ({ flowId }: UseNodeSyncOptions): UseNodeSyncReturn =
         if (loggedWaiting && waited < FLUSH_MAX_WAIT_MS) {
             console.log('[useNodeSync] In-flight mutation completed');
         }
-    }, [flowId, upsertMutation, createMutation, waitForNodeId]);
+    }, [disabled, flowId, upsertMutation, createMutation, waitForNodeId]);
 
     // useCallback with [] deps: stable reference needed for executeNode's dependency array
     const getSyncedConfig = useCallback(

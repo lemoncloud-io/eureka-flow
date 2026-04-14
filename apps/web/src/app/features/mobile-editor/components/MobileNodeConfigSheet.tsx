@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import {
     EXECUTE_FUNCTIONS,
     compressImageIfNeeded,
+    getPermissions,
     processImageWithConfig,
     runNode,
     upsertNode,
@@ -36,6 +37,7 @@ import { S3Image } from '../../flows/components/S3Image';
 import { INPUT_FILE_ACCEPT, clearFileConfig, isTempId, processUploadedFile } from '../../flows/utils';
 import { deleteNodeWithSync, hydrateInputPorts } from '../utils';
 
+import type { FlowRole } from '@flows/flows';
 import type { NodeConfigItem, NodeData, NodeState } from '@lemoncloud/eureka-flows-api';
 
 const STATE_STYLES: Record<string, { bg: string; text: string; label: string; icon: React.ReactNode }> = {
@@ -382,6 +384,7 @@ interface MobileNodeConfigSheetProps {
     nodeId: string | null;
     flowId: string | null;
     socketConnectionId?: string;
+    role?: FlowRole;
 }
 
 export const MobileNodeConfigSheet = ({
@@ -390,6 +393,7 @@ export const MobileNodeConfigSheet = ({
     nodeId,
     flowId,
     socketConnectionId,
+    role = 'owner',
 }: MobileNodeConfigSheetProps) => {
     const { t } = useTranslation(['flows']);
     const node = useCanvasStore(state => (nodeId ? state.nodes.find(n => n.id === nodeId) : undefined));
@@ -402,9 +406,11 @@ export const MobileNodeConfigSheet = ({
     const blockDef = node ? blockRegistry[node.type] : undefined;
     const syncTimerRef = useRef<number | null>(null);
 
+    const { canEdit, canRun } = useMemo(() => getPermissions(role), [role]);
+
     const syncNodeToServer = useCallback(
         (updates: Record<string, unknown>) => {
-            if (!nodeId || !flowId || isTempId(nodeId)) return;
+            if (!canEdit || !nodeId || !flowId || isTempId(nodeId)) return;
             if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
             syncTimerRef.current = window.setTimeout(() => {
                 upsertNode(nodeId, flowId, updates).catch(err => {
@@ -412,7 +418,7 @@ export const MobileNodeConfigSheet = ({
                 });
             }, 500);
         },
-        [nodeId, flowId]
+        [canEdit, nodeId, flowId]
     );
 
     useEffect(
@@ -429,74 +435,84 @@ export const MobileNodeConfigSheet = ({
 
     const handleConfigChange = useCallback(
         (key: string, value: unknown) => {
-            if (!nodeId) return;
+            if (role === 'anonymous' || !nodeId) return;
             const currentNode = useCanvasStore.getState().nodes.find(n => n.id === nodeId);
             if (!currentNode) return;
+
+            // Guest: only allow input node value changes (local only)
+            if (role === 'guest' && !currentNode.type?.startsWith('input-')) return;
+
             const newConfig = { ...currentNode.config, [key]: value };
             useCanvasStore.getState().updateNodeData(nodeId, { config: newConfig } as Partial<NodeData>);
-            syncNodeToServer({ config: newConfig });
+            syncNodeToServer({ config: newConfig }); // no-op for guest (syncNodeToServer guards canEdit)
         },
-        [nodeId, syncNodeToServer]
+        [role, nodeId, syncNodeToServer]
     );
 
     const handleCustomLabelChange = useCallback(
         (value: string) => {
+            if (!canEdit) return;
             setCustomLabel(value);
             if (!nodeId) return;
             useCanvasStore.getState().updateNodeData(nodeId, { customLabel: value } as Partial<NodeData>);
             syncNodeToServer({ customLabel: value || undefined });
         },
-        [nodeId, syncNodeToServer]
+        [canEdit, nodeId, syncNodeToServer]
     );
 
     const handleDescriptionChange = useCallback(
         (value: string) => {
-            if (!nodeId) return;
+            if (!canEdit || !nodeId) return;
             useCanvasStore.getState().updateNodeData(nodeId, { description: value } as Partial<NodeData>);
             syncNodeToServer({ description: value || undefined });
         },
-        [nodeId, syncNodeToServer]
+        [canEdit, nodeId, syncNodeToServer]
     );
 
     const handleToggleAuto = useCallback(
         (auto: boolean) => {
-            if (!nodeId) return;
+            if (!canEdit || !nodeId) return;
             useCanvasStore.getState().updateNodeData(nodeId, { auto } as Partial<NodeData>);
             syncNodeToServer({ auto });
         },
-        [nodeId, syncNodeToServer]
+        [canEdit, nodeId, syncNodeToServer]
     );
 
     const handleRun = useCallback(async () => {
+        if (!canRun) return;
         if (!nodeId || !node || !blockDef) return;
         const { updateNodeData, connections: conns, nodes: allNodes } = useCanvasStore.getState();
         updateNodeData(nodeId, { state: 'RUNNING' } as Partial<NodeData>);
 
         try {
+            const nodeConfig = (node.config ?? {}) as Record<string, string>;
+
             if (blockDef.isFrontend && EXECUTE_FUNCTIONS[blockDef.type]) {
                 const executeFn = EXECUTE_FUNCTIONS[blockDef.type];
                 const result = await executeFn(node.inputData ?? {}, node.config ?? {});
                 updateNodeData(nodeId, { outputData: result, state: 'COMPLETED' } as Partial<NodeData>);
-                await runNode(nodeId, { output: result }, { force: true, connection: socketConnectionId });
+                const runBody = canEdit ? { output: result } : { output: result, config: nodeConfig };
+                await runNode(nodeId, runBody, { force: true, connection: socketConnectionId });
             } else {
-                if (flowId) {
+                if (canEdit && flowId) {
                     await hydrateInputPorts(nodeId, flowId, conns, allNodes, node.inputData ?? {});
                 }
-                await runNode(nodeId, undefined, { connection: socketConnectionId });
+                const runBody = canEdit ? undefined : { config: nodeConfig };
+                await runNode(nodeId, runBody, { connection: socketConnectionId });
             }
         } catch (e) {
             updateNodeData(nodeId, { state: 'ERROR' } as Partial<NodeData>);
             toast.error(e instanceof Error ? e.message : 'Node execution failed');
         }
-    }, [nodeId, node, blockDef, socketConnectionId, flowId]);
+    }, [canRun, canEdit, nodeId, node, blockDef, socketConnectionId, flowId]);
 
     const handleDelete = useCallback(() => {
-        if (!nodeId) return;
+        if (!canEdit || !nodeId) return;
         if (window.confirm(t('detailPanel.confirmDelete', 'Delete this node?'))) {
             deleteNodeWithSync(nodeId, flowId);
             onOpenChange(false);
         }
-    }, [nodeId, onOpenChange, flowId, t]);
+    }, [canEdit, nodeId, onOpenChange, flowId, t]);
 
     if (!node || !blockDef) return null;
 
@@ -557,7 +573,7 @@ export const MobileNodeConfigSheet = ({
                     </div>
 
                     {/* Run button */}
-                    {blockDef.isRunnable !== false && (
+                    {canRun && blockDef.isRunnable !== false && (
                         <button
                             onClick={handleRun}
                             disabled={state === 'RUNNING'}
@@ -592,10 +608,11 @@ export const MobileNodeConfigSheet = ({
                             onChange={e => handleCustomLabelChange(e.target.value)}
                             placeholder={blockDef.label}
                             className="h-9 flex-1 text-sm"
+                            disabled={!canEdit}
                         />
                         <div className="flex items-center gap-1.5 shrink-0 px-2 py-1.5 rounded-lg bg-muted/30">
                             <Zap className="w-3 h-3 text-muted-foreground/60" />
-                            <Switch checked={isAuto} onCheckedChange={handleToggleAuto} />
+                            <Switch checked={isAuto} onCheckedChange={handleToggleAuto} disabled={!canEdit} />
                         </div>
                     </div>
 
@@ -694,6 +711,7 @@ export const MobileNodeConfigSheet = ({
                             onChange={e => handleDescriptionChange(e.target.value)}
                             placeholder={t('detailPanel.addDescription', 'Add a description...')}
                             className="h-9 text-xs"
+                            disabled={!canEdit}
                         />
                     </div>
 
@@ -768,13 +786,15 @@ export const MobileNodeConfigSheet = ({
                     {/* Execution History */}
                     {node && <RunHistoryPanel nodeId={node.id} maxHeight="240px" />}
 
-                    {/* Delete button */}
-                    <div className="pt-4 border-t border-border">
-                        <Button variant="destructive" className="w-full gap-2" onClick={handleDelete}>
-                            <Trash2 className="w-4 h-4" />
-                            {t('detailPanel.deleteNode', 'Delete Node')}
-                        </Button>
-                    </div>
+                    {/* Delete button — owner only */}
+                    {canEdit && (
+                        <div className="pt-4 border-t border-border">
+                            <Button variant="destructive" className="w-full gap-2" onClick={handleDelete}>
+                                <Trash2 className="w-4 h-4" />
+                                {t('detailPanel.deleteNode', 'Delete Node')}
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </SheetContent>
         </Sheet>

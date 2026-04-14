@@ -11,6 +11,7 @@ import { buildNodeDisplayNames, deleteNodeWithSync } from '../utils';
 import { MobileNodeCard } from './MobileNodeCard';
 import { SwipeToDelete } from './SwipeToDelete';
 
+import type { FlowRole } from '@flows/flows';
 import type { Connection } from '@lemoncloud/eureka-flows-api';
 
 const EMPTY_CONNECTIONS = { inputs: [] as Connection[], outputs: [] as Connection[] };
@@ -20,7 +21,7 @@ interface MobileNodeListProps {
     onTapOutputPort: (nodeId: string, portId: string, portDataType: string, nodeName: string, portName: string) => void;
     socketConnectionId?: string;
     selectedNodeId?: string | null;
-    isReadOnly?: boolean;
+    role?: FlowRole;
     flowId: string | null;
     collapsedNodes?: Set<string>;
     onToggleCollapse?: (nodeId: string) => void;
@@ -31,7 +32,7 @@ export const MobileNodeList = ({
     onTapOutputPort,
     socketConnectionId,
     selectedNodeId,
-    isReadOnly,
+    role = 'owner',
     flowId,
     collapsedNodes,
     onToggleCollapse,
@@ -88,6 +89,7 @@ export const MobileNodeList = ({
                                 flowId={flowId}
                                 isCollapsed={collapsedNodes?.has(nodeId)}
                                 onToggleCollapse={onToggleCollapse}
+                                role={role}
                             />
                         );
 
@@ -107,7 +109,7 @@ export const MobileNodeList = ({
                                         <div className="w-px h-1.5 bg-primary/20" />
                                     </div>
                                 )}
-                                {isReadOnly ? (
+                                {role !== 'owner' ? (
                                     card
                                 ) : (
                                     <SwipeToDelete onDelete={() => deleteNodeWithSync(nodeId, flowId)}>

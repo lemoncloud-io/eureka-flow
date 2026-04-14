@@ -1,4 +1,5 @@
 export * from './graph';
+export * from './permissions';
 
 export type {
     BlockDefinition,
@@ -619,6 +620,8 @@ export interface LoadFlowResult extends FlowModel {
     ports?: LoadFlowPortData[];
     /** WebSocket channel ID for real-time node status updates */
     channelId?: string;
+    /** Whether the current user can edit this flow (owner = true, guest = false) */
+    isEditable?: boolean;
 }
 
 /**

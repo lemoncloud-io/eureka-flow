@@ -4,6 +4,8 @@ import { ChevronsDownUp, ChevronsUpDown, Loader2, Play, Plus } from 'lucide-reac
 
 import { cn } from '@flows/lib/utils';
 
+import type { FlowRole } from '@flows/flows';
+
 interface RunProgress {
     current: number;
     total: number;
@@ -14,7 +16,7 @@ interface MobileBottomBarProps {
     onRunAll: () => void;
     isRunning: boolean;
     progress: RunProgress | null;
-    isReadOnly?: boolean;
+    role?: FlowRole;
     nodeCount: number;
     isAllCollapsed?: boolean;
     onToggleCollapseAll?: () => void;
@@ -25,7 +27,7 @@ export const MobileBottomBar = ({
     onRunAll,
     isRunning,
     progress,
-    isReadOnly,
+    role = 'owner',
     nodeCount,
     isAllCollapsed,
     onToggleCollapseAll,
@@ -34,7 +36,7 @@ export const MobileBottomBar = ({
 
     const progressPct = progress && progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
 
-    if (isReadOnly) return null;
+    if (role === 'anonymous') return null;
 
     return (
         <div
@@ -68,21 +70,23 @@ export const MobileBottomBar = ({
                     </button>
                 )}
 
-                {/* Add Block */}
-                <button
-                    onClick={onAddBlock}
-                    disabled={isRunning}
-                    className={cn(
-                        'flex items-center gap-2 px-4 h-11 rounded-xl shrink-0',
-                        'bg-card border border-primary/20 hover:border-primary/40 hover:bg-primary/5',
-                        'text-sm font-medium',
-                        'active:scale-[0.96] transition-all duration-150',
-                        'disabled:opacity-40'
-                    )}
-                >
-                    <Plus className="w-4 h-4 text-primary" />
-                    <span>{t('mobile.addBlock', 'Add')}</span>
-                </button>
+                {/* Add Block — owner only */}
+                {role === 'owner' && (
+                    <button
+                        onClick={onAddBlock}
+                        disabled={isRunning}
+                        className={cn(
+                            'flex items-center gap-2 px-4 h-11 rounded-xl shrink-0',
+                            'bg-card border border-primary/20 hover:border-primary/40 hover:bg-primary/5',
+                            'text-sm font-medium',
+                            'active:scale-[0.96] transition-all duration-150',
+                            'disabled:opacity-40'
+                        )}
+                    >
+                        <Plus className="w-4 h-4 text-primary" />
+                        <span>{t('mobile.addBlock', 'Add')}</span>
+                    </button>
+                )}
 
                 {/* Run All */}
                 <button

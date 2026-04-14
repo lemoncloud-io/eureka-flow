@@ -1,3 +1,4 @@
+export * from './block-categories';
 export * from './block-types';
 export * from './status';
 

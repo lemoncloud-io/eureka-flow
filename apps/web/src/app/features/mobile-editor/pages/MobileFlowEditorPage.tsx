@@ -31,16 +31,23 @@ import { useCollapseState } from '../hooks/useCollapseState';
 import { useRecentBlocks } from '../hooks/useRecentBlocks';
 import { useScrollRestore } from '../hooks/useScrollRestore';
 
+import type { FlowRole } from '@flows/flows';
+
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? [] });
 
 export const MobileFlowEditorPage = () => {
     const { t } = useTranslation(['flows']);
-    const { currentFlowId, flowName, isLoading, isSaving, saveStatus, updateFlowName } = useFlows();
+    const { currentFlowId, flowName, isLoading, isSaving, saveStatus, updateFlowName, isEditable } = useFlows();
     const { apiKey } = useWebCoreStore();
     const blockRegistry = useBlockRegistry();
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
     const nodeCount = useCanvasStore(state => state.nodes.length);
+
+    // Role derivation (same as desktop FlowEditorPage)
+    const computedRole: FlowRole = isPublicMode ? 'anonymous' : isEditable ? 'owner' : 'guest';
+    const [devRoleOverride, setDevRoleOverride] = useState<FlowRole | null>(null);
+    const role: FlowRole = devRoleOverride ?? computedRole;
 
     // Shared refs for cross-hook communication
     const lastSavedStateRef = useRef<string | null>(null);
@@ -69,7 +76,7 @@ export const MobileFlowEditorPage = () => {
 
     useMobileAutoSave({
         isAppReady,
-        isPublicMode,
+        canSave: role === 'owner',
         serializeWorkflowState,
         lastSavedStateRef,
         lastLocalUpdateTimestampRef,
@@ -203,10 +210,11 @@ export const MobileFlowEditorPage = () => {
                 onSave={handleSave}
                 onOpenFlowList={() => setIsFlowListOpen(true)}
                 onOpenFlowMap={() => setIsFlowMapOpen(true)}
-                onExport={isPublicMode ? undefined : handleExport}
-                onNew={isPublicMode ? undefined : handleNew}
-                onClear={isPublicMode ? undefined : handleClear}
+                onExport={handleExport}
+                onNew={role === 'owner' ? handleNew : undefined}
+                onClear={role === 'owner' ? handleClear : undefined}
                 onApiKeySettings={() => setIsApiKeyDialogOpen(true)}
+                role={role}
             />
 
             <MobileFlowMap
@@ -226,7 +234,7 @@ export const MobileFlowEditorPage = () => {
                         onTapOutputPort={connectionMode.openForPort}
                         socketConnectionId={socketConnectionId}
                         selectedNodeId={configNodeId}
-                        isReadOnly={isPublicMode}
+                        role={role}
                         flowId={currentFlowId}
                         collapsedNodes={collapsedNodes}
                         onToggleCollapse={toggleCollapse}
@@ -239,7 +247,7 @@ export const MobileFlowEditorPage = () => {
                 onRunAll={handleRunAll}
                 isRunning={isRunning}
                 progress={runProgress}
-                isReadOnly={isPublicMode}
+                role={role}
                 nodeCount={nodeCount}
                 isAllCollapsed={isAllCollapsed}
                 onToggleCollapseAll={isAllCollapsed ? expandAll : collapseAll}
@@ -261,6 +269,7 @@ export const MobileFlowEditorPage = () => {
                         connectionMode.connectTo(targetNodeId, targetPortId);
                     }}
                     onDisconnect={connectionMode.disconnect}
+                    role={role}
                 />
             )}
 
@@ -279,6 +288,7 @@ export const MobileFlowEditorPage = () => {
                 nodeId={configNodeId}
                 flowId={currentFlowId}
                 socketConnectionId={socketConnectionId}
+                role={role}
             />
 
             <FlowListDialog
@@ -296,6 +306,25 @@ export const MobileFlowEditorPage = () => {
                 codesUrl={import.meta.env.VITE_CODES_URL}
                 initialValue={apiKey ?? undefined}
             />
+
+            {/* Dev Role Toggle (hidden in production) */}
+            {import.meta.env.VITE_ENV !== 'PROD' && (
+                <div className="fixed top-16 right-2 z-50 flex gap-0.5 bg-background/90 backdrop-blur border border-border rounded-lg p-0.5 text-[10px] font-mono">
+                    {(['owner', 'guest', 'anonymous'] as FlowRole[]).map(r => (
+                        <button
+                            key={r}
+                            onClick={() => setDevRoleOverride(r === computedRole ? null : r)}
+                            className={`px-1.5 py-0.5 rounded transition-colors ${
+                                role === r
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'text-muted-foreground hover:bg-muted'
+                            }`}
+                        >
+                            {r.slice(0, 5)}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {isLoading && (
                 <div className="fixed inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-sm">

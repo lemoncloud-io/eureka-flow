@@ -181,6 +181,7 @@ export const Providers = ({ children }: ProvidersProps) => {
                                 </ApiKeyGate>
                                 <Toaster
                                     position="bottom-right"
+                                    richColors
                                     toastOptions={{
                                         classNames: {
                                             toast: 'backdrop-blur-md bg-background/95 border-border/50 shadow-lg',
