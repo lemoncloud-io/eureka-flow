@@ -11,7 +11,6 @@ import {
     Hash,
     Image,
     Loader2,
-    MoreVertical,
     Pencil,
     Play,
     RefreshCw,
@@ -1407,7 +1406,16 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         }}
                         title={t('config.doubleClickRename')}
                     >
-                        <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                        <button
+                            className="w-4 h-4 flex items-center justify-center shrink-0 cursor-pointer hover:opacity-70 transition-opacity"
+                            onClick={e => {
+                                e.stopPropagation();
+                                setShowMenu(prev => !prev);
+                            }}
+                            onMouseDown={e => e.stopPropagation()}
+                            onTouchStart={e => e.stopPropagation()}
+                            title={t('contextMenu.options', 'Options')}
+                        >
                             {nodeState === 'RUNNING' || nodeState === 'ERROR' ? (
                                 <StatusIcon state={nodeState} />
                             ) : (
@@ -1417,7 +1425,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                     fallback={<StatusIcon state={nodeState} />}
                                 />
                             )}
-                        </div>
+                        </button>
                         <div className="flex flex-col overflow-hidden min-w-0">
                             <div className="flex items-center gap-1.5">
                                 <span className="font-semibold text-[13px] text-foreground truncate leading-tight">
@@ -1465,16 +1473,6 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 )}
                             </button>
                         ) : null)}
-                    <button
-                        onClick={e => {
-                            e.stopPropagation();
-                            setShowMenu(!showMenu);
-                        }}
-                        className={cn(iconBtnBase, 'hover:text-foreground hover:bg-muted/50')}
-                    >
-                        <MoreVertical className="w-3.5 h-3.5" />
-                    </button>
-
                     {showMenu && (
                         <>
                             <div
@@ -1486,7 +1484,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                                 onWheel={e => e.stopPropagation()}
                             />
                             <div
-                                className="absolute right-0 top-8 w-36 bg-popover/95 backdrop-blur-md border border-border rounded-lg shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100"
+                                className="absolute left-3 top-8 w-36 bg-popover/95 backdrop-blur-md border border-border rounded-lg shadow-xl z-50 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100"
                                 onWheel={e => e.stopPropagation()}
                             >
                                 <button
