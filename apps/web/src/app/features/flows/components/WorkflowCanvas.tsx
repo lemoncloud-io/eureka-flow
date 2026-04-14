@@ -51,7 +51,7 @@ interface WorkflowStateWithPorts extends WorkflowState {
 }
 
 export interface WorkflowCanvasRef {
-    addNode: (type: string) => void;
+    addNode: (type: string, customLabel?: string) => void;
     getWorkflow: () => WorkflowState;
     /** Load workflow from server data. Fetches missing port data (data: null) via API. */
     loadWorkflow: (state: WorkflowStateWithPorts) => Promise<void>;
@@ -431,7 +431,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         useImperativeHandle(
             ref,
             () => ({
-                addNode: (type: string) => {
+                addNode: (type: string, customLabel?: string) => {
                     if (readOnly) return;
                     saveCheckpoint();
 
@@ -505,6 +505,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         inputData: {},
                         outputData: {},
                         autoExecutionEnabled: true,
+                        ...(customLabel ? { customLabel } : {}),
                     };
 
                     // Generate temp edge ID if connection will be created
@@ -583,6 +584,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             position: { x: snappedX, y: snappedY },
                             config: { ...blockRegistry[type].defaultConfig },
                             autoExecutionEnabled: true,
+                            ...(customLabel ? { customLabel } : {}),
                         },
                         (oldTempId, newServerId) => {
                             replaceNodeIdInState(oldTempId, newServerId, setNodes, setConnections, setSelectedNodeIds);

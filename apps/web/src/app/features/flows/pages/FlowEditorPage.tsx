@@ -506,8 +506,8 @@ export const FlowEditorPage = () => {
         }
     };
 
-    const handleAddNode = useCallback((type: string) => {
-        canvasRef.current?.addNode(type);
+    const handleAddNode = useCallback((type: string, customLabel?: string) => {
+        canvasRef.current?.addNode(type, customLabel);
     }, []);
 
     const handleSelectionChange = (nodeId: string | null) => {
@@ -651,7 +651,7 @@ export const FlowEditorPage = () => {
             <div className="flex h-screen bg-background text-foreground font-sans items-center justify-center flex-col gap-4">
                 <div className="relative w-16 h-16">
                     <div className="absolute inset-0 border-4 border-border rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin"></div>
+                    <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin-slow"></div>
                 </div>
                 <div className="text-muted-foreground font-mono text-sm animate-pulse">{loadingText}</div>
             </div>

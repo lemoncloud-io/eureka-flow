@@ -1102,23 +1102,20 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
         e.stopPropagation();
     };
 
-    const StatusIcon = () => {
-        if (isDisabled) return <Ban className="w-4 h-4 text-muted-foreground" />;
-        switch (nodeState) {
-            case 'RUNNING':
-                return <Loader2 className="w-4 h-4 text-status-running animate-spin" />;
-            case 'COMPLETED':
-                return <Check className="w-4 h-4 text-status-completed" />;
-            case 'ERROR':
-                return (
-                    <div className="w-4 h-4 rounded-full bg-destructive/20 flex items-center justify-center">
-                        <span className="text-destructive font-bold text-[10px]">!</span>
-                    </div>
-                );
-            default:
-                return null;
-        }
-    };
+    const statusIconEl = isDisabled ? (
+        <Ban className="w-4 h-4 text-muted-foreground" />
+    ) : nodeState === 'RUNNING' ? (
+        <div
+            className="w-4 h-4 rounded-full border-2 border-status-running border-t-transparent animate-spin"
+            style={{ animationDuration: '1.2s', animationTimingFunction: 'linear' }}
+        />
+    ) : nodeState === 'COMPLETED' ? (
+        <Check className="w-4 h-4 text-status-completed" />
+    ) : nodeState === 'ERROR' ? (
+        <div className="w-4 h-4 rounded-full bg-destructive/20 flex items-center justify-center">
+            <span className="text-destructive font-bold text-[10px]">!</span>
+        </div>
+    ) : null;
 
     return (
         <div
@@ -1179,9 +1176,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                         }}
                         title={t('config.doubleClickRename')}
                     >
-                        <div className="w-4 h-4 flex items-center justify-center shrink-0">
-                            <StatusIcon />
-                        </div>
+                        <div className="w-4 h-4 flex items-center justify-center shrink-0">{statusIconEl}</div>
                         <div className="flex flex-col overflow-hidden min-w-0">
                             <div className="flex items-center gap-1.5">
                                 <span className="font-semibold text-[13px] text-foreground truncate leading-tight">

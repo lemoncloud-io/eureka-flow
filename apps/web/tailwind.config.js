@@ -140,10 +140,15 @@ module.exports = {
                     from: { height: 'var(--radix-collapsible-content-height)' },
                     to: { height: '0' },
                 },
+                'spin-slow': {
+                    from: { transform: 'rotate(0deg)' },
+                    to: { transform: 'rotate(360deg)' },
+                },
             },
             animation: {
                 'collapsible-down': 'collapsible-down 0.2s ease-out',
                 'collapsible-up': 'collapsible-up 0.2s ease-out',
+                'spin-slow': 'spin-slow 2.5s linear infinite',
             },
         },
     },
