@@ -620,8 +620,8 @@ export interface LoadFlowResult extends FlowModel {
     ports?: LoadFlowPortData[];
     /** WebSocket channel ID for real-time node status updates */
     channelId?: string;
-    /** User's role for this flow (server WIP - undefined until implemented) */
-    role?: 'owner' | 'guest';
+    /** Whether the current user can edit this flow (owner = true, guest = false) */
+    isEditable?: boolean;
 }
 
 /**

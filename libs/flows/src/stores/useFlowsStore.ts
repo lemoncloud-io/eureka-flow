@@ -28,6 +28,8 @@ interface FlowsState {
     channelId: string | null;
     /** Whether this flow is publicly accessible */
     isPublic: boolean;
+    /** Whether the current user can edit this flow (from server response) */
+    isEditable: boolean;
     /** Thumbnail URL (http or s3) */
     flowThumbnail: string;
 
@@ -44,6 +46,7 @@ interface FlowsState {
     setSaveError: (error: Error | null) => void;
     setChannelId: (channelId: string | null) => void;
     setIsPublic: (isPublic: boolean) => void;
+    setIsEditable: (isEditable: boolean) => void;
     setFlowThumbnail: (thumbnail: string) => void;
 }
 
@@ -60,6 +63,7 @@ export const useFlowsStore = create<FlowsState>(set => ({
     saveError: null,
     channelId: '0000',
     isPublic: false,
+    isEditable: true,
     flowThumbnail: '',
 
     setBlockRegistry: blocks => {
@@ -107,6 +111,8 @@ export const useFlowsStore = create<FlowsState>(set => ({
     setChannelId: channelId => set({ channelId }),
 
     setIsPublic: isPublic => set({ isPublic }),
+
+    setIsEditable: isEditable => set({ isEditable }),
 
     setFlowThumbnail: thumbnail => set({ flowThumbnail: thumbnail }),
 }));

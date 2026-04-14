@@ -59,6 +59,7 @@ export const FlowEditorPage = () => {
         toggleAutoSave,
         updateFlowName,
         isPublic,
+        isEditable,
         flowThumbnail,
         togglePublic,
         publishFlow,
@@ -117,10 +118,8 @@ export const FlowEditorPage = () => {
     // Public mode: read-only viewing when no API key and viewing an existing flow
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
 
-    // Role derivation: owner / guest / anonymous
-    // TODO: Replace isOwner with server response field when API is ready
-    const isOwner = !!apiKey; // Placeholder: all authenticated users are owners
-    const computedRole: FlowRole = isPublicMode ? 'anonymous' : isOwner ? 'owner' : 'guest';
+    // Role derivation: owner (isEditable) / guest (has apiKey but !isEditable) / anonymous (no apiKey)
+    const computedRole: FlowRole = isPublicMode ? 'anonymous' : isEditable ? 'owner' : 'guest';
 
     // Dev-only role override for testing
     const [devRoleOverride, setDevRoleOverride] = useState<FlowRole | null>(null);
@@ -747,8 +746,8 @@ export const FlowEditorPage = () => {
                 </div>
             )}
 
-            {/* Dev Role Toggle (development only) */}
-            {import.meta.env.DEV && (
+            {/* Dev Role Toggle (hidden in production) */}
+            {import.meta.env.VITE_ENV !== 'PROD' && (
                 <div className="fixed bottom-4 right-4 z-50 flex gap-1 bg-background/90 backdrop-blur border border-border rounded-lg p-1 text-xs font-mono">
                     {(['owner', 'guest', 'anonymous'] as FlowRole[]).map(r => (
                         <button

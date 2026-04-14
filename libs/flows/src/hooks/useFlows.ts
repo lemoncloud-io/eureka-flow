@@ -51,6 +51,8 @@ export const useFlows = () => {
         setChannelId,
         isPublic,
         setIsPublic,
+        isEditable,
+        setIsEditable,
         flowThumbnail,
         setFlowThumbnail,
     } = useFlowsStore();
@@ -104,6 +106,7 @@ export const useFlows = () => {
                     setChannelId(flowData.channelId);
                 }
                 setIsPublic(!!flowData.isPublic);
+                setIsEditable(flowData.isEditable ?? true);
                 setFlowThumbnail(flowData.thumbnail ?? '');
                 return { flowId: savedFlowId, flowData, isNew: false };
             } catch (err) {
@@ -126,9 +129,19 @@ export const useFlows = () => {
         setFlowName('Untitled Workflow');
         setFlowDescription('');
         setIsPublic(false);
+        setIsEditable(true);
         setFlowThumbnail('');
         return { flowId: newFlowId, flowData: null, isNew: true };
-    }, [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setIsPublic, setFlowThumbnail]);
+    }, [
+        queryClient,
+        setCurrentFlowId,
+        setFlowName,
+        setFlowDescription,
+        setChannelId,
+        setIsPublic,
+        setIsEditable,
+        setFlowThumbnail,
+    ]);
 
     /**
      * Load a specific flow by ID
@@ -160,6 +173,7 @@ export const useFlows = () => {
                     setChannelId(flowData.channelId);
                 }
                 setIsPublic(!!flowData.isPublic);
+                setIsEditable(flowData.isEditable ?? true);
                 setFlowThumbnail(flowData.thumbnail ?? '');
                 return flowData;
             } catch (err) {
@@ -167,7 +181,16 @@ export const useFlows = () => {
                 return null;
             }
         },
-        [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setChannelId, setIsPublic, setFlowThumbnail]
+        [
+            queryClient,
+            setCurrentFlowId,
+            setFlowName,
+            setFlowDescription,
+            setChannelId,
+            setIsPublic,
+            setIsEditable,
+            setFlowThumbnail,
+        ]
     );
 
     /**
@@ -463,6 +486,7 @@ export const useFlows = () => {
 
         // Actions - Publish
         isPublic,
+        isEditable,
         flowThumbnail,
         togglePublic,
         publishFlow,
