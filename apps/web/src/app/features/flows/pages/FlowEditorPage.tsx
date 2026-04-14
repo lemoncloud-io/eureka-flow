@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useBlocks, useFlows } from '@flows/flows';
+import { getPermissions, useBlocks, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
@@ -24,6 +24,7 @@ import { useSocketHandlers } from '../hooks/useSocketHandlers';
 import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
+import type { FlowRole } from '@flows/flows';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -115,6 +116,16 @@ export const FlowEditorPage = () => {
 
     // Public mode: read-only viewing when no API key and viewing an existing flow
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
+
+    // Role derivation: owner / guest / anonymous
+    // TODO: Replace isOwner with server response field when API is ready
+    const isOwner = !!apiKey; // Placeholder: all authenticated users are owners
+    const computedRole: FlowRole = isPublicMode ? 'anonymous' : isOwner ? 'owner' : 'guest';
+
+    // Dev-only role override for testing
+    const [devRoleOverride, setDevRoleOverride] = useState<FlowRole | null>(null);
+    const role: FlowRole = devRoleOverride ?? computedRole;
+    const permissions = getPermissions(role);
 
     const autoSaveTimerRef = useRef<number | null>(null);
 
@@ -266,7 +277,7 @@ export const FlowEditorPage = () => {
     );
 
     const triggerAutoSave = useCallback(() => {
-        if (!isAutoSaveEnabled || isPublicMode) return;
+        if (!isAutoSaveEnabled || !permissions.canSave) return;
 
         if (autoSaveTimerRef.current) {
             window.clearTimeout(autoSaveTimerRef.current);
@@ -590,7 +601,7 @@ export const FlowEditorPage = () => {
             <div data-tour="canvas" className="absolute inset-0">
                 <WorkflowCanvas
                     ref={canvasRef}
-                    readOnly={isPublicMode}
+                    role={role}
                     flowId={currentFlowId}
                     connectionId={socketConnectionId ?? undefined}
                     onNodeSelect={handleSelectionChange}
@@ -648,6 +659,7 @@ export const FlowEditorPage = () => {
                 }
                 isPublic={isPublic}
                 isPublicMode={isPublicMode}
+                role={role}
                 onTogglePublic={async () => {
                     const success = await togglePublic();
                     if (success) {
@@ -663,7 +675,7 @@ export const FlowEditorPage = () => {
             />
 
             {/* Floating Sidebar */}
-            <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} readOnly={isPublicMode} />
+            <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} role={role} />
 
             {/* API Key Dialog */}
             <ApiKeyDialog
@@ -732,6 +744,25 @@ export const FlowEditorPage = () => {
                             {t('flowEditor.signInToEdit', 'Sign in to edit this flow')}
                         </Button>
                     </div>
+                </div>
+            )}
+
+            {/* Dev Role Toggle (development only) */}
+            {import.meta.env.DEV && (
+                <div className="fixed bottom-4 right-4 z-50 flex gap-1 bg-background/90 backdrop-blur border border-border rounded-lg p-1 text-xs font-mono">
+                    {(['owner', 'guest', 'anonymous'] as FlowRole[]).map(r => (
+                        <button
+                            key={r}
+                            onClick={() => setDevRoleOverride(r === computedRole ? null : r)}
+                            className={`px-2 py-1 rounded transition-colors ${
+                                role === r
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'text-muted-foreground hover:bg-muted'
+                            }`}
+                        >
+                            {r}
+                        </button>
+                    ))}
                 </div>
             )}
 

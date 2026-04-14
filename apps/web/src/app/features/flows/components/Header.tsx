@@ -43,7 +43,7 @@ import {
     TooltipTrigger,
 } from '@flows/ui-kit';
 
-import type { SaveStatus } from '@flows/flows';
+import type { FlowRole, SaveStatus } from '@flows/flows';
 
 export interface FlowInfoProps {
     flowName: string;
@@ -94,6 +94,8 @@ interface HeaderProps {
     isPublic?: boolean;
     /** Read-only public viewing mode (no API key) */
     isPublicMode?: boolean;
+    /** User role for this flow */
+    role?: FlowRole;
     onTogglePublic?: () => void;
     onPublish?: () => void;
     onApiKeySettings?: () => void;
@@ -322,6 +324,7 @@ export const Header: React.FC<HeaderProps> = ({
     socketState,
     isPublic,
     isPublicMode,
+    role = 'owner',
     onTogglePublic,
     onPublish,
     onApiKeySettings,
@@ -365,14 +368,14 @@ export const Header: React.FC<HeaderProps> = ({
                             </Badge>
                         </RouterLink>
                         <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
-                        {isPublicMode ? (
+                        {role !== 'owner' ? (
                             <span className="text-xs sm:text-sm text-foreground truncate max-w-[120px] sm:max-w-[200px]">
                                 {flowInfo.flowName}
                             </span>
                         ) : (
                             <FlowNameInput {...flowInfo} />
                         )}
-                        {!isPublicMode && (
+                        {role === 'owner' && (
                             <span className="hidden md:inline">
                                 <SaveStatusBadge
                                     saveStatus={saveState.saveStatus}
@@ -383,6 +386,11 @@ export const Header: React.FC<HeaderProps> = ({
                         {isPublicMode && (
                             <Badge variant="secondary" size="sm" className="text-[10px]">
                                 {t('header.viewOnly', 'View Only')}
+                            </Badge>
+                        )}
+                        {role === 'guest' && !isPublicMode && (
+                            <Badge variant="secondary" size="sm" className="text-[10px]">
+                                {t('header.guestMode', 'Guest')}
                             </Badge>
                         )}
                     </div>
@@ -399,7 +407,7 @@ export const Header: React.FC<HeaderProps> = ({
                             'shadow-sm'
                         )}
                     >
-                        {!isPublicMode && onOpenFlowList && (
+                        {role === 'owner' && onOpenFlowList && (
                             <ToolbarButton
                                 onClick={onOpenFlowList}
                                 icon={<FolderOpen className="w-4 h-4" />}
@@ -407,7 +415,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 shortcut="⌘O"
                             />
                         )}
-                        {!isPublicMode && (
+                        {role === 'owner' && (
                             <ToolbarButton
                                 onClick={editActions.onSave}
                                 icon={<Save className="w-4 h-4" />}
@@ -428,7 +436,7 @@ export const Header: React.FC<HeaderProps> = ({
                             tooltip={t('header.redo')}
                             shortcut="⌘⇧Z"
                         />
-                        {!isPublicMode && editActions.onRunAll && (
+                        {role !== 'anonymous' && editActions.onRunAll && (
                             <ToolbarButton
                                 onClick={editActions.onRunAll}
                                 icon={<Play className="w-4 h-4" />}
@@ -458,7 +466,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.file')}
                             </DropdownMenuLabel>
-                            {!isPublicMode && (
+                            {role === 'owner' && (
                                 <>
                                     <DropdownMenuItem onClick={fileActions.onNew}>
                                         <FileText className="w-4 h-4 mr-2" />
@@ -505,11 +513,13 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.canvas')}
                             </DropdownMenuLabel>
-                            <DropdownMenuItem onClick={editActions.onAutoLayout}>
-                                <LayoutGrid className="w-4 h-4 mr-2" />
-                                {t('header.autoLayout')}
-                                <DropdownMenuShortcut>⌘A</DropdownMenuShortcut>
-                            </DropdownMenuItem>
+                            {role === 'owner' && (
+                                <DropdownMenuItem onClick={editActions.onAutoLayout}>
+                                    <LayoutGrid className="w-4 h-4 mr-2" />
+                                    {t('header.autoLayout')}
+                                    <DropdownMenuShortcut>⌘A</DropdownMenuShortcut>
+                                </DropdownMenuItem>
+                            )}
                             {editActions.onCollapseAll && (
                                 <DropdownMenuItem onClick={editActions.onCollapseAll}>
                                     <ChevronsDownUp className="w-4 h-4 mr-2" />
@@ -522,7 +532,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.expandAll')}
                                 </DropdownMenuItem>
                             )}
-                            {!isPublicMode && (
+                            {role === 'owner' && (
                                 <DropdownMenuItem onClick={editActions.onClear} className="text-destructive">
                                     <Trash2 className="w-4 h-4 mr-2" />
                                     {t('header.clearCanvas')}
@@ -532,7 +542,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuSeparator />
 
                             {/* Share Group */}
-                            {!isPublicMode && (onTogglePublic || onPublish) && (
+                            {role === 'owner' && (onTogglePublic || onPublish) && (
                                 <>
                                     <DropdownMenuLabel className="flex items-center justify-between text-xs text-muted-foreground font-normal">
                                         {t('header.menuGroup.share')}
@@ -568,7 +578,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.settings')}
                             </DropdownMenuLabel>
-                            {!isPublicMode && (
+                            {role === 'owner' && (
                                 <div className="flex items-center justify-between px-2 py-1.5">
                                     <span className="text-sm">{t('header.autoSave')}</span>
                                     <button
@@ -609,7 +619,7 @@ export const Header: React.FC<HeaderProps> = ({
                             )}
 
                             {/* Help & Tour */}
-                            {(onHelp || onTour || !isPublicMode) && <DropdownMenuSeparator />}
+                            {(onHelp || onTour || role !== 'anonymous') && <DropdownMenuSeparator />}
                             {onHelp && (
                                 <DropdownMenuItem onClick={onHelp}>
                                     <HelpCircle className="w-4 h-4 mr-2" />
@@ -623,7 +633,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.guidedTour')}
                                 </DropdownMenuItem>
                             )}
-                            {!isPublicMode && (
+                            {role !== 'anonymous' && (
                                 <DropdownMenuItem onClick={() => navigate('/tutorial')}>
                                     <GraduationCap className="w-4 h-4 mr-2" />
                                     {t('header.replayTutorial')}

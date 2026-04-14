@@ -35,10 +35,12 @@ import {
 import { BlockIcon } from './BlockIcon';
 import { FrontendBadge } from './FrontendBadge';
 
+import type { FlowRole } from '@flows/flows';
+
 interface SidebarProps {
     onAddNode: (type: string) => void;
     isLoading?: boolean;
-    readOnly?: boolean;
+    role?: FlowRole;
 }
 
 export interface SidebarRef {
@@ -170,7 +172,8 @@ const BlockItem: React.FC<BlockItemProps> = ({
 
 type CategoryKey = keyof typeof BLOCK_CATEGORY_CONFIG;
 
-export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoading, readOnly }, ref) => {
+export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoading, role = 'owner' }, ref) => {
+    const isReadOnly = role !== 'owner';
     const { t } = useTranslation(['flows']);
     const [isOpen, setIsOpen] = useState(false);
     const [expandedCategories, setExpandedCategories] = useState<Set<CategoryKey>>(new Set(BLOCK_CATEGORIES));
@@ -213,7 +216,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
     };
 
     const handleAddNode = (type: string) => {
-        if (readOnly) return;
+        if (isReadOnly) return;
         onAddNode(type);
         setIsOpen(false);
     };
@@ -372,7 +375,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                             description={block.description}
                                                             icon={block.icon}
                                                             onAdd={() => handleAddNode(block.id)}
-                                                            disabled={isLoading || readOnly}
+                                                            disabled={isLoading || isReadOnly}
                                                             inputCount={block.inputs?.length}
                                                             outputCount={block.outputs?.length}
                                                             isFrontend={block.isFrontend}
@@ -387,7 +390,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                         </div>
 
                         <div className="mt-3 pt-2 border-t border-glass-border text-[10px] text-muted-foreground text-center">
-                            {readOnly ? t('sidebar.readOnlyHint', 'Sign in to add blocks') : t('sidebar.clickToAdd')}
+                            {isReadOnly ? t('sidebar.readOnlyHint', 'Sign in to add blocks') : t('sidebar.clickToAdd')}
                         </div>
                     </div>
                 </>
