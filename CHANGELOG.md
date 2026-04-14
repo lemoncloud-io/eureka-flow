@@ -1,5 +1,34 @@
 # Changelog
 
+## [2026-04-14] - root@0.28.0, @flows/web@0.28.0, @flows/admin@0.15.0
+
+### Features
+
+- add dev role toggle and animations
+- update mobile-editor
+- add isEditable flag
+- support 3-tier setting
+- add run all functionality
+- add canvas context menu for block selection
+- enhance port data retrieval with options
+- add node block context menu
+
+### Bug Fixes
+
+- sync pending updates during node execution
+
+### Refactor
+
+- enhance toaster styling
+- refactor code
+- remove import functionality from header
+- replace MoreVertical button with styled div
+
+### Chores
+
+- update error styling
+- update button colors for run options
+
 ## [2026-04-13] - root@0.27.0, @flows/web@0.27.0, @flows/admin@0.14.0
 
 ### Features
