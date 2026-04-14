@@ -380,8 +380,11 @@
     .animate-port-glow-image,
     .animate-port-glow-number,
     .animate-port-glow-json,
-    .animate-port-glow-any {
+    .animate-port-glow-any,
+    .animate-fade-in-up,
+    .animate-stagger-entrance {
         animation: none !important;
+        opacity: 1 !important;
     }
 }
 

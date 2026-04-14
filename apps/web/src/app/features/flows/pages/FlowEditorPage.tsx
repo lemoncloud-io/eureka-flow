@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -29,9 +29,89 @@ import type { FlowRole } from '@flows/flows';
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
 
+const STAGGER_DELAY_MS = 80;
+const staggerStyle = (index: number): React.CSSProperties => ({
+    animationDelay: `${STAGGER_DELAY_MS * index}ms`,
+    opacity: 0,
+});
+
 const isInputElement = (target: EventTarget | null): boolean => {
     if (!target || !(target instanceof HTMLElement)) return false;
     return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
+};
+
+const DEV_ROLES: FlowRole[] = ['owner', 'guest', 'anonymous'];
+
+const DevRoleToggle: React.FC<{
+    role: FlowRole;
+    computedRole: FlowRole;
+    onOverride: (role: FlowRole | null) => void;
+}> = ({ role, computedRole, onOverride }) => {
+    const dragRef = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState({ x: 16, y: 16 }); // bottom-right offset
+    const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+    const didDrag = useRef(false);
+
+    const handlePointerDown = useCallback(
+        (e: React.PointerEvent) => {
+            if ((e.target as HTMLElement).closest('button')) return;
+            e.preventDefault();
+            dragState.current = { startX: e.clientX, startY: e.clientY, originX: pos.x, originY: pos.y };
+            didDrag.current = false;
+            dragRef.current?.setPointerCapture(e.pointerId);
+        },
+        [pos]
+    );
+
+    const handlePointerMove = useCallback((e: React.PointerEvent) => {
+        if (!dragState.current) return;
+        const dx = dragState.current.startX - e.clientX;
+        const dy = dragState.current.startY - e.clientY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true;
+        setPos({
+            x: Math.max(0, dragState.current.originX + dx),
+            y: Math.max(0, dragState.current.originY + dy),
+        });
+    }, []);
+
+    const handlePointerUp = useCallback(() => {
+        dragState.current = null;
+        // Reset after a tick so the click event (which fires after pointerup) can still check didDrag
+        requestAnimationFrame(() => {
+            didDrag.current = false;
+        });
+    }, []);
+
+    return (
+        <div
+            ref={dragRef}
+            className="fixed z-50 touch-none"
+            style={{ right: pos.x, bottom: pos.y }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+        >
+            <div className="flex gap-1 bg-glass-bg backdrop-blur-[24px] border border-glass-border shadow-floating rounded-xl p-1 text-xs font-mono cursor-grab active:cursor-grabbing">
+                <span className="px-1.5 py-1 text-muted-foreground/50 select-none">DEV</span>
+                {DEV_ROLES.map(r => (
+                    <button
+                        key={r}
+                        onClick={() => {
+                            if (didDrag.current) return;
+                            onOverride(r === computedRole ? null : r);
+                        }}
+                        className={`px-2 py-1 rounded-lg transition-colors ${
+                            role === r
+                                ? 'bg-primary text-primary-foreground'
+                                : 'text-muted-foreground hover:bg-accent/60'
+                        }`}
+                    >
+                        {r}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
 };
 
 export const FlowEditorPage = () => {
@@ -426,6 +506,9 @@ export const FlowEditorPage = () => {
         showNotification(t('flowEditor.exportedToJson'), 'success');
     };
 
+    const isGraphViewOpenRef = useRef(false);
+    isGraphViewOpenRef.current = isGraphViewOpen;
+
     const handlersRef = useRef({
         save: handleSave,
         new: handleNew,
@@ -445,6 +528,13 @@ export const FlowEditorPage = () => {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // ESC to close graph view overlay
+            if (e.key === 'Escape' && isGraphViewOpenRef.current) {
+                e.preventDefault();
+                setIsGraphViewOpen(false);
+                return;
+            }
+
             if (isInputElement(e.target)) return;
 
             // Handle ? key for help (Shift + / on most keyboards)
@@ -513,27 +603,35 @@ export const FlowEditorPage = () => {
         return (
             <div className="flex h-screen bg-background text-foreground font-sans items-center justify-center flex-col gap-4">
                 {bootError ? (
-                    <div className="flex flex-col items-center max-w-sm mx-auto px-4 animate-fade-in-up">
+                    <div className="flex flex-col items-center max-w-sm mx-auto px-4">
                         {/* Icon */}
-                        {isPublicMode ? (
-                            <div className="w-16 h-16 rounded-2xl bg-muted/30 border border-border/40 flex items-center justify-center mb-5">
-                                <Lock className="w-7 h-7 text-muted-foreground/50" />
-                            </div>
-                        ) : (
-                            <div className="w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center mb-5">
-                                <ShieldX className="w-7 h-7 text-destructive/60" />
-                            </div>
-                        )}
+                        <div className="animate-fade-in-up" style={staggerStyle(0)}>
+                            {isPublicMode ? (
+                                <div className="w-16 h-16 rounded-2xl bg-muted/30 border border-border/40 flex items-center justify-center mb-5">
+                                    <Lock className="w-7 h-7 text-muted-foreground/50" />
+                                </div>
+                            ) : (
+                                <div className="w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center mb-5">
+                                    <ShieldX className="w-7 h-7 text-destructive/60" />
+                                </div>
+                            )}
+                        </div>
 
                         {/* Title */}
-                        <h2 className="text-base font-semibold text-foreground mb-1.5 text-center">
+                        <h2
+                            className="text-base font-semibold text-foreground mb-1.5 text-center animate-fade-in-up"
+                            style={staggerStyle(1)}
+                        >
                             {isPublicMode
                                 ? t('flowEditor.privateFlowTitle', 'Private Flow')
                                 : t('flowEditor.loadErrorTitle', 'Failed to Load')}
                         </h2>
 
                         {/* Description */}
-                        <p className="text-sm text-muted-foreground text-center mb-6 leading-relaxed">
+                        <p
+                            className="text-sm text-muted-foreground text-center mb-6 leading-relaxed animate-fade-in-up"
+                            style={staggerStyle(2)}
+                        >
                             {isPublicMode
                                 ? t(
                                       'flowEditor.privateFlowDescription',
@@ -543,7 +641,7 @@ export const FlowEditorPage = () => {
                         </p>
 
                         {/* Actions */}
-                        <div className="flex flex-col items-center gap-2.5">
+                        <div className="flex flex-col items-center gap-2.5 animate-fade-in-up" style={staggerStyle(3)}>
                             {isPublicMode ? (
                                 <Button size="sm" className="gap-2" onClick={() => setIsApiKeyDialogOpen(true)}>
                                     <KeyRound className="w-3.5 h-3.5" />
@@ -554,7 +652,7 @@ export const FlowEditorPage = () => {
                                     <Button size="sm" onClick={boot}>
                                         {t('flowEditor.retry')}
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => setIsApiKeyDialogOpen(true)}>
+                                    <Button variant="ghost" size="sm" onClick={() => setIsApiKeyDialogOpen(true)}>
                                         {t('flowEditor.resetApiKey')}
                                     </Button>
                                 </div>
@@ -565,18 +663,32 @@ export const FlowEditorPage = () => {
                             >
                                 <Globe className="w-3.5 h-3.5" />
                                 {t('flowEditor.browsePublicFlows', 'Browse public flows')}
-                                <ArrowRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                                <ArrowRight className="w-3 h-3 -translate-x-0.5 group-hover:translate-x-0 transition-transform" />
                             </Link>
                         </div>
                     </div>
                 ) : (
-                    <>
-                        <div className="relative w-16 h-16">
-                            <div className="absolute inset-0 border-4 border-border rounded-full"></div>
-                            <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin"></div>
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="relative w-12 h-12">
+                            <div className="absolute inset-0 border-[3px] border-border/40 rounded-full"></div>
+                            <div className="absolute inset-0 border-[3px] border-primary rounded-full border-t-transparent animate-spin"></div>
                         </div>
-                        <div className="text-muted-foreground font-mono text-sm animate-pulse">{loadingText}</div>
-                    </>
+                        <div className="flex flex-col items-center gap-2">
+                            {/* key forces remount to signal text change visually */}
+                            <div className="text-muted-foreground font-mono text-sm" key={loadingText}>
+                                {loadingText}
+                            </div>
+                            <div className="flex gap-1">
+                                {[0, 1, 2].map(i => (
+                                    <div
+                                        key={i}
+                                        className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-pulse"
+                                        style={{ animationDelay: `${i * 200}ms` }}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 )}
                 <ApiKeyDialog
                     open={isApiKeyDialogOpen}
@@ -722,9 +834,12 @@ export const FlowEditorPage = () => {
                     <div className="absolute top-3 right-3 z-10">
                         <button
                             onClick={() => setIsGraphViewOpen(false)}
-                            className="flex items-center justify-center w-9 h-9 rounded-xl bg-background/80 backdrop-blur-xl border border-border/50 shadow-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
+                            className="flex items-center gap-2 h-9 px-3 rounded-xl bg-background/80 backdrop-blur-xl border border-border/50 shadow-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
                         >
                             <X className="w-4 h-4" />
+                            <kbd className="text-[10px] font-mono border border-border/60 bg-muted/50 rounded px-1 py-0.5">
+                                ESC
+                            </kbd>
                         </button>
                     </div>
                 </div>
@@ -732,8 +847,11 @@ export const FlowEditorPage = () => {
 
             {/* Public Mode Info Card */}
             {isPublicMode && (
-                <div className="absolute bottom-4 left-4 z-30 pointer-events-auto">
-                    <div className="bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-xl p-4 shadow-floating max-w-[280px]">
+                <div
+                    className="absolute bottom-4 left-4 z-30 pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300"
+                    style={{ animationDelay: '300ms', animationFillMode: 'both' }}
+                >
+                    <div className="bg-glass-bg backdrop-blur-[24px] border border-glass-border border-t-primary/40 rounded-xl p-4 shadow-floating max-w-[280px]">
                         <h3 className="text-sm font-semibold text-foreground truncate">{flowName}</h3>
                         {flowDescription && (
                             <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{flowDescription}</p>
@@ -748,28 +866,14 @@ export const FlowEditorPage = () => {
 
             {/* Dev Role Toggle (hidden in production) */}
             {import.meta.env.VITE_ENV !== 'PROD' && (
-                <div className="fixed bottom-4 right-4 z-50 flex gap-1 bg-background/90 backdrop-blur border border-border rounded-lg p-1 text-xs font-mono">
-                    {(['owner', 'guest', 'anonymous'] as FlowRole[]).map(r => (
-                        <button
-                            key={r}
-                            onClick={() => setDevRoleOverride(r === computedRole ? null : r)}
-                            className={`px-2 py-1 rounded transition-colors ${
-                                role === r
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'text-muted-foreground hover:bg-muted'
-                            }`}
-                        >
-                            {r}
-                        </button>
-                    ))}
-                </div>
+                <DevRoleToggle role={role} computedRole={computedRole} onOverride={setDevRoleOverride} />
             )}
 
             {/* Loading Overlay */}
             {isLoading && (
-                <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-sm">
-                    <div className="flex flex-col items-center bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl p-6 shadow-floating">
-                        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-3"></div>
+                <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="flex flex-col items-center bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl p-6 shadow-floating animate-in fade-in zoom-in-95 duration-200">
+                        <div className="w-8 h-8 border-[3px] border-primary/30 border-t-primary rounded-full animate-spin mb-3"></div>
                         <span className="text-sm font-medium text-foreground">{t('flowEditor.processing')}</span>
                     </div>
                 </div>

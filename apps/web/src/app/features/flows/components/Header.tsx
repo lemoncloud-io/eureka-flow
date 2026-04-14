@@ -174,9 +174,20 @@ const ToolbarButton: React.FC<{
                         {icon}
                     </button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                    {tooltip}
-                    {shortcut && <span className="ml-2 text-primary-foreground/70 font-mono">{shortcut}</span>}
+                <TooltipContent side="bottom" className="text-xs flex items-center gap-1.5">
+                    <span>{tooltip}</span>
+                    {shortcut && (
+                        <span className="flex items-center gap-0.5 ml-0.5">
+                            {[...shortcut].map((key, i) => (
+                                <kbd
+                                    key={i}
+                                    className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-primary-foreground/20 bg-primary-foreground/10 px-1 text-[10px] font-mono text-primary-foreground/70"
+                                >
+                                    {key}
+                                </kbd>
+                            ))}
+                        </span>
+                    )}
                 </TooltipContent>
             </Tooltip>
         </TooltipProvider>
