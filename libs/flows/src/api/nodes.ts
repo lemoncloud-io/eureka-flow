@@ -60,9 +60,15 @@ export const getNode = async (id: string): Promise<NodeView> => {
  * @param direction - Port direction ('in' or 'out')
  * @returns PortDataResponse with port data
  */
-export const getPortData = async (portId: string, direction: 'in' | 'out'): Promise<PortDataResponse> => {
+export const getPortData = async (
+    portId: string,
+    direction: 'in' | 'out',
+    options?: { flowId?: string; runId?: string }
+): Promise<PortDataResponse> => {
     _log(`> getPortData(${portId}, direction=${direction})`);
-    const response = await api.get<PortDataResponse>(`/nodes/${portId}/port`, { params: { direction } });
+    const response = await api.get<PortDataResponse>(`/nodes/${portId}/port`, {
+        params: { direction, ...options },
+    });
     return response.data;
 };
 

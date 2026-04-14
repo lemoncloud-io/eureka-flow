@@ -179,7 +179,7 @@ export const useSocketHandlers = ({
         async (info: PortUpdateInfo) => {
             const { portId, nodeId, flowId, portName, no, runId } = info;
 
-            if (!flowId || flowId !== currentFlowId) return;
+            if (flowId && flowId !== currentFlowId) return;
 
             if (runId && no !== undefined) {
                 appendRunPortUpdate(runId, nodeId, {
@@ -222,7 +222,7 @@ export const useSocketHandlers = ({
             const direction = isOutputPort ? 'out' : 'in';
 
             try {
-                const portData = await getPortData(portId, direction);
+                const portData = await getPortData(portId, direction, { flowId, runId });
                 if (portData?.data) {
                     const dataPacket = {
                         value: portData.data.value,

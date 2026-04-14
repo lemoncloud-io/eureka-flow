@@ -1363,6 +1363,7 @@ export const NodeBlock: React.FC<NodeBlockProps> = ({
                 left: node.position.x,
                 top: node.position.y,
                 width: `${currentWidth}px`,
+                zIndex: isSelected ? 10 : 0,
             }}
             onMouseDown={onMouseDown}
             onTouchStart={onTouchStart}
