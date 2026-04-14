@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-14] - root@0.28.1, @flows/web@0.28.1
+
+### Other
+
+- perf: eliminate canvas re-renders on zoom/pan
+
 ## [2026-04-14] - root@0.28.0, @flows/web@0.28.0, @flows/admin@0.15.0
 
 ### Features
