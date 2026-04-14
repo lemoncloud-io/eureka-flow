@@ -117,7 +117,6 @@ export const FlowEditorPage = () => {
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
 
     const autoSaveTimerRef = useRef<number | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleOpenLibrary = useCallback(() => {
         sidebarRef.current?.open();
@@ -390,7 +389,11 @@ export const FlowEditorPage = () => {
         if (!canvasRef.current) return;
 
         const data = canvasRef.current.getWorkflow();
-        const jsonString = JSON.stringify(data, null, 2);
+        const exportData = {
+            nodes: data.nodes.map(({ id, ...rest }) => rest),
+            edges: data.edges.map(({ id, ...rest }) => rest),
+        };
+        const jsonString = JSON.stringify(exportData, null, 2);
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
 
@@ -403,33 +406,6 @@ export const FlowEditorPage = () => {
         URL.revokeObjectURL(url);
 
         showNotification(t('flowEditor.exportedToJson'), 'success');
-    };
-
-    const handleImport = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = async event => {
-            try {
-                const json = JSON.parse(event.target?.result as string);
-                if (canvasRef.current && json.nodes && (json.edges || json.connections)) {
-                    await canvasRef.current.loadWorkflow(json);
-                    lastSavedStateRef.current = null;
-                    showNotification(t('flowEditor.workflowImported'), 'success');
-                } else {
-                    showNotification(t('flowEditor.invalidWorkflowFile'), 'error');
-                }
-            } catch {
-                showNotification(t('flowEditor.failedToParseJson'), 'error');
-            }
-        };
-        reader.readAsText(file);
-        e.target.value = '';
     };
 
     const handlersRef = useRef({
@@ -602,9 +578,6 @@ export const FlowEditorPage = () => {
 
     return (
         <div className="relative h-screen bg-canvas text-foreground font-sans overflow-hidden animate-in fade-in duration-500">
-            {/* Hidden file input */}
-            <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFileChange} />
-
             {/* Full-screen Canvas */}
             <div data-tour="canvas" className="absolute inset-0">
                 <WorkflowCanvas
@@ -630,7 +603,6 @@ export const FlowEditorPage = () => {
                     onNew: handleNew,
                     onSave: handleSave,
                     onExport: handleExport,
-                    onImport: handleImport,
                     onExportPng: handleExportPng,
                 }}
                 editActions={{

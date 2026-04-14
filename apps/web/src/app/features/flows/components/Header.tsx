@@ -21,7 +21,6 @@ import {
     Save,
     Trash2,
     Undo2,
-    Upload,
 } from 'lucide-react';
 
 import { useSystemInfoQuery } from '@flows/flows';
@@ -54,7 +53,6 @@ export interface FileActionsProps {
     onNew: () => void;
     onSave: () => void;
     onExport: () => void;
-    onImport: () => void;
     onExportPng?: () => void;
 }
 
@@ -462,10 +460,6 @@ export const Header: React.FC<HeaderProps> = ({
                                         <Save className="w-4 h-4 mr-2" />
                                         {t('header.saveFlow')}
                                         <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={fileActions.onImport}>
-                                        <Upload className="w-4 h-4 mr-2" />
-                                        {t('header.importJson')}
                                     </DropdownMenuItem>
                                 </>
                             )}
