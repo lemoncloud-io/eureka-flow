@@ -416,13 +416,6 @@ export const Header: React.FC<HeaderProps> = ({
                                 variant={getSaveButtonVariant()}
                             />
                         )}
-                        {!isPublicMode && editActions.onRunAll && (
-                            <ToolbarButton
-                                onClick={editActions.onRunAll}
-                                icon={<Play className="w-4 h-4" />}
-                                tooltip={t('header.runAll')}
-                            />
-                        )}
                         <ToolbarButton
                             onClick={editActions.onUndo}
                             icon={<Undo2 className="w-4 h-4" />}
@@ -435,6 +428,13 @@ export const Header: React.FC<HeaderProps> = ({
                             tooltip={t('header.redo')}
                             shortcut="⌘⇧Z"
                         />
+                        {!isPublicMode && editActions.onRunAll && (
+                            <ToolbarButton
+                                onClick={editActions.onRunAll}
+                                icon={<Play className="w-4 h-4" />}
+                                tooltip={t('header.runAll')}
+                            />
+                        )}
                         {socketState && <SocketDot {...socketState} />}
                     </div>
 

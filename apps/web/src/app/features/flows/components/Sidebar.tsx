@@ -4,10 +4,12 @@ import { useTranslation } from 'react-i18next';
 import {
     ChevronDown,
     ChevronRight,
+    Eye,
     Image,
     LayoutGrid,
     Package,
     Puzzle,
+    RefreshCw,
     Ruler,
     Search,
     Shield,
