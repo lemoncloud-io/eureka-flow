@@ -11,6 +11,7 @@ import { BlockIcon } from '../../flows/components/BlockIcon';
 import { getPortStyleKey } from '../../flows/utils';
 
 import type { CompatibleTarget } from '../hooks/useConnectionMode';
+import type { FlowRole } from '@flows/flows';
 
 interface MobileConnectionSheetProps {
     open: boolean;
@@ -23,6 +24,7 @@ interface MobileConnectionSheetProps {
     compatibleTargets: CompatibleTarget[];
     onConnect: (targetNodeId: string, targetPortId: string) => void;
     onDisconnect: (connectionId: string) => void;
+    role?: FlowRole;
 }
 
 export const MobileConnectionSheet = ({
@@ -36,7 +38,9 @@ export const MobileConnectionSheet = ({
     compatibleTargets,
     onConnect,
     onDisconnect,
+    role = 'owner',
 }: MobileConnectionSheetProps) => {
+    const readOnly = role !== 'owner';
     const connections = useCanvasConnections();
     const nodes = useCanvasNodes();
     const blockRegistry = useBlockRegistry();
@@ -132,25 +136,27 @@ export const MobileConnectionSheet = ({
                                             </div>
                                         </div>
                                         <Check className="w-3.5 h-3.5 text-success/60 shrink-0" />
-                                        <button
-                                            onClick={() => onDisconnect(conn.connectionId)}
-                                            className={cn(
-                                                'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium shrink-0',
-                                                'bg-destructive/8 text-destructive/70 border border-destructive/15',
-                                                'hover:bg-destructive/15 hover:text-destructive active:scale-95 transition-all'
-                                            )}
-                                        >
-                                            <Unlink className="w-3 h-3" />
-                                            <span>Disconnect</span>
-                                        </button>
+                                        {!readOnly && (
+                                            <button
+                                                onClick={() => onDisconnect(conn.connectionId)}
+                                                className={cn(
+                                                    'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium shrink-0',
+                                                    'bg-destructive/8 text-destructive/70 border border-destructive/15',
+                                                    'hover:bg-destructive/15 hover:text-destructive active:scale-95 transition-all'
+                                                )}
+                                            >
+                                                <Unlink className="w-3 h-3" />
+                                                <span>Disconnect</span>
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    {/* Available targets */}
-                    {hasAvailable && (
+                    {/* Available targets — owner only */}
+                    {!readOnly && hasAvailable && (
                         <div className="px-4 pt-3 pb-2">
                             <div className="flex items-center gap-1.5 mb-2">
                                 <Link2Off className="w-3 h-3 text-muted-foreground/60" />

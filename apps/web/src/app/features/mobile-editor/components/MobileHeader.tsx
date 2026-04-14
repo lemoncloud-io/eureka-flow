@@ -28,7 +28,7 @@ import {
     ThemeToggle,
 } from '@flows/ui-kit';
 
-import type { SaveStatus } from '@flows/flows';
+import type { FlowRole, SaveStatus } from '@flows/flows';
 
 interface MobileHeaderProps {
     flowName: string;
@@ -43,6 +43,7 @@ interface MobileHeaderProps {
     onNew?: () => void;
     onClear?: () => void;
     onApiKeySettings?: () => void;
+    role?: FlowRole;
 }
 
 export const MobileHeader = ({
@@ -58,6 +59,7 @@ export const MobileHeader = ({
     onNew,
     onClear,
     onApiKeySettings,
+    role = 'owner',
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
@@ -109,13 +111,15 @@ export const MobileHeader = ({
                         className="w-full text-sm font-bold bg-transparent border-b-2 border-primary outline-none"
                         autoFocus
                     />
-                ) : (
+                ) : role === 'owner' ? (
                     <button
                         onClick={handleStartEditing}
                         className="truncate text-sm font-bold text-foreground leading-tight"
                     >
                         {flowName}
                     </button>
+                ) : (
+                    <span className="truncate text-sm font-bold text-foreground leading-tight">{flowName}</span>
                 )}
 
                 <div className="flex items-center gap-1 shrink-0">
@@ -146,13 +150,15 @@ export const MobileHeader = ({
                 <MapIcon className="w-[18px] h-[18px]" />
             </button>
 
-            <button
-                onClick={onSave}
-                disabled={isSaving}
-                className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0 disabled:opacity-40"
-            >
-                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-            </button>
+            {role === 'owner' && (
+                <button
+                    onClick={onSave}
+                    disabled={isSaving}
+                    className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0 disabled:opacity-40"
+                >
+                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                </button>
+            )}
 
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -175,10 +181,12 @@ export const MobileHeader = ({
                         <FolderOpen className="w-4 h-4" />
                         {t('header.openFlow', 'Open Flow')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onSave} className="gap-2">
-                        <Save className="w-4 h-4" />
-                        {t('header.saveFlow', 'Save Flow')}
-                    </DropdownMenuItem>
+                    {role === 'owner' && (
+                        <DropdownMenuItem onClick={onSave} className="gap-2">
+                            <Save className="w-4 h-4" />
+                            {t('header.saveFlow', 'Save Flow')}
+                        </DropdownMenuItem>
+                    )}
                     {onExport && (
                         <DropdownMenuItem onClick={onExport} className="gap-2">
                             <Download className="w-4 h-4" />
