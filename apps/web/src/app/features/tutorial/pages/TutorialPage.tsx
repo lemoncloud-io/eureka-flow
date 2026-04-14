@@ -5,17 +5,14 @@ import { useNavigate } from 'react-router-dom';
 import { useBlocks, useCanvasStore, useFlowsStore } from '@flows/flows';
 import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 
-import { Sidebar, WorkflowCanvas } from '../../flows';
+import { Header, Sidebar, WorkflowCanvas } from '../../flows';
 import { CompletionScreen } from '../components/CompletionScreen';
+import { GuideTour } from '../components/GuideTour';
 import { TutorialOverlay } from '../components/TutorialOverlay';
-import { createBaseDriverConfig, importDriver } from '../consts/tourSteps';
 import { FALLBACK_BLOCKS, TUTORIAL_WORKFLOW } from '../consts/tutorialSteps';
 import { useTutorialSteps } from '../hooks/useTutorialSteps';
 
 import type { SidebarRef, WorkflowCanvasRef } from '../../flows';
-
-/** Delay before starting mini-tour so canvas DOM settles after loadWorkflow */
-const TOUR_INIT_DELAY_MS = 500;
 
 const noop = () => {
     /* intentionally empty */
@@ -26,11 +23,11 @@ export const TutorialPage = () => {
     const navigate = useNavigate();
     const canvasRef = useRef<WorkflowCanvasRef>(null);
     const sidebarRef = useRef<SidebarRef>(null);
-    const driverRef = useRef<{ destroy: () => void } | null>(null);
 
     const { loadBlocks } = useBlocks();
     const { setApiKey } = useWebCoreStore();
     const [isReady, setIsReady] = useState(false);
+    const [showGuideTour, setShowGuideTour] = useState(false);
 
     const { currentStep, step, totalSteps, isLastStep, isSuccess, goNext, goPrev, skipToEnd, markTutorialDone } =
         useTutorialSteps();
@@ -65,68 +62,17 @@ export const TutorialPage = () => {
         boot();
     }, [loadBlocks]);
 
-    /** Run driver.js mini-tour (welcome + sidebar + canvas highlight) */
-    const runGuidedTour = useCallback(async () => {
-        const driver = await importDriver();
-
-        const driverInstance = driver({
-            ...createBaseDriverConfig(t),
-            steps: [
-                {
-                    popover: {
-                        title: t('tutorial:steps.welcome.title'),
-                        description: t('tutorial:steps.welcome.description'),
-                        side: 'over',
-                        align: 'center',
-                    },
-                },
-                {
-                    element: '[data-tour="sidebar"]',
-                    popover: {
-                        title: t('tutorial:steps.sidebar.title'),
-                        description: t('tutorial:steps.sidebar.description'),
-                        side: 'right',
-                        align: 'center',
-                    },
-                },
-                {
-                    element: '[data-tour="canvas"]',
-                    popover: {
-                        title: t('tutorial:steps.canvas.title'),
-                        description: t('tutorial:steps.canvas.description'),
-                        side: 'over',
-                        align: 'center',
-                    },
-                },
-            ],
-            onDestroyStarted: () => {
-                driverInstance.destroy();
-                driverRef.current = null;
-            },
-        });
-
-        driverRef.current = driverInstance;
-        driverInstance.drive();
-    }, [t]);
-
-    // Load pre-built workflow once canvas mounts, then auto-start mini-tour
+    // Load pre-built workflow once canvas mounts, then auto-start guide tour
     const workflowLoadedRef = useRef(false);
     useEffect(() => {
         if (!isReady || workflowLoadedRef.current) return;
         if (canvasRef.current) {
             workflowLoadedRef.current = true;
             canvasRef.current.loadWorkflow(TUTORIAL_WORKFLOW);
-            const timer = setTimeout(runGuidedTour, TOUR_INIT_DELAY_MS);
+            const timer = setTimeout(() => setShowGuideTour(true), 500);
             return () => clearTimeout(timer);
         }
-    }, [isReady, runGuidedTour]);
-
-    // Clean up driver.js on unmount
-    useEffect(() => {
-        return () => {
-            driverRef.current?.destroy();
-        };
-    }, []);
+    }, [isReady]);
 
     const handleAddNode = useCallback((type: string) => {
         canvasRef.current?.addNode(type);
@@ -176,21 +122,48 @@ export const TutorialPage = () => {
                 />
             </div>
 
+            {/* Header for guide tour targeting (header-left, header-toolbar, header-menu) */}
+            <Header
+                flowInfo={{ flowName: t('tutorial:flowName', '모델 합성'), onNameChange: noop }}
+                fileActions={{ onNew: noop, onSave: noop, onExport: noop, onExportPng: noop }}
+                editActions={{
+                    onUndo: noop,
+                    onRedo: noop,
+                    onAutoLayout: noop,
+                    onClear: noop,
+                    onSave: noop,
+                    onCollapseAll: noop,
+                    onExpandAll: noop,
+                    onRunAll: noop,
+                }}
+                saveState={{
+                    lastSavedAt: new Date(),
+                    isAutoSaveEnabled: false,
+                    onToggleAutoSave: noop,
+                    saveStatus: 'idle',
+                }}
+                role="owner"
+            />
+
             <Sidebar ref={sidebarRef} onAddNode={handleAddNode} />
 
             {isLastStep ? (
                 <CompletionScreen step={step} onSubmitKey={handleSubmitKey} onClose={goPrev} />
             ) : (
-                <TutorialOverlay
-                    currentStep={currentStep}
-                    step={step}
-                    totalSteps={totalSteps}
-                    isSuccess={isSuccess}
-                    onNext={goNext}
-                    onPrev={goPrev}
-                    onSkip={skipToEnd}
-                />
+                !showGuideTour && (
+                    <TutorialOverlay
+                        currentStep={currentStep}
+                        step={step}
+                        totalSteps={totalSteps}
+                        isSuccess={isSuccess}
+                        onNext={goNext}
+                        onPrev={goPrev}
+                        onSkip={skipToEnd}
+                    />
+                )
             )}
+
+            {showGuideTour && <GuideTour onClose={() => setShowGuideTour(false)} />}
         </div>
     );
 };
