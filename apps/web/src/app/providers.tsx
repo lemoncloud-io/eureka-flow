@@ -187,6 +187,7 @@ export const Providers = ({ children }: ProvidersProps) => {
                                             title: 'text-foreground text-sm font-medium',
                                             description: 'text-muted-foreground text-xs',
                                             actionButton: 'bg-primary text-primary-foreground text-xs',
+                                            error: '!bg-destructive/95 !border-destructive/50 !text-destructive-foreground',
                                         },
                                     }}
                                 />
