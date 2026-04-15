@@ -1,133 +1,45 @@
 import { useTranslation } from 'react-i18next';
 
-import { ChevronsDownUp, ChevronsUpDown, Loader2, Play, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 
 import type { FlowRole } from '@flows/flows';
 
-interface RunProgress {
-    current: number;
-    total: number;
-}
-
 interface MobileBottomBarProps {
-    onAddBlock: () => void;
-    onRunAll: () => void;
-    isRunning: boolean;
-    progress: RunProgress | null;
+    onAddNode: () => void;
     role?: FlowRole;
-    nodeCount: number;
-    isAllCollapsed?: boolean;
-    onToggleCollapseAll?: () => void;
 }
 
-export const MobileBottomBar = ({
-    onAddBlock,
-    onRunAll,
-    isRunning,
-    progress,
-    role = 'owner',
-    nodeCount,
-    isAllCollapsed,
-    onToggleCollapseAll,
-}: MobileBottomBarProps) => {
+export const MobileBottomBar = ({ onAddNode, role = 'owner' }: MobileBottomBarProps) => {
     const { t } = useTranslation(['flows']);
 
-    const progressPct = progress && progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
-
-    if (role === 'anonymous') return null;
+    if (role !== 'owner') return null;
 
     return (
         <div
             className={cn(
                 'fixed bottom-0 left-0 right-0 z-30',
                 'pb-[env(safe-area-inset-bottom)]',
-                'bg-background/80 backdrop-blur-2xl',
+                'bg-background/90 backdrop-blur-2xl',
                 'border-t border-border/30'
             )}
         >
-            <div className="flex items-center gap-2.5 px-4 py-2.5">
-                {/* Collapse/Expand All */}
-                {nodeCount > 0 && onToggleCollapseAll && (
-                    <button
-                        type="button"
-                        onClick={onToggleCollapseAll}
-                        disabled={isRunning}
-                        aria-label={isAllCollapsed ? 'Expand all' : 'Collapse all'}
-                        className={cn(
-                            'w-11 h-11 rounded-xl flex items-center justify-center shrink-0',
-                            'bg-card border border-border/50',
-                            'active:scale-[0.96] transition-all duration-150',
-                            'disabled:opacity-40'
-                        )}
-                    >
-                        {isAllCollapsed ? (
-                            <ChevronsUpDown className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                            <ChevronsDownUp className="w-4 h-4 text-muted-foreground" />
-                        )}
-                    </button>
-                )}
-
-                {/* Add Block — owner only */}
-                {role === 'owner' && (
-                    <button
-                        onClick={onAddBlock}
-                        disabled={isRunning}
-                        className={cn(
-                            'flex items-center gap-2 px-4 h-11 rounded-xl shrink-0',
-                            'bg-card border border-primary/20 hover:border-primary/40 hover:bg-primary/5',
-                            'text-sm font-medium',
-                            'active:scale-[0.96] transition-all duration-150',
-                            'disabled:opacity-40'
-                        )}
-                    >
-                        <Plus className="w-4 h-4 text-primary" />
-                        <span>{t('mobile.addBlock', 'Add')}</span>
-                    </button>
-                )}
-
-                {/* Run All */}
+            <div className="px-4 py-2.5">
                 <button
-                    onClick={onRunAll}
-                    disabled={nodeCount === 0 || isRunning}
+                    onClick={onAddNode}
                     className={cn(
-                        'flex-1 h-11 rounded-xl relative overflow-hidden',
+                        'w-full h-12 rounded-xl',
+                        'flex items-center justify-center gap-2',
                         'text-sm font-semibold',
-                        'active:scale-[0.97] transition-all duration-200',
-                        'disabled:opacity-40',
-                        isRunning
-                            ? 'bg-warning/10 border border-warning/25 text-warning'
-                            : 'bg-primary text-primary-foreground shadow-sm shadow-primary/25'
+                        'bg-card border border-primary/20 text-primary',
+                        'hover:bg-primary/5 hover:border-primary/40',
+                        'active:scale-[0.98] transition-all duration-200',
+                        'shadow-sm'
                     )}
                 >
-                    {/* Progress fill */}
-                    {isRunning && progress && (
-                        <div
-                            className="absolute inset-y-0 left-0 bg-warning/15 transition-[width] duration-300 ease-out"
-                            style={{ width: `${progressPct}%` }}
-                        />
-                    )}
-
-                    <span className="relative flex items-center justify-center gap-2">
-                        {isRunning ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>
-                                    {progress
-                                        ? `${progress.current} / ${progress.total}`
-                                        : t('mobile.running', 'Running...')}
-                                </span>
-                            </>
-                        ) : (
-                            <>
-                                <Play className="w-4 h-4 fill-current" />
-                                <span>{t('header.runAll', 'Run All')}</span>
-                                {nodeCount > 0 && <span className="text-xs opacity-60">({nodeCount})</span>}
-                            </>
-                        )}
-                    </span>
+                    <Plus className="w-4.5 h-4.5" />
+                    <span>{t('mobile.addNode', 'Add Node')}</span>
                 </button>
             </div>
         </div>

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBlocks, useCanvasStore, useFlowsStore } from '@flows/flows';
 import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 
-import { MobileConnectionSheet, MobileNodeList } from '../../mobile-editor/components';
+import { MobileConnectionSheet, MobileStepList } from '../../mobile-editor/components';
 import { useConnectionMode } from '../../mobile-editor/hooks';
 import { CompletionScreen } from '../components/CompletionScreen';
 import { MobileTutorialOverlay } from '../components/MobileTutorialOverlay';
@@ -98,12 +98,13 @@ export const MobileTutorialPage = () => {
             </div>
 
             <div className="pt-3 pb-40">
-                <MobileNodeList
+                <MobileStepList
                     onTapCard={handleTapCard}
-                    onTapOutputPort={connectionMode.openForPort}
-                    selectedNodeId={null}
-                    isReadOnly={false}
+                    onAddStep={() => {
+                        /* tutorial does not allow adding steps */
+                    }}
                     flowId={null}
+                    role="guest"
                 />
             </div>
 

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX } from 'lucide-react';
 
-import { useBlockRegistry, useCanvasStore, useFlows } from '@flows/flows';
+import { useBlockRegistry, useCanvasConnections, useCanvasNodes, useCanvasStore, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -16,20 +16,20 @@ import {
     MobileConnectionSheet,
     MobileFlowMap,
     MobileHeader,
-    MobileNodeConfigSheet,
-    MobileNodeList,
+    MobileStepDetail,
+    MobileStepList,
 } from '../components';
 import {
     useConnectionMode,
     useMobileAutoSave,
     useMobileEditorBoot,
     useMobileFlowActions,
+    useMobileNodeOrder,
     useMobileRunAll,
     useMobileSocketSync,
 } from '../hooks';
-import { useCollapseState } from '../hooks/useCollapseState';
 import { useRecentBlocks } from '../hooks/useRecentBlocks';
-import { useScrollRestore } from '../hooks/useScrollRestore';
+import { useStepNavigation } from '../hooks/useStepNavigation';
 
 import type { FlowRole } from '@flows/flows';
 
@@ -43,8 +43,11 @@ export const MobileFlowEditorPage = () => {
     const blockRegistry = useBlockRegistry();
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
     const nodeCount = useCanvasStore(state => state.nodes.length);
+    const nodes = useCanvasNodes();
+    const connections = useCanvasConnections();
+    const { orderedNodeIds } = useMobileNodeOrder(nodes, connections);
 
-    // Role derivation (same as desktop FlowEditorPage)
+    // Role derivation
     const computedRole: FlowRole = isPublicMode ? 'anonymous' : isEditable ? 'owner' : 'guest';
     const [devRoleOverride, setDevRoleOverride] = useState<FlowRole | null>(null);
     const role: FlowRole = devRoleOverride ?? computedRole;
@@ -53,14 +56,13 @@ export const MobileFlowEditorPage = () => {
     const lastSavedStateRef = useRef<string | null>(null);
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
 
-    // Scroll container ref for scroll restoration
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-
     // UI state
     const [isFlowListOpen, setIsFlowListOpen] = useState(false);
     const [isBlockLibraryOpen, setIsBlockLibraryOpen] = useState(false);
     const [isFlowMapOpen, setIsFlowMapOpen] = useState(false);
-    const [configNodeId, setConfigNodeId] = useState<string | null>(null);
+
+    // Step navigation (replaces configNodeId)
+    const stepNav = useStepNavigation(orderedNodeIds);
 
     // Hooks
     const {
@@ -100,22 +102,65 @@ export const MobileFlowEditorPage = () => {
     );
 
     const connectionMode = useConnectionMode(blockRegistry, currentFlowId);
-    const { collapsedNodes, toggleCollapse, collapseAll, expandAll, isAllCollapsed } = useCollapseState();
     const { recentIds, addRecent } = useRecentBlocks();
 
-    const isAnySheetOpen = configNodeId !== null || isBlockLibraryOpen || connectionMode.isOpen;
-    useScrollRestore(scrollContainerRef, isAnySheetOpen);
+    // Pending auto-connect: when user adds a new block via "Add new block & connect"
+    const [pendingConnectSource, setPendingConnectSource] = useState<{
+        nodeId: string;
+        portId: string;
+        portDataType: string;
+        /** 'output' = new block feeds INTO this port; 'input' = this port feeds INTO new block */
+        direction: 'output' | 'input';
+    } | null>(null);
 
-    const handleTapCard = useCallback((nodeId: string) => {
-        setConfigNodeId(nodeId);
-    }, []);
+    const handleTapCard = useCallback(
+        (nodeId: string) => {
+            stepNav.openStep(nodeId);
+        },
+        [stepNav]
+    );
 
     const handleAddBlockWithRecent = useCallback(
         async (type: string) => {
             addRecent(type);
-            await handleAddBlock(type);
+            const newNodeId = await handleAddBlock(type);
+
+            // Auto-connect if there's a pending connection source
+            if (newNodeId && pendingConnectSource) {
+                const newNodeDef = blockRegistry[type];
+                const srcType = pendingConnectSource.portDataType;
+                const isCompatible = (portType: string | undefined) => {
+                    const t = portType ?? 'any';
+                    return srcType === 'any' || t === 'any' || srcType.toLowerCase() === t.toLowerCase();
+                };
+
+                if (pendingConnectSource.direction === 'output') {
+                    // Original node's output → new block's input
+                    const compatibleInput = newNodeDef?.inputs?.find(p => isCompatible(p.type));
+                    if (compatibleInput) {
+                        await connectionMode.connectPorts(
+                            pendingConnectSource.nodeId,
+                            pendingConnectSource.portId,
+                            newNodeId,
+                            compatibleInput.id
+                        );
+                    }
+                } else {
+                    // New block's output → original node's input
+                    const compatibleOutput = newNodeDef?.outputs?.find(p => isCompatible(p.type));
+                    if (compatibleOutput) {
+                        await connectionMode.connectPorts(
+                            newNodeId,
+                            compatibleOutput.id,
+                            pendingConnectSource.nodeId,
+                            pendingConnectSource.portId
+                        );
+                    }
+                }
+                setPendingConnectSource(null);
+            }
         },
-        [addRecent, handleAddBlock]
+        [addRecent, handleAddBlock, pendingConnectSource, blockRegistry, connectionMode]
     );
 
     // ============================================================
@@ -210,6 +255,10 @@ export const MobileFlowEditorPage = () => {
                 onSave={handleSave}
                 onOpenFlowList={() => setIsFlowListOpen(true)}
                 onOpenFlowMap={() => setIsFlowMapOpen(true)}
+                onRunAll={handleRunAll}
+                isRunning={isRunning}
+                runProgress={runProgress}
+                nodeCount={nodeCount}
                 onExport={handleExport}
                 onNew={role === 'owner' ? handleNew : undefined}
                 onClear={role === 'owner' ? handleClear : undefined}
@@ -222,36 +271,44 @@ export const MobileFlowEditorPage = () => {
                 onClose={() => setIsFlowMapOpen(false)}
                 onTapNode={nodeId => {
                     setIsFlowMapOpen(false);
-                    setConfigNodeId(nodeId);
+                    stepNav.openStep(nodeId);
                 }}
                 flowId={currentFlowId}
             />
 
-            <div ref={scrollContainerRef} className="fixed inset-0 overflow-y-auto overscroll-contain pt-14 pb-24">
+            {/* Step list — kept mounted when detail is open for scroll preservation */}
+            <div
+                className="fixed inset-0 overflow-y-auto overscroll-contain pt-14 pb-20"
+                style={{ visibility: stepNav.isOpen ? 'hidden' : 'visible' }}
+            >
                 <div className="pt-2">
-                    <MobileNodeList
+                    <MobileStepList
                         onTapCard={handleTapCard}
-                        onTapOutputPort={connectionMode.openForPort}
+                        onAddStep={() => setIsBlockLibraryOpen(true)}
                         socketConnectionId={socketConnectionId}
-                        selectedNodeId={configNodeId}
-                        role={role}
                         flowId={currentFlowId}
-                        collapsedNodes={collapsedNodes}
-                        onToggleCollapse={toggleCollapse}
+                        role={role}
                     />
                 </div>
             </div>
 
-            <MobileBottomBar
-                onAddBlock={() => setIsBlockLibraryOpen(true)}
-                onRunAll={handleRunAll}
-                isRunning={isRunning}
-                progress={runProgress}
+            {/* Full-screen step detail */}
+            <MobileStepDetail
+                nodeId={stepNav.activeNodeId}
+                flowId={currentFlowId}
+                socketConnectionId={socketConnectionId}
                 role={role}
-                nodeCount={nodeCount}
-                isAllCollapsed={isAllCollapsed}
-                onToggleCollapseAll={isAllCollapsed ? expandAll : collapseAll}
+                hasNextStep={stepNav.hasNextStep}
+                hasPrevStep={stepNav.hasPrevStep}
+                onClose={stepNav.closeStep}
+                onNextStep={stepNav.goToNextStep}
+                onPrevStep={stepNav.goToPrevStep}
+                onOpenOutputConnection={connectionMode.openForPort}
+                onOpenInputConnection={connectionMode.openForInputPort}
             />
+
+            {/* Bottom bar — Add Node, hidden when step detail is open */}
+            {!stepNav.isOpen && <MobileBottomBar onAddNode={() => setIsBlockLibraryOpen(true)} role={role} />}
 
             {connectionMode.source && (
                 <MobileConnectionSheet
@@ -269,6 +326,19 @@ export const MobileFlowEditorPage = () => {
                         connectionMode.connectTo(targetNodeId, targetPortId);
                     }}
                     onDisconnect={connectionMode.disconnect}
+                    direction={connectionMode.direction}
+                    onAddNewAndConnect={() => {
+                        if (connectionMode.source) {
+                            setPendingConnectSource({
+                                nodeId: connectionMode.source.nodeId,
+                                portId: connectionMode.source.portId,
+                                portDataType: connectionMode.source.portDataType,
+                                direction: connectionMode.direction,
+                            });
+                        }
+                        connectionMode.close();
+                        setIsBlockLibraryOpen(true);
+                    }}
                     role={role}
                 />
             )}
@@ -278,17 +348,6 @@ export const MobileFlowEditorPage = () => {
                 onOpenChange={setIsBlockLibraryOpen}
                 onAddBlock={handleAddBlockWithRecent}
                 recentBlockIds={recentIds}
-            />
-
-            <MobileNodeConfigSheet
-                open={configNodeId !== null}
-                onOpenChange={open => {
-                    if (!open) setConfigNodeId(null);
-                }}
-                nodeId={configNodeId}
-                flowId={currentFlowId}
-                socketConnectionId={socketConnectionId}
-                role={role}
             />
 
             <FlowListDialog

@@ -180,7 +180,7 @@ export const Providers = ({ children }: ProvidersProps) => {
                                     <AppContent>{children}</AppContent>
                                 </ApiKeyGate>
                                 <Toaster
-                                    position="bottom-right"
+                                    position={window.innerWidth <= 767 ? 'top-center' : 'bottom-right'}
                                     richColors
                                     toastOptions={{
                                         classNames: {
