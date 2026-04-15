@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-04-15] - root@0.29.0, @flows/web@0.29.0
+
+### Features
+
+- improve tutorial ui/ux
+- implement custom guided tour and block tutorial
+
+### Refactor
+
+- improve tutorial flow and steps
+
 ## [2026-04-14] - root@0.28.1, @flows/web@0.28.1
 
 ### Other
