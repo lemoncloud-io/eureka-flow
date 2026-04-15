@@ -1,5 +1,6 @@
 {
     "loading": "튜토리얼 로딩 중...",
+    "flowName": "모델 합성",
     "retry": "다시 시도",
     "steps": {
         "welcome": {

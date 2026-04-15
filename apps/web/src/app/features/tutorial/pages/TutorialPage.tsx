@@ -14,6 +14,7 @@ import { FALLBACK_BLOCKS, TUTORIAL_WORKFLOW } from '../consts/tutorialSteps';
 import { useTutorialSteps } from '../hooks/useTutorialSteps';
 
 import type { SidebarRef, WorkflowCanvasRef } from '../../flows';
+import type { TutorialCanvasState } from '../hooks/useTutorialSteps';
 
 type TourPhase = 'guide' | 'block' | 'none';
 
@@ -31,9 +32,13 @@ export const TutorialPage = () => {
     const { setApiKey } = useWebCoreStore();
     const [isReady, setIsReady] = useState(false);
     const [tourPhase, setTourPhase] = useState<TourPhase>('none');
+    const [canvasState, setCanvasState] = useState<TutorialCanvasState>({
+        connectionCount: 0,
+        hasCompletedNode: false,
+    });
 
     const { currentStep, step, totalSteps, isLastStep, isSuccess, goNext, goPrev, skipToEnd, markTutorialDone } =
-        useTutorialSteps();
+        useTutorialSteps(canvasState);
 
     // Set tutorial hint on canvas store for NodeBlock visual hints
     const setTutorialHint = useCanvasStore(s => s.setTutorialHint);
@@ -91,6 +96,16 @@ export const TutorialPage = () => {
 
     const handleBlockTutorialClose = useCallback(() => {
         setTourPhase('none');
+        sidebarRef.current?.close();
+    }, []);
+
+    const handleCanvasChange = useCallback(() => {
+        const workflow = canvasRef.current?.getWorkflow();
+        if (!workflow) return;
+        setCanvasState({
+            connectionCount: workflow.edges?.length ?? 0,
+            hasCompletedNode: workflow.nodes?.some(n => n.status === 'COMPLETED') ?? false,
+        });
     }, []);
 
     const handleAddNode = useCallback((type: string) => {
@@ -136,7 +151,7 @@ export const TutorialPage = () => {
                     ref={canvasRef}
                     readOnly={false}
                     onNodeSelect={noop}
-                    onChange={noop}
+                    onChange={handleCanvasChange}
                     onOpenLibrary={handleOpenLibrary}
                     onConnectionError={noop}
                     onShowNotification={noop}

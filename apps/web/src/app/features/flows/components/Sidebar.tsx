@@ -45,6 +45,7 @@ interface SidebarProps {
 
 export interface SidebarRef {
     open: () => void;
+    close: () => void;
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -187,6 +188,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
             setExpandedCategories(new Set(BLOCK_CATEGORIES));
             setTimeout(() => searchInputRef.current?.focus(), 100);
         },
+        close: () => setIsOpen(false),
     }));
 
     const blockGroups = useBlockGroups(searchQuery);
