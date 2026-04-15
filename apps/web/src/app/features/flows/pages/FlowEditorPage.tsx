@@ -11,7 +11,7 @@ import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
-import { useTour } from '../../tutorial';
+import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
 import { FlowGraphView } from '../components/FlowGraphView';
 import { FlowListDialog } from '../components/FlowListDialog';
 import { Header } from '../components/Header';
@@ -192,6 +192,8 @@ export const FlowEditorPage = () => {
     const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
     const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
     const [isGraphViewOpen, setIsGraphViewOpen] = useState(false);
+    const [showGuideTour, setShowGuideTour] = useState(false);
+    const [showBlockTutorial, setShowBlockTutorial] = useState(false);
 
     const { apiKey, setApiKey } = useWebCoreStore();
 
@@ -780,7 +782,8 @@ export const FlowEditorPage = () => {
                 onPublish={handleOpenPublish}
                 onApiKeySettings={handleApiKeySettings}
                 onHelp={() => handleOpenHelp('gettingStarted')}
-                onTour={startTour}
+                onTour={() => setShowGuideTour(true)}
+                onBlockTutorial={() => setShowBlockTutorial(true)}
                 onOpenFlowList={handleOpenFlowList}
                 onGraphView={() => setIsGraphViewOpen(true)}
             />
@@ -877,6 +880,17 @@ export const FlowEditorPage = () => {
                         <span className="text-sm font-medium text-foreground">{t('flowEditor.processing')}</span>
                     </div>
                 </div>
+            )}
+
+            {/* Guide Tour */}
+            {showGuideTour && <GuideTour onClose={() => setShowGuideTour(false)} />}
+
+            {/* Block Tutorial */}
+            {showBlockTutorial && (
+                <BlockTutorial
+                    onClose={() => setShowBlockTutorial(false)}
+                    onOpenHelp={() => handleOpenHelp('gettingStarted')}
+                />
             )}
         </div>
     );

@@ -45,6 +45,7 @@ interface SidebarProps {
 
 export interface SidebarRef {
     open: () => void;
+    close: () => void;
 }
 
 const iconMap: Record<string, React.ElementType> = {
@@ -106,6 +107,7 @@ const BlockItem: React.FC<BlockItemProps> = ({
             <button
                 onClick={onAdd}
                 disabled={disabled}
+                data-block-item={type}
                 className={cn(
                     'w-full p-3 rounded-lg border border-glass-border bg-glass-bg backdrop-blur-sm',
                     'text-left transition-all duration-150',
@@ -186,6 +188,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
             setExpandedCategories(new Set(BLOCK_CATEGORIES));
             setTimeout(() => searchInputRef.current?.focus(), 100);
         },
+        close: () => setIsOpen(false),
     }));
 
     const blockGroups = useBlockGroups(searchQuery);
@@ -338,6 +341,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                         key={category}
                                         open={isExpanded}
                                         onOpenChange={() => handleCategoryToggle(category)}
+                                        data-block-category={category}
                                     >
                                         <CollapsibleTrigger
                                             className={cn(

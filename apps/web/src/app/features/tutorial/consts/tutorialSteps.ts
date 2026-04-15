@@ -9,7 +9,7 @@ export interface TutorialStep {
 }
 
 /** Delay before transitioning after user completes a step (connect/run) */
-export const SUCCESS_FEEDBACK_DELAY_MS = 1500;
+export const SUCCESS_FEEDBACK_DELAY_MS = 400;
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
     {
