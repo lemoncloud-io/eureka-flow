@@ -103,7 +103,11 @@ export const MobileStepList = ({ onTapCard, onAddStep, onRunNode, flowId, role =
                         const hasProcess = stereos.includes('process');
                         const hasOutput = stereos.includes('output');
                         const groupLabel = group.isMultiNode
-                            ? [hasInput && 'Input', hasProcess && 'Process', hasOutput && 'Output']
+                            ? [
+                                  hasInput && t('mobile.groupLabel.input', 'Input'),
+                                  hasProcess && t('mobile.groupLabel.process', 'Process'),
+                                  hasOutput && t('mobile.groupLabel.output', 'Output'),
+                              ]
                                   .filter(Boolean)
                                   .join(' → ')
                             : undefined;

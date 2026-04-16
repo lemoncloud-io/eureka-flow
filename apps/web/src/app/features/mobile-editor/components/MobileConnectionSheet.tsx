@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { ArrowRight, Check, CircleDot, Link2, Link2Off, PlugZap, Plus, Unlink, X } from 'lucide-react';
 
@@ -46,6 +47,7 @@ export const MobileConnectionSheet = ({
     direction = 'output',
     role = 'owner',
 }: MobileConnectionSheetProps) => {
+    const { t } = useTranslation(['flows']);
     const readOnly = role !== 'owner';
     const connections = useCanvasConnections();
     const nodes = useCanvasNodes();
@@ -53,7 +55,9 @@ export const MobileConnectionSheet = ({
     const sourceStyleKey = getPortStyleKey(sourcePortDataType);
 
     const isOutput = direction === 'output';
-    const sheetTitle = isOutput ? 'Connect output' : 'Connect input';
+    const sheetTitle = isOutput
+        ? t('mobile.connection.connectOutput', 'Connect output')
+        : t('mobile.connection.connectInput', 'Connect input');
 
     const existingWithNames = useMemo(() => {
         const filtered = isOutput
@@ -129,7 +133,7 @@ export const MobileConnectionSheet = ({
                             <div className="flex items-center gap-1.5 mb-2">
                                 <Link2 className="w-3 h-3 text-success" />
                                 <span className="text-[10px] font-semibold text-success uppercase tracking-wider">
-                                    Connected ({existingWithNames.length})
+                                    {t('mobile.connection.connected', 'Connected')} ({existingWithNames.length})
                                 </span>
                             </div>
                             <div className="space-y-1.5">
@@ -160,7 +164,7 @@ export const MobileConnectionSheet = ({
                                                 )}
                                             >
                                                 <Unlink className="w-3 h-3" />
-                                                <span>Disconnect</span>
+                                                <span>{t('mobile.connection.disconnect', 'Disconnect')}</span>
                                             </button>
                                         )}
                                     </div>
@@ -217,10 +221,14 @@ export const MobileConnectionSheet = ({
                                             </div>
                                             <div className="flex items-center gap-1 text-[11px] font-medium shrink-0">
                                                 {target.occupiedByNode ? (
-                                                    <span className="text-warning/60">Replace</span>
+                                                    <span className="text-warning/60">
+                                                        {t('mobile.connection.replace', 'Replace')}
+                                                    </span>
                                                 ) : (
                                                     <>
-                                                        <span className="text-primary/50">Connect</span>
+                                                        <span className="text-primary/50">
+                                                            {t('mobile.connection.connect', 'Connect')}
+                                                        </span>
                                                         <ArrowRight className="w-3.5 h-3.5 text-primary/50" />
                                                     </>
                                                 )}
@@ -246,7 +254,7 @@ export const MobileConnectionSheet = ({
                                 )}
                             >
                                 <Plus className="w-4 h-4" />
-                                Add new block & connect
+                                {t('mobile.connection.addNewAndConnect', 'Add new block & connect')}
                             </button>
                         </div>
                     )}
@@ -255,9 +263,11 @@ export const MobileConnectionSheet = ({
                     {!hasAvailable && !hasConnections && !onAddNewAndConnect && (
                         <div className="px-4 py-10 text-center">
                             <Link2Off className="w-8 h-8 text-muted-foreground/20 mx-auto mb-3" />
-                            <div className="text-sm text-muted-foreground">No compatible input ports found.</div>
+                            <div className="text-sm text-muted-foreground">
+                                {t('mobile.connection.noCompatiblePorts', 'No compatible input ports found.')}
+                            </div>
                             <div className="text-xs text-muted-foreground/50 mt-1">
-                                Add more nodes with matching input types.
+                                {t('mobile.connection.addMoreNodes', 'Add more nodes with matching input types.')}
                             </div>
                         </div>
                     )}

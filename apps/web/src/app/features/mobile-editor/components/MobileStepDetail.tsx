@@ -179,7 +179,12 @@ export const MobileStepDetail = ({
                                                 )}
                                             >
                                                 {stateStyle.icon}
-                                                <span>{stateStyle.label}</span>
+                                                <span>
+                                                    {t(
+                                                        `mobile.state.${stateStyle.label.toLowerCase()}`,
+                                                        stateStyle.label
+                                                    )}
+                                                </span>
                                             </span>
                                         )}
                                     </div>
@@ -263,13 +268,13 @@ export const MobileStepDetail = ({
                                     return (
                                         <div className="space-y-2">
                                             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider py-1">
-                                                Connections
+                                                {t('mobile.connections', 'Connections')}
                                             </div>
 
                                             {/* Input ports — tappable to connect sources */}
                                             {inputPorts.length > 0 && (
                                                 <div className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider pt-1">
-                                                    Inputs
+                                                    {t('mobile.inputs', 'Inputs')}
                                                 </div>
                                             )}
                                             {inputPorts.map(port => {
@@ -348,7 +353,7 @@ export const MobileStepDetail = ({
                                                         />
                                                         <span className="font-medium">{port.label || port.id}</span>
                                                         <span className="text-primary/40 flex-1 italic">
-                                                            tap to connect
+                                                            {t('mobile.connection.tapToConnect', 'tap to connect')}
                                                         </span>
                                                     </button>
                                                 );
@@ -357,7 +362,7 @@ export const MobileStepDetail = ({
                                             {/* Output ports — tappable to open connection sheet */}
                                             {outputPorts.length > 0 && (
                                                 <div className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider pt-2">
-                                                    Outputs
+                                                    {t('mobile.outputs', 'Outputs')}
                                                 </div>
                                             )}
                                             {outputPorts.map(port => {
@@ -422,7 +427,7 @@ export const MobileStepDetail = ({
                                                             </span>
                                                         ) : (
                                                             <span className="text-primary/40 flex-1 italic">
-                                                                tap to connect
+                                                                {t('mobile.connection.tapToConnect', 'tap to connect')}
                                                             </span>
                                                         )}
                                                     </button>

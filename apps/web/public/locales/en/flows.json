@@ -512,5 +512,56 @@
                 "description": "Start by adding a block from the library and connecting them together. Press ? anytime for help, or replay this tour from the menu."
             }
         }
+    },
+    "mobile": {
+        "addNode": "Add Node",
+        "addFirstStep": "Add your first step",
+        "flowOverview": "Flow Overview",
+        "running": "Running...",
+        "runStep": "Run",
+        "prevStep": "Prev",
+        "nextStep": "Next step",
+        "nodeFailed": "Node {{current}}/{{total}} failed",
+        "allNodesCompleted": "All {{count}} nodes completed",
+        "failedToCreateNode": "Failed to create node",
+        "emptyState": {
+            "title": "Start building your flow",
+            "description": "Add blocks to create an AI workflow. Connect them to pass data between steps."
+        },
+        "groupLabel": {
+            "input": "Input",
+            "process": "Process",
+            "output": "Output"
+        },
+        "connection": {
+            "connectOutput": "Connect output",
+            "connectInput": "Connect input",
+            "connected": "Connected",
+            "alreadyConnected": "Already connected",
+            "connect": "Connect",
+            "replace": "Replace",
+            "disconnect": "Disconnect",
+            "disconnected": "Disconnected",
+            "failedToConnect": "Failed to create connection",
+            "failedToDisconnect": "Failed to disconnect",
+            "addNewAndConnect": "Add new block & connect",
+            "tapToConnect": "tap to connect",
+            "noCompatiblePorts": "No compatible input ports found.",
+            "addMoreNodes": "Add more nodes with matching input types."
+        },
+        "connections": "Connections",
+        "inputs": "Inputs",
+        "outputs": "Outputs",
+        "nodeExecutionFailed": "Node execution failed",
+        "deleteStep": "Delete this step?",
+        "run": "Run",
+        "delete": "Delete",
+        "state": {
+            "idle": "Idle",
+            "ready": "Ready",
+            "running": "Running",
+            "done": "Done",
+            "error": "Error"
+        }
     }
 }

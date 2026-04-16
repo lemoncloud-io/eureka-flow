@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Loader2, MoreVertical, Play, Trash2 } from 'lucide-react';
 
@@ -23,6 +24,7 @@ interface MobileStepCardProps {
 
 export const MobileStepCard = React.memo(
     ({ node, displayName, onTapCard, onRun, onDelete, role = 'owner' }: MobileStepCardProps) => {
+        const { t } = useTranslation(['flows']);
         const blockRegistry = useBlockRegistry();
         const blockDef = blockRegistry[node.type];
         const state = (node.state ?? 'IDLE') as NodeState;
@@ -41,7 +43,7 @@ export const MobileStepCard = React.memo(
         const handleDelete = useCallback(
             (e: React.MouseEvent) => {
                 e.stopPropagation();
-                if (onDelete && window.confirm('Delete this step?')) {
+                if (onDelete && window.confirm(t('mobile.deleteStep', 'Delete this step?'))) {
                     onDelete(node.id);
                 }
             },
@@ -121,13 +123,13 @@ export const MobileStepCard = React.memo(
                             {blockDef?.isRunnable !== false && onRun && (
                                 <DropdownMenuItem onClick={handleRun} disabled={isRunning} className="gap-2">
                                     <Play className="w-3.5 h-3.5" />
-                                    Run
+                                    {t('mobile.run', 'Run')}
                                 </DropdownMenuItem>
                             )}
                             {onDelete && (
                                 <DropdownMenuItem onClick={handleDelete} className="gap-2 text-destructive">
                                     <Trash2 className="w-3.5 h-3.5" />
-                                    Delete
+                                    {t('mobile.delete', 'Delete')}
                                 </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>

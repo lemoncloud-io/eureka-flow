@@ -58,6 +58,6 @@ export const executeNodeWithToast = async (nodeId: string, options: ExecuteNodeO
     try {
         await executeNodeDirect(nodeId, options);
     } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Node execution failed');
+        toast.error(e instanceof Error ? e.message : 'Node execution failed'); // fallback English — i18n not available in utils
     }
 };

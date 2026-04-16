@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
@@ -38,6 +39,7 @@ export const useConnectionMode = (
     blockRegistry: Record<string, BlockDefinitionWithFrontend>,
     flowId: string | null
 ) => {
+    const { t } = useTranslation(['flows']);
     const [source, setSource] = useState<PortSelection | null>(null);
     const connections = useCanvasConnections();
     const nodes = useCanvasNodes();
@@ -170,7 +172,7 @@ export const useConnectionMode = (
                     c.targetPortId === tgtPortId
             );
             if (existing) {
-                toast.info('Already connected');
+                toast.info(t('mobile.connection.alreadyConnected', 'Already connected'));
                 return;
             }
 
@@ -237,10 +239,10 @@ export const useConnectionMode = (
                     updateConnection(tempId, { id: createdEdge.id });
                 }
 
-                toast.success('Connected');
+                toast.success(t('mobile.connection.connected', 'Connected'));
             } catch {
                 useCanvasStore.getState().deleteConnection(tempId);
-                toast.error('Failed to create connection');
+                toast.error(t('mobile.connection.failedToConnect', 'Failed to create connection'));
             }
         },
         [source, flowId]
@@ -319,10 +321,10 @@ export const useConnectionMode = (
                 if (createdEdge?.id && createdEdge.id !== tempId) {
                     updateConnection(tempId, { id: createdEdge.id });
                 }
-                toast.success('Connected');
+                toast.success(t('mobile.connection.connected', 'Connected'));
             } catch {
                 useCanvasStore.getState().deleteConnection(tempId);
-                toast.error('Failed to create connection');
+                toast.error(t('mobile.connection.failedToConnect', 'Failed to create connection'));
             }
         },
         [flowId]
@@ -335,9 +337,9 @@ export const useConnectionMode = (
                 if (!flowId) throw new Error('flowId is required');
                 const edgesToDelete = [{ id: `#${connectionId}` }];
                 await upsertFlow(flowId, { nodes: [], edges: edgesToDelete as never[] });
-                toast.success('Disconnected');
+                toast.success(t('mobile.connection.disconnected', 'Disconnected'));
             } catch {
-                toast.error('Failed to disconnect');
+                toast.error(t('mobile.connection.failedToDisconnect', 'Failed to disconnect'));
             }
         },
         [flowId]
