@@ -120,18 +120,19 @@ export const MobileStepList = ({ onTapCard, onAddStep, onRunNode, flowId, role =
                                 {/* Group container */}
                                 <div
                                     className={cn(
-                                        group.isMultiNode &&
-                                            'rounded-2xl border border-border/30 bg-card/30 p-3 space-y-0'
+                                        group.isMultiNode
+                                            ? 'rounded-2xl border-[1.3px] border-border p-3 space-y-0'
+                                            : ''
                                     )}
                                 >
                                     {/* Group header for multi-node groups */}
                                     {group.isMultiNode && groupLabel && (
-                                        <div className="flex items-center gap-2 pb-2.5 px-1">
-                                            <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+                                        <div className="flex items-center gap-2 pb-3 px-1">
+                                            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest">
                                                 <span>{groupLabel}</span>
                                             </div>
-                                            <div className="flex-1 h-px bg-border/30" />
-                                            <span className="text-[10px] text-muted-foreground/40">
+                                            <div className="flex-1 h-px bg-border/40" />
+                                            <span className="text-[10px] font-medium text-muted-foreground/50 tabular-nums">
                                                 {group.nodeIds.length}
                                             </span>
                                         </div>
