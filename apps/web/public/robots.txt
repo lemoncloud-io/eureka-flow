@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /editor
+
+Sitemap: https://flow.eureka.codes/site-map.xml

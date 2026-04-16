@@ -11,13 +11,13 @@
         --popover: 0 0% 100%;
         --popover-foreground: 240 10% 10%;
 
-        /* Primary - Soft Violet */
-        --primary: 250 80% 60%;
+        /* Primary - Vivid Violet (#8F19F6) */
+        --primary: 272 92% 53%;
         --primary-foreground: 0 0% 100%;
         --secondary: 240 5% 96%;
         --secondary-foreground: 240 5% 40%;
-        --accent: 250 50% 95%;
-        --accent-foreground: 250 80% 50%;
+        --accent: 272 50% 95%;
+        --accent-foreground: 272 80% 50%;
 
         --muted: 240 5% 96%;
         --muted-foreground: 240 5% 50%;
@@ -25,11 +25,11 @@
         --destructive-foreground: 0 0% 100%;
         --border: 240 5% 90%;
         --input: 240 5% 90%;
-        --ring: 250 80% 60%;
+        --ring: 272 92% 53%;
         --radius: 0.5rem;
 
         /* Point color */
-        --point: 250 80% 60%;
+        --point: 272 92% 53%;
 
         /* Semantic Colors */
         --success: 150 70% 40%;
@@ -48,12 +48,12 @@
         --popover: 240 8% 10%;
         --popover-foreground: 0 0% 96%;
 
-        --primary: 250 85% 70%;
+        --primary: 272 85% 70%;
         --primary-foreground: 0 0% 100%;
         --secondary: 240 6% 15%;
         --secondary-foreground: 0 0% 80%;
-        --accent: 250 30% 18%;
-        --accent-foreground: 250 80% 80%;
+        --accent: 272 30% 18%;
+        --accent-foreground: 272 80% 80%;
 
         --muted: 240 6% 15%;
         --muted-foreground: 0 0% 64%;
@@ -61,9 +61,9 @@
         --destructive-foreground: 0 0% 100%;
         --border: 240 6% 18%;
         --input: 240 6% 18%;
-        --ring: 250 85% 70%;
+        --ring: 272 85% 70%;
 
-        --point: 250 85% 72%;
+        --point: 272 85% 72%;
 
         --success: 150 60% 50%;
         --success-foreground: 0 0% 100%;

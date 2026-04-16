@@ -192,8 +192,7 @@ export const FlowEditorPage = () => {
     const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
     const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
     const [isGraphViewOpen, setIsGraphViewOpen] = useState(false);
-    const [showGuideTour, setShowGuideTour] = useState(false);
-    const [showBlockTutorial, setShowBlockTutorial] = useState(false);
+    const [tourPhase, setTourPhase] = useState<'none' | 'guide' | 'block'>('none');
 
     const { apiKey, setApiKey } = useWebCoreStore();
 
@@ -433,7 +432,7 @@ export const FlowEditorPage = () => {
     }, []);
 
     const handleCaptureCanvas = useCallback(async () => {
-        return canvasRef.current?.captureAsDataUrl() ?? null;
+        return canvasRef.current?.captureForThumbnail() ?? null;
     }, []);
 
     const handleClear = () => {
@@ -670,26 +669,11 @@ export const FlowEditorPage = () => {
                         </div>
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="relative w-12 h-12">
-                            <div className="absolute inset-0 border-[3px] border-border/40 rounded-full"></div>
-                            <div className="absolute inset-0 border-[3px] border-primary rounded-full border-t-transparent animate-spin"></div>
-                        </div>
-                        <div className="flex flex-col items-center gap-2">
-                            {/* key forces remount to signal text change visually */}
-                            <div className="text-muted-foreground font-mono text-sm" key={loadingText}>
-                                {loadingText}
-                            </div>
-                            <div className="flex gap-1">
-                                {[0, 1, 2].map(i => (
-                                    <div
-                                        key={i}
-                                        className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-pulse"
-                                        style={{ animationDelay: `${i * 200}ms` }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
+                        <span className="text-xs text-muted-foreground/60" key={loadingText}>
+                            {loadingText}
+                        </span>
                     </div>
                 )}
                 <ApiKeyDialog
@@ -782,8 +766,7 @@ export const FlowEditorPage = () => {
                 onPublish={handleOpenPublish}
                 onApiKeySettings={handleApiKeySettings}
                 onHelp={() => handleOpenHelp('gettingStarted')}
-                onTour={() => setShowGuideTour(true)}
-                onBlockTutorial={() => setShowBlockTutorial(true)}
+                onTour={() => setTourPhase('guide')}
                 onOpenFlowList={handleOpenFlowList}
                 onGraphView={() => setIsGraphViewOpen(true)}
             />
@@ -876,19 +859,27 @@ export const FlowEditorPage = () => {
             {isLoading && (
                 <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-md animate-in fade-in duration-200">
                     <div className="flex flex-col items-center bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl p-6 shadow-floating animate-in fade-in zoom-in-95 duration-200">
-                        <div className="w-8 h-8 border-[3px] border-primary/30 border-t-primary rounded-full animate-spin mb-3"></div>
+                        <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin mb-3"></div>
                         <span className="text-sm font-medium text-foreground">{t('flowEditor.processing')}</span>
                     </div>
                 </div>
             )}
 
-            {/* Guide Tour */}
-            {showGuideTour && <GuideTour onClose={() => setShowGuideTour(false)} />}
-
-            {/* Block Tutorial */}
-            {showBlockTutorial && (
+            {/* Guided Tour: Guide → Block Tutorial */}
+            {tourPhase === 'guide' && (
+                <GuideTour
+                    onClose={() => {
+                        setTourPhase('block');
+                        sidebarRef.current?.open();
+                    }}
+                />
+            )}
+            {tourPhase === 'block' && (
                 <BlockTutorial
-                    onClose={() => setShowBlockTutorial(false)}
+                    onClose={() => {
+                        setTourPhase('none');
+                        sidebarRef.current?.close();
+                    }}
                     onOpenHelp={() => handleOpenHelp('gettingStarted')}
                 />
             )}

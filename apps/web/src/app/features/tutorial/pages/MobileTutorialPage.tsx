@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBlocks, useCanvasStore, useFlowsStore } from '@flows/flows';
 import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 
-import { MobileConnectionSheet, MobileNodeList } from '../../mobile-editor/components';
+import { MobileConnectionSheet, MobileStepList } from '../../mobile-editor/components';
 import { useConnectionMode } from '../../mobile-editor/hooks';
 import { CompletionScreen } from '../components/CompletionScreen';
 import { MobileTutorialOverlay } from '../components/MobileTutorialOverlay';
@@ -76,12 +76,8 @@ export const MobileTutorialPage = () => {
 
     if (!isReady) {
         return (
-            <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
-                <div className="relative h-16 w-16">
-                    <div className="absolute inset-0 rounded-full border-4 border-border" />
-                    <div className="absolute inset-0 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                </div>
-                <div className="animate-pulse text-sm text-muted-foreground">{t('tutorial:loading')}</div>
+            <div className="flex h-screen flex-col items-center justify-center bg-background text-foreground">
+                <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
             </div>
         );
     }
@@ -98,12 +94,13 @@ export const MobileTutorialPage = () => {
             </div>
 
             <div className="pt-3 pb-40">
-                <MobileNodeList
+                <MobileStepList
                     onTapCard={handleTapCard}
-                    onTapOutputPort={connectionMode.openForPort}
-                    selectedNodeId={null}
-                    isReadOnly={false}
+                    onAddStep={() => {
+                        /* tutorial does not allow adding steps */
+                    }}
                     flowId={null}
+                    role="guest"
                 />
             </div>
 

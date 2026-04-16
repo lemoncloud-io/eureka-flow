@@ -21,7 +21,8 @@ interface UseMobileFlowActionsParams {
 interface UseMobileFlowActionsReturn {
     handleSave: () => Promise<void>;
     handleSelectFlow: (flowId: string) => Promise<void>;
-    handleAddBlock: (type: string) => Promise<void>;
+    /** Returns the final node ID (server-assigned or temp) */
+    handleAddBlock: (type: string) => Promise<string | null>;
     handleExport: () => void;
     handleNew: () => Promise<void>;
     handleClear: () => void;
@@ -76,10 +77,10 @@ export const useMobileFlowActions = ({
     );
 
     const handleAddBlock = useCallback(
-        async (type: string) => {
+        async (type: string): Promise<string | null> => {
             const { nodes } = useCanvasStore.getState();
             const def = blockRegistry[type];
-            if (!def) return;
+            if (!def) return null;
 
             const tempNodeId = generateTempId('node');
             const lastNode = nodes[nodes.length - 1];
@@ -118,9 +119,12 @@ export const useMobileFlowActions = ({
                             targetNodeId: c.targetNodeId === tempNodeId ? serverId : c.targetNodeId,
                         }))
                     );
+                    return serverId;
                 }
+                return tempNodeId;
             } catch {
                 toast.error(t('mobile.failedToCreateNode', 'Failed to create node'));
+                return null;
             }
         },
         [blockRegistry, currentFlowId, t]

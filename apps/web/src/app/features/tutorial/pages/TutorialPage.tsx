@@ -89,8 +89,18 @@ export const TutorialPage = () => {
         }
     }, [tourPhase]);
 
+    const handleGuideTourStepChange = useCallback(
+        (stepId: string) => {
+            if (stepId === 'block-library') {
+                sidebarRef.current?.open();
+            } else if (tourPhase === 'guide') {
+                sidebarRef.current?.close();
+            }
+        },
+        [tourPhase]
+    );
+
     const handleGuideTourClose = useCallback(() => {
-        // Guide tour done → start block tutorial
         setTourPhase('block');
     }, []);
 
@@ -132,12 +142,8 @@ export const TutorialPage = () => {
 
     if (!isReady) {
         return (
-            <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
-                <div className="relative h-16 w-16">
-                    <div className="absolute inset-0 rounded-full border-4 border-border" />
-                    <div className="absolute inset-0 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                </div>
-                <div className="animate-pulse text-sm text-muted-foreground">{t('tutorial:loading')}</div>
+            <div className="flex h-screen flex-col items-center justify-center bg-background text-foreground">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-border/40 border-t-primary" />
             </div>
         );
     }
@@ -149,7 +155,6 @@ export const TutorialPage = () => {
             <div data-tour="canvas" className="absolute inset-0">
                 <WorkflowCanvas
                     ref={canvasRef}
-                    readOnly={false}
                     onNodeSelect={noop}
                     onChange={handleCanvasChange}
                     onOpenLibrary={handleOpenLibrary}
@@ -197,7 +202,9 @@ export const TutorialPage = () => {
                     />
                 ))}
 
-            {tourPhase === 'guide' && <GuideTour onClose={handleGuideTourClose} />}
+            {tourPhase === 'guide' && (
+                <GuideTour onClose={handleGuideTourClose} onStepChange={handleGuideTourStepChange} />
+            )}
             {tourPhase === 'block' && <BlockTutorial onClose={handleBlockTutorialClose} />}
         </div>
     );

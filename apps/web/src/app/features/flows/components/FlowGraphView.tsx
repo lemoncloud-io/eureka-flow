@@ -16,7 +16,7 @@ import type { GraphCanvasRef, GraphEdge, GraphNode, InternalGraphNode, LayoutTyp
 /** Execution state → node fill color */
 const STATE_FILLS: Record<string, string> = {
     IDLE: '#6b7280',
-    READY: '#3b82f6',
+    READY: '#8F19F6',
     RUNNING: '#eab308',
     COMPLETED: '#22c55e',
     ERROR: '#ef4444',
@@ -37,12 +37,16 @@ const ROLE_LABELS: Record<string, string> = {
     orphan: 'Disconnected',
 };
 
+/** Theme accent — #8F19F6 variants */
+const THEME_ACTIVE = '#8F19F6';
+const THEME_ACTIVE_LIGHT = '#B46EFA';
+
 /** Custom dark theme */
 const flowDarkTheme: Theme = {
     canvas: { background: '#1f2023', fog: null },
     node: {
         fill: '#6b7280',
-        activeFill: '#a78bfa',
+        activeFill: THEME_ACTIVE_LIGHT,
         opacity: 1,
         selectedOpacity: 1,
         inactiveOpacity: 0.3,
@@ -53,17 +57,17 @@ const flowDarkTheme: Theme = {
             strokeWidth: 3,
         },
     },
-    ring: { fill: '#7c3aed15', activeFill: '#a78bfa60' },
+    ring: { fill: `${THEME_ACTIVE}15`, activeFill: `${THEME_ACTIVE_LIGHT}60` },
     edge: {
         fill: '#52525b',
-        activeFill: '#a78bfa',
+        activeFill: THEME_ACTIVE_LIGHT,
         opacity: 0.6,
         selectedOpacity: 1,
         inactiveOpacity: 0.12,
         label: { color: '#71717a', activeColor: '#e5e5e5', stroke: '#1f2023' },
     },
-    arrow: { fill: '#71717a', activeFill: '#a78bfa' },
-    lasso: { background: 'rgba(124, 58, 237, 0.08)', border: 'rgba(124, 58, 237, 0.3)' },
+    arrow: { fill: '#71717a', activeFill: THEME_ACTIVE_LIGHT },
+    lasso: { background: 'rgba(143, 25, 246, 0.08)', border: 'rgba(143, 25, 246, 0.3)' },
 };
 
 /** Custom light theme */
@@ -71,7 +75,7 @@ const flowLightTheme: Theme = {
     canvas: { background: '#f5f5f6', fog: null },
     node: {
         fill: '#6b7280',
-        activeFill: '#7c3aed',
+        activeFill: THEME_ACTIVE,
         opacity: 1,
         selectedOpacity: 1,
         inactiveOpacity: 0.3,
@@ -82,17 +86,17 @@ const flowLightTheme: Theme = {
             strokeWidth: 3,
         },
     },
-    ring: { fill: '#7c3aed10', activeFill: '#7c3aed50' },
+    ring: { fill: `${THEME_ACTIVE}10`, activeFill: `${THEME_ACTIVE}50` },
     edge: {
         fill: '#a1a1aa',
-        activeFill: '#7c3aed',
+        activeFill: THEME_ACTIVE,
         opacity: 0.5,
         selectedOpacity: 1,
         inactiveOpacity: 0.1,
         label: { color: '#71717a', activeColor: '#27272a', stroke: '#f5f5f6' },
     },
-    arrow: { fill: '#a1a1aa', activeFill: '#7c3aed' },
-    lasso: { background: 'rgba(124, 58, 237, 0.06)', border: 'rgba(124, 58, 237, 0.25)' },
+    arrow: { fill: '#a1a1aa', activeFill: THEME_ACTIVE },
+    lasso: { background: 'rgba(143, 25, 246, 0.06)', border: 'rgba(143, 25, 246, 0.25)' },
 };
 
 interface FlowGraphViewProps {
@@ -211,7 +215,7 @@ export const FlowGraphView = ({ flowId, className, onNavigateToNode }: FlowGraph
     if (isLoading) {
         return (
             <div className={cn('flex items-center justify-center', className)}>
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
             </div>
         );
     }

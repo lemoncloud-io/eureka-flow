@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { API_URL } from '../core';
 import { useWebCoreStore } from '../stores/useWebCoreStore';
 import { getApiEndpointPath } from '../utils/apiEndpoint';
+import { isPermissionDeniedResponse } from '../utils/error';
 
 import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
@@ -14,6 +15,11 @@ const handleAuthError = (): void => {
     localStorage.removeItem('flows-current-flow-id');
     // Delay toast to show after dialog appears
     setTimeout(() => toast.error(i18n.t('errors.authExpired', { ns: 'common' })), 100);
+};
+
+/** Handle permission denied: show toast without clearing credentials */
+const handlePermissionDenied = (): void => {
+    toast.error(i18n.t('errors.forbidden', { ns: 'common' }));
 };
 
 /**
@@ -80,9 +86,13 @@ apiClient.interceptors.response.use(
 
         const status = error.response?.status;
 
-        // Only explicit HTTP 403 triggers logout
+        // HTTP 403: distinguish permission denied (valid key) vs auth expired
         if (status === 403) {
-            handleAuthError();
+            if (isPermissionDeniedResponse(error.response?.data)) {
+                handlePermissionDenied();
+            } else {
+                handleAuthError();
+            }
         }
 
         return Promise.reject(error);

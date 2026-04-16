@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { ArrowRight, Globe, KeyRound, Lock, ShieldX } from 'lucide-react';
+import { ArrowRight, Globe, KeyRound, Lock, Search, ShieldX, X } from 'lucide-react';
 
 import { useBlockRegistry, useCanvasStore, useFlows } from '@flows/flows';
+import { cn } from '@flows/lib/utils';
 import { ApiKeyDialog } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -16,8 +17,8 @@ import {
     MobileConnectionSheet,
     MobileFlowMap,
     MobileHeader,
-    MobileNodeConfigSheet,
-    MobileNodeList,
+    MobileStepDetail,
+    MobileStepList,
 } from '../components';
 import {
     useConnectionMode,
@@ -27,9 +28,9 @@ import {
     useMobileRunAll,
     useMobileSocketSync,
 } from '../hooks';
-import { useCollapseState } from '../hooks/useCollapseState';
 import { useRecentBlocks } from '../hooks/useRecentBlocks';
-import { useScrollRestore } from '../hooks/useScrollRestore';
+import { useStepNavigation } from '../hooks/useStepNavigation';
+import { executeNodeWithToast } from '../utils';
 
 import type { FlowRole } from '@flows/flows';
 
@@ -44,7 +45,7 @@ export const MobileFlowEditorPage = () => {
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
     const nodeCount = useCanvasStore(state => state.nodes.length);
 
-    // Role derivation (same as desktop FlowEditorPage)
+    // Role derivation
     const computedRole: FlowRole = isPublicMode ? 'anonymous' : isEditable ? 'owner' : 'guest';
     const [devRoleOverride, setDevRoleOverride] = useState<FlowRole | null>(null);
     const role: FlowRole = devRoleOverride ?? computedRole;
@@ -53,14 +54,15 @@ export const MobileFlowEditorPage = () => {
     const lastSavedStateRef = useRef<string | null>(null);
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
 
-    // Scroll container ref for scroll restoration
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-
     // UI state
     const [isFlowListOpen, setIsFlowListOpen] = useState(false);
     const [isBlockLibraryOpen, setIsBlockLibraryOpen] = useState(false);
     const [isFlowMapOpen, setIsFlowMapOpen] = useState(false);
-    const [configNodeId, setConfigNodeId] = useState<string | null>(null);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Step navigation (replaces configNodeId)
+    const stepNav = useStepNavigation();
 
     // Hooks
     const {
@@ -100,22 +102,84 @@ export const MobileFlowEditorPage = () => {
     );
 
     const connectionMode = useConnectionMode(blockRegistry, currentFlowId);
-    const { collapsedNodes, toggleCollapse, collapseAll, expandAll, isAllCollapsed } = useCollapseState();
     const { recentIds, addRecent } = useRecentBlocks();
 
-    const isAnySheetOpen = configNodeId !== null || isBlockLibraryOpen || connectionMode.isOpen;
-    useScrollRestore(scrollContainerRef, isAnySheetOpen);
+    // Pending auto-connect: when user adds a new block via "Add new block & connect"
+    const [pendingConnectSource, setPendingConnectSource] = useState<{
+        nodeId: string;
+        portId: string;
+        portDataType: string;
+        /** 'output' = new block feeds INTO this port; 'input' = this port feeds INTO new block */
+        direction: 'output' | 'input';
+    } | null>(null);
 
-    const handleTapCard = useCallback((nodeId: string) => {
-        setConfigNodeId(nodeId);
-    }, []);
+    // Auto-scroll to currently running node during Run All
+    useEffect(() => {
+        const nodeId = runProgress?.currentNodeId;
+        if (!nodeId) return;
+        const el = document.querySelector(`[data-node-id="${nodeId}"]`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, [runProgress?.currentNodeId]);
+
+    const handleTapCard = useCallback(
+        (nodeId: string) => {
+            stepNav.openStep(nodeId);
+        },
+        [stepNav]
+    );
+
+    const handleRunNode = useCallback(
+        (nodeId: string) => {
+            executeNodeWithToast(nodeId, {
+                flowId: currentFlowId,
+                socketConnectionId,
+                canEdit: role === 'owner',
+            });
+        },
+        [currentFlowId, socketConnectionId, role]
+    );
 
     const handleAddBlockWithRecent = useCallback(
         async (type: string) => {
             addRecent(type);
-            await handleAddBlock(type);
+            const newNodeId = await handleAddBlock(type);
+
+            // Auto-connect if there's a pending connection source
+            if (newNodeId && pendingConnectSource) {
+                const newNodeDef = blockRegistry[type];
+                const srcType = pendingConnectSource.portDataType;
+                const isCompatible = (portType: string | undefined) => {
+                    const t = portType ?? 'any';
+                    return srcType === 'any' || t === 'any' || srcType.toLowerCase() === t.toLowerCase();
+                };
+
+                if (pendingConnectSource.direction === 'output') {
+                    // Original node's output → new block's input
+                    const compatibleInput = newNodeDef?.inputs?.find(p => isCompatible(p.type));
+                    if (compatibleInput) {
+                        await connectionMode.connectPorts(
+                            pendingConnectSource.nodeId,
+                            pendingConnectSource.portId,
+                            newNodeId,
+                            compatibleInput.id
+                        );
+                    }
+                } else {
+                    // New block's output → original node's input
+                    const compatibleOutput = newNodeDef?.outputs?.find(p => isCompatible(p.type));
+                    if (compatibleOutput) {
+                        await connectionMode.connectPorts(
+                            newNodeId,
+                            compatibleOutput.id,
+                            pendingConnectSource.nodeId,
+                            pendingConnectSource.portId
+                        );
+                    }
+                }
+                setPendingConnectSource(null);
+            }
         },
-        [addRecent, handleAddBlock]
+        [addRecent, handleAddBlock, pendingConnectSource, blockRegistry, connectionMode]
     );
 
     // ============================================================
@@ -172,13 +236,7 @@ export const MobileFlowEditorPage = () => {
                         </div>
                     </div>
                 ) : (
-                    <>
-                        <div className="relative w-16 h-16">
-                            <div className="absolute inset-0 border-4 border-border rounded-full" />
-                            <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin" />
-                        </div>
-                        <div className="text-muted-foreground font-mono text-sm animate-pulse">{loadingText}</div>
-                    </>
+                    <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
                 )}
                 <ApiKeyDialog
                     open={isApiKeyDialogOpen}
@@ -210,6 +268,16 @@ export const MobileFlowEditorPage = () => {
                 onSave={handleSave}
                 onOpenFlowList={() => setIsFlowListOpen(true)}
                 onOpenFlowMap={() => setIsFlowMapOpen(true)}
+                onRunAll={handleRunAll}
+                isRunning={isRunning}
+                runProgress={runProgress}
+                nodeCount={nodeCount}
+                onToggleSearch={() => {
+                    setIsSearchOpen(prev => {
+                        if (prev) setSearchQuery('');
+                        return !prev;
+                    });
+                }}
                 onExport={handleExport}
                 onNew={role === 'owner' ? handleNew : undefined}
                 onClear={role === 'owner' ? handleClear : undefined}
@@ -222,36 +290,65 @@ export const MobileFlowEditorPage = () => {
                 onClose={() => setIsFlowMapOpen(false)}
                 onTapNode={nodeId => {
                     setIsFlowMapOpen(false);
-                    setConfigNodeId(nodeId);
+                    stepNav.openStep(nodeId);
                 }}
                 flowId={currentFlowId}
             />
 
-            <div ref={scrollContainerRef} className="fixed inset-0 overflow-y-auto overscroll-contain pt-14 pb-24">
+            {/* Step list — kept mounted when detail is open for scroll preservation */}
+            <div
+                className={cn(
+                    'fixed inset-0 overflow-y-auto overscroll-contain pb-20',
+                    isSearchOpen ? 'pt-[104px]' : 'pt-14'
+                )}
+                style={{ visibility: stepNav.isOpen ? 'hidden' : 'visible' }}
+            >
+                {/* Search bar */}
+                {isSearchOpen && (
+                    <div className="fixed top-14 left-0 right-0 z-20 bg-background/95 backdrop-blur-md border-b border-border/40 px-3 py-2">
+                        <div className="flex items-center gap-2 h-10 px-3 rounded-xl bg-muted/40 border border-border/50">
+                            <Search className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+                            <input
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                placeholder={t('mobile.searchNodes', 'Search nodes...')}
+                                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/40"
+                                autoFocus
+                            />
+                            {searchQuery && (
+                                <button onClick={() => setSearchQuery('')} className="shrink-0">
+                                    <X className="w-4 h-4 text-muted-foreground/50" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
                 <div className="pt-2">
-                    <MobileNodeList
+                    <MobileStepList
                         onTapCard={handleTapCard}
-                        onTapOutputPort={connectionMode.openForPort}
-                        socketConnectionId={socketConnectionId}
-                        selectedNodeId={configNodeId}
-                        role={role}
+                        onAddStep={() => setIsBlockLibraryOpen(true)}
+                        onAddBlockDirect={handleAddBlockWithRecent}
+                        onRunNode={handleRunNode}
                         flowId={currentFlowId}
-                        collapsedNodes={collapsedNodes}
-                        onToggleCollapse={toggleCollapse}
+                        searchQuery={searchQuery}
+                        role={role}
                     />
                 </div>
             </div>
 
-            <MobileBottomBar
-                onAddBlock={() => setIsBlockLibraryOpen(true)}
-                onRunAll={handleRunAll}
-                isRunning={isRunning}
-                progress={runProgress}
+            {/* Full-screen step detail */}
+            <MobileStepDetail
+                nodeId={stepNav.activeNodeId}
+                flowId={currentFlowId}
+                socketConnectionId={socketConnectionId}
                 role={role}
-                nodeCount={nodeCount}
-                isAllCollapsed={isAllCollapsed}
-                onToggleCollapseAll={isAllCollapsed ? expandAll : collapseAll}
+                onClose={stepNav.closeStep}
+                onOpenOutputConnection={connectionMode.openForPort}
+                onOpenInputConnection={connectionMode.openForInputPort}
             />
+
+            {/* Bottom bar — Add Node, hidden when step detail is open */}
+            {!stepNav.isOpen && <MobileBottomBar onAddNode={() => setIsBlockLibraryOpen(true)} role={role} />}
 
             {connectionMode.source && (
                 <MobileConnectionSheet
@@ -269,6 +366,19 @@ export const MobileFlowEditorPage = () => {
                         connectionMode.connectTo(targetNodeId, targetPortId);
                     }}
                     onDisconnect={connectionMode.disconnect}
+                    direction={connectionMode.direction}
+                    onAddNewAndConnect={() => {
+                        if (connectionMode.source) {
+                            setPendingConnectSource({
+                                nodeId: connectionMode.source.nodeId,
+                                portId: connectionMode.source.portId,
+                                portDataType: connectionMode.source.portDataType,
+                                direction: connectionMode.direction,
+                            });
+                        }
+                        connectionMode.close();
+                        setIsBlockLibraryOpen(true);
+                    }}
                     role={role}
                 />
             )}
@@ -278,17 +388,6 @@ export const MobileFlowEditorPage = () => {
                 onOpenChange={setIsBlockLibraryOpen}
                 onAddBlock={handleAddBlockWithRecent}
                 recentBlockIds={recentIds}
-            />
-
-            <MobileNodeConfigSheet
-                open={configNodeId !== null}
-                onOpenChange={open => {
-                    if (!open) setConfigNodeId(null);
-                }}
-                nodeId={configNodeId}
-                flowId={currentFlowId}
-                socketConnectionId={socketConnectionId}
-                role={role}
             />
 
             <FlowListDialog
@@ -329,7 +428,7 @@ export const MobileFlowEditorPage = () => {
             {isLoading && (
                 <div className="fixed inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-sm">
                     <div className="flex flex-col items-center bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl p-6 shadow-floating">
-                        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+                        <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin mb-3" />
                         <span className="text-sm font-medium">{t('flowEditor.processing')}</span>
                     </div>
                 </div>

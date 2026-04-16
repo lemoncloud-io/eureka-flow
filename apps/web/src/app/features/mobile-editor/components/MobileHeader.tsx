@@ -4,15 +4,19 @@ import { useNavigate } from 'react-router-dom';
 
 import {
     ArrowLeft,
+    Check,
     Download,
     FilePlus,
     FolderOpen,
     Key,
     Loader2,
     Map as MapIcon,
-    Menu,
+    MoreVertical,
+    Play,
     Save,
+    Search,
     Trash2,
+    WifiOff,
 } from 'lucide-react';
 
 import { useSystemInfoQuery } from '@flows/flows';
@@ -30,6 +34,11 @@ import {
 
 import type { FlowRole, SaveStatus } from '@flows/flows';
 
+interface RunProgress {
+    current: number;
+    total: number;
+}
+
 interface MobileHeaderProps {
     flowName: string;
     onNameChange: (name: string) => void;
@@ -39,6 +48,11 @@ interface MobileHeaderProps {
     onSave: () => void;
     onOpenFlowList: () => void;
     onOpenFlowMap: () => void;
+    onRunAll: () => void;
+    isRunning: boolean;
+    runProgress: RunProgress | null;
+    nodeCount: number;
+    onToggleSearch?: () => void;
     onExport?: () => void;
     onNew?: () => void;
     onClear?: () => void;
@@ -55,6 +69,11 @@ export const MobileHeader = ({
     onSave,
     onOpenFlowList,
     onOpenFlowMap,
+    onRunAll,
+    isRunning,
+    runProgress,
+    nodeCount,
+    onToggleSearch,
     onExport,
     onNew,
     onClear,
@@ -81,23 +100,27 @@ export const MobileHeader = ({
         setIsEditing(false);
     }, [editValue, flowName, onNameChange]);
 
+    const isDisconnected = isSocketConnected === false;
+
     return (
         <header
             className={cn(
                 'fixed top-0 left-0 right-0 z-30',
                 'h-14 px-2 flex items-center gap-1',
-                'bg-background/95 backdrop-blur-md border-b border-border/60',
+                'bg-background/95 backdrop-blur-md border-b border-border/40',
                 'pt-[env(safe-area-inset-top)]'
             )}
         >
+            {/* Back */}
             <button
                 onClick={() => navigate('/')}
-                className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
+                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
             >
                 <ArrowLeft className="w-5 h-5" />
             </button>
 
-            <div className="flex-1 min-w-0 flex items-center gap-1.5">
+            {/* Flow name */}
+            <div className="flex-1 min-w-0 flex items-center gap-2">
                 {isEditing ? (
                     <input
                         ref={inputRef}
@@ -122,48 +145,79 @@ export const MobileHeader = ({
                     <span className="truncate text-sm font-bold text-foreground leading-tight">{flowName}</span>
                 )}
 
-                <div className="flex items-center gap-1 shrink-0">
-                    <div
-                        className={cn(
-                            'w-1.5 h-1.5 rounded-full',
-                            saveStatus === 'saving' && 'bg-warning animate-pulse',
-                            saveStatus === 'success' && 'bg-success',
-                            saveStatus === 'error' && 'bg-destructive',
-                            saveStatus === 'idle' && 'bg-muted-foreground/30'
-                        )}
-                    />
-                    {isSocketConnected !== undefined && (
-                        <div
-                            className={cn(
-                                'w-1.5 h-1.5 rounded-full',
-                                isSocketConnected ? 'bg-success' : 'bg-muted-foreground/20'
-                            )}
-                        />
-                    )}
-                </div>
+                {/* View-only badge for non-owner roles */}
+                {role !== 'owner' && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
+                        {t('mobile.viewOnly', 'View only')}
+                    </span>
+                )}
+                {/* Disconnected warning — only when socket is down */}
+                {isDisconnected && <WifiOff className="w-3.5 h-3.5 text-destructive/60 shrink-0" />}
             </div>
 
-            <button
-                onClick={onOpenFlowMap}
-                className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
-            >
-                <MapIcon className="w-[18px] h-[18px]" />
-            </button>
+            {/* Action buttons group */}
+            <div className="flex items-center gap-1 shrink-0">
+                {/* Search */}
+                {onToggleSearch && nodeCount > 0 && (
+                    <button
+                        onClick={onToggleSearch}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
+                        aria-label="Search nodes"
+                    >
+                        <Search className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                )}
+                {/* Save */}
+                {role === 'owner' && (
+                    <button
+                        onClick={onSave}
+                        disabled={isSaving}
+                        className={cn(
+                            'w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 shrink-0',
+                            'active:scale-90 disabled:opacity-40',
+                            isSaving
+                                ? 'bg-muted/50'
+                                : saveStatus === 'success'
+                                  ? 'bg-success/10 text-success'
+                                  : 'hover:bg-muted/60 text-muted-foreground'
+                        )}
+                    >
+                        {isSaving ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : saveStatus === 'success' ? (
+                            <Check className="w-4 h-4" />
+                        ) : (
+                            <Save className="w-4 h-4" />
+                        )}
+                    </button>
+                )}
 
-            {role === 'owner' && (
-                <button
-                    onClick={onSave}
-                    disabled={isSaving}
-                    className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0 disabled:opacity-40"
-                >
-                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                </button>
-            )}
+                {/* Run All */}
+                {role !== 'anonymous' && nodeCount > 0 && (
+                    <button
+                        onClick={onRunAll}
+                        disabled={isRunning || nodeCount === 0}
+                        className={cn(
+                            'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200',
+                            'active:scale-90 disabled:opacity-40',
+                            isRunning ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary hover:bg-primary/15'
+                        )}
+                        aria-label="Run All"
+                    >
+                        {isRunning ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Play className="w-4 h-4 fill-current" />
+                        )}
+                    </button>
+                )}
+            </div>
 
+            {/* More menu */}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <button className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0">
-                        <Menu className="w-5 h-5" />
+                    <button className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0">
+                        <MoreVertical className="w-5 h-5" />
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">

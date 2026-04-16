@@ -1,5 +1,7 @@
 import { api, withRetry } from '@flows/web-core';
 
+import { encodePathSegment } from '../utils';
+
 import type { ReagraphGraph } from '../types';
 
 const _log = console.log.bind(console, '[graphs-api]');
@@ -13,6 +15,10 @@ const _log = console.log.bind(console, '[graphs-api]');
  */
 export const fetchFlowGraph = async (flowId: string): Promise<ReagraphGraph> => {
     _log(`> fetchFlowGraph(${flowId})`);
-    const response = await withRetry(() => api.get<ReagraphGraph>(`/flows/${flowId}/graph`), 3, 'fetchFlowGraph');
+    const response = await withRetry(
+        () => api.get<ReagraphGraph>(`/flows/${encodePathSegment(flowId)}/graph`),
+        3,
+        'fetchFlowGraph'
+    );
     return response.data;
 };

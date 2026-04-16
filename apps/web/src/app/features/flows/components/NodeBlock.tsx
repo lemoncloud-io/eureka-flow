@@ -100,7 +100,7 @@ const getStatusStyles = (state: NodeState | undefined, isSelected: boolean, isFr
             case 'IDLE':
             case 'READY':
             default:
-                return 'border-primary shadow-[0_0_20px_rgba(139,92,246,0.25)]';
+                return 'border-primary shadow-[0_0_20px_rgba(143,25,246,0.25)]';
         }
     }
 

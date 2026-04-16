@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import { toast } from 'sonner';
 
-import { getPortData, useCanvasStore, useFlows, useFlowsStore } from '@flows/flows';
+import { EXECUTE_FUNCTIONS, getPortData, useCanvasStore, useFlows, useFlowsStore } from '@flows/flows';
 import { useInitFlowSocket } from '@flows/socket';
+
+import { executeNodeWithToast } from '../utils';
 
 import type { SerializeWorkflowFn } from './types';
 import type { NodeState } from '@flows/flows';
@@ -39,6 +41,8 @@ export const useMobileSocketSync = ({
     const nodeNoRef = useRef<Map<string, number>>(new Map());
     const nodeRunIdRef = useRef<Map<string, string>>(new Map());
     const portNoRef = useRef<Map<string, number>>(new Map());
+    const connectionIdRef = useRef<string | undefined>();
+    const pendingAutoExecRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleFlowUpdate = useCallback(
         async (flowId: string) => {
@@ -91,7 +95,8 @@ export const useMobileSocketSync = ({
                 }
             }
 
-            const { updateNodeData } = useCanvasStore.getState();
+            const storeState = useCanvasStore.getState();
+            const { updateNodeData, nodes } = storeState;
 
             if (state === 'ERROR') {
                 updateNodeData(nodeId, {
@@ -108,6 +113,29 @@ export const useMobileSocketSync = ({
 
             if (state === 'COMPLETED') {
                 toast.success(`Node completed`, { duration: 3000 });
+            }
+
+            // Auto-execute READY frontend nodes (same as desktop useSocketHandlers)
+            if (state === 'READY') {
+                const node = nodes.find(n => n.id === nodeId);
+                if (!node?.type) return;
+
+                const nodeDef = useFlowsStore.getState().blockRegistry[node.type];
+                if (!nodeDef?.isFrontend || !EXECUTE_FUNCTIONS[nodeDef.type]) return;
+                if (nodeDef.stereo === 'input') return;
+
+                const hasAllInputs = (nodeDef.inputs ?? []).every(
+                    input => node.inputData?.[input.id]?.value !== undefined
+                );
+                if (!hasAllInputs) return;
+
+                pendingAutoExecRef.current = setTimeout(() => {
+                    pendingAutoExecRef.current = null;
+                    executeNodeWithToast(nodeId, {
+                        flowId: currentFlowId,
+                        socketConnectionId: connectionIdRef.current,
+                    });
+                }, 0);
             }
         },
         [currentFlowId, clearTraceLogs, beginRun, finalizeRun]
@@ -198,12 +226,23 @@ export const useMobileSocketSync = ({
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
     });
+    connectionIdRef.current = connectionId ?? undefined;
 
-    // Clear sequence tracking on flow change
+    // Clear sequence tracking + pending auto-exec on flow change / unmount
     useEffect(() => {
         nodeNoRef.current.clear();
         nodeRunIdRef.current.clear();
         portNoRef.current.clear();
+        if (pendingAutoExecRef.current) {
+            clearTimeout(pendingAutoExecRef.current);
+            pendingAutoExecRef.current = null;
+        }
+        return () => {
+            if (pendingAutoExecRef.current) {
+                clearTimeout(pendingAutoExecRef.current);
+                pendingAutoExecRef.current = null;
+            }
+        };
     }, [currentFlowId]);
 
     return {

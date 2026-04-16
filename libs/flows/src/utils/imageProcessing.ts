@@ -7,7 +7,7 @@
  * - bypass: if "true", skips processing and only compresses
  */
 
-import { THUMBNAIL_ASPECT_RATIO, THUMBNAIL_MAX_WIDTH } from '../consts';
+import { THUMBNAIL_MAX_WIDTH } from '../consts';
 import { compressImageIfNeeded } from './imageCompression';
 
 export interface ImageProcessConfig {
@@ -183,10 +183,10 @@ export const processImageWithConfig = async (dataUrl: string, config: ImageProce
 };
 
 /**
- * Process image as a flow thumbnail (4:3 aspect ratio, 800px max width)
+ * Process image as a flow thumbnail (no crop, 800px max width)
+ * Preserves original aspect ratio for masonry layout variety.
  */
 export const processThumbnail = (dataUrl: string): Promise<string> =>
     processImageWithConfig(dataUrl, {
-        aspectRatio: THUMBNAIL_ASPECT_RATIO,
         maxWidth: THUMBNAIL_MAX_WIDTH,
     });

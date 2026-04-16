@@ -6,6 +6,7 @@
         "emitDeclarationOnly": true,
         "importHelpers": true,
         "isolatedModules": true,
+        "resolveJsonModule": true,
         "lib": ["es2022", "dom"],
         "module": "esnext",
         "moduleResolution": "bundler",
