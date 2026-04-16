@@ -670,26 +670,11 @@ export const FlowEditorPage = () => {
                         </div>
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="relative w-12 h-12">
-                            <div className="absolute inset-0 border-[3px] border-border/40 rounded-full"></div>
-                            <div className="absolute inset-0 border-[3px] border-primary rounded-full border-t-transparent animate-spin"></div>
-                        </div>
-                        <div className="flex flex-col items-center gap-2">
-                            {/* key forces remount to signal text change visually */}
-                            <div className="text-muted-foreground font-mono text-sm" key={loadingText}>
-                                {loadingText}
-                            </div>
-                            <div className="flex gap-1">
-                                {[0, 1, 2].map(i => (
-                                    <div
-                                        key={i}
-                                        className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-pulse"
-                                        style={{ animationDelay: `${i * 200}ms` }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
+                        <span className="text-xs text-muted-foreground/60" key={loadingText}>
+                            {loadingText}
+                        </span>
                     </div>
                 )}
                 <ApiKeyDialog

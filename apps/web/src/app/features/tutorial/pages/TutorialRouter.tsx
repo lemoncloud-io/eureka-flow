@@ -7,10 +7,7 @@ const MobileTutorialPage = lazy(() => import('./MobileTutorialPage').then(m => (
 
 const LoadingFallback = () => (
     <div className="flex h-screen bg-background items-center justify-center">
-        <div className="relative w-16 h-16">
-            <div className="absolute inset-0 border-4 border-border rounded-full" />
-            <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin" />
-        </div>
+        <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
     </div>
 );
 
