@@ -117,7 +117,7 @@ const ImagePreview: React.FC<{ src: string }> = ({ src }) => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
             </div>
         );
     }

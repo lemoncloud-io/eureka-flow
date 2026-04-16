@@ -861,7 +861,7 @@ export const FlowEditorPage = () => {
             {isLoading && (
                 <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-md animate-in fade-in duration-200">
                     <div className="flex flex-col items-center bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl p-6 shadow-floating animate-in fade-in zoom-in-95 duration-200">
-                        <div className="w-8 h-8 border-[3px] border-primary/30 border-t-primary rounded-full animate-spin mb-3"></div>
+                        <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin mb-3"></div>
                         <span className="text-sm font-medium text-foreground">{t('flowEditor.processing')}</span>
                     </div>
                 </div>

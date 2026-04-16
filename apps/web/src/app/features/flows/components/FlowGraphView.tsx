@@ -211,7 +211,7 @@ export const FlowGraphView = ({ flowId, className, onNavigateToNode }: FlowGraph
     if (isLoading) {
         return (
             <div className={cn('flex items-center justify-center', className)}>
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
             </div>
         );
     }

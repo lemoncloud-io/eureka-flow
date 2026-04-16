@@ -236,13 +236,7 @@ export const MobileFlowEditorPage = () => {
                         </div>
                     </div>
                 ) : (
-                    <>
-                        <div className="relative w-16 h-16">
-                            <div className="absolute inset-0 border-4 border-border rounded-full" />
-                            <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin" />
-                        </div>
-                        <div className="text-muted-foreground font-mono text-sm animate-pulse">{loadingText}</div>
-                    </>
+                    <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
                 )}
                 <ApiKeyDialog
                     open={isApiKeyDialogOpen}
@@ -434,7 +428,7 @@ export const MobileFlowEditorPage = () => {
             {isLoading && (
                 <div className="fixed inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-sm">
                     <div className="flex flex-col items-center bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl p-6 shadow-floating">
-                        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+                        <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin mb-3" />
                         <span className="text-sm font-medium">{t('flowEditor.processing')}</span>
                     </div>
                 </div>

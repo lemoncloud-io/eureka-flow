@@ -144,12 +144,8 @@ export const TutorialPage = () => {
 
     if (!isReady) {
         return (
-            <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
-                <div className="relative h-16 w-16">
-                    <div className="absolute inset-0 rounded-full border-4 border-border" />
-                    <div className="absolute inset-0 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                </div>
-                <div className="animate-pulse text-sm text-muted-foreground">{t('tutorial:loading')}</div>
+            <div className="flex h-screen flex-col items-center justify-center bg-background text-foreground">
+                <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
             </div>
         );
     }
