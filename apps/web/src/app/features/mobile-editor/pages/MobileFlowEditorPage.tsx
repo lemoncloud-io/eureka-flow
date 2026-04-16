@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -112,6 +112,14 @@ export const MobileFlowEditorPage = () => {
         /** 'output' = new block feeds INTO this port; 'input' = this port feeds INTO new block */
         direction: 'output' | 'input';
     } | null>(null);
+
+    // Auto-scroll to currently running node during Run All
+    useEffect(() => {
+        const nodeId = runProgress?.currentNodeId;
+        if (!nodeId) return;
+        const el = document.querySelector(`[data-node-id="${nodeId}"]`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, [runProgress?.currentNodeId]);
 
     const handleTapCard = useCallback(
         (nodeId: string) => {
@@ -325,6 +333,7 @@ export const MobileFlowEditorPage = () => {
                     <MobileStepList
                         onTapCard={handleTapCard}
                         onAddStep={() => setIsBlockLibraryOpen(true)}
+                        onAddBlockDirect={handleAddBlockWithRecent}
                         onRunNode={handleRunNode}
                         flowId={currentFlowId}
                         searchQuery={searchQuery}

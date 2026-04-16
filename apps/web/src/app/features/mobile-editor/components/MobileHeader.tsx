@@ -145,6 +145,12 @@ export const MobileHeader = ({
                     <span className="truncate text-sm font-bold text-foreground leading-tight">{flowName}</span>
                 )}
 
+                {/* View-only badge for non-owner roles */}
+                {role !== 'owner' && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
+                        {t('mobile.viewOnly', 'View only')}
+                    </span>
+                )}
                 {/* Disconnected warning — only when socket is down */}
                 {isDisconnected && <WifiOff className="w-3.5 h-3.5 text-destructive/60 shrink-0" />}
             </div>

@@ -559,6 +559,8 @@
         "searchNodes": "Search nodes...",
         "noSearchResults": "No matching nodes",
         "imageOutput": "Image",
+        "viewOnly": "View only",
+        "browseAllBlocks": "Browse all blocks",
         "state": {
             "idle": "Idle",
             "ready": "Ready",

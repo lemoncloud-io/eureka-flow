@@ -20,7 +20,9 @@ interface UseMobileRunAllReturn {
 export const useMobileRunAll = ({ socketConnectionId }: UseMobileRunAllParams): UseMobileRunAllReturn => {
     const { t } = useTranslation(['flows']);
     const { currentFlowId } = useFlows();
-    const [runProgress, setRunProgress] = useState<{ current: number; total: number } | null>(null);
+    const [runProgress, setRunProgress] = useState<{ current: number; total: number; currentNodeId?: string } | null>(
+        null
+    );
 
     const handleRunAll = useCallback(async () => {
         const { nodes, connections } = useCanvasStore.getState();
@@ -30,9 +32,10 @@ export const useMobileRunAll = ({ socketConnectionId }: UseMobileRunAllParams): 
         const total = ordered.length;
         let completed = 0;
 
-        setRunProgress({ current: 0, total });
+        setRunProgress({ current: 0, total, currentNodeId: ordered[0] });
 
         for (const nodeId of ordered) {
+            setRunProgress(prev => (prev ? { ...prev, currentNodeId: nodeId } : null));
             try {
                 await executeNodeDirect(nodeId, {
                     flowId: currentFlowId,

@@ -7,7 +7,9 @@ import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
+import { BlockIcon } from '../../flows/components/BlockIcon';
 import { buildNodeDisplayNames, deleteNodeWithSync, findConnectedComponents } from '../utils';
+import { STEREO_ICON_BG } from './consts';
 import { MobileStepCard } from './MobileStepCard';
 
 import type { FlowRole } from '@flows/flows';
@@ -15,6 +17,7 @@ import type { FlowRole } from '@flows/flows';
 interface MobileStepListProps {
     onTapCard: (nodeId: string) => void;
     onAddStep: () => void;
+    onAddBlockDirect?: (type: string) => void;
     onRunNode?: (nodeId: string) => void;
     flowId: string | null;
     searchQuery?: string;
@@ -24,6 +27,7 @@ interface MobileStepListProps {
 export const MobileStepList = ({
     onTapCard,
     onAddStep,
+    onAddBlockDirect,
     onRunNode,
     flowId,
     searchQuery,
@@ -102,19 +106,53 @@ export const MobileStepList = ({
                     )}
                 </p>
 
-                {role === 'owner' && (
-                    <button
-                        onClick={onAddStep}
-                        className={cn(
-                            'flex items-center gap-2 px-5 py-2.5 rounded-full',
-                            'bg-primary text-primary-foreground text-sm font-medium',
-                            'active:scale-[0.96] transition-all shadow-sm shadow-primary/20'
-                        )}
-                    >
-                        <Plus className="w-4 h-4" />
-                        {t('mobile.addFirstStep', 'Add your first step')}
-                    </button>
-                )}
+                {role === 'owner' &&
+                    (() => {
+                        const quickBlocks = Object.values(blockRegistry)
+                            .filter(b => b.stereo === 'input')
+                            .slice(0, 3);
+
+                        return (
+                            <div className="flex flex-col items-center gap-4">
+                                {/* Quick-add blocks */}
+                                {onAddBlockDirect && quickBlocks.length > 0 && (
+                                    <div className="flex flex-wrap justify-center gap-2">
+                                        {quickBlocks.map(block => (
+                                            <button
+                                                key={block.type}
+                                                onClick={() => onAddBlockDirect(block.type)}
+                                                className={cn(
+                                                    'flex items-center gap-2 px-3 py-2 rounded-xl',
+                                                    'border border-border/60 bg-card',
+                                                    'text-xs font-medium',
+                                                    'hover:border-primary/30 hover:shadow-sm',
+                                                    'active:scale-[0.97] transition-all'
+                                                )}
+                                            >
+                                                <div
+                                                    className={cn(
+                                                        'w-7 h-7 rounded-lg flex items-center justify-center',
+                                                        STEREO_ICON_BG.input
+                                                    )}
+                                                >
+                                                    <BlockIcon icon={block.icon} size={14} />
+                                                </div>
+                                                {block.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {/* Browse all */}
+                                <button
+                                    onClick={onAddStep}
+                                    className="flex items-center gap-1.5 text-xs text-primary/60 hover:text-primary transition-colors"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    {t('mobile.browseAllBlocks', 'Browse all blocks')}
+                                </button>
+                            </div>
+                        );
+                    })()}
             </div>
         );
     }

@@ -64,6 +64,7 @@ export const MobileStepCard = React.memo(
         return (
             <button
                 type="button"
+                data-node-id={node.id}
                 onClick={() => onTapCard(node.id)}
                 className={cn(
                     'w-full flex items-center gap-3 px-4 py-3.5 min-h-[56px]',
@@ -98,12 +99,13 @@ export const MobileStepCard = React.memo(
                             const entries = Object.entries(node.outputData);
                             if (entries.length === 0) return null;
                             const [, data] = entries[0];
-                            if (data?.type === 'image')
-                                {return (
+                            if (data?.type === 'image') {
+                                return (
                                     <div className="text-[11px] text-success/50 truncate mt-0.5">
                                         🖼 {t('mobile.imageOutput', 'Image')}
                                     </div>
-                                );}
+                                );
+                            }
                             const val =
                                 typeof data?.value === 'string'
                                     ? data.value.slice(0, 40)

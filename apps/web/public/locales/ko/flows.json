@@ -559,6 +559,8 @@
         "searchNodes": "노드 검색...",
         "noSearchResults": "일치하는 노드 없음",
         "imageOutput": "이미지",
+        "viewOnly": "보기 전용",
+        "browseAllBlocks": "전체 블록 보기",
         "state": {
             "idle": "대기",
             "ready": "준비",
