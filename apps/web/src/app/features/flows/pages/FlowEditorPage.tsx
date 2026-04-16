@@ -192,8 +192,7 @@ export const FlowEditorPage = () => {
     const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
     const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
     const [isGraphViewOpen, setIsGraphViewOpen] = useState(false);
-    const [showGuideTour, setShowGuideTour] = useState(false);
-    const [showBlockTutorial, setShowBlockTutorial] = useState(false);
+    const [tourPhase, setTourPhase] = useState<'none' | 'guide' | 'block'>('none');
 
     const { apiKey, setApiKey } = useWebCoreStore();
 
@@ -767,8 +766,7 @@ export const FlowEditorPage = () => {
                 onPublish={handleOpenPublish}
                 onApiKeySettings={handleApiKeySettings}
                 onHelp={() => handleOpenHelp('gettingStarted')}
-                onTour={() => setShowGuideTour(true)}
-                onBlockTutorial={() => setShowBlockTutorial(true)}
+                onTour={() => setTourPhase('guide')}
                 onOpenFlowList={handleOpenFlowList}
                 onGraphView={() => setIsGraphViewOpen(true)}
             />
@@ -867,13 +865,11 @@ export const FlowEditorPage = () => {
                 </div>
             )}
 
-            {/* Guide Tour */}
-            {showGuideTour && <GuideTour onClose={() => setShowGuideTour(false)} />}
-
-            {/* Block Tutorial */}
-            {showBlockTutorial && (
+            {/* Guided Tour: Guide → Block Tutorial */}
+            {tourPhase === 'guide' && <GuideTour onClose={() => setTourPhase('block')} />}
+            {tourPhase === 'block' && (
                 <BlockTutorial
-                    onClose={() => setShowBlockTutorial(false)}
+                    onClose={() => setTourPhase('none')}
                     onOpenHelp={() => handleOpenHelp('gettingStarted')}
                 />
             )}

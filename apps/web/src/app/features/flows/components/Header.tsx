@@ -15,7 +15,6 @@ import {
     ImageDown,
     Key,
     LayoutGrid,
-    MapPin,
     Menu,
     Play,
     Redo2,
@@ -101,7 +100,6 @@ interface HeaderProps {
     onApiKeySettings?: () => void;
     onHelp?: () => void;
     onTour?: () => void;
-    onBlockTutorial?: () => void;
     onOpenFlowList?: () => void;
     onGraphView?: () => void;
 }
@@ -342,7 +340,6 @@ export const Header: React.FC<HeaderProps> = ({
     onApiKeySettings,
     onHelp,
     onTour,
-    onBlockTutorial,
     onOpenFlowList,
     onGraphView,
 }) => {
@@ -642,14 +639,8 @@ export const Header: React.FC<HeaderProps> = ({
                             )}
                             {onTour && (
                                 <DropdownMenuItem onClick={onTour}>
-                                    <MapPin className="w-4 h-4 mr-2" />
-                                    {t('header.guidedTour')}
-                                </DropdownMenuItem>
-                            )}
-                            {onBlockTutorial && (
-                                <DropdownMenuItem onClick={onBlockTutorial}>
                                     <GraduationCap className="w-4 h-4 mr-2" />
-                                    {t('header.blockTutorial', '블록 사용법')}
+                                    {t('header.guidedTour')}
                                 </DropdownMenuItem>
                             )}
                             {role !== 'anonymous' && (
