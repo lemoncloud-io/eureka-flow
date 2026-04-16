@@ -10,14 +10,13 @@ import {
     Loader2,
     Play,
     Trash2,
-    X,
     Zap,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import { useBlockRegistry, useCanvasConnections, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import { Button, Input, Label, Switch } from '@flows/ui-kit';
+import { Input, Label, Switch } from '@flows/ui-kit';
 
 import { BlockIcon } from '../../flows/components/BlockIcon';
 import { RunHistoryPanel } from '../../flows/components/RunHistoryPanel';
@@ -38,11 +37,7 @@ interface MobileStepDetailProps {
     flowId: string | null;
     socketConnectionId?: string;
     role?: FlowRole;
-    hasNextStep: boolean;
-    hasPrevStep: boolean;
     onClose: () => void;
-    onNextStep: () => void;
-    onPrevStep: () => void;
     onOpenOutputConnection?: (
         nodeId: string,
         portId: string,
@@ -64,11 +59,7 @@ export const MobileStepDetail = ({
     flowId,
     socketConnectionId,
     role = 'owner',
-    hasNextStep,
-    hasPrevStep,
     onClose,
-    onNextStep,
-    onPrevStep,
     onOpenOutputConnection,
     onOpenInputConnection,
 }: MobileStepDetailProps) => {
@@ -86,10 +77,13 @@ export const MobileStepDetail = ({
         handleToggleAuto,
     } = useNodeConfig(nodeId, flowId, role);
 
-    const handleRun = useCallback(async () => {
-        if (!canRun || !nodeId) return;
-        await executeNodeWithToast(nodeId, { flowId, socketConnectionId, canEdit });
-    }, [canRun, canEdit, nodeId, flowId, socketConnectionId]);
+    const handleRun = useCallback(
+        async (options?: { propagate?: boolean }) => {
+            if (!canRun || !nodeId) return;
+            await executeNodeWithToast(nodeId, { flowId, socketConnectionId, canEdit, propagate: options?.propagate });
+        },
+        [canRun, canEdit, nodeId, flowId, socketConnectionId]
+    );
     const isRunning = (node?.state as string) === 'RUNNING';
 
     const allConnections = useCanvasConnections();
@@ -145,13 +139,6 @@ export const MobileStepDetail = ({
                         <span className="text-sm font-semibold text-foreground truncate">
                             {node.customLabel || blockDef.label || node.type}
                         </span>
-                        <div className="flex-1" />
-                        <button
-                            onClick={onClose}
-                            className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors"
-                        >
-                            <X className="w-5 h-5 text-muted-foreground" />
-                        </button>
                     </header>
 
                     {/* ── Scrollable body ── */}
@@ -498,79 +485,108 @@ export const MobileStepDetail = ({
 
                             {/* Delete */}
                             {canEdit && (
-                                <div className="pt-4 border-t border-border">
-                                    <Button variant="destructive" className="w-full gap-2" onClick={handleDelete}>
-                                        <Trash2 className="w-4 h-4" />
+                                <div className="pt-4 border-t border-border/30 flex justify-center">
+                                    <button
+                                        onClick={handleDelete}
+                                        className="flex items-center gap-1.5 px-3 py-2 text-xs text-destructive/60 hover:text-destructive transition-colors"
+                                    >
+                                        <Trash2 className="w-3 h-3" />
                                         {t('detailPanel.deleteNode', 'Delete Node')}
-                                    </Button>
+                                    </button>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* ── Bottom CTA bar ── */}
-                    <div
-                        className={cn(
-                            'shrink-0 border-t border-border/40',
-                            'pb-[env(safe-area-inset-bottom)]',
-                            'bg-background/95 backdrop-blur-md'
-                        )}
-                    >
-                        <div className="flex items-center gap-2.5 px-4 py-3">
-                            {/* Run Step */}
-                            {canRun && blockDef.isRunnable !== false && (
-                                <button
-                                    onClick={handleRun}
-                                    disabled={isRunning}
-                                    className={cn(
-                                        'flex items-center justify-center gap-2 h-11 px-5 rounded-xl',
-                                        'text-sm font-semibold transition-all',
-                                        'active:scale-[0.97]',
-                                        'disabled:opacity-40',
-                                        isRunning
-                                            ? 'bg-warning/10 text-warning border border-warning/25'
-                                            : 'bg-primary/10 text-primary border border-primary/20 hover:bg-primary/15'
-                                    )}
-                                >
-                                    {isRunning ? (
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                    ) : (
-                                        <Play className="w-4 h-4 fill-current" />
-                                    )}
-                                    <span>
-                                        {isRunning ? t('mobile.running', 'Running...') : t('mobile.runStep', 'Run')}
-                                    </span>
-                                </button>
+                    {/* ── Bottom Run bar — output nodes are view-only, no execution ── */}
+                    {canRun && stereo !== 'output' && blockDef.isRunnable !== false && (
+                        <div
+                            className={cn(
+                                'shrink-0 border-t border-border/40',
+                                'pb-[env(safe-area-inset-bottom)]',
+                                'bg-background/95 backdrop-blur-md'
                             )}
-
-                            <div className="flex-1" />
-
-                            {/* Step navigation */}
-                            {hasPrevStep && (
-                                <button
-                                    onClick={onPrevStep}
-                                    className="flex items-center gap-1 px-3 h-11 rounded-xl text-xs font-medium text-muted-foreground hover:bg-accent/50 transition-colors"
-                                >
-                                    <ArrowLeft className="w-3.5 h-3.5" />
-                                    {t('mobile.prevStep', 'Prev')}
-                                </button>
-                            )}
-                            {hasNextStep && (
-                                <button
-                                    onClick={onNextStep}
-                                    className={cn(
-                                        'flex items-center gap-1.5 px-4 h-11 rounded-xl',
-                                        'text-sm font-medium',
-                                        'bg-primary text-primary-foreground',
-                                        'active:scale-[0.97] transition-all shadow-sm shadow-primary/20'
-                                    )}
-                                >
-                                    {t('mobile.nextStep', 'Next step')}
-                                    <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                            )}
+                        >
+                            <div className="px-4 py-2.5">
+                                {stereo === 'process' ? (
+                                    /* Process nodes: two buttons — Run This Only + Run & Propagate */
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleRun({ propagate: false })}
+                                            disabled={isRunning}
+                                            className={cn(
+                                                'flex-1 flex items-center justify-center gap-1.5 h-11 rounded-xl',
+                                                'text-xs font-semibold transition-all',
+                                                'active:scale-[0.98] disabled:opacity-40',
+                                                isRunning
+                                                    ? 'bg-muted/30 text-muted-foreground border border-muted'
+                                                    : 'bg-primary/10 text-primary border border-primary/20 hover:bg-primary/15'
+                                            )}
+                                        >
+                                            {isRunning ? (
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            ) : (
+                                                <Play className="w-3.5 h-3.5 fill-current" />
+                                            )}
+                                            <span>
+                                                {t('actions.runThisOnly', {
+                                                    ns: 'nodes',
+                                                    defaultValue: 'Run This Only',
+                                                })}
+                                            </span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleRun({ propagate: true })}
+                                            disabled={isRunning}
+                                            className={cn(
+                                                'flex-1 flex items-center justify-center gap-1.5 h-11 rounded-xl',
+                                                'text-xs font-semibold transition-all',
+                                                'active:scale-[0.98] disabled:opacity-40',
+                                                isRunning
+                                                    ? 'bg-muted/30 text-muted-foreground border border-muted'
+                                                    : 'bg-success/10 text-success border border-success/20 hover:bg-success/15'
+                                            )}
+                                        >
+                                            {isRunning ? (
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            ) : (
+                                                <Play className="w-3.5 h-3.5 fill-current" />
+                                            )}
+                                            <span>
+                                                {t('actions.runAndPropagate', {
+                                                    ns: 'nodes',
+                                                    defaultValue: 'Run & Propagate',
+                                                })}
+                                            </span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    /* Input nodes: single Run button */
+                                    <button
+                                        onClick={() => handleRun()}
+                                        disabled={isRunning}
+                                        className={cn(
+                                            'w-full flex items-center justify-center gap-2 h-11 rounded-xl',
+                                            'text-sm font-semibold transition-all',
+                                            'active:scale-[0.98] disabled:opacity-40',
+                                            isRunning
+                                                ? 'bg-warning/10 text-warning border border-warning/25'
+                                                : 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                                        )}
+                                    >
+                                        {isRunning ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <Play className="w-4 h-4 fill-current" />
+                                        )}
+                                        <span>
+                                            {isRunning ? t('mobile.running', 'Running...') : t('mobile.runStep', 'Run')}
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </motion.div>
             )}
         </AnimatePresence>

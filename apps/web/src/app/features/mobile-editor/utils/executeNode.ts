@@ -6,11 +6,13 @@ import { hydrateInputPorts } from './nodeServerSync';
 
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
-interface ExecuteNodeOptions {
+export interface ExecuteNodeOptions {
     flowId: string | null;
     socketConnectionId?: string;
     /** Whether the user can edit (owner). Affects hydration and run body. */
     canEdit?: boolean;
+    /** If true, propagates to downstream nodes after execution (default: true for server) */
+    propagate?: boolean;
 }
 
 /**
@@ -18,7 +20,7 @@ interface ExecuteNodeOptions {
  * Mirrors desktop WorkflowCanvas executeNode logic.
  */
 export const executeNodeDirect = async (nodeId: string, options: ExecuteNodeOptions): Promise<void> => {
-    const { flowId, socketConnectionId, canEdit = true } = options;
+    const { flowId, socketConnectionId, canEdit = true, propagate } = options;
     const { nodes, connections, updateNodeData } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return;
@@ -37,17 +39,17 @@ export const executeNodeDirect = async (nodeId: string, options: ExecuteNodeOpti
             const result = await executeFn(node.inputData ?? {}, node.config ?? {});
             updateNodeData(nodeId, { outputData: result, state: 'COMPLETED' } as Partial<NodeData>);
             const runBody = canEdit ? { output: result } : { output: result, config: nodeConfig };
-            await runNode(nodeId, runBody, { force: true, connection: socketConnectionId });
+            await runNode(nodeId, runBody, { force: true, propagate, connection: socketConnectionId });
         } else {
             if (canEdit && flowId) {
                 await hydrateInputPorts(nodeId, flowId, connections, nodes, node.inputData ?? {});
             }
             const runBody = canEdit ? undefined : { config: nodeConfig };
-            await runNode(nodeId, runBody, { connection: socketConnectionId });
+            await runNode(nodeId, runBody, { propagate, connection: socketConnectionId });
         }
     } catch (e) {
         updateNodeData(nodeId, { state: 'ERROR' } as Partial<NodeData>);
-        throw e; // Re-throw so callers can handle (toast, break loop, etc.)
+        throw e;
     }
 };
 
@@ -58,6 +60,6 @@ export const executeNodeWithToast = async (nodeId: string, options: ExecuteNodeO
     try {
         await executeNodeDirect(nodeId, options);
     } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Node execution failed'); // fallback English — i18n not available in utils
+        toast.error(e instanceof Error ? e.message : 'Node execution failed');
     }
 };

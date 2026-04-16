@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX } from 'lucide-react';
 
-import { useBlockRegistry, useCanvasConnections, useCanvasNodes, useCanvasStore, useFlows } from '@flows/flows';
+import { useBlockRegistry, useCanvasStore, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -24,7 +24,6 @@ import {
     useMobileAutoSave,
     useMobileEditorBoot,
     useMobileFlowActions,
-    useMobileNodeOrder,
     useMobileRunAll,
     useMobileSocketSync,
 } from '../hooks';
@@ -44,9 +43,6 @@ export const MobileFlowEditorPage = () => {
     const blockRegistry = useBlockRegistry();
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
     const nodeCount = useCanvasStore(state => state.nodes.length);
-    const nodes = useCanvasNodes();
-    const connections = useCanvasConnections();
-    const { orderedNodeIds } = useMobileNodeOrder(nodes, connections);
 
     // Role derivation
     const computedRole: FlowRole = isPublicMode ? 'anonymous' : isEditable ? 'owner' : 'guest';
@@ -63,7 +59,7 @@ export const MobileFlowEditorPage = () => {
     const [isFlowMapOpen, setIsFlowMapOpen] = useState(false);
 
     // Step navigation (replaces configNodeId)
-    const stepNav = useStepNavigation(orderedNodeIds);
+    const stepNav = useStepNavigation();
 
     // Hooks
     const {
@@ -310,11 +306,7 @@ export const MobileFlowEditorPage = () => {
                 flowId={currentFlowId}
                 socketConnectionId={socketConnectionId}
                 role={role}
-                hasNextStep={stepNav.hasNextStep}
-                hasPrevStep={stepNav.hasPrevStep}
                 onClose={stepNav.closeStep}
-                onNextStep={stepNav.goToNextStep}
-                onPrevStep={stepNav.goToPrevStep}
                 onOpenOutputConnection={connectionMode.openForPort}
                 onOpenInputConnection={connectionMode.openForInputPort}
             />
