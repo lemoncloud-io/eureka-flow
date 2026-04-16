@@ -1,6 +1,6 @@
 {
     "header": {
-        "title": "FlowMosaic",
+        "title": "EurekaFlow",
         "autoSave": "Auto Save",
         "share": "Share",
         "newFlow": "New Flow",
@@ -200,7 +200,7 @@
         "cancel": "Cancel"
     },
     "flowEditor": {
-        "initializingEngine": "Initializing FlowMosaic Engine...",
+        "initializingEngine": "Initializing EurekaFlow Engine...",
         "loadingBlockRegistry": "Loading Block Registry...",
         "loadingFlow": "Loading Flow {{flowId}}...",
         "initializingFlow": "Initializing Flow...",
@@ -289,12 +289,11 @@
         "tabs": {
             "gettingStarted": "Getting Started",
             "blocks": "Blocks",
-            "shortcuts": "Shortcuts",
-            "examples": "Examples"
+            "shortcuts": "Shortcuts"
         },
         "gettingStarted": {
-            "title": "Getting Started with FlowMosaic",
-            "intro": "FlowMosaic is a visual workflow editor that lets you build automation flows by connecting blocks. Each block performs a specific action, and data flows from one block to the next.",
+            "title": "Getting Started with EurekaFlow",
+            "intro": "EurekaFlow is a visual workflow editor that lets you build automation flows by connecting blocks. Each block performs a specific action, and data flows from one block to the next.",
             "steps": {
                 "navigate": {
                     "title": "Navigate the Canvas",
@@ -419,37 +418,6 @@
             "optional": "Optional",
             "frontend": "Frontend Block",
             "frontendDescription": "This block runs in your browser, not on the server."
-        },
-        "examples": {
-            "title": "Example Workflows",
-            "description": "Get started quickly with these pre-built workflow templates.",
-            "useTemplate": "Use Template",
-            "comingSoon": "Template import feature coming soon!",
-            "preview": "Preview",
-            "difficulty": {
-                "beginner": "Beginner",
-                "intermediate": "Intermediate",
-                "advanced": "Advanced"
-            },
-            "categories": {
-                "all": "All",
-                "gettingStarted": "Getting Started",
-                "textProcessing": "Text Processing"
-            },
-            "templates": {
-                "helloWorld": {
-                    "name": "Hello World",
-                    "description": "A simple workflow that takes user input and displays it in a preview block. Perfect for learning the basics."
-                },
-                "textTransform": {
-                    "name": "Text Transform Pipeline",
-                    "description": "Chain multiple text transformations together - uppercase, lowercase, reverse, and more."
-                },
-                "delayedOutput": {
-                    "name": "Delayed Output",
-                    "description": "Learn how to use the Buffer block to add delays between operations."
-                }
-            }
         },
         "emptyState": {
             "title": "Start Building Your Workflow",
