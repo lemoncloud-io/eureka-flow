@@ -208,11 +208,22 @@ export const MobileConnectionSheet = ({
                                                         )}
                                                     />
                                                     {target.portName}
+                                                    {target.occupiedByNode && (
+                                                        <span className="text-warning/70 ml-1">
+                                                            ← {target.occupiedByNode}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-1 text-[11px] text-primary/50 font-medium shrink-0">
-                                                <span>Connect</span>
-                                                <ArrowRight className="w-3.5 h-3.5" />
+                                            <div className="flex items-center gap-1 text-[11px] font-medium shrink-0">
+                                                {target.occupiedByNode ? (
+                                                    <span className="text-warning/60">Replace</span>
+                                                ) : (
+                                                    <>
+                                                        <span className="text-primary/50">Connect</span>
+                                                        <ArrowRight className="w-3.5 h-3.5 text-primary/50" />
+                                                    </>
+                                                )}
                                             </div>
                                         </button>
                                     );

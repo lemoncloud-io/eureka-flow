@@ -28,7 +28,10 @@ export interface CompatibleTarget {
     portId: string;
     portName: string;
     portDataType: string;
+    /** This exact source→target pair already exists */
     alreadyConnected: boolean;
+    /** The target input port already has a connection from another source (will be replaced) */
+    occupiedByNode?: string;
 }
 
 export const useConnectionMode = (
@@ -69,6 +72,19 @@ export const useConnectionMode = (
                             c.targetPortId === port.id
                     );
 
+                    // Check if this input port is occupied by another source
+                    const existingConn = connections.find(
+                        c => c.targetNodeId === node.id && c.targetPortId === port.id
+                    );
+                    const occupiedByNode =
+                        existingConn && !alreadyConnected
+                            ? (() => {
+                                  const srcNode = nodes.find(n => n.id === existingConn.sourceNodeId);
+                                  const srcDef = srcNode ? blockRegistry[srcNode.type] : undefined;
+                                  return srcNode?.customLabel || srcDef?.label || existingConn.sourceNodeId;
+                              })()
+                            : undefined;
+
                     targets.push({
                         nodeId: node.id,
                         nodeName,
@@ -77,6 +93,7 @@ export const useConnectionMode = (
                         portName: port.label || port.id,
                         portDataType: port.type ?? 'any',
                         alreadyConnected,
+                        occupiedByNode,
                     });
                 }
             }
