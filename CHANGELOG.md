@@ -1,5 +1,40 @@
 # Changelog
 
+## [2026-04-16] - root@0.30.0, @flows/web@0.30.0, @flows/admin@0.16.0
+
+### Features
+
+- update theme
+- add interactive guide tour with step change handling
+- updat meta and public flow page
+- improve thumbnail capture
+- add view-only badge, run-all auto-scroll, and quick-add blocks
+- add search functionality in mobile editor
+- add localization for mobile editor flows
+- show occupied port info and replace connect button
+- improve mobile-editor ui/ux
+
+### Bug Fixes
+
+- remove unimplemented fitView shortcut from help dialog
+- open sidebar when block tutorial starts in editor
+
+### Refactor
+
+- remove examples tab from help dialog, fix FlowMosaic naming
+- align block tutorial icons with sidebar emoji icons
+- consolidate tutorial menu items from 3 to 2
+- redesign sidebar to 2-column card grid and remove unused interactive tutorial
+- simplify FrontendBadge component
+- unify loading spinners to consistent w-8 border-2 pattern
+- simplify loading indicators
+- refactor landing
+- improve flow card styling and layout
+- encode path segments in api requests
+- simplify step navigation logic
+- update group container styles
+- refactor mobile-editor
+
 ## [2026-04-15] - root@0.29.0, @flows/web@0.29.0
 
 ### Features
