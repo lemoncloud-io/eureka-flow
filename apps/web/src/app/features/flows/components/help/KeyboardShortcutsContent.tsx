@@ -11,7 +11,6 @@ const SHORTCUTS: ShortcutItem[] = [
     { key: 'pan', category: 'canvas' },
     { key: 'zoomIn', category: 'canvas' },
     { key: 'zoomOut', category: 'canvas' },
-    { key: 'fitView', category: 'canvas' },
     { key: 'undo', category: 'editing' },
     { key: 'redo', category: 'editing' },
     { key: 'copy', category: 'editing' },
