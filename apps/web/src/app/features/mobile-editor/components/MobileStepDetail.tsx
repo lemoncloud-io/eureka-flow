@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -23,8 +23,7 @@ import { BlockIcon } from '../../flows/components/BlockIcon';
 import { RunHistoryPanel } from '../../flows/components/RunHistoryPanel';
 import { getPortStyleKey } from '../../flows/utils';
 import { useNodeConfig } from '../hooks/useNodeConfig';
-import { useNodeExecution } from '../hooks/useNodeExecution';
-import { deleteNodeWithSync } from '../utils';
+import { deleteNodeWithSync, executeNodeWithToast } from '../utils';
 import { ConfigFieldList } from './ConfigFieldList';
 import { STATE_STYLES, STEREO_ICON_BG, TYPE_DOT } from './consts';
 import { DataPreview } from './DataPreview';
@@ -87,7 +86,12 @@ export const MobileStepDetail = ({
         handleToggleAuto,
     } = useNodeConfig(nodeId, flowId, role);
 
-    const { handleRun, isRunning } = useNodeExecution(nodeId, flowId, role, socketConnectionId);
+    const handleRun = useCallback(async () => {
+        if (!canRun || !nodeId) return;
+        await executeNodeWithToast(nodeId, { flowId, socketConnectionId, canEdit });
+    }, [canRun, canEdit, nodeId, flowId, socketConnectionId]);
+    const isRunning = (node?.state as string) === 'RUNNING';
+
     const allConnections = useCanvasConnections();
     const blockRegistry = useBlockRegistry();
 

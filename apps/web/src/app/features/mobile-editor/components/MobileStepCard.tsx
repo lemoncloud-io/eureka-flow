@@ -1,15 +1,13 @@
 import React, { useCallback } from 'react';
 
 import { Loader2, MoreVertical, Play, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
 
-import { EXECUTE_FUNCTIONS, runNode, useBlockRegistry, useCanvasStore } from '@flows/flows';
+import { useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
 
-import { BlockIcon } from '../../flows/components/BlockIcon';
-import { hydrateInputPorts } from '../utils';
 import { STATE_STYLES, STEREO_ICON_BG } from './consts';
+import { BlockIcon } from '../../flows/components/BlockIcon';
 
 import type { FlowRole } from '@flows/flows';
 import type { NodeData, NodeState } from '@lemoncloud/eureka-flows-api';
@@ -18,14 +16,13 @@ interface MobileStepCardProps {
     node: NodeData;
     displayName: string;
     onTapCard: (nodeId: string) => void;
+    onRun?: (nodeId: string) => void;
     onDelete?: (nodeId: string) => void;
-    socketConnectionId?: string;
-    flowId: string | null;
     role?: FlowRole;
 }
 
 export const MobileStepCard = React.memo(
-    ({ node, displayName, onTapCard, onDelete, socketConnectionId, flowId, role = 'owner' }: MobileStepCardProps) => {
+    ({ node, displayName, onTapCard, onRun, onDelete, role = 'owner' }: MobileStepCardProps) => {
         const blockRegistry = useBlockRegistry();
         const blockDef = blockRegistry[node.type];
         const state = (node.state ?? 'IDLE') as NodeState;
@@ -34,32 +31,11 @@ export const MobileStepCard = React.memo(
         const isRunning = state === 'RUNNING';
 
         const handleRun = useCallback(
-            async (e: React.MouseEvent) => {
+            (e: React.MouseEvent) => {
                 e.stopPropagation();
-                if (!blockDef) return;
-                const { updateNodeData, connections, nodes } = useCanvasStore.getState();
-                updateNodeData(node.id, { state: 'RUNNING' } as Partial<NodeData>);
-
-                try {
-                    const nodeConfig = (node.config ?? {}) as Record<string, string>;
-                    if (blockDef.isFrontend && EXECUTE_FUNCTIONS[blockDef.type]) {
-                        const result = await EXECUTE_FUNCTIONS[blockDef.type](node.inputData ?? {}, node.config ?? {});
-                        updateNodeData(node.id, { outputData: result, state: 'COMPLETED' } as Partial<NodeData>);
-                        await runNode(node.id, { output: result }, { force: true, connection: socketConnectionId });
-                    } else {
-                        if (flowId) {
-                            await hydrateInputPorts(node.id, flowId, connections, nodes, node.inputData ?? {});
-                        }
-                        await runNode(node.id, role === 'owner' ? undefined : { config: nodeConfig }, {
-                            connection: socketConnectionId,
-                        });
-                    }
-                } catch (err) {
-                    updateNodeData(node.id, { state: 'ERROR' } as Partial<NodeData>);
-                    toast.error(err instanceof Error ? err.message : 'Node execution failed');
-                }
+                onRun?.(node.id);
             },
-            [node.id, node.inputData, node.config, blockDef, socketConnectionId, flowId, role]
+            [node.id, onRun]
         );
 
         const handleDelete = useCallback(
@@ -72,7 +48,6 @@ export const MobileStepCard = React.memo(
             [node.id, onDelete]
         );
 
-        /** Status dot color */
         const dotColor =
             state === 'RUNNING'
                 ? 'bg-warning'
@@ -143,7 +118,7 @@ export const MobileStepCard = React.memo(
                             </div>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
-                            {blockDef?.isRunnable !== false && (
+                            {blockDef?.isRunnable !== false && onRun && (
                                 <DropdownMenuItem onClick={handleRun} disabled={isRunning} className="gap-2">
                                     <Play className="w-3.5 h-3.5" />
                                     Run

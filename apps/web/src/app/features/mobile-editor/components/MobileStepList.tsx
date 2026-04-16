@@ -15,18 +15,12 @@ import type { FlowRole } from '@flows/flows';
 interface MobileStepListProps {
     onTapCard: (nodeId: string) => void;
     onAddStep: () => void;
-    socketConnectionId?: string;
+    onRunNode?: (nodeId: string) => void;
     flowId: string | null;
     role?: FlowRole;
 }
 
-export const MobileStepList = ({
-    onTapCard,
-    onAddStep,
-    socketConnectionId,
-    flowId,
-    role = 'owner',
-}: MobileStepListProps) => {
+export const MobileStepList = ({ onTapCard, onAddStep, onRunNode, flowId, role = 'owner' }: MobileStepListProps) => {
     const { t } = useTranslation(['flows']);
     const nodes = useCanvasNodes();
     const connections = useCanvasConnections();
@@ -170,9 +164,8 @@ export const MobileStepList = ({
                                                     node={node}
                                                     displayName={displayNames.get(nodeId) ?? node.type}
                                                     onTapCard={onTapCard}
+                                                    onRun={onRunNode}
                                                     onDelete={handleDelete}
-                                                    socketConnectionId={socketConnectionId}
-                                                    flowId={flowId}
                                                     role={role}
                                                 />
                                             </div>

@@ -30,6 +30,7 @@ import {
 } from '../hooks';
 import { useRecentBlocks } from '../hooks/useRecentBlocks';
 import { useStepNavigation } from '../hooks/useStepNavigation';
+import { executeNodeWithToast } from '../utils';
 
 import type { FlowRole } from '@flows/flows';
 
@@ -118,6 +119,17 @@ export const MobileFlowEditorPage = () => {
             stepNav.openStep(nodeId);
         },
         [stepNav]
+    );
+
+    const handleRunNode = useCallback(
+        (nodeId: string) => {
+            executeNodeWithToast(nodeId, {
+                flowId: currentFlowId,
+                socketConnectionId,
+                canEdit: role === 'owner',
+            });
+        },
+        [currentFlowId, socketConnectionId, role]
     );
 
     const handleAddBlockWithRecent = useCallback(
@@ -285,7 +297,7 @@ export const MobileFlowEditorPage = () => {
                     <MobileStepList
                         onTapCard={handleTapCard}
                         onAddStep={() => setIsBlockLibraryOpen(true)}
-                        socketConnectionId={socketConnectionId}
+                        onRunNode={handleRunNode}
                         flowId={currentFlowId}
                         role={role}
                     />
