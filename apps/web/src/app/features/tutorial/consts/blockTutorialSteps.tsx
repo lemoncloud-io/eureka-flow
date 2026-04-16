@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { HelpCircle } from 'lucide-react';
+import { Eye, FileInput, HelpCircle, Image, RefreshCw, Search, Type } from 'lucide-react';
 
 import { TourStepIcon } from '../components/tour-visuals/TourStepIcon';
 
@@ -24,7 +24,7 @@ export const BLOCK_TUTORIAL_STEPS: TourStep[] = [
             '텍스트, 이미지 등 AI에게 전달할 데이터를 입력하는 블록입니다.\n입력 블록을 선택하여 캔버스에 추가하세요.',
         targetSelector: '[data-block-category="inputs"]',
         arrowDirection: 'left',
-        visual: { type: 'icon', element: <TourStepIcon emoji="📥" label="입력" /> },
+        visual: { type: 'icon', element: <TourStepIcon icon={<FileInput size={28} />} label="입력" /> },
     },
     {
         id: 'input-text',
@@ -32,7 +32,7 @@ export const BLOCK_TUTORIAL_STEPS: TourStep[] = [
         description: 'AI 이미지, AI 텍스트 등 원하는 결과를 만들기 위해\n텍스트 블록에 입력을 해줍니다.',
         targetSelector: '[data-block-item="0008"]',
         arrowDirection: 'left',
-        visual: { type: 'icon', element: <TourStepIcon emoji="📝" label="텍스트 입력" /> },
+        visual: { type: 'icon', element: <TourStepIcon icon={<Type size={28} />} label="텍스트 입력" /> },
     },
     {
         id: 'process-block',
@@ -41,7 +41,7 @@ export const BLOCK_TUTORIAL_STEPS: TourStep[] = [
             '입력 데이터를 AI로 처리하여 결과를 생성하는 블록입니다.\n처리 블록을 선택하여 캔버스에 추가하세요.',
         targetSelector: '[data-block-category="process"]',
         arrowDirection: 'left',
-        visual: { type: 'icon', element: <TourStepIcon emoji="⚙️" label="처리" /> },
+        visual: { type: 'icon', element: <TourStepIcon icon={<RefreshCw size={28} />} label="처리" /> },
     },
     {
         id: 'process-ai-image',
@@ -49,7 +49,7 @@ export const BLOCK_TUTORIAL_STEPS: TourStep[] = [
         description: "입력 블록에서 선택한 '텍스트 입력'과 연결하여\n실행하고, AI 이미지 결과를 확인할 수 있어요",
         targetSelector: '[data-block-item="0006"]',
         arrowDirection: 'left',
-        visual: { type: 'icon', element: <TourStepIcon emoji="🖼️" label="AI 이미지 생성기" /> },
+        visual: { type: 'icon', element: <TourStepIcon icon={<Image size={28} />} label="AI 이미지" /> },
     },
     {
         id: 'output-block',
@@ -57,7 +57,7 @@ export const BLOCK_TUTORIAL_STEPS: TourStep[] = [
         description: '처리된 결과를 미리보거나 로그를 확인하는 블록입니다.\n출력 블록을 선택하여 캔버스에 추가하세요.',
         targetSelector: '[data-block-category="outputs"]',
         arrowDirection: 'left',
-        visual: { type: 'icon', element: <TourStepIcon emoji="📤" label="출력" /> },
+        visual: { type: 'icon', element: <TourStepIcon icon={<Eye size={28} />} label="출력" /> },
     },
     {
         id: 'output-preview',
@@ -65,7 +65,7 @@ export const BLOCK_TUTORIAL_STEPS: TourStep[] = [
         description: '입력 + 처리 블록을 연결한 결과를 미리볼 수 있습니다.',
         targetSelector: '[data-block-item="0015"]',
         arrowDirection: 'left',
-        visual: { type: 'icon', element: <TourStepIcon emoji="🔍" label="미리보기" /> },
+        visual: { type: 'icon', element: <TourStepIcon icon={<Search size={28} />} label="미리보기" /> },
     },
     {
         id: 'help',
