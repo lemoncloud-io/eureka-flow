@@ -15,6 +15,7 @@ import {
     getNodeWidth,
     getPermissions,
     getPortData,
+    hydrateInputsFromUpstream,
     loadFlow,
     runFlow,
     runNode,
@@ -1200,11 +1201,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     return;
                 }
 
-                // Check for missing required inputs before execution
-                // Missing if: no data AND (has incoming connection OR explicitly required)
                 const incomingConnections = connectionsRef.current.filter(c => c.targetNodeId === nodeId);
+                const hydratedInputs = hydrateInputsFromUpstream(nodeId, incomingConnections, nodesRef.current, inputs);
+
                 const missingInputs = nodeDef.inputs.filter(inputPort => {
-                    if (inputs[inputPort.id]) return false; // Has data - not missing
+                    if (hydratedInputs[inputPort.id]) return false;
                     const hasConnection = incomingConnections.some(c => c.targetPortId === inputPort.id);
                     return hasConnection || inputPort.required === true;
                 });
@@ -1263,8 +1264,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             );
                         };
 
-                        // Execute frontend function
-                        const outputs = await executeFunc(inputs, currentNode.config || {}, onProgress);
+                        // Execute frontend function with hydrated inputs
+                        const outputs = await executeFunc(hydratedInputs, currentNode.config || {}, onProgress);
                         const duration = Date.now() - startTime;
 
                         // Update local state with outputs and propagate to downstream nodes
@@ -1326,22 +1327,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         // Priority: COMPLETED/ERROR (3) > RUNNING (2) > READY (1) > IDLE (0)
                         // ============================================================
 
-                        // Step 1: Collect input data from upstream nodes' outputs
-                        // Server's hydrateInputs() reads from DB port nodes, so we must save port data first.
-                        const collectedInputData: Record<string, DataPacket> = { ...inputs };
-                        for (const conn of incomingConnections) {
-                            if (!conn.sourceNodeId || !conn.sourcePortId || !conn.targetPortId) continue;
-                            const sourceNode = nodesRef.current.find(n => n.id === conn.sourceNodeId);
-                            const sourceOutput = sourceNode?.outputData?.[conn.sourcePortId];
-                            if (sourceOutput) {
-                                collectedInputData[conn.targetPortId] = sourceOutput;
-                            }
-                        }
-
-                        // Save input port data to server (server's fromNodeData ignores inputData)
-                        if (permissions.canUpsert && flowId && Object.keys(collectedInputData).length > 0) {
+                        if (permissions.canUpsert && flowId && Object.keys(hydratedInputs).length > 0) {
                             await Promise.all(
-                                Object.entries(collectedInputData).map(([portName, packet]) =>
+                                Object.entries(hydratedInputs).map(([portName, packet]) =>
                                     upsertPortNode(flowId, {
                                         stereo: 'port',
                                         parentId: nodeId,

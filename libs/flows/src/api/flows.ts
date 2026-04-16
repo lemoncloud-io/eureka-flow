@@ -5,7 +5,6 @@ import { encodePathSegment } from '../utils';
 import type { ApiListResult, FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../types';
 import type { BlockDefinition, DataPacket, LogEntry } from '@lemoncloud/eureka-flows-api';
 
-
 const _log = console.log.bind(console, '[flows-api]');
 
 /**
@@ -26,12 +25,12 @@ export const listFlows = async (): Promise<ApiListResult<FlowView>> => {
 
 /**
  * List public flows (always uses /public endpoint regardless of auth state)
- * GET /public/flows
+ * GET /public/flows?page=0
  */
-export const listPublicFlows = async (): Promise<ApiListResult<FlowView>> => {
-    _log('> listPublicFlows()');
+export const listPublicFlows = async (page = 0): Promise<ApiListResult<FlowView>> => {
+    _log(`> listPublicFlows(page=${page})`);
     const response = await withRetry(
-        () => api.get<ApiListResult<FlowView>>(`${API_URL}/public/flows`),
+        () => api.get<ApiListResult<FlowView>>(`${API_URL}/public/flows`, { params: { page } }),
         3,
         'listPublicFlows'
     );

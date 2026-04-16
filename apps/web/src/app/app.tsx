@@ -1,3 +1,4 @@
+import { Helmet } from 'react-helmet-async';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { PublicFlowsPage } from './features/flows';
@@ -8,6 +9,11 @@ import { TutorialRouter } from './features/tutorial';
 export const App = () => {
     return (
         <BrowserRouter>
+            <Helmet defaultTitle="Eureka Flow" titleTemplate="%s — Eureka Flow">
+                <meta name="description" content="Build, run, and share AI workflows visually. No code required." />
+                <meta property="og:site_name" content="Eureka Flow" />
+                <meta name="twitter:card" content="summary_large_image" />
+            </Helmet>
             <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/tutorial" element={<TutorialRouter />} />

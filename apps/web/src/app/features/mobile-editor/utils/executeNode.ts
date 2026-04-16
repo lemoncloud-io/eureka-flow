@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 
-import { EXECUTE_FUNCTIONS, runNode, useCanvasStore, useFlowsStore } from '@flows/flows';
+import { EXECUTE_FUNCTIONS, hydrateInputsFromUpstream, runNode, useCanvasStore, useFlowsStore } from '@flows/flows';
 
 import { hydrateInputPorts } from './nodeServerSync';
 
@@ -36,7 +36,8 @@ export const executeNodeDirect = async (nodeId: string, options: ExecuteNodeOpti
 
         if (blockDef.isFrontend && EXECUTE_FUNCTIONS[blockDef.type]) {
             const executeFn = EXECUTE_FUNCTIONS[blockDef.type];
-            const result = await executeFn(node.inputData ?? {}, node.config ?? {});
+            const hydratedInputs = hydrateInputsFromUpstream(nodeId, connections, nodes, node.inputData ?? {});
+            const result = await executeFn(hydratedInputs, node.config ?? {});
             updateNodeData(nodeId, { outputData: result, state: 'COMPLETED' } as Partial<NodeData>);
             const runBody = canEdit ? { output: result } : { output: result, config: nodeConfig };
             await runNode(nodeId, runBody, { force: true, propagate, connection: socketConnectionId });

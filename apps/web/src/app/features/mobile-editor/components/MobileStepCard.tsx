@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Loader2, MoreVertical, Play, Trash2 } from 'lucide-react';
@@ -50,6 +50,17 @@ export const MobileStepCard = React.memo(
             [node.id, onDelete]
         );
 
+        const outputSubtitle = useMemo(() => {
+            if (state !== 'COMPLETED' || !node.outputData) return null;
+            const entries = Object.entries(node.outputData);
+            if (entries.length === 0) return null;
+            const [, data] = entries[0];
+            if (data?.type === 'image') return t('mobile.imageOutput', 'Image');
+            const val =
+                typeof data?.value === 'string' ? data.value.slice(0, 40) : JSON.stringify(data?.value)?.slice(0, 40);
+            return val || null;
+        }, [state, node.outputData, t]);
+
         const dotColor =
             state === 'RUNNING'
                 ? 'bg-warning'
@@ -92,29 +103,9 @@ export const MobileStepCard = React.memo(
                     <div className="text-[13px] font-semibold truncate leading-tight">{displayName}</div>
                     {state === 'ERROR' && 'error' in node && typeof node.error === 'string' && node.error ? (
                         <div className="text-[11px] text-destructive/70 truncate mt-0.5">{node.error}</div>
-                    ) : (
-                        state === 'COMPLETED' &&
-                        node.outputData &&
-                        (() => {
-                            const entries = Object.entries(node.outputData);
-                            if (entries.length === 0) return null;
-                            const [, data] = entries[0];
-                            if (data?.type === 'image') {
-                                return (
-                                    <div className="text-[11px] text-success/50 truncate mt-0.5">
-                                        🖼 {t('mobile.imageOutput', 'Image')}
-                                    </div>
-                                );
-                            }
-                            const val =
-                                typeof data?.value === 'string'
-                                    ? data.value.slice(0, 40)
-                                    : JSON.stringify(data?.value)?.slice(0, 40);
-                            return val ? (
-                                <div className="text-[11px] text-success/50 truncate mt-0.5">{val}</div>
-                            ) : null;
-                        })()
-                    )}
+                    ) : outputSubtitle ? (
+                        <div className="text-[11px] text-success/50 truncate mt-0.5">{outputSubtitle}</div>
+                    ) : null}
                 </div>
 
                 {/* Status dot */}

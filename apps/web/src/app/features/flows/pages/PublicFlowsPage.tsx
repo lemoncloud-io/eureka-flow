@@ -1,24 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { ArrowRight, GitFork, Github, Globe, Layers, Search } from 'lucide-react';
+import { GitFork, Github, Globe, Layers, Loader2, Search } from 'lucide-react';
 
-import { usePublicFlowsListQuery, useS3Image } from '@flows/flows';
+import { usePublicFlowsInfiniteQuery, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import { ApiKeyDialog } from '@flows/shared';
+import { ApiKeyDialog, SITE_URL } from '@flows/shared';
 import { Badge, Button, Input, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
 import { formatRelativeTime } from '../utils';
 
 import type { FlowView } from '@flows/flows';
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const STAGGER_DELAY_MS = 80;
+const STAGGER_DELAY_MS = 50;
 
 const staggerStyle = (index: number): React.CSSProperties => ({
     animationDelay: `${STAGGER_DELAY_MS * index}ms`,
@@ -26,11 +22,10 @@ const staggerStyle = (index: number): React.CSSProperties => ({
 });
 
 // ============================================================================
-// MiniFlowGraph - visual preview of flow topology
+// MiniFlowGraph - visual preview of flow topology (fallback when no thumbnail)
 // ============================================================================
 
 const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nodeCount, edgeCount }) => {
-    // Generate deterministic "node" positions from counts
     const displayNodes = Math.min(nodeCount, 8);
     const positions = useMemo(() => {
         const pts: { x: number; y: number }[] = [];
@@ -49,7 +44,6 @@ const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nod
 
     return (
         <svg viewBox="0 0 128 48" className="w-full h-full" fill="none">
-            {/* Edges */}
             {Array.from({ length: displayEdges }).map((_, i) => {
                 const from = positions[i];
                 const to = positions[i + 1];
@@ -67,7 +61,6 @@ const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nod
                     />
                 );
             })}
-            {/* Nodes */}
             {positions.map((p, i) => (
                 <circle
                     key={`n${i}`}
@@ -77,7 +70,6 @@ const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nod
                     className={cn(i === 0 ? 'fill-primary/60' : 'fill-primary/30')}
                 />
             ))}
-            {/* Overflow indicator */}
             {nodeCount > 8 && (
                 <text x="120" y="44" className="fill-muted-foreground/40 text-[8px]" textAnchor="end">
                     +{nodeCount - 8}
@@ -88,75 +80,91 @@ const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nod
 };
 
 // ============================================================================
-// FlowCard
+// MasonryFlowCard - thumbnail-dominant card, image drives height naturally
 // ============================================================================
 
-interface PublicFlowCardProps {
+interface MasonryFlowCardProps {
     flow: FlowView & { id: string };
     index: number;
 }
 
-const PublicFlowCard: React.FC<PublicFlowCardProps> = ({ flow, index }) => {
+const MasonryFlowCard: React.FC<MasonryFlowCardProps> = ({ flow, index }) => {
     const { t } = useTranslation(['flows']);
     const { src: thumbnailSrc } = useS3Image(flow.thumbnail);
     const title = flow.name || t('header.untitledWorkflow');
     const description = flow.description;
     const nodeCount = flow.nodeIds$$?.length ?? 0;
     const edgeCount = flow.edgeIds$$?.length ?? 0;
+    const hasThumbnail = !!thumbnailSrc;
 
     return (
         <Link
             to={`/flows/${flow.id}`}
             className={cn(
-                'animate-fade-in-up group relative flex flex-col rounded-2xl border transition-all duration-300',
-                'bg-card/50 backdrop-blur-sm border-border/40',
-                'hover:border-primary/40 hover:shadow-[0_8px_30px_-8px_hsl(var(--primary)/0.15)]',
+                'animate-fade-in-up group relative block overflow-hidden rounded-xl',
+                'bg-card/50 border border-border/30 transition-all duration-300',
+                'hover:border-primary/40 hover:shadow-[0_8px_30px_-8px_hsl(var(--primary)/0.2)]',
                 'hover:-translate-y-0.5'
             )}
-            style={staggerStyle(index + 3)}
+            style={staggerStyle(index)}
         >
-            {/* Thumbnail / Graph Preview */}
-            <div className="relative h-20 overflow-hidden rounded-t-2xl bg-muted/20 border-b border-border/20">
-                {thumbnailSrc ? (
-                    <img src={thumbnailSrc} alt={title} className="w-full h-full object-cover" />
+            {/* Image — natural height drives masonry layout */}
+            <div className="relative w-full overflow-hidden bg-muted/20">
+                {hasThumbnail ? (
+                    <img
+                        src={thumbnailSrc}
+                        alt={title}
+                        className="block w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
                 ) : (
-                    <div className="px-3 pt-3 h-full">
-                        <MiniFlowGraph nodeCount={nodeCount} edgeCount={edgeCount} />
+                    <div className="w-full aspect-[4/3] flex items-center justify-center bg-muted/10">
+                        <div className="w-3/4 h-3/4 opacity-40">
+                            <MiniFlowGraph nodeCount={nodeCount} edgeCount={edgeCount} />
+                        </div>
                     </div>
                 )}
-                {/* Gradient fade */}
-                <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card/80 to-transparent" />
-            </div>
 
-            {/* Content */}
-            <div className="flex flex-1 flex-col gap-1.5 p-4 pt-3">
-                <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">
-                    {title}
-                </h3>
-
-                {description ? (
-                    <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">{description}</p>
-                ) : (
-                    <p className="text-xs text-muted-foreground/40 italic">{t('flowList.noDescription')}</p>
-                )}
-
-                {/* Footer */}
-                <div className="flex items-center gap-3 mt-auto pt-2 text-[11px] text-muted-foreground/60">
-                    <span className="flex items-center gap-1">
-                        <Layers className="w-3 h-3" />
-                        {nodeCount}
-                    </span>
-                    <span className="flex items-center gap-1">
-                        <GitFork className="w-3 h-3" />
-                        {edgeCount}
-                    </span>
-                    <span className="ml-auto">{formatRelativeTime(flow.updatedAt, t)}</span>
+                {/* Always-visible bottom gradient + title */}
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-3 pt-10">
+                    <h3 className="text-sm font-semibold text-white line-clamp-1 drop-shadow-sm">{title}</h3>
+                    <div className="flex items-center gap-3 mt-1 text-[11px] text-white/70">
+                        <span className="flex items-center gap-1">
+                            <Layers className="w-3 h-3" />
+                            {nodeCount}
+                        </span>
+                        <span className="flex items-center gap-1">
+                            <GitFork className="w-3 h-3" />
+                            {edgeCount}
+                        </span>
+                        <span className="ml-auto">{formatRelativeTime(flow.updatedAt, t)}</span>
+                    </div>
                 </div>
-            </div>
 
-            {/* Hover arrow */}
-            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <ArrowRight className="w-4 h-4 text-primary" />
+                {/* Hover overlay with description */}
+                {description && (
+                    <div
+                        className={cn(
+                            'absolute inset-0 flex items-end bg-black/50 backdrop-blur-[2px]',
+                            'opacity-0 group-hover:opacity-100 transition-opacity duration-300'
+                        )}
+                    >
+                        <div className="p-3 pt-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent w-full">
+                            <h3 className="text-sm font-semibold text-white line-clamp-1 drop-shadow-sm">{title}</h3>
+                            <p className="text-xs text-white/80 line-clamp-2 mt-1 leading-relaxed">{description}</p>
+                            <div className="flex items-center gap-3 mt-1.5 text-[11px] text-white/70">
+                                <span className="flex items-center gap-1">
+                                    <Layers className="w-3 h-3" />
+                                    {nodeCount}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <GitFork className="w-3 h-3" />
+                                    {edgeCount}
+                                </span>
+                                <span className="ml-auto">{formatRelativeTime(flow.updatedAt, t)}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </Link>
     );
@@ -170,16 +178,45 @@ export const PublicFlowsPage = () => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
     const { apiKey, setApiKey } = useWebCoreStore();
-    const { data, isLoading } = usePublicFlowsListQuery(true);
+    const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = usePublicFlowsInfiniteQuery(true);
+
+    // Enable page scroll (body has overflow:hidden for the flow editor)
+    useEffect(() => {
+        document.documentElement.classList.add('landing-scroll');
+        return () => document.documentElement.classList.remove('landing-scroll');
+    }, []);
 
     const [search, setSearch] = useState('');
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
 
+    // Infinite scroll trigger via IntersectionObserver
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+    const scrollStateRef = useRef({ hasNextPage, isFetchingNextPage, fetchNextPage });
+    scrollStateRef.current = { hasNextPage, isFetchingNextPage, fetchNextPage };
+
+    // Re-run when isLoading changes so observer attaches after sentinel mounts
+    useEffect(() => {
+        const el = loadMoreRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(
+            entries => {
+                const { hasNextPage: has, isFetchingNextPage: fetching, fetchNextPage: fetch } = scrollStateRef.current;
+                if (entries[0]?.isIntersecting && has && !fetching) fetch();
+            },
+            { threshold: 0.1 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [isLoading]);
+
+    const totalCount = data?.pages[0]?.total ?? 0;
+
     const publicFlows = useMemo(() => {
-        if (!data?.list) return [];
+        if (!data?.pages) return [];
+        const allFlows = data.pages.flatMap(page => page.list);
         const query = search.trim().toLowerCase();
 
-        return [...data.list]
+        return allFlows
             .filter((f): f is FlowView & { id: string } => {
                 if (!f.id) return false;
                 return f.isPublic === true;
@@ -189,13 +226,9 @@ export const PublicFlowsPage = () => {
                 return (
                     (f.name ?? '').toLowerCase().includes(query) || (f.description ?? '').toLowerCase().includes(query)
                 );
-            })
-            .sort((a, b) => {
-                const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-                const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-                return bTime - aTime;
             });
-    }, [data?.list, search]);
+        // No sort — API returns newest first, preserving order prevents CSS columns reflow flicker
+    }, [data?.pages, search]);
 
     const handleApiKeySubmit = async (key: string): Promise<boolean> => {
         setApiKey(key);
@@ -206,6 +239,18 @@ export const PublicFlowsPage = () => {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
+            <Helmet>
+                <title>Community Flows</title>
+                <meta name="description" content="Discover and explore public AI workflows shared by the community." />
+                <link rel="canonical" href={`${SITE_URL}/flows`} />
+                <meta property="og:title" content="Community Flows — Eureka Flow" />
+                <meta
+                    property="og:description"
+                    content="Discover and explore public AI workflows shared by the community."
+                />
+                <meta property="og:url" content={`${SITE_URL}/flows`} />
+            </Helmet>
+
             {/* Subtle background texture */}
             <div
                 className="fixed inset-0 pointer-events-none opacity-[0.015]"
@@ -215,9 +260,9 @@ export const PublicFlowsPage = () => {
                 }}
             />
 
-            {/* Header - matches landing NavBar */}
+            {/* Header */}
             <nav className="fixed top-0 right-0 left-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
-                <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
+                <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
                     <span className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap sm:gap-2 sm:text-base">
                         <Link to="/" className="flex items-center gap-1.5 sm:gap-2 hover:opacity-70 transition-opacity">
                             <img
@@ -258,7 +303,7 @@ export const PublicFlowsPage = () => {
             </nav>
 
             {/* Hero */}
-            <section className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-24 sm:pt-28 pb-8 sm:pb-10">
+            <section className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-24 sm:pt-28 pb-6 sm:pb-8">
                 {/* Glow accent */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[200px] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
 
@@ -280,7 +325,7 @@ export const PublicFlowsPage = () => {
                         </span>
                     </h1>
                     <p
-                        className="animate-fade-in-up text-sm sm:text-base text-muted-foreground max-w-lg mx-auto mb-8"
+                        className="animate-fade-in-up text-sm sm:text-base text-muted-foreground max-w-lg mx-auto mb-6"
                         style={staggerStyle(2)}
                     >
                         {t(
@@ -303,7 +348,7 @@ export const PublicFlowsPage = () => {
             </section>
 
             {/* Content */}
-            <main className="relative max-w-6xl mx-auto px-4 sm:px-6 pb-16">
+            <main className="relative max-w-7xl mx-auto px-4 sm:px-6 pb-16">
                 {isLoading ? (
                     <div className="flex items-center justify-center py-24">
                         <div className="flex flex-col items-center gap-3">
@@ -336,13 +381,22 @@ export const PublicFlowsPage = () => {
                     <>
                         <div className="flex items-center justify-between mb-4">
                             <span className="text-xs text-muted-foreground/60">
-                                {t('publicFlows.flowCount', '{{count}} flows', { count: publicFlows.length })}
+                                {t('publicFlows.flowCount', '{{count}} flows', { count: totalCount })}
                             </span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {/* CSS columns masonry — varied aspect ratios create dynamic heights */}
+                        <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3">
                             {publicFlows.map((flow, i) => (
-                                <PublicFlowCard key={flow.id} flow={flow} index={i} />
+                                <div key={flow.id} className="mb-3 break-inside-avoid-column">
+                                    <MasonryFlowCard flow={flow} index={i} />
+                                </div>
                             ))}
+                        </div>
+                        {/* Infinite scroll sentinel */}
+                        <div ref={loadMoreRef} className="flex justify-center py-8">
+                            {isFetchingNextPage && (
+                                <Loader2 className="w-5 h-5 text-muted-foreground/50 animate-spin" />
+                            )}
                         </div>
                     </>
                 )}

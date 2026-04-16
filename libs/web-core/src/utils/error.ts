@@ -25,11 +25,13 @@ interface ErrorLike {
     statusText?: string;
 }
 
+const PERMISSION_DENIED_MARKER = 'NOT ALLOWED';
+
 /** Check if response body indicates a permission-denied error (valid key, no edit rights) */
 export const isPermissionDeniedResponse = (data: unknown): boolean => {
     if (!data) return false;
     const str = typeof data === 'string' ? data : JSON.stringify(data);
-    return str.includes('NOT ALLOWED');
+    return str.includes(PERMISSION_DENIED_MARKER);
 };
 
 export const classifyError = (error: unknown): ErrorClassification => {
