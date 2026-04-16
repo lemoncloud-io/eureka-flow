@@ -11,13 +11,15 @@ import { Label } from '@flows/ui-kit';
 interface ThumbnailPickerProps {
     value: string | null;
     onChange: (url: string | null) => void;
+    isLoading?: boolean;
 }
 
-export const ThumbnailPicker = ({ value, onChange }: ThumbnailPickerProps) => {
+export const ThumbnailPicker = ({ value, onChange, isLoading }: ThumbnailPickerProps) => {
     const { t } = useTranslation(['flows']);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const isBusy = isProcessing || isLoading;
 
     const handleImageData = useCallback(
         async (dataUrl: string) => {
@@ -120,7 +122,7 @@ export const ThumbnailPicker = ({ value, onChange }: ThumbnailPickerProps) => {
                 <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={isProcessing}
+                    disabled={isBusy}
                     className={cn(
                         'flex w-full flex-col items-center justify-center gap-2',
                         'rounded-lg border border-dashed border-muted-foreground/25',
@@ -128,15 +130,17 @@ export const ThumbnailPicker = ({ value, onChange }: ThumbnailPickerProps) => {
                         'hover:border-muted-foreground/40 hover:bg-muted/30'
                     )}
                 >
-                    {isProcessing ? (
+                    {isBusy ? (
                         <Loader2 className="w-6 h-6 text-muted-foreground/40 animate-spin" />
                     ) : (
                         <ImagePlus className="w-6 h-6 text-muted-foreground/40" />
                     )}
                     <span className="text-xs text-muted-foreground/60">
-                        {isProcessing ? t('publish.compressing', 'Processing...') : t('publish.uploadThumbnail')}
+                        {isBusy ? t('publish.compressing', 'Processing...') : t('publish.uploadThumbnail')}
                     </span>
-                    <span className="text-[10px] text-muted-foreground/40">{t('publish.thumbnailHint')}</span>
+                    {!isBusy && (
+                        <span className="text-[10px] text-muted-foreground/40">{t('publish.thumbnailHint')}</span>
+                    )}
                 </button>
             )}
         </div>

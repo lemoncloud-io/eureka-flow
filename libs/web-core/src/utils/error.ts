@@ -25,6 +25,13 @@ interface ErrorLike {
     statusText?: string;
 }
 
+/** Check if response body indicates a permission-denied error (valid key, no edit rights) */
+export const isPermissionDeniedResponse = (data: unknown): boolean => {
+    if (!data) return false;
+    const str = typeof data === 'string' ? data : JSON.stringify(data);
+    return str.includes('NOT ALLOWED');
+};
+
 export const classifyError = (error: unknown): ErrorClassification => {
     const err = error as ErrorLike;
     const status = err?.status || err?.response?.status || err?.statusCode;
@@ -39,8 +46,16 @@ export const classifyError = (error: unknown): ErrorClassification => {
         };
     }
 
-    // HTTP 403 status → always reset API key
+    // HTTP 403 status → distinguish permission denied vs auth expired
     if (status === 403) {
+        if (isPermissionDeniedResponse(err?.response?.data)) {
+            return {
+                type: ErrorType.CLIENT,
+                shouldRetry: false,
+                shouldLogout: false,
+                message: 'errors.forbidden',
+            };
+        }
         return {
             type: ErrorType.AUTHENTICATION,
             shouldRetry: false,

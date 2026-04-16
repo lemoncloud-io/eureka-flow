@@ -53,6 +53,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
     const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+    const [isCapturing, setIsCapturing] = useState(false);
 
     // Reset form when dialog opens
     useEffect(() => {
@@ -60,23 +61,42 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
         setName(flowName);
         setDescription(flowDescription);
         setLinkCopied(false);
+        setIsCapturing(false);
 
         if (flowThumbnail) {
             setThumbnailUrl(flowThumbnail);
-        } else if (onCaptureCanvas) {
-            // Auto-capture canvas as default thumbnail
+            return;
+        }
+
+        if (!onCaptureCanvas) {
             setThumbnailUrl(null);
+            return;
+        }
+
+        // Defer capture to idle time so dialog renders immediately
+        setThumbnailUrl(null);
+        setIsCapturing(true);
+        let cancelled = false;
+        const idleId = requestIdleCallback(() => {
             onCaptureCanvas()
                 .then(dataUrl => {
-                    if (!dataUrl) return;
-                    return processThumbnail(dataUrl).then(setThumbnailUrl);
+                    if (cancelled || !dataUrl) return;
+                    return processThumbnail(dataUrl).then(url => {
+                        if (!cancelled) setThumbnailUrl(url);
+                    });
                 })
                 .catch(() => {
                     // Silent fail — user can still upload manually
+                })
+                .finally(() => {
+                    if (!cancelled) setIsCapturing(false);
                 });
-        } else {
-            setThumbnailUrl(null);
-        }
+        });
+
+        return () => {
+            cancelled = true;
+            cancelIdleCallback(idleId);
+        };
     }, [open, flowName, flowDescription, flowThumbnail, onCaptureCanvas]);
 
     const flowUrl = flowId ? `${window.location.origin}/flows/${flowId}` : '';
@@ -187,7 +207,7 @@ export const PublishDialog: React.FC<PublishDialogProps> = ({
                     </div>
 
                     {/* Thumbnail */}
-                    <ThumbnailPicker value={thumbnailUrl} onChange={setThumbnailUrl} />
+                    <ThumbnailPicker value={thumbnailUrl} onChange={setThumbnailUrl} isLoading={isCapturing} />
 
                     {/* Share Link */}
                     {flowId && (

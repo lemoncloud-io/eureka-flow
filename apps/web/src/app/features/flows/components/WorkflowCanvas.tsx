@@ -42,6 +42,7 @@ import { ZoomControls } from './ZoomControls';
 import { TOUCH_GESTURE_THRESHOLD, useTouchCanvas } from '../hooks';
 import {
     captureCanvasAsDataUrl,
+    captureCanvasForThumbnail,
     deduplicateEdges,
     exportCanvasAsPng,
     generateTempId,
@@ -100,6 +101,8 @@ export interface WorkflowCanvasRef {
     exportAsImage: (fileName: string) => Promise<void>;
     /** Capture canvas as data URL without downloading */
     captureAsDataUrl: () => Promise<string | null>;
+    /** Lightweight capture for thumbnail (skips CORS inlining, uses pixelRatio 1) */
+    captureForThumbnail: () => Promise<string | null>;
     /** Collapse all nodes */
     collapseAll: () => void;
     /** Expand all nodes */
@@ -1083,6 +1086,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const element = canvasRef.current;
                     if (!element) return null;
                     return captureCanvasAsDataUrl(element);
+                },
+                captureForThumbnail: async () => {
+                    const element = canvasRef.current;
+                    if (!element) return null;
+                    return captureCanvasForThumbnail(element);
                 },
                 collapseAll: () => {
                     const nodeIds = nodesRef.current.map(n => n.id);

@@ -433,7 +433,7 @@ export const FlowEditorPage = () => {
     }, []);
 
     const handleCaptureCanvas = useCallback(async () => {
-        return canvasRef.current?.captureAsDataUrl() ?? null;
+        return canvasRef.current?.captureForThumbnail() ?? null;
     }, []);
 
     const handleClear = () => {
