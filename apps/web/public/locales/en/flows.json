@@ -556,6 +556,9 @@
         "deleteStep": "Delete this step?",
         "run": "Run",
         "delete": "Delete",
+        "searchNodes": "Search nodes...",
+        "noSearchResults": "No matching nodes",
+        "imageOutput": "Image",
         "state": {
             "idle": "Idle",
             "ready": "Ready",

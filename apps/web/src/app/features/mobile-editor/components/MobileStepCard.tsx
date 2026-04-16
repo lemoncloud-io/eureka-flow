@@ -86,11 +86,32 @@ export const MobileStepCard = React.memo(
                     <BlockIcon icon={blockDef?.icon} size={18} />
                 </div>
 
-                {/* Node name */}
+                {/* Node name + subtitle */}
                 <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-semibold truncate leading-tight">{displayName}</div>
-                    {state === 'ERROR' && 'error' in node && typeof node.error === 'string' && node.error && (
+                    {state === 'ERROR' && 'error' in node && typeof node.error === 'string' && node.error ? (
                         <div className="text-[11px] text-destructive/70 truncate mt-0.5">{node.error}</div>
+                    ) : (
+                        state === 'COMPLETED' &&
+                        node.outputData &&
+                        (() => {
+                            const entries = Object.entries(node.outputData);
+                            if (entries.length === 0) return null;
+                            const [, data] = entries[0];
+                            if (data?.type === 'image')
+                                {return (
+                                    <div className="text-[11px] text-success/50 truncate mt-0.5">
+                                        🖼 {t('mobile.imageOutput', 'Image')}
+                                    </div>
+                                );}
+                            const val =
+                                typeof data?.value === 'string'
+                                    ? data.value.slice(0, 40)
+                                    : JSON.stringify(data?.value)?.slice(0, 40);
+                            return val ? (
+                                <div className="text-[11px] text-success/50 truncate mt-0.5">{val}</div>
+                            ) : null;
+                        })()
                     )}
                 </div>
 

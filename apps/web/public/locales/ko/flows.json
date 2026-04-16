@@ -556,6 +556,9 @@
         "deleteStep": "이 스텝을 삭제할까요?",
         "run": "실행",
         "delete": "삭제",
+        "searchNodes": "노드 검색...",
+        "noSearchResults": "일치하는 노드 없음",
+        "imageOutput": "이미지",
         "state": {
             "idle": "대기",
             "ready": "준비",

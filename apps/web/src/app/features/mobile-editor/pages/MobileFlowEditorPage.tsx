@@ -2,9 +2,10 @@ import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { ArrowRight, Globe, KeyRound, Lock, ShieldX } from 'lucide-react';
+import { ArrowRight, Globe, KeyRound, Lock, Search, ShieldX, X } from 'lucide-react';
 
 import { useBlockRegistry, useCanvasStore, useFlows } from '@flows/flows';
+import { cn } from '@flows/lib/utils';
 import { ApiKeyDialog } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -57,6 +58,8 @@ export const MobileFlowEditorPage = () => {
     const [isFlowListOpen, setIsFlowListOpen] = useState(false);
     const [isBlockLibraryOpen, setIsBlockLibraryOpen] = useState(false);
     const [isFlowMapOpen, setIsFlowMapOpen] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Step navigation (replaces configNodeId)
     const stepNav = useStepNavigation();
@@ -267,6 +270,12 @@ export const MobileFlowEditorPage = () => {
                 isRunning={isRunning}
                 runProgress={runProgress}
                 nodeCount={nodeCount}
+                onToggleSearch={() => {
+                    setIsSearchOpen(prev => {
+                        if (prev) setSearchQuery('');
+                        return !prev;
+                    });
+                }}
                 onExport={handleExport}
                 onNew={role === 'owner' ? handleNew : undefined}
                 onClear={role === 'owner' ? handleClear : undefined}
@@ -286,15 +295,39 @@ export const MobileFlowEditorPage = () => {
 
             {/* Step list — kept mounted when detail is open for scroll preservation */}
             <div
-                className="fixed inset-0 overflow-y-auto overscroll-contain pt-14 pb-20"
+                className={cn(
+                    'fixed inset-0 overflow-y-auto overscroll-contain pb-20',
+                    isSearchOpen ? 'pt-[104px]' : 'pt-14'
+                )}
                 style={{ visibility: stepNav.isOpen ? 'hidden' : 'visible' }}
             >
+                {/* Search bar */}
+                {isSearchOpen && (
+                    <div className="fixed top-14 left-0 right-0 z-20 bg-background/95 backdrop-blur-md border-b border-border/40 px-3 py-2">
+                        <div className="flex items-center gap-2 h-10 px-3 rounded-xl bg-muted/40 border border-border/50">
+                            <Search className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+                            <input
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                placeholder={t('mobile.searchNodes', 'Search nodes...')}
+                                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/40"
+                                autoFocus
+                            />
+                            {searchQuery && (
+                                <button onClick={() => setSearchQuery('')} className="shrink-0">
+                                    <X className="w-4 h-4 text-muted-foreground/50" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
                 <div className="pt-2">
                     <MobileStepList
                         onTapCard={handleTapCard}
                         onAddStep={() => setIsBlockLibraryOpen(true)}
                         onRunNode={handleRunNode}
                         flowId={currentFlowId}
+                        searchQuery={searchQuery}
                         role={role}
                     />
                 </div>

@@ -14,6 +14,7 @@ import {
     MoreVertical,
     Play,
     Save,
+    Search,
     Trash2,
     WifiOff,
 } from 'lucide-react';
@@ -51,6 +52,7 @@ interface MobileHeaderProps {
     isRunning: boolean;
     runProgress: RunProgress | null;
     nodeCount: number;
+    onToggleSearch?: () => void;
     onExport?: () => void;
     onNew?: () => void;
     onClear?: () => void;
@@ -71,6 +73,7 @@ export const MobileHeader = ({
     isRunning,
     runProgress,
     nodeCount,
+    onToggleSearch,
     onExport,
     onNew,
     onClear,
@@ -148,6 +151,16 @@ export const MobileHeader = ({
 
             {/* Action buttons group */}
             <div className="flex items-center gap-1 shrink-0">
+                {/* Search */}
+                {onToggleSearch && nodeCount > 0 && (
+                    <button
+                        onClick={onToggleSearch}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
+                        aria-label="Search nodes"
+                    >
+                        <Search className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                )}
                 {/* Save */}
                 {role === 'owner' && (
                     <button

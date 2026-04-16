@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Plus, Workflow } from 'lucide-react';
+import { ChevronDown, Plus, Workflow } from 'lucide-react';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 
 import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
@@ -17,10 +17,18 @@ interface MobileStepListProps {
     onAddStep: () => void;
     onRunNode?: (nodeId: string) => void;
     flowId: string | null;
+    searchQuery?: string;
     role?: FlowRole;
 }
 
-export const MobileStepList = ({ onTapCard, onAddStep, onRunNode, flowId, role = 'owner' }: MobileStepListProps) => {
+export const MobileStepList = ({
+    onTapCard,
+    onAddStep,
+    onRunNode,
+    flowId,
+    searchQuery,
+    role = 'owner',
+}: MobileStepListProps) => {
     const { t } = useTranslation(['flows']);
     const nodes = useCanvasNodes();
     const connections = useCanvasConnections();
@@ -40,6 +48,31 @@ export const MobileStepList = ({ onTapCard, onAddStep, onRunNode, flowId, role =
         }
         return pairs;
     }, [connections]);
+
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+    const toggleGroupCollapse = (groupId: string) => {
+        setCollapsedGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(groupId)) next.delete(groupId);
+            else next.add(groupId);
+            return next;
+        });
+    };
+
+    /** Filter groups/nodes by search query */
+    const filteredGroups = useMemo(() => {
+        if (!searchQuery?.trim()) return groups;
+        const q = searchQuery.toLowerCase();
+        return groups
+            .map(group => ({
+                ...group,
+                nodeIds: group.nodeIds.filter(id => {
+                    const name = displayNames.get(id) ?? nodeMap.get(id)?.type ?? '';
+                    return name.toLowerCase().includes(q);
+                }),
+            }))
+            .filter(group => group.nodeIds.length > 0);
+    }, [groups, searchQuery, displayNames, nodeMap]);
 
     const handleDelete = role === 'owner' ? (nodeId: string) => deleteNodeWithSync(nodeId, flowId) : undefined;
 
@@ -90,7 +123,7 @@ export const MobileStepList = ({ onTapCard, onAddStep, onRunNode, flowId, role =
         <LayoutGroup>
             <div className="flex flex-col gap-5 px-4 pb-28">
                 <AnimatePresence mode="popLayout">
-                    {groups.map((group, groupIdx) => {
+                    {filteredGroups.map((group, groupIdx) => {
                         const stereos = group.nodeIds
                             .map(id => {
                                 const node = nodeMap.get(id);
@@ -125,64 +158,84 @@ export const MobileStepList = ({ onTapCard, onAddStep, onRunNode, flowId, role =
                                 <div
                                     className={cn(
                                         group.isMultiNode
-                                            ? 'rounded-2xl border-[1.3px] border-border p-3 space-y-0'
+                                            ? cn(
+                                                  'rounded-2xl border-[1.3px] border-border px-3 pt-3 space-y-0',
+                                                  collapsedGroups.has(group.id) ? 'pb-0' : 'pb-3'
+                                              )
                                             : ''
                                     )}
                                 >
-                                    {/* Group header for multi-node groups */}
+                                    {/* Group header — tappable to collapse/expand */}
                                     {group.isMultiNode && groupLabel && (
-                                        <div className="flex items-center gap-2 pb-3 px-1">
-                                            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest">
-                                                <span>{groupLabel}</span>
-                                            </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleGroupCollapse(group.id)}
+                                            className="w-full flex items-center gap-2 pb-3 px-1"
+                                        >
+                                            <ChevronDown
+                                                className={cn(
+                                                    'w-3.5 h-3.5 text-muted-foreground/50 transition-transform duration-200',
+                                                    collapsedGroups.has(group.id) && '-rotate-90'
+                                                )}
+                                            />
+                                            <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest">
+                                                {groupLabel}
+                                            </span>
                                             <div className="flex-1 h-px bg-border/40" />
                                             <span className="text-[10px] font-medium text-muted-foreground/50 tabular-nums">
                                                 {group.nodeIds.length}
                                             </span>
-                                        </div>
+                                        </button>
                                     )}
 
-                                    {/* Nodes within the group */}
-                                    {group.nodeIds.map((nodeId, idx) => {
-                                        const node = nodeMap.get(nodeId);
-                                        if (!node) return null;
+                                    {/* Nodes within the group — hidden when collapsed */}
+                                    {!collapsedGroups.has(group.id) &&
+                                        group.nodeIds.map((nodeId, idx) => {
+                                            const node = nodeMap.get(nodeId);
+                                            if (!node) return null;
 
-                                        const prevId = idx > 0 ? group.nodeIds[idx - 1] : null;
-                                        const showConnector = prevId !== null && isDirectlyConnected(prevId, nodeId);
+                                            const prevId = idx > 0 ? group.nodeIds[idx - 1] : null;
+                                            const showConnector =
+                                                prevId !== null && isDirectlyConnected(prevId, nodeId);
 
-                                        return (
-                                            <div key={nodeId}>
-                                                {/* Connector line between connected nodes */}
-                                                {idx > 0 && (
-                                                    <div className="flex justify-center py-0.5">
-                                                        <div
-                                                            className={cn(
-                                                                'w-px h-4',
-                                                                showConnector
-                                                                    ? 'bg-primary/25'
-                                                                    : 'bg-border/30 border-l border-dashed border-border/40'
-                                                            )}
-                                                        />
-                                                    </div>
-                                                )}
-                                                <MobileStepCard
-                                                    node={node}
-                                                    displayName={displayNames.get(nodeId) ?? node.type}
-                                                    onTapCard={onTapCard}
-                                                    onRun={onRunNode}
-                                                    onDelete={handleDelete}
-                                                    role={role}
-                                                />
-                                            </div>
-                                        );
-                                    })}
+                                            return (
+                                                <div key={nodeId}>
+                                                    {/* Connector line between connected nodes */}
+                                                    {idx > 0 && (
+                                                        <div className="flex justify-center py-0.5">
+                                                            <div
+                                                                className={cn(
+                                                                    'w-px h-4',
+                                                                    showConnector
+                                                                        ? 'bg-primary/25'
+                                                                        : 'bg-border/30 border-l border-dashed border-border/40'
+                                                                )}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    <MobileStepCard
+                                                        node={node}
+                                                        displayName={displayNames.get(nodeId) ?? node.type}
+                                                        onTapCard={onTapCard}
+                                                        onRun={onRunNode}
+                                                        onDelete={handleDelete}
+                                                        role={role}
+                                                    />
+                                                </div>
+                                            );
+                                        })}
                                 </div>
                             </motion.div>
                         );
                     })}
                 </AnimatePresence>
 
-                {/* Bottom spacer for fixed bottom bar */}
+                {/* Search empty state */}
+                {searchQuery?.trim() && filteredGroups.length === 0 && (
+                    <div className="py-12 text-center text-sm text-muted-foreground">
+                        {t('mobile.noSearchResults', 'No matching nodes')}
+                    </div>
+                )}
             </div>
         </LayoutGroup>
     );
