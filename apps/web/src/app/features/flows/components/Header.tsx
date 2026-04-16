@@ -224,7 +224,7 @@ const SaveStatusBadge: React.FC<{
     }, [lastSavedAt, saveStatus]);
 
     if (saveStatus === 'saving') {
-        return <span className="text-[11px] text-blue-500 font-medium animate-pulse">{t('status.saving')}</span>;
+        return <span className="text-[11px] text-primary font-medium animate-pulse">{t('status.saving')}</span>;
     }
 
     if (saveStatus === 'error') {
@@ -257,10 +257,10 @@ const SocketDot: React.FC<SocketStateProps> = ({
 
     const getConfig = () => {
         if (isConnected) {
-            return { color: 'bg-sky-500', animate: true, tooltip: t('header.socketLive'), clickable: false };
+            return { color: 'bg-primary', animate: true, tooltip: t('header.socketLive'), clickable: false };
         }
         if (connectionStatus === 'connecting') {
-            return { color: 'bg-sky-400', animate: true, tooltip: t('header.socketConnecting'), clickable: false };
+            return { color: 'bg-primary/60', animate: true, tooltip: t('header.socketConnecting'), clickable: false };
         }
         if (connectionStatus === 'reconnecting') {
             return {

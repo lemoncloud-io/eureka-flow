@@ -18,7 +18,7 @@ export const getFirstOutputData = (node: NodeData, definition: BlockDefinitionWi
 };
 
 export const STAGE_STYLES = {
-    run: { label: 'RUN', color: 'text-blue-400' },
+    run: { label: 'RUN', color: 'text-violet-400' },
     planner: { label: 'PLAN', color: 'text-violet-400' },
     step: { label: 'STEP', color: 'text-cyan-400' },
     tool: { label: 'TOOL', color: 'text-amber-400' },

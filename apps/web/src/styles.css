@@ -80,7 +80,7 @@
         /* Node Category Colors - Light Mode */
         --node-cat-input: 150 70% 45%;
         --node-cat-process: 272 92% 53%;
-        --node-cat-output: 210 90% 55%;
+        --node-cat-output: 185 80% 45%;
 
         /* Enhanced Shadow Tokens - Light Mode */
         --shadow-node: 0 8px 24px -4px rgb(0 0 0 / 0.08);
@@ -165,7 +165,7 @@
         /* Node Category Colors - Dark Mode */
         --node-cat-input: 150 55% 45%;
         --node-cat-process: 272 75% 62%;
-        --node-cat-output: 210 75% 55%;
+        --node-cat-output: 185 65% 50%;
 
         /* Enhanced Shadow Tokens - Dark Mode */
         --shadow-node: 0 8px 24px -4px rgb(0 0 0 / 0.6);

@@ -16,7 +16,7 @@ import type { GraphCanvasRef, GraphEdge, GraphNode, InternalGraphNode, LayoutTyp
 /** Execution state → node fill color */
 const STATE_FILLS: Record<string, string> = {
     IDLE: '#6b7280',
-    READY: '#3b82f6',
+    READY: '#8F19F6',
     RUNNING: '#eab308',
     COMPLETED: '#22c55e',
     ERROR: '#ef4444',
