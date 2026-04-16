@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-16] - root@0.30.1, @flows/web@0.30.1
+
+### Chores
+
+- update theme color and add SEO meta tags
+
 ## [2026-04-16] - root@0.30.0, @flows/web@0.30.0, @flows/admin@0.16.0
 
 ### Features
