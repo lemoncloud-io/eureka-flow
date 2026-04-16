@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useParams } from 'react-router-dom';
 
@@ -36,9 +37,15 @@ export const PolicyPage = () => {
     }
 
     const { content, currentVersion } = result;
+    const policyTitle = type === 'privacy' ? 'Privacy Policy' : 'Terms of Service';
 
     return (
         <div className="min-h-screen bg-background text-foreground">
+            <Helmet>
+                <title>{policyTitle}</title>
+                <meta name="robots" content="noindex, nofollow" />
+            </Helmet>
+
             <header className="border-b border-border">
                 <div className="mx-auto flex max-w-4xl items-center gap-4 px-6 py-6">
                     <Link to="/" className="text-muted-foreground transition-colors hover:text-foreground">

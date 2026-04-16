@@ -26,7 +26,8 @@
         "viewConfig": "설정 보기",
         "collapse": "접기",
         "expand": "펼치기",
-        "delete": "삭제"
+        "delete": "삭제",
+        "options": "옵션"
     },
     "actions": {
         "run": "실행",

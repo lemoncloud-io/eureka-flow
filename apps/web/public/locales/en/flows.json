@@ -1,6 +1,6 @@
 {
     "header": {
-        "title": "FlowMosaic",
+        "title": "EurekaFlow",
         "autoSave": "Auto Save",
         "share": "Share",
         "newFlow": "New Flow",
@@ -39,6 +39,7 @@
         "viewOnly": "View Only",
         "apiKeySettings": "API Key Settings",
         "guidedTour": "Guided Tour",
+        "replayTutorial": "Replay Tutorial",
         "beta": "Beta",
         "menuGroup": {
             "file": "File",
@@ -199,7 +200,7 @@
         "cancel": "Cancel"
     },
     "flowEditor": {
-        "initializingEngine": "Initializing FlowMosaic Engine...",
+        "initializingEngine": "Initializing EurekaFlow Engine...",
         "loadingBlockRegistry": "Loading Block Registry...",
         "loadingFlow": "Loading Flow {{flowId}}...",
         "initializingFlow": "Initializing Flow...",
@@ -288,12 +289,11 @@
         "tabs": {
             "gettingStarted": "Getting Started",
             "blocks": "Blocks",
-            "shortcuts": "Shortcuts",
-            "examples": "Examples"
+            "shortcuts": "Shortcuts"
         },
         "gettingStarted": {
-            "title": "Getting Started with FlowMosaic",
-            "intro": "FlowMosaic is a visual workflow editor that lets you build automation flows by connecting blocks. Each block performs a specific action, and data flows from one block to the next.",
+            "title": "Getting Started with EurekaFlow",
+            "intro": "EurekaFlow is a visual workflow editor that lets you build automation flows by connecting blocks. Each block performs a specific action, and data flows from one block to the next.",
             "steps": {
                 "navigate": {
                     "title": "Navigate the Canvas",
@@ -419,43 +419,12 @@
             "frontend": "Frontend Block",
             "frontendDescription": "This block runs in your browser, not on the server."
         },
-        "examples": {
-            "title": "Example Workflows",
-            "description": "Get started quickly with these pre-built workflow templates.",
-            "useTemplate": "Use Template",
-            "comingSoon": "Template import feature coming soon!",
-            "preview": "Preview",
-            "difficulty": {
-                "beginner": "Beginner",
-                "intermediate": "Intermediate",
-                "advanced": "Advanced"
-            },
-            "categories": {
-                "all": "All",
-                "gettingStarted": "Getting Started",
-                "textProcessing": "Text Processing"
-            },
-            "templates": {
-                "helloWorld": {
-                    "name": "Hello World",
-                    "description": "A simple workflow that takes user input and displays it in a preview block. Perfect for learning the basics."
-                },
-                "textTransform": {
-                    "name": "Text Transform Pipeline",
-                    "description": "Chain multiple text transformations together - uppercase, lowercase, reverse, and more."
-                },
-                "delayedOutput": {
-                    "name": "Delayed Output",
-                    "description": "Learn how to use the Buffer block to add delays between operations."
-                }
-            }
-        },
         "emptyState": {
             "title": "Start Building Your Workflow",
             "description": "Drag blocks from the sidebar or use the quick actions below.",
             "actions": {
                 "addBlock": "Add First Block",
-                "browseExamples": "Browse Examples",
+                "browseExamples": "Explore Public Flows",
                 "viewHelp": "View Help"
             },
             "steps": {
@@ -510,6 +479,62 @@
                 "title": "You're all set! 🎉",
                 "description": "Start by adding a block from the library and connecting them together. Press ? anytime for help, or replay this tour from the menu."
             }
+        }
+    },
+    "mobile": {
+        "addNode": "Add Node",
+        "addFirstStep": "Add your first step",
+        "flowOverview": "Flow Overview",
+        "running": "Running...",
+        "runStep": "Run",
+        "prevStep": "Prev",
+        "nextStep": "Next step",
+        "nodeFailed": "Node {{current}}/{{total}} failed",
+        "allNodesCompleted": "All {{count}} nodes completed",
+        "failedToCreateNode": "Failed to create node",
+        "emptyState": {
+            "title": "Start building your flow",
+            "description": "Add blocks to create an AI workflow. Connect them to pass data between steps."
+        },
+        "groupLabel": {
+            "input": "Input",
+            "process": "Process",
+            "output": "Output"
+        },
+        "connection": {
+            "connectOutput": "Connect output",
+            "connectInput": "Connect input",
+            "connected": "Connected",
+            "alreadyConnected": "Already connected",
+            "connect": "Connect",
+            "replace": "Replace",
+            "disconnect": "Disconnect",
+            "disconnected": "Disconnected",
+            "failedToConnect": "Failed to create connection",
+            "failedToDisconnect": "Failed to disconnect",
+            "addNewAndConnect": "Add new block & connect",
+            "tapToConnect": "tap to connect",
+            "noCompatiblePorts": "No compatible input ports found.",
+            "addMoreNodes": "Add more nodes with matching input types."
+        },
+        "connections": "Connections",
+        "inputs": "Inputs",
+        "outputs": "Outputs",
+        "nodeExecutionFailed": "Node execution failed",
+        "deleteStep": "Delete this step?",
+        "run": "Run",
+        "delete": "Delete",
+        "searchNodes": "Search nodes...",
+        "noSearchResults": "No matching nodes",
+        "imageOutput": "Image",
+        "viewOnly": "View only",
+        "browseAllBlocks": "Browse all blocks",
+        "state": {
+            "idle": "Idle",
+            "ready": "Ready",
+            "running": "Running",
+            "done": "Done",
+            "error": "Error"
         }
     }
 }

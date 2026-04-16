@@ -1,5 +1,176 @@
 # Changelog
 
+## [2026-04-16] - root@0.30.0, @flows/web@0.30.0, @flows/admin@0.16.0
+
+### Features
+
+- update theme
+- add interactive guide tour with step change handling
+- updat meta and public flow page
+- improve thumbnail capture
+- add view-only badge, run-all auto-scroll, and quick-add blocks
+- add search functionality in mobile editor
+- add localization for mobile editor flows
+- show occupied port info and replace connect button
+- improve mobile-editor ui/ux
+
+### Bug Fixes
+
+- remove unimplemented fitView shortcut from help dialog
+- open sidebar when block tutorial starts in editor
+
+### Refactor
+
+- remove examples tab from help dialog, fix FlowMosaic naming
+- align block tutorial icons with sidebar emoji icons
+- consolidate tutorial menu items from 3 to 2
+- redesign sidebar to 2-column card grid and remove unused interactive tutorial
+- simplify FrontendBadge component
+- unify loading spinners to consistent w-8 border-2 pattern
+- simplify loading indicators
+- refactor landing
+- improve flow card styling and layout
+- encode path segments in api requests
+- simplify step navigation logic
+- update group container styles
+- refactor mobile-editor
+
+## [2026-04-15] - root@0.29.0, @flows/web@0.29.0
+
+### Features
+
+- improve tutorial ui/ux
+- implement custom guided tour and block tutorial
+
+### Refactor
+
+- improve tutorial flow and steps
+
+## [2026-04-14] - root@0.28.1, @flows/web@0.28.1
+
+### Other
+
+- perf: eliminate canvas re-renders on zoom/pan
+
+## [2026-04-14] - root@0.28.0, @flows/web@0.28.0, @flows/admin@0.15.0
+
+### Features
+
+- add dev role toggle and animations
+- update mobile-editor
+- add isEditable flag
+- support 3-tier setting
+- add run all functionality
+- add canvas context menu for block selection
+- enhance port data retrieval with options
+- add node block context menu
+
+### Bug Fixes
+
+- sync pending updates during node execution
+
+### Refactor
+
+- enhance toaster styling
+- refactor code
+- remove import functionality from header
+- replace MoreVertical button with styled div
+
+### Chores
+
+- update error styling
+- update button colors for run options
+
+## [2026-04-13] - root@0.27.0, @flows/web@0.27.0, @flows/admin@0.14.0
+
+### Features
+
+- add live trace indicator and run history panel
+- remove dnd
+- improve mobile UI/UX
+
+### Refactor
+
+- improve visual recognition and styling
+
+### Chores
+
+- resolve merge conflict with develop
+
+## [2026-04-13] - root@0.26.0, @flows/web@0.26.0, @flows/admin@0.13.0
+
+### Features
+
+- add execution stack (RunContext) UI for tracking node run history
+
+### Refactor
+
+- improve run history handling
+
+## [2026-04-13] - root@0.25.0, @flows/web@0.25.0, @flows/admin@0.12.0
+
+### Features
+
+- migrate socket event types and fix WebSocket message processing
+
+## [2026-04-10] - root@0.24.0, @flows/web@0.24.0, @flows/admin@0.11.0
+
+### Features
+
+- add S3 bucket URL for i18n translations
+- add node info card and navigation
+- enhance FlowGraphView with role colors
+- (flows) add custom graph themes and layout switcher
+- integrate reagraph
+
+### Refactor
+
+- unify floating bottom toolbar
+
+## [2026-04-10] - root@0.23.0, @flows/web@0.23.0, @flows/admin@0.10.0
+
+### Features
+
+- update mobile page
+- support i18n management
+- update tutorial, mobile editor
+- add mobile editor
+
+### Refactor
+
+- refactor code
+- update connection mode to use upsertFlow
+- update route paths and add read-only mode
+
+### Chores
+
+- remove images
+- temp commit
+- temp commit
+
+## [2026-04-09] - root@0.22.1, @flows/web@0.22.1, @flows/admin@0.9.1
+
+### Refactor
+
+- extract driver config and improve tour steps
+- refactor code
+- remove guided tour feature
+
+## [2026-04-09] - root@0.22.0, @flows/web@0.22.0, @flows/admin@0.9.0
+
+### Features
+
+- add tutorial
+
+### Refactor
+
+- (ui) remove demo mode and enhance API key dialog
+- update API endpoint
+
+### Chores
+
+- temp commit
+
 ## [2026-04-07] - root@0.21.0, @flows/web@0.21.0, @flows/admin@0.8.0
 
 ### Features
@@ -333,4 +504,3 @@
 - (ui) add version info to header dropdown
 
 All notable changes to this project will be documented in this file.
-

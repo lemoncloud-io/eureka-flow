@@ -5,6 +5,13 @@ import { api } from '@flows/web-core';
 const PNG_PIXEL_RATIO = 2;
 const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
+const BASE_PNG_OPTIONS = {
+    cacheBust: false,
+    backgroundColor: undefined,
+    filter: (node: HTMLElement) => !node.hasAttribute?.('data-canvas-overlay'),
+    imagePlaceholder: TRANSPARENT_PIXEL,
+} as const;
+
 const isCrossOrigin = (src: string): boolean => {
     if (!src || src.startsWith('data:') || src.startsWith('blob:')) return false;
     try {
@@ -87,17 +94,19 @@ export const captureCanvasAsDataUrl = async (canvasElement: HTMLElement): Promis
     const originals = await inlineCrossOriginImages(canvasElement);
 
     try {
-        return await toPng(canvasElement, {
-            cacheBust: false,
-            backgroundColor: undefined,
-            pixelRatio: PNG_PIXEL_RATIO,
-            filter: (node: HTMLElement) => !node.hasAttribute?.('data-canvas-overlay'),
-            imagePlaceholder: TRANSPARENT_PIXEL,
-        });
+        return await toPng(canvasElement, { ...BASE_PNG_OPTIONS, pixelRatio: PNG_PIXEL_RATIO });
     } finally {
         restoreImages(originals);
     }
 };
+
+/**
+ * Lightweight canvas capture for thumbnail generation.
+ * Skips cross-origin image inlining and uses pixelRatio 1
+ * since the result will be resized to 800px anyway.
+ */
+export const captureCanvasForThumbnail = (canvasElement: HTMLElement): Promise<string> =>
+    toPng(canvasElement, { ...BASE_PNG_OPTIONS, pixelRatio: 1 });
 
 /**
  * Capture the canvas as PNG and download as file.

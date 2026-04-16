@@ -1,5 +1,7 @@
 import { api, withRetry } from '@flows/web-core';
 
+import { encodePathSegment } from '../utils';
+
 import type { ApiListResult, EdgeBody, EdgeView } from '../types';
 
 const _log = console.log.bind(console, '[edges-api]');
@@ -28,7 +30,7 @@ export const listEdges = async (flowId: string): Promise<EdgeView[]> => {
  */
 export const getEdge = async (id: string): Promise<EdgeView> => {
     _log(`> getEdge(${id})`);
-    const response = await api.get<EdgeView>(`/edges/${id}`);
+    const response = await api.get<EdgeView>(`/edges/${encodePathSegment(id)}`);
     return response.data;
 };
 
@@ -48,7 +50,7 @@ export const createEdge = async (body: EdgeBody): Promise<EdgeView> => {
  */
 export const updateEdge = async (id: string, body: EdgeBody): Promise<EdgeView> => {
     _log(`> updateEdge(${id})`, body);
-    const response = await api.post<EdgeView>(`/edges/${id}`, body);
+    const response = await api.post<EdgeView>(`/edges/${encodePathSegment(id)}`, body);
     return response.data;
 };
 
@@ -58,7 +60,7 @@ export const updateEdge = async (id: string, body: EdgeBody): Promise<EdgeView> 
  */
 export const deleteEdge = async (id: string): Promise<void> => {
     _log(`> deleteEdge(${id})`);
-    await api.delete(`/edges/${id}`);
+    await api.delete(`/edges/${encodePathSegment(id)}`);
 };
 
 // Re-export types

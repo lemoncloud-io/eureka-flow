@@ -1,5 +1,7 @@
 import { API_URL, api, withRetry } from '@flows/web-core';
 
+import { encodePathSegment } from '../utils';
+
 import type { ApiListResult, FlowView, LoadFlowResult, SaveFlowBody, SaveFlowView, UpdateFlowBody } from '../types';
 import type { BlockDefinition, DataPacket, LogEntry } from '@lemoncloud/eureka-flows-api';
 
@@ -13,18 +15,22 @@ const _log = console.log.bind(console, '[flows-api]');
  */
 export const listFlows = async (): Promise<ApiListResult<FlowView>> => {
     _log('> listFlows()');
-    const response = await withRetry(() => api.get<ApiListResult<FlowView>>('/flows'), 3, 'listFlows');
+    const response = await withRetry(
+        () => api.get<ApiListResult<FlowView>>('/flows', { params: { view: 'mine' } }),
+        3,
+        'listFlows'
+    );
     return response.data;
 };
 
 /**
  * List public flows (always uses /public endpoint regardless of auth state)
- * GET /public/flows
+ * GET /public/flows?page=0
  */
-export const listPublicFlows = async (): Promise<ApiListResult<FlowView>> => {
-    _log('> listPublicFlows()');
+export const listPublicFlows = async (page = 0): Promise<ApiListResult<FlowView>> => {
+    _log(`> listPublicFlows(page=${page})`);
     const response = await withRetry(
-        () => api.get<ApiListResult<FlowView>>(`${API_URL}/public/flows`),
+        () => api.get<ApiListResult<FlowView>>(`${API_URL}/public/flows`, { params: { page } }),
         3,
         'listPublicFlows'
     );
@@ -44,7 +50,11 @@ export const loadFlow = async (id: string): Promise<LoadFlowResult> => {
         throw new Error('Flow ID is required');
     }
     _log(`> loadFlow(${id})`);
-    const response = await withRetry(() => api.get<LoadFlowResult>(`/flows/${id}/load`), 3, 'loadFlow');
+    const response = await withRetry(
+        () => api.get<LoadFlowResult>(`/flows/${encodePathSegment(id)}/load`),
+        3,
+        'loadFlow'
+    );
     return response.data;
 };
 
@@ -59,7 +69,7 @@ export const loadFlow = async (id: string): Promise<LoadFlowResult> => {
  */
 export const saveFlow = async (id: string, body: SaveFlowBody): Promise<SaveFlowView> => {
     _log(`> saveFlow(${id})`, { nodeCount: body.nodes.length, edgeCount: body.edges?.length ?? 0 });
-    const response = await api.post<SaveFlowView>(`/flows/${id}/save`, body);
+    const response = await api.post<SaveFlowView>(`/flows/${encodePathSegment(id)}/save`, body);
     return response.data;
 };
 
@@ -97,7 +107,7 @@ export const upsertFlow = async (id: string, body: SaveFlowBody): Promise<SaveFl
         throw new Error('Flow ID is required');
     }
     _log(`> upsertFlow(${id})`, { nodeCount: body.nodes?.length ?? 0, edgeCount: body.edges?.length ?? 0 });
-    const response = await api.post<SaveFlowView>(`/flows/${id}/upsert`, body);
+    const response = await api.post<SaveFlowView>(`/flows/${encodePathSegment(id)}/upsert`, body);
     return response.data;
 };
 
@@ -118,7 +128,7 @@ export const updateFlowMetadata = async (id: string, body: UpdateFlowBody): Prom
         throw new Error('Flow ID is required');
     }
     _log(`> updateFlowMetadata(${id})`, body);
-    const response = await api.post<FlowView>(`/flows/${id}/upsert`, body);
+    const response = await api.post<FlowView>(`/flows/${encodePathSegment(id)}/upsert`, body);
     return response.data;
 };
 
@@ -134,7 +144,7 @@ export const deleteFlow = async (id: string): Promise<FlowView> => {
         throw new Error('Flow ID is required');
     }
     _log(`> deleteFlow(${id})`);
-    const response = await api.delete<FlowView>(`/flows/${id}`);
+    const response = await api.delete<FlowView>(`/flows/${encodePathSegment(id)}`);
     return response.data;
 };
 
@@ -148,6 +158,23 @@ export const fetchBlockLogs = async (nodeId: string): Promise<LogEntry[]> => {
     _log(`> fetchBlockLogs(${nodeId})`);
     // TODO: Implement when GET /nodes/:id/logs API is available
     return [];
+};
+
+/**
+ * Run flow (execute multiple input nodes)
+ * POST /flows/:id/run
+ *
+ * @param flowId - Flow ID to execute
+ * @param nodeIds - Array of input node IDs to execute
+ * @returns API response
+ */
+export const runFlow = async (flowId: string, nodeIds: string[]): Promise<unknown> => {
+    if (!flowId) {
+        throw new Error('Flow ID is required');
+    }
+    _log(`> runFlow(${flowId})`, { nodeIds });
+    const response = await api.post(`/flows/${encodePathSegment(flowId)}/run`, { nodeIds });
+    return response.data;
 };
 
 export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'): DataPacket => ({

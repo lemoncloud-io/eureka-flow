@@ -1,9 +1,25 @@
 import { create } from 'zustand';
 
-import type { EdgeView, TraceEntry } from '../types';
+import type { EdgeView, RunContext, RunPortUpdate, TraceEntry } from '../types';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 const MAX_TRACE_ENTRIES = 500;
+const MAX_RUNS_PER_NODE = 20;
+
+const createRunContext = (
+    runId: string,
+    nodeId: string,
+    startedAt: number,
+    seed: Partial<Pick<RunContext, 'traces' | 'portUpdates' | 'state' | 'completedAt' | 'error'>> = {}
+): RunContext => ({
+    runId,
+    nodeId,
+    state: 'RUNNING',
+    startedAt,
+    traces: [],
+    portUpdates: [],
+    ...seed,
+});
 
 export interface Viewport {
     x: number;
@@ -70,8 +86,14 @@ interface CanvasState {
     // Agent Trace Logs (nodeId → trace entries)
     traceLogs: Map<string, TraceEntry[]>;
 
+    // Execution Stack (Run Context)
+    nodeRuns: Record<string, RunContext[]>;
+
     // Node Collapse State
     collapsedNodeIds: Set<string>;
+
+    // Tutorial Hint (set by TutorialPage, read by NodeBlock)
+    tutorialHint: 'output-port' | 'run-button' | null;
 
     // Actions - Core Data
     setNodes: (nodes: NodeData[] | ((prev: NodeData[]) => NodeData[])) => void;
@@ -108,9 +130,24 @@ interface CanvasState {
     appendTraceLog: (nodeId: string, entry: TraceEntry) => void;
     clearTraceLogs: (nodeId: string) => void;
 
+    // Actions - Execution Stack
+    beginRun: (runId: string, nodeId: string, timestamp: number) => void;
+    appendRunTrace: (runId: string, nodeId: string, trace: TraceEntry) => void;
+    appendRunPortUpdate: (runId: string, nodeId: string, portUpdate: RunPortUpdate) => void;
+    finalizeRun: (
+        runId: string,
+        nodeId: string,
+        state: 'COMPLETED' | 'ERROR',
+        timestamp: number,
+        error?: string
+    ) => void;
+
     // Actions - Node Collapse
     toggleNodeCollapsed: (nodeId: string) => void;
     setAllNodesCollapsed: (collapsed: boolean, nodeIds?: string[]) => void;
+
+    // Actions - Tutorial
+    setTutorialHint: (hint: 'output-port' | 'run-button' | null) => void;
 
     // Compound Actions
     clearSelection: () => void;
@@ -148,7 +185,9 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
     modalFlowId: null,
     updatedPortIds: new Set(),
     traceLogs: new Map(),
+    nodeRuns: {},
     collapsedNodeIds: new Set(),
+    tutorialHint: null,
 
     // Core Data Actions
     setNodes: nodes =>
@@ -223,6 +262,77 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             return { traceLogs: newMap };
         }),
 
+    // Execution Stack Actions (message order not guaranteed — auto-create RunContext on first event)
+    beginRun: (runId, nodeId, timestamp) =>
+        set(state => {
+            const existing = state.nodeRuns[nodeId] ?? [];
+            if (existing.some(r => r.runId === runId)) return state;
+            const updated = [createRunContext(runId, nodeId, timestamp), ...existing].slice(0, MAX_RUNS_PER_NODE);
+            return { nodeRuns: { ...state.nodeRuns, [nodeId]: updated } };
+        }),
+
+    appendRunTrace: (runId, nodeId, trace) =>
+        set(state => {
+            const runs = state.nodeRuns[nodeId];
+            if (!runs || !runs.some(r => r.runId === runId)) {
+                const newRun = createRunContext(runId, nodeId, trace.ts, { traces: [trace] });
+                return {
+                    nodeRuns: { ...state.nodeRuns, [nodeId]: [newRun, ...(runs ?? [])].slice(0, MAX_RUNS_PER_NODE) },
+                };
+            }
+            return {
+                nodeRuns: {
+                    ...state.nodeRuns,
+                    [nodeId]: runs.map(r => (r.runId === runId ? { ...r, traces: [...r.traces, trace] } : r)),
+                },
+            };
+        }),
+
+    appendRunPortUpdate: (runId, nodeId, portUpdate) =>
+        set(state => {
+            const runs = state.nodeRuns[nodeId];
+            if (!runs || !runs.some(r => r.runId === runId)) {
+                const newRun = createRunContext(runId, nodeId, portUpdate.timestamp, {
+                    portUpdates: [portUpdate],
+                });
+                return {
+                    nodeRuns: { ...state.nodeRuns, [nodeId]: [newRun, ...(runs ?? [])].slice(0, MAX_RUNS_PER_NODE) },
+                };
+            }
+            return {
+                nodeRuns: {
+                    ...state.nodeRuns,
+                    [nodeId]: runs.map(r =>
+                        r.runId === runId ? { ...r, portUpdates: [...r.portUpdates, portUpdate] } : r
+                    ),
+                },
+            };
+        }),
+
+    finalizeRun: (runId, nodeId, finalState, timestamp, error) =>
+        set(state => {
+            const runs = state.nodeRuns[nodeId] ?? [];
+            if (!runs.some(r => r.runId === runId)) {
+                // enter 없이 final만 도착 — 자동 생성 후 즉시 완료 (메시지 순서 미보장 방어)
+                const newRun = createRunContext(runId, nodeId, timestamp, {
+                    state: finalState,
+                    completedAt: timestamp,
+                    error,
+                });
+                return {
+                    nodeRuns: { ...state.nodeRuns, [nodeId]: [newRun, ...runs].slice(0, MAX_RUNS_PER_NODE) },
+                };
+            }
+            return {
+                nodeRuns: {
+                    ...state.nodeRuns,
+                    [nodeId]: runs.map(r =>
+                        r.runId === runId ? { ...r, state: finalState, completedAt: timestamp, error } : r
+                    ),
+                },
+            };
+        }),
+
     // Node Collapse Actions
     toggleNodeCollapsed: nodeId =>
         set(state => {
@@ -239,6 +349,9 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
         set(() => ({
             collapsedNodeIds: collapsed ? new Set(nodeIds ?? []) : new Set<string>(),
         })),
+
+    // Tutorial
+    setTutorialHint: hint => set({ tutorialHint: hint }),
 
     // Compound Actions
     clearSelection: () =>
@@ -259,6 +372,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             selectedNodeId: null,
             selectedConnectionId: null,
             traceLogs: new Map(),
+            nodeRuns: {},
             collapsedNodeIds: new Set(),
         });
     },
@@ -271,6 +385,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             selectedNodeId: null,
             selectedConnectionId: null,
             traceLogs: new Map(),
+            nodeRuns: {},
             collapsedNodeIds: new Set(),
         }),
 
@@ -284,6 +399,7 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             selectedConnectionId: null,
             clipboard: null,
             traceLogs: new Map(),
+            nodeRuns: {},
             collapsedNodeIds: new Set(),
         }),
 
@@ -341,6 +457,9 @@ export const useCollapsedNodeIds = () => useCanvasStore(state => state.collapsed
 const EMPTY_TRACE_ENTRIES: TraceEntry[] = [];
 export const useNodeTraceLogs = (nodeId: string) =>
     useCanvasStore(state => state.traceLogs.get(nodeId) ?? EMPTY_TRACE_ENTRIES);
+
+const EMPTY_RUNS: RunContext[] = [];
+export const useNodeRuns = (nodeId: string) => useCanvasStore(state => state.nodeRuns[nodeId] ?? EMPTY_RUNS);
 
 /**
  * Selector to get connections as EdgeView format (for API compatibility)

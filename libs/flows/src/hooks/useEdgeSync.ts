@@ -42,6 +42,12 @@ interface UseEdgeSyncReturn {
      * Returns the server ID when available
      */
     waitForEdgeId: (tempId: string) => Promise<string>;
+
+    /**
+     * Wait for all pending edge creations to complete
+     * Call before node execution to ensure edges are synced to server
+     */
+    flushPendingEdges: () => Promise<void>;
 }
 
 /**
@@ -208,10 +214,18 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
         });
     }, []);
 
+    const flushPendingEdges = useCallback(async (): Promise<void> => {
+        const pending = [...pendingEdgeIdsRef.current];
+        if (pending.length === 0) return;
+        console.log('[useEdgeSync] Flushing pending edges:', pending.length);
+        await Promise.all(pending.map(waitForEdgeId));
+    }, [waitForEdgeId]);
+
     return {
         createEdgeAsync,
         isPending: createMutation.isPending,
         pendingEdgeIds: pendingEdgeIdsRef.current,
         waitForEdgeId,
+        flushPendingEdges,
     };
 };

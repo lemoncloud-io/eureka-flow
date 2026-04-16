@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 import { RefreshCw, X } from 'lucide-react';
 
 import { useS3Image } from '@flows/flows';
@@ -21,26 +23,31 @@ interface S3ImageProps {
  * // Regular URL or data URL - used directly
  * <S3Image src="data:image/png;base64,..." alt="Image" />
  */
-export const S3Image: React.FC<S3ImageProps> = ({ src, alt, className, onLoad }) => {
-    const { src: resolvedSrc, isLoading, error } = useS3Image(src);
+// Compares only src/className: onLoad is often an inline callback from parent, and since
+// src drives all re-fetching, a stale onLoad will never fire on a stale image reference.
+export const S3Image = memo<S3ImageProps>(
+    ({ src, alt, className, onLoad }) => {
+        const { src: resolvedSrc, isLoading, error } = useS3Image(src);
 
-    if (isLoading) {
-        return (
-            <div className={cn('flex items-center justify-center', className)}>
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                    <RefreshCw className="w-4 h-4 text-primary animate-spin" />
+        if (isLoading) {
+            return (
+                <div className={cn('flex items-center justify-center', className)}>
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                        <RefreshCw className="w-4 h-4 text-primary animate-spin" />
+                    </div>
                 </div>
-            </div>
-        );
-    }
+            );
+        }
 
-    if (error || !resolvedSrc) {
-        return (
-            <div className={cn('bg-muted flex items-center justify-center text-destructive', className)}>
-                <X className="w-4 h-4" />
-            </div>
-        );
-    }
+        if (error || !resolvedSrc) {
+            return (
+                <div className={cn('bg-muted flex items-center justify-center text-destructive', className)}>
+                    <X className="w-4 h-4" />
+                </div>
+            );
+        }
 
-    return <img src={resolvedSrc} alt={alt} className={className} onLoad={onLoad} />;
-};
+        return <img src={resolvedSrc} alt={alt} className={className} onLoad={onLoad} />;
+    },
+    (prev, next) => prev.src === next.src && prev.className === next.className
+);

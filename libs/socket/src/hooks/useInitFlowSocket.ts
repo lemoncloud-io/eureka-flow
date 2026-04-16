@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from 'react';
 
+import { isNodeState } from '@flows/flows';
 import { useWebCoreStore } from '@flows/web-core';
 
 import { useWebSocketWorker } from './useWebSocketWorker';
@@ -8,11 +9,10 @@ import { useWebSocketStore } from '../stores/useWebSocketStore';
 import type {
     FlowUpdateMessage,
     NodeState,
-    NodeUpdateMessage,
     PortUpdateMessage,
-    TraceMessage,
+    SocketNodeEvent,
+    SocketTraceEvent,
     TraceStage,
-    TraceType,
     WebSocketMessage,
 } from '../types';
 
@@ -73,7 +73,7 @@ export const isFlowUpdateMessage = (data: unknown): data is FlowUpdateMessage =>
     return msg['type'] === 'flow' && typeof msg['id'] === 'string' && !('nodeId' in msg);
 };
 
-export const isNodeUpdateMessage = (data: unknown): data is NodeUpdateMessage => {
+export const isNodeUpdateMessage = (data: unknown): data is SocketNodeEvent => {
     if (typeof data !== 'object' || data === null) return false;
     const msg = data as Record<string, unknown>;
     return msg['type'] === 'node' && typeof msg['id'] === 'string' && !('nodeId' in msg);
@@ -128,15 +128,13 @@ const parsePortId = (
 };
 
 /**
- * Type guard for TraceMessage payload
- * Matches both formats:
- * - Full: { traceId, seq, stage, runId, type } (existing agent blocks)
- * - Simple: { seq, ts } (Agent Codex — minimal fields)
+ * Type guard for SocketTraceEvent
+ * `seq` (required number) is the discriminant — unique to trace events
  */
-export const isTraceMessage = (data: unknown): data is TraceMessage => {
+export const isTraceMessage = (data: unknown): data is SocketTraceEvent => {
     if (typeof data !== 'object' || data === null) return false;
     const msg = data as Record<string, unknown>;
-    return typeof msg['seq'] === 'number' && typeof msg['ts'] === 'number';
+    return typeof msg['seq'] === 'number';
 };
 
 /**
@@ -148,20 +146,18 @@ export interface TraceUpdateInfo {
     nodeId: string;
     /** Flow ID */
     flowId?: string;
-    /** Trace correlation ID */
-    traceId?: string;
     /** Sequence number for ordering */
     seq: number;
     /** Timestamp */
     ts: number;
-    /** Execution stage */
+    /** Execution stage (from SocketTraceEvent.stage) */
     stage?: TraceStage;
-    /** Log message */
+    /** Log message (from SocketTraceEvent.message) */
     message?: string;
+    /** Run state (from SocketTraceEvent.state) */
+    state?: string;
     /** Run correlation ID */
     runId?: string;
-    /** Specific event type (e.g., 'run_start', 'tool_start', 'error') */
-    type?: TraceType;
     /** Structured event data */
     data?: Record<string, unknown>;
 }
@@ -175,36 +171,24 @@ export interface NodeUpdateInfo {
      * Higher values indicate more recent updates - used for ordering
      */
     no?: number;
-    /**
-     * @deprecated Use `state` instead. Kept for backward compatibility.
-     */
-    status?: string;
-    /**
-     * @deprecated Use `prevState` instead. Kept for backward compatibility.
-     */
-    prevStatus?: string;
+    /** Computed: true if id contains ':' (port update piggybacked on node event) */
     isPort: boolean;
+    /** Computed: parent node ID extracted from port-format id */
     parentNodeId?: string;
-    /**
-     * Node execution state (preferred field)
-     * Values: 'IDLE' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR'
-     */
+    /** Node execution state */
     state?: NodeState;
-    /**
-     * Previous execution state before this update
-     */
-    prevState?: NodeState;
     progress?: number;
     /**
-     * Stereotype indicator for message content completeness
-     * - 0 or '': Socket message contains all necessary data - no API fetch needed
-     * - Other values or undefined: Additional data may be needed via API
+     * Minor stage of node run (from SocketNodeEvent.stage)
+     * - 'enter': node execution started
+     * - 'final': node execution completed with full data in socket message
+     * - 'progress': intermediate progress update
      */
-    stereo?: number | string;
-    /** Server-side error message (preferred) */
+    stage?: string;
+    /** Run correlation ID */
+    runId?: string;
+    /** Server-side error message */
     error?: string;
-    /** @deprecated Use `error` instead. */
-    errorMessage?: string;
 }
 
 /**
@@ -223,12 +207,14 @@ export interface PortUpdateInfo {
     /** Flow ID */
     flowId?: string;
     /** Timestamp when port data changed */
-    timestamp?: number;
+    ts?: number;
     /**
      * Message sequence number (monotonically increasing)
      * Higher values indicate more recent updates - used for ordering
      */
     no?: number;
+    /** Run correlation ID — links port update to a specific execution run */
+    runId?: string;
 }
 
 export interface UseInitFlowSocketOptions {
@@ -267,7 +253,7 @@ export interface UseInitFlowSocketOptions {
  *   },
  *   onNodeReload: (info) => {
  *     // Reload node: GET /nodes/:id
- *     // info contains: nodeId, flowId, timestamp, status, prevStatus
+ *     // info contains: nodeId, flowId, state, stage, runId, error
  *   },
  * });
  */
@@ -338,23 +324,25 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                     return;
                 }
 
+                // flowId comes from merged nested data, not from SocketTraceEvent directly
+                const tracePayload = data as Record<string, unknown>;
+                const traceFlowId = tracePayload.flowId as string | undefined;
+
                 // Skip if flowId is present and doesn't match current flow
-                // Note: flowId may be absent if server doesn't include it in trace wrapper
-                if (data.flowId && data.flowId !== currentFlowId) {
+                if (traceFlowId && traceFlowId !== currentFlowId) {
                     return;
                 }
 
                 if (onTraceUpdate) {
                     onTraceUpdate({
                         nodeId: lastMessage.id,
-                        flowId: data.flowId,
-                        traceId: data.traceId,
+                        flowId: traceFlowId,
                         seq: data.seq,
-                        ts: data.ts,
+                        ts: data.ts ?? Date.now(),
                         stage: data.stage,
                         message: data.message,
+                        state: data.state,
                         runId: data.runId,
-                        type: data.type,
                         data: data.data,
                     });
                 }
@@ -395,39 +383,29 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                 const isPort = data.id.includes(':');
                 const parentNodeId = isPort ? data.id.split(':')[0] : undefined;
 
-                // Skip if flowId is missing or doesn't match current flow
-                // All node updates should have flowId - reject those without it
-                const isForCurrentFlow = data.flowId && data.flowId === currentFlowId;
-                if (!isForCurrentFlow) {
+                // Skip if flowId is present but doesn't match current flow
+                // Node messages may omit flowId — channel subscription already filters by flow
+                if (data.flowId && data.flowId !== currentFlowId) {
                     return;
                 }
 
                 // Log state transitions with data (e.g., "1004310: IDLE→RUNNING {...}")
-                const stateChange = data.prevState ? `${data.prevState}→${data.state}` : data.state;
+                const stateChange = data.state;
                 console.log(`[WS] ${data.id}: ${stateChange}`, data);
 
                 if (onNodeReload) {
-                    // Prefer state over status (backward compatibility)
-                    const effectiveState = (data.state ?? data.status) as NodeState | undefined;
-                    const effectivePrevState = (data.prevState ?? data.prevStatus) as NodeState | undefined;
-
                     onNodeReload({
                         nodeId: data.id,
                         flowId: data.flowId,
-                        timestamp: data.timestamp,
+                        timestamp: data.ts,
                         no: data.no,
-                        // Deprecated fields (kept for backward compatibility)
-                        status: data.status,
-                        prevStatus: data.prevStatus,
                         isPort,
                         parentNodeId,
-                        // Preferred fields
-                        state: effectiveState,
-                        prevState: effectivePrevState,
+                        state: isNodeState(data.state) ? data.state : undefined,
                         progress: data.progress,
-                        stereo: data.stereo,
+                        stage: data.stage,
+                        runId: data.runId,
                         error: data.error,
-                        errorMessage: data.errorMessage,
                     });
                 }
                 return;
@@ -437,9 +415,9 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
             // Triggered when port data (input/output) changes
             // Used for real-time data synchronization between browser tabs
             if (isPortUpdateMessage(data)) {
-                // Skip if flowId is missing or doesn't match current flow
-                const isForCurrentFlow = data.flowId && data.flowId === currentFlowId;
-                if (!isForCurrentFlow) {
+                // Skip if flowId is present but doesn't match current flow
+                // Port messages may omit flowId — channel subscription already filters by flow
+                if (data.flowId && data.flowId !== currentFlowId) {
                     return;
                 }
 
@@ -457,8 +435,9 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         portName: parsed.portName,
                         direction: parsed.direction, // from @suffix
                         flowId: data.flowId,
-                        timestamp: data.timestamp,
+                        ts: data.ts,
                         no: data.no,
+                        runId: data.runId,
                     });
                 }
             }

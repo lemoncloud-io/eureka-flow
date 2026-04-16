@@ -1,0 +1,53 @@
+{
+    "loading": "Loading tutorial...",
+    "flowName": "Model Synthesis",
+    "retry": "Retry",
+    "steps": {
+        "welcome": {
+            "title": "Welcome!",
+            "description": "Let's learn the basics of Eureka Flow. We'll connect blocks and run a workflow together."
+        },
+        "explore": {
+            "title": "Block Library & Canvas",
+            "description": "On the left is the Block Library. Two blocks are already on your canvas — let's connect them!"
+        },
+        "sidebar": {
+            "title": "Block Library",
+            "description": "On the left is the Block Library. Browse input, process, and output blocks, then click to add them to your canvas."
+        },
+        "canvas": {
+            "title": "Workflow Canvas",
+            "description": "This is your workspace. Two blocks are already placed — connect them by dragging between ports. Scroll to zoom, drag empty space to pan."
+        },
+        "connect": {
+            "title": "Connect the blocks",
+            "description": "Drag from the blue dot (●) on the right side of \"My First Input\" to the blue dot on the left side of \"Result\"."
+        },
+        "run": {
+            "title": "Run it!",
+            "description": "Click the ▷ play button on \"My First Input\" to execute. The result will appear in the Preview block."
+        },
+        "done": {
+            "title": "You did it! 🎉",
+            "description": "Get a free API key to save your work and use AI blocks.",
+            "getKey": "Get Free Key from Codes",
+            "enterKey": "I already have a key",
+            "keyPlaceholder": "Paste your API key",
+            "validating": "Validating...",
+            "continue": "Start Building!",
+            "or": "or",
+            "invalidKey": "Invalid key. Please try again."
+        }
+    },
+    "feedback": {
+        "great": "Great!",
+        "advancing": "Moving to the next step..."
+    },
+    "cta": {
+        "next": "Next",
+        "prev": "Back",
+        "skip": "Skip tutorial",
+        "later": "Maybe later",
+        "exploreFlows": "Explore Public Flows"
+    }
+}

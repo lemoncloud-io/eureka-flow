@@ -84,7 +84,7 @@ const BlockDetail = ({ block }: BlockDetailProps) => {
                         {block.inputs.map(input => (
                             <div key={input.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                    <div className="w-2 h-2 rounded-full bg-primary" />
                                     <span className="text-sm">{input.label || input.id}</span>
                                 </div>
                                 <div className="flex items-center gap-2">

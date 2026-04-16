@@ -11,13 +11,13 @@
         --popover: 0 0% 100%;
         --popover-foreground: 240 10% 10%;
 
-        /* Primary - Soft Violet */
-        --primary: 250 80% 60%;
+        /* Primary - Vivid Violet (#8F19F6) */
+        --primary: 272 92% 53%;
         --primary-foreground: 0 0% 100%;
         --secondary: 240 5% 96%;
         --secondary-foreground: 240 5% 40%;
-        --accent: 250 50% 95%;
-        --accent-foreground: 250 80% 50%;
+        --accent: 272 50% 95%;
+        --accent-foreground: 272 80% 50%;
 
         --muted: 240 5% 96%;
         --muted-foreground: 240 5% 50%;
@@ -25,11 +25,11 @@
         --destructive-foreground: 0 0% 100%;
         --border: 240 5% 90%;
         --input: 240 5% 90%;
-        --ring: 250 80% 60%;
+        --ring: 272 92% 53%;
         --radius: 0.5rem;
 
         /* Point color */
-        --point: 250 80% 60%;
+        --point: 272 92% 53%;
 
         /* Semantic Colors */
         --success: 150 70% 40%;
@@ -61,7 +61,7 @@
         --sidebar-bg: 240 5% 98%;
         --header-bg: 0 0% 100%;
         --toolbar-bg: 240 5% 96%;
-        --connection-line: 250 60% 60%;
+        --connection-line: 272 60% 55%;
         --connection-active: 150 70% 45%;
         --port-empty: 240 5% 80%;
 
@@ -71,7 +71,7 @@
         --glass-blur: 20px;
 
         /* Port Type Colors - Light Mode */
-        --port-type-text: 210 90% 50%; /* Blue - text/string data */
+        --port-type-text: 230 80% 55%; /* Indigo - text/string data */
         --port-type-image: 280 75% 55%; /* Purple - image data */
         --port-type-number: 150 70% 40%; /* Green - numeric data */
         --port-type-json: 35 90% 50%; /* Orange - structured data */
@@ -79,12 +79,12 @@
 
         /* Node Category Colors - Light Mode */
         --node-cat-input: 150 70% 45%;
-        --node-cat-process: 250 80% 60%;
-        --node-cat-output: 210 90% 55%;
+        --node-cat-process: 272 92% 53%;
+        --node-cat-output: 185 80% 45%;
 
         /* Enhanced Shadow Tokens - Light Mode */
         --shadow-node: 0 8px 24px -4px rgb(0 0 0 / 0.08);
-        --shadow-node-selected: 0 8px 24px -4px rgb(139 92 246 / 0.2);
+        --shadow-node-selected: 0 8px 24px -4px rgb(143 25 246 / 0.2);
         --shadow-floating: 0 4px 12px -2px rgb(0 0 0 / 0.06);
     }
 
@@ -97,13 +97,13 @@
         --popover: 240 4% 15%;
         --popover-foreground: 0 0% 95%;
 
-        /* Primary - Soft Violet */
-        --primary: 250 70% 60%;
+        /* Primary - Vivid Violet (#8F19F6) */
+        --primary: 272 80% 65%;
         --primary-foreground: 0 0% 100%;
         --secondary: 240 4% 18%;
         --secondary-foreground: 240 5% 70%;
-        --accent: 250 25% 22%;
-        --accent-foreground: 250 70% 75%;
+        --accent: 272 25% 22%;
+        --accent-foreground: 272 70% 75%;
 
         --muted: 240 4% 18%;
         --muted-foreground: 240 5% 60%;
@@ -111,10 +111,10 @@
         --destructive-foreground: 0 0% 100%;
         --border: 240 4% 20%;
         --input: 240 4% 20%;
-        --ring: 250 70% 60%;
+        --ring: 272 80% 65%;
 
         /* Point color */
-        --point: 250 75% 65%;
+        --point: 272 85% 68%;
 
         /* Semantic Colors - Dark Mode */
         --success: 150 60% 45%;
@@ -146,7 +146,7 @@
         --sidebar-bg: 240 5% 11%;
         --header-bg: 240 5% 11%;
         --toolbar-bg: 240 4% 15%;
-        --connection-line: 250 55% 55%;
+        --connection-line: 272 55% 55%;
         --connection-active: 150 55% 45%;
         --port-empty: 240 4% 30%;
 
@@ -156,7 +156,7 @@
         --glass-blur: 20px;
 
         /* Port Type Colors - Dark Mode */
-        --port-type-text: 210 80% 55%; /* Blue - text/string data */
+        --port-type-text: 230 70% 60%; /* Indigo - text/string data */
         --port-type-image: 280 65% 58%; /* Purple - image data */
         --port-type-number: 150 55% 50%; /* Green - numeric data */
         --port-type-json: 35 80% 55%; /* Orange - structured data */
@@ -164,12 +164,12 @@
 
         /* Node Category Colors - Dark Mode */
         --node-cat-input: 150 55% 45%;
-        --node-cat-process: 250 65% 58%;
-        --node-cat-output: 210 75% 55%;
+        --node-cat-process: 272 75% 62%;
+        --node-cat-output: 185 65% 50%;
 
         /* Enhanced Shadow Tokens - Dark Mode */
         --shadow-node: 0 8px 24px -4px rgb(0 0 0 / 0.6);
-        --shadow-node-selected: 0 8px 24px -4px rgb(139 92 246 / 0.3);
+        --shadow-node-selected: 0 8px 24px -4px rgb(143 25 246 / 0.3);
         --shadow-floating: 0 4px 12px -2px rgb(0 0 0 / 0.4);
     }
 }
@@ -177,6 +177,26 @@
 @layer base {
     * {
         @apply border-border;
+        scrollbar-width: thin;
+        scrollbar-color: hsl(var(--muted-foreground) / 0.2) transparent;
+    }
+    /* Webkit (Chrome, Safari, Edge) */
+    *::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    *::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    *::-webkit-scrollbar-thumb {
+        background-color: hsl(var(--muted-foreground) / 0.2);
+        border-radius: 3px;
+    }
+    *::-webkit-scrollbar-thumb:hover {
+        background-color: hsl(var(--muted-foreground) / 0.4);
+    }
+    *::-webkit-scrollbar-corner {
+        background: transparent;
     }
     body {
         @apply bg-background text-foreground antialiased;
@@ -214,7 +234,17 @@
     }
 }
 
-/* Edge flow animation for workflow execution */
+/* Edge pulse animation for workflow execution */
+@keyframes edge-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.35;
+    }
+}
+
 @keyframes edge-flow {
     from {
         stroke-dashoffset: 20;
@@ -350,8 +380,11 @@
     .animate-port-glow-image,
     .animate-port-glow-number,
     .animate-port-glow-json,
-    .animate-port-glow-any {
+    .animate-port-glow-any,
+    .animate-fade-in-up,
+    .animate-stagger-entrance {
         animation: none !important;
+        opacity: 1 !important;
     }
 }
 
@@ -426,17 +459,43 @@ html {
     transition: all 0.15s ease !important;
 }
 
-.eureka-tour-popover .driver-popover-next-btn,
-.eureka-tour-popover .driver-popover-close-btn {
+.eureka-tour-popover .driver-popover-next-btn {
     background-color: var(--djs-primary) !important;
     color: var(--djs-primary-fg) !important;
     border: none !important;
     text-shadow: none !important;
 }
 
-.eureka-tour-popover .driver-popover-next-btn:hover,
-.eureka-tour-popover .driver-popover-close-btn:hover {
+.eureka-tour-popover .driver-popover-next-btn:hover {
     opacity: 0.9 !important;
+}
+
+.eureka-tour-popover .driver-popover-close-btn {
+    position: absolute !important;
+    top: 0.5rem !important;
+    right: 0.5rem !important;
+    padding: 0.25rem !important;
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+    font-size: 0 !important;
+    background-color: transparent !important;
+    color: hsl(var(--muted-foreground)) !important;
+    border: none !important;
+    border-radius: 0.375rem !important;
+    text-shadow: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.eureka-tour-popover .driver-popover-close-btn::after {
+    content: '✕' !important;
+    font-size: 0.75rem !important;
+}
+
+.eureka-tour-popover .driver-popover-close-btn:hover {
+    background-color: hsl(var(--accent)) !important;
+    color: var(--djs-fg) !important;
 }
 
 .eureka-tour-popover .driver-popover-prev-btn {
@@ -455,4 +514,61 @@ html {
 .eureka-tour-popover .driver-popover-arrow-side-top .driver-popover-arrow,
 .eureka-tour-popover .driver-popover-arrow-side-bottom .driver-popover-arrow {
     border-color: var(--djs-border) !important;
+}
+
+/* Tutorial Animations */
+
+/* Success check scale-in on step completion */
+.tutorial-success-check {
+    animation: tutorial-success-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes tutorial-success-pop {
+    0% {
+        transform: scale(0.6);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Pulsing ring on output port during connect step */
+.tutorial-port-pulse {
+    animation: tutorial-port-ring 2s ease-in-out infinite;
+}
+
+@keyframes tutorial-port-ring {
+    0%,
+    100% {
+        filter: drop-shadow(0 0 0 transparent);
+    }
+    50% {
+        filter: drop-shadow(0 0 6px hsl(var(--primary) / 0.6)) drop-shadow(0 0 12px hsl(var(--primary) / 0.3));
+    }
+}
+
+/* Bounce + highlight on run button */
+.tutorial-run-bounce {
+    animation: tutorial-bounce 1.5s ease-in-out infinite;
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3);
+}
+
+@keyframes tutorial-bounce {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.15);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tutorial-success-check,
+    .tutorial-port-pulse,
+    .tutorial-run-bounce {
+        animation: none;
+    }
 }

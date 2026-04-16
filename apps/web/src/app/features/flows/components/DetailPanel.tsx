@@ -38,13 +38,16 @@ import { ContentPreviewModal } from './ContentPreviewModal';
 import { FilePreviewDialog } from './FilePreviewDialog';
 import { FrontendBadge } from './FrontendBadge';
 import { ImageEditorDialog } from './ImageEditorDialog';
+import { RunHistoryPanel } from './RunHistoryPanel';
 import { S3Image } from './S3Image';
 import { TouchDialog } from './TouchDialog';
 import { INPUT_FILE_ACCEPT, clearFileConfig, processUploadedFile, tryParseJson } from '../utils';
 
-import type { BlockDefinition, ConfigField, Connection, DataPacket, NodeData } from '@flows/flows';
+import type { BlockDefinition, ConfigField, Connection, DataPacket, FlowRole, NodeData } from '@flows/flows';
 
 interface DetailPanelProps {
+    /** User role for permission-based UI controls */
+    role?: FlowRole;
     selectedNode: NodeData | null;
     selectedConnection: Connection | null;
     nodes: NodeData[];
@@ -448,7 +451,12 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     );
 };
 
+const playIconCls = 'w-3.5 h-3.5 flex-shrink-0 fill-current';
+const utilBtnCls =
+    'h-8 w-8 rounded-lg transition-all duration-150 active:scale-[0.92] flex items-center justify-center';
+
 export const DetailPanel: React.FC<DetailPanelProps> = ({
+    role = 'owner',
     selectedNode,
     selectedConnection,
     nodes,
@@ -467,6 +475,9 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 }) => {
     const { t } = useTranslation(['flows', 'common']);
     const blockRegistry = useBlockRegistry();
+    const canEdit = role === 'owner';
+    const canRun = role !== 'anonymous';
+    const isInputNode = selectedNode?.type?.startsWith('input-') ?? false;
     const [isTouchDialogOpen, setIsTouchDialogOpen] = useState(false);
     const [touchPortId, setTouchPortId] = useState<string | null>(null);
     const [previewContent, setPreviewContent] = useState<{ value: unknown; type?: string } | null>(null);
@@ -579,38 +590,46 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
     const renderConfigInput = (node: NodeData, field: ConfigField, definition: BlockDefinition) => {
         const value = node.config?.[field.key] ?? definition.defaultConfig[field.key];
+        // Guest can edit input node values locally (not persisted)
+        const isDisabled = !canEdit && !(role === 'guest' && isInputNode);
 
-        const handleChange = (val: unknown) => onConfigChange(node.id, field.key, val);
+        const handleChange = (val: unknown) => {
+            if (isDisabled) return;
+            onConfigChange(node.id, field.key, val);
+        };
 
         switch (field.type) {
             case 'text':
                 return field.short ? (
                     <input
                         type="text"
-                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors font-mono"
+                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors font-mono disabled:opacity-60 disabled:cursor-default"
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
                         placeholder={field.placeholder}
+                        disabled={isDisabled}
                     />
                 ) : (
                     <textarea
-                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors resize-y min-h-[56px] font-mono"
+                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors resize-y min-h-[56px] font-mono disabled:opacity-60 disabled:cursor-default"
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
                         placeholder={field.placeholder}
+                        disabled={isDisabled}
                     />
                 );
             case 'number':
                 return (
                     <input
                         type="number"
-                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors font-mono"
+                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors font-mono disabled:opacity-60 disabled:cursor-default"
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
                         placeholder={field.placeholder}
+                        disabled={isDisabled}
                     />
                 );
             case 'boolean':
@@ -618,8 +637,9 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     <div className="flex items-center gap-2.5 mt-1">
                         <button
                             onClick={() => handleChange(!value)}
+                            disabled={isDisabled}
                             className={cn(
-                                'w-9 h-5 rounded-full p-0.5 transition-colors relative',
+                                'w-9 h-5 rounded-full p-0.5 transition-colors relative disabled:opacity-60 disabled:cursor-default',
                                 value ? 'bg-primary' : 'bg-muted'
                             )}
                         >
@@ -638,9 +658,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             case 'select':
                 return (
                     <select
-                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors"
+                        className="w-full bg-background/80 border border-border/60 rounded-md px-2.5 py-2 text-xs text-foreground focus:border-primary/60 outline-none transition-colors disabled:opacity-60 disabled:cursor-default"
                         value={value}
                         onChange={e => handleChange(e.target.value)}
+                        disabled={isDisabled}
                     >
                         {field.options?.map(opt => (
                             <option key={opt.value} value={opt.value}>
@@ -741,7 +762,8 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 type="text"
                                 value={selectedNode.customLabel || def.label}
                                 onChange={e => onLabelChange(selectedNode.id, e.target.value)}
-                                className="bg-transparent font-semibold text-sm text-foreground focus:bg-muted/30 outline-none rounded px-1.5 py-0.5 -ml-1 flex-1 min-w-0 border border-transparent focus:border-primary/40 transition-colors"
+                                disabled={!canEdit}
+                                className="bg-transparent font-semibold text-sm text-foreground focus:bg-muted/30 outline-none rounded px-1.5 py-0.5 -ml-1 flex-1 min-w-0 border border-transparent focus:border-primary/40 transition-colors disabled:opacity-60 disabled:cursor-default"
                                 placeholder={t('flows:detailPanel.nodeLabel')}
                             />
                         </div>
@@ -817,9 +839,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         defaultOpen={false}
                     >
                         <textarea
-                            className="w-full bg-background/60 border border-border/50 rounded-md p-2 text-xs text-foreground focus:border-primary/50 outline-none resize-none h-14 transition-colors mt-2"
+                            className="w-full bg-background/60 border border-border/50 rounded-md p-2 text-xs text-foreground focus:border-primary/50 outline-none resize-none h-14 transition-colors mt-2 disabled:opacity-60 disabled:cursor-default"
                             value={selectedNode.description || ''}
                             onChange={e => onDescriptionChange(selectedNode.id, e.target.value)}
+                            disabled={!canEdit}
                             placeholder={t('flows:detailPanel.descriptionPlaceholder')}
                         />
                     </CollapsibleSection>
@@ -836,7 +859,8 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             </span>
                             <button
                                 onClick={() => onToggleAuto(selectedNode.id)}
-                                className="flex items-center gap-2"
+                                disabled={!canEdit}
+                                className="flex items-center gap-2 disabled:opacity-60 disabled:cursor-default"
                                 title={
                                     isAuto
                                         ? t('flows:detailPanel.autoRunEnabled')
@@ -1029,51 +1053,69 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     </CollapsibleSection>
                 </div>
 
+                {/* Execution History */}
+                <RunHistoryPanel nodeId={selectedNode.id} />
+
                 {/* Footer Actions */}
-                <div className="p-3 border-t border-border/50 bg-surface-elevated/30 flex gap-2 flex-shrink-0">
-                    {/* Run button: hidden when isRunnable is explicitly false or stereo is 'output' */}
-                    {/* Process stereo: split button with run-only and run-with-propagation */}
-                    {def?.stereo !== 'output' &&
+                <div className="px-2.5 py-2 border-t border-border/40 bg-surface-elevated/20 flex items-center gap-1 flex-shrink-0">
+                    {/* Run buttons */}
+                    {canRun &&
+                        def?.stereo !== 'output' &&
                         def?.isRunnable !== false &&
                         (def?.stereo === 'process' ? (
-                            <div className="flex-1 flex gap-1">
+                            <div className="flex-1 min-w-0 flex gap-1">
                                 <button
                                     onClick={() => onTriggerNode(selectedNode.id, { propagate: false })}
-                                    className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                    className="h-8 flex-1 min-w-0 group bg-primary hover:bg-primary/85 active:scale-[0.98] text-primary-foreground text-xs rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.1)]"
                                 >
-                                    <Play className="w-3.5 h-3.5" /> {t('nodes:actions.runThisOnly')}
+                                    <Play className={playIconCls} />
+                                    <span className="truncate">{t('nodes:actions.runThisOnly')}</span>
                                 </button>
                                 <button
                                     onClick={() => onTriggerNode(selectedNode.id, { propagate: true })}
-                                    className="flex-1 bg-green-600 hover:bg-green-600/90 text-white text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                    className="h-8 flex-1 min-w-0 group border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-[0.98] text-emerald-600 dark:text-emerald-400 text-xs rounded-lg font-medium transition-all duration-150 flex items-center justify-center gap-1.5"
                                 >
-                                    <Play className="w-3.5 h-3.5" /> {t('nodes:actions.runAndPropagate')}
+                                    <Zap className="w-3 h-3 flex-shrink-0" />
+                                    <span className="truncate">{t('nodes:actions.runAndPropagate')}</span>
                                 </button>
                             </div>
                         ) : (
                             <button
                                 onClick={() => onTriggerNode(selectedNode.id)}
-                                className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                                className="h-8 flex-1 min-w-0 group bg-primary hover:bg-primary/85 active:scale-[0.98] text-primary-foreground text-xs rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.1)]"
                             >
-                                <Play className="w-3.5 h-3.5" /> {t('flows:detailPanel.runBlock')}
+                                <Play className={playIconCls} />
+                                <span className="truncate">{t('flows:detailPanel.runBlock')}</span>
                             </button>
                         ))}
-                    {import.meta.env.DEV && (
-                        <button
-                            onClick={() => setIsTouchDialogOpen(true)}
-                            className="px-3 bg-warning/10 border border-warning/30 hover:bg-warning/20 text-warning text-xs rounded-lg transition-colors flex items-center justify-center"
-                            title={t('flows:detailPanel.touchDebug')}
-                        >
-                            <Wrench className="w-3.5 h-3.5" />
-                        </button>
-                    )}
-                    <button
-                        onClick={() => onDeleteNode(selectedNode.id)}
-                        className="px-3 bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs rounded-lg transition-colors flex items-center justify-center"
-                        title={t('common:actions.delete')}
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+                    {/* Utility icons — fixed width, never shrink */}
+                    <div className="flex-shrink-0 flex items-center">
+                        {import.meta.env.DEV && (
+                            <button
+                                onClick={() => setIsTouchDialogOpen(true)}
+                                className={cn(
+                                    utilBtnCls,
+                                    'text-muted-foreground/40 hover:text-warning hover:bg-warning/10'
+                                )}
+                                title={t('flows:detailPanel.touchDebug')}
+                            >
+                                <Wrench className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                        {canEdit && (
+                            <button
+                                onClick={() => onDeleteNode(selectedNode.id)}
+                                className={cn(
+                                    utilBtnCls,
+                                    'text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10'
+                                )}
+                                title={t('common:actions.delete')}
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Touch Debug Dialog for Node (Dev only) */}
@@ -1210,12 +1252,14 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             <Wrench className="w-3.5 h-3.5" />
                         </button>
                     )}
-                    <button
-                        onClick={() => onDeleteConnection(selectedConnection.id)}
-                        className="flex-1 bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-                    >
-                        <Trash2 className="w-3.5 h-3.5" /> {t('flows:detailPanel.deleteConnection')}
-                    </button>
+                    {canEdit && (
+                        <button
+                            onClick={() => onDeleteConnection(selectedConnection.id)}
+                            className="flex-1 bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" /> {t('flows:detailPanel.deleteConnection')}
+                        </button>
+                    )}
                 </div>
 
                 {/* Touch Debug Dialog (Dev only) */}

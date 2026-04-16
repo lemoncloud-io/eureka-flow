@@ -9,15 +9,15 @@ export const ScreenshotSection = () => {
     const { isDarkTheme } = useTheme();
 
     return (
-        <div className="animate-fade-in-up mx-auto max-w-5xl px-6 pb-24" style={staggerStyle(4)}>
-            <div className="overflow-hidden rounded-xl border border-border shadow-2xl">
-                <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-2.5">
+        <div className="animate-fade-in-up mx-auto max-w-[1400px] px-6 pb-20" style={staggerStyle(4)}>
+            <div className="overflow-hidden rounded-xl border border-border/40 shadow-2xl">
+                <div className="flex items-center gap-2 border-b border-border/40 bg-muted/30 px-4 py-2">
                     <div className="flex gap-1.5">
-                        <span className="block h-3 w-3 rounded-full bg-red-400" />
-                        <span className="block h-3 w-3 rounded-full bg-yellow-400" />
-                        <span className="block h-3 w-3 rounded-full bg-green-400" />
+                        <span className="block h-2.5 w-2.5 rounded-full bg-red-400/80" />
+                        <span className="block h-2.5 w-2.5 rounded-full bg-yellow-400/80" />
+                        <span className="block h-2.5 w-2.5 rounded-full bg-green-400/80" />
                     </div>
-                    <div className="mx-auto text-xs text-muted-foreground">{t('screenshot.url_bar')}</div>
+                    <div className="mx-auto text-[11px] text-muted-foreground/60">{t('screenshot.url_bar')}</div>
                 </div>
                 <img
                     src={isDarkTheme ? '/images/screenshot-dark.jpg' : '/images/screenshot-light.jpg'}

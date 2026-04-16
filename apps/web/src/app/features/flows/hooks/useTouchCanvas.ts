@@ -7,8 +7,8 @@ interface Viewport {
 }
 
 interface UseTouchCanvasOptions {
-    viewport: Viewport;
-    setViewport: React.Dispatch<React.SetStateAction<Viewport>>;
+    viewportRef: React.RefObject<Viewport>;
+    updateViewport: (vp: Viewport) => void;
     minZoom: number;
     maxZoom: number;
     canvasRef: React.RefObject<HTMLDivElement | null>;
@@ -35,8 +35,8 @@ export const TOUCH_GESTURE_THRESHOLD = 10;
  * - Tap: Passes through to allow node/button clicks
  */
 export const useTouchCanvas = ({
-    viewport,
-    setViewport,
+    viewportRef,
+    updateViewport,
     minZoom,
     maxZoom,
     canvasRef,
@@ -132,11 +132,8 @@ export const useTouchCanvas = ({
                     const dx = currentX - lastTouchRef.current.x;
                     const dy = currentY - lastTouchRef.current.y;
 
-                    setViewport(prev => ({
-                        ...prev,
-                        x: prev.x + dx,
-                        y: prev.y + dy,
-                    }));
+                    const vp = viewportRef.current;
+                    updateViewport({ ...vp, x: vp.x + dx, y: vp.y + dy });
                 }
 
                 lastTouchRef.current = { x: currentX, y: currentY };
@@ -150,17 +147,19 @@ export const useTouchCanvas = ({
                 const currentDistance = getTouchDistance(e.touches);
                 const currentCenter = getTouchCenter(e.touches);
 
+                const vp = viewportRef.current;
+
                 // Calculate zoom change based on pinch distance change
                 const scale = currentDistance / lastPinchDistanceRef.current;
-                const newZoom = Math.min(Math.max(viewport.zoom * scale, minZoom), maxZoom);
+                const newZoom = Math.min(Math.max(vp.zoom * scale, minZoom), maxZoom);
 
                 // Calculate the point to zoom around (pinch center in canvas coordinates)
                 const pinchX = currentCenter.x - rect.left;
                 const pinchY = currentCenter.y - rect.top;
 
                 // Calculate world coordinates of pinch center
-                const worldX = (pinchX - viewport.x) / viewport.zoom;
-                const worldY = (pinchY - viewport.y) / viewport.zoom;
+                const worldX = (pinchX - vp.x) / vp.zoom;
+                const worldY = (pinchY - vp.y) / vp.zoom;
 
                 // Calculate new viewport position to keep pinch center stationary
                 const newX = pinchX - worldX * newZoom;
@@ -170,7 +169,7 @@ export const useTouchCanvas = ({
                 const panDx = lastPinchCenterRef.current ? currentCenter.x - lastPinchCenterRef.current.x : 0;
                 const panDy = lastPinchCenterRef.current ? currentCenter.y - lastPinchCenterRef.current.y : 0;
 
-                setViewport({
+                updateViewport({
                     x: newX + panDx,
                     y: newY + panDy,
                     zoom: newZoom,
@@ -182,8 +181,8 @@ export const useTouchCanvas = ({
         },
         [
             isNodeDragging,
-            viewport,
-            setViewport,
+            viewportRef,
+            updateViewport,
             minZoom,
             maxZoom,
             canvasRef,

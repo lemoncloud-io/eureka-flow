@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { ArrowRight, GitFork, Github, Globe, Layers, Search } from 'lucide-react';
+import { GitFork, Github, Layers, Loader2, Search } from 'lucide-react';
 
-import { usePublicFlowsListQuery, useS3Image } from '@flows/flows';
+import { usePublicFlowsInfiniteQuery, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import { ApiKeyDialog } from '@flows/shared';
+import { ApiKeyDialog, SITE_URL } from '@flows/shared';
 import { Badge, Button, Input, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
@@ -18,7 +19,7 @@ import type { FlowView } from '@flows/flows';
 // Constants
 // ============================================================================
 
-const STAGGER_DELAY_MS = 80;
+const STAGGER_DELAY_MS = 40;
 
 const staggerStyle = (index: number): React.CSSProperties => ({
     animationDelay: `${STAGGER_DELAY_MS * index}ms`,
@@ -26,11 +27,10 @@ const staggerStyle = (index: number): React.CSSProperties => ({
 });
 
 // ============================================================================
-// MiniFlowGraph - visual preview of flow topology
+// MiniFlowGraph - fallback when no thumbnail
 // ============================================================================
 
 const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nodeCount, edgeCount }) => {
-    // Generate deterministic "node" positions from counts
     const displayNodes = Math.min(nodeCount, 8);
     const positions = useMemo(() => {
         const pts: { x: number; y: number }[] = [];
@@ -49,7 +49,6 @@ const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nod
 
     return (
         <svg viewBox="0 0 128 48" className="w-full h-full" fill="none">
-            {/* Edges */}
             {Array.from({ length: displayEdges }).map((_, i) => {
                 const from = positions[i];
                 const to = positions[i + 1];
@@ -67,7 +66,6 @@ const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nod
                     />
                 );
             })}
-            {/* Nodes */}
             {positions.map((p, i) => (
                 <circle
                     key={`n${i}`}
@@ -77,7 +75,6 @@ const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nod
                     className={cn(i === 0 ? 'fill-primary/60' : 'fill-primary/30')}
                 />
             ))}
-            {/* Overflow indicator */}
             {nodeCount > 8 && (
                 <text x="120" y="44" className="fill-muted-foreground/40 text-[8px]" textAnchor="end">
                     +{nodeCount - 8}
@@ -88,75 +85,69 @@ const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nod
 };
 
 // ============================================================================
-// FlowCard
+// MasonryFlowCard — image-only card, info on hover (higgsfield style)
 // ============================================================================
 
-interface PublicFlowCardProps {
+interface MasonryFlowCardProps {
     flow: FlowView & { id: string };
     index: number;
 }
 
-const PublicFlowCard: React.FC<PublicFlowCardProps> = ({ flow, index }) => {
+const MasonryFlowCard: React.FC<MasonryFlowCardProps> = ({ flow, index }) => {
     const { t } = useTranslation(['flows']);
     const { src: thumbnailSrc } = useS3Image(flow.thumbnail);
     const title = flow.name || t('header.untitledWorkflow');
-    const description = flow.description;
     const nodeCount = flow.nodeIds$$?.length ?? 0;
     const edgeCount = flow.edgeIds$$?.length ?? 0;
+    const hasThumbnail = !!thumbnailSrc;
 
     return (
         <Link
             to={`/flows/${flow.id}`}
             className={cn(
-                'animate-fade-in-up group relative flex flex-col rounded-2xl border transition-all duration-300',
-                'bg-card/50 backdrop-blur-sm border-border/40',
-                'hover:border-primary/40 hover:shadow-[0_8px_30px_-8px_hsl(var(--primary)/0.15)]',
-                'hover:-translate-y-0.5'
+                'animate-fade-in-up group relative block overflow-hidden rounded-lg',
+                'transition-all duration-300',
+                'hover:ring-2 hover:ring-primary/50 hover:shadow-xl hover:shadow-primary/10'
             )}
-            style={staggerStyle(index + 3)}
+            style={staggerStyle(index)}
         >
-            {/* Thumbnail / Graph Preview */}
-            <div className="relative h-20 overflow-hidden rounded-t-2xl bg-muted/20 border-b border-border/20">
-                {thumbnailSrc ? (
-                    <img src={thumbnailSrc} alt={title} className="w-full h-full object-cover" />
+            <div className="relative w-full overflow-hidden">
+                {hasThumbnail ? (
+                    <img
+                        src={thumbnailSrc}
+                        alt={title}
+                        className="block w-full h-auto transition-transform duration-500 group-hover:scale-[1.03]"
+                    />
                 ) : (
-                    <div className="px-3 pt-3 h-full">
-                        <MiniFlowGraph nodeCount={nodeCount} edgeCount={edgeCount} />
+                    <div className="w-full aspect-[4/3] flex items-center justify-center bg-muted/30">
+                        <div className="w-3/4 h-3/4 opacity-30">
+                            <MiniFlowGraph nodeCount={nodeCount} edgeCount={edgeCount} />
+                        </div>
                     </div>
                 )}
-                {/* Gradient fade */}
-                <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-card/80 to-transparent" />
-            </div>
 
-            {/* Content */}
-            <div className="flex flex-1 flex-col gap-1.5 p-4 pt-3">
-                <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">
-                    {title}
-                </h3>
-
-                {description ? (
-                    <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">{description}</p>
-                ) : (
-                    <p className="text-xs text-muted-foreground/40 italic">{t('flowList.noDescription')}</p>
-                )}
-
-                {/* Footer */}
-                <div className="flex items-center gap-3 mt-auto pt-2 text-[11px] text-muted-foreground/60">
-                    <span className="flex items-center gap-1">
-                        <Layers className="w-3 h-3" />
-                        {nodeCount}
-                    </span>
-                    <span className="flex items-center gap-1">
-                        <GitFork className="w-3 h-3" />
-                        {edgeCount}
-                    </span>
-                    <span className="ml-auto">{formatRelativeTime(flow.updatedAt, t)}</span>
+                {/* Hover overlay — glassmorphic bottom bar */}
+                <div
+                    className={cn(
+                        'absolute inset-x-0 bottom-0 translate-y-full',
+                        'group-hover:translate-y-0 transition-transform duration-300 ease-out'
+                    )}
+                >
+                    <div className="bg-black/60 backdrop-blur-md px-3 py-2.5">
+                        <h3 className="text-[13px] font-medium text-white line-clamp-1">{title}</h3>
+                        <div className="flex items-center gap-3 mt-0.5 text-[11px] text-white/60">
+                            <span className="flex items-center gap-1">
+                                <Layers className="w-3 h-3" />
+                                {nodeCount}
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <GitFork className="w-3 h-3" />
+                                {edgeCount}
+                            </span>
+                            <span className="ml-auto">{formatRelativeTime(flow.updatedAt, t)}</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
-
-            {/* Hover arrow */}
-            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <ArrowRight className="w-4 h-4 text-primary" />
             </div>
         </Link>
     );
@@ -170,16 +161,44 @@ export const PublicFlowsPage = () => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
     const { apiKey, setApiKey } = useWebCoreStore();
-    const { data, isLoading } = usePublicFlowsListQuery(true);
+    const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = usePublicFlowsInfiniteQuery(true);
+
+    // Enable page scroll (body has overflow:hidden for the flow editor)
+    useEffect(() => {
+        document.documentElement.classList.add('landing-scroll');
+        return () => document.documentElement.classList.remove('landing-scroll');
+    }, []);
 
     const [search, setSearch] = useState('');
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
 
+    // Infinite scroll trigger via IntersectionObserver
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+    const scrollStateRef = useRef({ hasNextPage, isFetchingNextPage, fetchNextPage });
+    scrollStateRef.current = { hasNextPage, isFetchingNextPage, fetchNextPage };
+
+    useEffect(() => {
+        const el = loadMoreRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(
+            entries => {
+                const { hasNextPage: has, isFetchingNextPage: fetching, fetchNextPage: fetch } = scrollStateRef.current;
+                if (entries[0]?.isIntersecting && has && !fetching) fetch();
+            },
+            { threshold: 0.1 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [isLoading]);
+
+    const totalCount = data?.pages[0]?.total ?? 0;
+
     const publicFlows = useMemo(() => {
-        if (!data?.list) return [];
+        if (!data?.pages) return [];
+        const allFlows = data.pages.flatMap(page => page.list);
         const query = search.trim().toLowerCase();
 
-        return [...data.list]
+        return allFlows
             .filter((f): f is FlowView & { id: string } => {
                 if (!f.id) return false;
                 return f.isPublic === true;
@@ -189,13 +208,8 @@ export const PublicFlowsPage = () => {
                 return (
                     (f.name ?? '').toLowerCase().includes(query) || (f.description ?? '').toLowerCase().includes(query)
                 );
-            })
-            .sort((a, b) => {
-                const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-                const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-                return bTime - aTime;
             });
-    }, [data?.list, search]);
+    }, [data?.pages, search]);
 
     const handleApiKeySubmit = async (key: string): Promise<boolean> => {
         setApiKey(key);
@@ -206,50 +220,65 @@ export const PublicFlowsPage = () => {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
-            {/* Subtle background texture */}
-            <div
-                className="fixed inset-0 pointer-events-none opacity-[0.015]"
-                style={{
-                    backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)',
-                    backgroundSize: '32px 32px',
-                }}
-            />
+            <Helmet>
+                <title>Community Flows</title>
+                <meta name="description" content="Discover and explore public AI workflows shared by the community." />
+                <link rel="canonical" href={`${SITE_URL}/flows`} />
+                <meta property="og:title" content="Community Flows — Eureka Flow" />
+                <meta
+                    property="og:description"
+                    content="Discover and explore public AI workflows shared by the community."
+                />
+                <meta property="og:url" content={`${SITE_URL}/flows`} />
+            </Helmet>
 
-            {/* Header - matches landing NavBar */}
-            <nav className="fixed top-0 right-0 left-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
-                <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-                    <span className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap sm:gap-2 sm:text-base">
-                        <Link to="/" className="flex items-center gap-1.5 sm:gap-2 hover:opacity-70 transition-opacity">
+            {/* ── Header ── */}
+            <nav className="fixed top-0 right-0 left-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/30">
+                <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-2.5 sm:px-6">
+                    <div className="flex items-center gap-3">
+                        <Link to="/" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
                             <img
                                 src="/logo/purple-symbol.png"
-                                alt="Eureka Flow logo"
-                                className="h-6 w-6 sm:h-7 sm:w-7"
-                                width={28}
-                                height={28}
+                                alt="Eureka Flow"
+                                className="h-6 w-6"
+                                width={24}
+                                height={24}
                             />
-                            <span className="hidden sm:inline">Eureka Flow</span>
+                            <span className="text-sm font-semibold hidden sm:inline">Eureka Flow</span>
                         </Link>
                         <Badge className="pulse-soft text-[10px]">Beta</Badge>
-                    </span>
-                    <div className="flex items-center gap-1 sm:gap-2">
-                        <Button variant="ghost" size="icon" className="hidden sm:inline-flex" asChild>
+                    </div>
+
+                    {/* Inline search — always visible in header */}
+                    <div className="relative flex-1 max-w-xs mx-4 hidden sm:block">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40" />
+                        <Input
+                            placeholder={t('publicFlows.searchPlaceholder', 'Search public flows...')}
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="pl-9 h-8 text-xs rounded-lg bg-muted/30 border-border/30"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="hidden sm:inline-flex h-8 w-8" asChild>
                             <a
                                 href="https://github.com/lemoncloud-io/eureka-flow"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 aria-label="GitHub"
                             >
-                                <Github size={18} />
+                                <Github size={16} />
                             </a>
                         </Button>
                         <LanguageSwitcher />
                         <ThemeToggle />
                         {apiKey ? (
-                            <Button size="sm" onClick={() => navigate('/editor')}>
+                            <Button size="sm" className="h-8 text-xs" onClick={() => navigate('/editor')}>
                                 {t('publicFlows.goToEditor', 'Go to Editor')}
                             </Button>
                         ) : (
-                            <Button size="sm" onClick={() => setIsApiKeyDialogOpen(true)}>
+                            <Button size="sm" className="h-8 text-xs" onClick={() => setIsApiKeyDialogOpen(true)}>
                                 {t('publicFlows.signIn', 'Sign in')}
                             </Button>
                         )}
@@ -257,70 +286,45 @@ export const PublicFlowsPage = () => {
                 </div>
             </nav>
 
-            {/* Hero */}
-            <section className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-24 sm:pt-28 pb-8 sm:pb-10">
-                {/* Glow accent */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[200px] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
-
-                <div className="relative text-center">
-                    <div
-                        className="animate-fade-in-up inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs text-primary"
-                        style={staggerStyle(0)}
-                    >
-                        <Globe className="w-3.5 h-3.5" />
-                        {t('publicFlows.badge', 'Community Workflows')}
+            {/* ── Compact Hero ── */}
+            <section className="max-w-[1600px] mx-auto px-4 sm:px-6 pt-16 pb-4">
+                <div className="flex items-center justify-between pt-4">
+                    <div>
+                        <h1 className="animate-fade-in-up text-lg font-semibold tracking-tight" style={staggerStyle(0)}>
+                            {t('publicFlows.heroTitlePrefix', 'Explore')}{' '}
+                            <span className="text-primary">{t('publicFlows.heroTitleHighlight', 'Public Flows')}</span>
+                        </h1>
+                        <p className="animate-fade-in-up text-xs text-muted-foreground mt-0.5" style={staggerStyle(1)}>
+                            {totalCount > 0
+                                ? t('publicFlows.flowCount', '{{count}} flows', { count: totalCount })
+                                : t(
+                                      'publicFlows.heroDescription',
+                                      'Discover and learn from workflows shared by the community. Open any flow to see how it works.'
+                                  )}
+                        </p>
                     </div>
-                    <h1
-                        className="animate-fade-in-up text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-3"
-                        style={staggerStyle(1)}
-                    >
-                        {t('publicFlows.heroTitlePrefix', 'Explore')}{' '}
-                        <span className="bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-                            {t('publicFlows.heroTitleHighlight', 'Public Flows')}
-                        </span>
-                    </h1>
-                    <p
-                        className="animate-fade-in-up text-sm sm:text-base text-muted-foreground max-w-lg mx-auto mb-8"
-                        style={staggerStyle(2)}
-                    >
-                        {t(
-                            'publicFlows.heroDescription',
-                            'Discover and learn from workflows shared by the community. Open any flow to see how it works.'
-                        )}
-                    </p>
 
-                    {/* Search */}
-                    <div className="animate-fade-in-up relative max-w-md mx-auto" style={staggerStyle(3)}>
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+                    {/* Mobile search */}
+                    <div className="relative sm:hidden w-36">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/40" />
                         <Input
-                            placeholder={t('publicFlows.searchPlaceholder', 'Search public flows...')}
+                            placeholder={t('publicFlows.searchPlaceholder', 'Search...')}
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            className="pl-10 h-10 rounded-xl bg-card/50 border-border/40 backdrop-blur-sm"
+                            className="pl-8 h-8 text-xs rounded-lg bg-muted/30 border-border/30"
                         />
                     </div>
                 </div>
             </section>
 
-            {/* Content */}
-            <main className="relative max-w-6xl mx-auto px-4 sm:px-6 pb-16">
+            {/* ── Gallery ── */}
+            <main className="max-w-[1600px] mx-auto px-4 sm:px-6 pb-16">
                 {isLoading ? (
-                    <div className="flex items-center justify-center py-24">
-                        <div className="flex flex-col items-center gap-3">
-                            <div className="relative w-10 h-10">
-                                <div className="absolute inset-0 border-4 border-border rounded-full" />
-                                <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin" />
-                            </div>
-                            <span className="text-sm text-muted-foreground animate-pulse">
-                                {t('publicFlows.loading', 'Loading flows...')}
-                            </span>
-                        </div>
+                    <div className="flex items-center justify-center py-32">
+                        <Loader2 className="w-6 h-6 text-muted-foreground/40 animate-spin" />
                     </div>
                 ) : publicFlows.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
-                        <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
-                            <Globe className="w-8 h-8 opacity-30" />
-                        </div>
+                    <div className="flex flex-col items-center justify-center py-32 text-muted-foreground">
                         <p className="text-sm font-medium mb-1">
                             {search
                                 ? t('publicFlows.noSearchResults', 'No flows match your search')
@@ -334,21 +338,24 @@ export const PublicFlowsPage = () => {
                     </div>
                 ) : (
                     <>
-                        <div className="flex items-center justify-between mb-4">
-                            <span className="text-xs text-muted-foreground/60">
-                                {t('publicFlows.flowCount', '{{count}} flows', { count: publicFlows.length })}
-                            </span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {/* Masonry grid — tight gaps like higgsfield */}
+                        <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-1.5">
                             {publicFlows.map((flow, i) => (
-                                <PublicFlowCard key={flow.id} flow={flow} index={i} />
+                                <div key={flow.id} className="mb-1.5 break-inside-avoid-column">
+                                    <MasonryFlowCard flow={flow} index={i} />
+                                </div>
                             ))}
+                        </div>
+                        {/* Infinite scroll sentinel */}
+                        <div ref={loadMoreRef} className="flex justify-center py-8">
+                            {isFetchingNextPage && (
+                                <Loader2 className="w-5 h-5 text-muted-foreground/40 animate-spin" />
+                            )}
                         </div>
                     </>
                 )}
             </main>
 
-            {/* API Key Dialog */}
             <ApiKeyDialog
                 open={isApiKeyDialogOpen}
                 onSubmit={handleApiKeySubmit}

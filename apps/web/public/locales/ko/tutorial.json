@@ -1,0 +1,53 @@
+{
+    "loading": "튜토리얼 로딩 중...",
+    "flowName": "모델 합성",
+    "retry": "다시 시도",
+    "steps": {
+        "welcome": {
+            "title": "환영합니다!",
+            "description": "Eureka Flow의 기본을 알아보겠습니다. 블록을 연결하고 워크플로우를 실행해봅시다."
+        },
+        "explore": {
+            "title": "블록 라이브러리 & 캔버스",
+            "description": "왼쪽에 블록 라이브러리가 있습니다. 캔버스에 블록 2개가 이미 배치되어 있습니다 — 연결해볼까요!"
+        },
+        "sidebar": {
+            "title": "블록 라이브러리",
+            "description": "왼쪽에 블록 라이브러리가 있습니다. 입력, 처리, 출력 블록을 찾아보고 클릭하여 캔버스에 추가하세요."
+        },
+        "canvas": {
+            "title": "워크플로우 캔버스",
+            "description": "여기가 작업 공간입니다. 블록 2개가 이미 배치되어 있습니다 — 포트를 드래그하여 연결하세요. 스크롤로 확대/축소, 빈 공간 드래그로 이동합니다."
+        },
+        "connect": {
+            "title": "블록 연결하기",
+            "description": "\"My First Input\" 오른쪽의 파란 점(●)에서 \"Result\" 왼쪽의 파란 점으로 드래그하세요."
+        },
+        "run": {
+            "title": "실행하기!",
+            "description": "\"My First Input\"의 ▷ 재생 버튼을 클릭하여 실행하세요. 결과가 미리보기 블록에 나타납니다."
+        },
+        "done": {
+            "title": "완성했습니다! 🎉",
+            "description": "무료 API 키를 받아 작업을 저장하고 AI 블록을 사용해보세요.",
+            "getKey": "Eureka Codes에서 무료 키 받기",
+            "enterKey": "이미 키가 있어요",
+            "keyPlaceholder": "API 키를 붙여넣으세요",
+            "validating": "검증 중...",
+            "continue": "시작하기!",
+            "or": "또는",
+            "invalidKey": "유효하지 않은 키입니다. 다시 시도해주세요."
+        }
+    },
+    "feedback": {
+        "great": "잘했어요!",
+        "advancing": "다음 단계로 이동합니다..."
+    },
+    "cta": {
+        "next": "다음",
+        "prev": "이전",
+        "skip": "튜토리얼 건너뛰기",
+        "later": "나중에 하기",
+        "exploreFlows": "공개 플로우 둘러보기"
+    }
+}

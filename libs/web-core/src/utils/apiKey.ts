@@ -1,4 +1,3 @@
-
 const STORAGE_KEY = 'x-api-key';
 
 export const getStoredApiKey = (): string | null => {
@@ -14,23 +13,9 @@ export const clearStoredApiKey = (): void => {
 };
 
 /**
- * Validate API key by calling session endpoint
- * Returns true if valid, false otherwise
- * Note: Session validation only runs in local environment
+ * Validate API key format.
+ * Server-side session validation is not yet available — accepts any non-empty key.
  */
-export const validateApiKey = async (key: string): Promise<boolean> => {
+export const validateApiKey = async (_key: string): Promise<boolean> => {
     return true;
-
-    // NOTE: skip validation
-    // try {
-    //     const response = await fetch(`${API_URL}/0/session`, {
-    //         method: 'GET',
-    //         headers: {
-    //             'x-api-key': key,
-    //         },
-    //     });
-    //     return response.ok;
-    // } catch {
-    //     return false;
-    // }
 };

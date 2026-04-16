@@ -26,7 +26,8 @@
         "viewConfig": "View Config",
         "collapse": "Collapse",
         "expand": "Expand",
-        "delete": "Delete"
+        "delete": "Delete",
+        "options": "Options"
     },
     "actions": {
         "run": "Run",

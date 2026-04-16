@@ -56,7 +56,7 @@ export const useApiKeyPopup = ({ codesUrl, onSuccess, onError }: UseApiKeyPopupO
         sessionStorage.setItem(STATE_STORAGE_KEY, state);
 
         const currentOrigin = window.location.origin;
-        const url = new URL(`${codesUrl}/openapi-keys`);
+        const url = new URL(`${codesUrl}/codes-keys`);
         url.searchParams.set('callback', 'flow');
         url.searchParams.set('state', state);
         url.searchParams.set('origin', currentOrigin);
@@ -73,7 +73,7 @@ export const useApiKeyPopup = ({ codesUrl, onSuccess, onError }: UseApiKeyPopupO
         );
 
         if (!popupRef.current) {
-            setError('팝업이 차단되었습니다. 팝업 차단을 해제해 주세요.');
+            setError('POPUP_BLOCKED');
             onErrorRef.current?.('Popup blocked');
             sessionStorage.removeItem(STATE_STORAGE_KEY);
             return;

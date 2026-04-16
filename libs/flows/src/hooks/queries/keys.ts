@@ -43,6 +43,11 @@ export const logsKeys = {
     node: (nodeId: string) => [...logsKeys.all, 'node', nodeId] as const,
 };
 
+export const graphKeys = {
+    all: ['graph'] as const,
+    detail: (flowId: string) => [...graphKeys.all, flowId] as const,
+};
+
 export const systemKeys = {
     all: ['system'] as const,
     info: () => [...systemKeys.all, 'info'] as const,

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Blocks, BookOpen, Keyboard, Sparkles } from 'lucide-react';
+import { Blocks, BookOpen, Keyboard } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@flows/ui-kit';
 
-import { BlockReferenceContent, ExamplesContent, GettingStartedContent, KeyboardShortcutsContent } from './help';
+import { BlockReferenceContent, GettingStartedContent, KeyboardShortcutsContent } from './help';
 
 import type { HelpTab } from './help';
 
@@ -14,7 +14,6 @@ const TABS: { key: HelpTab; icon: typeof BookOpen }[] = [
     { key: 'gettingStarted', icon: BookOpen },
     { key: 'blocks', icon: Blocks },
     { key: 'shortcuts', icon: Keyboard },
-    { key: 'examples', icon: Sparkles },
 ];
 
 interface HelpDialogProps {
@@ -42,8 +41,6 @@ export const HelpDialog = ({ open, onOpenChange, defaultTab = 'gettingStarted' }
                 return <BlockReferenceContent />;
             case 'shortcuts':
                 return <KeyboardShortcutsContent />;
-            case 'examples':
-                return <ExamplesContent />;
             default:
                 return null;
         }

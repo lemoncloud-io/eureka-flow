@@ -1,5 +1,7 @@
 import { api, withRetry } from '@flows/web-core';
 
+import { encodePathSegment } from '../utils';
+
 import type {
     ApiListResult,
     DataPacket,
@@ -11,6 +13,7 @@ import type {
     UpsertNodeResult,
 } from '../types';
 import type { EdgeData } from '@lemoncloud/eureka-flows-api';
+
 
 const _log = console.log.bind(console, '[nodes-api]');
 
@@ -45,7 +48,7 @@ export const listNodes = async (flowId: string): Promise<NodeView[]> => {
  */
 export const getNode = async (id: string): Promise<NodeView> => {
     _log(`> getNode(${id})`);
-    const response = await api.get<NodeView>(`/nodes/${id}`);
+    const response = await api.get<NodeView>(`/nodes/${encodePathSegment(id)}`);
     return response.data;
 };
 
@@ -60,9 +63,15 @@ export const getNode = async (id: string): Promise<NodeView> => {
  * @param direction - Port direction ('in' or 'out')
  * @returns PortDataResponse with port data
  */
-export const getPortData = async (portId: string, direction: 'in' | 'out'): Promise<PortDataResponse> => {
+export const getPortData = async (
+    portId: string,
+    direction: 'in' | 'out',
+    options?: { flowId?: string; runId?: string }
+): Promise<PortDataResponse> => {
     _log(`> getPortData(${portId}, direction=${direction})`);
-    const response = await api.get<PortDataResponse>(`/nodes/${portId}/port`, { params: { direction } });
+    const response = await api.get<PortDataResponse>(`/nodes/${encodePathSegment(portId)}/port`, {
+        params: { direction, ...options },
+    });
     return response.data;
 };
 
@@ -104,7 +113,9 @@ export const upsertNode = async (id: string, flowId: string, body: Partial<NodeV
     _log(`> upsertNode(${id}, flowId=${flowId})`, body);
     // Send body directly - server expects { config?, output?, ...nodeFields }
     // NOT wrapped in { nodes: [...] } format
-    const response = await api.post<UpsertNodeResult>(`/nodes/${id}/upsert`, body, { params: { flowId } });
+    const response = await api.post<UpsertNodeResult>(`/nodes/${encodePathSegment(id)}/upsert`, body, {
+        params: { flowId },
+    });
     return response.data;
 };
 
@@ -183,7 +194,7 @@ export const toPortVariantData = (packet: DataPacket): PortVariantData => {
  */
 export const deleteNode = async (id: string): Promise<void> => {
     _log(`> deleteNode(${id})`);
-    await api.delete(`/nodes/${id}`);
+    await api.delete(`/nodes/${encodePathSegment(id)}`);
 };
 
 /**
@@ -229,7 +240,7 @@ export const runNode = async (nodeId: string, body?: RunNodeBody, options?: RunN
         if (options?.connection) queryParams.push(`connection=${encodeURIComponent(options.connection)}`);
 
         const params = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-        const response = await api.post<NodeView>(`/nodes/${nodeId}/run${params}`, body || {});
+        const response = await api.post<NodeView>(`/nodes/${encodePathSegment(nodeId)}/run${params}`, body || {});
         return response.data;
     } catch (err) {
         _log('> runNode error:', err);
@@ -318,6 +329,6 @@ export interface TouchNodeBody {
  */
 export const touchNode = async (nodeId: string, body: TouchNodeBody): Promise<NodeView> => {
     _log(`> touchNode(${nodeId})`, body);
-    const response = await api.post<NodeView>(`/nodes/${nodeId}/touch`, body);
+    const response = await api.post<NodeView>(`/nodes/${encodePathSegment(nodeId)}/touch`, body);
     return response.data;
 };

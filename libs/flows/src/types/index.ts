@@ -1,3 +1,6 @@
+export * from './graph';
+export * from './permissions';
+
 export type {
     BlockDefinition,
     BlockView,
@@ -36,6 +39,81 @@ export type {
     WorkflowState,
 } from '@lemoncloud/eureka-flows-api';
 
+// ============================================================================
+// Socket Event Types (will move to @lemoncloud/eureka-flows-api in next release)
+// ============================================================================
+
+/**
+ * Common event type for WebSocket messages
+ */
+export interface SocketEvent {
+    /** type of node (ex: node, node/port, trace) */
+    type: string;
+    /** id of node */
+    id: string;
+    /** message sequence (as no) */
+    no?: number;
+    /** (optional) timestamp value */
+    ts?: number;
+}
+
+/**
+ * type: `SocketNodeEvent`
+ * - event from web-socket service
+ */
+export interface SocketNodeEvent extends SocketEvent {
+    /** (optional) id of flow */
+    flowId?: string;
+    /** (optional) id of run in current */
+    runId?: string;
+    /** major state (ex: READY, ERROR, RUNNING) */
+    state: NodeStatusType;
+    /** minor stage (ex: enter, final, progress) */
+    stage?: RunNodeStage;
+    /** (optional) the percentage progress to show */
+    progress?: number;
+    /** (optional) error message if `state=ERROR` */
+    error?: string;
+}
+
+/**
+ * type: `SocketTraceEvent`
+ * - event to notify internal trace event.
+ */
+export interface SocketTraceEvent extends SocketEvent {
+    /** trace sequence no */
+    seq: number;
+    /** run state */
+    state?: string;
+    /** stage of trace */
+    stage: CodexTraceStage;
+    /** detailed message */
+    message: string;
+    /** (optional) running id */
+    runId?: string;
+    /** additional data to info */
+    data?: Record<string, unknown>;
+}
+
+/** Stages for structured tracing. */
+export type CodexTraceStage =
+    | 'run'
+    | 'planner'
+    | 'step'
+    | 'tool'
+    | 'approval'
+    | 'reflector'
+    | 'finalizer'
+    | 'trace'
+    | 'error'
+    | 'runtime';
+
+/** state of run condition */
+export type CodexRunStatus = 'idle' | 'running' | 'waiting_for_approval' | 'completed' | 'failed';
+
+/** minor stage of node run */
+export type RunNodeStage = 'enter' | 'final' | 'progress' | (string & {});
+
 import type {
     BlockDefinition,
     DataPacket,
@@ -46,6 +124,7 @@ import type {
     NodeConfigItem,
     NodeData,
     NodeDataPacketItem,
+    NodeStatusType,
     NodeStereo,
     Position,
 } from '@lemoncloud/eureka-flows-api';
@@ -69,21 +148,16 @@ import type {
  */
 export type NodeState = 'IDLE' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR';
 
+const NODE_STATES: ReadonlySet<string> = new Set<NodeState>(['IDLE', 'READY', 'RUNNING', 'COMPLETED', 'ERROR']);
+
+/** Type guard: narrows NodeStatusType (or any string) to frontend NodeState */
+export const isNodeState = (value: string): value is NodeState => NODE_STATES.has(value);
+
 /**
  * TraceStage - agent block execution stages for trace messages
+ * Extends CodexTraceStage with open string fallback for forward compatibility
  */
-export type TraceStage =
-    | 'run'
-    | 'planner'
-    | 'step'
-    | 'tool'
-    | 'approval'
-    | 'reflector'
-    | 'finalizer'
-    | 'trace'
-    | 'error'
-    | 'runtime'
-    | (string & {});
+export type TraceStage = CodexTraceStage | (string & {});
 
 /**
  * TraceType - specific event types within agent trace logs
@@ -546,6 +620,8 @@ export interface LoadFlowResult extends FlowModel {
     ports?: LoadFlowPortData[];
     /** WebSocket channel ID for real-time node status updates */
     channelId?: string;
+    /** Whether the current user can edit this flow (owner = true, guest = false) */
+    isEditable?: boolean;
 }
 
 /**
@@ -711,4 +787,28 @@ export interface SystemComponent {
  */
 export interface SystemInfo {
     components: SystemComponent[];
+}
+
+// ============================================================================
+// Execution Stack (Run Context)
+// ============================================================================
+
+/** Port update recorded within a run context */
+export interface RunPortUpdate {
+    portId: string;
+    portName: string;
+    no: number;
+    timestamp: number;
+}
+
+/** Single execution context identified by runId */
+export interface RunContext {
+    runId: string;
+    nodeId: string;
+    state: 'RUNNING' | 'COMPLETED' | 'ERROR';
+    startedAt?: number;
+    completedAt?: number;
+    traces: TraceEntry[];
+    portUpdates: RunPortUpdate[];
+    error?: string;
 }

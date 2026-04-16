@@ -4,7 +4,6 @@ import { HelmetProvider } from 'react-helmet-async';
 import { I18nextProvider } from 'react-i18next';
 
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toaster } from 'sonner';
 
 import { flowStorage } from '@flows/flows';
@@ -20,7 +19,7 @@ import { ThemeProvider } from '@flows/theme';
 import { reportError, useWebCoreStore, validateApiKey } from '@flows/web-core';
 
 import { i18n } from '../i18n';
-import { useApiKeyTour } from './features/flows/components/tour';
+import { useApiKeyTour } from './features/tutorial';
 
 import type { ErrorInfo, ReactNode } from 'react';
 
@@ -52,9 +51,9 @@ const isPublicRoute = (): boolean => {
     const pathname = window.location.pathname;
     return (
         pathname === '/' ||
-        pathname === '/explore' ||
+        pathname === '/flows' ||
+        pathname === '/tutorial' ||
         pathname.startsWith('/flows/') ||
-        pathname.startsWith('/flow/examples') ||
         pathname.startsWith('/policy/')
     );
 };
@@ -158,6 +157,17 @@ export const Providers = ({ children }: ProvidersProps) => {
         reportError(error, { componentStack: info.componentStack ?? undefined }, 'web');
     }, []);
 
+    // Force re-render when i18n bundles change via postMessage (iframe preview mode)
+    // react-i18next's useSyncExternalStore doesn't reliably pick up addResourceBundle changes,
+    // so we use React state to guarantee the component tree re-renders
+    const [, setI18nRevision] = useState(0);
+    useEffect(() => {
+        if (window.parent === window) return;
+        const onBundleAdded = () => setI18nRevision(r => r + 1);
+        i18n.store.on('added', onBundleAdded);
+        return () => i18n.store.off('added', onBundleAdded);
+    }, []);
+
     return (
         <Suspense fallback={<LoadingFallback />}>
             <ErrorBoundary FallbackComponent={ErrorFallback} onError={handleError}>
@@ -169,7 +179,8 @@ export const Providers = ({ children }: ProvidersProps) => {
                                     <AppContent>{children}</AppContent>
                                 </ApiKeyGate>
                                 <Toaster
-                                    position="bottom-right"
+                                    position={window.innerWidth <= 767 ? 'top-center' : 'bottom-right'}
+                                    richColors
                                     toastOptions={{
                                         classNames: {
                                             toast: 'backdrop-blur-md bg-background/95 border-border/50 shadow-lg',
@@ -180,7 +191,6 @@ export const Providers = ({ children }: ProvidersProps) => {
                                     }}
                                 />
                             </ThemeProvider>
-                            {import.meta.env.DEV && <ReactQueryDevtools />}
                         </QueryClientProvider>
                     </HelmetProvider>
                 </I18nextProvider>

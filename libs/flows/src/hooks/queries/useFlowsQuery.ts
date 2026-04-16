@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { flowsKeys } from './keys';
 import { createFlow, deleteFlow, listFlows, listPublicFlows, loadFlow, saveFlow, updateFlowMetadata } from '../../api';
@@ -26,13 +26,21 @@ export const useFlowsListQuery = (enabled = true) => {
 };
 
 /**
- * Query hook for listing public flows (always uses /public endpoint)
- * GET /public/flows
+ * Infinite query hook for listing public flows with pagination
+ * GET /public/flows?page=N
  */
-export const usePublicFlowsListQuery = (enabled = true) => {
-    return useQuery<ApiListResult<FlowView>>({
+export const usePublicFlowsInfiniteQuery = (enabled = true) => {
+    return useInfiniteQuery({
         queryKey: flowsKeys.publicList(),
-        queryFn: listPublicFlows,
+        queryFn: ({ pageParam }) => listPublicFlows(pageParam),
+        initialPageParam: 0,
+        getNextPageParam: lastPage => {
+            const limit = lastPage.limit ?? 10;
+            const page = lastPage.page ?? 0;
+            const total = lastPage.total ?? 0;
+            const fetched = (page + 1) * limit;
+            return fetched < total ? page + 1 : undefined;
+        },
         enabled,
     });
 };
