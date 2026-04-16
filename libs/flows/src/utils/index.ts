@@ -6,3 +6,4 @@ export * from './imageProcessing';
 export * from './nodeHeight';
 export * from './nodeSize';
 export * from './s3Utils';
+export * from './urlUtils';
