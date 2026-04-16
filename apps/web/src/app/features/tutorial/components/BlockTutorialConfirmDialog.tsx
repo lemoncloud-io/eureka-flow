@@ -46,7 +46,7 @@ export const BlockTutorialConfirmDialog: React.FC<BlockTutorialConfirmDialogProp
                         onClick={onConfirm}
                         className={cn(
                             'flex h-[46px] flex-1 items-center justify-center rounded-full',
-                            'bg-[#8F19F6] text-base font-semibold text-white'
+                            'bg-primary text-base font-semibold text-primary-foreground'
                         )}
                     >
                         중단

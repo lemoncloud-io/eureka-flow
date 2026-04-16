@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { cn } from '@flows/lib/utils';
 
 import { EurekaFlowLogo } from './tour-visuals/EurekaFlowLogo';
+import { LottieConfetti } from './tour-visuals/LottieConfetti';
 
 import type { TourStep } from '../types/tour';
 
@@ -13,19 +14,21 @@ interface TourTooltipProps {
     currentIndex: number;
     totalSteps: number;
     width?: number;
+    /** Hide step counter (e.g. for intro/completion modals) */
+    hideCounter?: boolean;
     onNext: () => void;
     onPrev: () => void;
     onClose: () => void;
 }
 
-const VisualArea: React.FC<{ visual: TourStep['visual']; width: number }> = ({ visual, width }) => (
+const VisualArea: React.FC<{ visual: NonNullable<TourStep['visual']>; width: number }> = ({ visual, width }) => (
     <div
         className="flex items-center justify-center overflow-hidden rounded-t-[22px] bg-muted"
         style={{ width, height: 184 }}
     >
         {visual.type === 'logo' && <EurekaFlowLogo />}
         {visual.type === 'icon' && (visual.element ?? <div className="h-16 w-16 rounded-xl bg-foreground" />)}
-        {visual.type === 'confetti' && <span className="text-6xl">🎉</span>}
+        {visual.type === 'confetti' && <LottieConfetti />}
         {visual.type === 'image' && <img src={visual.src} alt="" className="h-full w-full object-cover" />}
         {visual.type === 'images' && (
             <div className="flex gap-2 px-4">
@@ -42,14 +45,12 @@ export const TourTooltip: React.FC<TourTooltipProps> = ({
     currentIndex,
     totalSteps,
     width = 360,
+    hideCounter = false,
     onNext,
     onPrev,
     onClose,
 }) => (
-    <div
-        className="relative overflow-hidden rounded-[22px] bg-background shadow-[0_0_16px_0_#8F19F6]"
-        style={{ width }}
-    >
+    <div className="relative overflow-hidden rounded-[22px] bg-background shadow-lg" style={{ width }}>
         <button
             onClick={onClose}
             aria-label="닫기"
@@ -61,7 +62,7 @@ export const TourTooltip: React.FC<TourTooltipProps> = ({
             <X size={20} className="text-foreground" />
         </button>
 
-        <VisualArea visual={step.visual} width={width} />
+        {step.visual && <VisualArea visual={step.visual} width={width} />}
 
         <div className="flex flex-col gap-5 p-5">
             <div className="flex flex-col gap-2">
@@ -71,10 +72,12 @@ export const TourTooltip: React.FC<TourTooltipProps> = ({
                 </p>
             </div>
 
-            <div className="flex items-center">
-                <span className="flex-1 text-sm font-semibold text-foreground">
-                    {currentIndex + 1}/<span className="text-muted-foreground">{totalSteps}</span>
-                </span>
+            <div className={cn('flex items-center', hideCounter && 'justify-end')}>
+                {!hideCounter && (
+                    <span className="flex-1 text-sm font-semibold text-foreground">
+                        {currentIndex + 1}/<span className="text-muted-foreground">{totalSteps}</span>
+                    </span>
+                )}
 
                 <div className="flex gap-3">
                     {step.showSecondary !== false && currentIndex > 0 && (
@@ -91,7 +94,7 @@ export const TourTooltip: React.FC<TourTooltipProps> = ({
                     <button
                         onClick={onNext}
                         className={cn(
-                            'rounded-[10px] bg-[#8F19F6] px-4 py-[9px]',
+                            'rounded-[10px] bg-primary px-4 py-[9px]',
                             'text-sm font-semibold leading-[22px] text-white'
                         )}
                     >

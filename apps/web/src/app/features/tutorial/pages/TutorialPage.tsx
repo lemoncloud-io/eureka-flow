@@ -91,7 +91,6 @@ export const TutorialPage = () => {
 
     const handleGuideTourStepChange = useCallback(
         (stepId: string) => {
-            // Open sidebar when showing block-library step
             if (stepId === 'block-library') {
                 sidebarRef.current?.open();
             } else if (tourPhase === 'guide') {
@@ -102,7 +101,6 @@ export const TutorialPage = () => {
     );
 
     const handleGuideTourClose = useCallback(() => {
-        // Guide tour done → start block tutorial
         setTourPhase('block');
     }, []);
 
@@ -145,7 +143,7 @@ export const TutorialPage = () => {
     if (!isReady) {
         return (
             <div className="flex h-screen flex-col items-center justify-center bg-background text-foreground">
-                <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-border/40 border-t-primary" />
             </div>
         );
     }
@@ -157,7 +155,6 @@ export const TutorialPage = () => {
             <div data-tour="canvas" className="absolute inset-0">
                 <WorkflowCanvas
                     ref={canvasRef}
-                    readOnly={false}
                     onNodeSelect={noop}
                     onChange={handleCanvasChange}
                     onOpenLibrary={handleOpenLibrary}

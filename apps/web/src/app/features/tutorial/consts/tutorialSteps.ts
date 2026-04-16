@@ -37,6 +37,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 export const TUTORIAL_STORAGE_KEY = 'eureka-flow-tutorial-completed';
 
 const BLOCK_ID_TEXT_INPUT = '0004';
+const BLOCK_ID_AI_IMAGE = '0006';
 const BLOCK_ID_PREVIEW = '0007';
 
 /** Fallback block definitions when public API is unavailable */
@@ -53,6 +54,33 @@ export const FALLBACK_BLOCKS = [
         outputs: [{ id: 'out', label: 'Text', type: 'text' }],
         defaultConfig: { text: '' },
         configSchema: [{ key: 'text', type: 'text', label: 'Text', placeholder: 'Enter text...' }],
+    },
+    {
+        id: BLOCK_ID_AI_IMAGE,
+        type: 'single-image-generator',
+        label: 'AI Image',
+        icon: '🎨',
+        description: 'Generate AI images from text',
+        stereo: 'process' as const,
+        isFrontend: false,
+        inputs: [{ id: 'prompt', label: 'Prompt', type: 'text' }],
+        outputs: [
+            { id: 'out', label: 'Result', type: 'image' },
+            { id: 'err', label: 'Error', type: 'text' },
+        ],
+        defaultConfig: { model: 'gemini-2.5-flash' },
+        configSchema: [
+            {
+                key: 'model',
+                type: 'select',
+                label: 'Generation Model',
+                options: [
+                    { value: 'gemini-default', label: 'Gemini Default' },
+                    { value: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash' },
+                    { value: 'gpt-image-1', label: 'GPT Image 1' },
+                ],
+            },
+        ],
     },
     {
         id: BLOCK_ID_PREVIEW,

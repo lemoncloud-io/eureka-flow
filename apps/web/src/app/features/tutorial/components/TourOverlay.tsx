@@ -18,7 +18,7 @@ interface TourOverlayProps {
     children: React.ReactNode;
 }
 
-const GLOW_COLOR = '#8F19F6';
+const GLOW_COLOR = 'hsl(272, 92%, 53%)';
 const HIGHLIGHT_RADIUS = 15;
 
 const useHighlightRect = (selector?: string, padding = 8): HighlightRect | null => {

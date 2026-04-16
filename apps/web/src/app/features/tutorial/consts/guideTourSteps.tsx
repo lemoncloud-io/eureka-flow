@@ -2,6 +2,7 @@ import React from 'react';
 
 import { FileText, LayoutGrid } from 'lucide-react';
 
+import { LottieConfetti } from '../components/tour-visuals/LottieConfetti';
 import { MenuPreview } from '../components/tour-visuals/MenuPreview';
 import { ShortcutGrid } from '../components/tour-visuals/ShortcutGrid';
 import { TourStepIcon } from '../components/tour-visuals/TourStepIcon';
@@ -14,8 +15,7 @@ export const GUIDE_TOUR_STEPS: TourStep[] = [
     {
         id: 'welcome',
         title: '에디터를 둘러볼까요!?',
-        description:
-            'EurekaAPI 키가 설정되었습니다.\n워크플로우 에디터를 빠르게 둘러볼게요!\n튜토리얼은 메뉴에서 언제든 다시 볼 수 있습니다.',
+        description: '워크플로우 에디터를 빠르게 둘러볼게요!\n튜토리얼은 메뉴에서 언제든 다시 볼 수 있습니다.',
         arrowDirection: 'none',
         visual: { type: 'logo' },
         showSecondary: false,
@@ -62,7 +62,7 @@ export const GUIDE_TOUR_STEPS: TourStep[] = [
         description:
             '블록 라이브러리에서 블록을 추가하고 연결하는 것 부터 시작하세요!\n언제든 메인 메뉴에서 도움말을 클릭하여 유레카플로우 안내를 받을 수 있습니다.',
         arrowDirection: 'none',
-        visual: { type: 'confetti' },
+        visual: { type: 'icon', element: <LottieConfetti /> },
         primaryLabel: '시작하기',
     },
 ];
