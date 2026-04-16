@@ -866,10 +866,20 @@ export const FlowEditorPage = () => {
             )}
 
             {/* Guided Tour: Guide → Block Tutorial */}
-            {tourPhase === 'guide' && <GuideTour onClose={() => setTourPhase('block')} />}
+            {tourPhase === 'guide' && (
+                <GuideTour
+                    onClose={() => {
+                        setTourPhase('block');
+                        sidebarRef.current?.open();
+                    }}
+                />
+            )}
             {tourPhase === 'block' && (
                 <BlockTutorial
-                    onClose={() => setTourPhase('none')}
+                    onClose={() => {
+                        setTourPhase('none');
+                        sidebarRef.current?.close();
+                    }}
                     onOpenHelp={() => handleOpenHelp('gettingStarted')}
                 />
             )}
