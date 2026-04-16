@@ -1,7 +1,8 @@
 import React from 'react';
 
-import { FileText, LayoutGrid, Menu } from 'lucide-react';
+import { FileText, LayoutGrid } from 'lucide-react';
 
+import { MenuPreview } from '../components/tour-visuals/MenuPreview';
 import { ShortcutGrid } from '../components/tour-visuals/ShortcutGrid';
 import { TourStepIcon } from '../components/tour-visuals/TourStepIcon';
 
@@ -53,7 +54,7 @@ export const GUIDE_TOUR_STEPS: TourStep[] = [
             '파일 작업(내보내기, 가져오기), 편집 도구(자동 정렬, 초기화),\n게시, 도움말 등 메인 메뉴에서 사용할 수 있어요\nAPI 키 설정에서 EurekaAPI 키를 관리합니다.',
         targetSelector: '[data-tour="header-menu"]',
         arrowDirection: 'top',
-        visual: { type: 'icon', element: <TourStepIcon icon={<Menu size={28} />} label="메인 메뉴" /> },
+        visual: { type: 'icon', element: <MenuPreview /> },
     },
     {
         id: 'ready',

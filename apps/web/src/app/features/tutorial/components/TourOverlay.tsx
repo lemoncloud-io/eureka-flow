@@ -12,6 +12,8 @@ interface TourOverlayProps {
     opacity: number;
     highlightSelector?: string;
     highlightPadding?: number;
+    /** When false, the highlighted element is not clickable (view-only) */
+    interactive?: boolean;
     onClose?: () => void;
     children: React.ReactNode;
 }
@@ -65,6 +67,7 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
     opacity,
     highlightSelector,
     highlightPadding = 8,
+    interactive = true,
     onClose,
     children,
 }) => {
@@ -120,6 +123,20 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
             </svg>
 
             {glowStyle && <div className="pointer-events-none absolute" style={glowStyle} />}
+
+            {/* Block interactions with highlighted element when non-interactive */}
+            {!interactive && highlight && (
+                <div
+                    className="absolute"
+                    style={{
+                        top: highlight.top,
+                        left: highlight.left,
+                        width: highlight.width,
+                        height: highlight.height,
+                        borderRadius: HIGHLIGHT_RADIUS,
+                    }}
+                />
+            )}
 
             {children}
         </div>,

@@ -89,6 +89,18 @@ export const TutorialPage = () => {
         }
     }, [tourPhase]);
 
+    const handleGuideTourStepChange = useCallback(
+        (stepId: string) => {
+            // Open sidebar when showing block-library step
+            if (stepId === 'block-library') {
+                sidebarRef.current?.open();
+            } else if (tourPhase === 'guide') {
+                sidebarRef.current?.close();
+            }
+        },
+        [tourPhase]
+    );
+
     const handleGuideTourClose = useCallback(() => {
         // Guide tour done → start block tutorial
         setTourPhase('block');
@@ -197,7 +209,9 @@ export const TutorialPage = () => {
                     />
                 ))}
 
-            {tourPhase === 'guide' && <GuideTour onClose={handleGuideTourClose} />}
+            {tourPhase === 'guide' && (
+                <GuideTour onClose={handleGuideTourClose} onStepChange={handleGuideTourStepChange} />
+            )}
             {tourPhase === 'block' && <BlockTutorial onClose={handleBlockTutorialClose} />}
         </div>
     );
