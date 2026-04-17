@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-04-17] - root@0.31.0, @flows/web@0.31.0, @flows/admin@0.17.0
+
+### Features
+
+- enable CORS for translation uploads
+- (i18n) add API key auth support for presign API requests
+- (i18n) add presigned URL upload, dynamic locale discovery, and security hardening
+- (i18n) add live sync for translation edits
+
+### Bug Fixes
+
+- (i18n) use URLSearchParams for presign API query encoding
+- (i18n) rename presign auth header to x-i18n-key
+
+### Chores
+
+- update S3 bucket to eureka-flows-i18n and add presign env vars to CI
+
 ## [2026-04-16] - root@0.30.1, @flows/web@0.30.1
 
 ### Chores
