@@ -7,7 +7,7 @@ const CHANNEL_NAME = 'i18n-preview';
 
 export type PreviewMessage =
     | { type: 'i18n:sync'; namespace: I18nNamespace; edited: Record<Language, FlatTranslations> }
-    | { type: 'i18n:showKeys'; enabled: boolean }
+    | { type: 'i18n:showKeys'; namespace: I18nNamespace; keys: Record<string, unknown> }
     | { type: 'i18n:changeLanguage'; language: Language }
     | { type: 'i18n:keyClicked'; key: string };
 

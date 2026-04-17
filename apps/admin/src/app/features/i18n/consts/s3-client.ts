@@ -1,13 +1,16 @@
 const S3_BUCKET_URL = import.meta.env.VITE_I18N_BUCKET_URL as string | undefined;
+const WEB_APP_URL = import.meta.env.VITE_WEB_APP_URL as string | undefined;
 
-const getS3Url = (lng: string, ns: string): string => {
-    if (!S3_BUCKET_URL) throw new Error('VITE_I18N_BUCKET_URL is not configured');
-    return `${S3_BUCKET_URL}/${lng}/${ns}.json`;
+/** S3 mode: direct bucket access. Local mode: fetch from web dev server's /locales/ */
+const getTranslationUrl = (lng: string, ns: string): string => {
+    if (S3_BUCKET_URL) return `${S3_BUCKET_URL}/${lng}/${ns}.json`;
+    const webUrl = WEB_APP_URL || 'http://localhost:3000';
+    return `${webUrl}/locales/${lng}/${ns}.json`;
 };
 
-/** Fetch translation JSON from S3 */
+/** Fetch translation JSON (from S3 or web app's local files) */
 export const fetchTranslation = async (lng: string, ns: string): Promise<Record<string, unknown>> => {
-    const url = getS3Url(lng, ns);
+    const url = getTranslationUrl(lng, ns);
     const response = await fetch(url, {
         method: 'GET',
         mode: 'cors',
@@ -17,9 +20,10 @@ export const fetchTranslation = async (lng: string, ns: string): Promise<Record<
     return response.json();
 };
 
-/** Upload translation JSON to S3 */
+/** Upload translation JSON to S3 (only available when S3 is configured) */
 export const uploadTranslation = async (lng: string, ns: string, data: Record<string, unknown>): Promise<void> => {
-    const url = getS3Url(lng, ns);
+    if (!S3_BUCKET_URL) throw new Error('Upload requires VITE_I18N_BUCKET_URL to be configured');
+    const url = getTranslationUrl(lng, ns);
     const response = await fetch(url, {
         method: 'PUT',
         mode: 'cors',

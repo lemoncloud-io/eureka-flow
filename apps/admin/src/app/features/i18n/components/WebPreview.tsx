@@ -120,41 +120,53 @@ export const WebPreview = ({ onKeySearch, externalData }: WebPreviewProps) => {
         };
     }, [showKeys]);
 
-    // Sync to iframe
-    useEffect(() => {
-        if (syncTrigger === 0) return;
-
-        if (showKeys && allNsKeys) {
-            // showKeys ON: send key overlays for ALL namespaces
-            for (const ns of I18N_NAMESPACES) {
-                const keys =
-                    ns === namespace
-                        ? [...new Set(LANGUAGES.flatMap(lang => Object.keys(edited[lang])))]
-                        : (allNsKeys[ns] ?? []);
-                if (keys.length > 0) {
-                    postToIframe({ type: 'i18n:showKeys', namespace: ns, keys: buildKeyOverlay(keys) });
-                }
-            }
-        } else if (!showKeys) {
-            // Restore current namespace with edited values
+    const syncEditedToIframe = useCallback(
+        (ns: I18nNamespace, data: Record<Language, FlatTranslations>) => {
             LANGUAGES.forEach(lang => {
                 postToIframe({
                     type: 'i18n:update',
-                    namespace,
+                    namespace: ns,
                     language: lang,
-                    resources: unflattenJson(edited[lang]),
+                    resources: unflattenJson(data[lang]),
                 });
             });
-            // Restore other namespaces with cached S3 values (if coming back from showKeys)
+        },
+        [postToIframe]
+    );
+
+    // Refs for full sync to read current values without re-triggering
+    const editedRef = useRef(edited);
+    const namespaceRef = useRef(namespace);
+    editedRef.current = edited;
+    namespaceRef.current = namespace;
+
+    // Full sync to iframe (initial load, refresh, showKeys toggle only)
+    useEffect(() => {
+        if (syncTrigger === 0) return;
+        const ns = namespaceRef.current;
+        const ed = editedRef.current;
+
+        if (showKeys && allNsKeys) {
+            for (const targetNs of I18N_NAMESPACES) {
+                const keys =
+                    targetNs === ns
+                        ? [...new Set(LANGUAGES.flatMap(lang => Object.keys(ed[lang])))]
+                        : (allNsKeys[targetNs] ?? []);
+                if (keys.length > 0) {
+                    postToIframe({ type: 'i18n:showKeys', namespace: targetNs, keys: buildKeyOverlay(keys) });
+                }
+            }
+        } else if (!showKeys) {
+            syncEditedToIframe(ns, ed);
             if (allNsValues) {
-                for (const ns of I18N_NAMESPACES) {
-                    if (ns === namespace) continue;
+                for (const targetNs of I18N_NAMESPACES) {
+                    if (targetNs === ns) continue;
                     LANGUAGES.forEach(lang => {
                         postToIframe({
                             type: 'i18n:update',
-                            namespace: ns,
+                            namespace: targetNs,
                             language: lang,
-                            resources: allNsValues[ns] ?? {},
+                            resources: allNsValues[targetNs] ?? {},
                         });
                     });
                 }
@@ -162,7 +174,22 @@ export const WebPreview = ({ onKeySearch, externalData }: WebPreviewProps) => {
                 setAllNsValues(null);
             }
         }
-    }, [syncTrigger, showKeys, allNsKeys, allNsValues, edited, namespace, postToIframe]);
+    }, [syncTrigger, showKeys, allNsKeys, allNsValues, postToIframe, syncEditedToIframe]);
+
+    // Live sync: push edited translations to iframe on every change (debounced)
+    const liveSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        if (syncTrigger === 0 || showKeys) return;
+
+        if (liveSyncTimerRef.current) clearTimeout(liveSyncTimerRef.current);
+        liveSyncTimerRef.current = setTimeout(() => {
+            syncEditedToIframe(namespace, edited);
+        }, 150);
+
+        return () => {
+            if (liveSyncTimerRef.current) clearTimeout(liveSyncTimerRef.current);
+        };
+    }, [edited, namespace, syncTrigger, showKeys, syncEditedToIframe]);
 
     const handleLanguageChange = useCallback(
         (lang: Language) => {

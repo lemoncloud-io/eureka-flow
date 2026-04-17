@@ -26,6 +26,7 @@ import type { PreviewMessage } from '../hooks';
 import type { FlatTranslations, Language } from '../types';
 
 type AllNsData = Record<I18nNamespace, Record<Language, FlatTranslations>>;
+const s3Mode = isS3Configured();
 
 export const I18nPage = () => {
     const namespace = useI18nStore(s => s.namespace);
@@ -69,7 +70,7 @@ export const I18nPage = () => {
     const allNsDataLoadedRef = useRef(false);
 
     useEffect(() => {
-        if (!isS3Configured() || allNsDataLoadedRef.current) return;
+        if (allNsDataLoadedRef.current) return;
         allNsDataLoadedRef.current = true;
         const load = async () => {
             const result = {} as AllNsData;
@@ -95,9 +96,7 @@ export const I18nPage = () => {
     }, []);
 
     useEffect(() => {
-        if (isS3Configured()) {
-            loadFromS3();
-        }
+        loadFromS3();
     }, [namespace, loadFromS3]);
 
     const searchMatchCounts = useMemo(() => {
@@ -179,23 +178,6 @@ export const I18nPage = () => {
         window.open('/i18n/preview', 'i18n-preview');
     }, []);
 
-    if (!isS3Configured()) {
-        return (
-            <div className="flex flex-col items-center justify-center gap-4 py-20">
-                <AlertTriangle className="h-12 w-12 text-yellow-500" />
-                <h2 className="text-lg font-semibold">S3 Configuration Required</h2>
-                <p className="text-muted-foreground text-center max-w-md">
-                    Set the VITE_I18N_BUCKET_URL environment variable.
-                    <br />
-                    Example:{' '}
-                    <code className="text-xs bg-muted px-1 rounded">
-                        https://your-bucket.s3.ap-northeast-2.amazonaws.com/i18n
-                    </code>
-                </p>
-            </div>
-        );
-    }
-
     return (
         <div className="flex flex-col gap-3 h-[calc(100vh-theme(spacing.14)-theme(spacing.12))]">
             {/* Toolbar */}
@@ -238,11 +220,21 @@ export const I18nPage = () => {
                         <ExternalLink className="h-3.5 w-3.5" />
                     </Button>
                     <div className="w-px h-6 bg-border" />
+                    {!s3Mode && (
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                            Local mode (read-only)
+                        </span>
+                    )}
                     <Button variant="outline" size="sm" onClick={handleReset} disabled={!hasChanges || isSaving}>
                         <RotateCcw className="h-3.5 w-3.5 mr-1" />
                         Reset
                     </Button>
-                    <Button size="sm" onClick={handleSave} disabled={!hasChanges || isSaving}>
+                    <Button
+                        size="sm"
+                        onClick={handleSave}
+                        disabled={!hasChanges || isSaving || !s3Mode}
+                        title={!s3Mode ? 'Set VITE_I18N_BUCKET_URL to enable saving' : undefined}
+                    >
                         {isSaving ? (
                             <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
                         ) : (
