@@ -1,19 +1,18 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { WebPreview } from '../components';
 import { usePreviewPublisher, usePreviewSubscriber } from '../hooks';
 
-import type { I18nNamespace } from '../consts';
 import type { PreviewMessage } from '../hooks';
-import type { FlatTranslations, Language } from '../types';
+import type { FlatTranslations } from '../types';
 
 interface SyncData {
-    namespace: I18nNamespace;
-    edited: Record<Language, FlatTranslations>;
+    namespace: string;
+    edited: Record<string, FlatTranslations>;
 }
 
 export const PreviewPage = () => {
-    const [syncData, setSyncData] = useState<SyncData>({ namespace: 'common', edited: { en: {}, ko: {} } });
+    const [syncData, setSyncData] = useState<SyncData | null>(null);
     const { broadcast } = usePreviewPublisher();
 
     usePreviewSubscriber(
@@ -31,11 +30,9 @@ export const PreviewPage = () => {
         [broadcast]
     );
 
-    const externalData = useMemo(() => syncData, [syncData]);
-
     return (
         <div className="h-screen w-screen bg-background">
-            <WebPreview onKeySearch={handleKeySearch} externalData={externalData} />
+            <WebPreview onKeySearch={handleKeySearch} externalData={syncData ?? undefined} />
         </div>
     );
 };

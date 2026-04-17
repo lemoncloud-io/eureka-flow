@@ -1,3 +1,5 @@
+import { PRESIGN_API_URL } from './namespaces';
+
 const S3_BUCKET_URL = import.meta.env.VITE_I18N_BUCKET_URL as string | undefined;
 const WEB_APP_URL = import.meta.env.VITE_WEB_APP_URL as string | undefined;
 
@@ -20,17 +22,24 @@ export const fetchTranslation = async (lng: string, ns: string): Promise<Record<
     return response.json();
 };
 
-/** Upload translation JSON to S3 (only available when S3 is configured) */
+/** Get a pre-signed PUT URL from the presign API */
+const getPresignedUrl = async (lng: string, ns: string): Promise<string> => {
+    if (!PRESIGN_API_URL) throw new Error('VITE_I18N_PRESIGN_URL is not configured');
+    const res = await fetch(`${PRESIGN_API_URL}/presign?lng=${lng}&ns=${ns}`, { mode: 'cors' });
+    if (!res.ok) throw new Error(`Failed to get presigned URL: ${res.status}`);
+    const { url } = (await res.json()) as { url: string };
+    return url;
+};
+
+/** Upload translation JSON via pre-signed URL */
 export const uploadTranslation = async (lng: string, ns: string, data: Record<string, unknown>): Promise<void> => {
-    if (!S3_BUCKET_URL) throw new Error('Upload requires VITE_I18N_BUCKET_URL to be configured');
-    const url = getTranslationUrl(lng, ns);
+    const url = await getPresignedUrl(lng, ns);
     const response = await fetch(url, {
         method: 'PUT',
-        mode: 'cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data, null, 4),
     });
-    if (!response.ok) throw new Error(`Failed to upload ${url}: ${response.status}`);
+    if (!response.ok) throw new Error(`Failed to upload: ${response.status}`);
 };
 
-export const isS3Configured = (): boolean => !!S3_BUCKET_URL;
+export const isUploadConfigured = (): boolean => !!PRESIGN_API_URL;

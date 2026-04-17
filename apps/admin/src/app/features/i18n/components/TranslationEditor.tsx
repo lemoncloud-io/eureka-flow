@@ -6,15 +6,16 @@ import { cn } from '@flows/lib/utils';
 import { Button, Input } from '@flows/ui-kit';
 
 import { buildTranslationTree } from '../consts';
-import { LANGUAGES, LANGUAGE_LABELS } from '../types';
+import { getLanguageLabel } from '../types';
 
-import type { FlatTranslations, Language, TranslationTreeNode } from '../types';
+import type { FlatTranslations, TranslationTreeNode } from '../types';
 
 interface TranslationEditorProps {
-    edited: Record<Language, FlatTranslations>;
-    originals: Record<Language, FlatTranslations>;
-    onUpdateValue: (key: string, lang: Language, value: string) => void;
-    onAddKey: (key: string, values: Record<Language, string>) => void;
+    languages: string[];
+    edited: Record<string, FlatTranslations>;
+    originals: Record<string, FlatTranslations>;
+    onUpdateValue: (key: string, lang: string, value: string) => void;
+    onAddKey: (key: string, values: Record<string, string>) => void;
     onDeleteKey: (key: string) => void;
     searchQuery: string;
     focusKey?: string | null;
@@ -23,9 +24,8 @@ interface TranslationEditorProps {
 
 const ITEMS_PER_PAGE = 50;
 
-const EMPTY_VALUES = Object.fromEntries(LANGUAGES.map(l => [l, ''])) as Record<Language, string>;
-
 export const TranslationEditor = ({
+    languages,
     edited,
     originals,
     onUpdateValue,
@@ -35,12 +35,14 @@ export const TranslationEditor = ({
     focusKey,
     onFocusHandled,
 }: TranslationEditorProps) => {
+    const emptyValues = useMemo(() => Object.fromEntries(languages.map(l => [l, ''])), [languages]);
+
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
     const [page, setPage] = useState(0);
     const [addingKey, setAddingKey] = useState(false);
     const [newKey, setNewKey] = useState('');
-    const [newValues, setNewValues] = useState<Record<Language, string>>(() => ({ ...EMPTY_VALUES }));
+    const [newValues, setNewValues] = useState<Record<string, string>>(() => ({}));
     const [changedOnly, setChangedOnly] = useState(false);
 
     const tree = useMemo(() => buildTranslationTree(edited), [edited]);
@@ -51,7 +53,7 @@ export const TranslationEditor = ({
             for (const node of nodes) {
                 if (
                     node.values &&
-                    LANGUAGES.some(lang => originals[lang]?.[node.fullPath] !== edited[lang]?.[node.fullPath])
+                    languages.some(lang => originals[lang]?.[node.fullPath] !== edited[lang]?.[node.fullPath])
                 ) {
                     keys.add(node.fullPath);
                 }
@@ -70,7 +72,7 @@ export const TranslationEditor = ({
         if (!newKey.trim()) return;
         onAddKey(newKey.trim(), newValues);
         setNewKey('');
-        setNewValues({ ...EMPTY_VALUES });
+        setNewValues({ ...emptyValues });
         setAddingKey(false);
     };
 
@@ -87,7 +89,7 @@ export const TranslationEditor = ({
                     const matchesSearch =
                         !searchQuery ||
                         node.fullPath.toLowerCase().includes(query) ||
-                        LANGUAGES.some(lang => (node.values?.[lang] ?? '').toLowerCase().includes(query));
+                        languages.some(lang => (node.values?.[lang] ?? '').toLowerCase().includes(query));
                     if (matchesSearch && (!changedOnly || isNodeChanged)) {
                         leaves.push(node);
                     }
@@ -150,7 +152,7 @@ export const TranslationEditor = ({
                 result.push(
                     <tr key={`b-${node.fullPath}`} className="bg-muted/30 hover:bg-muted/50">
                         <td
-                            colSpan={LANGUAGES.length + 2}
+                            colSpan={languages.length + 2}
                             className="px-3 py-1.5 cursor-pointer select-none"
                             onClick={() => toggleCollapse(node.fullPath)}
                             style={{ paddingLeft: `${depth * 16 + 12}px` }}
@@ -184,7 +186,7 @@ export const TranslationEditor = ({
                         >
                             {node.segment}
                         </td>
-                        {LANGUAGES.map(lang => (
+                        {languages.map(lang => (
                             <td key={lang} className="px-2 py-1">
                                 <input
                                     className={cn(
@@ -223,12 +225,12 @@ export const TranslationEditor = ({
                             <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground w-[200px]">
                                 Key
                             </th>
-                            {LANGUAGES.map(lang => (
+                            {languages.map(lang => (
                                 <th
                                     key={lang}
                                     className="px-3 py-2 text-left text-xs font-medium text-muted-foreground"
                                 >
-                                    {LANGUAGE_LABELS[lang]} ({lang})
+                                    {getLanguageLabel(lang)} ({lang})
                                 </th>
                             ))}
                             <th className="w-8" />
@@ -303,10 +305,10 @@ export const TranslationEditor = ({
                         onChange={e => setNewKey(e.target.value)}
                         className="flex-[2]"
                     />
-                    {LANGUAGES.map(lang => (
+                    {languages.map(lang => (
                         <Input
                             key={lang}
-                            placeholder={LANGUAGE_LABELS[lang]}
+                            placeholder={getLanguageLabel(lang)}
                             value={newValues[lang]}
                             onChange={e => setNewValues(prev => ({ ...prev, [lang]: e.target.value }))}
                             className="flex-[3]"

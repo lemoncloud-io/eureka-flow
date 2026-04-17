@@ -82,6 +82,21 @@ i18n.use(ChainedBackend)
 if (isEmbeddedInIframe) {
     console.log('[i18n-preview] iframe mode activated');
 
+    // Cross-origin iframes can't access parent.origin — fallback to '*' for postMessage
+    const parentOrigin = (() => {
+        try {
+            return window.parent.origin;
+        } catch {
+            return '*';
+        }
+    })();
+
+    const isTrustedOrigin = (eventOrigin: string) => parentOrigin === '*' || eventOrigin === parentOrigin;
+
+    const postToParent = (message: Record<string, unknown>) => {
+        window.parent.postMessage(message, parentOrigin);
+    };
+
     // Helper: update bundle and force re-render via both store event AND languageChanged
     const updateBundle = (lng: string, ns: string, resources: Record<string, unknown>) => {
         i18n.addResourceBundle(lng, ns, resources, true, true);
@@ -92,6 +107,7 @@ if (isEmbeddedInIframe) {
     window.addEventListener('message', (event: MessageEvent) => {
         const { data } = event;
         if (!data || typeof data.type !== 'string' || !data.type.startsWith('i18n:')) return;
+        if (!isTrustedOrigin(event.origin)) return;
 
         switch (data.type) {
             case 'i18n:update':
@@ -117,6 +133,7 @@ if (isEmbeddedInIframe) {
     // Key click detection: when showKeys is active, clicking [key.name] text sends it to admin
     let showKeysActive = false;
     window.addEventListener('message', (event: MessageEvent) => {
+        if (!isTrustedOrigin(event.origin)) return;
         if (event.data?.type === 'i18n:showKeys') showKeysActive = true;
         if (event.data?.type === 'i18n:update') showKeysActive = false;
     });
@@ -133,7 +150,7 @@ if (isEmbeddedInIframe) {
             if (match) {
                 e.preventDefault();
                 e.stopPropagation();
-                window.parent.postMessage({ type: 'i18n:keyClicked', key: match[1] }, '*');
+                postToParent({ type: 'i18n:keyClicked', key: match[1] });
             }
         },
         true
@@ -142,7 +159,7 @@ if (isEmbeddedInIframe) {
     // Notify admin that iframe is ready to receive messages
     const sendReady = () => {
         console.log('[i18n-preview] sending i18n:ready');
-        window.parent.postMessage({ type: 'i18n:ready' }, '*');
+        postToParent({ type: 'i18n:ready' });
     };
     if (i18n.isInitialized) {
         sendReady();

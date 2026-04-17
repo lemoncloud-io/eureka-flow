@@ -1,6 +1,4 @@
-import { LANGUAGES } from '../types';
-
-import type { FlatTranslations, Language, NestedTranslations, TranslationTreeNode } from '../types';
+import type { FlatTranslations, NestedTranslations, TranslationTreeNode } from '../types';
 
 /**
  * Flatten nested JSON to dot-notation keys.
@@ -42,10 +40,12 @@ export const unflattenJson = (flat: FlatTranslations): NestedTranslations => {
 
 /**
  * Build a tree structure from per-language flat translations for rendering collapsible sections.
+ * Languages are derived from the translations record keys.
  */
-export const buildTranslationTree = (translations: Record<Language, FlatTranslations>): TranslationTreeNode[] => {
+export const buildTranslationTree = (translations: Record<string, FlatTranslations>): TranslationTreeNode[] => {
+    const languages = Object.keys(translations);
     const allKeys = new Set<string>();
-    for (const lang of LANGUAGES) {
+    for (const lang of languages) {
         for (const key of Object.keys(translations[lang] || {})) {
             allKeys.add(key);
         }
@@ -69,9 +69,7 @@ export const buildTranslationTree = (translations: Record<Language, FlatTranslat
             if (!child) {
                 child = { segment, fullPath };
                 if (isLeaf) {
-                    child.values = Object.fromEntries(
-                        LANGUAGES.map(lang => [lang, translations[lang]?.[key] ?? ''])
-                    ) as Record<Language, string>;
+                    child.values = Object.fromEntries(languages.map(lang => [lang, translations[lang]?.[key] ?? '']));
                 } else {
                     child.children = [];
                 }
