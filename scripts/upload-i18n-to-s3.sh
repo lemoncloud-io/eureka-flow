@@ -2,12 +2,12 @@
 # Upload local i18n JSON files to S3 bucket.
 # Usage: ./scripts/upload-i18n-to-s3.sh <env>
 # Example:
-#   ./scripts/upload-i18n-to-s3.sh dev   → s3://flow-front-i18n/dev/
-#   ./scripts/upload-i18n-to-s3.sh prod  → s3://flow-front-i18n/prod/
+#   ./scripts/upload-i18n-to-s3.sh dev   → s3://eureka-flows-i18n/dev/
+#   ./scripts/upload-i18n-to-s3.sh prod  → s3://eureka-flows-i18n/prod/
 #
 # Prerequisites:
 #   - AWS CLI configured with appropriate credentials
-#   - S3 bucket 'flow-front-i18n' exists
+#   - S3 bucket 'eureka-flows-i18n' exists
 
 set -euo pipefail
 
@@ -18,7 +18,7 @@ if [[ "$ENV" != "dev" && "$ENV" != "prod" ]]; then
     exit 1
 fi
 
-BUCKET="flow-front-i18n"
+BUCKET="eureka-flows-i18n"
 LOCALES_DIR="$(dirname "$0")/../apps/web/public/locales"
 
 if [ ! -d "$LOCALES_DIR" ]; then

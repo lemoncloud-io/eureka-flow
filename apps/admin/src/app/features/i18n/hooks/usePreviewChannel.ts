@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import type { I18nNamespace } from '../consts';
-import type { FlatTranslations, Language } from '../types';
+import type { FlatTranslations } from '../types';
 
 const CHANNEL_NAME = 'i18n-preview';
 
 export type PreviewMessage =
-    | { type: 'i18n:sync'; namespace: I18nNamespace; edited: Record<Language, FlatTranslations> }
-    | { type: 'i18n:showKeys'; enabled: boolean }
-    | { type: 'i18n:changeLanguage'; language: Language }
+    | { type: 'i18n:sync'; namespace: string; edited: Record<string, FlatTranslations> }
+    | { type: 'i18n:showKeys'; namespace: string; keys: Record<string, unknown> }
+    | { type: 'i18n:changeLanguage'; language: string }
     | { type: 'i18n:keyClicked'; key: string };
 
 /** Publish messages to preview tabs via BroadcastChannel */

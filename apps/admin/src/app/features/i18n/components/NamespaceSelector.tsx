@@ -1,19 +1,16 @@
 import { cn } from '@flows/lib/utils';
 
-import { I18N_NAMESPACES } from '../consts';
-
-import type { I18nNamespace } from '../consts';
-
 interface NamespaceSelectorProps {
-    selected: I18nNamespace;
-    onChange: (ns: I18nNamespace) => void;
-    matchCounts?: Partial<Record<I18nNamespace, number>>;
+    namespaces: string[];
+    selected: string;
+    onChange: (ns: string) => void;
+    matchCounts?: Partial<Record<string, number>>;
 }
 
-export const NamespaceSelector = ({ selected, onChange, matchCounts }: NamespaceSelectorProps) => {
+export const NamespaceSelector = ({ namespaces, selected, onChange, matchCounts }: NamespaceSelectorProps) => {
     return (
         <div className="flex gap-1 border-b">
-            {I18N_NAMESPACES.map(ns => {
+            {namespaces.map(ns => {
                 const count = matchCounts?.[ns];
                 return (
                     <button

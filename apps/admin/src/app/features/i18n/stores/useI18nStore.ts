@@ -1,61 +1,74 @@
 import { create } from 'zustand';
 
-import { fetchTranslation, flattenJson, sortObjectKeys, unflattenJson, uploadTranslation } from '../consts';
-import { LANGUAGES } from '../types';
+import { DEFAULT_LANGUAGES, DEFAULT_NAMESPACES, fetchLocales } from '../consts';
+import { fetchTranslation, sortObjectKeys, unflattenJson, uploadTranslation } from '../consts';
+import { flattenJson } from '../consts';
 
-import type { I18nNamespace } from '../consts';
-import type { FlatTranslations, Language, NestedTranslations } from '../types';
+import type { FlatTranslations, NestedTranslations } from '../types';
 
-const mapByLang = (fn: (lang: Language) => FlatTranslations): Record<Language, FlatTranslations> =>
-    Object.fromEntries(LANGUAGES.map(lang => [lang, fn(lang)])) as Record<Language, FlatTranslations>;
+const emptyByLang = (langs: string[]): Record<string, FlatTranslations> =>
+    Object.fromEntries(langs.map(lang => [lang, {}]));
 
 interface I18nState {
-    namespace: I18nNamespace;
-    originals: Record<Language, FlatTranslations>;
-    edited: Record<Language, FlatTranslations>;
+    languages: string[];
+    namespaces: string[];
+    namespace: string;
+    originals: Record<string, FlatTranslations>;
+    edited: Record<string, FlatTranslations>;
     isLoading: boolean;
     isSaving: boolean;
     error: string | null;
 
     isDirty: () => boolean;
-    setNamespace: (ns: I18nNamespace) => void;
-    loadFromS3: () => Promise<void>;
-    saveToS3: () => Promise<void>;
-    updateValue: (key: string, lang: Language, value: string) => void;
-    addKey: (key: string, values: Record<Language, string>) => void;
+    initLocales: () => Promise<void>;
+    setNamespace: (ns: string) => void;
+    loadTranslations: () => Promise<void>;
+    saveTranslations: () => Promise<void>;
+    updateValue: (key: string, lang: string, value: string) => void;
+    addKey: (key: string, values: Record<string, string>) => void;
     deleteKey: (key: string) => void;
     resetChanges: () => void;
 }
 
 export const useI18nStore = create<I18nState>()((set, get) => ({
+    languages: DEFAULT_LANGUAGES,
+    namespaces: DEFAULT_NAMESPACES,
     namespace: 'common',
-    originals: mapByLang(() => ({})),
-    edited: mapByLang(() => ({})),
+    originals: emptyByLang(DEFAULT_LANGUAGES),
+    edited: emptyByLang(DEFAULT_LANGUAGES),
     isLoading: false,
     isSaving: false,
     error: null,
 
     isDirty: () => {
-        const { originals, edited } = get();
-        return LANGUAGES.some(lang => JSON.stringify(originals[lang]) !== JSON.stringify(edited[lang]));
+        const { originals, edited, languages } = get();
+        return languages.some(lang => JSON.stringify(originals[lang]) !== JSON.stringify(edited[lang]));
     },
 
-    setNamespace: (ns: I18nNamespace) => {
-        set({ namespace: ns });
+    initLocales: async () => {
+        const { languages, namespaces } = await fetchLocales();
+        set({
+            languages,
+            namespaces,
+            originals: emptyByLang(languages),
+            edited: emptyByLang(languages),
+        });
     },
 
-    loadFromS3: async () => {
-        const { namespace } = get();
+    setNamespace: (ns: string) => set({ namespace: ns }),
+
+    loadTranslations: async () => {
+        const { namespace, languages } = get();
         set({ isLoading: true, error: null });
         try {
-            const results = await Promise.all(LANGUAGES.map(lang => fetchTranslation(lang, namespace)));
-            const flatMap = Object.fromEntries(LANGUAGES.map((lang, i) => [lang, flattenJson(results[i])])) as Record<
-                Language,
+            const results = await Promise.all(languages.map(lang => fetchTranslation(lang, namespace)));
+            const flatMap = Object.fromEntries(languages.map((lang, i) => [lang, flattenJson(results[i])])) as Record<
+                string,
                 FlatTranslations
             >;
             set({
                 originals: flatMap,
-                edited: mapByLang(lang => ({ ...flatMap[lang] })),
+                edited: Object.fromEntries(languages.map(lang => [lang, { ...flatMap[lang] }])),
                 isLoading: false,
             });
         } catch (e) {
@@ -63,45 +76,45 @@ export const useI18nStore = create<I18nState>()((set, get) => ({
         }
     },
 
-    saveToS3: async () => {
-        const { namespace, edited } = get();
+    saveTranslations: async () => {
+        const { namespace, edited, languages } = get();
         set({ isSaving: true, error: null });
         try {
             await Promise.all(
-                LANGUAGES.map(lang => {
+                languages.map(lang => {
                     const nested = sortObjectKeys(unflattenJson(edited[lang]) as NestedTranslations);
                     return uploadTranslation(lang, namespace, nested);
                 })
             );
-            set({ originals: mapByLang(lang => ({ ...edited[lang] })), isSaving: false });
+            set({
+                originals: Object.fromEntries(languages.map(lang => [lang, { ...edited[lang] }])),
+                isSaving: false,
+            });
         } catch (e) {
             set({ isSaving: false, error: e instanceof Error ? e.message : 'Failed to save translations' });
         }
     },
 
-    updateValue: (key: string, lang: Language, value: string) => {
+    updateValue: (key, lang, value) => {
         set(state => ({
-            edited: {
-                ...state.edited,
-                [lang]: { ...state.edited[lang], [key]: value },
-            },
+            edited: { ...state.edited, [lang]: { ...state.edited[lang], [key]: value } },
         }));
     },
 
-    addKey: (key: string, values: Record<Language, string>) => {
+    addKey: (key, values) => {
         set(state => {
             const newEdited = { ...state.edited };
-            LANGUAGES.forEach(lang => {
+            state.languages.forEach(lang => {
                 newEdited[lang] = { ...newEdited[lang], [key]: values[lang] ?? '' };
             });
             return { edited: newEdited };
         });
     },
 
-    deleteKey: (key: string) => {
+    deleteKey: key => {
         set(state => {
             const newEdited = { ...state.edited };
-            LANGUAGES.forEach(lang => {
+            state.languages.forEach(lang => {
                 const copy = { ...newEdited[lang] };
                 delete copy[key];
                 newEdited[lang] = copy;
@@ -111,6 +124,8 @@ export const useI18nStore = create<I18nState>()((set, get) => ({
     },
 
     resetChanges: () => {
-        set(state => ({ edited: mapByLang(lang => ({ ...state.originals[lang] })) }));
+        set(state => ({
+            edited: Object.fromEntries(state.languages.map(lang => [lang, { ...state.originals[lang] }])),
+        }));
     },
 }));
