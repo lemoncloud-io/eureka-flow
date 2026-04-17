@@ -53,6 +53,8 @@ export const useI18nStore = create<I18nState>()((set, get) => ({
             originals: emptyByLang(languages),
             edited: emptyByLang(languages),
         });
+        // Load first namespace immediately after locale discovery
+        await get().loadTranslations();
     },
 
     setNamespace: (ns: string) => set({ namespace: ns }),
