@@ -35,6 +35,7 @@ export const uploadTranslation = async (lng: string, ns: string, data: Record<st
     const url = await getPresignedUrl(lng, ns);
     const response = await fetch(url, {
         method: 'PUT',
+        mode: 'cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data, null, 4),
     });
