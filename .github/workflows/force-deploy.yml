@@ -141,6 +141,8 @@ jobs:
                   VITE_WS_ENDPOINT: ${{ secrets.VITE_DEV_WS_ENDPOINT }}
                   VITE_CODES_URL: ${{ secrets.VITE_DEV_CODES_URL }}
                   VITE_I18N_BUCKET_URL: ${{ secrets.VITE_DEV_I18N_BUCKET_URL }}
+                  VITE_I18N_PRESIGN_URL: ${{ secrets.VITE_DEV_I18N_PRESIGN_URL }}
+                  VITE_I18N_PRESIGN_API_KEY: ${{ secrets.VITE_DEV_I18N_PRESIGN_API_KEY }}
               run: |
                   set -e
                   chmod +x scripts/deploy.sh scripts/deploy-${{ matrix.project }}.sh
@@ -218,6 +220,8 @@ jobs:
                   VITE_WS_ENDPOINT: ${{ secrets.VITE_PROD_WS_ENDPOINT }}
                   VITE_CODES_URL: ${{ secrets.VITE_PROD_CODES_URL }}
                   VITE_I18N_BUCKET_URL: ${{ secrets.VITE_PROD_I18N_BUCKET_URL }}
+                  VITE_I18N_PRESIGN_URL: ${{ secrets.VITE_PROD_I18N_PRESIGN_URL }}
+                  VITE_I18N_PRESIGN_API_KEY: ${{ secrets.VITE_PROD_I18N_PRESIGN_API_KEY }}
               run: |
                   set -e
                   chmod +x scripts/deploy.sh scripts/deploy-${{ matrix.project }}.sh
