@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-17] - root@0.31.1, @flows/admin@0.17.1
+
+### Bug Fixes
+
+- (i18n) load translations immediately after locale discovery
+
 ## [2026-04-17] - root@0.31.0, @flows/web@0.31.0, @flows/admin@0.17.0
 
 ### Features
