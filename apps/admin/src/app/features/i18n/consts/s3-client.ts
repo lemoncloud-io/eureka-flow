@@ -1,4 +1,4 @@
-import { PRESIGN_API_URL } from './namespaces';
+import { PRESIGN_API_URL, presignFetch } from './namespaces';
 
 const S3_BUCKET_URL = import.meta.env.VITE_I18N_BUCKET_URL as string | undefined;
 const WEB_APP_URL = import.meta.env.VITE_WEB_APP_URL as string | undefined;
@@ -24,8 +24,7 @@ export const fetchTranslation = async (lng: string, ns: string): Promise<Record<
 
 /** Get a pre-signed PUT URL from the presign API */
 const getPresignedUrl = async (lng: string, ns: string): Promise<string> => {
-    if (!PRESIGN_API_URL) throw new Error('VITE_I18N_PRESIGN_URL is not configured');
-    const res = await fetch(`${PRESIGN_API_URL}/presign?lng=${lng}&ns=${ns}`, { mode: 'cors' });
+    const res = await presignFetch(`/presign?lng=${lng}&ns=${ns}`);
     if (!res.ok) throw new Error(`Failed to get presigned URL: ${res.status}`);
     const { url } = (await res.json()) as { url: string };
     return url;
