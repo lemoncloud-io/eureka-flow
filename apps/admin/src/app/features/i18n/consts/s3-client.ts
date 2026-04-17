@@ -24,7 +24,8 @@ export const fetchTranslation = async (lng: string, ns: string): Promise<Record<
 
 /** Get a pre-signed PUT URL from the presign API */
 const getPresignedUrl = async (lng: string, ns: string): Promise<string> => {
-    const res = await presignFetch(`/presign?lng=${lng}&ns=${ns}`);
+    const params = new URLSearchParams({ lng, ns });
+    const res = await presignFetch(`/presign?${params}`);
     if (!res.ok) throw new Error(`Failed to get presigned URL: ${res.status}`);
     const { url } = (await res.json()) as { url: string };
     return url;
