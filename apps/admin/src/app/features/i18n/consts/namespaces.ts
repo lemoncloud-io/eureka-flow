@@ -9,7 +9,7 @@ const PRESIGN_API_KEY = import.meta.env.VITE_I18N_PRESIGN_API_KEY as string | un
 export const presignFetch = (path: string): Promise<Response> => {
     if (!PRESIGN_API_URL) throw new Error('VITE_I18N_PRESIGN_URL is not configured');
     const headers: Record<string, string> = {};
-    if (PRESIGN_API_KEY) headers['x-api-key'] = PRESIGN_API_KEY;
+    if (PRESIGN_API_KEY) headers['x-i18n-key'] = PRESIGN_API_KEY;
     return fetch(`${PRESIGN_API_URL}${path}`, { mode: 'cors', headers });
 };
 
