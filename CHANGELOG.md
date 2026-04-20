@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-20] - root@0.32.1, @flows/web@0.32.1
+
+### Bug Fixes
+
+- handle initial flow id
+
 ## [2026-04-20] - root@0.32.0, @flows/web@0.32.0, @flows/admin@0.18.0
 
 ### Features
