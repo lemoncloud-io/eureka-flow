@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Loader2, MoreVertical, Play, Trash2 } from 'lucide-react';
 
-import { useBlockRegistry } from '@flows/flows';
+import { getPermissions, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
 
@@ -26,6 +26,7 @@ export const MobileStepCard = React.memo(
     ({ node, displayName, onTapCard, onRun, onDelete, role = 'owner' }: MobileStepCardProps) => {
         const { t } = useTranslation(['flows']);
         const blockRegistry = useBlockRegistry();
+        const { canEdit, canRun } = useMemo(() => getPermissions(role), [role]);
         const blockDef = blockRegistry[node.type];
         const state = (node.state ?? 'IDLE') as NodeState;
         const stateStyle = STATE_STYLES[state] ?? STATE_STYLES.IDLE;
@@ -120,8 +121,7 @@ export const MobileStepCard = React.memo(
                     )}
                 </div>
 
-                {/* More menu */}
-                {role === 'owner' && (
+                {canRun && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <div
@@ -140,7 +140,7 @@ export const MobileStepCard = React.memo(
                                     {t('mobile.run', 'Run')}
                                 </DropdownMenuItem>
                             )}
-                            {onDelete && (
+                            {canEdit && onDelete && (
                                 <DropdownMenuItem onClick={handleDelete} className="gap-2 text-destructive">
                                     <Trash2 className="w-3.5 h-3.5" />
                                     {t('mobile.delete', 'Delete')}
