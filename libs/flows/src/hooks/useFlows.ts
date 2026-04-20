@@ -155,8 +155,6 @@ export const useFlows = () => {
             }
 
             console.log('[useFlows] Loading flow:', id);
-            setCurrentFlowId(id);
-            flowStorage.setFlowId(id);
 
             try {
                 // Use queryClient.fetchQuery for caching benefit
@@ -165,6 +163,16 @@ export const useFlows = () => {
                     queryFn: () => loadFlow(id),
                     retry: false, // loadFlow uses withRetry internally
                 });
+
+                // URL may carry an alias slug (e.g. "1003845-TestFlow"); API operations require the canonical numeric ID
+                const canonicalId = flowData.id ?? id;
+                if (canonicalId !== id) {
+                    // Pre-populate cache with canonical key so useLoadFlowQuery won't re-fetch
+                    queryClient.setQueryData(flowsKeys.snapshot(canonicalId), flowData);
+                }
+                setCurrentFlowId(canonicalId);
+                flowStorage.setFlowId(canonicalId);
+
                 if (flowData.name) {
                     setFlowName(flowData.name);
                 }

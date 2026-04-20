@@ -88,9 +88,10 @@ export const MobileFlowEditorPage = () => {
         serializeWorkflowState,
         lastSavedStateRef,
         lastLocalUpdateTimestampRef,
+        canEdit: role === 'owner',
     });
 
-    const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ socketConnectionId });
+    const { runProgress, isRunning, handleRunAll } = useMobileRunAll();
 
     const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleNew, handleClear } = useMobileFlowActions(
         {

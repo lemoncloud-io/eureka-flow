@@ -19,7 +19,7 @@ import {
     WifiOff,
 } from 'lucide-react';
 
-import { useSystemInfoQuery } from '@flows/flows';
+import { getPermissions, useSystemInfoQuery } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     DropdownMenu,
@@ -82,6 +82,7 @@ export const MobileHeader = ({
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
+    const { canEdit, canRun } = getPermissions(role);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(flowName);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -134,7 +135,7 @@ export const MobileHeader = ({
                         className="w-full text-sm font-bold bg-transparent border-b-2 border-primary outline-none"
                         autoFocus
                     />
-                ) : role === 'owner' ? (
+                ) : canEdit ? (
                     <button
                         onClick={handleStartEditing}
                         className="truncate text-sm font-bold text-foreground leading-tight"
@@ -146,7 +147,7 @@ export const MobileHeader = ({
                 )}
 
                 {/* View-only badge for non-owner roles */}
-                {role !== 'owner' && (
+                {!canEdit && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
                         {t('mobile.viewOnly', 'View only')}
                     </span>
@@ -168,7 +169,7 @@ export const MobileHeader = ({
                     </button>
                 )}
                 {/* Save */}
-                {role === 'owner' && (
+                {canEdit && (
                     <button
                         onClick={onSave}
                         disabled={isSaving}
@@ -193,7 +194,7 @@ export const MobileHeader = ({
                 )}
 
                 {/* Run All */}
-                {role !== 'anonymous' && nodeCount > 0 && (
+                {canRun && nodeCount > 0 && (
                     <button
                         onClick={onRunAll}
                         disabled={isRunning || nodeCount === 0}
@@ -235,13 +236,13 @@ export const MobileHeader = ({
                         <FolderOpen className="w-4 h-4" />
                         {t('header.openFlow', 'Open Flow')}
                     </DropdownMenuItem>
-                    {role === 'owner' && (
+                    {canEdit && (
                         <DropdownMenuItem onClick={onSave} className="gap-2">
                             <Save className="w-4 h-4" />
                             {t('header.saveFlow', 'Save Flow')}
                         </DropdownMenuItem>
                     )}
-                    {onExport && (
+                    {canRun && onExport && (
                         <DropdownMenuItem onClick={onExport} className="gap-2">
                             <Download className="w-4 h-4" />
                             {t('header.export', 'Export JSON')}

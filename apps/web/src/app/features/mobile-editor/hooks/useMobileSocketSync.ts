@@ -16,6 +16,7 @@ interface UseMobileSocketSyncParams {
     serializeWorkflowState: SerializeWorkflowFn;
     lastSavedStateRef: React.MutableRefObject<string | null>;
     lastLocalUpdateTimestampRef: React.MutableRefObject<number | null>;
+    canEdit?: boolean;
 }
 
 interface UseMobileSocketSyncReturn {
@@ -27,6 +28,7 @@ export const useMobileSocketSync = ({
     serializeWorkflowState,
     lastSavedStateRef,
     lastLocalUpdateTimestampRef,
+    canEdit = false,
 }: UseMobileSocketSyncParams): UseMobileSocketSyncReturn => {
     const { currentFlowId, channelId, loadFlowById } = useFlows();
 
@@ -134,6 +136,7 @@ export const useMobileSocketSync = ({
                     executeNodeWithToast(nodeId, {
                         flowId: currentFlowId,
                         socketConnectionId: connectionIdRef.current,
+                        canEdit,
                     });
                 }, 0);
             }
