@@ -79,7 +79,7 @@ export const useMobileEditorBoot = ({
                     }
                     throw new Error(t('flowEditor.failedToLoadFlow'));
                 }
-                loadedId = flowIdFromUrl;
+                loadedId = initialFlow.id ?? flowIdFromUrl;
             } else {
                 setLoadingText(t('flowEditor.initializingFlow'));
                 const result = await initializeFlow();
