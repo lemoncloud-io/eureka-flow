@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-20] - root@0.32.0, @flows/web@0.32.0, @flows/admin@0.18.0
+
+### Features
+
+- (permissions) enforce role-based UI gating across desktop and mobile editors
+
 ## [2026-04-17] - root@0.31.1, @flows/admin@0.17.1
 
 ### Bug Fixes
