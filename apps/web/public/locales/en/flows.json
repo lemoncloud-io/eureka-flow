@@ -37,6 +37,7 @@
         "editPublishInfo": "Edit publish info",
         "unpublish": "Unpublish",
         "viewOnly": "View Only",
+        "guestMode": "Guest",
         "apiKeySettings": "API Key Settings",
         "guidedTour": "Guided Tour",
         "replayTutorial": "Replay Tutorial",
@@ -65,7 +66,9 @@
         "clickToAdd": "Click to add to canvas",
         "clientExecution": "Runs in browser (client-side)",
         "frontend": "Frontend",
-        "portsInfo": "{{inputs}} inputs → {{outputs}} outputs"
+        "portsInfo": "{{inputs}} inputs → {{outputs}} outputs",
+        "recent": "Recent",
+        "readOnlyHint": "Sign in to add blocks"
     },
     "canvas": {
         "executionLogs": "Execution Logs",
@@ -238,7 +241,8 @@
         "loadErrorTitle": "Failed to Load",
         "signInWithApiKey": "Sign in with API Key",
         "browsePublicFlows": "Browse public flows",
-        "signInToEdit": "Sign in to edit this flow"
+        "signInToEdit": "Sign in to edit this flow",
+        "failedToRunFlow": "Failed to run flow"
     },
     "publicFlows": {
         "title": "Public Flows",
@@ -481,6 +485,11 @@
                 "description": "Start by adding a block from the library and connecting them together. Press ? anytime for help, or replay this tour from the menu."
             }
         }
+    },
+    "graphView": {
+        "noNodes": "No nodes to display",
+        "fitToView": "Fit to View",
+        "goToNode": "Go to node"
     },
     "mobile": {
         "addNode": "Add Node",
