@@ -50,6 +50,7 @@ export interface NodePortHandlers {
         portType: string,
         e: React.TouchEvent
     ) => void;
+    onPortDoubleClick?: (nodeId: string, portId: string, type: 'input' | 'output', portType: string) => void;
 }
 
 export interface NodeConfigHandlers {
@@ -208,7 +209,7 @@ export const NodeBlock = memo<NodeBlockProps>(
             connectedPortIds = [],
             connectionDraft,
         } = highlightState;
-        const { onPortMouseDown, onPortMouseUp, onPortTouchStart } = portHandlers;
+        const { onPortMouseDown, onPortMouseUp, onPortTouchStart, onPortDoubleClick } = portHandlers;
         const { onConfigChange, onLabelChange } = configHandlers;
         const { onDelete, onTrigger, onDuplicate, onResize, onResizing } = actions;
 
@@ -639,6 +640,7 @@ export const NodeBlock = memo<NodeBlockProps>(
                                     onMouseDown={onPortMouseDown}
                                     onMouseUp={onPortMouseUp}
                                     onTouchStart={onPortTouchStart}
+                                    onDoubleClick={onPortDoubleClick}
                                 />
                             ))}
                         </div>
@@ -660,6 +662,7 @@ export const NodeBlock = memo<NodeBlockProps>(
                                     onMouseDown={onPortMouseDown}
                                     onMouseUp={onPortMouseUp}
                                     onTouchStart={onPortTouchStart}
+                                    onDoubleClick={onPortDoubleClick}
                                 />
                             ))}
                         </div>
@@ -684,6 +687,7 @@ export const NodeBlock = memo<NodeBlockProps>(
                                     onMouseDown={onPortMouseDown}
                                     onMouseUp={onPortMouseUp}
                                     onTouchStart={onPortTouchStart}
+                                    onDoubleClick={onPortDoubleClick}
                                 />
                             ))}
                         </div>
@@ -710,6 +714,7 @@ export const NodeBlock = memo<NodeBlockProps>(
                                     onMouseDown={onPortMouseDown}
                                     onMouseUp={onPortMouseUp}
                                     onTouchStart={onPortTouchStart}
+                                    onDoubleClick={onPortDoubleClick}
                                 />
                             ))}
                         </div>

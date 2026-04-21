@@ -194,16 +194,16 @@ export const useSocketHandlers = ({
             // Reset port sequence tracking when runId changes (new execution run)
             if (runId) {
                 const prevRunId = portRunIdRef.current.get(portId);
-                if (prevRunId && prevRunId !== runId) {
+                if (prevRunId !== runId) {
                     portNoRef.current.delete(portId);
+                    portRunIdRef.current.set(portId, runId);
                 }
-                portRunIdRef.current.set(portId, runId);
             }
 
-            // ts present = server signals fresh data, always update
-            if (!ts && no !== undefined) {
+            if (no !== undefined) {
                 const prevNo = portNoRef.current.get(portId);
-                if (prevNo !== undefined && prevNo >= no) return;
+                // ts = server signals fresh data, skip dedup
+                if (!ts && prevNo !== undefined && prevNo >= no) return;
                 portNoRef.current.set(portId, no);
             }
 

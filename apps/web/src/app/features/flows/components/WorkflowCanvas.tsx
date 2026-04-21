@@ -2043,6 +2043,38 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             setConnectionDraft(null);
         };
 
+        const handlePortDoubleClick = async (nodeId: string, portId: string, type: 'input' | 'output') => {
+            if (connectionDraft) return;
+
+            const fullPortId = `${nodeId}:${portId}`;
+            const direction = type === 'output' ? 'out' : 'in';
+            const store = useCanvasStore.getState();
+
+            // Pulse animation while fetching
+            store.setUpdatedPort(fullPortId);
+
+            try {
+                const portData = await getPortData(fullPortId, direction);
+                if (portData?.data) {
+                    const dataPacket = {
+                        value: portData.data.value,
+                        type: portData.data.type,
+                        timestamp: portData.data.timestamp,
+                    };
+                    const updates =
+                        direction === 'out'
+                            ? { outputData: { [portId]: dataPacket } }
+                            : { inputData: { [portId]: dataPacket } };
+                    setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, ...updates } : n)));
+                }
+            } catch (err) {
+                console.warn('[Canvas] Port data fetch failed:', fullPortId, err);
+            } finally {
+                // Clear highlight after fetch completes (with minimum visible duration)
+                setTimeout(() => store.clearUpdatedPort(fullPortId), 300);
+            }
+        };
+
         const handlePortMouseDown = (
             nodeId: string,
             portId: string,
@@ -2649,6 +2681,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 onPortMouseDown: handlePortMouseDown,
                                                 onPortMouseUp: handlePortMouseUp,
                                                 onPortTouchStart: handlePortTouchStart,
+                                                onPortDoubleClick: handlePortDoubleClick,
                                             }}
                                             configHandlers={{
                                                 onConfigChange: (k, v) => handleConfigChange(node.id, k, v),
