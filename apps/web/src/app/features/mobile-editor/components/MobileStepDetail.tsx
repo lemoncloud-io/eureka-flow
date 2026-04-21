@@ -181,7 +181,7 @@ export const MobileStepDetail = ({
                                         </span>
                                         {blockDef.isFrontend && (
                                             <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary font-medium">
-                                                frontend
+                                                {t('sidebar.frontend')}
                                             </span>
                                         )}
                                     </div>
@@ -447,7 +447,7 @@ export const MobileStepDetail = ({
                             {/* Input Data */}
                             {node.inputData && Object.keys(node.inputData).length > 0 && (
                                 <CollapsibleDataSection
-                                    title="Input Data"
+                                    title={t('mobile.inputs')}
                                     isOpen={showInputData}
                                     onToggle={() => setShowInputData(!showInputData)}
                                 >
@@ -475,7 +475,7 @@ export const MobileStepDetail = ({
                             {/* Output Data */}
                             {node.outputData && Object.keys(node.outputData).length > 0 && (
                                 <CollapsibleDataSection
-                                    title="Output Data"
+                                    title={t('mobile.outputs')}
                                     isOpen={showOutputData}
                                     onToggle={() => setShowOutputData(!showOutputData)}
                                 >

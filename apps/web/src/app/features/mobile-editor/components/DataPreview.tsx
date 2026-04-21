@@ -7,15 +7,16 @@ import { S3Image } from '../../flows/components/S3Image';
 interface DataPreviewProps {
     data: { value?: unknown; type?: string };
     expanded?: boolean;
+    emptyLabel?: string;
 }
 
-export const DataPreview = React.memo(({ data, expanded }: DataPreviewProps) => {
+export const DataPreview = React.memo(({ data, expanded, emptyLabel = 'empty' }: DataPreviewProps) => {
     const jsonStr = useMemo(
         () => (data?.value !== null && typeof data?.value === 'object' ? JSON.stringify(data.value, null, 2) : null),
         [data?.value]
     );
 
-    if (!data?.value) return <span className="text-muted-foreground/40 italic text-[11px]">empty</span>;
+    if (!data?.value) return <span className="text-muted-foreground/40 italic text-[11px]">{emptyLabel}</span>;
 
     if (data.type === 'image' && typeof data.value === 'string') {
         return (

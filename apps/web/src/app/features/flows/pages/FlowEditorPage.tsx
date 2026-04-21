@@ -12,6 +12,7 @@ import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
+import { DevSocketPanel } from '../components/DevSocketPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
 import { FlowListDialog } from '../components/FlowListDialog';
 import { Header } from '../components/Header';
@@ -20,6 +21,7 @@ import { PublishDialog } from '../components/PublishDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { useSocketHandlers } from '../hooks/useSocketHandlers';
+import { useSocketRecorder } from '../hooks/useSocketRecorder';
 
 import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
@@ -154,6 +156,7 @@ export const FlowEditorPage = () => {
         handleTraceUpdate,
         getLastLocalUpdateTimestamp,
         lastLocalUpdateTimestampRef,
+        resetSequenceTracking,
     } = useSocketHandlers({
         canvasRef,
         blockRegistry,
@@ -163,6 +166,14 @@ export const FlowEditorPage = () => {
         serializeWorkflowState,
     });
 
+    const socketRecorder = useSocketRecorder();
+
+    const resetAllNodesToIdle = useCallback(() => {
+        canvasRef.current?.getWorkflow()?.nodes?.forEach(n => {
+            canvasRef.current?.updateNodeFromServer(n.id, { state: 'IDLE', status: 'IDLE' }, { force: true });
+        });
+    }, []);
+
     // Initialize WebSocket connection when channelId is available
     const {
         isConnected: isSocketConnected,
@@ -171,6 +182,7 @@ export const FlowEditorPage = () => {
         reconnectAttempts,
         maxReconnectReached,
         connectionId: socketConnectionId,
+        replayMessage,
     } = useInitFlowSocket({
         channelId,
         currentFlowId,
@@ -179,6 +191,7 @@ export const FlowEditorPage = () => {
         onNodeReload: handleNodeUpdate,
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
+        onMessage: socketRecorder.record,
     });
 
     const { startTourIfFirstVisit, startTour } = useTour();
@@ -850,9 +863,42 @@ export const FlowEditorPage = () => {
                 </div>
             )}
 
-            {/* Dev Role Toggle (hidden in production) */}
+            {/* Dev Tools (hidden in production) */}
             {import.meta.env.VITE_ENV !== 'PROD' && (
-                <DevRoleToggle role={role} computedRole={computedRole} onOverride={setDevRoleOverride} />
+                <>
+                    <DevRoleToggle role={role} computedRole={computedRole} onOverride={setDevRoleOverride} />
+                    <DevSocketPanel
+                        messages={socketRecorder.messages}
+                        isRecording={socketRecorder.isRecording}
+                        replayState={socketRecorder.replayState}
+                        onToggleRecording={socketRecorder.toggleRecording}
+                        onClear={socketRecorder.clear}
+                        onReplay={msg => {
+                            resetSequenceTracking();
+                            const nodeId = msg.id.split(':')[0];
+                            canvasRef.current?.updateNodeFromServer(
+                                nodeId,
+                                { state: 'IDLE', status: 'IDLE' },
+                                { force: true }
+                            );
+                            replayMessage(msg);
+                        }}
+                        onReplayFromIndex={fromIndex => {
+                            resetSequenceTracking();
+                            resetAllNodesToIdle();
+                            socketRecorder.startReplayFromIndex(fromIndex, replayMessage);
+                        }}
+                        onStopReplay={() => {
+                            socketRecorder.stopReplaySequence();
+                            resetAllNodesToIdle();
+                        }}
+                        onResetNodes={() => {
+                            resetSequenceTracking();
+                            resetAllNodesToIdle();
+                        }}
+                        onMarkReplayed={socketRecorder.markReplayed}
+                    />
+                </>
             )}
 
             {/* Loading Overlay */}

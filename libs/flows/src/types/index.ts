@@ -580,27 +580,31 @@ export interface UpsertNodeResult {
 /**
  * LoadFlowPortData - port data from GET /flows/:id/load response
  *
- * Unlike PortDataResponse (from GET /nodes/:portId/port), this type
- * has nullable data field because the server may return data: null
- * when port data hasn't been populated yet.
+ * Three-state data field:
+ * - `DataPacket` — port has data (e.g., `{ value: "Hello", type: "text", timestamp: ... }`)
+ * - `null` — server confirms port is empty (no fetch needed)
+ * - `undefined` (absent) — server didn't include data; fetch via `getPortData()` in background
  *
  * @example
  * {
- *   "id": "1004298:in",
- *   "nodeId": "1004298",
- *   "portId": "in",
- *   "data": null  // or { value, type, timestamp }
+ *   "id": "1008730:out",
+ *   "nodeId": "1008730",
+ *   "portId": "out",
+ *   "direction": "out",
+ *   "data": { "value": "Hello Eureka", "type": "text", "timestamp": 1776746792954 }
  * }
  */
 export interface LoadFlowPortData {
-    /** Full port ID (e.g., "1004298:in") */
+    /** Full port ID (e.g., "1008730:out") */
     id: string;
-    /** Parent node ID (e.g., "1004298") */
+    /** Parent node ID (e.g., "1008730") */
     nodeId: string;
     /** Port name/key (e.g., "in" or "out") */
     portId: string;
-    /** Port data - null when not populated, DataPacket when available */
-    data: DataPacket | null;
+    /** Port direction from server response */
+    direction?: 'in' | 'out';
+    /** Port data — null when truly empty, undefined when not loaded, DataPacket when available */
+    data?: DataPacket | null;
 }
 
 /**

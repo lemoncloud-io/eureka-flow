@@ -37,10 +37,12 @@
         "editPublishInfo": "게시 정보 수정",
         "unpublish": "게시 취소",
         "viewOnly": "읽기 전용",
+        "guestMode": "게스트",
         "apiKeySettings": "API 키 설정",
         "guidedTour": "가이드 투어",
         "replayTutorial": "튜토리얼 다시보기",
         "beta": "베타",
+        "graphView": "그래프 뷰",
         "menuGroup": {
             "file": "파일",
             "canvas": "캔버스",
@@ -64,7 +66,9 @@
         "clickToAdd": "클릭하여 캔버스에 추가",
         "clientExecution": "브라우저에서 실행 (클라이언트)",
         "frontend": "프론트엔드",
-        "portsInfo": "입력 {{inputs}}개 → 출력 {{outputs}}개"
+        "portsInfo": "입력 {{inputs}}개 → 출력 {{outputs}}개",
+        "recent": "최근",
+        "readOnlyHint": "블록을 추가하려면 로그인하세요"
     },
     "canvas": {
         "executionLogs": "실행 로그",
@@ -237,7 +241,8 @@
         "loadErrorTitle": "로드 실패",
         "signInWithApiKey": "API 키로 로그인",
         "browsePublicFlows": "공개 플로우 둘러보기",
-        "signInToEdit": "로그인하여 편집하기"
+        "signInToEdit": "로그인하여 편집하기",
+        "failedToRunFlow": "플로우 실행 실패"
     },
     "publicFlows": {
         "title": "공개 플로우",
@@ -480,6 +485,11 @@
                 "description": "라이브러리에서 블록을 추가하고 연결하는 것부터 시작하세요. 언제든 ?를 눌러 도움말을 열거나, 메뉴에서 이 투어를 다시 볼 수 있습니다."
             }
         }
+    },
+    "graphView": {
+        "noNodes": "표시할 노드가 없습니다",
+        "fitToView": "화면에 맞추기",
+        "goToNode": "노드로 이동"
     },
     "mobile": {
         "addNode": "노드 추가",
