@@ -74,12 +74,14 @@ export const useSocketHandlers = ({
             // Node messages may omit flowId — channel subscription already filters by flow
             if (flowId && flowId !== currentFlowId) return;
 
-            // Reset sequence tracking when runId changes (new execution run)
+            // Reset sequence tracking and node state when runId changes (new execution run)
+            // Without this, state priority (COMPLETED > RUNNING) blocks re-execution updates
             const { runId } = info;
             if (runId) {
                 const prevRunId = nodeRunIdRef.current.get(nodeId);
                 if (prevRunId && prevRunId !== runId) {
                     nodeNoRef.current.delete(nodeId);
+                    canvasRef.current?.updateNodeFromServer(nodeId, { state: 'IDLE', status: 'IDLE' }, { force: true });
                 }
                 nodeRunIdRef.current.set(nodeId, runId);
             }
