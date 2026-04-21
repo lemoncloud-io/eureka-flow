@@ -41,6 +41,7 @@
         "guidedTour": "Guided Tour",
         "replayTutorial": "Replay Tutorial",
         "beta": "Beta",
+        "graphView": "Graph View",
         "menuGroup": {
             "file": "File",
             "canvas": "Canvas",
