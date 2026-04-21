@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-04-21] - root@0.34.0, @flows/web@0.34.0, @flows/admin@0.20.0
+
+### Features
+
+- update debug mode
+- add AI key warning and dialog
+- add api key popup
+- add get profile api
+
 ## [2026-04-21] - root@0.33.0, @flows/web@0.33.0, @flows/admin@0.19.0
 
 ### Features
