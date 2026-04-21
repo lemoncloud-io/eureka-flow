@@ -180,7 +180,7 @@ export const Minimap = ({
             <button
                 onClick={toggleVisible}
                 className={cn(
-                    'absolute bottom-14 right-4 z-20 hidden sm:flex',
+                    'absolute bottom-4 right-4 z-20 hidden sm:flex',
                     'items-center justify-center w-8 h-8 rounded-lg',
                     'bg-background/80 backdrop-blur-xl border border-border/50 shadow-sm',
                     'text-muted-foreground hover:text-foreground transition-colors'
@@ -194,7 +194,7 @@ export const Minimap = ({
     return (
         <div
             className={cn(
-                'absolute bottom-14 right-4 z-20 hidden sm:block',
+                'absolute bottom-4 right-4 z-20 hidden sm:block',
                 'rounded-lg overflow-hidden',
                 'bg-background/90 backdrop-blur-xl border border-border/40 shadow-md'
             )}

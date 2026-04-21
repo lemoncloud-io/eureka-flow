@@ -19,6 +19,8 @@ export interface WebCoreState {
     profile: UserProfile | null;
     userName: string;
     apiKey: string | null;
+    hasGeminiKey: boolean;
+    hasOpenaiKey: boolean;
 }
 
 export interface WebCoreStore extends WebCoreState {
@@ -28,6 +30,7 @@ export interface WebCoreStore extends WebCoreState {
     setProfile: (profile: UserProfile) => void;
     updateProfile: (user: UserView) => void;
     registerLogoutCallback: (callback: () => void) => () => void;
+    setAiKeyStatus: (status: { hasGeminiKey: boolean; hasOpenaiKey: boolean }) => void;
     setApiKey: (key: string) => void;
     clearApiKey: () => void;
     initializeApiKey: () => void;
@@ -40,6 +43,8 @@ const initialState: Pick<WebCoreStore, keyof WebCoreState> = {
     profile: null,
     userName: '',
     apiKey: null,
+    hasGeminiKey: false,
+    hasOpenaiKey: false,
 };
 
 export const useWebCoreStore = create<WebCoreStore>()(set => {
@@ -61,7 +66,7 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
                 }
             });
 
-            set({ isAuthenticated: false, profile: null, userName: '' });
+            set({ isAuthenticated: false, profile: null, userName: '', hasGeminiKey: false, hasOpenaiKey: false });
         },
 
         setIsAuthenticated: (isAuthenticated: boolean) => set({ isAuthenticated }),
@@ -90,6 +95,13 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
                 logoutCallbacks.delete(callback);
             };
         },
+
+        setAiKeyStatus: (status: { hasGeminiKey: boolean; hasOpenaiKey: boolean }) =>
+            set(state =>
+                state.hasGeminiKey === status.hasGeminiKey && state.hasOpenaiKey === status.hasOpenaiKey
+                    ? state
+                    : status
+            ),
 
         setApiKey: (key: string) => {
             setStoredApiKey(key);

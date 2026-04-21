@@ -816,3 +816,15 @@ export interface RunContext {
     portUpdates: RunPortUpdate[];
     error?: string;
 }
+
+// ============================================================================
+// Profile API Types
+// ============================================================================
+
+/** Response from GET /flows/0/profile */
+export interface ProfileResponse {
+    sid: string;
+    uid: string;
+    geminiApiKey?: string;
+    openaiApiKey?: string;
+}

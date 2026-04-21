@@ -12,12 +12,16 @@ import {
     getBlockDefinition,
     getEffectiveState,
     getNodeWidth,
+    isAiBlock,
+    isMissingAiKey,
     useBlockRegistry,
     useCanvasStore,
     useNodeTraceLogs,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+import { useWebCoreStore } from '@flows/web-core';
 
+import { AiKeyWarningBanner } from './AiKeyWarningBanner';
 import { BlockIcon } from './BlockIcon';
 import { PortItem } from './PortItem';
 import { ProcessRunButtons, StatusIcon } from './ProcessRunButtons';
@@ -63,6 +67,7 @@ export interface NodeActions {
     onDelete: () => void;
     onTrigger: (options?: { propagate?: boolean }) => Promise<void> | void;
     onDuplicate?: () => void;
+    onOpenAiKeyDialog?: () => void;
 
     onResize?: (width: number, height: number) => void;
     /** Called during resize for real-time edge updates */
@@ -211,7 +216,18 @@ export const NodeBlock = memo<NodeBlockProps>(
         } = highlightState;
         const { onPortMouseDown, onPortMouseUp, onPortTouchStart, onPortDoubleClick } = portHandlers;
         const { onConfigChange, onLabelChange } = configHandlers;
-        const { onDelete, onTrigger, onDuplicate, onResize, onResizing } = actions;
+        const { onDelete, onTrigger, onDuplicate, onOpenAiKeyDialog, onResize, onResizing } = actions;
+
+        // AI key availability check for AI blocks
+        const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
+        const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
+        const needsAiKey = useMemo(
+            () =>
+                !!definition &&
+                isAiBlock(definition.type) &&
+                isMissingAiKey(node.config?.model as string | undefined, hasGeminiKey, hasOpenaiKey),
+            [definition, node.config?.model, hasGeminiKey, hasOpenaiKey]
+        );
 
         // Memoize visible ports to avoid recalculating on every render
         const visibleInputPorts = useMemo(
@@ -788,6 +804,9 @@ export const NodeBlock = memo<NodeBlockProps>(
                             {/* Output Preview for process nodes */}
                             <OutputPreview node={node} definition={definition} contentHeight={contentAreaHeight} />
                         </div>
+
+                        {/* AI Key Warning */}
+                        {needsAiKey && <AiKeyWarningBanner onRegisterKey={onOpenAiKeyDialog} />}
 
                         {/* Error Message */}
                         {nodeState === 'ERROR' && (

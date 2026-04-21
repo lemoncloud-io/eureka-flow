@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { getProfile, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 import { useWebCoreStore } from '@flows/web-core';
 
 import type { SerializeWorkflowFn } from './types';
@@ -64,6 +64,18 @@ export const useMobileEditorBoot = ({
 
         setLoadingText(t('flowEditor.initializingEngine'));
         try {
+            // Fetch AI key availability (fire-and-forget, parallel with loadBlocks)
+            if (currentApiKey) {
+                getProfile()
+                    .then(data => {
+                        useWebCoreStore.getState().setAiKeyStatus({
+                            hasGeminiKey: !!data.geminiApiKey,
+                            hasOpenaiKey: !!data.openaiApiKey,
+                        });
+                    })
+                    .catch(err => console.warn('[MobileFlowEditor] Profile fetch failed:', err));
+            }
+
             setLoadingText(t('flowEditor.loadingBlockRegistry'));
             await loadBlocks();
 

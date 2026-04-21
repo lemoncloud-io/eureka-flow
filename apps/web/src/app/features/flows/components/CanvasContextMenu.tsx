@@ -7,7 +7,6 @@ import { BLOCK_CATEGORIES, BLOCK_CATEGORY_CONFIG, useBlockGroups } from '@flows/
 import { cn } from '@flows/lib/utils';
 
 import { BlockIcon } from './BlockIcon';
-import { FrontendBadge } from './FrontendBadge';
 
 interface CanvasContextMenuProps {
     screenX: number;
@@ -138,7 +137,6 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ screenX, s
                                             <span className="text-xs font-medium text-foreground truncate">
                                                 {block.label}
                                             </span>
-                                            {block.isFrontend && <FrontendBadge />}
                                         </div>
                                     </div>
                                     <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
