@@ -32,6 +32,8 @@ import {
     ThemeToggle,
 } from '@flows/ui-kit';
 
+import { DebugModeToggle } from '../../../components/DebugModeToggle';
+
 import type { FlowRole, SaveStatus } from '@flows/flows';
 
 interface RunProgress {
@@ -58,6 +60,9 @@ interface MobileHeaderProps {
     onClear?: () => void;
     onApiKeySettings?: () => void;
     role?: FlowRole;
+    onVersionClick?: () => void;
+    isDebugMode?: boolean;
+    onDisableDebugMode?: () => void;
 }
 
 export const MobileHeader = ({
@@ -79,6 +84,9 @@ export const MobileHeader = ({
     onClear,
     onApiKeySettings,
     role = 'owner',
+    onVersionClick,
+    isDebugMode,
+    onDisableDebugMode,
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
@@ -281,14 +289,18 @@ export const MobileHeader = ({
 
                     <DropdownMenuSeparator />
 
-                    {/* Theme & Language */}
+                    {/* Theme, Language & Debug */}
                     <div className="flex items-center justify-center gap-4 px-2 py-1.5">
                         <ThemeToggle />
                         <LanguageSwitcher />
+                        {isDebugMode && onDisableDebugMode && <DebugModeToggle onDisable={onDisableDebugMode} />}
                     </div>
 
                     {/* Version */}
-                    <div className="px-2 py-1.5 text-[10px] text-muted-foreground/50 text-center">
+                    <div
+                        className="px-2 py-1.5 text-[10px] text-muted-foreground/50 text-center select-none cursor-default"
+                        onClick={onVersionClick}
+                    >
                         Web v{__APP_VERSION__} {apiVersion && `/ API v${apiVersion}`}
                     </div>
                 </DropdownMenuContent>

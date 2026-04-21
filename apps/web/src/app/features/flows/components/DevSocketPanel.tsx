@@ -45,7 +45,7 @@ export const DevSocketPanel: React.FC<DevSocketPanelProps> = ({
     onResetNodes,
     onMarkReplayed,
 }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
     const [pos, setPos] = useState({ x: 16, y: 80 });
     const dragRef = useRef<HTMLDivElement>(null);
     const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
@@ -111,13 +111,11 @@ export const DevSocketPanel: React.FC<DevSocketPanelProps> = ({
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
+                onClick={() => {
+                    if (!didDrag.current) setIsExpanded(true);
+                }}
             >
-                <button
-                    onClick={() => {
-                        if (!didDrag.current) setIsExpanded(true);
-                    }}
-                    className="flex items-center gap-1.5 bg-glass-bg backdrop-blur-[24px] border border-glass-border shadow-floating rounded-xl px-2.5 py-1.5 text-xs font-mono cursor-grab active:cursor-grabbing"
-                >
+                <div className="flex items-center gap-1.5 bg-glass-bg backdrop-blur-[24px] border border-glass-border shadow-floating rounded-xl px-2.5 py-1.5 text-xs font-mono cursor-grab active:cursor-grabbing select-none">
                     {replayState.isReplaying ? (
                         <Play className="w-3 h-3 text-green-400 animate-pulse" />
                     ) : (
@@ -127,7 +125,7 @@ export const DevSocketPanel: React.FC<DevSocketPanelProps> = ({
                     )}
                     <span className="text-muted-foreground">WS</span>
                     {messages.length > 0 && <span className="text-muted-foreground/60">{messages.length}</span>}
-                </button>
+                </div>
             </div>
         );
     }

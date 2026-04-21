@@ -11,6 +11,7 @@ import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
+import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
 import { AiKeyDialog } from '../components/AiKeyDialog';
 import { DevSocketPanel } from '../components/DevSocketPanel';
@@ -49,9 +50,10 @@ const DevRoleToggle: React.FC<{
     role: FlowRole;
     computedRole: FlowRole;
     onOverride: (role: FlowRole | null) => void;
-}> = ({ role, computedRole, onOverride }) => {
+    onClose?: () => void;
+}> = ({ role, computedRole, onOverride, onClose }) => {
     const dragRef = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState({ x: 16, y: 16 }); // bottom-right offset
+    const [pos, setPos] = useState({ x: 16, y: 56 }); // bottom-right offset (above minimap)
     const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
     const didDrag = useRef(false);
 
@@ -112,6 +114,18 @@ const DevRoleToggle: React.FC<{
                         {r}
                     </button>
                 ))}
+                {onClose && (
+                    <button
+                        onClick={() => {
+                            if (didDrag.current) return;
+                            onClose();
+                        }}
+                        className="px-1.5 py-1 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Exit debug mode"
+                    >
+                        <X className="w-3 h-3" />
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -210,6 +224,8 @@ export const FlowEditorPage = () => {
     const [tourPhase, setTourPhase] = useState<'none' | 'guide' | 'block'>('none');
 
     const { apiKey, setApiKey } = useWebCoreStore();
+    const { isDebugMode, handleVersionClick, disableDebugMode } = useDebugMode();
+    const showDevTools = import.meta.env.VITE_ENV !== 'PROD' || isDebugMode;
 
     // Public mode: read-only viewing when no API key and viewing an existing flow
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
@@ -733,7 +749,7 @@ export const FlowEditorPage = () => {
                     onOpenLibrary={handleOpenLibrary}
                     onConnectionError={handleConnectionError}
                     onShowNotification={showNotification}
-                    onAiKeyRequired={() => setIsAiKeyDialogOpen(true)}
+                    onAiKeyRequired={showDevTools ? () => setIsAiKeyDialogOpen(true) : undefined}
                 />
             </div>
 
@@ -797,6 +813,9 @@ export const FlowEditorPage = () => {
                 onTour={() => setTourPhase('guide')}
                 onOpenFlowList={handleOpenFlowList}
                 onGraphView={() => setIsGraphViewOpen(true)}
+                onVersionClick={handleVersionClick}
+                isDebugMode={isDebugMode}
+                onDisableDebugMode={isDebugMode ? disableDebugMode : undefined}
             />
 
             {/* Floating Sidebar */}
@@ -835,8 +854,8 @@ export const FlowEditorPage = () => {
                 onCaptureCanvas={handleCaptureCanvas}
             />
 
-            {/* AI Key Dialog */}
-            <AiKeyDialog open={isAiKeyDialogOpen} onOpenChange={setIsAiKeyDialogOpen} />
+            {/* AI Key Dialog (dev + debug mode) */}
+            {showDevTools && <AiKeyDialog open={isAiKeyDialogOpen} onOpenChange={setIsAiKeyDialogOpen} />}
 
             {/* Graph View Overlay */}
             {isGraphViewOpen && (
@@ -881,10 +900,15 @@ export const FlowEditorPage = () => {
                 </div>
             )}
 
-            {/* Dev Tools (hidden in production) */}
-            {import.meta.env.VITE_ENV !== 'PROD' && (
+            {/* Dev Tools (hidden in production unless debug mode activated) */}
+            {showDevTools && (
                 <>
-                    <DevRoleToggle role={role} computedRole={computedRole} onOverride={setDevRoleOverride} />
+                    <DevRoleToggle
+                        role={role}
+                        computedRole={computedRole}
+                        onOverride={setDevRoleOverride}
+                        onClose={isDebugMode ? disableDebugMode : undefined}
+                    />
                     <DevSocketPanel
                         messages={socketRecorder.messages}
                         isRecording={socketRecorder.isRecording}

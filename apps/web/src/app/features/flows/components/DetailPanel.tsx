@@ -840,8 +840,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 )}
 
                 {/* AI Key Warning */}
-                {onOpenAiKeyDialog &&
-                    isAiBlock(def.type) &&
+                {isAiBlock(def.type) &&
                     isMissingAiKey(selectedNode.config?.model as string | undefined, hasGeminiKey, hasOpenaiKey) && (
                         <div className="px-3 pt-2 flex-shrink-0">
                             <AiKeyWarningBanner onRegisterKey={onOpenAiKeyDialog} />

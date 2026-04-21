@@ -806,7 +806,7 @@ export const NodeBlock = memo<NodeBlockProps>(
                         </div>
 
                         {/* AI Key Warning */}
-                        {needsAiKey && onOpenAiKeyDialog && <AiKeyWarningBanner onRegisterKey={onOpenAiKeyDialog} />}
+                        {needsAiKey && <AiKeyWarningBanner onRegisterKey={onOpenAiKeyDialog} />}
 
                         {/* Error Message */}
                         {nodeState === 'ERROR' && (

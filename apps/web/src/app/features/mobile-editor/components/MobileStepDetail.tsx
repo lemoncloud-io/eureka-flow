@@ -185,11 +185,6 @@ export const MobileStepDetail = ({
                                         <span className="text-[10px] font-mono text-muted-foreground/50">
                                             {blockDef.type}
                                         </span>
-                                        {blockDef.isFrontend && (
-                                            <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary font-medium">
-                                                {t('sidebar.frontend')}
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -222,8 +217,7 @@ export const MobileStepDetail = ({
                             {isInputText && <MobileTextInput node={node} onConfigChange={handleConfigChange} />}
 
                             {/* AI Key Warning */}
-                            {onOpenAiKeyDialog &&
-                                isAiBlock(blockDef.type) &&
+                            {isAiBlock(blockDef.type) &&
                                 isMissingAiKey(
                                     node.config?.model as string | undefined,
                                     hasGeminiKey,
