@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-21] - root@0.36.0, @flows/web@0.36.0
+
+### Features
+
+- add compact mode to DevSocketPanel
+
 ## [2026-04-21] - root@0.35.0, @flows/web@0.35.0
 
 ### Features
