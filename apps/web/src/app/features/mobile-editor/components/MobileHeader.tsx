@@ -253,7 +253,7 @@ export const MobileHeader = ({
                     {canRun && onExport && (
                         <DropdownMenuItem onClick={onExport} className="gap-2">
                             <Download className="w-4 h-4" />
-                            {t('header.export', 'Export JSON')}
+                            {t('header.exportJson', 'Export JSON')}
                         </DropdownMenuItem>
                     )}
 

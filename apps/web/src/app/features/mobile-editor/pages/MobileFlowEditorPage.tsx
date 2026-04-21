@@ -12,7 +12,9 @@ import { useWebCoreStore } from '@flows/web-core';
 
 import { useDebugMode } from '../../../hooks/useDebugMode';
 import { AiKeyDialog } from '../../flows/components/AiKeyDialog';
+import { DevSocketPanel } from '../../flows/components/DevSocketPanel';
 import { FlowListDialog } from '../../flows/components/FlowListDialog';
+import { useSocketRecorder } from '../../flows/hooks/useSocketRecorder';
 import {
     MobileBlockLibrarySheet,
     MobileBottomBar,
@@ -35,6 +37,7 @@ import { useStepNavigation } from '../hooks/useStepNavigation';
 import { executeNodeWithToast } from '../utils';
 
 import type { FlowRole } from '@flows/flows';
+import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? [] });
@@ -47,7 +50,7 @@ export const MobileFlowEditorPage = () => {
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
     const nodeCount = useCanvasStore(state => state.nodes.length);
     const { isDebugMode, handleVersionClick, disableDebugMode } = useDebugMode();
-    const showDevTools = showDevTools;
+    const showDevTools = isDebugMode;
 
     // Role derivation
     const computedRole: FlowRole = isPublicMode ? 'anonymous' : isEditable ? 'owner' : 'guest';
@@ -89,12 +92,20 @@ export const MobileFlowEditorPage = () => {
         lastLocalUpdateTimestampRef,
     });
 
-    const { isSocketConnected, socketConnectionId } = useMobileSocketSync({
+    const socketRecorder = useSocketRecorder();
+
+    const { isSocketConnected, socketConnectionId, replayMessage } = useMobileSocketSync({
         serializeWorkflowState,
         lastSavedStateRef,
         lastLocalUpdateTimestampRef,
         canEdit: role === 'owner',
+        onMessage: socketRecorder.record,
     });
+
+    const resetAllNodesToIdle = useCallback(() => {
+        const { nodes, updateNodeData } = useCanvasStore.getState();
+        nodes.forEach(n => updateNodeData(n.id, { state: 'IDLE' } as Partial<NodeData>));
+    }, []);
 
     const { runProgress, isRunning, handleRunAll } = useMobileRunAll();
 
@@ -444,6 +455,28 @@ export const MobileFlowEditorPage = () => {
                         </button>
                     )}
                 </div>
+            )}
+
+            {showDevTools && (
+                <DevSocketPanel
+                    compact
+                    messages={socketRecorder.messages}
+                    isRecording={socketRecorder.isRecording}
+                    replayState={socketRecorder.replayState}
+                    onToggleRecording={socketRecorder.toggleRecording}
+                    onClear={socketRecorder.clear}
+                    onReplay={msg => replayMessage(msg.raw)}
+                    onReplayFromIndex={fromIndex => {
+                        resetAllNodesToIdle();
+                        socketRecorder.startReplayFromIndex(fromIndex, replayMessage);
+                    }}
+                    onStopReplay={() => {
+                        socketRecorder.stopReplaySequence();
+                        resetAllNodesToIdle();
+                    }}
+                    onResetNodes={resetAllNodesToIdle}
+                    onMarkReplayed={socketRecorder.markReplayed}
+                />
             )}
 
             {isLoading && (
