@@ -10,6 +10,8 @@ import { ApiKeyDialog } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
+import { useDebugMode } from '../../../hooks/useDebugMode';
+import { AiKeyDialog } from '../../flows/components/AiKeyDialog';
 import { FlowListDialog } from '../../flows/components/FlowListDialog';
 import {
     MobileBlockLibrarySheet,
@@ -44,6 +46,8 @@ export const MobileFlowEditorPage = () => {
     const blockRegistry = useBlockRegistry();
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
     const nodeCount = useCanvasStore(state => state.nodes.length);
+    const { isDebugMode, handleVersionClick, disableDebugMode } = useDebugMode();
+    const showDevTools = showDevTools;
 
     // Role derivation
     const computedRole: FlowRole = isPublicMode ? 'anonymous' : isEditable ? 'owner' : 'guest';
@@ -60,6 +64,7 @@ export const MobileFlowEditorPage = () => {
     const [isFlowMapOpen, setIsFlowMapOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isAiKeyDialogOpen, setIsAiKeyDialogOpen] = useState(false);
 
     // Step navigation (replaces configNodeId)
     const stepNav = useStepNavigation();
@@ -88,9 +93,10 @@ export const MobileFlowEditorPage = () => {
         serializeWorkflowState,
         lastSavedStateRef,
         lastLocalUpdateTimestampRef,
+        canEdit: role === 'owner',
     });
 
-    const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ socketConnectionId });
+    const { runProgress, isRunning, handleRunAll } = useMobileRunAll();
 
     const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleNew, handleClear } = useMobileFlowActions(
         {
@@ -283,6 +289,9 @@ export const MobileFlowEditorPage = () => {
                 onClear={role === 'owner' ? handleClear : undefined}
                 onApiKeySettings={() => setIsApiKeyDialogOpen(true)}
                 role={role}
+                onVersionClick={handleVersionClick}
+                isDebugMode={isDebugMode}
+                onDisableDebugMode={isDebugMode ? disableDebugMode : undefined}
             />
 
             <MobileFlowMap
@@ -345,6 +354,7 @@ export const MobileFlowEditorPage = () => {
                 onClose={stepNav.closeStep}
                 onOpenOutputConnection={connectionMode.openForPort}
                 onOpenInputConnection={connectionMode.openForInputPort}
+                onOpenAiKeyDialog={showDevTools ? () => setIsAiKeyDialogOpen(true) : undefined}
             />
 
             {/* Bottom bar — Add Node, hidden when step detail is open */}
@@ -406,8 +416,10 @@ export const MobileFlowEditorPage = () => {
                 initialValue={apiKey ?? undefined}
             />
 
-            {/* Dev Role Toggle (hidden in production) */}
-            {import.meta.env.VITE_ENV !== 'PROD' && (
+            {showDevTools && <AiKeyDialog open={isAiKeyDialogOpen} onOpenChange={setIsAiKeyDialogOpen} />}
+
+            {/* Dev Role Toggle (hidden in production unless debug mode) */}
+            {showDevTools && (
                 <div className="fixed top-16 right-2 z-50 flex gap-0.5 bg-background/90 backdrop-blur border border-border rounded-lg p-0.5 text-[10px] font-mono">
                     {(['owner', 'guest', 'anonymous'] as FlowRole[]).map(r => (
                         <button
@@ -422,6 +434,15 @@ export const MobileFlowEditorPage = () => {
                             {r.slice(0, 5)}
                         </button>
                     ))}
+                    {isDebugMode && (
+                        <button
+                            onClick={disableDebugMode}
+                            className="px-1 py-0.5 rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            title="Exit debug mode"
+                        >
+                            <X className="w-3 h-3" />
+                        </button>
+                    )}
                 </div>
             )}
 

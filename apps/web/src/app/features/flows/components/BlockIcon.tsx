@@ -6,7 +6,7 @@ import { cn } from '@flows/lib/utils';
 // Icon Type Detection
 // ============================================================================
 
-const isUrl = (value: string): boolean => /^https?:\/\//.test(value);
+const isUrl = (value: string): boolean => /^(https?:\/\/|\/)/.test(value);
 
 const isSvg = (value: string): boolean => value.trimStart().startsWith('<svg');
 

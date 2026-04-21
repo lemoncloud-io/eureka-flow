@@ -57,6 +57,8 @@ import {
 import type { FlowRole, LoadFlowPortData, NodeState, RunNodeBody } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
+const PORT_HIGHLIGHT_MS = 300;
+
 /** Stable empty array to avoid new references in render loop */
 const EMPTY_STRING_ARRAY: string[] = [];
 
@@ -97,7 +99,7 @@ export interface WorkflowCanvasRef {
     /** Update node data (used for socket status updates) */
     updateNode: (nodeId: string, updates: Partial<NodeData>) => void;
     /** Update node from server data (used for socket node update notifications) */
-    updateNodeFromServer: (nodeId: string, serverData: Partial<NodeData>) => void;
+    updateNodeFromServer: (nodeId: string, serverData: Partial<NodeData>, options?: { force?: boolean }) => void;
     /** Export canvas as PNG image */
     exportAsImage: (fileName: string) => Promise<void>;
     /** Capture canvas as data URL without downloading */
@@ -128,6 +130,8 @@ interface WorkflowCanvasProps {
     onConnectionError?: (error: 'cycle' | 'invalid_type') => void;
     /** Called to show notification message (dev only, for touch debug) */
     onShowNotification?: (message: string, type: 'success' | 'error') => void;
+    /** Called when AI key is required but missing */
+    onAiKeyRequired?: () => void;
 }
 
 const GRID_SIZE = 20;
@@ -209,6 +213,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             onOpenLibrary,
             onConnectionError,
             onShowNotification,
+            onAiKeyRequired,
         },
         ref
     ) => {
@@ -778,13 +783,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         });
                     };
 
-                    // Step 1: Apply existing port data (non-null) and display nodes immediately
-                    // This prevents empty state flash while fetching null port data
-                    const portsWithData = ports.filter(p => p.data !== null);
+                    // Apply ports with known state immediately; fetch undefined ones in background
+                    const portsWithData = ports.filter(p => p.data !== undefined);
                     const nodesWithExistingPortData = applyPortDataToNodes(loadedNodes, portsWithData);
                     const nodesWithPropagatedData = propagateData(nodesWithExistingPortData, loadedConnections);
 
-                    // Display nodes immediately
                     setNodes(nodesWithPropagatedData);
                     setConnections(loadedConnections);
                     pastRef.current = [];
@@ -792,13 +795,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     handleSelectionChange(null);
                     setSelectedConnectionId(null);
 
-                    // Step 2: Fetch missing port data (data: null) in background
-                    // Each port updates individually when fetched for progressive loading UX
-                    const nullDataPorts = ports.filter(p => p.data === null && p.portId);
+                    // null = server confirmed empty; undefined = server omitted, fetch now
+                    const undefinedDataPorts = ports.filter(p => p.data === undefined && p.portId);
 
-                    if (nullDataPorts.length > 0) {
-                        nullDataPorts.forEach(p => {
-                            const direction = p.portId === 'out' ? 'out' : 'in';
+                    if (undefinedDataPorts.length > 0) {
+                        undefinedDataPorts.forEach(p => {
+                            const direction = p.direction ?? (p.portId === 'out' ? 'out' : 'in');
                             getPortData(p.id, direction)
                                 .then(portData => {
                                     if (portData.data) {
@@ -971,7 +973,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 updateNode: (nodeId: string, updates: Partial<NodeData>) => {
                     setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, ...updates } : n)));
                 },
-                updateNodeFromServer: (nodeId: string, serverData: Partial<NodeData>) => {
+                updateNodeFromServer: (
+                    nodeId: string,
+                    serverData: Partial<NodeData>,
+                    options?: { force?: boolean }
+                ) => {
                     // Merge server data with existing node, preserving UI-specific fields
                     // Note: Server returns NodeView format from GET /nodes/:id
                     // - config$: ConfigItem[] (array) -> config: Record<string, string> (object)
@@ -1044,7 +1050,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 serverData.executionStats?.progress !== undefined &&
                                 !isTerminalCurrent;
                             const finalState =
-                                isActiveExecution || shouldUpdateState(currentState, serverState)
+                                options?.force || isActiveExecution || shouldUpdateState(currentState, serverState)
                                     ? serverState
                                     : currentState;
 
@@ -2043,6 +2049,39 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             setConnectionDraft(null);
         };
 
+        const handlePortDoubleClick = async (
+            nodeId: string,
+            portId: string,
+            type: 'input' | 'output',
+            _portType: string
+        ) => {
+            // Double-click fires after mouseDown already started a connection draft — cancel it
+            if (connectionDraft) setConnectionDraft(null);
+
+            const fullPortId = `${nodeId}:${portId}`;
+            const direction = type === 'output' ? 'out' : 'in';
+
+            useCanvasStore.getState().setUpdatedPort(fullPortId);
+
+            try {
+                const portData = await getPortData(fullPortId, direction);
+                if (portData?.data) {
+                    setNodes(prev =>
+                        prev.map(n => {
+                            if (n.id !== nodeId) return n;
+                            return direction === 'out'
+                                ? { ...n, outputData: { ...n.outputData, [portId]: portData.data } }
+                                : { ...n, inputData: { ...n.inputData, [portId]: portData.data } };
+                        })
+                    );
+                }
+            } catch (err) {
+                console.warn('[Canvas] Port data fetch failed:', fullPortId, err);
+            } finally {
+                setTimeout(() => useCanvasStore.getState().clearUpdatedPort(fullPortId), PORT_HIGHLIGHT_MS);
+            }
+        };
+
         const handlePortMouseDown = (
             nodeId: string,
             portId: string,
@@ -2621,7 +2660,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 const connectedPorts = connectedPortsByNodeId.get(node.id) ?? EMPTY_STRING_ARRAY;
 
                                 return (
-                                    <div key={node.id} className="relative">
+                                    <div key={node.id} className="relative hover:z-50">
                                         {role === 'anonymous' && (
                                             <div
                                                 className="absolute inset-0 z-10 pointer-events-auto cursor-pointer"
@@ -2649,6 +2688,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 onPortMouseDown: handlePortMouseDown,
                                                 onPortMouseUp: handlePortMouseUp,
                                                 onPortTouchStart: handlePortTouchStart,
+                                                onPortDoubleClick: handlePortDoubleClick,
                                             }}
                                             configHandlers={{
                                                 onConfigChange: (k, v) => handleConfigChange(node.id, k, v),
@@ -2659,6 +2699,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 onDelete: () => deleteNode(node.id),
                                                 onTrigger: opts => executeNode(node.id, undefined, opts),
                                                 onDuplicate: () => duplicateNode(node.id),
+                                                onOpenAiKeyDialog: onAiKeyRequired,
 
                                                 onResize: (w, h) => handleNodeResize(node.id, w, h),
                                                 onResizing: w =>
@@ -2767,6 +2808,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 setSelectedConnectionId(null);
                             }}
                             onShowNotification={onShowNotification}
+                            onOpenAiKeyDialog={onAiKeyRequired}
                         />
                     </div>
 

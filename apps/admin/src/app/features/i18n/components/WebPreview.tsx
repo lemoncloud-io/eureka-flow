@@ -5,15 +5,15 @@ import { Eye, Monitor, RefreshCw, Smartphone, Tablet } from 'lucide-react';
 import { cn } from '@flows/lib/utils';
 import { Button } from '@flows/ui-kit';
 
-import { I18N_NAMESPACES, fetchTranslation, flattenJson, unflattenJson } from '../consts';
+import { fetchTranslation, flattenJson, unflattenJson } from '../consts';
 import { useI18nStore } from '../stores';
-import { LANGUAGES, LANGUAGE_LABELS } from '../types';
+import { getLanguageLabel } from '../types';
 
-import type { I18nNamespace } from '../consts';
-import type { FlatTranslations, Language } from '../types';
+import type { FlatTranslations } from '../types';
 
 const WEB_APP_URL = import.meta.env.VITE_WEB_APP_URL as string | undefined;
 const PREVIEW_URL = WEB_APP_URL || 'http://localhost:3000';
+const PREVIEW_ORIGIN = new URL(PREVIEW_URL).origin;
 
 const DEVICE_PRESETS = [
     { name: 'Mobile', width: 375, height: 667, icon: Smartphone },
@@ -31,8 +31,8 @@ const buildKeyOverlay = (flatKeys: string[]): Record<string, unknown> => {
 };
 
 interface ExternalData {
-    namespace: I18nNamespace;
-    edited: Record<Language, FlatTranslations>;
+    namespace: string;
+    edited: Record<string, FlatTranslations>;
 }
 
 interface WebPreviewProps {
@@ -44,17 +44,19 @@ interface WebPreviewProps {
 export const WebPreview = ({ onKeySearch, externalData }: WebPreviewProps) => {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [language, setLanguage] = useState<Language>('ko');
+    const [language, setLanguage] = useState<string>('ko');
     const [refreshKey, setRefreshKey] = useState(0);
     const [showKeys, setShowKeys] = useState(false);
     const [device, setDevice] = useState<DevicePreset>('Desktop');
     const [containerWidth, setContainerWidth] = useState(0);
     const [syncTrigger, setSyncTrigger] = useState(0);
-    const [allNsKeys, setAllNsKeys] = useState<Record<I18nNamespace, string[]> | null>(null);
-    const [allNsValues, setAllNsValues] = useState<Record<I18nNamespace, Record<string, unknown>> | null>(null);
+    const [allNsKeys, setAllNsKeys] = useState<Record<string, string[]> | null>(null);
+    const [allNsValues, setAllNsValues] = useState<Record<string, Record<string, unknown>> | null>(null);
 
     const storeNamespace = useI18nStore(s => s.namespace);
     const storeEdited = useI18nStore(s => s.edited);
+    const languages = useI18nStore(s => s.languages);
+    const namespaces = useI18nStore(s => s.namespaces);
     const namespace = externalData?.namespace ?? storeNamespace;
     const edited = externalData?.edited ?? storeEdited;
 
@@ -87,18 +89,18 @@ export const WebPreview = ({ onKeySearch, externalData }: WebPreviewProps) => {
     }, []);
 
     const postToIframe = useCallback((message: Record<string, unknown>) => {
-        iframeRef.current?.contentWindow?.postMessage(message, '*');
+        iframeRef.current?.contentWindow?.postMessage(message, PREVIEW_ORIGIN);
     }, []);
 
-    // Fetch all namespace keys+values when showKeys is toggled on
+    // Fetch all namespace keys+values when showKeys is toggled on (cached after first load)
     useEffect(() => {
-        if (!showKeys) return;
+        if (!showKeys || allNsKeys) return;
         let cancelled = false;
         const load = async () => {
-            const keys = {} as Record<I18nNamespace, string[]>;
-            const values = {} as Record<I18nNamespace, Record<string, unknown>>;
+            const keys = {} as Record<string, string[]>;
+            const values = {} as Record<string, Record<string, unknown>>;
             await Promise.all(
-                I18N_NAMESPACES.map(async ns => {
+                namespaces.map(async ns => {
                     try {
                         const data = await fetchTranslation('en', ns);
                         keys[ns] = Object.keys(flattenJson(data));
@@ -120,52 +122,77 @@ export const WebPreview = ({ onKeySearch, externalData }: WebPreviewProps) => {
         };
     }, [showKeys]);
 
-    // Sync to iframe
+    const syncEditedToIframe = useCallback(
+        (ns: string, data: Record<string, FlatTranslations>) => {
+            languages.forEach(lang => {
+                postToIframe({
+                    type: 'i18n:update',
+                    namespace: ns,
+                    language: lang,
+                    resources: unflattenJson(data[lang]),
+                });
+            });
+        },
+        [postToIframe]
+    );
+
+    // Refs for full sync to read current values without re-triggering
+    const editedRef = useRef(edited);
+    const namespaceRef = useRef(namespace);
+    editedRef.current = edited;
+    namespaceRef.current = namespace;
+
+    // Full sync to iframe (initial load, refresh, showKeys toggle only)
     useEffect(() => {
         if (syncTrigger === 0) return;
+        const ns = namespaceRef.current;
+        const ed = editedRef.current;
 
         if (showKeys && allNsKeys) {
-            // showKeys ON: send key overlays for ALL namespaces
-            for (const ns of I18N_NAMESPACES) {
+            for (const targetNs of namespaces) {
                 const keys =
-                    ns === namespace
-                        ? [...new Set(LANGUAGES.flatMap(lang => Object.keys(edited[lang])))]
-                        : (allNsKeys[ns] ?? []);
+                    targetNs === ns
+                        ? [...new Set(languages.flatMap(lang => Object.keys(ed[lang])))]
+                        : (allNsKeys[targetNs] ?? []);
                 if (keys.length > 0) {
-                    postToIframe({ type: 'i18n:showKeys', namespace: ns, keys: buildKeyOverlay(keys) });
+                    postToIframe({ type: 'i18n:showKeys', namespace: targetNs, keys: buildKeyOverlay(keys) });
                 }
             }
         } else if (!showKeys) {
-            // Restore current namespace with edited values
-            LANGUAGES.forEach(lang => {
-                postToIframe({
-                    type: 'i18n:update',
-                    namespace,
-                    language: lang,
-                    resources: unflattenJson(edited[lang]),
-                });
-            });
-            // Restore other namespaces with cached S3 values (if coming back from showKeys)
+            syncEditedToIframe(ns, ed);
             if (allNsValues) {
-                for (const ns of I18N_NAMESPACES) {
-                    if (ns === namespace) continue;
-                    LANGUAGES.forEach(lang => {
+                for (const targetNs of namespaces) {
+                    if (targetNs === ns) continue;
+                    languages.forEach(lang => {
                         postToIframe({
                             type: 'i18n:update',
-                            namespace: ns,
+                            namespace: targetNs,
                             language: lang,
-                            resources: allNsValues[ns] ?? {},
+                            resources: allNsValues[targetNs] ?? {},
                         });
                     });
                 }
-                setAllNsKeys(null);
-                setAllNsValues(null);
             }
         }
-    }, [syncTrigger, showKeys, allNsKeys, allNsValues, edited, namespace, postToIframe]);
+    }, [syncTrigger, showKeys, allNsKeys, allNsValues, postToIframe, syncEditedToIframe]);
+
+    // Live sync: push edited translations to iframe on every change (debounced)
+    const liveSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        if (syncTrigger === 0 || showKeys) return;
+
+        if (liveSyncTimerRef.current) clearTimeout(liveSyncTimerRef.current);
+        liveSyncTimerRef.current = setTimeout(() => {
+            syncEditedToIframe(namespace, edited);
+        }, 150);
+
+        return () => {
+            if (liveSyncTimerRef.current) clearTimeout(liveSyncTimerRef.current);
+        };
+    }, [edited, namespace, syncTrigger, showKeys, syncEditedToIframe]);
 
     const handleLanguageChange = useCallback(
-        (lang: Language) => {
+        (lang: string) => {
             setLanguage(lang);
             postToIframe({ type: 'i18n:changeLanguage', language: lang });
         },
@@ -174,6 +201,7 @@ export const WebPreview = ({ onKeySearch, externalData }: WebPreviewProps) => {
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
+            if (event.origin !== PREVIEW_ORIGIN) return;
             if (!event.data || typeof event.data.type !== 'string') return;
             switch (event.data.type) {
                 case 'i18n:ready':
@@ -216,7 +244,7 @@ export const WebPreview = ({ onKeySearch, externalData }: WebPreviewProps) => {
                         <Eye className="h-3.5 w-3.5 mr-1" />
                         Keys
                     </Button>
-                    {LANGUAGES.map(lang => (
+                    {languages.map(lang => (
                         <Button
                             key={lang}
                             variant={language === lang ? 'default' : 'outline'}
@@ -224,7 +252,7 @@ export const WebPreview = ({ onKeySearch, externalData }: WebPreviewProps) => {
                             onClick={() => handleLanguageChange(lang)}
                             className={cn('text-xs h-7', language === lang && 'pointer-events-none')}
                         >
-                            {LANGUAGE_LABELS[lang]}
+                            {getLanguageLabel(lang)}
                         </Button>
                     ))}
                     <Button

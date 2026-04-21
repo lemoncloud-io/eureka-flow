@@ -1,11 +1,12 @@
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Loader2, MoreVertical, Play, Trash2 } from 'lucide-react';
+import { AlertTriangle, Loader2, MoreVertical, Play, Trash2 } from 'lucide-react';
 
-import { useBlockRegistry } from '@flows/flows';
+import { getPermissions, isAiBlock, isMissingAiKey, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
+import { useWebCoreStore } from '@flows/web-core';
 
 import { STATE_STYLES, STEREO_ICON_BG } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
@@ -26,11 +27,22 @@ export const MobileStepCard = React.memo(
     ({ node, displayName, onTapCard, onRun, onDelete, role = 'owner' }: MobileStepCardProps) => {
         const { t } = useTranslation(['flows']);
         const blockRegistry = useBlockRegistry();
+        const { canEdit, canRun } = useMemo(() => getPermissions(role), [role]);
         const blockDef = blockRegistry[node.type];
         const state = (node.state ?? 'IDLE') as NodeState;
         const stateStyle = STATE_STYLES[state] ?? STATE_STYLES.IDLE;
         const stereo = blockDef?.stereo ?? 'process';
         const isRunning = state === 'RUNNING';
+
+        const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
+        const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
+        const needsAiKey = useMemo(
+            () =>
+                !!blockDef &&
+                isAiBlock(blockDef.type) &&
+                isMissingAiKey(node.config?.model as string | undefined, hasGeminiKey, hasOpenaiKey),
+            [blockDef, node.config?.model, hasGeminiKey, hasOpenaiKey]
+        );
 
         const handleRun = useCallback(
             (e: React.MouseEvent) => {
@@ -108,6 +120,9 @@ export const MobileStepCard = React.memo(
                     ) : null}
                 </div>
 
+                {/* AI Key Warning */}
+                {needsAiKey && <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />}
+
                 {/* Status dot */}
                 <div className="flex items-center gap-1 shrink-0">
                     {isRunning ? (
@@ -120,8 +135,7 @@ export const MobileStepCard = React.memo(
                     )}
                 </div>
 
-                {/* More menu */}
-                {role === 'owner' && (
+                {canRun && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <div
@@ -140,7 +154,7 @@ export const MobileStepCard = React.memo(
                                     {t('mobile.run', 'Run')}
                                 </DropdownMenuItem>
                             )}
-                            {onDelete && (
+                            {canEdit && onDelete && (
                                 <DropdownMenuItem onClick={handleDelete} className="gap-2 text-destructive">
                                     <Trash2 className="w-3.5 h-3.5" />
                                     {t('mobile.delete', 'Delete')}

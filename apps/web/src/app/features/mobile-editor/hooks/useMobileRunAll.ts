@@ -3,21 +3,20 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { useCanvasStore, useFlows } from '@flows/flows';
+import { runFlow, useCanvasStore, useFlows, useFlowsStore } from '@flows/flows';
 
-import { executeNodeDirect, topologicalSort } from '../utils';
-
-interface UseMobileRunAllParams {
-    socketConnectionId: string | undefined;
-}
+import type { NodeData, NodeState } from '@lemoncloud/eureka-flows-api';
 
 interface UseMobileRunAllReturn {
-    runProgress: { current: number; total: number } | null;
+    runProgress: { current: number; total: number; currentNodeId?: string } | null;
     isRunning: boolean;
     handleRunAll: () => Promise<void>;
 }
 
-export const useMobileRunAll = ({ socketConnectionId }: UseMobileRunAllParams): UseMobileRunAllReturn => {
+/**
+ * Delegates to server via `runFlow()`. Node state updates arrive via WebSocket.
+ */
+export const useMobileRunAll = (): UseMobileRunAllReturn => {
     const { t } = useTranslation(['flows']);
     const { currentFlowId } = useFlows();
     const [runProgress, setRunProgress] = useState<{ current: number; total: number; currentNodeId?: string } | null>(
@@ -25,44 +24,41 @@ export const useMobileRunAll = ({ socketConnectionId }: UseMobileRunAllParams): 
     );
 
     const handleRunAll = useCallback(async () => {
-        const { nodes, connections } = useCanvasStore.getState();
-        if (nodes.length === 0) return;
+        if (!currentFlowId) return;
 
-        const ordered = topologicalSort(nodes, connections);
-        const total = ordered.length;
-        let completed = 0;
+        const { nodes, updateNodeData } = useCanvasStore.getState();
+        const blockRegistry = useFlowsStore.getState().blockRegistry;
 
-        setRunProgress({ current: 0, total, currentNodeId: ordered[0] });
+        // Collect input nodes with auto-execution enabled (same filter as desktop)
+        const inputNodeIds = nodes
+            .filter(n => {
+                const def = blockRegistry[n.type];
+                return def?.stereo === 'input' && n.autoExecutionEnabled !== false;
+            })
+            .map(n => n.id);
 
-        for (const nodeId of ordered) {
-            setRunProgress(prev => (prev ? { ...prev, currentNodeId: nodeId } : null));
-            try {
-                await executeNodeDirect(nodeId, {
-                    flowId: currentFlowId,
-                    socketConnectionId,
-                    canEdit: true,
-                });
-                completed++;
-                setRunProgress({ current: completed, total });
-            } catch {
-                toast.error(
-                    t('mobile.nodeFailed', {
-                        current: completed + 1,
-                        total,
-                        defaultValue: `Node ${completed + 1}/${total} failed`,
-                    })
-                );
-                break;
+        if (inputNodeIds.length === 0) return;
+
+        const total = inputNodeIds.length;
+
+        // Set input nodes to RUNNING state
+        for (const id of inputNodeIds) {
+            updateNodeData(id, { state: 'RUNNING' as NodeState } as Partial<NodeData>);
+        }
+        setRunProgress({ current: 0, total });
+
+        try {
+            await runFlow(currentFlowId, inputNodeIds);
+        } catch {
+            // Reset input nodes to IDLE on failure
+            for (const id of inputNodeIds) {
+                updateNodeData(id, { state: 'IDLE' as NodeState } as Partial<NodeData>);
             }
+            toast.error(t('mobile.runAllFailed', { defaultValue: 'Failed to run flow' }));
+        } finally {
+            setRunProgress(null);
         }
-
-        setRunProgress(null);
-        if (completed === total) {
-            toast.success(
-                t('mobile.allNodesCompleted', { count: total, defaultValue: `All ${total} nodes completed` })
-            );
-        }
-    }, [socketConnectionId, currentFlowId, t]);
+    }, [currentFlowId, t]);
 
     return {
         runProgress,

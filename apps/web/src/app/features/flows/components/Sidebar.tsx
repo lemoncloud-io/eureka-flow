@@ -17,7 +17,6 @@ import {
 } from '@flows/ui-kit';
 
 import { BlockIcon } from './BlockIcon';
-import { FrontendBadge } from './FrontendBadge';
 
 import type { FlowRole } from '@flows/flows';
 
@@ -43,7 +42,6 @@ interface BlockCardProps {
     disabled?: boolean;
     inputCount?: number;
     outputCount?: number;
-    isFrontend?: boolean;
 }
 
 const BlockCard: React.FC<BlockCardProps> = ({
@@ -55,7 +53,6 @@ const BlockCard: React.FC<BlockCardProps> = ({
     disabled,
     inputCount = 0,
     outputCount = 0,
-    isFrontend,
 }) => (
     <Tooltip>
         <TooltipTrigger asChild>
@@ -71,7 +68,6 @@ const BlockCard: React.FC<BlockCardProps> = ({
                     'disabled:cursor-not-allowed disabled:opacity-40'
                 )}
             >
-                {isFrontend && <FrontendBadge className="mb-1.5" />}
                 <div className="flex items-start gap-1.5">
                     <BlockIcon icon={icon} size={18} className="mt-0.5 shrink-0" />
                     <span className="line-clamp-2 text-[13px] font-semibold leading-[18px] tracking-[-0.3px] text-foreground">
@@ -291,7 +287,6 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                                     disabled={isLoading || isReadOnly}
                                                                     inputCount={block.inputs?.length}
                                                                     outputCount={block.outputs?.length}
-                                                                    isFrontend={block.isFrontend}
                                                                 />
                                                             ))}
                                                         </div>

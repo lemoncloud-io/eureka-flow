@@ -1,5 +1,75 @@
 # Changelog
 
+## [2026-04-21] - root@0.34.0, @flows/web@0.34.0, @flows/admin@0.20.0
+
+### Features
+
+- update debug mode
+- add AI key warning and dialog
+- add api key popup
+- add get profile api
+
+## [2026-04-21] - root@0.33.0, @flows/web@0.33.0, @flows/admin@0.19.0
+
+### Features
+
+- add new translations and update existing ones
+- add graph view translation
+- update socket dev
+- add double click event to ports
+
+### Bug Fixes
+
+- reset node state on runId change
+
+### Refactor
+
+- improve port data handling
+- improve socket recorder and node replay logic
+- improve port update handling
+
+## [2026-04-20] - root@0.32.1, @flows/web@0.32.1
+
+### Bug Fixes
+
+- handle initial flow id
+
+## [2026-04-20] - root@0.32.0, @flows/web@0.32.0, @flows/admin@0.18.0
+
+### Features
+
+- (permissions) enforce role-based UI gating across desktop and mobile editors
+
+## [2026-04-17] - root@0.31.1, @flows/admin@0.17.1
+
+### Bug Fixes
+
+- (i18n) load translations immediately after locale discovery
+
+## [2026-04-17] - root@0.31.0, @flows/web@0.31.0, @flows/admin@0.17.0
+
+### Features
+
+- enable CORS for translation uploads
+- (i18n) add API key auth support for presign API requests
+- (i18n) add presigned URL upload, dynamic locale discovery, and security hardening
+- (i18n) add live sync for translation edits
+
+### Bug Fixes
+
+- (i18n) use URLSearchParams for presign API query encoding
+- (i18n) rename presign auth header to x-i18n-key
+
+### Chores
+
+- update S3 bucket to eureka-flows-i18n and add presign env vars to CI
+
+## [2026-04-16] - root@0.30.1, @flows/web@0.30.1
+
+### Chores
+
+- update theme color and add SEO meta tags
+
 ## [2026-04-16] - root@0.30.0, @flows/web@0.30.0, @flows/admin@0.16.0
 
 ### Features

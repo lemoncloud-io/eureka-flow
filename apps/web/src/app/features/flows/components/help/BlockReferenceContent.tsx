@@ -7,6 +7,8 @@ import { useBlocks } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { MarkdownViewer } from '@flows/ui-kit';
 
+import { BlockIcon } from '../BlockIcon';
+
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
 
 const CATEGORY_ORDER = ['input', 'process', 'output'] as const;
@@ -29,7 +31,7 @@ const BlockItem = ({ block, isSelected, onClick }: BlockItemProps) => {
             )}
         >
             <div className="flex items-center gap-2">
-                <span className="text-lg">{block.icon || '📦'}</span>
+                <BlockIcon icon={block.icon} size={20} fallback={<span className="text-lg">📦</span>} />
                 <span className="font-medium text-sm">{block.label}</span>
                 {block.isFrontend && (
                     <span className="ml-auto flex items-center gap-1 text-xs text-primary">
@@ -53,7 +55,7 @@ const BlockDetail = ({ block }: BlockDetailProps) => {
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-3">
-                <span className="text-2xl">{block.icon || '📦'}</span>
+                <BlockIcon icon={block.icon} size={28} fallback={<span className="text-2xl">📦</span>} />
                 <div>
                     <h3 className="font-semibold">{block.label}</h3>
                     <p className="text-xs text-muted-foreground">{block.type}</p>

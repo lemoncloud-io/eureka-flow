@@ -155,6 +155,7 @@ export const TutorialPage = () => {
             <div data-tour="canvas" className="absolute inset-0">
                 <WorkflowCanvas
                     ref={canvasRef}
+                    role="owner"
                     onNodeSelect={noop}
                     onChange={handleCanvasChange}
                     onOpenLibrary={handleOpenLibrary}

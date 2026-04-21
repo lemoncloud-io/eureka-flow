@@ -27,13 +27,17 @@ import {
     downloadImage,
     getEffectiveState,
     getNodeHeight,
+    isAiBlock,
+    isMissingAiKey,
     processImageWithConfig,
     useBlockRegistry,
     useS3Image,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
+import { useWebCoreStore } from '@flows/web-core';
 
+import { AiKeyWarningBanner } from './AiKeyWarningBanner';
 import { ContentPreviewModal } from './ContentPreviewModal';
 import { FilePreviewDialog } from './FilePreviewDialog';
 import { FrontendBadge } from './FrontendBadge';
@@ -64,6 +68,7 @@ interface DetailPanelProps {
     onSelectConnection: (connectionId: string) => void;
     onClose: () => void;
     onShowNotification?: (message: string, type: 'success' | 'error') => void;
+    onOpenAiKeyDialog?: () => void;
 }
 
 type ConfigControlType = 'text' | 'number' | 'boolean' | 'select' | 'file' | 'workflow-selector' | 'separator';
@@ -472,9 +477,12 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     onSelectConnection,
     onClose,
     onShowNotification,
+    onOpenAiKeyDialog,
 }) => {
     const { t } = useTranslation(['flows', 'common']);
     const blockRegistry = useBlockRegistry();
+    const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
+    const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
     const canEdit = role === 'owner';
     const canRun = role !== 'anonymous';
     const isInputNode = selectedNode?.type?.startsWith('input-') ?? false;
@@ -830,6 +838,14 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         </div>
                     </div>
                 )}
+
+                {/* AI Key Warning */}
+                {isAiBlock(def.type) &&
+                    isMissingAiKey(selectedNode.config?.model as string | undefined, hasGeminiKey, hasOpenaiKey) && (
+                        <div className="px-3 pt-2 flex-shrink-0">
+                            <AiKeyWarningBanner onRegisterKey={onOpenAiKeyDialog} />
+                        </div>
+                    )}
 
                 <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3" onWheel={e => e.stopPropagation()}>
                     {/* Description Section */}

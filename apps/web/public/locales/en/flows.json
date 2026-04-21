@@ -37,10 +37,12 @@
         "editPublishInfo": "Edit publish info",
         "unpublish": "Unpublish",
         "viewOnly": "View Only",
+        "guestMode": "Guest",
         "apiKeySettings": "API Key Settings",
         "guidedTour": "Guided Tour",
         "replayTutorial": "Replay Tutorial",
         "beta": "Beta",
+        "graphView": "Graph View",
         "menuGroup": {
             "file": "File",
             "canvas": "Canvas",
@@ -64,7 +66,9 @@
         "clickToAdd": "Click to add to canvas",
         "clientExecution": "Runs in browser (client-side)",
         "frontend": "Frontend",
-        "portsInfo": "{{inputs}} inputs → {{outputs}} outputs"
+        "portsInfo": "{{inputs}} inputs → {{outputs}} outputs",
+        "recent": "Recent",
+        "readOnlyHint": "Sign in to add blocks"
     },
     "canvas": {
         "executionLogs": "Execution Logs",
@@ -237,7 +241,8 @@
         "loadErrorTitle": "Failed to Load",
         "signInWithApiKey": "Sign in with API Key",
         "browsePublicFlows": "Browse public flows",
-        "signInToEdit": "Sign in to edit this flow"
+        "signInToEdit": "Sign in to edit this flow",
+        "failedToRunFlow": "Failed to run flow"
     },
     "publicFlows": {
         "title": "Public Flows",
@@ -481,6 +486,11 @@
             }
         }
     },
+    "graphView": {
+        "noNodes": "No nodes to display",
+        "fitToView": "Fit to View",
+        "goToNode": "Go to node"
+    },
     "mobile": {
         "addNode": "Add Node",
         "addFirstStep": "Add your first step",
@@ -536,5 +546,35 @@
             "done": "Done",
             "error": "Error"
         }
+    },
+    "aiKey": {
+        "missing": "No AI key found.",
+        "missingDescription": "An AI key is required to use AI blocks.\nPlease register an AI key and re-run.",
+        "registerButton": "Register AI Key",
+        "dialogTitle": "Register AI Key",
+        "dialogDescription": "Select an AI model provider to register.",
+        "geminiConnection": "Gemini",
+        "openaiConnection": "OpenAI",
+        "register": "Register",
+        "registered": "Registered",
+        "geminiInstructions": "You can get a Gemini API key from Google AI Studio.",
+        "openaiInstructions": "You can get an API key from the OpenAI Platform.",
+        "howToGet": "How to Get",
+        "steps": "Steps",
+        "geminiStep1": " — Sign in",
+        "geminiStep2": "Click \"Create API key\"",
+        "geminiStep3": "Copy the generated API key",
+        "openaiStep1": " — Sign in",
+        "openaiStep2": "Click \"+ Create new secret key\"",
+        "openaiStep3": "Copy the key immediately (shown only once)",
+        "caution": "Caution",
+        "caution1": "Keep your API key secure",
+        "caution2": "Do not commit to public repositories",
+        "caution3": "We recommend rotating keys periodically",
+        "keyPlaceholder": "Key",
+        "save": "Save",
+        "saving": "Saving...",
+        "saveSuccess": "API key registered successfully.",
+        "saveFailed": "Failed to register API key."
     }
 }

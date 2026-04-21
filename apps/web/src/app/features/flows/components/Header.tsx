@@ -23,7 +23,7 @@ import {
     Undo2,
 } from 'lucide-react';
 
-import { useSystemInfoQuery } from '@flows/flows';
+import { getPermissions, useSystemInfoQuery } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Badge,
@@ -41,6 +41,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@flows/ui-kit';
+
+import { DebugModeToggle } from '../../../components/DebugModeToggle';
 
 import type { FlowRole, SaveStatus } from '@flows/flows';
 
@@ -102,6 +104,9 @@ interface HeaderProps {
     onTour?: () => void;
     onOpenFlowList?: () => void;
     onGraphView?: () => void;
+    onVersionClick?: () => void;
+    isDebugMode?: boolean;
+    onDisableDebugMode?: () => void;
 }
 
 const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
@@ -312,15 +317,15 @@ const SocketDot: React.FC<SocketStateProps> = ({
     );
 };
 
-/**
- * Version info component for dropdown menu
- */
-const VersionInfo: React.FC = () => {
+const VersionInfo: React.FC<{ onClick?: () => void }> = ({ onClick }) => {
     const { data: systemInfo } = useSystemInfoQuery();
     const apiVersion = systemInfo?.components?.find(c => c.name === 'eureka-flows-api')?.version;
 
     return (
-        <div className="px-2 py-1.5 text-[10px] text-muted-foreground/50 text-center">
+        <div
+            className="px-2 py-1.5 text-[10px] text-muted-foreground/50 text-center select-none cursor-default"
+            onClick={onClick}
+        >
             Web v{__APP_VERSION__} {apiVersion && `/ API v${apiVersion}`}
         </div>
     );
@@ -342,9 +347,13 @@ export const Header: React.FC<HeaderProps> = ({
     onTour,
     onOpenFlowList,
     onGraphView,
+    onVersionClick,
+    isDebugMode,
+    onDisableDebugMode,
 }) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
+    const { canEdit, canRun } = getPermissions(role);
 
     const getSaveButtonVariant = (): 'default' | 'success' | 'warning' | 'error' => {
         if (saveState.saveStatus === 'saving') return 'warning';
@@ -378,14 +387,14 @@ export const Header: React.FC<HeaderProps> = ({
                             </Badge>
                         </RouterLink>
                         <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
-                        {role !== 'owner' ? (
+                        {!canEdit ? (
                             <span className="text-xs sm:text-sm text-foreground truncate max-w-[120px] sm:max-w-[200px]">
                                 {flowInfo.flowName}
                             </span>
                         ) : (
                             <FlowNameInput {...flowInfo} />
                         )}
-                        {role === 'owner' && (
+                        {canEdit && (
                             <span className="hidden md:inline">
                                 <SaveStatusBadge
                                     saveStatus={saveState.saveStatus}
@@ -417,7 +426,7 @@ export const Header: React.FC<HeaderProps> = ({
                             'shadow-sm'
                         )}
                     >
-                        {role === 'owner' && onOpenFlowList && (
+                        {canEdit && onOpenFlowList && (
                             <ToolbarButton
                                 onClick={onOpenFlowList}
                                 icon={<FolderOpen className="w-4 h-4" />}
@@ -425,7 +434,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 shortcut="⌘O"
                             />
                         )}
-                        {role === 'owner' && (
+                        {canEdit && (
                             <ToolbarButton
                                 onClick={editActions.onSave}
                                 icon={<Save className="w-4 h-4" />}
@@ -434,19 +443,23 @@ export const Header: React.FC<HeaderProps> = ({
                                 variant={getSaveButtonVariant()}
                             />
                         )}
-                        <ToolbarButton
-                            onClick={editActions.onUndo}
-                            icon={<Undo2 className="w-4 h-4" />}
-                            tooltip={t('header.undo')}
-                            shortcut="⌘Z"
-                        />
-                        <ToolbarButton
-                            onClick={editActions.onRedo}
-                            icon={<Redo2 className="w-4 h-4" />}
-                            tooltip={t('header.redo')}
-                            shortcut="⌘⇧Z"
-                        />
-                        {role !== 'anonymous' && editActions.onRunAll && (
+                        {canEdit && (
+                            <>
+                                <ToolbarButton
+                                    onClick={editActions.onUndo}
+                                    icon={<Undo2 className="w-4 h-4" />}
+                                    tooltip={t('header.undo')}
+                                    shortcut="⌘Z"
+                                />
+                                <ToolbarButton
+                                    onClick={editActions.onRedo}
+                                    icon={<Redo2 className="w-4 h-4" />}
+                                    tooltip={t('header.redo')}
+                                    shortcut="⌘⇧Z"
+                                />
+                            </>
+                        )}
+                        {canRun && editActions.onRunAll && (
                             <ToolbarButton
                                 onClick={editActions.onRunAll}
                                 icon={<Play className="w-4 h-4" />}
@@ -476,7 +489,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.file')}
                             </DropdownMenuLabel>
-                            {role === 'owner' && (
+                            {canEdit && (
                                 <>
                                     <DropdownMenuItem onClick={fileActions.onNew}>
                                         <FileText className="w-4 h-4 mr-2" />
@@ -490,40 +503,46 @@ export const Header: React.FC<HeaderProps> = ({
                                     </DropdownMenuItem>
                                 </>
                             )}
-                            <DropdownMenuItem onClick={fileActions.onExport}>
-                                <Download className="w-4 h-4 mr-2" />
-                                {t('header.exportJson')}
-                                <DropdownMenuShortcut>⌘E</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                            {fileActions.onExportPng && (
-                                <DropdownMenuItem onClick={fileActions.onExportPng}>
-                                    <ImageDown className="w-4 h-4 mr-2" />
-                                    {t('header.exportPng')}
-                                </DropdownMenuItem>
+                            {canRun && (
+                                <>
+                                    <DropdownMenuItem onClick={fileActions.onExport}>
+                                        <Download className="w-4 h-4 mr-2" />
+                                        {t('header.exportJson')}
+                                        <DropdownMenuShortcut>⌘E</DropdownMenuShortcut>
+                                    </DropdownMenuItem>
+                                    {fileActions.onExportPng && (
+                                        <DropdownMenuItem onClick={fileActions.onExportPng}>
+                                            <ImageDown className="w-4 h-4 mr-2" />
+                                            {t('header.exportPng')}
+                                        </DropdownMenuItem>
+                                    )}
+                                </>
                             )}
 
                             <DropdownMenuSeparator />
 
-                            {/* Edit actions - visible on mobile */}
-                            <div className="sm:hidden">
-                                <DropdownMenuItem onClick={editActions.onUndo}>
-                                    <Undo2 className="w-4 h-4 mr-2" />
-                                    {t('header.undo')}
-                                    <DropdownMenuShortcut>⌘Z</DropdownMenuShortcut>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={editActions.onRedo}>
-                                    <Redo2 className="w-4 h-4 mr-2" />
-                                    {t('header.redo')}
-                                    <DropdownMenuShortcut>⌘⇧Z</DropdownMenuShortcut>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                            </div>
+                            {/* Edit actions - visible on mobile, owner only */}
+                            {canEdit && (
+                                <div className="sm:hidden">
+                                    <DropdownMenuItem onClick={editActions.onUndo}>
+                                        <Undo2 className="w-4 h-4 mr-2" />
+                                        {t('header.undo')}
+                                        <DropdownMenuShortcut>⌘Z</DropdownMenuShortcut>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={editActions.onRedo}>
+                                        <Redo2 className="w-4 h-4 mr-2" />
+                                        {t('header.redo')}
+                                        <DropdownMenuShortcut>⌘⇧Z</DropdownMenuShortcut>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                </div>
+                            )}
 
                             {/* Canvas Group */}
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.canvas')}
                             </DropdownMenuLabel>
-                            {role === 'owner' && (
+                            {canEdit && (
                                 <DropdownMenuItem onClick={editActions.onAutoLayout}>
                                     <LayoutGrid className="w-4 h-4 mr-2" />
                                     {t('header.autoLayout')}
@@ -542,7 +561,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.expandAll')}
                                 </DropdownMenuItem>
                             )}
-                            {role === 'owner' && (
+                            {canEdit && (
                                 <DropdownMenuItem onClick={editActions.onClear} className="text-destructive">
                                     <Trash2 className="w-4 h-4 mr-2" />
                                     {t('header.clearCanvas')}
@@ -552,7 +571,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuSeparator />
 
                             {/* Share Group */}
-                            {role === 'owner' && (onTogglePublic || onPublish) && (
+                            {canEdit && (onTogglePublic || onPublish) && (
                                 <>
                                     <DropdownMenuLabel className="flex items-center justify-between text-xs text-muted-foreground font-normal">
                                         {t('header.menuGroup.share')}
@@ -588,7 +607,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.settings')}
                             </DropdownMenuLabel>
-                            {role === 'owner' && (
+                            {canEdit && (
                                 <div className="flex items-center justify-between px-2 py-1.5">
                                     <span className="text-sm">{t('header.autoSave')}</span>
                                     <button
@@ -629,7 +648,7 @@ export const Header: React.FC<HeaderProps> = ({
                             )}
 
                             {/* Help & Tour */}
-                            {(onHelp || onTour || role !== 'anonymous') && <DropdownMenuSeparator />}
+                            {(onHelp || onTour || canRun) && <DropdownMenuSeparator />}
                             {onHelp && (
                                 <DropdownMenuItem onClick={onHelp}>
                                     <HelpCircle className="w-4 h-4 mr-2" />
@@ -643,7 +662,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.guidedTour')}
                                 </DropdownMenuItem>
                             )}
-                            {role !== 'anonymous' && (
+                            {canRun && (
                                 <DropdownMenuItem onClick={() => navigate('/tutorial')}>
                                     <GraduationCap className="w-4 h-4 mr-2" />
                                     {t('header.replayTutorial')}
@@ -652,13 +671,16 @@ export const Header: React.FC<HeaderProps> = ({
 
                             <DropdownMenuSeparator />
 
-                            {/* Theme & Language */}
+                            {/* Theme, Language & Debug */}
                             <div className="flex items-center justify-center gap-4 px-2 py-1.5">
                                 <ThemeToggle />
                                 <LanguageSwitcher />
+                                {isDebugMode && onDisableDebugMode && (
+                                    <DebugModeToggle onDisable={onDisableDebugMode} />
+                                )}
                             </div>
 
-                            <VersionInfo />
+                            <VersionInfo onClick={onVersionClick} />
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>

@@ -9,6 +9,26 @@ const _log = console.log.bind(console, '[blocks-api]');
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
+ * Block types with local SVG icon overrides in /block-icons/.
+ * Overrides server emoji icons with frontend SVG assets.
+ */
+const BLOCK_ICON_TYPES = new Set([
+    'input-text',
+    'input-image',
+    'upload-html',
+    'buffer',
+    'single-output-generator',
+    'single-image-generator',
+    'schema-json-converter',
+    'mustache-text-generator',
+    'agent-codex',
+    'output-preview',
+    'output-console',
+    'schema-extractor',
+    'template-converter',
+]);
+
+/**
  * Create a DataPacket
  */
 export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'): DataPacket => ({
@@ -114,6 +134,7 @@ export const listBlocks = async (): Promise<BlockDefinitionWithFrontend[]> => {
 
             return {
                 ...definition,
+                icon: BLOCK_ICON_TYPES.has(definition.type) ? `/block-icons/${definition.type}.svg` : definition.icon,
                 isFrontend,
                 stereo,
                 isRunnable: item.isRunnable,

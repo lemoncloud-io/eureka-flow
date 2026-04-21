@@ -16,22 +16,24 @@ import { toast } from 'sonner';
 import { Button, Input } from '@flows/ui-kit';
 
 import { NamespaceSelector, TranslationEditor, WebPreview } from '../components';
-import { I18N_NAMESPACES, fetchTranslation, flattenJson, isS3Configured } from '../consts';
+import { fetchTranslation, flattenJson, isUploadConfigured } from '../consts';
 import { usePreviewPublisher, usePreviewSubscriber } from '../hooks';
 import { useI18nStore } from '../stores';
-import { LANGUAGES } from '../types';
 
-import type { I18nNamespace } from '../consts';
 import type { PreviewMessage } from '../hooks';
-import type { FlatTranslations, Language } from '../types';
+import type { FlatTranslations } from '../types';
 
-type AllNsData = Record<I18nNamespace, Record<Language, FlatTranslations>>;
+type AllNsData = Record<string, Record<string, FlatTranslations>>;
+const canUpload = isUploadConfigured();
 
 export const I18nPage = () => {
     const namespace = useI18nStore(s => s.namespace);
+    const namespaces = useI18nStore(s => s.namespaces);
+    const languages = useI18nStore(s => s.languages);
     const setNamespace = useI18nStore(s => s.setNamespace);
-    const loadFromS3 = useI18nStore(s => s.loadFromS3);
-    const saveToS3 = useI18nStore(s => s.saveToS3);
+    const initLocales = useI18nStore(s => s.initLocales);
+    const loadTranslations = useI18nStore(s => s.loadTranslations);
+    const saveTranslations = useI18nStore(s => s.saveTranslations);
     const resetChanges = useI18nStore(s => s.resetChanges);
     const updateValue = useI18nStore(s => s.updateValue);
     const addKey = useI18nStore(s => s.addKey);
@@ -51,6 +53,14 @@ export const I18nPage = () => {
     const { broadcast } = usePreviewPublisher();
     const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    // Discover languages and namespaces from API on mount
+    const initRef = useRef(false);
+    useEffect(() => {
+        if (initRef.current) return;
+        initRef.current = true;
+        initLocales();
+    }, [initLocales]);
+
     useEffect(() => {
         if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
         broadcastTimerRef.current = setTimeout(() => {
@@ -69,74 +79,71 @@ export const I18nPage = () => {
     const allNsDataLoadedRef = useRef(false);
 
     useEffect(() => {
-        if (!isS3Configured() || allNsDataLoadedRef.current) return;
+        if (allNsDataLoadedRef.current || namespaces.length === 0) return;
         allNsDataLoadedRef.current = true;
         const load = async () => {
-            const result = {} as AllNsData;
-            await Promise.all(
-                I18N_NAMESPACES.map(async ns => {
-                    const langData = {} as Record<Language, FlatTranslations>;
-                    await Promise.all(
-                        LANGUAGES.map(async lang => {
-                            try {
-                                const data = await fetchTranslation(lang, ns);
-                                langData[lang] = flattenJson(data);
-                            } catch {
-                                langData[lang] = {};
-                            }
-                        })
-                    );
-                    result[ns] = langData;
+            const pairs = namespaces.flatMap(ns => languages.map(lang => ({ ns, lang })));
+            const results = await Promise.all(
+                pairs.map(async ({ ns, lang }) => {
+                    try {
+                        const data = await fetchTranslation(lang, ns);
+                        return { ns, lang, flat: flattenJson(data) };
+                    } catch {
+                        return { ns, lang, flat: {} as FlatTranslations };
+                    }
                 })
             );
+            const result = {} as AllNsData;
+            for (const { ns, lang, flat } of results) {
+                if (!result[ns]) result[ns] = {};
+                result[ns][lang] = flat;
+            }
             setAllNsData(result);
         };
         load();
-    }, []);
+    }, [namespaces, languages]);
 
     useEffect(() => {
-        if (isS3Configured()) {
-            loadFromS3();
-        }
-    }, [namespace, loadFromS3]);
+        loadTranslations();
+    }, [namespace, loadTranslations]);
 
     const searchMatchCounts = useMemo(() => {
         if (!searchQuery || !allNsData) return undefined;
         const query = searchQuery.toLowerCase();
-        const counts: Partial<Record<I18nNamespace, number>> = {};
-        for (const ns of I18N_NAMESPACES) {
+        const counts: Partial<Record<string, number>> = {};
+        for (const ns of namespaces) {
             const data = ns === namespace ? edited : allNsData[ns];
             if (!data) continue;
             let count = 0;
             const allKeys = new Set<string>();
-            LANGUAGES.forEach(lang => Object.keys(data[lang] || {}).forEach(k => allKeys.add(k)));
+            languages.forEach(lang => Object.keys(data[lang] || {}).forEach(k => allKeys.add(k)));
             for (const key of allKeys) {
                 if (key.toLowerCase().includes(query)) {
                     count++;
                     continue;
                 }
-                if (LANGUAGES.some(lang => (data[lang]?.[key] ?? '').toLowerCase().includes(query))) count++;
+                if (languages.some(lang => (data[lang]?.[key] ?? '').toLowerCase().includes(query))) count++;
             }
             if (count > 0) counts[ns] = count;
         }
         return counts;
-    }, [searchQuery, allNsData, edited, namespace]);
+    }, [searchQuery, allNsData, edited, namespace, namespaces, languages]);
 
     const findNamespaceForKey = useCallback(
-        (key: string): I18nNamespace | null => {
-            if (LANGUAGES.some(lang => key in edited[lang])) return namespace;
+        (key: string): string | null => {
+            if (languages.some(lang => key in edited[lang])) return namespace;
             if (!allNsData) return null;
-            for (const ns of I18N_NAMESPACES) {
+            for (const ns of namespaces) {
                 if (ns === namespace) continue;
-                if (LANGUAGES.some(lang => key in (allNsData[ns]?.[lang] ?? {}))) return ns;
+                if (languages.some(lang => key in (allNsData[ns]?.[lang] ?? {}))) return ns;
             }
             return null;
         },
-        [edited, namespace, allNsData]
+        [edited, namespace, allNsData, namespaces, languages]
     );
 
     const handleNamespaceChange = useCallback(
-        (ns: I18nNamespace) => {
+        (ns: string) => {
             if (hasChanges) {
                 const confirmed = window.confirm('You have unsaved changes. Continue?');
                 if (!confirmed) return;
@@ -147,9 +154,9 @@ export const I18nPage = () => {
     );
 
     const handleSave = useCallback(async () => {
-        await saveToS3();
-        toast.success('Saved to S3');
-    }, [saveToS3]);
+        await saveTranslations();
+        toast.success('Saved');
+    }, [saveTranslations]);
 
     const handleReset = useCallback(() => {
         const confirmed = window.confirm('Discard all changes?');
@@ -179,28 +186,12 @@ export const I18nPage = () => {
         window.open('/i18n/preview', 'i18n-preview');
     }, []);
 
-    if (!isS3Configured()) {
-        return (
-            <div className="flex flex-col items-center justify-center gap-4 py-20">
-                <AlertTriangle className="h-12 w-12 text-yellow-500" />
-                <h2 className="text-lg font-semibold">S3 Configuration Required</h2>
-                <p className="text-muted-foreground text-center max-w-md">
-                    Set the VITE_I18N_BUCKET_URL environment variable.
-                    <br />
-                    Example:{' '}
-                    <code className="text-xs bg-muted px-1 rounded">
-                        https://your-bucket.s3.ap-northeast-2.amazonaws.com/i18n
-                    </code>
-                </p>
-            </div>
-        );
-    }
-
     return (
         <div className="flex flex-col gap-3 h-[calc(100vh-theme(spacing.14)-theme(spacing.12))]">
             {/* Toolbar */}
             <div className="flex items-end justify-between gap-4">
                 <NamespaceSelector
+                    namespaces={namespaces}
                     selected={namespace}
                     onChange={handleNamespaceChange}
                     matchCounts={searchMatchCounts}
@@ -238,11 +229,21 @@ export const I18nPage = () => {
                         <ExternalLink className="h-3.5 w-3.5" />
                     </Button>
                     <div className="w-px h-6 bg-border" />
+                    {!canUpload && (
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                            Local mode (read-only)
+                        </span>
+                    )}
                     <Button variant="outline" size="sm" onClick={handleReset} disabled={!hasChanges || isSaving}>
                         <RotateCcw className="h-3.5 w-3.5 mr-1" />
                         Reset
                     </Button>
-                    <Button size="sm" onClick={handleSave} disabled={!hasChanges || isSaving}>
+                    <Button
+                        size="sm"
+                        onClick={handleSave}
+                        disabled={!hasChanges || isSaving || !canUpload}
+                        title={!canUpload ? 'Set VITE_I18N_PRESIGN_URL to enable saving' : undefined}
+                    >
                         {isSaving ? (
                             <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
                         ) : (
@@ -258,7 +259,7 @@ export const I18nPage = () => {
                 <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     <span>{error}</span>
-                    <Button variant="outline" size="sm" onClick={loadFromS3} className="ml-auto h-7">
+                    <Button variant="outline" size="sm" onClick={loadTranslations} className="ml-auto h-7">
                         Retry
                     </Button>
                 </div>
@@ -274,6 +275,7 @@ export const I18nPage = () => {
                         </div>
                     ) : (
                         <TranslationEditor
+                            languages={languages}
                             edited={edited}
                             originals={originals}
                             onUpdateValue={updateValue}

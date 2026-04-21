@@ -106,6 +106,7 @@ interface PortItemProps {
         portType: string,
         e: React.TouchEvent
     ) => void;
+    onDoubleClick?: (nodeId: string, portId: string, type: 'input' | 'output', portType: string) => void;
 }
 
 export const PortItem: React.FC<PortItemProps> = ({
@@ -120,6 +121,7 @@ export const PortItem: React.FC<PortItemProps> = ({
     onMouseDown,
     onMouseUp,
     onTouchStart,
+    onDoubleClick,
 }) => {
     // Determine if this input port is a valid drop target for the current connection draft
     const isDraggingConnection = !!connectionDraft;
@@ -173,6 +175,10 @@ export const PortItem: React.FC<PortItemProps> = ({
             onTouchStart={e => {
                 e.stopPropagation();
                 onTouchStart?.(nodeId, port.id, type, port.type, e);
+            }}
+            onDoubleClick={e => {
+                e.stopPropagation();
+                onDoubleClick?.(nodeId, port.id, type, port.type);
             }}
             onTouchEnd={e => {
                 // For output ports, let the event bubble to canvas for connection drop handling

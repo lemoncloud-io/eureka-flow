@@ -5,13 +5,16 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { getPermissions, useBlocks, useFlows } from '@flows/flows';
+import { getPermissions, getProfile, useBlocks, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
+import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
+import { AiKeyDialog } from '../components/AiKeyDialog';
+import { DevSocketPanel } from '../components/DevSocketPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
 import { FlowListDialog } from '../components/FlowListDialog';
 import { Header } from '../components/Header';
@@ -20,6 +23,7 @@ import { PublishDialog } from '../components/PublishDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { useSocketHandlers } from '../hooks/useSocketHandlers';
+import { useSocketRecorder } from '../hooks/useSocketRecorder';
 
 import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
@@ -46,9 +50,10 @@ const DevRoleToggle: React.FC<{
     role: FlowRole;
     computedRole: FlowRole;
     onOverride: (role: FlowRole | null) => void;
-}> = ({ role, computedRole, onOverride }) => {
+    onClose?: () => void;
+}> = ({ role, computedRole, onOverride, onClose }) => {
     const dragRef = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState({ x: 16, y: 16 }); // bottom-right offset
+    const [pos, setPos] = useState({ x: 16, y: 56 }); // bottom-right offset (above minimap)
     const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
     const didDrag = useRef(false);
 
@@ -109,6 +114,18 @@ const DevRoleToggle: React.FC<{
                         {r}
                     </button>
                 ))}
+                {onClose && (
+                    <button
+                        onClick={() => {
+                            if (didDrag.current) return;
+                            onClose();
+                        }}
+                        className="px-1.5 py-1 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Exit debug mode"
+                    >
+                        <X className="w-3 h-3" />
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -154,6 +171,7 @@ export const FlowEditorPage = () => {
         handleTraceUpdate,
         getLastLocalUpdateTimestamp,
         lastLocalUpdateTimestampRef,
+        resetSequenceTracking,
     } = useSocketHandlers({
         canvasRef,
         blockRegistry,
@@ -163,6 +181,14 @@ export const FlowEditorPage = () => {
         serializeWorkflowState,
     });
 
+    const socketRecorder = useSocketRecorder();
+
+    const resetAllNodesToIdle = useCallback(() => {
+        canvasRef.current?.getWorkflow()?.nodes?.forEach(n => {
+            canvasRef.current?.updateNodeFromServer(n.id, { state: 'IDLE', status: 'IDLE' }, { force: true });
+        });
+    }, []);
+
     // Initialize WebSocket connection when channelId is available
     const {
         isConnected: isSocketConnected,
@@ -171,6 +197,7 @@ export const FlowEditorPage = () => {
         reconnectAttempts,
         maxReconnectReached,
         connectionId: socketConnectionId,
+        replayMessage,
     } = useInitFlowSocket({
         channelId,
         currentFlowId,
@@ -179,6 +206,7 @@ export const FlowEditorPage = () => {
         onNodeReload: handleNodeUpdate,
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
+        onMessage: socketRecorder.record,
     });
 
     const { startTourIfFirstVisit, startTour } = useTour();
@@ -192,9 +220,12 @@ export const FlowEditorPage = () => {
     const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
     const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
     const [isGraphViewOpen, setIsGraphViewOpen] = useState(false);
+    const [isAiKeyDialogOpen, setIsAiKeyDialogOpen] = useState(false);
     const [tourPhase, setTourPhase] = useState<'none' | 'guide' | 'block'>('none');
 
     const { apiKey, setApiKey } = useWebCoreStore();
+    const { isDebugMode, handleVersionClick, disableDebugMode } = useDebugMode();
+    const showDevTools = import.meta.env.VITE_ENV !== 'PROD' || isDebugMode;
 
     // Public mode: read-only viewing when no API key and viewing an existing flow
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
@@ -274,6 +305,18 @@ export const FlowEditorPage = () => {
 
         setLoadingText(t('flowEditor.initializingEngine'));
         try {
+            // Fetch AI key availability (fire-and-forget, parallel with loadBlocks)
+            if (currentApiKey) {
+                getProfile()
+                    .then(data => {
+                        useWebCoreStore.getState().setAiKeyStatus({
+                            hasGeminiKey: !!data.geminiApiKey,
+                            hasOpenaiKey: !!data.openaiApiKey,
+                        });
+                    })
+                    .catch(err => console.warn('[FlowEditor] Profile fetch failed:', err));
+            }
+
             setLoadingText(t('flowEditor.loadingBlockRegistry'));
             await loadBlocks();
 
@@ -294,7 +337,7 @@ export const FlowEditorPage = () => {
                     }
                     throw new Error(t('flowEditor.failedToLoadFlow'));
                 }
-                loadedId = flowIdFromUrl;
+                loadedId = initialFlow.id ?? flowIdFromUrl;
             } else {
                 setLoadingText(t('flowEditor.initializingFlow'));
                 const result = await initializeFlow();
@@ -706,6 +749,7 @@ export const FlowEditorPage = () => {
                     onOpenLibrary={handleOpenLibrary}
                     onConnectionError={handleConnectionError}
                     onShowNotification={showNotification}
+                    onAiKeyRequired={showDevTools ? () => setIsAiKeyDialogOpen(true) : undefined}
                 />
             </div>
 
@@ -769,6 +813,9 @@ export const FlowEditorPage = () => {
                 onTour={() => setTourPhase('guide')}
                 onOpenFlowList={handleOpenFlowList}
                 onGraphView={() => setIsGraphViewOpen(true)}
+                onVersionClick={handleVersionClick}
+                isDebugMode={isDebugMode}
+                onDisableDebugMode={isDebugMode ? disableDebugMode : undefined}
             />
 
             {/* Floating Sidebar */}
@@ -806,6 +853,9 @@ export const FlowEditorPage = () => {
                 onPublish={publishFlow}
                 onCaptureCanvas={handleCaptureCanvas}
             />
+
+            {/* AI Key Dialog (dev + debug mode) */}
+            {showDevTools && <AiKeyDialog open={isAiKeyDialogOpen} onOpenChange={setIsAiKeyDialogOpen} />}
 
             {/* Graph View Overlay */}
             {isGraphViewOpen && (
@@ -850,9 +900,47 @@ export const FlowEditorPage = () => {
                 </div>
             )}
 
-            {/* Dev Role Toggle (hidden in production) */}
-            {import.meta.env.VITE_ENV !== 'PROD' && (
-                <DevRoleToggle role={role} computedRole={computedRole} onOverride={setDevRoleOverride} />
+            {/* Dev Tools (hidden in production unless debug mode activated) */}
+            {showDevTools && (
+                <>
+                    <DevRoleToggle
+                        role={role}
+                        computedRole={computedRole}
+                        onOverride={setDevRoleOverride}
+                        onClose={isDebugMode ? disableDebugMode : undefined}
+                    />
+                    <DevSocketPanel
+                        messages={socketRecorder.messages}
+                        isRecording={socketRecorder.isRecording}
+                        replayState={socketRecorder.replayState}
+                        onToggleRecording={socketRecorder.toggleRecording}
+                        onClear={socketRecorder.clear}
+                        onReplay={msg => {
+                            resetSequenceTracking();
+                            const nodeId = msg.id.split(':')[0];
+                            canvasRef.current?.updateNodeFromServer(
+                                nodeId,
+                                { state: 'IDLE', status: 'IDLE' },
+                                { force: true }
+                            );
+                            replayMessage(msg);
+                        }}
+                        onReplayFromIndex={fromIndex => {
+                            resetSequenceTracking();
+                            resetAllNodesToIdle();
+                            socketRecorder.startReplayFromIndex(fromIndex, replayMessage);
+                        }}
+                        onStopReplay={() => {
+                            socketRecorder.stopReplaySequence();
+                            resetAllNodesToIdle();
+                        }}
+                        onResetNodes={() => {
+                            resetSequenceTracking();
+                            resetAllNodesToIdle();
+                        }}
+                        onMarkReplayed={socketRecorder.markReplayed}
+                    />
+                </>
             )}
 
             {/* Loading Overlay */}

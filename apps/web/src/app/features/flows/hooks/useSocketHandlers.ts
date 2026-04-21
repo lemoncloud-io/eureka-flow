@@ -39,6 +39,7 @@ export const useSocketHandlers = ({
     const nodeNoRef = useRef<Map<string, number>>(new Map());
     const nodeRunIdRef = useRef<Map<string, string>>(new Map());
     const portNoRef = useRef<Map<string, number>>(new Map());
+    const portRunIdRef = useRef<Map<string, string>>(new Map());
     const highlightTimeoutsRef = useRef<Map<string, number>>(new Map());
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
 
@@ -73,12 +74,14 @@ export const useSocketHandlers = ({
             // Node messages may omit flowId — channel subscription already filters by flow
             if (flowId && flowId !== currentFlowId) return;
 
-            // Reset sequence tracking when runId changes (new execution run)
+            // Reset sequence tracking and node state when runId changes (new execution run)
+            // Without this, state priority (COMPLETED > RUNNING) blocks re-execution updates
             const { runId } = info;
             if (runId) {
                 const prevRunId = nodeRunIdRef.current.get(nodeId);
                 if (prevRunId && prevRunId !== runId) {
                     nodeNoRef.current.delete(nodeId);
+                    canvasRef.current?.updateNodeFromServer(nodeId, { state: 'IDLE', status: 'IDLE' }, { force: true });
                 }
                 nodeRunIdRef.current.set(nodeId, runId);
             }
@@ -177,7 +180,7 @@ export const useSocketHandlers = ({
 
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
-            const { portId, nodeId, flowId, portName, no, runId } = info;
+            const { portId, nodeId, flowId, portName, no, runId, ts } = info;
 
             if (flowId && flowId !== currentFlowId) return;
 
@@ -190,9 +193,19 @@ export const useSocketHandlers = ({
                 });
             }
 
+            // Reset port sequence tracking when runId changes (new execution run)
+            if (runId) {
+                const prevRunId = portRunIdRef.current.get(portId);
+                if (prevRunId !== runId) {
+                    portNoRef.current.delete(portId);
+                    portRunIdRef.current.set(portId, runId);
+                }
+            }
+
             if (no !== undefined) {
                 const prevNo = portNoRef.current.get(portId);
-                if (prevNo !== undefined && prevNo >= no) return;
+                // ts = server signals fresh data, skip dedup
+                if (!ts && prevNo !== undefined && prevNo >= no) return;
                 portNoRef.current.set(portId, no);
             }
 
@@ -271,6 +284,7 @@ export const useSocketHandlers = ({
         nodeNoRef.current.clear();
         nodeRunIdRef.current.clear();
         portNoRef.current.clear();
+        portRunIdRef.current.clear();
         highlightTimeoutsRef.current.forEach(id => window.clearTimeout(id));
         highlightTimeoutsRef.current.clear();
     }, [currentFlowId]);
@@ -280,6 +294,13 @@ export const useSocketHandlers = ({
         [lastLocalUpdateTimestampRef]
     );
 
+    const resetSequenceTracking = useCallback(() => {
+        nodeNoRef.current.clear();
+        nodeRunIdRef.current.clear();
+        portNoRef.current.clear();
+        portRunIdRef.current.clear();
+    }, []);
+
     return {
         handleFlowUpdate,
         handleNodeUpdate,
@@ -287,5 +308,6 @@ export const useSocketHandlers = ({
         handleTraceUpdate,
         getLastLocalUpdateTimestamp,
         lastLocalUpdateTimestampRef,
+        resetSequenceTracking,
     };
 };

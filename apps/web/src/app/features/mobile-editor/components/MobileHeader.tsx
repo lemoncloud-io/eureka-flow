@@ -19,7 +19,7 @@ import {
     WifiOff,
 } from 'lucide-react';
 
-import { useSystemInfoQuery } from '@flows/flows';
+import { getPermissions, useSystemInfoQuery } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     DropdownMenu,
@@ -31,6 +31,8 @@ import {
     LanguageSwitcher,
     ThemeToggle,
 } from '@flows/ui-kit';
+
+import { DebugModeToggle } from '../../../components/DebugModeToggle';
 
 import type { FlowRole, SaveStatus } from '@flows/flows';
 
@@ -58,6 +60,9 @@ interface MobileHeaderProps {
     onClear?: () => void;
     onApiKeySettings?: () => void;
     role?: FlowRole;
+    onVersionClick?: () => void;
+    isDebugMode?: boolean;
+    onDisableDebugMode?: () => void;
 }
 
 export const MobileHeader = ({
@@ -79,9 +84,13 @@ export const MobileHeader = ({
     onClear,
     onApiKeySettings,
     role = 'owner',
+    onVersionClick,
+    isDebugMode,
+    onDisableDebugMode,
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
+    const { canEdit, canRun } = getPermissions(role);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(flowName);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -134,7 +143,7 @@ export const MobileHeader = ({
                         className="w-full text-sm font-bold bg-transparent border-b-2 border-primary outline-none"
                         autoFocus
                     />
-                ) : role === 'owner' ? (
+                ) : canEdit ? (
                     <button
                         onClick={handleStartEditing}
                         className="truncate text-sm font-bold text-foreground leading-tight"
@@ -146,7 +155,7 @@ export const MobileHeader = ({
                 )}
 
                 {/* View-only badge for non-owner roles */}
-                {role !== 'owner' && (
+                {!canEdit && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
                         {t('mobile.viewOnly', 'View only')}
                     </span>
@@ -168,7 +177,7 @@ export const MobileHeader = ({
                     </button>
                 )}
                 {/* Save */}
-                {role === 'owner' && (
+                {canEdit && (
                     <button
                         onClick={onSave}
                         disabled={isSaving}
@@ -193,7 +202,7 @@ export const MobileHeader = ({
                 )}
 
                 {/* Run All */}
-                {role !== 'anonymous' && nodeCount > 0 && (
+                {canRun && nodeCount > 0 && (
                     <button
                         onClick={onRunAll}
                         disabled={isRunning || nodeCount === 0}
@@ -235,13 +244,13 @@ export const MobileHeader = ({
                         <FolderOpen className="w-4 h-4" />
                         {t('header.openFlow', 'Open Flow')}
                     </DropdownMenuItem>
-                    {role === 'owner' && (
+                    {canEdit && (
                         <DropdownMenuItem onClick={onSave} className="gap-2">
                             <Save className="w-4 h-4" />
                             {t('header.saveFlow', 'Save Flow')}
                         </DropdownMenuItem>
                     )}
-                    {onExport && (
+                    {canRun && onExport && (
                         <DropdownMenuItem onClick={onExport} className="gap-2">
                             <Download className="w-4 h-4" />
                             {t('header.export', 'Export JSON')}
@@ -280,14 +289,18 @@ export const MobileHeader = ({
 
                     <DropdownMenuSeparator />
 
-                    {/* Theme & Language */}
+                    {/* Theme, Language & Debug */}
                     <div className="flex items-center justify-center gap-4 px-2 py-1.5">
                         <ThemeToggle />
                         <LanguageSwitcher />
+                        {isDebugMode && onDisableDebugMode && <DebugModeToggle onDisable={onDisableDebugMode} />}
                     </div>
 
                     {/* Version */}
-                    <div className="px-2 py-1.5 text-[10px] text-muted-foreground/50 text-center">
+                    <div
+                        className="px-2 py-1.5 text-[10px] text-muted-foreground/50 text-center select-none cursor-default"
+                        onClick={onVersionClick}
+                    >
                         Web v{__APP_VERSION__} {apiVersion && `/ API v${apiVersion}`}
                     </div>
                 </DropdownMenuContent>

@@ -14,10 +14,12 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-import { useBlockRegistry, useCanvasConnections, useCanvasStore } from '@flows/flows';
+import { isAiBlock, isMissingAiKey, useBlockRegistry, useCanvasConnections, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Input, Label, Switch } from '@flows/ui-kit';
+import { useWebCoreStore } from '@flows/web-core';
 
+import { AiKeyWarningBanner } from '../../flows/components/AiKeyWarningBanner';
 import { BlockIcon } from '../../flows/components/BlockIcon';
 import { RunHistoryPanel } from '../../flows/components/RunHistoryPanel';
 import { getPortStyleKey } from '../../flows/utils';
@@ -52,6 +54,7 @@ interface MobileStepDetailProps {
         nodeName: string,
         portName: string
     ) => void;
+    onOpenAiKeyDialog?: () => void;
 }
 
 export const MobileStepDetail = ({
@@ -62,6 +65,7 @@ export const MobileStepDetail = ({
     onClose,
     onOpenOutputConnection,
     onOpenInputConnection,
+    onOpenAiKeyDialog,
 }: MobileStepDetailProps) => {
     const { t } = useTranslation(['flows']);
     const {
@@ -88,6 +92,8 @@ export const MobileStepDetail = ({
 
     const allConnections = useCanvasConnections();
     const blockRegistry = useBlockRegistry();
+    const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
+    const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
 
     const [showInputData, setShowInputData] = useState(false);
     const [showOutputData, setShowOutputData] = useState(false);
@@ -179,11 +185,6 @@ export const MobileStepDetail = ({
                                         <span className="text-[10px] font-mono text-muted-foreground/50">
                                             {blockDef.type}
                                         </span>
-                                        {blockDef.isFrontend && (
-                                            <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary font-medium">
-                                                frontend
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -214,6 +215,14 @@ export const MobileStepDetail = ({
                             {/* Special UI for input blocks */}
                             {isInputImage && <MobileImageUpload node={node} onConfigChange={handleConfigChange} />}
                             {isInputText && <MobileTextInput node={node} onConfigChange={handleConfigChange} />}
+
+                            {/* AI Key Warning */}
+                            {isAiBlock(blockDef.type) &&
+                                isMissingAiKey(
+                                    node.config?.model as string | undefined,
+                                    hasGeminiKey,
+                                    hasOpenaiKey
+                                ) && <AiKeyWarningBanner onRegisterKey={onOpenAiKeyDialog} />}
 
                             {/* Config fields */}
                             <div className="space-y-4">
@@ -286,16 +295,22 @@ export const MobileStepDetail = ({
                                                         <button
                                                             key={`in-${port.id}`}
                                                             type="button"
-                                                            onClick={() =>
-                                                                onOpenInputConnection?.(
-                                                                    nodeId,
-                                                                    port.id,
-                                                                    port.type ?? 'any',
-                                                                    displayName,
-                                                                    port.label || port.id
-                                                                )
+                                                            onClick={
+                                                                canEdit
+                                                                    ? () =>
+                                                                          onOpenInputConnection?.(
+                                                                              nodeId,
+                                                                              port.id,
+                                                                              port.type ?? 'any',
+                                                                              displayName,
+                                                                              port.label || port.id
+                                                                          )
+                                                                    : undefined
                                                             }
-                                                            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-success/5 hover:bg-success/10 text-xs text-left transition-all active:scale-[0.98]"
+                                                            className={cn(
+                                                                'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-success/5 text-xs text-left transition-all',
+                                                                canEdit && 'hover:bg-success/10 active:scale-[0.98]'
+                                                            )}
                                                         >
                                                             <ArrowLeft className="w-3 h-3 text-success/50 shrink-0" />
                                                             <span
@@ -316,19 +331,23 @@ export const MobileStepDetail = ({
                                                     <button
                                                         key={`in-${port.id}`}
                                                         type="button"
-                                                        onClick={() =>
-                                                            onOpenInputConnection?.(
-                                                                nodeId,
-                                                                port.id,
-                                                                port.type ?? 'any',
-                                                                displayName,
-                                                                port.label || port.id
-                                                            )
+                                                        onClick={
+                                                            canEdit
+                                                                ? () =>
+                                                                      onOpenInputConnection?.(
+                                                                          nodeId,
+                                                                          port.id,
+                                                                          port.type ?? 'any',
+                                                                          displayName,
+                                                                          port.label || port.id
+                                                                      )
+                                                                : undefined
                                                         }
                                                         className={cn(
                                                             'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs text-left',
-                                                            'border border-dashed border-primary/20 bg-primary/[0.02] hover:border-primary/40',
-                                                            'transition-all active:scale-[0.98]'
+                                                            'border border-dashed border-primary/20 bg-primary/[0.02]',
+                                                            'transition-all',
+                                                            canEdit && 'hover:border-primary/40 active:scale-[0.98]'
                                                         )}
                                                     >
                                                         <ArrowLeft className="w-3 h-3 text-primary/30 shrink-0" />
@@ -339,9 +358,11 @@ export const MobileStepDetail = ({
                                                             )}
                                                         />
                                                         <span className="font-medium">{port.label || port.id}</span>
-                                                        <span className="text-primary/40 flex-1 italic">
-                                                            {t('mobile.connection.tapToConnect', 'tap to connect')}
-                                                        </span>
+                                                        {canEdit && (
+                                                            <span className="text-primary/40 flex-1 italic">
+                                                                {t('mobile.connection.tapToConnect', 'tap to connect')}
+                                                            </span>
+                                                        )}
                                                     </button>
                                                 );
                                             })}
@@ -363,21 +384,29 @@ export const MobileStepDetail = ({
                                                     <button
                                                         key={`out-${port.id}`}
                                                         type="button"
-                                                        onClick={() =>
-                                                            onOpenOutputConnection?.(
-                                                                nodeId,
-                                                                port.id,
-                                                                port.type ?? 'any',
-                                                                displayName,
-                                                                port.label || port.id
-                                                            )
+                                                        onClick={
+                                                            canEdit
+                                                                ? () =>
+                                                                      onOpenOutputConnection?.(
+                                                                          nodeId,
+                                                                          port.id,
+                                                                          port.type ?? 'any',
+                                                                          displayName,
+                                                                          port.label || port.id
+                                                                      )
+                                                                : undefined
                                                         }
                                                         className={cn(
                                                             'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs text-left',
-                                                            'transition-all active:scale-[0.98]',
+                                                            'transition-all',
+                                                            canEdit && 'active:scale-[0.98]',
                                                             isConnected
-                                                                ? 'bg-success/5 hover:bg-success/10'
-                                                                : 'border border-dashed border-primary/20 bg-primary/[0.02] hover:border-primary/40'
+                                                                ? 'bg-success/5'
+                                                                : 'border border-dashed border-primary/20 bg-primary/[0.02]',
+                                                            canEdit &&
+                                                                (isConnected
+                                                                    ? 'hover:bg-success/10'
+                                                                    : 'hover:border-primary/40')
                                                         )}
                                                     >
                                                         <ArrowRight
@@ -412,11 +441,11 @@ export const MobileStepDetail = ({
                                                                     })
                                                                     .join(', ')}
                                                             </span>
-                                                        ) : (
+                                                        ) : canEdit ? (
                                                             <span className="text-primary/40 flex-1 italic">
                                                                 {t('mobile.connection.tapToConnect', 'tap to connect')}
                                                             </span>
-                                                        )}
+                                                        ) : null}
                                                     </button>
                                                 );
                                             })}
@@ -427,7 +456,7 @@ export const MobileStepDetail = ({
                             {/* Input Data */}
                             {node.inputData && Object.keys(node.inputData).length > 0 && (
                                 <CollapsibleDataSection
-                                    title="Input Data"
+                                    title={t('mobile.inputs')}
                                     isOpen={showInputData}
                                     onToggle={() => setShowInputData(!showInputData)}
                                 >
@@ -455,7 +484,7 @@ export const MobileStepDetail = ({
                             {/* Output Data */}
                             {node.outputData && Object.keys(node.outputData).length > 0 && (
                                 <CollapsibleDataSection
-                                    title="Output Data"
+                                    title={t('mobile.outputs')}
                                     isOpen={showOutputData}
                                     onToggle={() => setShowOutputData(!showOutputData)}
                                 >
