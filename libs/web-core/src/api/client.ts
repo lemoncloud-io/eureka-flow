@@ -9,6 +9,13 @@ import { isPermissionDeniedResponse } from '../utils/error';
 
 import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
+declare module 'axios' {
+    interface AxiosRequestConfig {
+        /** Skip auth error handling (clearApiKey) for this request */
+        _skipAuthError?: boolean;
+    }
+}
+
 /** Handle auth error: clear credentials, storage, and show toast */
 const handleAuthError = (): void => {
     useWebCoreStore.getState().clearApiKey();
@@ -62,6 +69,10 @@ const hasPermissionError = (data: unknown): boolean => {
 /** Check if request is using the public endpoint (no API key) */
 const isPublicRequest = (config?: InternalAxiosRequestConfig): boolean => config?.baseURL?.includes('/public') ?? false;
 
+/** Check if auth error handling should be skipped for this request */
+const shouldSkipAuthError = (config?: InternalAxiosRequestConfig): boolean =>
+    isPublicRequest(config) || !!config?._skipAuthError;
+
 /**
  * Response interceptor: Handle errors globally
  *
@@ -71,8 +82,8 @@ const isPublicRequest = (config?: InternalAxiosRequestConfig): boolean => config
  */
 apiClient.interceptors.response.use(
     (response: AxiosResponse) => {
-        // Skip auth error handling for public (unauthenticated) requests
-        if (isPublicRequest(response.config)) return response;
+        // Skip auth error handling for public or explicitly opted-out requests
+        if (shouldSkipAuthError(response.config)) return response;
 
         // Handle 200-wrapped 403 from API Gateway (treat as auth error)
         if (hasPermissionError(response.data)) {
@@ -81,8 +92,8 @@ apiClient.interceptors.response.use(
         return response;
     },
     (error: AxiosError) => {
-        // Skip auth error handling for public (unauthenticated) requests
-        if (isPublicRequest(error.config)) return Promise.reject(error);
+        // Skip auth error handling for public or explicitly opted-out requests
+        if (shouldSkipAuthError(error.config)) return Promise.reject(error);
 
         const status = error.response?.status;
 

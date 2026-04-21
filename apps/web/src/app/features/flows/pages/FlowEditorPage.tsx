@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { getPermissions, useBlocks, useFlows } from '@flows/flows';
+import { getPermissions, getProfile, useBlocks, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
@@ -287,6 +287,18 @@ export const FlowEditorPage = () => {
 
         setLoadingText(t('flowEditor.initializingEngine'));
         try {
+            // Fetch AI key availability (fire-and-forget, parallel with loadBlocks)
+            if (currentApiKey) {
+                getProfile()
+                    .then(data => {
+                        useWebCoreStore.getState().setAiKeyStatus({
+                            hasGeminiKey: !!data.geminiApiKey,
+                            hasOpenaiKey: !!data.openaiApiKey,
+                        });
+                    })
+                    .catch(err => console.warn('[FlowEditor] Profile fetch failed:', err));
+            }
+
             setLoadingText(t('flowEditor.loadingBlockRegistry'));
             await loadBlocks();
 
