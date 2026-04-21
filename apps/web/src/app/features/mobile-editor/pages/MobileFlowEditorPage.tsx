@@ -10,6 +10,7 @@ import { ApiKeyDialog } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
+import { AiKeyDialog } from '../../flows/components/AiKeyDialog';
 import { FlowListDialog } from '../../flows/components/FlowListDialog';
 import {
     MobileBlockLibrarySheet,
@@ -60,6 +61,7 @@ export const MobileFlowEditorPage = () => {
     const [isFlowMapOpen, setIsFlowMapOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isAiKeyDialogOpen, setIsAiKeyDialogOpen] = useState(false);
 
     // Step navigation (replaces configNodeId)
     const stepNav = useStepNavigation();
@@ -346,6 +348,7 @@ export const MobileFlowEditorPage = () => {
                 onClose={stepNav.closeStep}
                 onOpenOutputConnection={connectionMode.openForPort}
                 onOpenInputConnection={connectionMode.openForInputPort}
+                onOpenAiKeyDialog={() => setIsAiKeyDialogOpen(true)}
             />
 
             {/* Bottom bar — Add Node, hidden when step detail is open */}
@@ -406,6 +409,8 @@ export const MobileFlowEditorPage = () => {
                 codesUrl={import.meta.env.VITE_CODES_URL}
                 initialValue={apiKey ?? undefined}
             />
+
+            <AiKeyDialog open={isAiKeyDialogOpen} onOpenChange={setIsAiKeyDialogOpen} />
 
             {/* Dev Role Toggle (hidden in production) */}
             {import.meta.env.VITE_ENV !== 'PROD' && (

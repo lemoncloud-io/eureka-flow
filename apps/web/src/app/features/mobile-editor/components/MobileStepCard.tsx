@@ -1,11 +1,12 @@
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Loader2, MoreVertical, Play, Trash2 } from 'lucide-react';
+import { AlertTriangle, Loader2, MoreVertical, Play, Trash2 } from 'lucide-react';
 
-import { getPermissions, useBlockRegistry } from '@flows/flows';
+import { getPermissions, isAiBlock, isMissingAiKey, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
+import { useWebCoreStore } from '@flows/web-core';
 
 import { STATE_STYLES, STEREO_ICON_BG } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
@@ -32,6 +33,16 @@ export const MobileStepCard = React.memo(
         const stateStyle = STATE_STYLES[state] ?? STATE_STYLES.IDLE;
         const stereo = blockDef?.stereo ?? 'process';
         const isRunning = state === 'RUNNING';
+
+        const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
+        const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
+        const needsAiKey = useMemo(
+            () =>
+                !!blockDef &&
+                isAiBlock(blockDef.type) &&
+                isMissingAiKey(node.config?.model as string | undefined, hasGeminiKey, hasOpenaiKey),
+            [blockDef, node.config?.model, hasGeminiKey, hasOpenaiKey]
+        );
 
         const handleRun = useCallback(
             (e: React.MouseEvent) => {
@@ -108,6 +119,9 @@ export const MobileStepCard = React.memo(
                         <div className="text-[11px] text-success/50 truncate mt-0.5">{outputSubtitle}</div>
                     ) : null}
                 </div>
+
+                {/* AI Key Warning */}
+                {needsAiKey && <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />}
 
                 {/* Status dot */}
                 <div className="flex items-center gap-1 shrink-0">

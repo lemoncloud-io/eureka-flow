@@ -14,10 +14,12 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-import { useBlockRegistry, useCanvasConnections, useCanvasStore } from '@flows/flows';
+import { isAiBlock, isMissingAiKey, useBlockRegistry, useCanvasConnections, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Input, Label, Switch } from '@flows/ui-kit';
+import { useWebCoreStore } from '@flows/web-core';
 
+import { AiKeyWarningBanner } from '../../flows/components/AiKeyWarningBanner';
 import { BlockIcon } from '../../flows/components/BlockIcon';
 import { RunHistoryPanel } from '../../flows/components/RunHistoryPanel';
 import { getPortStyleKey } from '../../flows/utils';
@@ -52,6 +54,7 @@ interface MobileStepDetailProps {
         nodeName: string,
         portName: string
     ) => void;
+    onOpenAiKeyDialog?: () => void;
 }
 
 export const MobileStepDetail = ({
@@ -62,6 +65,7 @@ export const MobileStepDetail = ({
     onClose,
     onOpenOutputConnection,
     onOpenInputConnection,
+    onOpenAiKeyDialog,
 }: MobileStepDetailProps) => {
     const { t } = useTranslation(['flows']);
     const {
@@ -88,6 +92,8 @@ export const MobileStepDetail = ({
 
     const allConnections = useCanvasConnections();
     const blockRegistry = useBlockRegistry();
+    const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
+    const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
 
     const [showInputData, setShowInputData] = useState(false);
     const [showOutputData, setShowOutputData] = useState(false);
@@ -214,6 +220,15 @@ export const MobileStepDetail = ({
                             {/* Special UI for input blocks */}
                             {isInputImage && <MobileImageUpload node={node} onConfigChange={handleConfigChange} />}
                             {isInputText && <MobileTextInput node={node} onConfigChange={handleConfigChange} />}
+
+                            {/* AI Key Warning */}
+                            {onOpenAiKeyDialog &&
+                                isAiBlock(blockDef.type) &&
+                                isMissingAiKey(
+                                    node.config?.model as string | undefined,
+                                    hasGeminiKey,
+                                    hasOpenaiKey
+                                ) && <AiKeyWarningBanner onRegisterKey={onOpenAiKeyDialog} />}
 
                             {/* Config fields */}
                             <div className="space-y-4">
