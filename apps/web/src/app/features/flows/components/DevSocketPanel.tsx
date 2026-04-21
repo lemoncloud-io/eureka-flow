@@ -1,6 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
 
-import { Copy, Play, Radio, RotateCcw, Square, Trash2, X } from 'lucide-react';
+import { ChevronRight, Copy, Play, Radio, RotateCcw, Square, Trash2, X } from 'lucide-react';
+
+import { JsonViewer } from '@flows/ui-kit';
 
 import type { RecordedMessage, ReplayState } from '../hooks/useSocketRecorder';
 import type { WebSocketMessage } from '@flows/socket';
@@ -46,6 +48,7 @@ export const DevSocketPanel: React.FC<DevSocketPanelProps> = ({
     onMarkReplayed,
 }) => {
     const [isExpanded, setIsExpanded] = useState(true);
+    const [expandedSeq, setExpandedSeq] = useState<number | null>(null);
     const [pos, setPos] = useState({ x: 16, y: 80 });
     const dragRef = useRef<HTMLDivElement>(null);
     const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
@@ -205,42 +208,67 @@ export const DevSocketPanel: React.FC<DevSocketPanelProps> = ({
                     ) : (
                         messages.map((msg, i) => {
                             const isCurrentReplay = replayState.currentSeq === msg.seq;
+                            const isDetailOpen = expandedSeq === msg.seq;
                             return (
-                                <div
-                                    key={msg.seq}
-                                    onDoubleClick={() => handleDoubleClick(msg)}
-                                    className={`group flex items-center gap-2 px-3 py-1 text-[11px] font-mono hover:bg-accent/30 cursor-pointer border-b border-border/10 transition-colors ${
-                                        isCurrentReplay ? 'bg-green-500/15' : msg.replayed ? 'bg-primary/10' : ''
-                                    }`}
-                                    title="Double-click to replay single message"
-                                >
-                                    <span className="text-muted-foreground/40 w-[56px] shrink-0 text-right">
-                                        {i === 0 ? '+0ms' : formatRelativeTime(msg.timestamp, messages[0].timestamp)}
-                                    </span>
-                                    <span className={`w-[36px] shrink-0 ${TYPE_COLORS[msg.type]}`}>{msg.type}</span>
-                                    <span className="text-foreground/70 w-[90px] shrink-0 truncate">
-                                        {msg.targetId}
-                                    </span>
-                                    <span className="text-muted-foreground/60 truncate flex-1">{msg.summary}</span>
-                                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={e => handleReplayFrom(i, e)}
-                                            className="p-0.5 text-green-400/60 hover:text-green-400 transition-colors"
-                                            title="Replay from here"
-                                        >
-                                            <Play className="w-3 h-3" />
-                                        </button>
+                                <div key={msg.seq} className="border-b border-border/10">
+                                    <div
+                                        onDoubleClick={() => handleDoubleClick(msg)}
+                                        className={`group flex items-center gap-2 px-3 py-1 text-[11px] font-mono hover:bg-accent/30 cursor-pointer transition-colors ${
+                                            isCurrentReplay ? 'bg-green-500/15' : msg.replayed ? 'bg-primary/10' : ''
+                                        }`}
+                                        title="Double-click to replay"
+                                    >
                                         <button
                                             onClick={e => {
                                                 e.stopPropagation();
-                                                handleCopy(msg);
+                                                setExpandedSeq(isDetailOpen ? null : msg.seq);
                                             }}
-                                            className="p-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-                                            title="Copy JSON"
+                                            className="p-0 border-0 bg-transparent cursor-pointer"
                                         >
-                                            <Copy className="w-3 h-3" />
+                                            <ChevronRight
+                                                className={`w-3 h-3 shrink-0 text-muted-foreground/30 transition-transform ${isDetailOpen ? 'rotate-90' : ''}`}
+                                            />
                                         </button>
+                                        <span className="text-muted-foreground/40 w-[48px] shrink-0 text-right">
+                                            {i === 0
+                                                ? '+0ms'
+                                                : formatRelativeTime(msg.timestamp, messages[0].timestamp)}
+                                        </span>
+                                        <span className={`w-[36px] shrink-0 ${TYPE_COLORS[msg.type]}`}>{msg.type}</span>
+                                        <span className="text-foreground/70 w-[90px] shrink-0 truncate">
+                                            {msg.targetId}
+                                        </span>
+                                        <span className="text-muted-foreground/60 truncate flex-1">{msg.summary}</span>
+                                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={e => handleReplayFrom(i, e)}
+                                                className="p-0.5 text-green-400/60 hover:text-green-400 transition-colors"
+                                                title="Replay from here"
+                                            >
+                                                <Play className="w-3 h-3" />
+                                            </button>
+                                            <button
+                                                onClick={e => {
+                                                    e.stopPropagation();
+                                                    handleCopy(msg);
+                                                }}
+                                                className="p-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                                                title="Copy JSON"
+                                            >
+                                                <Copy className="w-3 h-3" />
+                                            </button>
+                                        </div>
                                     </div>
+                                    {isDetailOpen && (
+                                        <div className="px-3 py-1.5 bg-black/20 border-t border-border/10">
+                                            <JsonViewer
+                                                data={msg.raw.data as object}
+                                                maxHeight={200}
+                                                collapsed={2}
+                                                className="text-[10px]"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })
