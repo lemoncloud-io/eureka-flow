@@ -39,6 +39,7 @@ export const useSocketHandlers = ({
     const nodeNoRef = useRef<Map<string, number>>(new Map());
     const nodeRunIdRef = useRef<Map<string, string>>(new Map());
     const portNoRef = useRef<Map<string, number>>(new Map());
+    const portRunIdRef = useRef<Map<string, string>>(new Map());
     const highlightTimeoutsRef = useRef<Map<string, number>>(new Map());
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
 
@@ -177,7 +178,7 @@ export const useSocketHandlers = ({
 
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
-            const { portId, nodeId, flowId, portName, no, runId } = info;
+            const { portId, nodeId, flowId, portName, no, runId, ts } = info;
 
             if (flowId && flowId !== currentFlowId) return;
 
@@ -190,7 +191,17 @@ export const useSocketHandlers = ({
                 });
             }
 
-            if (no !== undefined) {
+            // Reset port sequence tracking when runId changes (new execution run)
+            if (runId) {
+                const prevRunId = portRunIdRef.current.get(portId);
+                if (prevRunId && prevRunId !== runId) {
+                    portNoRef.current.delete(portId);
+                }
+                portRunIdRef.current.set(portId, runId);
+            }
+
+            // ts present = server signals fresh data, always update
+            if (!ts && no !== undefined) {
                 const prevNo = portNoRef.current.get(portId);
                 if (prevNo !== undefined && prevNo >= no) return;
                 portNoRef.current.set(portId, no);
@@ -271,6 +282,7 @@ export const useSocketHandlers = ({
         nodeNoRef.current.clear();
         nodeRunIdRef.current.clear();
         portNoRef.current.clear();
+        portRunIdRef.current.clear();
         highlightTimeoutsRef.current.forEach(id => window.clearTimeout(id));
         highlightTimeoutsRef.current.clear();
     }, [currentFlowId]);
