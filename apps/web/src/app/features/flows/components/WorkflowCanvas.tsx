@@ -780,13 +780,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         });
                     };
 
-                    // Step 1: Apply existing port data (non-null) and display nodes immediately
-                    // This prevents empty state flash while fetching null port data
-                    const portsWithData = ports.filter(p => p.data !== null);
+                    // Apply ports with known state immediately; fetch undefined ones in background
+                    const portsWithData = ports.filter(p => p.data !== undefined);
                     const nodesWithExistingPortData = applyPortDataToNodes(loadedNodes, portsWithData);
                     const nodesWithPropagatedData = propagateData(nodesWithExistingPortData, loadedConnections);
 
-                    // Display nodes immediately
                     setNodes(nodesWithPropagatedData);
                     setConnections(loadedConnections);
                     pastRef.current = [];
@@ -794,13 +792,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     handleSelectionChange(null);
                     setSelectedConnectionId(null);
 
-                    // Step 2: Fetch missing port data (data: null) in background
-                    // Each port updates individually when fetched for progressive loading UX
-                    const nullDataPorts = ports.filter(p => p.data === null && p.portId);
+                    // null = server confirmed empty; undefined = server omitted, fetch now
+                    const undefinedDataPorts = ports.filter(p => p.data === undefined && p.portId);
 
-                    if (nullDataPorts.length > 0) {
-                        nullDataPorts.forEach(p => {
-                            const direction = p.portId === 'out' ? 'out' : 'in';
+                    if (undefinedDataPorts.length > 0) {
+                        undefinedDataPorts.forEach(p => {
+                            const direction = p.direction ?? (p.portId === 'out' ? 'out' : 'in');
                             getPortData(p.id, direction)
                                 .then(portData => {
                                     if (portData.data) {
