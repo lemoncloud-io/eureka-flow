@@ -232,6 +232,8 @@ export interface UseInitFlowSocketOptions {
     onPortUpdate?: (info: PortUpdateInfo) => void;
     /** Callback when trace message is received - for agent block execution logs */
     onTraceUpdate?: (info: TraceUpdateInfo) => void;
+    /** Observer for all parsed messages (dev tools, replay recording) */
+    onMessage?: (message: WebSocketMessage) => void;
 }
 
 /**
@@ -266,6 +268,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         onNodeReload,
         onPortUpdate,
         onTraceUpdate,
+        onMessage,
     } = options;
 
     const apiKey = useWebCoreStore(state => state.apiKey);
@@ -308,17 +311,14 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         setConnectionStatus(connectionStatus);
     }, [connectionStatus, setConnectionStatus]);
 
-    // Broadcast messages to all subscribers and handle updates
-    useEffect(() => {
-        if (lastMessage) {
-            broadcastMessage(lastMessage);
-
-            const data = lastMessage.data;
+    const dispatchMessage = useCallback(
+        (message: WebSocketMessage) => {
+            const data = message.data;
 
             // Handle trace message FIRST (before node/flow handlers)
             // Merged trace payload contains type: "node" from nested data,
             // which would incorrectly match isNodeUpdateMessage if checked later.
-            if (lastMessage.action === 'trace' && isTraceMessage(data)) {
+            if (message.action === 'trace' && isTraceMessage(data)) {
                 // Skip completion signals with no stage and no message
                 if (!data.stage && !data.message) {
                     return;
@@ -335,7 +335,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
 
                 if (onTraceUpdate) {
                     onTraceUpdate({
-                        nodeId: lastMessage.id,
+                        nodeId: message.id,
                         flowId: traceFlowId,
                         seq: data.seq,
                         ts: data.ts ?? Date.now(),
@@ -441,17 +441,18 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                     });
                 }
             }
+        },
+        [currentFlowId, getLastLocalUpdateTimestamp, onFlowUpdate, onNodeReload, onPortUpdate, onTraceUpdate]
+    );
+
+    // Broadcast messages to all subscribers and handle updates
+    useEffect(() => {
+        if (lastMessage) {
+            broadcastMessage(lastMessage);
+            onMessage?.(lastMessage);
+            dispatchMessage(lastMessage);
         }
-    }, [
-        lastMessage,
-        broadcastMessage,
-        currentFlowId,
-        getLastLocalUpdateTimestamp,
-        onFlowUpdate,
-        onNodeReload,
-        onPortUpdate,
-        onTraceUpdate,
-    ]);
+    }, [lastMessage, broadcastMessage, onMessage, dispatchMessage]);
 
     // Cleanup on unmount
     // Note: Empty deps intentional - runs only on unmount
@@ -482,5 +483,6 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         connectionStatus,
         reconnectAttempts,
         maxReconnectReached,
+        replayMessage: dispatchMessage,
     };
 };

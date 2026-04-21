@@ -292,6 +292,13 @@ export const useSocketHandlers = ({
         [lastLocalUpdateTimestampRef]
     );
 
+    const resetSequenceTracking = useCallback(() => {
+        nodeNoRef.current.clear();
+        nodeRunIdRef.current.clear();
+        portNoRef.current.clear();
+        portRunIdRef.current.clear();
+    }, []);
+
     return {
         handleFlowUpdate,
         handleNodeUpdate,
@@ -299,5 +306,6 @@ export const useSocketHandlers = ({
         handleTraceUpdate,
         getLastLocalUpdateTimestamp,
         lastLocalUpdateTimestampRef,
+        resetSequenceTracking,
     };
 };

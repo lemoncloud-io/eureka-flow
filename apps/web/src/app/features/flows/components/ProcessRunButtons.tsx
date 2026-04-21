@@ -44,7 +44,7 @@ export const ProcessRunButtons: React.FC<{
                         'flex-1 text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
                         isRunning
                             ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
-                            : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
+                            : 'bg-green-500/15 hover:bg-green-500/25 text-green-600 dark:text-green-400 border border-green-500/20'
                     )}
                 >
                     {icon}
@@ -57,7 +57,7 @@ export const ProcessRunButtons: React.FC<{
                         'flex-1 text-[11px] py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 font-medium',
                         isRunning
                             ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
-                            : 'bg-green-500/15 hover:bg-green-500/25 text-green-600 dark:text-green-400 border border-green-500/20'
+                            : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
                     )}
                 >
                     {icon}
@@ -81,7 +81,7 @@ export const ProcessRunButtons: React.FC<{
                     'w-6 h-6 rounded-md flex items-center justify-center transition-all',
                     isRunning
                         ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
-                        : 'bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400'
+                        : 'bg-primary/10 hover:bg-primary/20 text-primary'
                 )}
                 title={t('actions.runOptions')}
             >
@@ -107,7 +107,7 @@ export const ProcessRunButtons: React.FC<{
                             }}
                             onMouseDown={e => e.stopPropagation()}
                         >
-                            <Play className="w-3 h-3 text-primary" />
+                            <Play className="w-3 h-3 text-green-500" />
                             {t('actions.runThisOnly')}
                         </button>
                         <button
@@ -119,7 +119,7 @@ export const ProcessRunButtons: React.FC<{
                             }}
                             onMouseDown={e => e.stopPropagation()}
                         >
-                            <Play className="w-3 h-3 text-green-500" />
+                            <Play className="w-3 h-3 text-primary" />
                             {t('actions.runAndPropagate')}
                         </button>
                     </div>

@@ -57,6 +57,8 @@ import {
 import type { FlowRole, LoadFlowPortData, NodeState, RunNodeBody } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
+const PORT_HIGHLIGHT_MS = 300;
+
 /** Stable empty array to avoid new references in render loop */
 const EMPTY_STRING_ARRAY: string[] = [];
 
@@ -97,7 +99,7 @@ export interface WorkflowCanvasRef {
     /** Update node data (used for socket status updates) */
     updateNode: (nodeId: string, updates: Partial<NodeData>) => void;
     /** Update node from server data (used for socket node update notifications) */
-    updateNodeFromServer: (nodeId: string, serverData: Partial<NodeData>) => void;
+    updateNodeFromServer: (nodeId: string, serverData: Partial<NodeData>, options?: { force?: boolean }) => void;
     /** Export canvas as PNG image */
     exportAsImage: (fileName: string) => Promise<void>;
     /** Capture canvas as data URL without downloading */
@@ -971,7 +973,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 updateNode: (nodeId: string, updates: Partial<NodeData>) => {
                     setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, ...updates } : n)));
                 },
-                updateNodeFromServer: (nodeId: string, serverData: Partial<NodeData>) => {
+                updateNodeFromServer: (
+                    nodeId: string,
+                    serverData: Partial<NodeData>,
+                    options?: { force?: boolean }
+                ) => {
                     // Merge server data with existing node, preserving UI-specific fields
                     // Note: Server returns NodeView format from GET /nodes/:id
                     // - config$: ConfigItem[] (array) -> config: Record<string, string> (object)
@@ -1044,7 +1050,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 serverData.executionStats?.progress !== undefined &&
                                 !isTerminalCurrent;
                             const finalState =
-                                isActiveExecution || shouldUpdateState(currentState, serverState)
+                                options?.force || isActiveExecution || shouldUpdateState(currentState, serverState)
                                     ? serverState
                                     : currentState;
 
@@ -2043,35 +2049,36 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             setConnectionDraft(null);
         };
 
-        const handlePortDoubleClick = async (nodeId: string, portId: string, type: 'input' | 'output') => {
-            if (connectionDraft) return;
+        const handlePortDoubleClick = async (
+            nodeId: string,
+            portId: string,
+            type: 'input' | 'output',
+            _portType: string
+        ) => {
+            // Double-click fires after mouseDown already started a connection draft — cancel it
+            if (connectionDraft) setConnectionDraft(null);
 
             const fullPortId = `${nodeId}:${portId}`;
             const direction = type === 'output' ? 'out' : 'in';
-            const store = useCanvasStore.getState();
 
-            // Pulse animation while fetching
-            store.setUpdatedPort(fullPortId);
+            useCanvasStore.getState().setUpdatedPort(fullPortId);
 
             try {
                 const portData = await getPortData(fullPortId, direction);
                 if (portData?.data) {
-                    const dataPacket = {
-                        value: portData.data.value,
-                        type: portData.data.type,
-                        timestamp: portData.data.timestamp,
-                    };
-                    const updates =
-                        direction === 'out'
-                            ? { outputData: { [portId]: dataPacket } }
-                            : { inputData: { [portId]: dataPacket } };
-                    setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, ...updates } : n)));
+                    setNodes(prev =>
+                        prev.map(n => {
+                            if (n.id !== nodeId) return n;
+                            return direction === 'out'
+                                ? { ...n, outputData: { ...n.outputData, [portId]: portData.data } }
+                                : { ...n, inputData: { ...n.inputData, [portId]: portData.data } };
+                        })
+                    );
                 }
             } catch (err) {
                 console.warn('[Canvas] Port data fetch failed:', fullPortId, err);
             } finally {
-                // Clear highlight after fetch completes (with minimum visible duration)
-                setTimeout(() => store.clearUpdatedPort(fullPortId), 300);
+                setTimeout(() => useCanvasStore.getState().clearUpdatedPort(fullPortId), PORT_HIGHLIGHT_MS);
             }
         };
 
@@ -2653,7 +2660,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 const connectedPorts = connectedPortsByNodeId.get(node.id) ?? EMPTY_STRING_ARRAY;
 
                                 return (
-                                    <div key={node.id} className="relative">
+                                    <div key={node.id} className="relative hover:z-50">
                                         {role === 'anonymous' && (
                                             <div
                                                 className="absolute inset-0 z-10 pointer-events-auto cursor-pointer"
