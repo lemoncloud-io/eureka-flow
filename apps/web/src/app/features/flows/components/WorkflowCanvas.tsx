@@ -130,6 +130,8 @@ interface WorkflowCanvasProps {
     onConnectionError?: (error: 'cycle' | 'invalid_type') => void;
     /** Called to show notification message (dev only, for touch debug) */
     onShowNotification?: (message: string, type: 'success' | 'error') => void;
+    /** Called when AI key is required but missing */
+    onAiKeyRequired?: () => void;
 }
 
 const GRID_SIZE = 20;
@@ -211,6 +213,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             onOpenLibrary,
             onConnectionError,
             onShowNotification,
+            onAiKeyRequired,
         },
         ref
     ) => {
@@ -2696,6 +2699,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                                 onDelete: () => deleteNode(node.id),
                                                 onTrigger: opts => executeNode(node.id, undefined, opts),
                                                 onDuplicate: () => duplicateNode(node.id),
+                                                onOpenAiKeyDialog: onAiKeyRequired,
 
                                                 onResize: (w, h) => handleNodeResize(node.id, w, h),
                                                 onResizing: w =>
@@ -2804,6 +2808,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 setSelectedConnectionId(null);
                             }}
                             onShowNotification={onShowNotification}
+                            onOpenAiKeyDialog={onAiKeyRequired}
                         />
                     </div>
 

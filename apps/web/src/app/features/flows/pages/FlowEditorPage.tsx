@@ -12,6 +12,7 @@ import { Button } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
+import { AiKeyDialog } from '../components/AiKeyDialog';
 import { DevSocketPanel } from '../components/DevSocketPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
 import { FlowListDialog } from '../components/FlowListDialog';
@@ -205,6 +206,7 @@ export const FlowEditorPage = () => {
     const [helpDialogTab, setHelpDialogTab] = useState<HelpTab>('gettingStarted');
     const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
     const [isGraphViewOpen, setIsGraphViewOpen] = useState(false);
+    const [isAiKeyDialogOpen, setIsAiKeyDialogOpen] = useState(false);
     const [tourPhase, setTourPhase] = useState<'none' | 'guide' | 'block'>('none');
 
     const { apiKey, setApiKey } = useWebCoreStore();
@@ -731,6 +733,7 @@ export const FlowEditorPage = () => {
                     onOpenLibrary={handleOpenLibrary}
                     onConnectionError={handleConnectionError}
                     onShowNotification={showNotification}
+                    onAiKeyRequired={() => setIsAiKeyDialogOpen(true)}
                 />
             </div>
 
@@ -831,6 +834,9 @@ export const FlowEditorPage = () => {
                 onPublish={publishFlow}
                 onCaptureCanvas={handleCaptureCanvas}
             />
+
+            {/* AI Key Dialog */}
+            <AiKeyDialog open={isAiKeyDialogOpen} onOpenChange={setIsAiKeyDialogOpen} />
 
             {/* Graph View Overlay */}
             {isGraphViewOpen && (
