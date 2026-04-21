@@ -521,7 +521,7 @@ export const NodeBlock = memo<NodeBlockProps>(
                                         'w-6 h-6 rounded-md flex items-center justify-center transition-all',
                                         isRunning
                                             ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
-                                            : 'bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400',
+                                            : 'bg-primary/10 hover:bg-primary/20 text-primary',
                                         tutorialHint === 'run-button' && !isRunning && 'tutorial-run-bounce'
                                     )}
                                     title={t('actions.run')}
@@ -751,7 +751,7 @@ export const NodeBlock = memo<NodeBlockProps>(
                                                 ? 'bg-muted/30 text-muted-foreground border border-muted cursor-not-allowed'
                                                 : definition.inputs.every(p => node.inputData?.[p.id])
                                                   ? 'bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30'
-                                                  : 'bg-green-500/15 hover:bg-green-500/25 text-green-600 dark:text-green-400 border border-green-500/20'
+                                                  : 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/20'
                                         )}
                                         onMouseDown={e => e.stopPropagation()}
                                     >

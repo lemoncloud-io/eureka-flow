@@ -168,6 +168,12 @@ export const FlowEditorPage = () => {
 
     const socketRecorder = useSocketRecorder();
 
+    const resetAllNodesToIdle = useCallback(() => {
+        canvasRef.current?.getWorkflow()?.nodes?.forEach(n => {
+            canvasRef.current?.updateNodeFromServer(n.id, { state: 'IDLE', status: 'IDLE' }, { force: true });
+        });
+    }, []);
+
     // Initialize WebSocket connection when channelId is available
     const {
         isConnected: isSocketConnected,
@@ -879,42 +885,16 @@ export const FlowEditorPage = () => {
                         }}
                         onReplayFromIndex={fromIndex => {
                             resetSequenceTracking();
-                            // Reset all nodes to IDLE before sequence replay
-                            const workflow = canvasRef.current?.getWorkflow();
-                            workflow?.nodes?.forEach(n => {
-                                canvasRef.current?.updateNodeFromServer(
-                                    n.id,
-                                    { state: 'IDLE', status: 'IDLE' },
-                                    { force: true }
-                                );
-                            });
-                            socketRecorder.startReplayFromIndex(fromIndex, msg => {
-                                resetSequenceTracking();
-                                replayMessage(msg);
-                            });
+                            resetAllNodesToIdle();
+                            socketRecorder.startReplayFromIndex(fromIndex, replayMessage);
                         }}
                         onStopReplay={() => {
                             socketRecorder.stopReplaySequence();
-                            // Reset all nodes to IDLE after stopping
-                            const workflow = canvasRef.current?.getWorkflow();
-                            workflow?.nodes?.forEach(n => {
-                                canvasRef.current?.updateNodeFromServer(
-                                    n.id,
-                                    { state: 'IDLE', status: 'IDLE' },
-                                    { force: true }
-                                );
-                            });
+                            resetAllNodesToIdle();
                         }}
                         onResetNodes={() => {
                             resetSequenceTracking();
-                            const workflow = canvasRef.current?.getWorkflow();
-                            workflow?.nodes?.forEach(n => {
-                                canvasRef.current?.updateNodeFromServer(
-                                    n.id,
-                                    { state: 'IDLE', status: 'IDLE' },
-                                    { force: true }
-                                );
-                            });
+                            resetAllNodesToIdle();
                         }}
                         onMarkReplayed={socketRecorder.markReplayed}
                     />

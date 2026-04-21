@@ -50,6 +50,8 @@ export interface ReplayState {
     totalCount: number;
 }
 
+const HIGHLIGHT_MS = 400;
+
 export const useSocketRecorder = () => {
     const [messages, setMessages] = useState<RecordedMessage[]>([]);
     const [isRecording, setIsRecording] = useState(true);
@@ -59,82 +61,91 @@ export const useSocketRecorder = () => {
         totalCount: 0,
     });
     const seqRef = useRef(0);
-    const replayTimersRef = useRef<number[]>([]);
+    const isRecordingRef = useRef(true);
+    const replayTimerRef = useRef<number | null>(null);
+    const highlightTimerRef = useRef<number | null>(null);
 
-    const record = useCallback(
-        (message: WebSocketMessage) => {
-            if (!isRecording) return;
-            const { type, targetId, summary } = summarize(message);
-            const entry: RecordedMessage = {
-                seq: ++seqRef.current,
-                timestamp: Date.now(),
-                type,
-                targetId,
-                summary,
-                raw: message,
-            };
-            setMessages(prev => {
-                const next = [...prev, entry];
-                return next.length > MAX_MESSAGES ? next.slice(-MAX_MESSAGES) : next;
-            });
-        },
-        [isRecording]
-    );
+    const record = useCallback((message: WebSocketMessage) => {
+        if (!isRecordingRef.current) return;
+        const { type, targetId, summary } = summarize(message);
+        const entry: RecordedMessage = {
+            seq: ++seqRef.current,
+            timestamp: Date.now(),
+            type,
+            targetId,
+            summary,
+            raw: message,
+        };
+        setMessages(prev => (prev.length >= MAX_MESSAGES ? [...prev.slice(1), entry] : [...prev, entry]));
+    }, []);
 
     const clear = useCallback(() => {
         setMessages([]);
         seqRef.current = 0;
     }, []);
 
-    const toggleRecording = useCallback(() => setIsRecording(prev => !prev), []);
+    const toggleRecording = useCallback(() => {
+        setIsRecording(prev => {
+            isRecordingRef.current = !prev;
+            return !prev;
+        });
+    }, []);
 
     const markReplayed = useCallback((seq: number) => {
         setMessages(prev => prev.map(m => (m.seq === seq ? { ...m, replayed: true } : m)));
-        setTimeout(() => {
+        if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+        highlightTimerRef.current = window.setTimeout(() => {
             setMessages(prev => prev.map(m => (m.seq === seq ? { ...m, replayed: false } : m)));
         }, 600);
     }, []);
 
     const stopReplaySequence = useCallback(() => {
-        replayTimersRef.current.forEach(id => window.clearTimeout(id));
-        replayTimersRef.current = [];
+        if (replayTimerRef.current) window.clearTimeout(replayTimerRef.current);
+        if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+        replayTimerRef.current = null;
+        highlightTimerRef.current = null;
         setReplayState({ isReplaying: false, currentSeq: null, totalCount: 0 });
-        setMessages(prev => prev.map(m => ({ ...m, replayed: false })));
+        setMessages(prev => prev.map(m => (m.replayed ? { ...m, replayed: false } : m)));
     }, []);
 
     const startReplayFromIndex = useCallback(
         (fromIndex: number, replayFn: (msg: WebSocketMessage) => void) => {
             stopReplaySequence();
 
+            // Snapshot messages at call time
             const remaining = messages.slice(fromIndex);
             if (remaining.length === 0) return;
 
             const baseTs = remaining[0].timestamp;
             setReplayState({ isReplaying: true, currentSeq: null, totalCount: remaining.length });
 
-            remaining.forEach((msg, i) => {
-                const delay = msg.timestamp - baseTs;
-                const timerId = window.setTimeout(() => {
+            // Sequential scheduler: one timer at a time
+            const scheduleNext = (index: number) => {
+                if (index >= remaining.length) {
+                    replayTimerRef.current = window.setTimeout(() => {
+                        setReplayState({ isReplaying: false, currentSeq: null, totalCount: 0 });
+                    }, HIGHLIGHT_MS);
+                    return;
+                }
+
+                const msg = remaining[index];
+                const delay = index === 0 ? 0 : msg.timestamp - remaining[index - 1].timestamp;
+
+                replayTimerRef.current = window.setTimeout(() => {
                     replayFn(msg.raw);
                     setReplayState(prev => ({ ...prev, currentSeq: msg.seq }));
-                    setMessages(prev => prev.map(m => (m.seq === msg.seq ? { ...m, replayed: true } : m)));
-
-                    // Clear highlight after 400ms (unless next message arrives sooner)
-                    const clearId = window.setTimeout(() => {
-                        setMessages(prev => prev.map(m => (m.seq === msg.seq ? { ...m, replayed: false } : m)));
-                    }, 400);
-                    replayTimersRef.current.push(clearId);
-
-                    // Last message: end replay
-                    if (i === remaining.length - 1) {
-                        const endId = window.setTimeout(() => {
-                            setReplayState({ isReplaying: false, currentSeq: null, totalCount: 0 });
-                        }, 500);
-                        replayTimersRef.current.push(endId);
-                    }
+                    setMessages(prev =>
+                        prev.map(m => {
+                            if (m.seq === msg.seq) return { ...m, replayed: true };
+                            if (m.replayed) return { ...m, replayed: false };
+                            return m;
+                        })
+                    );
+                    scheduleNext(index + 1);
                 }, delay);
-                replayTimersRef.current.push(timerId);
-            });
+            };
+
+            scheduleNext(0);
         },
         [messages, stopReplaySequence]
     );
