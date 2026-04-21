@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-04-21] - root@0.33.0, @flows/web@0.33.0, @flows/admin@0.19.0
+
+### Features
+
+- add new translations and update existing ones
+- add graph view translation
+- update socket dev
+- add double click event to ports
+
+### Bug Fixes
+
+- reset node state on runId change
+
+### Refactor
+
+- improve port data handling
+- improve socket recorder and node replay logic
+- improve port update handling
+
 ## [2026-04-20] - root@0.32.1, @flows/web@0.32.1
 
 ### Bug Fixes
