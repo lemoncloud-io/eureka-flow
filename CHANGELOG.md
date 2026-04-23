@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-23] - root@0.38.0, @flows/web@0.38.0
+
+### Features
+
+- update editor design
+
 ## [2026-04-23] - root@0.37.0, @flows/web@0.37.0
 
 ### Features
