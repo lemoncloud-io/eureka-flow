@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-23] - root@0.39.0, @flows/web@0.39.0
+
+### Features
+
+- add seo metadata and translations
+
 ## [2026-04-23] - root@0.38.1, @flows/web@0.38.1
 
 ### Refactor
