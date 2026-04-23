@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-04-23] - root@0.37.0, @flows/web@0.37.0
+
+### Features
+
+- update landing page
+
+### Refactor
+
+- (ui) simplify and optimize code structure
+
 ## [2026-04-21] - root@0.36.0, @flows/web@0.36.0
 
 ### Features
