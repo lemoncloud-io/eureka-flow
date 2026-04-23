@@ -15,20 +15,14 @@ import { formatRelativeTime } from '../utils';
 
 import type { FlowView } from '@flows/flows';
 
-// ============================================================================
-// Constants
-// ============================================================================
-
+const GITHUB_URL = 'https://github.com/lemoncloud-io/eureka-flow';
 const STAGGER_DELAY_MS = 40;
+const SKELETON_HEIGHTS = [200, 260, 180, 240, 220, 280, 190, 250];
 
 const staggerStyle = (index: number): React.CSSProperties => ({
     animationDelay: `${STAGGER_DELAY_MS * index}ms`,
     opacity: 0,
 });
-
-// ============================================================================
-// MiniFlowGraph - fallback when no thumbnail
-// ============================================================================
 
 const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nodeCount, edgeCount }) => {
     const displayNodes = Math.min(nodeCount, 8);
@@ -84,13 +78,8 @@ const MiniFlowGraph: React.FC<{ nodeCount: number; edgeCount: number }> = ({ nod
     );
 };
 
-// ============================================================================
-// SkeletonCard — loading placeholder
-// ============================================================================
-
 const SkeletonCard = ({ index }: { index: number }) => {
-    const heights = [200, 260, 180, 240, 220, 280, 190, 250];
-    const h = heights[index % heights.length];
+    const h = SKELETON_HEIGHTS[index % SKELETON_HEIGHTS.length];
 
     return (
         <div className="mb-3 break-inside-avoid-column animate-fade-in-up" style={staggerStyle(index)}>
@@ -98,10 +87,6 @@ const SkeletonCard = ({ index }: { index: number }) => {
         </div>
     );
 };
-
-// ============================================================================
-// MasonryFlowCard
-// ============================================================================
 
 interface MasonryFlowCardProps {
     flow: FlowView & { id: string };
@@ -141,7 +126,6 @@ const MasonryFlowCard: React.FC<MasonryFlowCardProps> = ({ flow, index }) => {
                     </div>
                 )}
 
-                {/* Hover overlay */}
                 <div
                     className={cn(
                         'absolute inset-x-0 bottom-0 translate-y-full',
@@ -168,10 +152,6 @@ const MasonryFlowCard: React.FC<MasonryFlowCardProps> = ({ flow, index }) => {
     );
 };
 
-// ============================================================================
-// PublicFlowsPage
-// ============================================================================
-
 export const PublicFlowsPage = () => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
@@ -186,7 +166,6 @@ export const PublicFlowsPage = () => {
     const [search, setSearch] = useState('');
     const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
 
-    // Infinite scroll
     const loadMoreRef = useRef<HTMLDivElement>(null);
     const scrollStateRef = useRef({ hasNextPage, isFetchingNextPage, fetchNextPage });
     scrollStateRef.current = { hasNextPage, isFetchingNextPage, fetchNextPage };
@@ -246,7 +225,6 @@ export const PublicFlowsPage = () => {
                 <meta property="og:url" content={`${SITE_URL}/flows`} />
             </Helmet>
 
-            {/* ── Floating Nav ── */}
             <nav className="fixed top-0 right-0 left-0 z-50 flex justify-center px-4 pt-4">
                 <div className="flex w-full max-w-[1200px] items-center justify-between rounded-2xl border border-border/40 bg-background/70 px-4 py-2 backdrop-blur-2xl">
                     <div className="flex items-center gap-2.5">
@@ -263,7 +241,6 @@ export const PublicFlowsPage = () => {
                         <Badge className="pulse-soft text-[10px]">Open Beta</Badge>
                     </div>
 
-                    {/* Inline search */}
                     <div className="relative mx-4 hidden max-w-xs flex-1 sm:block">
                         <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/40" />
                         <Input
@@ -276,12 +253,7 @@ export const PublicFlowsPage = () => {
 
                     <div className="flex items-center gap-0.5">
                         <Button variant="ghost" size="icon" className="hidden h-8 w-8 sm:inline-flex" asChild>
-                            <a
-                                href="https://github.com/lemoncloud-io/eureka-flow"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label="GitHub"
-                            >
+                            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" aria-label="GitHub">
                                 <Github size={15} />
                             </a>
                         </Button>
@@ -308,7 +280,6 @@ export const PublicFlowsPage = () => {
                 </div>
             </nav>
 
-            {/* ── Hero ── */}
             <section className="mx-auto max-w-[1200px] px-6 pb-6 pt-24">
                 <div className="flex items-end justify-between gap-4 pt-4">
                     <div>
@@ -331,7 +302,6 @@ export const PublicFlowsPage = () => {
                         </p>
                     </div>
 
-                    {/* Mobile search */}
                     <div className="relative w-36 sm:hidden">
                         <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/40" />
                         <Input
@@ -344,7 +314,6 @@ export const PublicFlowsPage = () => {
                 </div>
             </section>
 
-            {/* ── Gallery ── */}
             <main className="mx-auto max-w-[1200px] px-6 pb-20">
                 {isLoading ? (
                     <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
@@ -374,7 +343,6 @@ export const PublicFlowsPage = () => {
                                 </div>
                             ))}
                         </div>
-                        {/* Infinite scroll sentinel */}
                         <div ref={loadMoreRef} className="flex justify-center py-10">
                             {isFetchingNextPage && (
                                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/40" />
