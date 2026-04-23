@@ -97,7 +97,7 @@ export const MobileStepCard = React.memo(
                     isRunning && 'border-warning/30',
                     state === 'ERROR' && 'border-destructive/20',
                     state === 'COMPLETED' && 'border-success/20',
-                    state !== 'RUNNING' && state !== 'ERROR' && state !== 'COMPLETED' && 'border-border/60'
+                    state !== 'RUNNING' && state !== 'ERROR' && state !== 'COMPLETED' && 'border-border/40'
                 )}
             >
                 {/* Icon */}

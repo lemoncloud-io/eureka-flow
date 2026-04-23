@@ -369,9 +369,9 @@ export const Header: React.FC<HeaderProps> = ({
                 <div data-tour="header-left" className="pointer-events-auto">
                     <div
                         className={cn(
-                            'flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-2 sm:px-3 rounded-xl',
-                            'bg-background/80 backdrop-blur-xl border border-border/50',
-                            'shadow-sm'
+                            'flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-2 sm:px-3 rounded-2xl',
+                            'bg-glass-bg backdrop-blur-2xl border border-border/40',
+                            'shadow-floating'
                         )}
                     >
                         <RouterLink
@@ -421,9 +421,9 @@ export const Header: React.FC<HeaderProps> = ({
                     <div
                         data-tour="header-toolbar"
                         className={cn(
-                            'hidden sm:flex items-center h-9 sm:h-10 px-1 rounded-xl',
-                            'bg-background/80 backdrop-blur-xl border border-border/50',
-                            'shadow-sm'
+                            'hidden sm:flex items-center h-9 sm:h-10 px-1 rounded-2xl',
+                            'bg-glass-bg backdrop-blur-2xl border border-border/40',
+                            'shadow-floating'
                         )}
                     >
                         {canEdit && onOpenFlowList && (
@@ -475,10 +475,10 @@ export const Header: React.FC<HeaderProps> = ({
                             <button
                                 data-tour="header-menu"
                                 className={cn(
-                                    'flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl',
-                                    'bg-background/80 backdrop-blur-xl border border-border/50',
+                                    'flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-2xl',
+                                    'bg-glass-bg backdrop-blur-2xl border border-border/40',
                                     'text-muted-foreground hover:text-foreground',
-                                    'shadow-sm transition-colors duration-150'
+                                    'shadow-floating transition-colors duration-150'
                                 )}
                             >
                                 <Menu className="w-4 h-4" />

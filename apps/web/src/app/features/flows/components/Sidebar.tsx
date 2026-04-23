@@ -61,9 +61,9 @@ const BlockCard: React.FC<BlockCardProps> = ({
                 disabled={disabled}
                 data-block-item={type}
                 className={cn(
-                    'group w-full rounded-xl border border-border/80 bg-background p-3',
-                    'text-left transition-all duration-200',
-                    'hover:border-primary/30 hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)]',
+                    'group w-full rounded-xl border border-border/40 bg-background p-3',
+                    'text-left transition-[transform,box-shadow,border-color] duration-300',
+                    'hover:border-primary/30 hover:shadow-floating-hover hover:-translate-y-0.5',
                     'active:scale-[0.98]',
                     'disabled:cursor-not-allowed disabled:opacity-40'
                 )}
@@ -162,8 +162,8 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
             >
                 <div
                     className={cn(
-                        'flex flex-col gap-2 rounded-xl border border-glass-border bg-glass-bg p-1.5 backdrop-blur-[24px]',
-                        'shadow-floating sm:rounded-2xl sm:p-2'
+                        'flex flex-col gap-2 rounded-2xl border border-border/40 bg-glass-bg p-1.5 backdrop-blur-2xl',
+                        'shadow-floating sm:p-2'
                     )}
                 >
                     <TooltipProvider delayDuration={0}>
@@ -193,7 +193,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                             'fixed inset-x-0 bottom-0 z-20 rounded-t-2xl',
                             'max-h-[80vh] sm:max-h-none',
                             'sm:absolute sm:inset-auto sm:left-[72px] sm:top-1/2 sm:w-[340px] sm:-translate-y-1/2 sm:rounded-2xl',
-                            'border border-glass-border bg-glass-bg/95 p-3 shadow-xl backdrop-blur-[24px]',
+                            'border border-border/40 bg-glass-bg p-3 shadow-floating backdrop-blur-2xl',
                             'pointer-events-auto',
                             'animate-in fade-in slide-in-from-bottom-4 duration-200 sm:slide-in-from-left-2'
                         )}
@@ -252,7 +252,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                         onOpenChange={() => handleCategoryToggle(category)}
                                         data-block-category={category}
                                     >
-                                        <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+                                        <div className="rounded-xl border border-border/30 bg-card/40 p-3">
                                             <CollapsibleTrigger className="flex w-full items-center gap-2">
                                                 <Icon className={cn('h-[18px] w-[18px]', config.color)} />
                                                 <span className="flex-1 text-left text-[13px] font-semibold tracking-[-0.3px] text-foreground">
@@ -300,7 +300,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                         </div>
 
                         {/* Footer */}
-                        <div className="mt-3 border-t border-border/50 pt-2.5 text-center text-[11px] text-muted-foreground/70">
+                        <div className="mt-3 border-t border-border/30 pt-2.5 text-center text-[11px] text-muted-foreground/70">
                             {isReadOnly ? t('sidebar.readOnlyHint', 'Sign in to add blocks') : t('sidebar.clickToAdd')}
                         </div>
                     </div>

@@ -118,7 +118,7 @@ export const MobileBlockLibrarySheet = ({
                                     onClick={() => handleAddBlock(block)}
                                     className={cn(
                                         'flex flex-col items-center gap-1.5 p-2.5 rounded-xl min-w-[72px] shrink-0',
-                                        'border border-border/50 bg-card',
+                                        'border border-border/40 bg-card',
                                         'hover:bg-accent/50 active:scale-[0.96] transition-all'
                                     )}
                                 >
@@ -176,7 +176,7 @@ export const MobileBlockLibrarySheet = ({
                                                     key={block.id}
                                                     onClick={() => handleAddBlock(block)}
                                                     className={cn(
-                                                        'w-full p-3 rounded-xl border border-border/50',
+                                                        'w-full p-3 rounded-xl border border-border/40',
                                                         'text-left transition-all duration-150',
                                                         'hover:bg-accent/50 hover:border-accent',
                                                         'active:scale-[0.98]'
