@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-23] - root@0.38.1, @flows/web@0.38.1
+
+### Refactor
+
+- relocate public mode sign-in banner
+
 ## [2026-04-23] - root@0.38.0, @flows/web@0.38.0
 
 ### Features
