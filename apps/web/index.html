@@ -29,6 +29,29 @@
         <meta name="twitter:description" content="Build, run, and share AI workflows visually. No code required." />
         <meta name="twitter:image" content="https://flow.eureka.codes/images/screenshot-light.jpg" />
 
+        <!-- Structured Data -->
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "WebApplication",
+                "name": "Eureka Flow",
+                "url": "https://flow.eureka.codes",
+                "description": "Build, run, and share AI workflows visually. No code required.",
+                "applicationCategory": "DeveloperApplication",
+                "operatingSystem": "Web",
+                "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD"
+                },
+                "creator": {
+                    "@type": "Organization",
+                    "name": "LemonCloud",
+                    "url": "https://lemoncloud.io"
+                }
+            }
+        </script>
+
         <link rel="icon" type="image/x-icon" href="/favicon_io/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon_io/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon_io/favicon-16x16.png" />
@@ -64,6 +87,28 @@
     </head>
     <body>
         <div id="root"></div>
+        <noscript>
+            <div style="max-width: 800px; margin: 0 auto; padding: 40px 20px; font-family: system-ui, sans-serif">
+                <h1>Eureka Flow — Visual AI Workflow Builder</h1>
+                <p>
+                    Build, run, and share AI workflows visually. No code required. Drag, connect, and run AI pipelines
+                    on a visual canvas.
+                </p>
+                <h2>How It Works</h2>
+                <ol>
+                    <li><strong>Add Blocks</strong> — Drag AI blocks onto the canvas</li>
+                    <li><strong>Connect Flow</strong> — Link blocks to define your pipeline</li>
+                    <li><strong>Run &amp; Iterate</strong> — Execute and refine your workflow</li>
+                </ol>
+                <h2>Features</h2>
+                <ul>
+                    <li><strong>Visual Canvas</strong> — Intuitive drag-and-drop workflow editor</li>
+                    <li><strong>AI Nodes</strong> — Pre-built blocks for LLMs, image generation, and more</li>
+                    <li><strong>Instant Run</strong> — Execute your entire pipeline with one click</li>
+                </ul>
+                <p><a href="https://flow.eureka.codes/editor">Get Started Free</a></p>
+            </div>
+        </noscript>
         <script type="module" src="/src/main.tsx"></script>
     </body>
 </html>
