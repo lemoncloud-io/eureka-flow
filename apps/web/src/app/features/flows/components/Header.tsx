@@ -14,6 +14,7 @@ import {
     HelpCircle,
     ImageDown,
     Key,
+    KeyRound,
     LayoutGrid,
     Menu,
     Play,
@@ -364,6 +365,20 @@ export const Header: React.FC<HeaderProps> = ({
 
     return (
         <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
+            {/* Public Mode: Full-width sign-in banner */}
+            {isPublicMode && onApiKeySettings && (
+                <button
+                    onClick={onApiKeySettings}
+                    className={cn(
+                        'pointer-events-auto w-full flex items-center justify-center gap-2 py-2 px-4',
+                        'bg-destructive text-destructive-foreground text-xs sm:text-sm font-medium',
+                        'hover:bg-destructive/90 transition-colors duration-150'
+                    )}
+                >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    {t('flowEditor.signInToEdit', 'Sign in to edit this flow')}
+                </button>
+            )}
             <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3">
                 {/* Left: Brand + Flow Info */}
                 <div data-tour="header-left" className="pointer-events-auto">
