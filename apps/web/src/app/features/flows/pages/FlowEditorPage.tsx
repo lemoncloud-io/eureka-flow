@@ -96,7 +96,7 @@ const DevRoleToggle: React.FC<{
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
         >
-            <div className="flex gap-1 bg-glass-bg backdrop-blur-[24px] border border-glass-border shadow-floating rounded-xl p-1 text-xs font-mono cursor-grab active:cursor-grabbing">
+            <div className="flex gap-1 bg-glass-bg backdrop-blur-2xl border border-border/40 shadow-floating rounded-2xl p-1 text-xs font-mono cursor-grab active:cursor-grabbing">
                 <span className="px-1.5 py-1 text-muted-foreground/50 select-none">DEV</span>
                 {DEV_ROLES.map(r => (
                     <button
@@ -738,7 +738,7 @@ export const FlowEditorPage = () => {
     return (
         <div className="relative h-screen bg-canvas text-foreground font-sans overflow-hidden animate-in fade-in duration-500">
             {/* Full-screen Canvas */}
-            <div data-tour="canvas" className="absolute inset-0">
+            <div data-tour="canvas" className="absolute inset-0 editor-grain">
                 <WorkflowCanvas
                     ref={canvasRef}
                     role={role}
@@ -870,32 +870,13 @@ export const FlowEditorPage = () => {
                     <div className="absolute top-3 right-3 z-10">
                         <button
                             onClick={() => setIsGraphViewOpen(false)}
-                            className="flex items-center gap-2 h-9 px-3 rounded-xl bg-background/80 backdrop-blur-xl border border-border/50 shadow-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
+                            className="flex items-center gap-2 h-9 px-3 rounded-2xl bg-glass-bg backdrop-blur-2xl border border-border/40 shadow-floating text-muted-foreground hover:text-foreground transition-colors duration-150"
                         >
                             <X className="w-4 h-4" />
                             <kbd className="text-[10px] font-mono border border-border/60 bg-muted/50 rounded px-1 py-0.5">
                                 ESC
                             </kbd>
                         </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Public Mode Info Card */}
-            {isPublicMode && (
-                <div
-                    className="absolute bottom-4 left-4 z-30 pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300"
-                    style={{ animationDelay: '300ms', animationFillMode: 'both' }}
-                >
-                    <div className="bg-glass-bg backdrop-blur-[24px] border border-glass-border border-t-primary/40 rounded-xl p-4 shadow-floating max-w-[280px]">
-                        <h3 className="text-sm font-semibold text-foreground truncate">{flowName}</h3>
-                        {flowDescription && (
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{flowDescription}</p>
-                        )}
-                        <Button size="sm" className="w-full mt-3 gap-2" onClick={() => setIsApiKeyDialogOpen(true)}>
-                            <KeyRound className="w-3.5 h-3.5" />
-                            {t('flowEditor.signInToEdit', 'Sign in to edit this flow')}
-                        </Button>
                     </div>
                 </div>
             )}
@@ -946,7 +927,7 @@ export const FlowEditorPage = () => {
             {/* Loading Overlay */}
             {isLoading && (
                 <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-md animate-in fade-in duration-200">
-                    <div className="flex flex-col items-center bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl p-6 shadow-floating animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex flex-col items-center bg-glass-bg backdrop-blur-2xl border border-border/40 rounded-2xl p-6 shadow-floating animate-in fade-in zoom-in-95 duration-200">
                         <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin mb-3"></div>
                         <span className="text-sm font-medium text-foreground">{t('flowEditor.processing')}</span>
                     </div>

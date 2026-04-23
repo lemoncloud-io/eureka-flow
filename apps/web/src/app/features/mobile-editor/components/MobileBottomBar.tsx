@@ -21,7 +21,7 @@ export const MobileBottomBar = ({ onAddNode, role = 'owner' }: MobileBottomBarPr
             className={cn(
                 'fixed bottom-0 left-0 right-0 z-30',
                 'pb-[env(safe-area-inset-bottom)]',
-                'bg-background/90 backdrop-blur-2xl',
+                'bg-glass-bg backdrop-blur-2xl',
                 'border-t border-border/30'
             )}
         >

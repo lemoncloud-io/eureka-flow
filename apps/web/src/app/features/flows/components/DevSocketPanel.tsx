@@ -119,7 +119,7 @@ export const DevSocketPanel: React.FC<DevSocketPanelProps> = ({
             <div className="fixed bottom-[72px] left-1/2 -translate-x-1/2 z-40 mb-[env(safe-area-inset-bottom)]">
                 <button
                     onClick={() => setIsExpanded(true)}
-                    className="flex items-center gap-1.5 bg-glass-bg backdrop-blur-[24px] border border-glass-border shadow-floating rounded-full px-3 py-1.5 text-xs font-mono"
+                    className="flex items-center gap-1.5 bg-glass-bg backdrop-blur-2xl border border-border/40 shadow-floating rounded-full px-3 py-1.5 text-xs font-mono"
                 >
                     {replayState.isReplaying ? (
                         <Play className="w-3 h-3 text-green-400 animate-pulse" />
@@ -139,7 +139,7 @@ export const DevSocketPanel: React.FC<DevSocketPanelProps> = ({
     if (compact) {
         return (
             <div className="fixed inset-x-0 bottom-[72px] z-40 px-2 mb-[env(safe-area-inset-bottom)]">
-                <div className="bg-glass-bg backdrop-blur-[24px] border border-glass-border shadow-floating rounded-xl overflow-hidden">
+                <div className="bg-glass-bg backdrop-blur-2xl border border-border/40 shadow-floating rounded-xl overflow-hidden">
                     {/* Header */}
                     <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
                         <div className="flex items-center gap-2">
@@ -290,7 +290,7 @@ export const DevSocketPanel: React.FC<DevSocketPanelProps> = ({
                     if (!didDrag.current) setIsExpanded(true);
                 }}
             >
-                <div className="flex items-center gap-1.5 bg-glass-bg backdrop-blur-[24px] border border-glass-border shadow-floating rounded-xl px-2.5 py-1.5 text-xs font-mono cursor-grab active:cursor-grabbing select-none">
+                <div className="flex items-center gap-1.5 bg-glass-bg backdrop-blur-2xl border border-border/40 shadow-floating rounded-xl px-2.5 py-1.5 text-xs font-mono cursor-grab active:cursor-grabbing select-none">
                     {replayState.isReplaying ? (
                         <Play className="w-3 h-3 text-green-400 animate-pulse" />
                     ) : (
@@ -314,7 +314,7 @@ export const DevSocketPanel: React.FC<DevSocketPanelProps> = ({
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
         >
-            <div className="bg-glass-bg backdrop-blur-[24px] border border-glass-border shadow-floating rounded-xl overflow-hidden w-[420px] cursor-grab active:cursor-grabbing">
+            <div className="bg-glass-bg backdrop-blur-2xl border border-border/40 shadow-floating rounded-xl overflow-hidden w-[420px] cursor-grab active:cursor-grabbing">
                 {/* Header */}
                 <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
                     <div className="flex items-center gap-2">

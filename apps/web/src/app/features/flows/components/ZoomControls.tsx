@@ -21,7 +21,7 @@ export const ZoomControls = ({ zoom, onZoomIn, onZoomOut, onFitToScreen, onReset
         <div
             className={cn(
                 'flex items-center gap-1 px-2 py-1.5 rounded-full',
-                'bg-glass-bg backdrop-blur-[24px] border border-glass-border',
+                'bg-glass-bg backdrop-blur-2xl border border-border/40',
                 'shadow-floating',
                 className
             )}
@@ -63,7 +63,7 @@ export const ZoomControls = ({ zoom, onZoomIn, onZoomOut, onFitToScreen, onReset
                     </TooltipContent>
                 </Tooltip>
 
-                <div className="w-px h-5 bg-glass-border mx-1" />
+                <div className="w-px h-5 bg-border/40 mx-1" />
 
                 <Tooltip>
                     <TooltipTrigger asChild>

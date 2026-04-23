@@ -325,8 +325,8 @@ export const MobileFlowEditorPage = () => {
             >
                 {/* Search bar */}
                 {isSearchOpen && (
-                    <div className="fixed top-14 left-0 right-0 z-20 bg-background/95 backdrop-blur-md border-b border-border/40 px-3 py-2">
-                        <div className="flex items-center gap-2 h-10 px-3 rounded-xl bg-muted/40 border border-border/50">
+                    <div className="fixed top-14 left-0 right-0 z-20 bg-glass-bg backdrop-blur-2xl border-b border-border/30 px-3 py-2">
+                        <div className="flex items-center gap-2 h-10 px-3 rounded-xl bg-muted/40 border border-border/40">
                             <Search className="w-4 h-4 text-muted-foreground/50 shrink-0" />
                             <input
                                 value={searchQuery}
@@ -481,7 +481,7 @@ export const MobileFlowEditorPage = () => {
 
             {isLoading && (
                 <div className="fixed inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-sm">
-                    <div className="flex flex-col items-center bg-glass-bg backdrop-blur-[24px] border border-glass-border rounded-2xl p-6 shadow-floating">
+                    <div className="flex flex-col items-center bg-glass-bg backdrop-blur-2xl border border-border/40 rounded-2xl p-6 shadow-floating">
                         <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin mb-3" />
                         <span className="text-sm font-medium">{t('flowEditor.processing')}</span>
                     </div>
