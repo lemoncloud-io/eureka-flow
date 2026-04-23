@@ -123,7 +123,7 @@ export const MobileStepList = ({
                                                 onClick={() => onAddBlockDirect(block.type)}
                                                 className={cn(
                                                     'flex items-center gap-2 px-3 py-2 rounded-xl',
-                                                    'border border-border/60 bg-card',
+                                                    'border border-border/40 bg-card',
                                                     'text-xs font-medium',
                                                     'hover:border-primary/30 hover:shadow-sm',
                                                     'active:scale-[0.97] transition-all'

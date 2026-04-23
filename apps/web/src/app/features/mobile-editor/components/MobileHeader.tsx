@@ -116,7 +116,7 @@ export const MobileHeader = ({
             className={cn(
                 'fixed top-0 left-0 right-0 z-30',
                 'h-14 px-2 flex items-center gap-1',
-                'bg-background/95 backdrop-blur-md border-b border-border/40',
+                'bg-glass-bg backdrop-blur-2xl border-b border-border/30',
                 'pt-[env(safe-area-inset-top)]'
             )}
         >

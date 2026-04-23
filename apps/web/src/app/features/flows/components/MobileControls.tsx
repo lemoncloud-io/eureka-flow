@@ -23,8 +23,8 @@ const buttonClasses = cn(
     'w-11 h-11',
     // Appearance
     'rounded-full',
-    'bg-glass-bg backdrop-blur-[24px]',
-    'border border-glass-border',
+    'bg-glass-bg backdrop-blur-2xl',
+    'border border-border/40',
     'shadow-floating',
     // Content
     'flex items-center justify-center',

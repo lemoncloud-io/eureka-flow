@@ -752,7 +752,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             <div
                 className={cn(
                     'fixed inset-y-0 right-0 w-full sm:w-80',
-                    'flex flex-col bg-glass-bg backdrop-blur-[20px] border-l sm:border-l border-glass-border',
+                    'flex flex-col bg-glass-bg backdrop-blur-2xl border-l sm:border-l border-border/40',
                     'shadow-floating overflow-hidden',
                     'animate-in slide-in-from-right-4 duration-200 z-50'
                 )}
@@ -1186,7 +1186,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             <div
                 className={cn(
                     'fixed inset-y-0 right-0 w-full sm:w-72',
-                    'flex flex-col bg-glass-bg backdrop-blur-[20px] border-l sm:border-l border-glass-border',
+                    'flex flex-col bg-glass-bg backdrop-blur-2xl border-l sm:border-l border-border/40',
                     'shadow-floating overflow-hidden',
                     'animate-in slide-in-from-right-4 duration-200 z-50'
                 )}

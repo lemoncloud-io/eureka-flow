@@ -61,7 +61,7 @@ export const CompletionScreen = ({ step, onSubmitKey, onClose }: CompletionScree
             <div
                 className={cn(
                     'relative mx-4 w-full max-w-md rounded-2xl p-8 text-center',
-                    'border border-glass-border bg-glass-bg shadow-floating backdrop-blur-[24px]',
+                    'border border-border/40 bg-glass-bg shadow-floating backdrop-blur-2xl',
                     'animate-in fade-in-0 zoom-in-95 duration-300'
                 )}
             >

@@ -118,17 +118,15 @@ module.exports = {
                 /* Glassmorphism */
                 glass: {
                     bg: 'hsl(var(--glass-bg))',
-                    border: 'hsl(var(--glass-border))',
                 },
             },
             boxShadow: {
                 node: 'var(--shadow-node)',
                 'node-selected': 'var(--shadow-node-selected)',
                 floating: 'var(--shadow-floating)',
+                'floating-hover': 'var(--shadow-floating-hover)',
             },
-            backdropBlur: {
-                glass: 'var(--glass-blur)',
-            },
+            backdropBlur: {},
             borderRadius: {
                 lg: 'var(--radius)',
                 md: 'calc(var(--radius) - 2px)',

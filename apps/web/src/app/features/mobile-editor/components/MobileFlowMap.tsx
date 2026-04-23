@@ -20,7 +20,7 @@ export const MobileFlowMap = ({ open, onClose, onTapNode, flowId }: MobileFlowMa
             <div className="absolute top-3 right-3 z-10 pt-[env(safe-area-inset-top)]">
                 <button
                     onClick={onClose}
-                    className="flex items-center justify-center w-9 h-9 rounded-xl bg-background/80 backdrop-blur-xl border border-border/50 shadow-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
+                    className="flex items-center justify-center w-9 h-9 rounded-2xl bg-glass-bg backdrop-blur-2xl border border-border/40 shadow-floating text-muted-foreground hover:text-foreground transition-colors duration-150"
                 >
                     <X className="w-4 h-4" />
                 </button>

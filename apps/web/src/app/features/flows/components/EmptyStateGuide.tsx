@@ -25,7 +25,7 @@ export const EmptyStateGuide = ({ onAddBlock }: EmptyStateGuideProps) => {
             <div
                 className={cn(
                     'max-w-md w-full mx-4 p-8 rounded-2xl text-center',
-                    'bg-glass-bg backdrop-blur-[24px] border border-glass-border',
+                    'bg-glass-bg backdrop-blur-2xl border border-border/40',
                     'shadow-floating pointer-events-auto',
                     'animate-in fade-in-0 zoom-in-95 duration-300'
                 )}

@@ -533,7 +533,7 @@ export const MobileStepDetail = ({
                             className={cn(
                                 'shrink-0 border-t border-border/40',
                                 'pb-[env(safe-area-inset-bottom)]',
-                                'bg-background/95 backdrop-blur-md'
+                                'bg-glass-bg backdrop-blur-2xl'
                             )}
                         >
                             <div className="px-4 py-2.5">
