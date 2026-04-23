@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-04-23] - root@0.40.0, @flows/web@0.40.0
+
+### Features
+
+- add SEO metadata to tutorial and public flows pages
+
 ## [2026-04-23] - root@0.39.0, @flows/web@0.39.0
 
 ### Features
