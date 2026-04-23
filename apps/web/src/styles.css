@@ -411,6 +411,76 @@ html.landing-scroll {
     overflow-y: scroll;
 }
 
+/* ── Landing Page Premium Styles ── */
+
+/* Grain texture overlay */
+.landing-grain::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Hero ambient gradient */
+.landing-hero-gradient {
+    background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, hsl(var(--primary) / 0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 50%, hsl(var(--primary) / 0.06) 0%, transparent 50%);
+}
+
+.dark .landing-hero-gradient {
+    background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, hsl(var(--primary) / 0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 50%, hsl(var(--primary) / 0.08) 0%, transparent 50%);
+}
+
+/* CTA ambient gradient */
+.landing-cta-gradient {
+    background: radial-gradient(ellipse 80% 60% at 50% 120%, hsl(var(--primary) / 0.1) 0%, transparent 60%);
+}
+
+.dark .landing-cta-gradient {
+    background: radial-gradient(ellipse 80% 60% at 50% 120%, hsl(var(--primary) / 0.15) 0%, transparent 60%);
+}
+
+/* Landing card with hover lift */
+.landing-card {
+    transition:
+        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 0.3s ease;
+}
+
+.landing-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -12px hsl(var(--primary) / 0.12);
+    border-color: hsl(var(--primary) / 0.3);
+}
+
+.dark .landing-card:hover {
+    box-shadow: 0 20px 40px -12px hsl(var(--primary) / 0.2);
+}
+
+/* Marquee pause on hover */
+.landing-marquee:hover .landing-marquee-track {
+    animation-play-state: paused;
+}
+
+/* Screenshot hover */
+.landing-screenshot {
+    transition:
+        transform 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-screenshot:hover {
+    transform: scale(1.01);
+    box-shadow: 0 32px 64px -16px hsl(var(--primary) / 0.18);
+}
+
 /* Smooth transitions for theme switching */
 html {
     transition:

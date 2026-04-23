@@ -11,6 +11,9 @@ module.exports = {
     ],
     prefix: '',
     theme: {
+        fontFamily: {
+            sans: ['Outfit', 'system-ui', '-apple-system', 'sans-serif'],
+        },
         container: {
             center: true,
             padding: '2rem',
@@ -144,11 +147,16 @@ module.exports = {
                     '0%': { opacity: '0', transform: 'translateY(20px)' },
                     '100%': { opacity: '1', transform: 'translateY(0)' },
                 },
+                marquee: {
+                    '0%': { transform: 'translateX(0)' },
+                    '100%': { transform: 'translateX(-50%)' },
+                },
             },
             animation: {
                 'collapsible-down': 'collapsible-down 0.2s ease-out',
                 'collapsible-up': 'collapsible-up 0.2s ease-out',
                 'fade-in-up': 'fade-in-up 0.6s ease-out forwards',
+                marquee: 'marquee 40s linear infinite',
             },
         },
     },

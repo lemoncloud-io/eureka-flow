@@ -9,7 +9,7 @@ import { executeNodeWithToast } from '../utils';
 
 import type { SerializeWorkflowFn } from './types';
 import type { NodeState } from '@flows/flows';
-import type { NodeUpdateInfo, PortUpdateInfo, TraceUpdateInfo } from '@flows/socket';
+import type { NodeUpdateInfo, PortUpdateInfo, TraceUpdateInfo, WebSocketMessage } from '@flows/socket';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 interface UseMobileSocketSyncParams {
@@ -17,11 +17,13 @@ interface UseMobileSocketSyncParams {
     lastSavedStateRef: React.MutableRefObject<string | null>;
     lastLocalUpdateTimestampRef: React.MutableRefObject<number | null>;
     canEdit?: boolean;
+    onMessage?: (message: WebSocketMessage) => void;
 }
 
 interface UseMobileSocketSyncReturn {
     isSocketConnected: boolean;
     socketConnectionId: string | undefined;
+    replayMessage: (message: WebSocketMessage) => void;
 }
 
 export const useMobileSocketSync = ({
@@ -29,6 +31,7 @@ export const useMobileSocketSync = ({
     lastSavedStateRef,
     lastLocalUpdateTimestampRef,
     canEdit = false,
+    onMessage,
 }: UseMobileSocketSyncParams): UseMobileSocketSyncReturn => {
     const { currentFlowId, channelId, loadFlowById } = useFlows();
 
@@ -220,7 +223,7 @@ export const useMobileSocketSync = ({
         [lastLocalUpdateTimestampRef]
     );
 
-    const { isConnected, connectionId } = useInitFlowSocket({
+    const { isConnected, connectionId, replayMessage } = useInitFlowSocket({
         channelId,
         currentFlowId,
         getLastLocalUpdateTimestamp,
@@ -228,6 +231,7 @@ export const useMobileSocketSync = ({
         onNodeReload: handleNodeUpdate,
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
+        onMessage,
     });
     connectionIdRef.current = connectionId ?? undefined;
 
@@ -251,5 +255,6 @@ export const useMobileSocketSync = ({
     return {
         isSocketConnected: isConnected,
         socketConnectionId: connectionId ?? undefined,
+        replayMessage,
     };
 };

@@ -7,20 +7,23 @@ export const FooterSection = () => {
     const { t } = useTranslation('landing');
 
     return (
-        <footer className="border-t border-border/30">
-            <div className="mx-auto flex max-w-[1600px] flex-col gap-3 px-6 py-6">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <span className="flex items-center gap-2 text-xs text-muted-foreground">
+        <footer className="border-t border-border/20 bg-muted/5">
+            <div className="mx-auto max-w-[1200px] px-6 py-10 sm:py-14">
+                <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
+                    {/* Brand */}
+                    <div className="flex items-center gap-2.5">
                         <img
                             src="/logo/purple-symbol.png"
                             alt="Eureka Flow"
-                            className="h-4 w-4"
-                            width={16}
-                            height={16}
+                            className="h-5 w-5"
+                            width={20}
+                            height={20}
                         />
-                        {t('footer.brand')}
-                    </span>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span className="text-sm font-semibold tracking-tight">{t('footer.brand')}</span>
+                    </div>
+
+                    {/* Links */}
+                    <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
                         <Link to={ROUTES.EXPLORE} className="transition-colors hover:text-foreground">
                             {t('footer.explore', 'Explore')}
                         </Link>
@@ -40,7 +43,9 @@ export const FooterSection = () => {
                         </Link>
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground/60">
+
+                {/* Bottom bar */}
+                <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-border/15 pt-6 text-xs text-muted-foreground/50">
                     <a href="mailto:app@lemoncloud.io" className="transition-colors hover:text-foreground">
                         {t('footer.email')}
                     </a>

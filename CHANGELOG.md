@@ -1,5 +1,27 @@
 # Changelog
 
+## [2026-04-23] - root@0.37.0, @flows/web@0.37.0
+
+### Features
+
+- update landing page
+
+### Refactor
+
+- (ui) simplify and optimize code structure
+
+## [2026-04-21] - root@0.36.0, @flows/web@0.36.0
+
+### Features
+
+- add compact mode to DevSocketPanel
+
+## [2026-04-21] - root@0.35.0, @flows/web@0.35.0
+
+### Features
+
+- update DevSocketPanel
+
 ## [2026-04-21] - root@0.34.0, @flows/web@0.34.0, @flows/admin@0.20.0
 
 ### Features

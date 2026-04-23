@@ -18,20 +18,29 @@ export const CtaSection = () => {
     const handleExplore = () => navigate(ROUTES.EXPLORE);
 
     return (
-        <section ref={ref} className="border-t border-border/40 py-20 text-center">
+        <section ref={ref} className="landing-cta-gradient border-t border-border/30 py-28 sm:py-36 text-center">
             <div
                 className={`relative mx-auto max-w-xl px-6 transition-all duration-700 ${
                     isInView ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
                 }`}
             >
-                <h2 className="mb-3 text-2xl font-bold tracking-tight sm:text-3xl">{t('cta.title')}</h2>
-                <p className="mb-3 text-sm text-muted-foreground">{t('cta.subtitle')}</p>
-                <p className="mb-6 text-xs text-muted-foreground/60">{t('cta.note')}</p>
+                <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">{t('cta.title')}</h2>
+                <p className="mb-2 text-base text-muted-foreground">{t('cta.subtitle')}</p>
+                <p className="mb-8 text-xs font-medium uppercase tracking-widest text-primary/60">{t('cta.note')}</p>
                 <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-                    <Button size="lg" onClick={handleStart}>
+                    <Button
+                        size="lg"
+                        className="w-full rounded-xl px-8 text-sm font-semibold sm:w-auto"
+                        onClick={handleStart}
+                    >
                         {t('cta.button')}
                     </Button>
-                    <Button variant="outline" size="lg" className="gap-2" onClick={handleExplore}>
+                    <Button
+                        variant="outline"
+                        size="lg"
+                        className="w-full gap-2 rounded-xl px-8 text-sm font-medium sm:w-auto"
+                        onClick={handleExplore}
+                    >
                         <Globe size={16} />
                         {t('cta.explore', 'Explore Public Flows')}
                     </Button>
