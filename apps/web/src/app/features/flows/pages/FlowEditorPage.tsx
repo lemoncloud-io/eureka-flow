@@ -881,25 +881,6 @@ export const FlowEditorPage = () => {
                 </div>
             )}
 
-            {/* Public Mode Info Card */}
-            {isPublicMode && (
-                <div
-                    className="absolute bottom-4 left-4 z-30 pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300"
-                    style={{ animationDelay: '300ms', animationFillMode: 'both' }}
-                >
-                    <div className="bg-glass-bg backdrop-blur-2xl border border-border/40 border-t-primary/40 rounded-2xl p-4 shadow-floating max-w-[280px]">
-                        <h3 className="text-sm font-semibold text-foreground truncate">{flowName}</h3>
-                        {flowDescription && (
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{flowDescription}</p>
-                        )}
-                        <Button size="sm" className="w-full mt-3 gap-2" onClick={() => setIsApiKeyDialogOpen(true)}>
-                            <KeyRound className="w-3.5 h-3.5" />
-                            {t('flowEditor.signInToEdit', 'Sign in to edit this flow')}
-                        </Button>
-                    </div>
-                </div>
-            )}
-
             {/* Dev Tools (hidden in production unless debug mode activated) */}
             {showDevTools && (
                 <>
