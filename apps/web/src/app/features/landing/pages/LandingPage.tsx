@@ -23,7 +23,7 @@ export const LandingPage = () => {
     }, []);
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
+        <div className="landing-grain min-h-screen overflow-x-hidden bg-background text-foreground">
             <Helmet>
                 <title>Eureka Flow — Visual AI Workflow Builder</title>
                 <meta
