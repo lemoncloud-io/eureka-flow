@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-04-24] - root@0.41.0, @flows/web@0.41.0, @flows/admin@0.21.0
+
+### Features
+
+- add connection parameter to runFlow API
+
+## [2026-04-23] - root@0.40.0, @flows/web@0.40.0
+
+### Features
+
+- add SEO metadata to tutorial and public flows pages
+
+## [2026-04-23] - root@0.39.0, @flows/web@0.39.0
+
+### Features
+
+- add seo metadata and translations
+
 ## [2026-04-23] - root@0.38.1, @flows/web@0.38.1
 
 ### Refactor

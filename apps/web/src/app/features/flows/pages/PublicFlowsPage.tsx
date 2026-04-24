@@ -223,6 +223,7 @@ export const PublicFlowsPage = () => {
                     content="Discover and explore public AI workflows shared by the community."
                 />
                 <meta property="og:url" content={`${SITE_URL}/flows`} />
+                <meta property="og:image" content={`${SITE_URL}/images/screenshot-light.jpg`} />
             </Helmet>
 
             <nav className="fixed top-0 right-0 left-0 z-50 flex justify-center px-4 pt-4">

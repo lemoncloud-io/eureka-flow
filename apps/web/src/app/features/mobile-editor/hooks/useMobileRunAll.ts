@@ -16,7 +16,11 @@ interface UseMobileRunAllReturn {
 /**
  * Delegates to server via `runFlow()`. Node state updates arrive via WebSocket.
  */
-export const useMobileRunAll = (): UseMobileRunAllReturn => {
+interface UseMobileRunAllParams {
+    socketConnectionId?: string;
+}
+
+export const useMobileRunAll = ({ socketConnectionId }: UseMobileRunAllParams = {}): UseMobileRunAllReturn => {
     const { t } = useTranslation(['flows']);
     const { currentFlowId } = useFlows();
     const [runProgress, setRunProgress] = useState<{ current: number; total: number; currentNodeId?: string } | null>(
@@ -48,7 +52,7 @@ export const useMobileRunAll = (): UseMobileRunAllReturn => {
         setRunProgress({ current: 0, total });
 
         try {
-            await runFlow(currentFlowId, inputNodeIds);
+            await runFlow(currentFlowId, inputNodeIds, { connection: socketConnectionId });
         } catch {
             // Reset input nodes to IDLE on failure
             for (const id of inputNodeIds) {
@@ -58,7 +62,7 @@ export const useMobileRunAll = (): UseMobileRunAllReturn => {
         } finally {
             setRunProgress(null);
         }
-    }, [currentFlowId, t]);
+    }, [currentFlowId, socketConnectionId, t]);
 
     return {
         runProgress,

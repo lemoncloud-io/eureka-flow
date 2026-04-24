@@ -1,4 +1,7 @@
 import { Suspense, lazy } from 'react';
+import { Helmet } from 'react-helmet-async';
+
+import { SITE_URL } from '@flows/shared';
 
 import { useIsMobile } from '../../mobile-editor/hooks';
 
@@ -14,5 +17,24 @@ const LoadingFallback = () => (
 export const TutorialRouter = () => {
     const isMobile = useIsMobile();
 
-    return <Suspense fallback={<LoadingFallback />}>{isMobile ? <MobileTutorialPage /> : <TutorialPage />}</Suspense>;
+    return (
+        <>
+            <Helmet>
+                <title>Tutorial</title>
+                <meta
+                    name="description"
+                    content="Learn how to build AI workflows with Eureka Flow. Step-by-step interactive tutorial."
+                />
+                <link rel="canonical" href={`${SITE_URL}/tutorial`} />
+                <meta property="og:title" content="Tutorial — Eureka Flow" />
+                <meta
+                    property="og:description"
+                    content="Learn how to build AI workflows with Eureka Flow. Step-by-step interactive tutorial."
+                />
+                <meta property="og:url" content={`${SITE_URL}/tutorial`} />
+                <meta property="og:image" content={`${SITE_URL}/images/screenshot-light.jpg`} />
+            </Helmet>
+            <Suspense fallback={<LoadingFallback />}>{isMobile ? <MobileTutorialPage /> : <TutorialPage />}</Suspense>
+        </>
+    );
 };
