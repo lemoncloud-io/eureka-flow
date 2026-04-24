@@ -107,7 +107,7 @@ export const MobileFlowEditorPage = () => {
         nodes.forEach(n => updateNodeData(n.id, { state: 'IDLE' } as Partial<NodeData>));
     }, []);
 
-    const { runProgress, isRunning, handleRunAll } = useMobileRunAll();
+    const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ socketConnectionId });
 
     const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleNew, handleClear } = useMobileFlowActions(
         {
