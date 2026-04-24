@@ -168,12 +168,22 @@ export const fetchBlockLogs = async (nodeId: string): Promise<LogEntry[]> => {
  * @param nodeIds - Array of input node IDs to execute
  * @returns API response
  */
-export const runFlow = async (flowId: string, nodeIds: string[]): Promise<unknown> => {
+export const runFlow = async (
+    flowId: string,
+    nodeIds: string[],
+    options?: { connection?: string }
+): Promise<unknown> => {
     if (!flowId) {
         throw new Error('Flow ID is required');
     }
-    _log(`> runFlow(${flowId})`, { nodeIds });
-    const response = await api.post(`/flows/${encodePathSegment(flowId)}/run`, { nodeIds });
+    _log(`> runFlow(${flowId})`, { nodeIds, options });
+    const response = await api.post(
+        `/flows/${encodePathSegment(flowId)}/run`,
+        { nodeIds },
+        {
+            params: options?.connection ? { connection: options.connection } : undefined,
+        }
+    );
     return response.data;
 };
 

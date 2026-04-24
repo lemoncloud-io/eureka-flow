@@ -1134,7 +1134,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     await Promise.all([flushPendingUpdates(), flushPendingEdges()]);
 
                     try {
-                        await runFlow(flowId, [...inputNodeIdSet]);
+                        await runFlow(flowId, [...inputNodeIdSet], { connection: connectionId });
                     } catch (error) {
                         setInputNodeStates('IDLE' as NodeState);
                         throw error;
