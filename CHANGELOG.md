@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-04-28] - root@0.41.1, @flows/web@0.41.1, @flows/admin@0.21.1
+
+### Refactor
+
+- update VersionUpdateBanner styling
+
+### Chores
+
+- remove open graph metadata
+
 ## [2026-04-24] - root@0.41.0, @flows/web@0.41.0, @flows/admin@0.21.0
 
 ### Features
