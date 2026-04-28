@@ -340,6 +340,7 @@ export const useFlows = () => {
                 setLastSavedAt(null);
                 setChannelId(null);
                 setIsPublic(false);
+                setIsEditable(true);
                 setFlowThumbnail('');
                 return newFlowId;
             }
@@ -356,6 +357,7 @@ export const useFlows = () => {
         setLastSavedAt,
         setChannelId,
         setIsPublic,
+        setIsEditable,
         setFlowThumbnail,
     ]);
 
