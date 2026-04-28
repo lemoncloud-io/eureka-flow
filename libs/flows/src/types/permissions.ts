@@ -25,8 +25,22 @@ export interface FlowPermissions {
 }
 
 export const ROLE_PERMISSIONS: Record<FlowRole, FlowPermissions> = {
-    owner: { canEdit: true, canRun: true, canDragNodes: true, canSave: true, canUpsert: true, canCreate: true },
-    guest: { canEdit: false, canRun: true, canDragNodes: true, canSave: false, canUpsert: false, canCreate: true },
+    owner: {
+        canEdit: true,
+        canRun: true,
+        canDragNodes: true,
+        canSave: true,
+        canUpsert: true,
+        canCreate: true,
+    },
+    guest: {
+        canEdit: false,
+        canRun: true,
+        canDragNodes: true,
+        canSave: false,
+        canUpsert: false,
+        canCreate: true,
+    },
     anonymous: {
         canEdit: false,
         canRun: false,
