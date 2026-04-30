@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Camera, FolderOpen, ImagePlus, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react';
+import { Camera, FolderOpen, Globe, ImagePlus, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { processThumbnail, useDeleteFlowMutation, useFlowsListQuery, useUpdateFlowMutation } from '@flows/flows';
@@ -15,6 +15,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
+    Badge,
     Dialog,
     DialogContent,
     DialogHeader,
@@ -111,6 +112,12 @@ const FlowCard: React.FC<{
                     <span className={cn('text-sm font-medium truncate', isCurrent && 'text-primary')}>
                         {flow.name || t('header.untitledWorkflow')}
                     </span>
+                    {flow.isPublic && (
+                        <Badge variant="blue" className="gap-0.5 text-[10px] h-auto px-1.5 rounded-full shrink-0">
+                            <Globe className="w-3 h-3" />
+                            {t('flowList.public')}
+                        </Badge>
+                    )}
                     {isCurrent && (
                         <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full shrink-0">
                             {t('flowList.current')}

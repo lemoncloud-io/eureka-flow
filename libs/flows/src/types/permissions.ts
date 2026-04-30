@@ -20,12 +20,35 @@ export interface FlowPermissions {
     canSave: boolean;
     /** Sync node data to server (upsert) */
     canUpsert: boolean;
+    /** Create new flow, open flow list (authenticated users) */
+    canCreate: boolean;
 }
 
 export const ROLE_PERMISSIONS: Record<FlowRole, FlowPermissions> = {
-    owner: { canEdit: true, canRun: true, canDragNodes: true, canSave: true, canUpsert: true },
-    guest: { canEdit: false, canRun: true, canDragNodes: true, canSave: false, canUpsert: false },
-    anonymous: { canEdit: false, canRun: false, canDragNodes: false, canSave: false, canUpsert: false },
+    owner: {
+        canEdit: true,
+        canRun: true,
+        canDragNodes: true,
+        canSave: true,
+        canUpsert: true,
+        canCreate: true,
+    },
+    guest: {
+        canEdit: false,
+        canRun: true,
+        canDragNodes: true,
+        canSave: false,
+        canUpsert: false,
+        canCreate: true,
+    },
+    anonymous: {
+        canEdit: false,
+        canRun: false,
+        canDragNodes: false,
+        canSave: false,
+        canUpsert: false,
+        canCreate: false,
+    },
 };
 
 export const getPermissions = (role: FlowRole): FlowPermissions => ROLE_PERMISSIONS[role];

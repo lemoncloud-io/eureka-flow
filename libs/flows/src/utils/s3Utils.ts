@@ -77,16 +77,30 @@ export const getS3ImageCacheSize = (): number => {
     return imageCache.size;
 };
 
-/**
- * Download an image from a data URL
- * @param dataUrl - Data URL or resolved image URL
- * @param filename - Optional filename (defaults to image-{timestamp}.png)
- */
-export const downloadImage = (dataUrl: string, filename?: string): void => {
+const triggerAnchorDownload = (href: string, name: string): void => {
     const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = filename || `image-${Date.now()}.png`;
+    link.href = href;
+    link.download = name;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+};
+
+export const downloadImage = async (url: string, filename?: string): Promise<void> => {
+    const name = filename || `image-${Date.now()}.png`;
+
+    if (url.startsWith('data:')) {
+        triggerAnchorDownload(url, name);
+        return;
+    }
+
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        triggerAnchorDownload(blobUrl, name);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
 };

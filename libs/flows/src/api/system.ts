@@ -6,7 +6,7 @@ import type { SystemInfo } from '../types';
 
 /**
  * Fetch system info from backend
- * GET /flw-d1 or /flw-v1 (root endpoint, no /_apis or /_api_ suffix)
+ * GET /flw-d1 or /flw-v1 (root endpoint, no /_api_ suffix)
  *
  * Response format (plain text):
  * eureka-flows-api/0.26.227b

@@ -354,7 +354,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
-    const { canEdit, canRun } = getPermissions(role);
+    const { canEdit, canRun, canCreate } = getPermissions(role);
 
     const getSaveButtonVariant = (): 'default' | 'success' | 'warning' | 'error' => {
         if (saveState.saveStatus === 'saving') return 'warning';
@@ -441,7 +441,7 @@ export const Header: React.FC<HeaderProps> = ({
                             'shadow-floating'
                         )}
                     >
-                        {canEdit && onOpenFlowList && (
+                        {canCreate && onOpenFlowList && (
                             <ToolbarButton
                                 onClick={onOpenFlowList}
                                 icon={<FolderOpen className="w-4 h-4" />}
@@ -504,19 +504,19 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.file')}
                             </DropdownMenuLabel>
+                            {canCreate && (
+                                <DropdownMenuItem onClick={fileActions.onNew}>
+                                    <FileText className="w-4 h-4 mr-2" />
+                                    {t('header.newFlow')}
+                                    <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
+                                </DropdownMenuItem>
+                            )}
                             {canEdit && (
-                                <>
-                                    <DropdownMenuItem onClick={fileActions.onNew}>
-                                        <FileText className="w-4 h-4 mr-2" />
-                                        {t('header.newFlow')}
-                                        <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={fileActions.onSave}>
-                                        <Save className="w-4 h-4 mr-2" />
-                                        {t('header.saveFlow')}
-                                        <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-                                    </DropdownMenuItem>
-                                </>
+                                <DropdownMenuItem onClick={fileActions.onSave}>
+                                    <Save className="w-4 h-4 mr-2" />
+                                    {t('header.saveFlow')}
+                                    <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+                                </DropdownMenuItem>
                             )}
                             {canRun && (
                                 <>
