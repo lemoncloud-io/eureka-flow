@@ -201,7 +201,8 @@
         "delete": "Delete",
         "deleteConfirmTitle": "Delete Flow",
         "deleteConfirmDescription": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "public": "Public"
     },
     "flowEditor": {
         "initializingEngine": "Initializing EurekaFlow Engine...",
