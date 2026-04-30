@@ -26,12 +26,26 @@ interface ErrorLike {
 }
 
 const PERMISSION_DENIED_MARKER = 'NOT ALLOWED';
+const AUTH_ERROR_MARKER = 'FORBIDDEN';
+
+/** Normalize response data to uppercase string for marker detection */
+const toUpperBody = (data: unknown): string => {
+    if (!data) return '';
+    const str = typeof data === 'string' ? data : JSON.stringify(data);
+    return str.toUpperCase();
+};
 
 /** Check if response body indicates a permission-denied error (valid key, no edit rights) */
-export const isPermissionDeniedResponse = (data: unknown): boolean => {
-    if (!data) return false;
-    const str = typeof data === 'string' ? data : JSON.stringify(data);
-    return str.includes(PERMISSION_DENIED_MARKER);
+export const isPermissionDeniedResponse = (data: unknown): boolean =>
+    toUpperBody(data).includes(PERMISSION_DENIED_MARKER);
+
+/** Single-pass classification of 200-wrapped 403 errors from API Gateway */
+export const classify403Body = (data: unknown): 'permission_denied' | 'auth_error' | null => {
+    const upper = toUpperBody(data);
+    if (!upper.includes('403')) return null;
+    if (upper.includes(PERMISSION_DENIED_MARKER)) return 'permission_denied';
+    if (upper.includes(AUTH_ERROR_MARKER)) return 'auth_error';
+    return null;
 };
 
 export const classifyError = (error: unknown): ErrorClassification => {
