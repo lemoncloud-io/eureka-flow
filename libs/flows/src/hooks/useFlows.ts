@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { createFlow, loadFlow } from '../api';
+import { FLOW_FORBIDDEN } from '../consts';
 import {
     flowsKeys,
     useCreateFlowMutation,
@@ -186,6 +187,12 @@ export const useFlows = () => {
                 return flowData;
             } catch (err) {
                 console.error('[useFlows] Failed to load flow:', err);
+                const status =
+                    (err as { response?: { status?: number } })?.response?.status ??
+                    (err as { status?: number })?.status;
+                if (status === 403) {
+                    throw new Error(FLOW_FORBIDDEN);
+                }
                 return null;
             }
         },
@@ -340,6 +347,7 @@ export const useFlows = () => {
                 setLastSavedAt(null);
                 setChannelId(null);
                 setIsPublic(false);
+                setIsEditable(true);
                 setFlowThumbnail('');
                 return newFlowId;
             }
@@ -356,6 +364,7 @@ export const useFlows = () => {
         setLastSavedAt,
         setChannelId,
         setIsPublic,
+        setIsEditable,
         setFlowThumbnail,
     ]);
 

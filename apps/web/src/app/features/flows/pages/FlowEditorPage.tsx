@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { getPermissions, getProfile, useBlocks, useFlows } from '@flows/flows';
+import { FLOW_FORBIDDEN, getPermissions, getProfile, useBlocks, useFlows } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
@@ -327,15 +327,23 @@ export const FlowEditorPage = () => {
 
             if (flowIdFromUrl) {
                 setLoadingText(t('flowEditor.loadingFlow', { flowId: flowIdFromUrl }));
-                initialFlow = await loadFlowById(flowIdFromUrl);
+                try {
+                    initialFlow = await loadFlowById(flowIdFromUrl);
+                } catch (loadErr) {
+                    if (loadErr instanceof Error && loadErr.message === FLOW_FORBIDDEN) {
+                        throw new Error(
+                            t('flowEditor.flowForbidden', 'You do not have permission to access this flow.')
+                        );
+                    }
+                    throw loadErr;
+                }
                 if (!initialFlow) {
-                    // In public mode, failure likely means the flow is private
                     if (!currentApiKey) {
                         throw new Error(
                             t('flowEditor.flowNotPublic', 'This flow is private. Sign in with an API key to view it.')
                         );
                     }
-                    throw new Error(t('flowEditor.failedToLoadFlow'));
+                    throw new Error(t('flowEditor.failedToLoadFlow', 'Failed to load flow'));
                 }
                 loadedId = initialFlow.id ?? flowIdFromUrl;
             } else {

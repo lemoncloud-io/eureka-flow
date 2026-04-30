@@ -293,6 +293,43 @@ sync_locales() {
     fi
 }
 
+sync_i18n_bucket() {
+    local deploy_env="${1:-}"
+    local locales_dir="${DIST_DIR}/locales"
+
+    if [ -z "${VITE_I18N_BUCKET_URL:-}" ]; then
+        log_info "VITE_I18N_BUCKET_URL not set, skipping i18n bucket sync..."
+        return 0
+    fi
+
+    if [ ! -d "${locales_dir}" ]; then
+        log_info "No locales directory found, skipping i18n bucket sync..."
+        return 0
+    fi
+
+    # Parse bucket and prefix from URL: https://{bucket}.s3.{region}.amazonaws.com/{stage}
+    local i18n_bucket i18n_prefix
+    i18n_bucket=$(echo "$VITE_I18N_BUCKET_URL" | sed -n 's|https://\([^.]*\)\.s3\..*|\1|p')
+    i18n_prefix=$(echo "$VITE_I18N_BUCKET_URL" | sed -n 's|.*/\([^/]*\)$|\1|p')
+
+    if [ -z "${i18n_bucket}" ] || [ -z "${i18n_prefix}" ]; then
+        log_info "Could not parse i18n bucket URL, skipping..."
+        return 0
+    fi
+
+    log_info "Syncing locale files to i18n bucket: s3://${i18n_bucket}/${i18n_prefix}/"
+
+    if ! aws s3 ${AWS_PROFILE} sync "${locales_dir}" "s3://${i18n_bucket}/${i18n_prefix}" \
+        --metadata-directive REPLACE \
+        --content-type "application/json" \
+        --cache-control "${CACHE_CONTROL_LOCALES}"; then
+        log_error "Failed to sync i18n bucket"
+        return 1
+    fi
+
+    log_success "i18n bucket synced"
+}
+
 upload_index_html() {
     local deploy_env="${1:-}"
     local s3_target
@@ -433,6 +470,7 @@ main() {
         "sync_css_js_files"
         "sync_asset_files"
         "sync_locales"
+        "sync_i18n_bucket"
         "upload_index_html"
         "upload_version_json"
         "invalidate_cloudfront"

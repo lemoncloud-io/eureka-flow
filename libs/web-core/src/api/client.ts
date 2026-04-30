@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { API_URL } from '../core';
 import { useWebCoreStore } from '../stores/useWebCoreStore';
 import { getApiEndpointPath } from '../utils/apiEndpoint';
-import { isPermissionDeniedResponse } from '../utils/error';
+import { classify403Body, isPermissionDeniedResponse } from '../utils/error';
 
 import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
@@ -56,16 +56,6 @@ apiClient.interceptors.request.use(
     (error: unknown) => Promise.reject(error)
 );
 
-/**
- * Check if response data contains permission error (403 forbidden).
- * Some API Gateway configurations return HTTP 200 with a 403 error in the body.
- */
-const hasPermissionError = (data: unknown): boolean => {
-    if (!data) return false;
-    const str = typeof data === 'string' ? data : JSON.stringify(data);
-    return str.toUpperCase().includes('403') && str.toUpperCase().includes('FORBIDDEN');
-};
-
 /** Check if request is using the public endpoint (no API key) */
 const isPublicRequest = (config?: InternalAxiosRequestConfig): boolean => config?.baseURL?.includes('/public') ?? false;
 
@@ -85,8 +75,11 @@ apiClient.interceptors.response.use(
         // Skip auth error handling for public or explicitly opted-out requests
         if (shouldSkipAuthError(response.config)) return response;
 
-        // Handle 200-wrapped 403 from API Gateway (treat as auth error)
-        if (hasPermissionError(response.data)) {
+        // Handle 200-wrapped 403 from API Gateway (single-pass detection)
+        const bodyResult = classify403Body(response.data);
+        if (bodyResult === 'permission_denied') {
+            handlePermissionDenied();
+        } else if (bodyResult === 'auth_error') {
             handleAuthError();
         }
         return response;

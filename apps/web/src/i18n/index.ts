@@ -33,9 +33,8 @@ const httpLoadPath = S3_BUCKET_URL
     : `/locales/{{lng}}/{{ns}}.json${isDevelopment ? '' : `?v=${I18N_VERSION}`}`;
 
 // Bundled fallback: dynamic import from public/locales (safety net when S3 is unreachable)
-const bundledFallback = resourcesToBackend(
-    (lng: string, ns: string) => import(`../../public/locales/${lng}/${ns}.json`)
-);
+const loadBundled = (lng: string, ns: string) => import(`../../public/locales/${lng}/${ns}.json`);
+const bundledFallback = resourcesToBackend(loadBundled);
 
 const isEmbeddedInIframe = window.parent !== window;
 
@@ -77,6 +76,29 @@ i18n.use(ChainedBackend)
             ...(isEmbeddedInIframe ? { bindI18nStore: 'added removed' } : {}),
         },
     });
+
+// Supplement S3-loaded translations with bundled resources for keys not yet deployed to S3.
+// Uses deep merge without overwrite so S3 keys take priority, but new code-level keys are available.
+const supplementWithBundled = async () => {
+    const lngs = [...new Set([i18n.language, i18n.options.fallbackLng].flat().filter(Boolean))] as string[];
+    for (const lng of lngs) {
+        for (const ns of namespaces) {
+            try {
+                const bundled = (await loadBundled(lng, ns)).default;
+                i18n.addResourceBundle(lng, ns, bundled, true, false);
+            } catch {
+                // bundled resource not available
+            }
+        }
+    }
+    i18n.emit('languageChanged', i18n.language);
+};
+
+if (i18n.isInitialized) {
+    supplementWithBundled();
+} else {
+    i18n.on('initialized', supplementWithBundled);
+}
 
 // Admin i18n editor integration via postMessage (only active when embedded in iframe)
 if (isEmbeddedInIframe) {

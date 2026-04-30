@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getProfile, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { FLOW_FORBIDDEN, getProfile, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 import { useWebCoreStore } from '@flows/web-core';
 
 import type { SerializeWorkflowFn } from './types';
@@ -84,7 +84,16 @@ export const useMobileEditorBoot = ({
 
             if (flowIdFromUrl) {
                 setLoadingText(t('flowEditor.loadingFlow', { flowId: flowIdFromUrl }));
-                initialFlow = await loadFlowById(flowIdFromUrl);
+                try {
+                    initialFlow = await loadFlowById(flowIdFromUrl);
+                } catch (loadErr) {
+                    if (loadErr instanceof Error && loadErr.message === FLOW_FORBIDDEN) {
+                        throw new Error(
+                            t('flowEditor.flowForbidden', 'You do not have permission to access this flow.')
+                        );
+                    }
+                    throw loadErr;
+                }
                 if (!initialFlow) {
                     if (!currentApiKey) {
                         throw new Error(t('flowEditor.flowNotPublic', 'This flow is private.'));

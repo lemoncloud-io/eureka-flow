@@ -33,7 +33,6 @@ export interface WebCoreStore extends WebCoreState {
     setAiKeyStatus: (status: { hasGeminiKey: boolean; hasOpenaiKey: boolean }) => void;
     setApiKey: (key: string) => void;
     clearApiKey: () => void;
-    initializeApiKey: () => void;
 }
 
 const initialState: Pick<WebCoreStore, keyof WebCoreState> = {
@@ -42,7 +41,7 @@ const initialState: Pick<WebCoreStore, keyof WebCoreState> = {
     error: null,
     profile: null,
     userName: '',
-    apiKey: null,
+    apiKey: getStoredApiKey(),
     hasGeminiKey: false,
     hasOpenaiKey: false,
 };
@@ -111,11 +110,6 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
         clearApiKey: () => {
             clearStoredApiKey();
             set({ apiKey: null });
-        },
-
-        initializeApiKey: () => {
-            const storedKey = getStoredApiKey();
-            set({ apiKey: storedKey });
         },
     };
 });
