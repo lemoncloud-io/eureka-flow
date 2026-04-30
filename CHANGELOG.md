@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-04-30] - root@0.42.0, @flows/web@0.42.0, @flows/admin@0.22.0
+
+### Features
+
+- add public badge to flow list
+- (flows) add flow forbidden error handling
+- add dark mode and loading animation
+- (i18n) add bundled fallback for translations
+
+### Bug Fixes
+
+- (ui) hide root element
+- (permissions) clarify guest role permissions
+- (ui) improve flow creation button visibility
+
+### Refactor
+
+- (apikey) simplify apiKey initialization
+- improve permission denied error handling
+- (ui) simplify theme styling
+
 ## [2026-04-28] - root@0.41.1, @flows/web@0.41.1, @flows/admin@0.21.1
 
 ### Refactor
