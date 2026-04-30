@@ -53,28 +53,11 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&display=swap" rel="stylesheet" />
-        <script>
-            (function () {
-                if (localStorage.getItem('flows-theme') !== 'light') {
-                    document.documentElement.classList.add('dark');
-                }
-            })();
-        </script>
         <style>
-            :root {
-                --background: 0 0% 100%;
-                --border: 240 5% 90%;
-                --primary: 272 92% 53%;
-            }
-            .dark {
-                --background: 240 5% 13%;
-                --border: 240 4% 20%;
-                --primary: 272 80% 65%;
-            }
             body {
                 margin: 0;
                 overflow: hidden;
-                background-color: hsl(var(--background));
+                background-color: #111827;
                 color: white;
             }
             /* Custom scrollbar for better aesthetics */
