@@ -86,23 +86,16 @@ const ApiKeyGateDialog = ({
  * Bypasses authentication for public routes (landing, demo)
  */
 const ApiKeyGate = ({ children }: { children: ReactNode }) => {
-    const { apiKey, setApiKey, initializeApiKey } = useWebCoreStore();
+    const { apiKey, setApiKey } = useWebCoreStore();
     const [error, setError] = useState<string | null>(null);
 
-    const [isInitialized, setIsInitialized] = useState(false);
-
-    useEffect(() => {
-        initializeApiKey();
-        setIsInitialized(true);
-    }, [initializeApiKey]);
-
-    // Clear flow ID when no API key on flow pages (only after initialization)
+    // Clear flow ID when no API key on flow pages
     // Note: /flows/:id is allowed without API key for public viewing
     useEffect(() => {
-        if (isInitialized && !apiKey && window.location.pathname.startsWith('/flows/')) {
+        if (!apiKey && window.location.pathname.startsWith('/flows/')) {
             flowStorage.clearFlowId();
         }
-    }, [isInitialized, apiKey]);
+    }, [apiKey]);
 
     const handleApiKeySubmit = async (key: string): Promise<boolean> => {
         setError(null);
