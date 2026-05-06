@@ -13,10 +13,10 @@ const _log = console.log.bind(console, '[flows-api]');
  *
  * @returns ApiListResult<FlowView> with list of flows and total count
  */
-export const listFlows = async (): Promise<ApiListResult<FlowView>> => {
-    _log('> listFlows()');
+export const listFlows = async (page = 0): Promise<ApiListResult<FlowView>> => {
+    _log(`> listFlows(page=${page})`);
     const response = await withRetry(
-        () => api.get<ApiListResult<FlowView>>('/flows', { params: { view: 'mine' } }),
+        () => api.get<ApiListResult<FlowView>>('/flows', { params: { view: 'mine', page } }),
         3,
         'listFlows'
     );

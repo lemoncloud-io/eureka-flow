@@ -632,20 +632,6 @@ export const FlowEditorPage = () => {
     }, []);
 
     useEffect(() => {
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (!canvasRef.current) return;
-            const currentState = serializeWorkflowState(canvasRef.current.getWorkflow());
-            if (currentState !== lastSavedStateRef.current) {
-                e.preventDefault();
-                e.returnValue = '';
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, []);
-
-    useEffect(() => {
         if (isAppReady && !isPublicMode && !isLoading) {
             return startTourIfFirstVisit();
         }
