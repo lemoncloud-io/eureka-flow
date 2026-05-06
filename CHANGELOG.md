@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-05-06] - root@0.43.0, @flows/web@0.43.0, @flows/admin@0.23.0
+
+### Features
+
+- update viewport logic
+
 ## [2026-04-30] - root@0.42.0, @flows/web@0.42.0, @flows/admin@0.22.0
 
 ### Features
