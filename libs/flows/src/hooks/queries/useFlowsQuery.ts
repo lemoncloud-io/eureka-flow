@@ -13,14 +13,24 @@ import type {
     UpdateFlowBody,
 } from '../../types';
 
+const getNextPageParam = (lastPage: ApiListResult<unknown>) => {
+    const limit = lastPage.limit ?? 10;
+    const page = lastPage.page ?? 0;
+    const total = lastPage.total ?? 0;
+    const fetched = (page + 1) * limit;
+    return fetched < total ? page + 1 : undefined;
+};
+
 /**
- * Query hook for listing all flows
- * GET /flows
+ * Infinite query hook for listing my flows with pagination
+ * GET /flows?view=mine&page=N
  */
 export const useFlowsListQuery = (enabled = true) => {
-    return useQuery<ApiListResult<FlowView>>({
-        queryKey: flowsKeys.lists(),
-        queryFn: listFlows,
+    return useInfiniteQuery({
+        queryKey: flowsKeys.infiniteList(),
+        queryFn: ({ pageParam }) => listFlows(pageParam),
+        initialPageParam: 0,
+        getNextPageParam,
         enabled,
     });
 };
@@ -34,13 +44,7 @@ export const usePublicFlowsInfiniteQuery = (enabled = true) => {
         queryKey: flowsKeys.publicList(),
         queryFn: ({ pageParam }) => listPublicFlows(pageParam),
         initialPageParam: 0,
-        getNextPageParam: lastPage => {
-            const limit = lastPage.limit ?? 10;
-            const page = lastPage.page ?? 0;
-            const total = lastPage.total ?? 0;
-            const fetched = (page + 1) * limit;
-            return fetched < total ? page + 1 : undefined;
-        },
+        getNextPageParam,
         enabled,
     });
 };
@@ -137,7 +141,7 @@ export const useUpdateFlowMutation = () => {
                 };
             });
             // Refresh the flows list so updated metadata is visible
-            queryClient.invalidateQueries({ queryKey: flowsKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: flowsKeys.infiniteList() });
         },
     });
 };
@@ -151,28 +155,8 @@ export const useDeleteFlowMutation = () => {
 
     return useMutation({
         mutationFn: (id: string) => deleteFlow(id),
-        onMutate: async id => {
-            await queryClient.cancelQueries({ queryKey: flowsKeys.lists() });
-            const previous = queryClient.getQueryData<ApiListResult<FlowView>>(flowsKeys.lists());
-
-            // Optimistically remove from cache
-            if (previous) {
-                queryClient.setQueryData<ApiListResult<FlowView>>(flowsKeys.lists(), {
-                    ...previous,
-                    list: previous.list.filter(f => f.id !== id),
-                    total: Math.max((previous.total ?? previous.list.length) - 1, 0),
-                });
-            }
-            return { previous };
-        },
-        onError: (_error, _id, context) => {
-            // Rollback on error
-            if (context?.previous) {
-                queryClient.setQueryData(flowsKeys.lists(), context.previous);
-            }
-        },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: flowsKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: flowsKeys.infiniteList() });
         },
     });
 };

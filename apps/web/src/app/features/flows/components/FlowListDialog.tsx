@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Camera, FolderOpen, Globe, ImagePlus, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react';
+import { Camera, FolderOpen, Globe, ImagePlus, Loader2, MoreVertical, Plus, Search, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { processThumbnail, useDeleteFlowMutation, useFlowsListQuery, useUpdateFlowMutation } from '@flows/flows';
@@ -227,7 +227,7 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
     onNewFlow,
 }) => {
     const { t } = useTranslation(['flows']);
-    const { data, isLoading } = useFlowsListQuery(open);
+    const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useFlowsListQuery(open);
     const updateFlowMutation = useUpdateFlowMutation();
     const deleteFlowMutation = useDeleteFlowMutation();
 
@@ -238,6 +238,26 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
     // Shared file input — lives outside Dialog to avoid focus-stealing issues
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadTargetFlowIdRef = useRef<string | null>(null);
+
+    // Infinite scroll
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+    const scrollStateRef = useRef({ hasNextPage, isFetchingNextPage, fetchNextPage });
+    scrollStateRef.current = { hasNextPage, isFetchingNextPage, fetchNextPage };
+
+    useEffect(() => {
+        const el = loadMoreRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(
+            entries => {
+                const { hasNextPage: has, isFetchingNextPage: fetching, fetchNextPage: fetch } = scrollStateRef.current;
+                if (entries[0]?.isIntersecting && has && !fetching) fetch();
+            },
+            { root: scrollContainerRef.current, threshold: 0.1 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [isLoading]);
 
     const handleRequestThumbnailUpload = useCallback((flowId: string) => {
         uploadTargetFlowIdRef.current = flowId;
@@ -271,10 +291,13 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
         [updateFlowMutation, t]
     );
 
+    const totalCount = data?.pages?.[0]?.total ?? 0;
+
     const filteredFlows = useMemo((): FlowItemData[] => {
-        if (!data?.list) return [];
+        if (!data?.pages) return [];
+        const allFlows = data.pages.flatMap(page => page.list);
         const query = search.trim().toLowerCase();
-        return [...data.list]
+        return allFlows
             .filter((f): f is FlowView & { id: string } => !!f.id)
             .map(f => ({
                 ...f,
@@ -286,15 +309,8 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
                     (f.name ?? '').toLowerCase().includes(query) ||
                     (f.description ?? '').toLowerCase().includes(query) ||
                     f.id.includes(query)
-            )
-            .sort((a, b) => {
-                const aTime =
-                    typeof a.updatedAt === 'string' ? new Date(a.updatedAt).getTime() : Number(a.updatedAt ?? 0);
-                const bTime =
-                    typeof b.updatedAt === 'string' ? new Date(b.updatedAt).getTime() : Number(b.updatedAt ?? 0);
-                return bTime - aTime;
-            });
-    }, [data?.list, search]);
+            );
+    }, [data?.pages, search]);
 
     const handleSelect = (flowId: string) => {
         if (flowId !== currentFlowId) onSelectFlow(flowId);
@@ -374,7 +390,7 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
                     )}
 
                     {/* Flow list */}
-                    <div className="overflow-y-auto max-h-[60vh] px-5 pb-5">
+                    <div ref={scrollContainerRef} className="overflow-y-auto max-h-[60vh] px-5 pb-5">
                         {isLoading ? (
                             <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
                                 {t('flowList.loading')}
@@ -387,7 +403,7 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
                         ) : (
                             <div className="flex flex-col gap-2">
                                 <div className="text-xs text-muted-foreground mb-1">
-                                    {t('flowList.totalFlows', { count: filteredFlows.length })}
+                                    {t('flowList.totalFlows', { count: search ? filteredFlows.length : totalCount })}
                                 </div>
                                 {filteredFlows.map(flow => (
                                     <FlowCard
@@ -400,6 +416,11 @@ export const FlowListDialog: React.FC<FlowListDialogProps> = ({
                                         onRequestThumbnailUpload={() => handleRequestThumbnailUpload(flow.id)}
                                     />
                                 ))}
+                                <div ref={loadMoreRef} className="flex justify-center py-2">
+                                    {isFetchingNextPage && (
+                                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
