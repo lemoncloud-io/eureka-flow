@@ -175,7 +175,6 @@ export const TutorialPage = () => {
                     onSave: noop,
                     onCollapseAll: noop,
                     onExpandAll: noop,
-                    onRunAll: noop,
                 }}
                 saveState={{
                     lastSavedAt: new Date(),

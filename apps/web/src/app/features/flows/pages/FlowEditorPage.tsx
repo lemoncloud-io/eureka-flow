@@ -770,7 +770,6 @@ export const FlowEditorPage = () => {
                     onSave: handleSave,
                     onCollapseAll: () => canvasRef.current?.collapseAll(),
                     onExpandAll: () => canvasRef.current?.expandAll(),
-                    onRunAll: handleRunAll,
                 }}
                 saveState={{
                     isSaving,
@@ -806,6 +805,7 @@ export const FlowEditorPage = () => {
                 onHelp={() => handleOpenHelp('gettingStarted')}
                 onTour={() => setTourPhase('guide')}
                 onOpenFlowList={handleOpenFlowList}
+                onRunAll={handleRunAll}
                 onGraphView={() => setIsGraphViewOpen(true)}
                 onVersionClick={handleVersionClick}
                 isDebugMode={isDebugMode}

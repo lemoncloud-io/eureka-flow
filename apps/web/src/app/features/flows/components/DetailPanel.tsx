@@ -12,7 +12,6 @@ import {
     Expand,
     FileText,
     Pencil,
-    Play,
     Settings,
     Trash2,
     Upload,
@@ -456,7 +455,6 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
     );
 };
 
-const playIconCls = 'w-3.5 h-3.5 flex-shrink-0 fill-current';
 const utilBtnCls =
     'h-8 w-8 rounded-lg transition-all duration-150 active:scale-[0.92] flex items-center justify-center';
 
@@ -1082,25 +1080,23 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             <div className="flex-1 min-w-0 flex gap-1">
                                 <button
                                     onClick={() => onTriggerNode(selectedNode.id, { propagate: false })}
-                                    className="h-8 flex-1 min-w-0 group bg-primary hover:bg-primary/85 active:scale-[0.98] text-primary-foreground text-xs rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.1)]"
+                                    className="h-8 flex-1 min-w-0 group bg-primary hover:bg-primary/85 active:scale-[0.98] text-primary-foreground text-xs rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-1.5"
                                 >
-                                    <Play className={playIconCls} />
                                     <span className="truncate">{t('nodes:actions.runThisOnly')}</span>
                                 </button>
                                 <button
                                     onClick={() => onTriggerNode(selectedNode.id, { propagate: true })}
-                                    className="h-8 flex-1 min-w-0 group border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-[0.98] text-emerald-600 dark:text-emerald-400 text-xs rounded-lg font-medium transition-all duration-150 flex items-center justify-center gap-1.5"
+                                    className="h-8 flex-1 min-w-0 group border border-primary/30 bg-primary/10 hover:bg-primary/20 active:scale-[0.98] text-primary text-xs rounded-lg font-medium transition-all duration-150 flex items-center justify-center gap-1.5"
                                 >
-                                    <Zap className="w-3 h-3 flex-shrink-0" />
                                     <span className="truncate">{t('nodes:actions.runAndPropagate')}</span>
                                 </button>
                             </div>
                         ) : (
                             <button
                                 onClick={() => onTriggerNode(selectedNode.id)}
-                                className="h-8 flex-1 min-w-0 group bg-primary hover:bg-primary/85 active:scale-[0.98] text-primary-foreground text-xs rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.1)]"
+                                className="h-8 flex-1 min-w-0 group bg-primary hover:bg-primary/85 active:scale-[0.98] text-primary-foreground text-xs rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-1.5"
                             >
-                                <Play className={playIconCls} />
+                                <img src="/play_white.svg" alt="" className="w-4 h-4 flex-shrink-0" />
                                 <span className="truncate">{t('flows:detailPanel.runBlock')}</span>
                             </button>
                         ))}
