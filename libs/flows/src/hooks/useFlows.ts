@@ -13,11 +13,10 @@ import {
 } from './queries';
 import { useFlowsStore } from '../stores/useFlowsStore';
 import { flowStorage } from '../utils/flowStorage';
-import { getNodeHeight } from '../utils/nodeHeight';
+import { transformNodesForSave } from '../utils/transformNodes';
 
 import type { SaveStatus } from '../stores/useFlowsStore';
 import type { LoadFlowResult, SaveFlowBody, UpdateFlowBody } from '../types';
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 /**
  * Hook for managing workflows/flows
@@ -252,37 +251,8 @@ export const useFlows = () => {
                 const { nodes = [], edges, connections } = body;
                 const edgesData = edges ?? connections ?? [];
 
-                // Transform nodes for save:
-                // 1. Convert type (block.id) -> blockId, and set type to processType
-                // 2. Remove runtime fields (status, inputData, outputData, etc.)
-                // 3. Remove empty customLabel, description
-                // 4. Extract height (with backward compatibility for legacy config.textareaHeight)
                 const { blockRegistry } = useFlowsStore.getState();
-
-                const slimNodes = nodes.map(node => {
-                    const blockDef = blockRegistry[node.type];
-                    const height = getNodeHeight(node);
-
-                    const slimNode: Partial<NodeData> = {
-                        id: node.id,
-                        // type becomes processType (e.g., "input-text")
-                        type: blockDef?.type ?? node.type,
-                        // blockId is the block's id (e.g., "0008")
-                        blockId: node.blockId ?? node.type,
-                        position: node.position,
-                    };
-
-                    // Add width/height only if they have values
-                    if (node.width) slimNode.width = node.width;
-                    if (height) slimNode.height = height;
-
-                    // Add customLabel/description only if non-empty
-                    if (node.customLabel) slimNode.customLabel = node.customLabel;
-                    if (node.description) slimNode.description = node.description;
-
-                    return slimNode as NodeData;
-                });
-
+                const slimNodes = transformNodesForSave(nodes, blockRegistry);
                 const saveBody: SaveFlowBody = { nodes: slimNodes, edges: edgesData };
 
                 // Store for retry on failure

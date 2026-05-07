@@ -10,6 +10,7 @@ import {
     LAYOUT_CONFIG,
     PORT_LAYOUT,
     estimateNodeHeight,
+    flowStorage,
     getEffectiveState,
     getNode,
     getNodeWidth,
@@ -278,9 +279,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const gridRef = useRef<HTMLDivElement>(null);
         const [displayViewport, setDisplayViewport] = useState({ x: 0, y: 0, zoom: 1 });
         const displayTimerRef = useRef<ReturnType<typeof setTimeout>>();
+        const viewportSaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+        const flowIdRef = useRef(flowId);
+        flowIdRef.current = flowId;
 
         useEffect(() => {
-            return () => clearTimeout(displayTimerRef.current);
+            return () => {
+                clearTimeout(displayTimerRef.current);
+                clearTimeout(viewportSaveTimerRef.current);
+            };
         }, []);
 
         const updateViewport = useCallback((vp: { x: number; y: number; zoom: number }) => {
@@ -297,6 +304,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             displayTimerRef.current = setTimeout(() => {
                 setDisplayViewport(vp);
             }, 150);
+            clearTimeout(viewportSaveTimerRef.current);
+            viewportSaveTimerRef.current = setTimeout(() => {
+                if (flowIdRef.current) {
+                    flowStorage.saveViewport(flowIdRef.current, vp);
+                }
+            }, 500);
         }, []);
 
         const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
@@ -794,6 +807,14 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     futureRef.current = [];
                     handleSelectionChange(null);
                     setSelectedConnectionId(null);
+
+                    // Restore saved viewport for this flow
+                    if (flowIdRef.current) {
+                        const savedVp = flowStorage.getViewport(flowIdRef.current);
+                        if (savedVp) {
+                            updateViewport(savedVp);
+                        }
+                    }
 
                     // null = server confirmed empty; undefined = server omitted, fetch now
                     const undefinedDataPorts = ports.filter(p => p.data === undefined && p.portId);

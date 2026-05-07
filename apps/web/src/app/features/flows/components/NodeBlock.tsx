@@ -1,7 +1,7 @@
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChevronDown, ChevronUp, Copy, Loader2, Pencil, Play, RefreshCw, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Loader2, Pencil, RefreshCw, X } from 'lucide-react';
 
 import {
     NODE_CONTENT_OVERHEAD,
@@ -534,10 +534,10 @@ export const NodeBlock = memo<NodeBlockProps>(
                                     onMouseDown={e => e.stopPropagation()}
                                     disabled={isRunning}
                                     className={cn(
-                                        'w-6 h-6 rounded-md flex items-center justify-center transition-all',
+                                        'w-7 h-7 rounded-md border border-border/60 flex items-center justify-center transition-all',
                                         isRunning
                                             ? 'bg-muted/30 text-muted-foreground cursor-not-allowed'
-                                            : 'bg-primary/10 hover:bg-primary/20 text-primary',
+                                            : 'bg-transparent hover:bg-muted/30 text-primary',
                                         tutorialHint === 'run-button' && !isRunning && 'tutorial-run-bounce'
                                     )}
                                     title={t('actions.run')}
@@ -545,7 +545,7 @@ export const NodeBlock = memo<NodeBlockProps>(
                                     {isRunning ? (
                                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                     ) : (
-                                        <Play className="w-3.5 h-3.5" />
+                                        <img src="/play.svg" alt="" className="w-3.5 h-3.5" />
                                     )}
                                 </button>
                             ) : null)}
@@ -774,7 +774,7 @@ export const NodeBlock = memo<NodeBlockProps>(
                                         {isRunning ? (
                                             <Loader2 className="w-3 h-3 animate-spin" />
                                         ) : (
-                                            <Play className="w-3 h-3" />
+                                            <img src="/play.svg" alt="" className="w-3.5 h-3.5" />
                                         )}
                                         {t('actions.forceRun')}
                                     </button>

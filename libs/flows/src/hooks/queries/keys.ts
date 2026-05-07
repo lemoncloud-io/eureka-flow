@@ -8,6 +8,7 @@ export const flowsKeys = {
     all: ['flows'] as const,
     lists: () => [...flowsKeys.all, 'list'] as const,
     list: (filters?: Record<string, unknown>) => [...flowsKeys.lists(), filters] as const,
+    infiniteList: () => [...flowsKeys.all, 'infinite-list'] as const,
     publicList: () => [...flowsKeys.all, 'public-list'] as const,
     details: () => [...flowsKeys.all, 'detail'] as const,
     detail: (id: string) => [...flowsKeys.details(), id] as const,
