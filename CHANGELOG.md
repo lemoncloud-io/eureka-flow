@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-05-07] - root@0.44.0, @flows/web@0.44.0, @flows/admin@0.24.0
+
+### Features
+
+- (ui) add new play icons for buttons
+
 ## [2026-05-06] - root@0.43.0, @flows/web@0.43.0, @flows/admin@0.23.0
 
 ### Features
