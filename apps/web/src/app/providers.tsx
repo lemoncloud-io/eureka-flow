@@ -174,6 +174,7 @@ export const Providers = ({ children }: ProvidersProps) => {
                                 <Toaster
                                     position={window.innerWidth <= 767 ? 'top-center' : 'bottom-right'}
                                     richColors
+                                    closeButton
                                     toastOptions={{
                                         classNames: {
                                             toast: 'backdrop-blur-md bg-background/95 border-border/50 shadow-lg',

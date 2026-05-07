@@ -33,6 +33,7 @@ export const transformNodeForSave = (
     if (node.customLabel) slim.customLabel = node.customLabel;
     if (node.description) slim.description = node.description;
 
+    // id, type, blockId, position are always set above — Partial used for conditional fields only
     return slim as NodeData;
 };
 

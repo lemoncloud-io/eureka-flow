@@ -17,7 +17,6 @@ import {
     KeyRound,
     LayoutGrid,
     Menu,
-    Play,
     Redo2,
     Save,
     Trash2,
@@ -67,7 +66,6 @@ export interface EditActionsProps {
     onSave: () => void;
     onCollapseAll?: () => void;
     onExpandAll?: () => void;
-    onRunAll?: () => void;
 }
 
 export interface SocketStateProps {
@@ -104,6 +102,7 @@ interface HeaderProps {
     onHelp?: () => void;
     onTour?: () => void;
     onOpenFlowList?: () => void;
+    onRunAll?: () => void;
     onGraphView?: () => void;
     onVersionClick?: () => void;
     isDebugMode?: boolean;
@@ -347,6 +346,7 @@ export const Header: React.FC<HeaderProps> = ({
     onHelp,
     onTour,
     onOpenFlowList,
+    onRunAll,
     onGraphView,
     onVersionClick,
     isDebugMode,
@@ -417,6 +417,15 @@ export const Header: React.FC<HeaderProps> = ({
                                 />
                             </span>
                         )}
+                        {canRun && onRunAll && (
+                            <button
+                                onClick={onRunAll}
+                                className="hidden sm:inline-flex items-center gap-1 px-1.5 text-xs font-semibold text-foreground hover:opacity-70 transition-opacity"
+                            >
+                                <img src="/icons/play_all.svg" alt="" className="w-4 h-4" />
+                                {t('header.runAll')}
+                            </button>
+                        )}
                         {isPublicMode && (
                             <Badge variant="secondary" size="sm" className="text-[10px]">
                                 {t('header.viewOnly', 'View Only')}
@@ -473,13 +482,6 @@ export const Header: React.FC<HeaderProps> = ({
                                     shortcut="⌘⇧Z"
                                 />
                             </>
-                        )}
-                        {canRun && editActions.onRunAll && (
-                            <ToolbarButton
-                                onClick={editActions.onRunAll}
-                                icon={<Play className="w-4 h-4" />}
-                                tooltip={t('header.runAll')}
-                            />
                         )}
                         {socketState && <SocketDot {...socketState} />}
                     </div>
