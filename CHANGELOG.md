@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-05-13] - root@0.46.0, @flows/web@0.46.0
+
+### Features
+
+- add i18n to tutorial
+
+### Chores
+
+- (ci) add OAuth env vars to force-deploy workflow
+
 ## [2026-05-13] - root@0.45.1, @flows/web@0.45.1
 
 ### Bug Fixes
