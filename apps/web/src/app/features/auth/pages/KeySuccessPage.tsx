@@ -6,7 +6,7 @@ import { Check, Copy, Eye, EyeOff, Info, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@flows/ui-kit';
-import { useWebCoreStore } from '@flows/web-core';
+import { getWebCoreOrNull, useWebCoreStore } from '@flows/web-core';
 
 import { AuthBrandHeader } from '../components/AuthBrandHeader';
 
@@ -42,6 +42,9 @@ export const KeySuccessPage = () => {
     };
 
     const handleComplete = () => {
+        // Clear lemon-web-core OAuth credentials (no longer needed after key creation)
+        const webCore = getWebCoreOrNull();
+        if (webCore) webCore.logout();
         setApiKey(apiKey);
         navigate(fromPath, { replace: true });
     };
