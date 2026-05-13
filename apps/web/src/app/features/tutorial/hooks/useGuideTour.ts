@@ -1,13 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { GUIDE_TOUR_STEPS, GUIDE_TOUR_STORAGE_KEY } from '../consts/guideTourSteps';
+import { GUIDE_TOUR_STORAGE_KEY, createGuideTourSteps } from '../consts/guideTourSteps';
 
 import type { TourStep } from '../types/tour';
 
 export const useGuideTour = (onComplete?: () => void, customSteps?: TourStep[]) => {
+    const { t } = useTranslation('tutorial');
     const [currentStep, setCurrentStep] = useState(0);
 
-    const steps = customSteps ?? GUIDE_TOUR_STEPS;
+    const defaultSteps = useMemo(() => createGuideTourSteps(t), [t]);
+    const steps = customSteps ?? defaultSteps;
     const step = steps[currentStep];
 
     const close = useCallback(() => {

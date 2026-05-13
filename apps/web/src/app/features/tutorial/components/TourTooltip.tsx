@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { X } from 'lucide-react';
 
@@ -49,59 +50,65 @@ export const TourTooltip: React.FC<TourTooltipProps> = ({
     onNext,
     onPrev,
     onClose,
-}) => (
-    <div className="relative overflow-hidden rounded-[22px] bg-background shadow-lg" style={{ width }}>
-        <button
-            onClick={onClose}
-            aria-label="닫기"
-            className={cn(
-                'absolute right-3.5 top-3.5 z-10 flex items-center justify-center rounded-full',
-                'border border-border bg-background p-2.5 shadow-[0_0_6px_rgba(0,0,0,0.14)]'
-            )}
-        >
-            <X size={20} className="text-foreground" />
-        </button>
+}) => {
+    const { t } = useTranslation('tutorial');
 
-        {step.visual && <VisualArea visual={step.visual} width={width} />}
-
-        <div className="flex flex-col gap-5 p-5">
-            <div className="flex flex-col gap-2">
-                <h3 className="text-base font-semibold leading-6 tracking-[-0.48px] text-foreground">{step.title}</h3>
-                <p className="whitespace-pre-line text-sm leading-[1.5] tracking-[-0.42px] text-muted-foreground">
-                    {step.description}
-                </p>
-            </div>
-
-            <div className={cn('flex items-center', hideCounter && 'justify-end')}>
-                {!hideCounter && (
-                    <span className="flex-1 text-sm font-semibold text-foreground">
-                        {currentIndex + 1}/<span className="text-muted-foreground">{totalSteps}</span>
-                    </span>
+    return (
+        <div className="relative overflow-hidden rounded-[22px] bg-background shadow-lg" style={{ width }}>
+            <button
+                onClick={onClose}
+                aria-label={t('cta.close')}
+                className={cn(
+                    'absolute right-3.5 top-3.5 z-10 flex items-center justify-center rounded-full',
+                    'border border-border bg-background p-2.5 shadow-[0_0_6px_rgba(0,0,0,0.14)]'
                 )}
+            >
+                <X size={20} className="text-foreground" />
+            </button>
 
-                <div className="flex gap-3">
-                    {step.showSecondary !== false && currentIndex > 0 && (
+            {step.visual && <VisualArea visual={step.visual} width={width} />}
+
+            <div className="flex flex-col gap-5 p-5">
+                <div className="flex flex-col gap-2">
+                    <h3 className="text-base font-semibold leading-6 tracking-[-0.48px] text-foreground">
+                        {step.title}
+                    </h3>
+                    <p className="whitespace-pre-line text-sm leading-[1.5] tracking-[-0.42px] text-muted-foreground">
+                        {step.description}
+                    </p>
+                </div>
+
+                <div className={cn('flex items-center', hideCounter && 'justify-end')}>
+                    {!hideCounter && (
+                        <span className="flex-1 text-sm font-semibold text-foreground">
+                            {currentIndex + 1}/<span className="text-muted-foreground">{totalSteps}</span>
+                        </span>
+                    )}
+
+                    <div className="flex gap-3">
+                        {step.showSecondary !== false && currentIndex > 0 && (
+                            <button
+                                onClick={onPrev}
+                                className={cn(
+                                    'rounded-[10px] border border-border px-4 py-[9px]',
+                                    'text-sm font-semibold leading-[22px] text-foreground'
+                                )}
+                            >
+                                {step.secondaryLabel ?? t('cta.prev')}
+                            </button>
+                        )}
                         <button
-                            onClick={onPrev}
+                            onClick={onNext}
                             className={cn(
-                                'rounded-[10px] border border-border px-4 py-[9px]',
-                                'text-sm font-semibold leading-[22px] text-foreground'
+                                'rounded-[10px] bg-primary px-4 py-[9px]',
+                                'text-sm font-semibold leading-[22px] text-white'
                             )}
                         >
-                            {step.secondaryLabel ?? '이전'}
+                            {step.primaryLabel ?? (currentIndex === totalSteps - 1 ? t('cta.done') : t('cta.next'))}
                         </button>
-                    )}
-                    <button
-                        onClick={onNext}
-                        className={cn(
-                            'rounded-[10px] bg-primary px-4 py-[9px]',
-                            'text-sm font-semibold leading-[22px] text-white'
-                        )}
-                    >
-                        {step.primaryLabel ?? (currentIndex === totalSteps - 1 ? '시작하기' : '다음')}
-                    </button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
