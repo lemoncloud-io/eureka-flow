@@ -39,11 +39,10 @@ export const LoginPage = () => {
     };
 
     return (
-        <div className="flex min-h-screen bg-white">
+        <div className="flex min-h-screen bg-background">
             {/* Left: Screenshot + Marketing */}
             <div className="relative hidden w-1/2 lg:block">
-                {/* Flow editor screenshot */}
-                <div className="absolute left-[46px] top-[46px] overflow-hidden rounded-[22px] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.08)] border border-[#f4f5f5]">
+                <div className="absolute left-[46px] top-[46px] overflow-hidden rounded-[22px] border border-border shadow-[0px_4px_12px_0px_rgba(0,0,0,0.08)]">
                     <img
                         src="/images/screenshot-light.jpg"
                         alt="Eureka Flow Editor"
@@ -51,9 +50,8 @@ export const LoginPage = () => {
                     />
                 </div>
 
-                {/* Bottom marketing copy */}
                 <div className="absolute bottom-0 left-0 right-0">
-                    <div className="relative bg-white px-[62px] pb-[82px] pt-[42px]">
+                    <div className="relative bg-background px-[62px] pb-[82px] pt-[42px]">
                         <div
                             className="absolute -top-[67px] left-0 right-0 h-[109px]"
                             style={{
@@ -62,14 +60,12 @@ export const LoginPage = () => {
                             }}
                         />
                         <div className="relative flex flex-col gap-[11px]">
-                            <h2 className="text-[32px] font-semibold leading-[1.4] tracking-[-0.96px] text-black">
-                                {t('auth.marketingTitle', 'AI 워크플로우, 비주얼하게 코딩 없이 만드세요')}
+                            <h2 className="text-[32px] font-semibold leading-[1.4] tracking-[-0.96px] text-foreground">
+                                {t('auth.marketingTitle')}
                             </h2>
-                            <div className="text-[19px] font-medium leading-[1.4] tracking-[-0.57px] text-[#84888f]">
-                                <p>{t('auth.marketingLine1', '드래그앤 드롭으로 연결하고 실행하세요.')}</p>
-                                <p>
-                                    {t('auth.marketingLine2', '설치 없이 브라우저에서바로 AI 파이프라인을 완성합니다.')}
-                                </p>
+                            <div className="text-[19px] font-medium leading-[1.4] tracking-[-0.57px] text-muted-foreground">
+                                <p>{t('auth.marketingLine1')}</p>
+                                <p>{t('auth.marketingLine2')}</p>
                             </div>
                         </div>
                     </div>
@@ -79,7 +75,6 @@ export const LoginPage = () => {
             {/* Right: Login Form */}
             <div className="flex w-full items-center justify-center lg:w-1/2">
                 <div className="flex w-[348px] flex-col items-center gap-[75px]">
-                    {/* Logo + Welcome */}
                     <div className="flex flex-col items-center gap-[26px]">
                         <img
                             src="/logo/purple-symbol.png"
@@ -87,19 +82,18 @@ export const LoginPage = () => {
                             className="h-[92px] w-[87px] object-contain"
                         />
                         <div className="flex flex-col items-center gap-3 text-center">
-                            <h1 className="text-[32px] font-semibold tracking-[-0.96px] text-black">
+                            <h1 className="text-[32px] font-semibold tracking-[-0.96px] text-foreground">
                                 Welcome To Eureka Flow
                             </h1>
-                            <p className="text-lg tracking-[-0.54px] text-[#9fa2a7]">
-                                {t('auth.loginDescription', 'Sign in to continue')}
+                            <p className="text-lg tracking-[-0.54px] text-muted-foreground">
+                                {t('auth.loginDescription')}
                             </p>
                         </div>
                     </div>
 
-                    {/* Login Buttons */}
                     <div className="flex w-full flex-col gap-3">
                         <button
-                            className="flex items-center gap-4 rounded-[14px] border border-[#dfe0e2] bg-white px-[56px] py-[22px] transition-shadow hover:shadow-md"
+                            className="flex items-center gap-4 rounded-[14px] border border-border bg-background px-[56px] py-[22px] transition-shadow hover:shadow-md"
                             onClick={handleGoogleLogin}
                         >
                             <img
@@ -110,15 +104,15 @@ export const LoginPage = () => {
                                     (e.target as HTMLImageElement).style.display = 'none';
                                 }}
                             />
-                            <span className="text-lg font-medium tracking-[-0.54px] text-black">
-                                {t('auth.googleLogin', 'Continue with Google')}
+                            <span className="text-lg font-medium tracking-[-0.54px] text-foreground">
+                                {t('auth.googleLogin')}
                             </span>
                         </button>
 
                         <div className="flex items-center gap-3 py-2">
-                            <div className="h-px flex-1 bg-[#f4f5f5]" />
-                            <span className="text-xs text-[#9fa2a7]">{t('auth.or', 'or')}</span>
-                            <div className="h-px flex-1 bg-[#f4f5f5]" />
+                            <div className="h-px flex-1 bg-border" />
+                            <span className="text-xs text-muted-foreground">{t('auth.or')}</span>
+                            <div className="h-px flex-1 bg-border" />
                         </div>
 
                         <Button
@@ -126,7 +120,7 @@ export const LoginPage = () => {
                             className="h-12 w-full rounded-[14px] text-sm"
                             onClick={() => setShowApiKeyDialog(true)}
                         >
-                            {t('auth.useApiKey', 'Use API Key')}
+                            {t('auth.useApiKey')}
                         </Button>
                     </div>
                 </div>
