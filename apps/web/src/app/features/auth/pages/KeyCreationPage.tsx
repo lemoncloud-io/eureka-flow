@@ -115,13 +115,17 @@ export const KeyCreationPage = () => {
                         >
                             <HelpCircle className="h-3.5 w-3.5" />
                             {showTooltip && (
-                                <div className="absolute bottom-full left-1/2 z-10 mb-2 w-72 -translate-x-1/2 rounded-lg bg-[#3a3d42] p-4 shadow-lg">
-                                    <p className="text-xs leading-relaxed text-white">
-                                        {t(
-                                            'auth.apiKeyExplanation',
-                                            'API는 서로 다른 서비스 정보를 주고받을 수 있도록 연결해주는 기능입니다.'
-                                        )}
-                                    </p>
+                                <div className="absolute left-1/2 top-full z-10 mt-2 w-72 -translate-x-1/2">
+                                    {/* Arrow */}
+                                    <div className="mx-auto h-0 w-0 border-x-[8px] border-b-[8px] border-x-transparent border-b-[#3a3d42]" />
+                                    <div className="rounded-lg bg-[#3a3d42] p-4 shadow-lg">
+                                        <p className="text-xs leading-relaxed text-white">
+                                            {t(
+                                                'auth.apiKeyExplanation',
+                                                'API는 서로 다른 서비스 정보를 주고받을 수 있도록 연결해주는 기능입니다.'
+                                            )}
+                                        </p>
+                                    </div>
                                 </div>
                             )}
                         </button>
@@ -139,8 +143,8 @@ export const KeyCreationPage = () => {
                                 }}
                                 placeholder={t('auth.keyNamePlaceholder', '키 이름 입력 (예: 플로우 사용 api)')}
                                 className={cn(
-                                    'h-11 pr-9 text-base',
-                                    error && 'border-red-500 focus-visible:ring-red-500'
+                                    'h-11 rounded-none border-0 border-b border-[#dfe0e2] pr-9 text-base shadow-none focus-visible:ring-0 focus-visible:border-black',
+                                    error && 'border-red-500 focus-visible:border-red-500'
                                 )}
                                 disabled={isCreating}
                             />
