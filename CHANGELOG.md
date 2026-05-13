@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-05-13] - root@0.45.1, @flows/web@0.45.1
+
+### Bug Fixes
+
+- (auth) clear lemon-web-core credentials after API key creation
+
 ## [2026-05-13] - root@0.45.0, @flows/web@0.45.0, @flows/admin@0.25.0
 
 ### Features
