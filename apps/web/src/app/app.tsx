@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { SITE_URL } from '@flows/shared';
+import { isOAuthEnabled } from '@flows/web-core';
 
+import { KeyCreationPage, LoginPage, OAuthResponsePage } from './features/auth';
 import { PublicFlowsPage } from './features/flows';
 import { LandingPage, PolicyPage } from './features/landing';
 import { FlowEditorRouter } from './features/mobile-editor';
@@ -30,6 +32,13 @@ export const App = () => {
                 <Route path="/editor" element={<FlowEditorRouter />} />
                 <Route path="/flows/:id" element={<FlowEditorRouter />} />
                 <Route path="/policy/:type" element={<PolicyPage />} />
+                {isOAuthEnabled && (
+                    <>
+                        <Route path="/auth/login" element={<LoginPage />} />
+                        <Route path="/auth/oauth-response" element={<OAuthResponsePage />} />
+                        <Route path="/auth/create-key" element={<KeyCreationPage />} />
+                    </>
+                )}
             </Routes>
         </BrowserRouter>
     );
