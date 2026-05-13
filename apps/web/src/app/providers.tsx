@@ -18,6 +18,7 @@ import {
 import { ThemeProvider } from '@flows/theme';
 import {
     isOAuthEnabled,
+    redirectToLogin,
     reportError,
     useInitWebCore,
     useTokenRefresh,
@@ -123,6 +124,9 @@ const ApiKeyGate = ({ children }: { children: ReactNode }) => {
     }
 
     if (!apiKey) {
+        if (redirectToLogin()) {
+            return <LoadingFallback />;
+        }
         return <ApiKeyGateDialog onSubmit={handleApiKeySubmit} error={error} />;
     }
 

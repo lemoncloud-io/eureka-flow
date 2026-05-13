@@ -26,6 +26,13 @@ export const HOST = import.meta.env?.VITE_HOST?.toLowerCase() || window.location
 /** Whether OAuth login is enabled (all required env vars present) */
 export const isOAuthEnabled = !!OAUTH_ENDPOINT && !!SOCIAL_OAUTH_ENDPOINT;
 
+/** Redirect to OAuth login if enabled. Returns true if redirected, false if caller should handle. */
+export const redirectToLogin = (): boolean => {
+    if (!isOAuthEnabled) return false;
+    window.location.href = `/auth/login?from=${encodeURIComponent(window.location.pathname)}`;
+    return true;
+};
+
 /**
  * Key for storing language preference
  */

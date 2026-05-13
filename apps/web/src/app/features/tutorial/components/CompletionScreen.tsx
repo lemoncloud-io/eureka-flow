@@ -7,6 +7,7 @@ import { ExternalLink, Eye, EyeOff, KeyRound, X } from 'lucide-react';
 import { cn } from '@flows/lib/utils';
 import { useApiKeyPopup } from '@flows/shared';
 import { Button, Input } from '@flows/ui-kit';
+import { redirectToLogin } from '@flows/web-core';
 
 import type { TutorialStep } from '../consts/tutorialSteps';
 
@@ -39,6 +40,11 @@ export const CompletionScreen = ({ step, onSubmitKey, onClose }: CompletionScree
             setShowKeyInput(true);
         },
     });
+
+    const handleGetKey = () => {
+        if (redirectToLogin()) return;
+        openPopup();
+    };
 
     const handleSubmitKey = async () => {
         if (!apiKey.trim() || isValidating) return;
@@ -105,7 +111,7 @@ export const CompletionScreen = ({ step, onSubmitKey, onClose }: CompletionScree
                         <Button
                             variant="outline"
                             className="gap-1.5 text-xs"
-                            onClick={openPopup}
+                            onClick={handleGetKey}
                             disabled={isPopupLoading}
                         >
                             <ExternalLink className="h-3.5 w-3.5" />
@@ -114,7 +120,7 @@ export const CompletionScreen = ({ step, onSubmitKey, onClose }: CompletionScree
                     </div>
                 ) : (
                     <div className="flex flex-col gap-2">
-                        <Button className="gap-2" onClick={openPopup} disabled={isPopupLoading}>
+                        <Button className="gap-2" onClick={handleGetKey} disabled={isPopupLoading}>
                             <KeyRound className="h-4 w-4" />
                             {isPopupLoading ? t('common:apiKeyDialog.waitingForKey') : t('tutorial:steps.done.getKey')}
                         </Button>
