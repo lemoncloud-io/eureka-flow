@@ -1,12 +1,14 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { BLOCK_TUTORIAL_STEPS, BLOCK_TUTORIAL_STORAGE_KEY } from '../consts/blockTutorialSteps';
+import { BLOCK_TUTORIAL_STORAGE_KEY, createBlockTutorialSteps } from '../consts/blockTutorialSteps';
 
 export const useBlockTutorial = (onComplete?: () => void) => {
+    const { t } = useTranslation('tutorial');
     const [currentStep, setCurrentStep] = useState(0);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-    const steps = BLOCK_TUTORIAL_STEPS;
+    const steps = useMemo(() => createBlockTutorialSteps(t), [t]);
     const step = steps[currentStep];
 
     const close = useCallback(() => {

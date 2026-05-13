@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
     ChevronsDownUp,
@@ -39,27 +40,31 @@ const MenuSeparator = () => <div className="my-0.5 h-px bg-border" />;
 const ICON_SIZE = 12;
 
 /** Static preview of the main menu for the guide tour */
-export const MenuPreview: React.FC = () => (
-    <div className="max-h-[168px] w-44 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-md">
-        <MenuLabel>파일</MenuLabel>
-        <MenuItem icon={<FileText size={ICON_SIZE} />} label="새 플로우" shortcut="⌘N" />
-        <MenuItem icon={<Save size={ICON_SIZE} />} label="저장" shortcut="⌘S" />
-        <MenuItem icon={<Download size={ICON_SIZE} />} label="JSON 내보내기" shortcut="⌘E" />
-        <MenuItem icon={<ImageDown size={ICON_SIZE} />} label="PNG 내보내기" />
-        <MenuSeparator />
-        <MenuLabel>캔버스</MenuLabel>
-        <MenuItem icon={<LayoutGrid size={ICON_SIZE} />} label="자동 정렬" shortcut="⌘A" />
-        <MenuItem icon={<ChevronsDownUp size={ICON_SIZE} />} label="모두 접기" />
-        <MenuItem icon={<ChevronsUpDown size={ICON_SIZE} />} label="모두 펼치기" />
-        <MenuItem icon={<Trash2 size={ICON_SIZE} />} label="캔버스 초기화" destructive />
-        <MenuSeparator />
-        <MenuLabel>게시</MenuLabel>
-        <MenuItem icon={<Globe size={ICON_SIZE} />} label="게시하기" />
-        <MenuSeparator />
-        <MenuLabel>설정</MenuLabel>
-        <MenuItem icon={<Key size={ICON_SIZE} />} label="API 키 설정" />
-        <MenuSeparator />
-        <MenuItem icon={<HelpCircle size={ICON_SIZE} />} label="도움말" shortcut="?" />
-        <MenuItem icon={<GraduationCap size={ICON_SIZE} />} label="튜토리얼 다시보기" />
-    </div>
-);
+export const MenuPreview: React.FC = () => {
+    const { t } = useTranslation('tutorial');
+
+    return (
+        <div className="max-h-[168px] w-44 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-md">
+            <MenuLabel>{t('menuPreview.file')}</MenuLabel>
+            <MenuItem icon={<FileText size={ICON_SIZE} />} label={t('menuPreview.newFlow')} shortcut="⌘N" />
+            <MenuItem icon={<Save size={ICON_SIZE} />} label={t('menuPreview.save')} shortcut="⌘S" />
+            <MenuItem icon={<Download size={ICON_SIZE} />} label={t('menuPreview.exportJson')} shortcut="⌘E" />
+            <MenuItem icon={<ImageDown size={ICON_SIZE} />} label={t('menuPreview.exportPng')} />
+            <MenuSeparator />
+            <MenuLabel>{t('menuPreview.canvas')}</MenuLabel>
+            <MenuItem icon={<LayoutGrid size={ICON_SIZE} />} label={t('menuPreview.autoLayout')} shortcut="⌘A" />
+            <MenuItem icon={<ChevronsDownUp size={ICON_SIZE} />} label={t('menuPreview.collapseAll')} />
+            <MenuItem icon={<ChevronsUpDown size={ICON_SIZE} />} label={t('menuPreview.expandAll')} />
+            <MenuItem icon={<Trash2 size={ICON_SIZE} />} label={t('menuPreview.clearCanvas')} destructive />
+            <MenuSeparator />
+            <MenuLabel>{t('menuPreview.publish')}</MenuLabel>
+            <MenuItem icon={<Globe size={ICON_SIZE} />} label={t('menuPreview.publishAction')} />
+            <MenuSeparator />
+            <MenuLabel>{t('menuPreview.settings')}</MenuLabel>
+            <MenuItem icon={<Key size={ICON_SIZE} />} label={t('menuPreview.apiKeySettings')} />
+            <MenuSeparator />
+            <MenuItem icon={<HelpCircle size={ICON_SIZE} />} label={t('menuPreview.help')} shortcut="?" />
+            <MenuItem icon={<GraduationCap size={ICON_SIZE} />} label={t('menuPreview.replayTutorial')} />
+        </div>
+    );
+};
