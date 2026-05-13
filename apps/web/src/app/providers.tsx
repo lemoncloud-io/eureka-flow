@@ -16,7 +16,15 @@ import {
     useVersionCheck,
 } from '@flows/shared';
 import { ThemeProvider } from '@flows/theme';
-import { reportError, useWebCoreStore, validateApiKey } from '@flows/web-core';
+import {
+    isOAuthEnabled,
+    redirectToLogin,
+    reportError,
+    useInitWebCore,
+    useTokenRefresh,
+    useWebCoreStore,
+    validateApiKey,
+} from '@flows/web-core';
 
 import { i18n } from '../i18n';
 import { useApiKeyTour } from './features/tutorial';
@@ -54,7 +62,8 @@ const isPublicRoute = (): boolean => {
         pathname === '/flows' ||
         pathname === '/tutorial' ||
         pathname.startsWith('/flows/') ||
-        pathname.startsWith('/policy/')
+        pathname.startsWith('/policy/') ||
+        pathname.startsWith('/auth/')
     );
 };
 
@@ -82,8 +91,9 @@ const ApiKeyGateDialog = ({
 
 /**
  * API Key gate component
- * Blocks app content until a valid API key is provided
- * Bypasses authentication for public routes (landing, demo)
+ * Blocks app content until a valid API key is provided.
+ * When OAuth is enabled: redirects to login page.
+ * When OAuth is disabled: shows API key dialog (existing behavior).
  */
 const ApiKeyGate = ({ children }: { children: ReactNode }) => {
     const { apiKey, setApiKey } = useWebCoreStore();
@@ -108,14 +118,40 @@ const ApiKeyGate = ({ children }: { children: ReactNode }) => {
         return false;
     };
 
-    // Bypass authentication for public routes (landing, demo)
+    // Bypass authentication for public routes (landing, auth, demo)
     if (isPublicRoute()) {
         return children;
     }
 
     if (!apiKey) {
+        if (redirectToLogin()) {
+            return <LoadingFallback />;
+        }
         return <ApiKeyGateDialog onSubmit={handleApiKeySubmit} error={error} />;
     }
+
+    return children;
+};
+
+/**
+ * WebCore initialization gate.
+ * When OAuth is enabled, waits for webCore.init() + token refresh before rendering.
+ * When OAuth is disabled, passes through immediately after init.
+ */
+const WebCoreGate = ({ children }: { children: ReactNode }) => {
+    const isWebCoreReady = useInitWebCore();
+    const { isAuthenticated } = useWebCoreStore();
+    const { isInitialized: isTokenInitialized } = useTokenRefresh(isWebCoreReady);
+
+    // If not OAuth mode, render as soon as webCore is ready (instant for API-key-only mode)
+    if (!isOAuthEnabled) {
+        if (!isWebCoreReady) return <LoadingFallback />;
+        return children;
+    }
+
+    // OAuth mode: wait for token refresh to complete if authenticated
+    const canRender = isWebCoreReady && (!isAuthenticated || isTokenInitialized);
+    if (!canRender) return <LoadingFallback />;
 
     return children;
 };
@@ -168,9 +204,11 @@ export const Providers = ({ children }: ProvidersProps) => {
                     <HelmetProvider>
                         <QueryClientProvider client={queryClient}>
                             <ThemeProvider defaultTheme="dark" storageKey="flows-theme">
-                                <ApiKeyGate>
-                                    <AppContent>{children}</AppContent>
-                                </ApiKeyGate>
+                                <WebCoreGate>
+                                    <ApiKeyGate>
+                                        <AppContent>{children}</AppContent>
+                                    </ApiKeyGate>
+                                </WebCoreGate>
                                 <Toaster
                                     position={window.innerWidth <= 767 ? 'top-center' : 'bottom-right'}
                                     richColors

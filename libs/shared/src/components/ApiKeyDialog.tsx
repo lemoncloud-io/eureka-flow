@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ExternalLink, Eye, EyeOff } from 'lucide-react';
+import { ExternalLink, Eye, EyeOff, KeyRound } from 'lucide-react';
 
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from '@flows/ui-kit';
+import { isOAuthEnabled } from '@flows/web-core';
 
 import { useApiKeyPopup } from '../hooks/useApiKeyPopup';
 
@@ -14,6 +15,7 @@ interface ApiKeyDialogProps {
     error?: string | null;
     codesUrl?: string;
     initialValue?: string;
+    hideCreateButton?: boolean;
 }
 
 const resolveError = (err: string | null, t: (key: string) => string): string | null => {
@@ -21,7 +23,15 @@ const resolveError = (err: string | null, t: (key: string) => string): string | 
     return err === 'POPUP_BLOCKED' ? t('apiKeyDialog.errors.popupBlocked') : err;
 };
 
-export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, initialValue }: ApiKeyDialogProps) => {
+export const ApiKeyDialog = ({
+    open,
+    onSubmit,
+    onOpenChange,
+    error,
+    codesUrl,
+    initialValue,
+    hideCreateButton,
+}: ApiKeyDialogProps) => {
     const { t } = useTranslation(['common']);
     const [apiKey, setApiKey] = useState(initialValue ?? '');
     const [isLoading, setIsLoading] = useState(false);
@@ -89,7 +99,20 @@ export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, in
                     <Button type="submit" size="sm" className="text-xs" disabled={!apiKey.trim() || isDisabled}>
                         {isLoading ? t('apiKeyDialog.validating') : t('apiKeyDialog.continue')}
                     </Button>
-                    {codesUrl && (
+                    {hideCreateButton ? null : isOAuthEnabled ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-xs gap-1.5"
+                            onClick={() => {
+                                window.location.href = `/auth/login?from=${encodeURIComponent(window.location.pathname)}`;
+                            }}
+                        >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            {t('apiKeyDialog.createNewKey', '키 생성하기')}
+                        </Button>
+                    ) : codesUrl ? (
                         <Button
                             type="button"
                             variant="outline"
@@ -107,8 +130,10 @@ export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, in
                                 </>
                             )}
                         </Button>
+                    ) : null}
+                    {!hideCreateButton && (
+                        <p className="text-[11px] text-muted-foreground text-center">{t('apiKeyDialog.hint')}</p>
                     )}
-                    <p className="text-[11px] text-muted-foreground text-center">{t('apiKeyDialog.hint')}</p>
                 </form>
             </DialogContent>
         </Dialog>

@@ -1,17 +1,8 @@
-import { API_URL, ENV } from '../core';
+import { ENV } from '../core';
 
 // Re-export API client
 export * from './client';
-
-/**
- * Base API configuration
- */
-export const getApiUrl = () => API_URL;
-
-/**
- * Helper to build API endpoint URLs
- */
-export const buildApiUrl = (path: string) => `${API_URL}${path}`;
+export * from './auth';
 
 // ============================================================================
 // Error Report Types & API

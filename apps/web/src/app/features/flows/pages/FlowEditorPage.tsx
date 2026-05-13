@@ -9,7 +9,7 @@ import { FLOW_FORBIDDEN, getPermissions, getProfile, useBlocks, useFlows } from 
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
-import { useWebCoreStore } from '@flows/web-core';
+import { redirectToLogin, useWebCoreStore } from '@flows/web-core';
 
 import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
@@ -245,6 +245,7 @@ export const FlowEditorPage = () => {
     }, []);
 
     const handleApiKeySettings = useCallback(() => {
+        if (!useWebCoreStore.getState().apiKey && redirectToLogin()) return;
         setIsApiKeyDialogOpen(true);
     }, []);
 

@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { ExternalLink, Eye, EyeOff, KeyRound, X } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, X } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { useApiKeyPopup } from '@flows/shared';
 import { Button, Input } from '@flows/ui-kit';
+import { isOAuthEnabled, redirectToLogin } from '@flows/web-core';
 
 import type { TutorialStep } from '../consts/tutorialSteps';
 
@@ -39,6 +40,11 @@ export const CompletionScreen = ({ step, onSubmitKey, onClose }: CompletionScree
             setShowKeyInput(true);
         },
     });
+
+    const handleGetKey = () => {
+        if (redirectToLogin()) return;
+        openPopup();
+    };
 
     const handleSubmitKey = async () => {
         if (!apiKey.trim() || isValidating) return;
@@ -102,24 +108,19 @@ export const CompletionScreen = ({ step, onSubmitKey, onClose }: CompletionScree
                         <Button className="gap-2" onClick={handleSubmitKey} disabled={!apiKey.trim() || isValidating}>
                             {isValidating ? t('tutorial:steps.done.validating') : t('tutorial:steps.done.continue')}
                         </Button>
-                        <Button
-                            variant="outline"
-                            className="gap-1.5 text-xs"
-                            onClick={openPopup}
-                            disabled={isPopupLoading}
-                        >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            {isPopupLoading ? t('common:apiKeyDialog.waitingForKey') : t('tutorial:steps.done.getKey')}
-                        </Button>
                     </div>
                 ) : (
                     <div className="flex flex-col gap-2">
-                        <Button className="gap-2" onClick={openPopup} disabled={isPopupLoading}>
+                        <Button className="gap-2" onClick={handleGetKey} disabled={isPopupLoading}>
                             <KeyRound className="h-4 w-4" />
-                            {isPopupLoading ? t('common:apiKeyDialog.waitingForKey') : t('tutorial:steps.done.getKey')}
+                            {isOAuthEnabled
+                                ? t('common:auth.createKey')
+                                : isPopupLoading
+                                  ? t('common:apiKeyDialog.waitingForKey')
+                                  : t('tutorial:steps.done.getKey')}
                         </Button>
                         <Button variant="outline" className="gap-2" onClick={() => setShowKeyInput(true)}>
-                            {t('tutorial:steps.done.enterKey')}
+                            {t('common:auth.alreadyHaveKey')}
                         </Button>
                         <div className="my-1 flex items-center gap-3">
                             <div className="h-px flex-1 bg-border/50" />
