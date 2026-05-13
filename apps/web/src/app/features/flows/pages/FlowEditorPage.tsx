@@ -245,7 +245,7 @@ export const FlowEditorPage = () => {
     }, []);
 
     const handleApiKeySettings = useCallback(() => {
-        if (redirectToLogin()) return;
+        if (!useWebCoreStore.getState().apiKey && redirectToLogin()) return;
         setIsApiKeyDialogOpen(true);
     }, []);
 

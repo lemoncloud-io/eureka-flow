@@ -299,7 +299,7 @@ export const MobileFlowEditorPage = () => {
                 onNew={role === 'owner' ? handleNew : undefined}
                 onClear={role === 'owner' ? handleClear : undefined}
                 onApiKeySettings={() => {
-                    if (redirectToLogin()) return;
+                    if (!useWebCoreStore.getState().apiKey && redirectToLogin()) return;
                     setIsApiKeyDialogOpen(true);
                 }}
                 role={role}
