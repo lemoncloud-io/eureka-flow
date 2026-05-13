@@ -5,8 +5,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { HelpCircle, Link2, LoaderCircle, X } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
+import { ApiKeyDialog } from '@flows/shared';
 import { Button, Input } from '@flows/ui-kit';
-import { API_URL, fetchOrCreateApiKey, useWebCoreStore } from '@flows/web-core';
+import { API_URL, fetchOrCreateApiKey, useWebCoreStore, validateApiKey } from '@flows/web-core';
 
 import { AuthBrandHeader } from '../components/AuthBrandHeader';
 
@@ -36,6 +37,7 @@ export const KeyCreationPage = () => {
     const [isPropagating, setIsPropagating] = useState(false);
     const [showTooltip, setShowTooltip] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
 
     useEffect(() => {
         const prefix = userName || 'flow';
@@ -65,7 +67,17 @@ export const KeyCreationPage = () => {
     }, [keyName, isCreating, navigate, fromPath, t]);
 
     const handleAlreadyHaveKey = () => {
-        navigate('/auth/login?mode=apikey', { replace: true });
+        setShowApiKeyDialog(true);
+    };
+
+    const handleApiKeySubmit = async (key: string): Promise<boolean> => {
+        const isValid = await validateApiKey(key);
+        if (isValid) {
+            setApiKey(key);
+            navigate(fromPath, { replace: true });
+            return true;
+        }
+        return false;
     };
 
     const handleSkip = () => {
@@ -74,9 +86,10 @@ export const KeyCreationPage = () => {
 
     if (isPropagating) {
         return (
-            <div className="relative flex min-h-screen items-center justify-center bg-background">
+            <div className="relative flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
                 <AuthBrandHeader />
                 <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">{t('auth.preparingKey')}</p>
             </div>
         );
     }
@@ -174,6 +187,13 @@ export const KeyCreationPage = () => {
                     </button>
                 </div>
             </div>
+
+            <ApiKeyDialog
+                open={showApiKeyDialog}
+                onSubmit={handleApiKeySubmit}
+                onOpenChange={setShowApiKeyDialog}
+                hideCreateButton
+            />
         </div>
     );
 };

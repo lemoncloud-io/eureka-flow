@@ -15,6 +15,7 @@ interface ApiKeyDialogProps {
     error?: string | null;
     codesUrl?: string;
     initialValue?: string;
+    hideCreateButton?: boolean;
 }
 
 const resolveError = (err: string | null, t: (key: string) => string): string | null => {
@@ -22,7 +23,15 @@ const resolveError = (err: string | null, t: (key: string) => string): string | 
     return err === 'POPUP_BLOCKED' ? t('apiKeyDialog.errors.popupBlocked') : err;
 };
 
-export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, initialValue }: ApiKeyDialogProps) => {
+export const ApiKeyDialog = ({
+    open,
+    onSubmit,
+    onOpenChange,
+    error,
+    codesUrl,
+    initialValue,
+    hideCreateButton,
+}: ApiKeyDialogProps) => {
     const { t } = useTranslation(['common']);
     const [apiKey, setApiKey] = useState(initialValue ?? '');
     const [isLoading, setIsLoading] = useState(false);
@@ -90,7 +99,7 @@ export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, in
                     <Button type="submit" size="sm" className="text-xs" disabled={!apiKey.trim() || isDisabled}>
                         {isLoading ? t('apiKeyDialog.validating') : t('apiKeyDialog.continue')}
                     </Button>
-                    {isOAuthEnabled ? (
+                    {hideCreateButton ? null : isOAuthEnabled ? (
                         <Button
                             type="button"
                             variant="outline"
@@ -122,7 +131,9 @@ export const ApiKeyDialog = ({ open, onSubmit, onOpenChange, error, codesUrl, in
                             )}
                         </Button>
                     ) : null}
-                    <p className="text-[11px] text-muted-foreground text-center">{t('apiKeyDialog.hint')}</p>
+                    {!hideCreateButton && (
+                        <p className="text-[11px] text-muted-foreground text-center">{t('apiKeyDialog.hint')}</p>
+                    )}
                 </form>
             </DialogContent>
         </Dialog>

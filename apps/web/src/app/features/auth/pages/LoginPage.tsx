@@ -1,21 +1,13 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useSearchParams } from 'react-router-dom';
 
-import { ApiKeyDialog } from '@flows/shared';
-import { Button } from '@flows/ui-kit';
-import { HOST, SOCIAL_OAUTH_ENDPOINT, useWebCoreStore, validateApiKey } from '@flows/web-core';
-
-const CODES_URL = import.meta.env.VITE_CODES_URL;
+import { HOST, SOCIAL_OAUTH_ENDPOINT } from '@flows/web-core';
 
 export const LoginPage = () => {
     const { t } = useTranslation(['common']);
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const fromPath = searchParams.get('from') || (location.state as { from?: string } | null)?.from || '/editor';
-    const { setApiKey } = useWebCoreStore();
-    const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
-    const [apiKeyError, setApiKeyError] = useState<string | null>(null);
 
     const handleGoogleLogin = () => {
         const redirectUrl = `${HOST}/auth/oauth-response`;
@@ -26,39 +18,26 @@ export const LoginPage = () => {
         );
     };
 
-    const handleApiKeySubmit = async (key: string): Promise<boolean> => {
-        setApiKeyError(null);
-        const isValid = await validateApiKey(key);
-        if (isValid) {
-            setApiKey(key);
-            window.location.href = fromPath;
-            return true;
-        }
-        setApiKeyError('Invalid API key. Please try again.');
-        return false;
-    };
-
     return (
-        <div className="flex min-h-screen bg-background">
-            {/* Left: Screenshot + Marketing */}
-            <div className="relative hidden w-1/2 lg:block">
+        <div className="flex min-h-dvh bg-background">
+            {/* Left: Screenshot + Marketing — desktop only */}
+            <div className="relative hidden w-1/2 overflow-hidden lg:block">
                 <div className="absolute left-[46px] top-[46px] overflow-hidden rounded-[22px] border border-border shadow-[0px_4px_12px_0px_rgba(0,0,0,0.08)]">
                     <img
                         src="/images/screenshot-light.jpg"
                         alt="Eureka Flow Editor"
-                        className="h-auto w-[999px] max-w-none object-cover"
+                        className="block h-auto w-[999px] max-w-none object-cover dark:hidden"
+                    />
+                    <img
+                        src="/images/screenshot-dark.jpg"
+                        alt="Eureka Flow Editor"
+                        className="hidden h-auto w-[999px] max-w-none object-cover dark:block"
                     />
                 </div>
 
                 <div className="absolute bottom-0 left-0 right-0">
                     <div className="relative bg-background px-[62px] pb-[82px] pt-[42px]">
-                        <div
-                            className="absolute -top-[67px] left-0 right-0 h-[109px]"
-                            style={{
-                                background:
-                                    'linear-gradient(rgba(255,255,255,0.01) 0%, rgba(255,255,255,0.48) 29%, rgba(255,255,255,0.8) 59%, rgb(255,255,255) 100%)',
-                            }}
-                        />
+                        <div className="absolute -top-[67px] left-0 right-0 h-[109px] bg-gradient-to-b from-transparent to-background" />
                         <div className="relative flex flex-col gap-[11px]">
                             <h2 className="text-[32px] font-semibold leading-[1.4] tracking-[-0.96px] text-foreground">
                                 {t('auth.marketingTitle')}
@@ -72,67 +51,45 @@ export const LoginPage = () => {
                 </div>
             </div>
 
-            {/* Right: Login Form */}
-            <div className="flex w-full items-center justify-center lg:w-1/2">
-                <div className="flex w-[348px] flex-col items-center gap-[75px]">
-                    <div className="flex flex-col items-center gap-[26px]">
+            {/* Right: Login Form — always visible */}
+            <div className="relative flex w-full items-center justify-center px-6 py-12 lg:w-1/2 lg:px-0 lg:py-0">
+                {/* Left edge blur — frosted glass boundary between panels */}
+                <div className="pointer-events-none absolute -left-16 top-0 hidden h-full w-32 bg-gradient-to-r from-transparent to-background lg:block" />
+                <div className="relative z-10 flex w-full max-w-[340px] flex-col items-center gap-10 sm:gap-12">
+                    <div className="flex flex-col items-center gap-5">
                         <img
                             src="/logo/purple-symbol.png"
                             alt="Eureka Flow"
-                            className="h-[92px] w-[87px] object-contain"
+                            className="h-14 w-14 object-contain sm:h-16 sm:w-16"
                         />
-                        <div className="flex flex-col items-center gap-3 text-center">
-                            <h1 className="text-[32px] font-semibold tracking-[-0.96px] text-foreground">
+                        <div className="flex flex-col items-center gap-2 text-center">
+                            <h1 className="text-xl font-semibold tracking-[-0.5px] text-foreground sm:text-2xl">
                                 Welcome To Eureka Flow
                             </h1>
-                            <p className="text-lg tracking-[-0.54px] text-muted-foreground">
+                            <p className="text-sm tracking-[-0.2px] text-muted-foreground">
                                 {t('auth.loginDescription')}
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex w-full flex-col gap-3">
+                    <div className="flex w-full flex-col gap-2.5">
                         <button
-                            className="flex items-center gap-4 rounded-[14px] border border-border bg-background px-[56px] py-[22px] transition-shadow hover:shadow-md"
+                            className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-border bg-background text-[15px] font-medium tracking-[-0.3px] text-foreground transition-all hover:border-foreground/20 hover:shadow-sm active:scale-[0.98]"
                             onClick={handleGoogleLogin}
                         >
                             <img
                                 src="/images/google-icon.svg"
                                 alt="Google"
-                                className="h-[21px] w-[21px]"
+                                className="h-[18px] w-[18px]"
                                 onError={e => {
                                     (e.target as HTMLImageElement).style.display = 'none';
                                 }}
                             />
-                            <span className="text-lg font-medium tracking-[-0.54px] text-foreground">
-                                {t('auth.googleLogin')}
-                            </span>
+                            {t('auth.googleLogin')}
                         </button>
-
-                        <div className="flex items-center gap-3 py-2">
-                            <div className="h-px flex-1 bg-border" />
-                            <span className="text-xs text-muted-foreground">{t('auth.or')}</span>
-                            <div className="h-px flex-1 bg-border" />
-                        </div>
-
-                        <Button
-                            variant="outline"
-                            className="h-12 w-full rounded-[14px] text-sm"
-                            onClick={() => setShowApiKeyDialog(true)}
-                        >
-                            {t('auth.useApiKey')}
-                        </Button>
                     </div>
                 </div>
             </div>
-
-            <ApiKeyDialog
-                open={showApiKeyDialog}
-                onSubmit={handleApiKeySubmit}
-                onOpenChange={setShowApiKeyDialog}
-                error={apiKeyError}
-                codesUrl={CODES_URL}
-            />
         </div>
     );
 };

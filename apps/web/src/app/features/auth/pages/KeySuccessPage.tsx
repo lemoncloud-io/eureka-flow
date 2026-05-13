@@ -51,8 +51,12 @@ export const KeySuccessPage = () => {
     };
 
     useEffect(() => {
-        if (!apiKey) navigate('/auth/create-key', { replace: true });
-    }, [apiKey, navigate]);
+        if (!apiKey) {
+            navigate('/auth/create-key', { replace: true });
+            return;
+        }
+        toast.success(t('auth.keyCreatedSuccess'));
+    }, [apiKey, navigate, t]);
 
     if (!apiKey) return null;
 
@@ -81,7 +85,7 @@ export const KeySuccessPage = () => {
                     <div className="mb-4 flex flex-col gap-1.5">
                         <span className="text-xs text-muted-foreground">{t('auth.apiKeyLabel')}</span>
                         <div className="relative overflow-hidden rounded-lg bg-[#1e1e1e] px-4 py-3 pr-10 dark:bg-[#0a0a0a]">
-                            <code className="block overflow-x-auto whitespace-nowrap text-xs leading-relaxed text-primary select-all">
+                            <code className="block overflow-x-auto whitespace-nowrap text-xs leading-relaxed text-green-400 select-all">
                                 {apiKey}
                             </code>
                             <button
@@ -133,11 +137,6 @@ export const KeySuccessPage = () => {
                 >
                     {t('auth.regenerateKey')} &gt;
                 </button>
-            </div>
-
-            {/* Bottom toast banner */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-2xl bg-popover px-8 py-3.5 text-popover-foreground shadow-xl">
-                <p className="whitespace-nowrap text-sm font-medium">{t('auth.keyCreatedSuccess')}</p>
             </div>
         </div>
     );
