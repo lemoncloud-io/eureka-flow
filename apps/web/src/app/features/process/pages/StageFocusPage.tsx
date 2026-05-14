@@ -113,7 +113,7 @@ export const StageFocusPage = () => {
     const hasNextStage = nextAction && nextAction.stage.id !== stage.id;
     const tasksDone = stage.tasks.filter(t => t.status === 'done').length;
     const tasksTotal = stage.tasks.length;
-    const incompleteTasks = stage.tasks.filter(t => t.status !== 'done');
+    const incompleteTaskCount = tasksTotal - tasksDone;
 
     const toolContext: ToolContext = {
         itemId: item.id,
@@ -124,7 +124,6 @@ export const StageFocusPage = () => {
 
     return (
         <div className="space-y-5">
-            {/* Breadcrumb — same pattern as ItemDetailPage */}
             <Breadcrumb>
                 <BreadcrumbList>
                     <BreadcrumbItem>
@@ -317,10 +316,10 @@ export const StageFocusPage = () => {
                     <AlertDialogHeader>
                         <AlertDialogTitle>{t('navigator.completeAnyway', 'Complete this stage?')}</AlertDialogTitle>
                         <AlertDialogDescription className="space-y-1">
-                            {incompleteTasks.length > 0 && (
+                            {incompleteTaskCount > 0 && (
                                 <span className="block">
                                     {t('navigator.incompleteTasksWarning', '{{count}} task(s) are not done yet.', {
-                                        count: incompleteTasks.length,
+                                        count: incompleteTaskCount,
                                     })}
                                 </span>
                             )}
