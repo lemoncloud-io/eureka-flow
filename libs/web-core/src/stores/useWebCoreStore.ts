@@ -1,8 +1,16 @@
 import { create } from 'zustand';
 
 import { LANGUAGE_KEY, getWebCoreOrNull, isOAuthEnabled } from '../core';
-import { clearStoredApiKey, getStoredApiKey, setStoredApiKey } from '../utils/apiKey';
+import {
+    clearStoredApiKey,
+    getStoredApiKey,
+    getStoredApiKeys,
+    maskKey,
+    setStoredApiKey,
+    setStoredApiKeys,
+} from '../utils/apiKey';
 
+import type { ApiKeyProfile, StoredApiKey } from '../utils/apiKey';
 import type { AWSWebCoreState } from '@lemoncloud/lemon-web-core';
 
 export interface UserProfile {
@@ -23,6 +31,7 @@ export interface WebCoreState {
     profile: UserProfile | null;
     userName: string;
     apiKey: string | null;
+    apiKeys: StoredApiKey[];
     hasGeminiKey: boolean;
     hasOpenaiKey: boolean;
 }
@@ -37,9 +46,14 @@ export interface WebCoreStore extends WebCoreState {
     setAiKeyStatus: (status: { hasGeminiKey: boolean; hasOpenaiKey: boolean }) => void;
     setApiKey: (key: string) => void;
     clearApiKey: () => void;
+    addApiKey: (key: string, options?: { label?: string; profile?: ApiKeyProfile }) => void;
+    removeApiKey: (key: string) => void;
+    switchApiKey: (key: string) => void;
+    updateKeyProfile: (key: string, profile: ApiKeyProfile) => void;
+    markKeyInvalid: (key: string) => void;
 }
 
-const initialState: Pick<WebCoreStore, keyof WebCoreState> = {
+const initialState: WebCoreState = {
     initState: undefined,
     isInitialized: false,
     isAuthenticated: false,
@@ -47,6 +61,7 @@ const initialState: Pick<WebCoreStore, keyof WebCoreState> = {
     profile: null,
     userName: '',
     apiKey: getStoredApiKey(),
+    apiKeys: getStoredApiKeys(),
     hasGeminiKey: false,
     hasOpenaiKey: false,
 };
@@ -144,6 +159,60 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
         clearApiKey: () => {
             clearStoredApiKey();
             set({ apiKey: null });
+        },
+
+        addApiKey: (key: string, options?: { label?: string; profile?: ApiKeyProfile }) => {
+            set(state => {
+                if (state.apiKeys.some(k => k.key === key)) return state;
+
+                const newEntry: StoredApiKey = {
+                    key,
+                    label: options?.label || maskKey(key),
+                    validated: !!options?.profile,
+                    profile: options?.profile,
+                    addedAt: Date.now(),
+                };
+                const updated = [...state.apiKeys, newEntry];
+                setStoredApiKeys(updated);
+                return { apiKeys: updated };
+            });
+        },
+
+        removeApiKey: (key: string) => {
+            set(state => {
+                const updated = state.apiKeys.filter(k => k.key !== key);
+                setStoredApiKeys(updated);
+
+                // If removing active key, clear it
+                if (state.apiKey === key) {
+                    clearStoredApiKey();
+                    return { apiKeys: updated, apiKey: null };
+                }
+                return { apiKeys: updated };
+            });
+        },
+
+        switchApiKey: (key: string) => {
+            setStoredApiKey(key);
+            set({ apiKey: key, profile: null, hasGeminiKey: false, hasOpenaiKey: false });
+        },
+
+        updateKeyProfile: (key: string, profile: ApiKeyProfile) => {
+            set(state => {
+                const updated = state.apiKeys.map(k => (k.key === key ? { ...k, profile, validated: true } : k));
+                setStoredApiKeys(updated);
+                return { apiKeys: updated };
+            });
+        },
+
+        markKeyInvalid: (key: string) => {
+            set(state => {
+                const updated = state.apiKeys.map(k =>
+                    k.key === key ? { ...k, validated: false, profile: undefined } : k
+                );
+                setStoredApiKeys(updated);
+                return { apiKeys: updated };
+            });
         },
     };
 });

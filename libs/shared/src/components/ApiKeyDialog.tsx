@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ExternalLink, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { Check, ExternalLink, Eye, EyeOff, KeyRound, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from '@flows/ui-kit';
-import { isOAuthEnabled } from '@flows/web-core';
+import { isOAuthEnabled, maskKey, useWebCoreStore } from '@flows/web-core';
 
 import { useApiKeyPopup } from '../hooks/useApiKeyPopup';
+
+import type { StoredApiKey } from '@flows/web-core';
 
 interface ApiKeyDialogProps {
     open: boolean;
@@ -33,16 +36,21 @@ export const ApiKeyDialog = ({
     hideCreateButton,
 }: ApiKeyDialogProps) => {
     const { t } = useTranslation(['common']);
-    const [apiKey, setApiKey] = useState(initialValue ?? '');
+    const [newKey, setNewKey] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [showApiKey, setShowApiKey] = useState(false);
+    const [showNewKey, setShowNewKey] = useState(false);
 
-    // Sync with initialValue when dialog opens
+    const activeKey = useWebCoreStore(s => s.apiKey);
+    const apiKeys = useWebCoreStore(s => s.apiKeys);
+    const switchApiKey = useWebCoreStore(s => s.switchApiKey);
+    const removeApiKey = useWebCoreStore(s => s.removeApiKey);
+
+    // Only pre-fill initialValue when no saved keys exist (first-time use)
     useEffect(() => {
-        if (open && initialValue) {
-            setApiKey(initialValue);
+        if (open && initialValue && apiKeys.length === 0) {
+            setNewKey(initialValue);
         }
-    }, [open, initialValue]);
+    }, [open, initialValue, apiKeys.length]);
 
     const {
         openPopup,
@@ -50,20 +58,38 @@ export const ApiKeyDialog = ({
         error: popupError,
     } = useApiKeyPopup({
         codesUrl: codesUrl || '',
-        onSuccess: setApiKey,
+        onSuccess: setNewKey,
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!apiKey.trim() || isLoading) return;
+        if (!newKey.trim() || isLoading) return;
 
         setIsLoading(true);
-        await onSubmit(apiKey.trim());
+        const success = await onSubmit(newKey.trim());
         setIsLoading(false);
+        if (success) {
+            setNewKey('');
+        } else {
+            toast.error(t('apiKeyDialog.invalidKey', 'Invalid API key'));
+        }
+    };
+
+    const handleSwitch = (key: string) => {
+        switchApiKey(key);
+        onOpenChange?.(false);
+        // Reload to re-boot with new key
+        window.location.reload();
+    };
+
+    const handleRemove = (key: string) => {
+        removeApiKey(key);
+        // If removed active key, stay open for new input
     };
 
     const displayError = resolveError(error, t) || resolveError(popupError, t);
     const isDisabled = isLoading || isPopupLoading;
+    const hasSavedKeys = apiKeys.length > 0;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,27 +102,44 @@ export const ApiKeyDialog = ({
                     <DialogTitle className="text-base">{t('apiKeyDialog.title')}</DialogTitle>
                     <DialogDescription className="text-xs">{t('apiKeyDialog.description')}</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="flex flex-col gap-3 mt-2">
+
+                {/* Saved keys list */}
+                {hasSavedKeys && (
+                    <SavedKeyList
+                        keys={apiKeys}
+                        activeKey={activeKey}
+                        onSwitch={handleSwitch}
+                        onRemove={handleRemove}
+                    />
+                )}
+
+                {/* New key input */}
+                <form onSubmit={handleSubmit} className="flex flex-col gap-3 mt-1">
+                    {hasSavedKeys && (
+                        <p className="text-[11px] text-muted-foreground font-medium">
+                            {t('apiKeyDialog.addNewKey', 'Add new key')}
+                        </p>
+                    )}
                     <div className="relative">
                         <Input
-                            type={showApiKey ? 'text' : 'password'}
+                            type={showNewKey ? 'text' : 'password'}
                             placeholder={t('apiKeyDialog.placeholder')}
-                            value={apiKey}
-                            onChange={e => setApiKey(e.target.value)}
-                            autoFocus
+                            value={newKey}
+                            onChange={e => setNewKey(e.target.value)}
+                            autoFocus={!hasSavedKeys}
                             disabled={isDisabled}
                             className="h-9 text-sm pr-9"
                         />
                         <button
                             type="button"
-                            onClick={() => setShowApiKey(!showApiKey)}
+                            onClick={() => setShowNewKey(!showNewKey)}
                             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                         >
-                            {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            {showNewKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                     </div>
                     {displayError && <p className="text-xs text-destructive">{displayError}</p>}
-                    <Button type="submit" size="sm" className="text-xs" disabled={!apiKey.trim() || isDisabled}>
+                    <Button type="submit" size="sm" className="text-xs" disabled={!newKey.trim() || isDisabled}>
                         {isLoading ? t('apiKeyDialog.validating') : t('apiKeyDialog.continue')}
                     </Button>
                     {hideCreateButton ? null : isOAuthEnabled ? (
@@ -137,5 +180,81 @@ export const ApiKeyDialog = ({
                 </form>
             </DialogContent>
         </Dialog>
+    );
+};
+
+// ============================================================================
+// Saved Key List (inline sub-component)
+// ============================================================================
+
+const SavedKeyList = ({
+    keys,
+    activeKey,
+    onSwitch,
+    onRemove,
+}: {
+    keys: StoredApiKey[];
+    activeKey: string | null;
+    onSwitch: (key: string) => void;
+    onRemove: (key: string) => void;
+}) => {
+    const { t } = useTranslation(['common']);
+
+    return (
+        <div className="flex flex-col gap-1.5 mt-2">
+            <p className="text-[11px] text-muted-foreground font-medium">{t('apiKeyDialog.savedKeys', 'Saved keys')}</p>
+            <div className="flex flex-col gap-1 max-h-40 overflow-y-auto">
+                {keys.map(entry => {
+                    const isActive = entry.key === activeKey;
+                    return (
+                        <div
+                            key={entry.key}
+                            className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs transition-colors ${
+                                isActive ? 'border-primary/40 bg-primary/5' : 'border-border/40 hover:bg-accent/40'
+                            }`}
+                        >
+                            {/* Active indicator */}
+                            <div
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                    isActive ? 'bg-primary' : 'bg-muted-foreground/30'
+                                }`}
+                            />
+
+                            {/* Key info */}
+                            <div className="flex-1 min-w-0">
+                                <div className="text-foreground truncate">
+                                    {entry.label !== maskKey(entry.key) ? entry.label : maskKey(entry.key)}
+                                </div>
+                                {entry.label !== maskKey(entry.key) && (
+                                    <div className="font-mono text-[10px] text-muted-foreground/60 truncate">
+                                        {maskKey(entry.key)}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Actions */}
+                            {isActive ? (
+                                <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => onSwitch(entry.key)}
+                                    className="text-[10px] text-muted-foreground hover:text-primary transition-colors px-1.5 py-0.5 rounded hover:bg-primary/10 shrink-0"
+                                >
+                                    {t('apiKeyDialog.switch', 'Switch')}
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => onRemove(entry.key)}
+                                className="text-muted-foreground/40 hover:text-destructive transition-colors shrink-0"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
     );
 };

@@ -18,7 +18,10 @@ declare module 'axios' {
 
 /** Handle auth error: clear credentials, storage, and show toast */
 const handleAuthError = (): void => {
-    useWebCoreStore.getState().clearApiKey();
+    const store = useWebCoreStore.getState();
+    const invalidKey = store.apiKey;
+    store.clearApiKey();
+    if (invalidKey) store.markKeyInvalid(invalidKey);
     localStorage.removeItem('flows-current-flow-id');
     // Delay toast to show after dialog appears
     setTimeout(() => toast.error(i18n.t('errors.authExpired', { ns: 'common' })), 100);
