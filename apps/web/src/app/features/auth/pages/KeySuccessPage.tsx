@@ -64,7 +64,7 @@ export const KeySuccessPage = () => {
     if (!apiKey) return null;
 
     return (
-        <div className="relative flex min-h-screen flex-col items-center bg-background pt-24">
+        <div className="relative flex min-h-dvh flex-col items-center overflow-y-auto bg-background pb-12 pt-24">
             <AuthBrandHeader />
 
             <div className="flex w-full max-w-[600px] flex-col items-center gap-6 px-6">
