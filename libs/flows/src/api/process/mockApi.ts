@@ -68,6 +68,30 @@ const instantiateItem = (process: Process, processId: string, name: string, thum
     };
 };
 
+const findNote = (id: string): Note | undefined => {
+    for (const item of dbItems) {
+        for (const stage of item.stages) {
+            const note = stage.notes.find(n => n.id === id);
+            if (note) return note;
+            for (const task of stage.tasks) {
+                const taskNote = task.notes.find(n => n.id === id);
+                if (taskNote) return taskNote;
+            }
+        }
+    }
+    return undefined;
+};
+
+const setNoteResolved = (id: string, resolved: boolean, actorId?: string): Note => {
+    const note = findNote(id);
+    if (!note) throw new Error('Note not found');
+    note.isResolved = resolved;
+    note.resolvedAt = resolved ? Date.now() : undefined;
+    note.resolvedByActorId = resolved ? actorId : undefined;
+    note.updatedAt = Date.now();
+    return note;
+};
+
 export const mockApi: ProcessApi = {
     processes: {
         async list(): Promise<ProcessApiListResponse<Process>> {
@@ -265,6 +289,16 @@ export const mockApi: ProcessApi = {
                 }
             }
             throw new Error('Stage not found');
+        },
+    },
+    notes: {
+        async resolve(id: string, input: { resolvedByActorId?: string }): Promise<ProcessApiResponse<Note>> {
+            await delay(200);
+            return success(setNoteResolved(id, true, input.resolvedByActorId));
+        },
+        async reopen(id: string): Promise<ProcessApiResponse<Note>> {
+            await delay(200);
+            return success(setNoteResolved(id, false));
         },
     },
     actors: {

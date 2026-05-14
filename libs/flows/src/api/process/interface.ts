@@ -42,6 +42,10 @@ export interface ProcessApi {
         addNote(id: string, input: CreateNoteInput): Promise<ProcessApiResponse<Note>>;
         addTask(id: string, input: CreateTaskInput): Promise<ProcessApiResponse<Task>>;
     };
+    notes: {
+        resolve(id: string, input: { resolvedByActorId?: string }): Promise<ProcessApiResponse<Note>>;
+        reopen(id: string): Promise<ProcessApiResponse<Note>>;
+    };
     actors: {
         list(): Promise<ProcessApiListResponse<Actor>>;
         create(input: CreateActorInput): Promise<ProcessApiResponse<Actor>>;

@@ -20,6 +20,8 @@ export {
     useChangeStageStatusMutation,
     useAddNoteMutation,
     useAddTaskMutation,
+    useResolveNoteMutation,
+    useReopenNoteMutation,
 } from './useStageQueries';
 export { useActors } from './useActorQueries';
 export { useTools } from './useToolQueries';

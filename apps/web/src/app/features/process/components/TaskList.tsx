@@ -1,0 +1,77 @@
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { Plus } from 'lucide-react';
+
+import { useAddTaskMutation } from '@flows/flows';
+import { Button, Input } from '@flows/ui-kit';
+
+import { StatusBadge } from './StatusBadge';
+
+import type { Task } from '@flows/flows';
+
+interface TaskListProps {
+    tasks: Task[];
+    stageId: string;
+    canAdd: boolean;
+}
+
+export const TaskList = ({ tasks, stageId, canAdd }: TaskListProps) => {
+    const { t } = useTranslation();
+    const [showForm, setShowForm] = useState(false);
+    const [title, setTitle] = useState('');
+    const addTaskMutation = useAddTaskMutation();
+
+    const handleAdd = () => {
+        if (!title.trim()) return;
+        addTaskMutation.mutate(
+            { stageId, input: { title: title.trim() } },
+            {
+                onSuccess: () => {
+                    setTitle('');
+                    setShowForm(false);
+                },
+            }
+        );
+    };
+
+    return (
+        <div className="space-y-2">
+            {tasks.length === 0 && !showForm && (
+                <p className="py-4 text-center text-xs text-muted-foreground">
+                    {t('navigator.noTasks', 'No tasks yet')}
+                </p>
+            )}
+            {tasks.map(task => (
+                <div key={task.id} className="flex items-center gap-3 rounded-md border border-border p-3">
+                    <StatusBadge status={task.status} />
+                    <span className="text-sm flex-1 truncate">{task.title}</span>
+                </div>
+            ))}
+            {canAdd && !showForm && (
+                <Button variant="ghost" size="sm" className="w-full gap-1.5" onClick={() => setShowForm(true)}>
+                    <Plus className="h-3.5 w-3.5" />
+                    {t('navigator.addTask', 'Add Task')}
+                </Button>
+            )}
+            {showForm && (
+                <div className="flex gap-2">
+                    <Input
+                        value={title}
+                        onChange={e => setTitle(e.target.value)}
+                        placeholder={t('navigator.taskTitle', 'Task title...')}
+                        className="flex-1"
+                        autoFocus
+                        onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                    />
+                    <Button size="sm" onClick={handleAdd} disabled={!title.trim() || addTaskMutation.isPending}>
+                        {t('navigator.add', 'Add')}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>
+                        {t('navigator.cancel', 'Cancel')}
+                    </Button>
+                </div>
+            )}
+        </div>
+    );
+};

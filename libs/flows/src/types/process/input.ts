@@ -54,7 +54,7 @@ export interface ChangeStatusInput {
 
 export interface CreateNoteInput {
     content: string;
-    authorId: string;
+    authorId?: string;
     stereo?: 'comment' | 'issue' | 'request';
     targetActorId?: string;
 }

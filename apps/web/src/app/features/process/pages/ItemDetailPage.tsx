@@ -18,6 +18,7 @@ import { Button } from '@flows/ui-kit';
 import { NextActionCTA } from '../components/NextActionCTA';
 import { ProgressBar } from '../components/ProgressBar';
 import { StageCard } from '../components/StageCard';
+import { StageDetailPanel } from '../components/StageDetailPanel';
 
 import type { Status } from '@flows/flows';
 
@@ -131,15 +132,18 @@ export const ItemDetailPage = () => {
                 </div>
             </div>
 
-            {/* Selected stage detail placeholder */}
-            {selectedStageId && (
-                <div className="rounded-lg border border-dashed border-border p-6 text-center">
-                    <p className="text-sm text-muted-foreground">
-                        {t('navigator.stageDetailPlaceholder', 'Stage Detail Panel — coming in Phase 4')}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground/60">Stage: {selectedStageId}</p>
-                </div>
-            )}
+            {/* Stage Detail Panel */}
+            <StageDetailPanel
+                stage={item.stages.find(s => s.id === selectedStageId) ?? null}
+                actors={actors}
+                itemName={item.name}
+                onClose={() =>
+                    setSearchParams(prev => {
+                        prev.delete('stage');
+                        return prev;
+                    })
+                }
+            />
         </div>
     );
 };

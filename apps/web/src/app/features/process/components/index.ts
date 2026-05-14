@@ -1,3 +1,4 @@
+export { EmbedBrowser } from './EmbedBrowser';
 export { EmptyState } from './EmptyState';
 export { ItemCard } from './ItemCard';
 export { ModeRail } from './ModeRail';
@@ -5,7 +6,12 @@ export { NavigatorHeader } from './NavigatorHeader';
 export { NavigatorLayout } from './NavigatorLayout';
 export { NavigatorSidebar } from './NavigatorSidebar';
 export { NextActionCTA } from './NextActionCTA';
+export { NoteForm } from './NoteForm';
+export { NoteList } from './NoteList';
 export { ProgressBar } from './ProgressBar';
 export { StageCard } from './StageCard';
+export { StageDetailPanel } from './StageDetailPanel';
 export { StatsBar } from './StatsBar';
 export { StatusBadge } from './StatusBadge';
+export { TaskList } from './TaskList';
+export { ToolAction } from './ToolAction';

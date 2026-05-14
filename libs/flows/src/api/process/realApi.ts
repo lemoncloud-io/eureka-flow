@@ -28,6 +28,10 @@ export const realApi: ProcessApi = {
         addNote: notImplemented,
         addTask: notImplemented,
     },
+    notes: {
+        resolve: notImplemented,
+        reopen: notImplemented,
+    },
     actors: {
         list: notImplemented,
         create: notImplemented,

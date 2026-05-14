@@ -55,3 +55,24 @@ export const useAddTaskMutation = () => {
         },
     });
 };
+
+export const useResolveNoteMutation = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, resolvedByActorId }: { id: string; resolvedByActorId?: string }) =>
+            processApi.notes.resolve(id, { resolvedByActorId }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: itemKeys.all });
+        },
+    });
+};
+
+export const useReopenNoteMutation = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => processApi.notes.reopen(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: itemKeys.all });
+        },
+    });
+};
