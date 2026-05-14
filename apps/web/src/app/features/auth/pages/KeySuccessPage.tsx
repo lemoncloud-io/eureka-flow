@@ -46,6 +46,7 @@ export const KeySuccessPage = () => {
         const webCore = getWebCoreOrNull();
         if (webCore) webCore.logout();
         setApiKey(apiKey);
+        useWebCoreStore.getState().addApiKey(apiKey, { label: keyName || undefined });
         navigate(fromPath, { replace: true });
     };
 

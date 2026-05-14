@@ -96,6 +96,11 @@
         "waitingForKey": "Waiting for key...",
         "hint": "Don't have a key? Click above to create one for free from Eureka Codes.",
         "createNewKey": "Create API Key",
+        "invalidKey": "Invalid API key",
+        "savedKeys": "Saved keys",
+        "addNewKey": "Add new key",
+        "switch": "Switch",
+        "unverified": "?",
         "errors": {
             "popupBlocked": "Popup was blocked. Please allow popups and try again."
         }

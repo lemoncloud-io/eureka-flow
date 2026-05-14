@@ -96,6 +96,11 @@
         "waitingForKey": "키 대기 중...",
         "hint": "키가 없으신가요? 위 버튼을 클릭하여 Eureka Codes에서 무료로 생성하세요.",
         "createNewKey": "키 생성하기",
+        "invalidKey": "유효하지 않은 API 키입니다",
+        "savedKeys": "저장된 키",
+        "addNewKey": "새 키 추가",
+        "switch": "전환",
+        "unverified": "?",
         "errors": {
             "popupBlocked": "팝업이 차단되었습니다. 팝업 차단을 해제하고 다시 시도해주세요."
         }
