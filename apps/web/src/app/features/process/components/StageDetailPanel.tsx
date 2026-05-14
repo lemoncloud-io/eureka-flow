@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
+import { Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { getStageUnresolvedNotesCount, useChangeStageStatusMutation } from '@flows/flows';
@@ -11,6 +13,7 @@ import { NoteList } from './NoteList';
 import { StatusBadge } from './StatusBadge';
 import { TaskList } from './TaskList';
 import { ToolAction } from './ToolAction';
+import { NEXT_STATUS } from '../consts';
 import { useFlowExecution } from '../hooks/useFlowExecution';
 
 import type { Actor, Stage, Status, ToolContext } from '@flows/flows';
@@ -22,13 +25,9 @@ interface StageDetailPanelProps {
     onClose: () => void;
 }
 
-const NEXT_STATUS: Partial<Record<Status, Status>> = {
-    todo: 'doing',
-    doing: 'done',
-};
-
 export const StageDetailPanel = ({ stage, actors, itemName, onClose }: StageDetailPanelProps) => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);
     const changeStatusMutation = useChangeStageStatusMutation();
     const flowExecution = useFlowExecution(stage?.id ?? '');
@@ -71,6 +70,15 @@ export const StageDetailPanel = ({ stage, actors, itemName, onClose }: StageDeta
                             <div className="flex items-center gap-2">
                                 <span className="text-xs text-muted-foreground">{stage.order}</span>
                                 <SheetTitle className="flex-1">{stage.name}</SheetTitle>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 shrink-0"
+                                    onClick={() => navigate(`/items/${stage.itemId}/stages/${stage.id}`)}
+                                    title={t('navigator.focusMode', 'Focus mode')}
+                                >
+                                    <Maximize2 className="h-3.5 w-3.5" />
+                                </Button>
                             </div>
                             <div className="flex items-center gap-2 mt-2">
                                 <StatusBadge status={stage.status} />

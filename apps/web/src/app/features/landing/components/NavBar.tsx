@@ -1,18 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import { Github } from 'lucide-react';
 
 import { Badge, Button, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 
-import { GITHUB_URL, ROUTES } from '../consts';
-import { shouldShowTutorial } from '../utils';
+import { GITHUB_URL } from '../consts';
+import { useStartNavigation } from '../hooks';
 
 export const NavBar = () => {
-    const navigate = useNavigate();
     const { t } = useTranslation('landing');
-
-    const handleStart = () => navigate(shouldShowTutorial() ? ROUTES.TUTORIAL : ROUTES.EDITOR);
+    const handleStart = useStartNavigation();
 
     return (
         <nav className="fixed top-0 right-0 left-0 z-50 flex justify-center px-4 pt-4">

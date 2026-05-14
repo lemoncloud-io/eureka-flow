@@ -1,7 +1,19 @@
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
-import { Badge, Button } from '@flows/ui-kit';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+    Badge,
+    Button,
+} from '@flows/ui-kit';
 
 import type { CreateStageInput } from '@flows/flows';
 
@@ -73,17 +85,35 @@ export const StageTemplateItem = ({
                 >
                     <ArrowDown className="h-3 w-3" />
                 </Button>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                    onClick={e => {
-                        e.stopPropagation();
-                        onRemove();
-                    }}
-                >
-                    <Trash2 className="h-3 w-3" />
-                </Button>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <Trash2 className="h-3 w-3" />
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent onClick={e => e.stopPropagation()}>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Stage</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This will remove the stage from the process template. This action cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={onRemove}
+                            >
+                                Delete
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </div>
     );

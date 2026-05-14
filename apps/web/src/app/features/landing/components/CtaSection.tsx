@@ -1,20 +1,18 @@
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { Globe } from 'lucide-react';
+import { Blocks, Compass } from 'lucide-react';
 
 import { Button } from '@flows/ui-kit';
 
 import { ROUTES } from '../consts';
-import { useInView } from '../hooks';
-import { shouldShowTutorial } from '../utils';
+import { useInView, useStartNavigation } from '../hooks';
 
 export const CtaSection = () => {
     const navigate = useNavigate();
     const { t } = useTranslation('landing');
     const { ref, isInView } = useInView();
-
-    const handleStart = () => navigate(shouldShowTutorial() ? ROUTES.TUTORIAL : ROUTES.EDITOR);
+    const handleStart = useStartNavigation();
     const handleExplore = () => navigate(ROUTES.EXPLORE);
 
     return (
@@ -30,9 +28,10 @@ export const CtaSection = () => {
                 <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
                     <Button
                         size="lg"
-                        className="w-full rounded-xl px-8 text-sm font-semibold sm:w-auto"
+                        className="w-full gap-2 rounded-xl px-8 text-sm font-semibold sm:w-auto"
                         onClick={handleStart}
                     >
+                        <Compass size={16} />
                         {t('cta.button')}
                     </Button>
                     <Button
@@ -41,8 +40,8 @@ export const CtaSection = () => {
                         className="w-full gap-2 rounded-xl px-8 text-sm font-medium sm:w-auto"
                         onClick={handleExplore}
                     >
-                        <Globe size={16} />
-                        {t('cta.explore', 'Explore Public Flows')}
+                        <Blocks size={16} />
+                        {t('cta.explore', 'Build a Flow')}
                     </Button>
                 </div>
             </div>

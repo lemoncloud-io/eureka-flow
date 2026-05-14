@@ -13,10 +13,10 @@ export const NavigatorLayout = () => {
     return (
         <div className="flex h-screen overflow-hidden bg-background">
             {/* Desktop: mode rail + sidebar */}
-            <div className="hidden sm:flex">
+            <aside className="hidden sm:flex">
                 <ModeRail />
                 <NavigatorSidebar />
-            </div>
+            </aside>
 
             {/* Mobile sidebar sheet */}
             <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>

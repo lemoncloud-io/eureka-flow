@@ -3,12 +3,17 @@ import { useTranslation } from 'react-i18next';
 
 import { Plus } from 'lucide-react';
 
-import { useAddTaskMutation } from '@flows/flows';
+import { useAddTaskMutation, useChangeTaskStatusMutation } from '@flows/flows';
 import { Button, Input } from '@flows/ui-kit';
 
 import { StatusBadge } from './StatusBadge';
 
-import type { Task } from '@flows/flows';
+import type { Status, Task } from '@flows/flows';
+
+const NEXT_TASK_STATUS: Partial<Record<Status, Status>> = {
+    todo: 'doing',
+    doing: 'done',
+};
 
 interface TaskListProps {
     tasks: Task[];
@@ -21,6 +26,7 @@ export const TaskList = ({ tasks, stageId, canAdd }: TaskListProps) => {
     const [showForm, setShowForm] = useState(false);
     const [title, setTitle] = useState('');
     const addTaskMutation = useAddTaskMutation();
+    const changeStatusMutation = useChangeTaskStatusMutation();
 
     const handleAdd = () => {
         if (!title.trim()) return;
@@ -35,6 +41,12 @@ export const TaskList = ({ tasks, stageId, canAdd }: TaskListProps) => {
         );
     };
 
+    const handleStatusToggle = (task: Task) => {
+        const nextStatus = NEXT_TASK_STATUS[task.status];
+        if (!nextStatus) return;
+        changeStatusMutation.mutate({ id: task.id, input: { status: nextStatus } });
+    };
+
     return (
         <div className="space-y-2">
             {tasks.length === 0 && !showForm && (
@@ -42,12 +54,28 @@ export const TaskList = ({ tasks, stageId, canAdd }: TaskListProps) => {
                     {t('navigator.noTasks', 'No tasks yet')}
                 </p>
             )}
-            {tasks.map(task => (
-                <div key={task.id} className="flex items-center gap-3 rounded-md border border-border p-3">
-                    <StatusBadge status={task.status} />
-                    <span className="text-sm flex-1 truncate">{task.title}</span>
-                </div>
-            ))}
+            {tasks.map(task => {
+                const nextStatus = NEXT_TASK_STATUS[task.status];
+                return (
+                    <div key={task.id} className="flex items-center gap-3 rounded-md border border-border p-3">
+                        <StatusBadge status={task.status} />
+                        <span className="text-sm flex-1 truncate">{task.title}</span>
+                        {nextStatus && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs shrink-0"
+                                onClick={() => handleStatusToggle(task)}
+                                disabled={changeStatusMutation.isPending}
+                            >
+                                {nextStatus === 'doing'
+                                    ? t('navigator.start', 'Start')
+                                    : t('navigator.complete', 'Complete')}
+                            </Button>
+                        )}
+                    </div>
+                );
+            })}
             {canAdd && !showForm && (
                 <Button variant="ghost" size="sm" className="w-full gap-1.5" onClick={() => setShowForm(true)}>
                     <Plus className="h-3.5 w-3.5" />

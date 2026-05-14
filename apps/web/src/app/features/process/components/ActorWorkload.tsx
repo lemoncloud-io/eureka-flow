@@ -5,6 +5,8 @@ import { getStageUnresolvedNotesCount, useActors, useItems } from '@flows/flows'
 import { cn } from '@flows/lib/utils';
 import { Card, CardContent } from '@flows/ui-kit';
 
+import { STATUS_COLORS } from './StatusBadge';
+
 export const ActorWorkload = () => {
     const { t } = useTranslation();
     const { data: itemsData } = useItems();
@@ -43,11 +45,13 @@ export const ActorWorkload = () => {
                         <CardContent className="p-3">
                             <div className="flex items-center gap-2 mb-2">
                                 <div className={cn('h-3 w-3 rounded-full shrink-0', actor.color)} />
-                                <span className="text-sm font-medium truncate">{actor.name}</span>
+                                <span className="text-sm font-medium truncate" title={actor.name}>
+                                    {actor.name}
+                                </span>
                             </div>
                             <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                 {doing > 0 && (
-                                    <span className="text-blue-500">
+                                    <span className={STATUS_COLORS.doing}>
                                         {doing} {t('navigator.doingShort', 'doing')}
                                     </span>
                                 )}
@@ -57,7 +61,7 @@ export const ActorWorkload = () => {
                                     </span>
                                 )}
                                 {unresolved > 0 && (
-                                    <span className="text-orange-500">
+                                    <span className={STATUS_COLORS.hold}>
                                         {unresolved} {t('navigator.unresolvedShort', 'unresolved')}
                                     </span>
                                 )}

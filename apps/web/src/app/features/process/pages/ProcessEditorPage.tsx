@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { ArrowLeft, Play, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, Play, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useApplyProcessMutation, useCreateProcessMutation, useProcess, useUpdateProcessMutation } from '@flows/flows';
@@ -141,7 +141,6 @@ export const ProcessEditorPage = () => {
                 }
             );
         } else if (id) {
-             
             updateMutation.mutate(
                 { id, input: { name: name.trim(), description, stages: stageInputs as any } },
                 { onSuccess: () => toast.success(t('navigator.processSaved', 'Process saved')) }
@@ -188,12 +187,20 @@ export const ProcessEditorPage = () => {
                             disabled={applyMutation.isPending}
                             className="gap-1.5"
                         >
-                            <Play className="h-3.5 w-3.5" />
+                            {applyMutation.isPending ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                                <Play className="h-3.5 w-3.5" />
+                            )}
                             {t('navigator.apply', 'Apply')}
                         </Button>
                     )}
                     <Button size="sm" onClick={handleSave} disabled={!name.trim() || isPending} className="gap-1.5">
-                        <Save className="h-3.5 w-3.5" />
+                        {isPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <Save className="h-3.5 w-3.5" />
+                        )}
                         {t('navigator.save', 'Save')}
                     </Button>
                 </div>

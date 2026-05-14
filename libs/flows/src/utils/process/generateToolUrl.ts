@@ -14,5 +14,6 @@ export const generateToolUrl = (template: string, context: ToolContext): string 
         .replace(/\{stageId\}/g, context.stageId || '')
         .replace(/\{stageName\}/g, encodeURIComponent(context.stageName || ''))
         .replace(/\{taskId\}/g, context.taskId || '')
-        .replace(/\{taskTitle\}/g, encodeURIComponent(context.taskTitle || ''));
+        .replace(/\{taskTitle\}/g, encodeURIComponent(context.taskTitle || ''))
+        .replace(/\{\w+\}/g, ''); // Remove any unsupported placeholders
 };

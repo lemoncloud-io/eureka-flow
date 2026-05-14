@@ -1,6 +1,7 @@
 export const GITHUB_URL = 'https://github.com/lemoncloud-io/eureka-flow';
 
 export const ROUTES = {
+    DASHBOARD: '/dashboard',
     TUTORIAL: '/tutorial',
     EDITOR: '/editor',
     EXPLORE: '/flows',

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle, CheckCircle2, Loader2, Package } from 'lucide-react';
 
 import { getUnresolvedCount } from '@flows/flows';
-import { Card, CardContent } from '@flows/ui-kit';
+import { cn } from '@flows/lib/utils';
 
 import type { Item } from '@flows/flows';
 
@@ -28,25 +28,36 @@ export const StatsBar = ({ items }: StatsBarProps) => {
     );
 
     const stats = [
-        { icon: Package, label: t('navigator.totalItems', 'Total'), value: total },
-        { icon: Loader2, label: t('navigator.inProgress', 'In Progress'), value: inProgress },
-        { icon: CheckCircle2, label: t('navigator.completed', 'Completed'), value: completed },
-        { icon: AlertCircle, label: t('navigator.unresolvedNotes', 'Unresolved'), value: unresolvedNotes },
+        { icon: Package, label: t('navigator.totalItems', 'Total'), value: total, color: 'text-foreground' },
+        {
+            icon: Loader2,
+            label: t('navigator.inProgress', 'In Progress'),
+            value: inProgress,
+            color: 'text-blue-500 dark:text-blue-400',
+        },
+        {
+            icon: CheckCircle2,
+            label: t('navigator.completed', 'Completed'),
+            value: completed,
+            color: 'text-green-600 dark:text-green-400',
+        },
+        {
+            icon: AlertCircle,
+            label: t('navigator.unresolvedNotes', 'Unresolved'),
+            value: unresolvedNotes,
+            color: unresolvedNotes > 0 ? 'text-orange-500 dark:text-orange-400' : 'text-muted-foreground',
+        },
     ];
 
     return (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {stats.map(({ icon: Icon, label, value }) => (
-                <Card key={label}>
-                    <CardContent className="flex items-center gap-3 p-3">
-                        <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <div>
-                            <p className="text-lg font-bold">{value}</p>
-                            <p className="text-xs text-muted-foreground">{label}</p>
-                        </div>
-                    </CardContent>
-                </Card>
+        <dl className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-3">
+            {stats.map(({ icon: Icon, label, value, color }) => (
+                <div key={label} className="flex items-center gap-2">
+                    <Icon className={cn('h-3.5 w-3.5 shrink-0', color)} />
+                    <dd className={cn('text-sm font-semibold tabular-nums', color)}>{value}</dd>
+                    <dt className="text-xs text-muted-foreground">{label}</dt>
+                </div>
             ))}
-        </div>
+        </dl>
     );
 };

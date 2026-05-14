@@ -122,7 +122,7 @@ export const MobileHeader = ({
         >
             {/* Back */}
             <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/dashboard')}
                 className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
             >
                 <ArrowLeft className="w-5 h-5" />

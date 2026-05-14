@@ -26,8 +26,9 @@ export const ModeRail = () => {
                 variant="ghost"
                 size="icon"
                 className={cn('h-9 w-9 rounded-lg', isNavigatorActive && 'bg-accent text-accent-foreground')}
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/dashboard')}
                 title="Navigator"
+                aria-label="Navigator"
             >
                 <Compass className="h-4 w-4" />
             </Button>
@@ -37,6 +38,7 @@ export const ModeRail = () => {
                 className={cn('h-9 w-9 rounded-lg', isBuilderActive && 'bg-accent text-accent-foreground')}
                 onClick={() => navigate('/flows')}
                 title="Builder"
+                aria-label="Builder"
             >
                 <Blocks className="h-4 w-4" />
             </Button>

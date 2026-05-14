@@ -7,6 +7,7 @@ import { isOAuthEnabled } from '@flows/web-core';
 
 import { KeyCreationPage, KeySuccessPage, LoginPage, OAuthResponsePage } from './features/auth';
 import { PublicFlowsPage } from './features/flows';
+import { HomePage } from './features/home';
 import { PolicyPage } from './features/landing';
 import { FlowEditorRouter } from './features/mobile-editor';
 import {
@@ -15,8 +16,10 @@ import {
     ItemBoardPage,
     ItemDetailPage,
     NavigatorLayout,
+    ProcessApplyPage,
     ProcessEditorPage,
     ProcessListPage,
+    StageFocusPage,
     ToolManagerPage,
 } from './features/process';
 import { TutorialRouter } from './features/tutorial';
@@ -36,18 +39,24 @@ export const App = () => {
                 <link rel="alternate" hreflang="x-default" href={`${SITE_URL}/`} />
             </Helmet>
             <Routes>
+                <Route path="/" element={<HomePage />} />
+
+                {/* Focus mode — outside NavigatorLayout (no sidebar) */}
+                <Route path="/items/:id/stages/:stageId" element={<StageFocusPage />} />
+
                 {/* Navigator routes */}
                 <Route element={<NavigatorLayout />}>
-                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/items" element={<ItemBoardPage />} />
                     <Route path="/items/:id" element={<ItemDetailPage />} />
                     <Route path="/processes" element={<ProcessListPage />} />
                     <Route path="/processes/:id" element={<ProcessEditorPage />} />
+                    <Route path="/processes/:id/apply" element={<ProcessApplyPage />} />
                     <Route path="/actors" element={<ActorManagerPage />} />
                     <Route path="/tools" element={<ToolManagerPage />} />
                 </Route>
 
-                {/* Builder routes — unchanged */}
+                {/* Builder routes */}
                 <Route path="/flows" element={<PublicFlowsPage />} />
                 <Route path="/editor" element={<FlowEditorRouter />} />
                 <Route path="/flows/:id" element={<FlowEditorRouter />} />

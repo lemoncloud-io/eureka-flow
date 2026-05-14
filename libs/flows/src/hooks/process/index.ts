@@ -20,6 +20,8 @@ export {
     useChangeStageStatusMutation,
     useAddNoteMutation,
     useAddTaskMutation,
+    useChangeTaskStatusMutation,
+    useAddTaskNoteMutation,
     useResolveNoteMutation,
     useReopenNoteMutation,
 } from './useStageQueries';

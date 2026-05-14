@@ -4,6 +4,8 @@ export { CurrentActorDropdown } from './CurrentActorDropdown';
 export { EmbedBrowser } from './EmbedBrowser';
 export { EmptyState } from './EmptyState';
 export { ItemCard } from './ItemCard';
+export { ItemNotesList } from './ItemNotesList';
+export { ItemRow } from './ItemRow';
 export { LivenessIndicator } from './LivenessIndicator';
 export { ModeRail } from './ModeRail';
 export { NavigatorHeader } from './NavigatorHeader';

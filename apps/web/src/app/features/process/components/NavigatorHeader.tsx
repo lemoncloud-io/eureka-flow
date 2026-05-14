@@ -20,7 +20,7 @@ export const NavigatorHeader = ({ onMenuClick }: NavigatorHeaderProps) => {
 
     const match =
         NAV_ITEMS.find(item => item.to === location.pathname) ??
-        NAV_ITEMS.find(item => item.to !== '/' && location.pathname.startsWith(item.to));
+        NAV_ITEMS.find(item => item.to !== '/dashboard' && location.pathname.startsWith(item.to));
     const title = match ? t(match.labelKey, match.fallback) : 'Navigator';
 
     return (

@@ -56,6 +56,28 @@ export const useAddTaskMutation = () => {
     });
 };
 
+export const useChangeTaskStatusMutation = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, input }: { id: string; input: ChangeStatusInput }) =>
+            processApi.tasks.changeStatus(id, input),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: itemKeys.all });
+        },
+    });
+};
+
+export const useAddTaskNoteMutation = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ taskId, input }: { taskId: string; input: CreateNoteInput }) =>
+            processApi.tasks.addNote(taskId, input),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: itemKeys.all });
+        },
+    });
+};
+
 export const useResolveNoteMutation = () => {
     const queryClient = useQueryClient();
     return useMutation({

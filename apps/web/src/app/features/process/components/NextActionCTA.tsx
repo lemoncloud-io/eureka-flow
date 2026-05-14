@@ -15,13 +15,13 @@ const REASON_CONFIG: Record<
         icon: AlertCircle,
         labelKey: 'navigator.unresolvedNotes',
         fallback: 'Unresolved request',
-        color: 'text-orange-500',
+        color: 'text-orange-500 dark:text-orange-400',
     },
     doing: {
         icon: Play,
         labelKey: 'navigator.inProgress',
         fallback: 'In progress',
-        color: 'text-blue-500',
+        color: 'text-blue-500 dark:text-blue-400',
     },
     next_todo: {
         icon: ArrowRight,
@@ -56,7 +56,7 @@ export const NextActionCTA = ({ item, action, onAction, compact }: NextActionCTA
     }
 
     return (
-        <Card className="border-primary/20 bg-primary/5">
+        <Card className="border-primary/20 bg-primary/5 hover:shadow-md transition-all duration-200">
             <CardContent className="flex items-center justify-between gap-4 p-4">
                 <div className="flex items-center gap-3 min-w-0">
                     <Icon className={cn('h-5 w-5 shrink-0', config.color)} />

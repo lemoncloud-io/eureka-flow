@@ -82,6 +82,16 @@ const findNote = (id: string): Note | undefined => {
     return undefined;
 };
 
+const findTask = (id: string): { task: Task; stage: Stage } | undefined => {
+    for (const item of dbItems) {
+        for (const stage of item.stages) {
+            const task = stage.tasks.find(t => t.id === id);
+            if (task) return { task, stage };
+        }
+    }
+    return undefined;
+};
+
 const setNoteResolved = (id: string, resolved: boolean, actorId?: string): Note => {
     const note = findNote(id);
     if (!note) throw new Error('Note not found');
@@ -289,6 +299,40 @@ export const mockApi: ProcessApi = {
                 }
             }
             throw new Error('Stage not found');
+        },
+    },
+    tasks: {
+        async changeStatus(id: string, input: ChangeStatusInput): Promise<ProcessApiResponse<Task>> {
+            await delay(200);
+            const result = findTask(id);
+            if (!result) throw new Error('Task not found');
+            result.task.status = input.status;
+            result.task.updatedAt = Date.now();
+            if (input.status === 'done') {
+                result.task.completedAt = Date.now();
+                result.task.completedByActorId = input.actorId;
+            }
+            result.stage.updatedAt = Date.now();
+            return success(result.task);
+        },
+        async addNote(id: string, input: CreateNoteInput): Promise<ProcessApiResponse<Note>> {
+            await delay(200);
+            const result = findTask(id);
+            if (!result) throw new Error('Task not found');
+            const newNote: Note = {
+                id: `note-${Date.now()}`,
+                taskId: id,
+                content: input.content,
+                stereo: input.stereo || 'comment',
+                actorId: input.authorId,
+                targetActorId: input.targetActorId,
+                isResolved: false,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
+            result.task.notes = [newNote, ...result.task.notes];
+            result.stage.updatedAt = Date.now();
+            return success(newNote);
         },
     },
     notes: {

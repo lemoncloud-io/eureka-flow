@@ -1,8 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
-import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -13,8 +12,17 @@ import {
     useChangeStageStatusMutation,
     useItem,
 } from '@flows/flows';
-import { Button } from '@flows/ui-kit';
+import { cn } from '@flows/lib/utils';
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from '@flows/ui-kit';
 
+import { ItemNotesList } from '../components/ItemNotesList';
 import { NextActionCTA } from '../components/NextActionCTA';
 import { ProgressBar } from '../components/ProgressBar';
 import { StageCard } from '../components/StageCard';
@@ -26,10 +34,10 @@ export const ItemDetailPage = () => {
     const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
     const [searchParams, setSearchParams] = useSearchParams();
-    const navigate = useNavigate();
     const { data: itemData, isLoading } = useItem(id ?? null);
     const { data: actorsData } = useActors();
     const changeStatusMutation = useChangeStageStatusMutation();
+    const [activeTab, setActiveTab] = useState<'stages' | 'notes'>('stages');
 
     const item = itemData?.data;
     const actors = actorsData?.data ?? [];
@@ -64,8 +72,8 @@ export const ItemDetailPage = () => {
     if (isLoading || !item) {
         return (
             <div className="space-y-6">
-                <div className="h-8 w-48 animate-pulse rounded bg-muted" />
-                <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+                <div className="h-10 w-48 animate-pulse rounded bg-muted" />
                 <div className="space-y-3">
                     {Array.from({ length: 5 }).map((_, i) => (
                         <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />
@@ -78,32 +86,46 @@ export const ItemDetailPage = () => {
     const progress = calculateProgress(item);
     const nextAction = getNextAction(item);
     const getActorName = (actorId?: string) => (actorId ? actorMap.get(actorId) : undefined);
+    const currentStage = item.stages.find(s => s.status === 'doing');
+    const totalNoteCount = item.stages.reduce((sum, s) => sum + s.notes.length, 0);
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-start gap-4">
-                <Button variant="ghost" size="icon" className="mt-0.5 shrink-0" onClick={() => navigate('/items')}>
-                    <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div className="flex min-w-0 flex-1 items-start gap-4">
-                    {item.thumbnailUrl ? (
-                        <img
-                            src={item.thumbnailUrl}
-                            alt={item.name}
-                            className="h-16 w-16 rounded-lg object-cover shrink-0"
-                        />
-                    ) : (
-                        <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-primary/10 text-primary text-xl font-bold shrink-0">
-                            {item.name.charAt(0).toUpperCase()}
-                        </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                        <h1 className="text-2xl font-bold truncate">{item.name}</h1>
-                        <div className="mt-2 flex items-center gap-3">
-                            <ProgressBar value={progress} className="flex-1 max-w-xs" />
-                            <span className="text-sm text-muted-foreground shrink-0">{progress}%</span>
-                        </div>
+            {/* Breadcrumb */}
+            <Breadcrumb>
+                <BreadcrumbList>
+                    <BreadcrumbItem>
+                        <BreadcrumbLink asChild>
+                            <Link to="/items">{t('navigator.items', 'Items')}</Link>
+                        </BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                        <BreadcrumbPage>{item.name}</BreadcrumbPage>
+                    </BreadcrumbItem>
+                </BreadcrumbList>
+            </Breadcrumb>
+
+            {/* Compact Header */}
+            <div className="flex items-center gap-4">
+                {item.thumbnailUrl ? (
+                    <img
+                        src={item.thumbnailUrl}
+                        alt={item.name}
+                        className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                    />
+                ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold">
+                        {item.name.charAt(0).toUpperCase()}
+                    </div>
+                )}
+                <div className="min-w-0 flex-1">
+                    <h1 className="text-xl font-bold truncate">{item.name}</h1>
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        {currentStage && <span>{currentStage.name}</span>}
+                        {currentStage && <span>·</span>}
+                        <span>{progress}%</span>
+                        <ProgressBar value={progress} className="h-1.5 w-24" />
                     </div>
                 </div>
             </div>
@@ -113,24 +135,52 @@ export const ItemDetailPage = () => {
                 <NextActionCTA item={item} action={nextAction} onAction={stageId => handleStageSelect(stageId)} />
             )}
 
-            {/* Stage List */}
-            <div className="space-y-2">
-                <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                    {t('navigator.stages', 'Stages')} ({item.stages.length})
-                </h2>
-                <div className="space-y-2">
-                    {item.stages.map(stage => (
+            {/* Tab Navigation */}
+            <div className="border-b border-border">
+                <div className="flex gap-0">
+                    <button
+                        onClick={() => setActiveTab('stages')}
+                        className={cn(
+                            'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+                            activeTab === 'stages'
+                                ? 'border-primary text-foreground'
+                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                        )}
+                    >
+                        {t('navigator.stages', 'Stages')} ({item.stages.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('notes')}
+                        className={cn(
+                            'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+                            activeTab === 'notes'
+                                ? 'border-primary text-foreground'
+                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                        )}
+                    >
+                        {t('navigator.notes', 'Notes')} ({totalNoteCount})
+                    </button>
+                </div>
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'stages' && (
+                <div>
+                    {item.stages.map((stage, index) => (
                         <StageCard
                             key={stage.id}
                             stage={stage}
                             actorName={getActorName(stage.actorId)}
                             unresolvedCount={getStageUnresolvedNotesCount(stage)}
+                            isStatusChangePending={changeStatusMutation.isPending}
+                            isLast={index === item.stages.length - 1}
                             onStatusChange={handleStatusChange}
                             onSelect={handleStageSelect}
                         />
                     ))}
                 </div>
-            </div>
+            )}
+            {activeTab === 'notes' && <ItemNotesList stages={item.stages} />}
 
             {/* Stage Detail Panel */}
             <StageDetailPanel

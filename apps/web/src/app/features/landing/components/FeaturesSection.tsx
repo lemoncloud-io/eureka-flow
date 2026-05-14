@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { BrainCircuit, LayoutGrid, Zap } from 'lucide-react';
+import { BrainCircuit, LayoutDashboard, LayoutGrid } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 
@@ -13,7 +13,7 @@ const STAGGER_MS = 120;
 const FEATURES: { key: string; Icon: LucideIcon; tall?: boolean }[] = [
     { key: 'visual_canvas', Icon: LayoutGrid, tall: true },
     { key: 'ai_nodes', Icon: BrainCircuit },
-    { key: 'instant_run', Icon: Zap },
+    { key: 'instant_run', Icon: LayoutDashboard },
 ];
 
 export const FeaturesSection = () => {

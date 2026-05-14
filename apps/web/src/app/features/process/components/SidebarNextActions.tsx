@@ -74,7 +74,7 @@ export const SidebarNextActions = () => {
                         return (
                             <button
                                 key={`${item.id}-${action.stage.id}`}
-                                onClick={() => navigate(`/items/${item.id}?stage=${action.stage.id}`)}
+                                onClick={() => navigate(`/items/${item.id}/stages/${action.stage.id}`)}
                                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-accent/50 transition-colors"
                             >
                                 <Icon className={cn('h-3 w-3 shrink-0', REASON_COLOR[action.reason])} />
@@ -88,7 +88,10 @@ export const SidebarNextActions = () => {
                 </div>
             )}
             {actionsForActor.length > MAX_ITEMS && (
-                <button onClick={() => navigate('/')} className="mt-1 px-2 text-xs text-primary hover:underline">
+                <button
+                    onClick={() => navigate('/dashboard')}
+                    className="mt-1 px-2 text-xs text-primary hover:underline"
+                >
                     {t('navigator.viewAll', 'View all')} ({actionsForActor.length})
                 </button>
             )}

@@ -3,8 +3,10 @@ export {
     DashboardPage,
     ItemBoardPage,
     ItemDetailPage,
-    ProcessListPage,
+    ProcessApplyPage,
     ProcessEditorPage,
+    ProcessListPage,
+    StageFocusPage,
     ActorManagerPage,
     ToolManagerPage,
 } from './pages';
