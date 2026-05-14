@@ -11,6 +11,7 @@ import { NoteList } from './NoteList';
 import { StatusBadge } from './StatusBadge';
 import { TaskList } from './TaskList';
 import { ToolAction } from './ToolAction';
+import { useFlowExecution } from '../hooks/useFlowExecution';
 
 import type { Actor, Stage, Status, ToolContext } from '@flows/flows';
 
@@ -30,6 +31,7 @@ export const StageDetailPanel = ({ stage, actors, itemName, onClose }: StageDeta
     const { t } = useTranslation();
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);
     const changeStatusMutation = useChangeStageStatusMutation();
+    const flowExecution = useFlowExecution(stage?.id ?? '');
 
     const handleStatusChange = (newStatus: Status) => {
         if (!stage) return;
@@ -109,7 +111,13 @@ export const StageDetailPanel = ({ stage, actors, itemName, onClose }: StageDeta
                                     </Button>
                                 )}
                                 {stage.toolId && (
-                                    <ToolAction toolId={stage.toolId} context={toolContext} onEmbed={setEmbedUrl} />
+                                    <ToolAction
+                                        toolId={stage.toolId}
+                                        context={toolContext}
+                                        onEmbed={setEmbedUrl}
+                                        onFlowExecute={flowExecution.execute}
+                                        flowState={{ status: flowExecution.status, error: flowExecution.error }}
+                                    />
                                 )}
                             </div>
 

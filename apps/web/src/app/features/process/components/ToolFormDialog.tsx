@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useCreateToolMutation, useUpdateToolMutation } from '@flows/flows';
+import { useCreateToolMutation, useFlowsListQuery, useUpdateToolMutation } from '@flows/flows';
 import {
     Button,
     Dialog,
@@ -37,10 +37,14 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
     const createMutation = useCreateToolMutation();
     const updateMutation = useUpdateToolMutation();
 
+    const flowsQuery = useFlowsListQuery(open && (tool?.stereo === 'flow' || !isEdit));
+    const flows = flowsQuery.data?.pages?.flatMap(p => p.list) ?? [];
+
     const [name, setName] = useState(tool?.name ?? '');
     const [stereo, setStereo] = useState<'link' | 'embed' | 'flow'>(tool?.stereo ?? 'link');
     const [actionLabel, setActionLabel] = useState(tool?.actionLabel ?? '');
     const [urlTemplate, setUrlTemplate] = useState(tool?.urlTemplate ?? '');
+    const [flowRefId, setFlowRefId] = useState(tool?.flowRef?.flowId ?? '');
     const [memo, setMemo] = useState(tool?.memo ?? '');
 
     const hasInvalidPlaceholder = urlTemplate && INVALID_PLACEHOLDER_RE.test(urlTemplate);
@@ -58,6 +62,7 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                         name: name.trim(),
                         actionLabel: actionLabel.trim(),
                         urlTemplate: urlTemplate.trim() || undefined,
+                        flowRef: flowRefId ? { flowId: flowRefId } : undefined,
                         memo: memo || undefined,
                     },
                 },
@@ -142,6 +147,29 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                                     )}
                                 </div>
                             )}
+                        </div>
+                    )}
+                    {stereo === 'flow' && (
+                        <div className="space-y-2">
+                            <Label>{t('navigator.flowRef', 'Connected Flow')}</Label>
+                            <Select value={flowRefId} onValueChange={setFlowRefId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={t('navigator.selectFlow', 'Select a flow...')} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {flows.length === 0 ? (
+                                        <SelectItem value="" disabled>
+                                            {t('navigator.noFlows', 'No flows available')}
+                                        </SelectItem>
+                                    ) : (
+                                        flows.map(f => (
+                                            <SelectItem key={f.id} value={f.id ?? ''}>
+                                                {f.name || `Flow ${f.id}`}
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
                         </div>
                     )}
                     <div className="space-y-2">
