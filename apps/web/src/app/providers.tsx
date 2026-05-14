@@ -109,9 +109,10 @@ const ApiKeyGate = ({ children }: { children: ReactNode }) => {
 
     const handleApiKeySubmit = async (key: string): Promise<boolean> => {
         setError(null);
-        const isValid = await validateApiKey(key);
-        if (isValid) {
+        const result = await validateApiKey(key);
+        if (result.valid) {
             setApiKey(key);
+            useWebCoreStore.getState().addApiKey(key, { profile: result.profile });
             return true;
         }
         setError('Invalid API key. Please try again.');

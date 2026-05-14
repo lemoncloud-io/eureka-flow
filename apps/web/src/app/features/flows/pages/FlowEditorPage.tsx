@@ -9,7 +9,7 @@ import { FLOW_FORBIDDEN, getPermissions, getProfile, useBlocks, useFlows } from 
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
-import { redirectToLogin, useWebCoreStore } from '@flows/web-core';
+import { redirectToLogin, useWebCoreStore, validateApiKey } from '@flows/web-core';
 
 import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
@@ -310,10 +310,13 @@ export const FlowEditorPage = () => {
             if (currentApiKey) {
                 getProfile()
                     .then(data => {
-                        useWebCoreStore.getState().setAiKeyStatus({
+                        const store = useWebCoreStore.getState();
+                        store.setAiKeyStatus({
                             hasGeminiKey: !!data.geminiApiKey,
                             hasOpenaiKey: !!data.openaiApiKey,
                         });
+                        store.addApiKey(currentApiKey);
+                        store.updateKeyProfile(currentApiKey, { sid: data.sid, uid: data.uid });
                     })
                     .catch(err => console.warn('[FlowEditor] Profile fetch failed:', err));
             }
@@ -399,7 +402,10 @@ export const FlowEditorPage = () => {
 
     const handleApiKeySubmit = useCallback(
         async (key: string): Promise<boolean> => {
+            const result = await validateApiKey(key);
+            if (!result.valid) return false;
             setApiKey(key);
+            useWebCoreStore.getState().addApiKey(key, { profile: result.profile });
             setIsApiKeyDialogOpen(false);
             bootedRef.current = false;
             setTimeout(() => boot(), 0);

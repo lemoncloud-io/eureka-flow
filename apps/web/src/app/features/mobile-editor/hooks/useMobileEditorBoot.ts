@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FLOW_FORBIDDEN, getProfile, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
-import { useWebCoreStore } from '@flows/web-core';
+import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 
 import type { SerializeWorkflowFn } from './types';
 
@@ -68,10 +68,13 @@ export const useMobileEditorBoot = ({
             if (currentApiKey) {
                 getProfile()
                     .then(data => {
-                        useWebCoreStore.getState().setAiKeyStatus({
+                        const store = useWebCoreStore.getState();
+                        store.setAiKeyStatus({
                             hasGeminiKey: !!data.geminiApiKey,
                             hasOpenaiKey: !!data.openaiApiKey,
                         });
+                        store.addApiKey(currentApiKey);
+                        store.updateKeyProfile(currentApiKey, { sid: data.sid, uid: data.uid });
                     })
                     .catch(err => console.warn('[MobileFlowEditor] Profile fetch failed:', err));
             }
@@ -133,7 +136,10 @@ export const useMobileEditorBoot = ({
 
     const handleApiKeySubmit = useCallback(
         async (key: string): Promise<boolean> => {
+            const result = await validateApiKey(key);
+            if (!result.valid) return false;
             setApiKey(key);
+            useWebCoreStore.getState().addApiKey(key, { profile: result.profile });
             setIsApiKeyDialogOpen(false);
             bootedRef.current = false;
             setTimeout(() => boot(), 0);

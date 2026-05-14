@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-05-14] - root@0.47.0, @flows/web@0.47.0, @flows/admin@0.26.0
+
+### Features
+
+- implement multiple api keys
+
 ## [2026-05-14] - root@0.46.1, @flows/web@0.46.1
 
 ### Bug Fixes

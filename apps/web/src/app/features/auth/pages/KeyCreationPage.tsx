@@ -71,9 +71,10 @@ export const KeyCreationPage = () => {
     };
 
     const handleApiKeySubmit = async (key: string): Promise<boolean> => {
-        const isValid = await validateApiKey(key);
-        if (isValid) {
+        const result = await validateApiKey(key);
+        if (result.valid) {
             setApiKey(key);
+            useWebCoreStore.getState().addApiKey(key, { profile: result.profile });
             navigate(fromPath, { replace: true });
             return true;
         }

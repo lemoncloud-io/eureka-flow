@@ -44,7 +44,8 @@
                 "typecheckTargetName": "typecheck",
                 "buildDepsTargetName": "build-deps",
                 "watchDepsTargetName": "watch-deps"
-            }
+            },
+            "exclude": ["refer/**"]
         },
         {
             "plugin": "@nx/eslint/plugin",
