@@ -86,7 +86,7 @@ export const KeyCreationPage = () => {
 
     if (isPropagating) {
         return (
-            <div className="relative flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
+            <div className="relative flex min-h-dvh flex-col items-center justify-center gap-4 overflow-y-auto bg-background">
                 <AuthBrandHeader />
                 <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
                 <p className="text-sm text-muted-foreground">{t('auth.preparingKey')}</p>
@@ -98,7 +98,7 @@ export const KeyCreationPage = () => {
     const isDisabled = isEmpty || isCreating;
 
     return (
-        <div className="relative flex min-h-screen items-center justify-center bg-background">
+        <div className="relative flex min-h-dvh items-center justify-center overflow-y-auto bg-background py-12">
             <AuthBrandHeader />
 
             <div className="flex w-full max-w-[520px] flex-col items-center gap-8 px-6">
