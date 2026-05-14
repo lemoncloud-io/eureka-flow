@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useAddNoteMutation } from '@flows/flows';
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@flows/ui-kit';
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '@flows/ui-kit';
+
+import { useCurrentActor } from '../hooks/useCurrentActor';
 
 interface NoteFormProps {
     stageId: string;
@@ -13,23 +15,24 @@ export const NoteForm = ({ stageId }: NoteFormProps) => {
     const [content, setContent] = useState('');
     const [stereo, setStereo] = useState<'comment' | 'issue' | 'request'>('comment');
     const addNoteMutation = useAddNoteMutation();
+    const { currentActorId } = useCurrentActor();
 
     const handleSubmit = () => {
         if (!content.trim()) return;
         addNoteMutation.mutate(
-            { stageId, input: { content: content.trim(), stereo } }, // TODO Phase 5: wire authorId from current actor
+            { stageId, input: { content: content.trim(), stereo, authorId: currentActorId ?? undefined } },
             { onSuccess: () => setContent('') }
         );
     };
 
     return (
         <div className="space-y-2">
-            <textarea
+            <Textarea
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 placeholder={t('navigator.notePlaceholder', 'Write a note...')}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
                 rows={2}
+                className="resize-none"
             />
             <div className="flex items-center justify-between gap-2">
                 <Select value={stereo} onValueChange={v => setStereo(v as typeof stereo)}>

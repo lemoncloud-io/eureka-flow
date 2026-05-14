@@ -1,3 +1,5 @@
+export { ActorFormDialog } from './ActorFormDialog';
+export { CurrentActorDropdown } from './CurrentActorDropdown';
 export { EmbedBrowser } from './EmbedBrowser';
 export { EmptyState } from './EmptyState';
 export { ItemCard } from './ItemCard';
@@ -15,3 +17,4 @@ export { StatsBar } from './StatsBar';
 export { StatusBadge } from './StatusBadge';
 export { TaskList } from './TaskList';
 export { ToolAction } from './ToolAction';
+export { ToolFormDialog } from './ToolFormDialog';

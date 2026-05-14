@@ -23,5 +23,17 @@ export {
     useResolveNoteMutation,
     useReopenNoteMutation,
 } from './useStageQueries';
-export { useActors } from './useActorQueries';
-export { useTools } from './useToolQueries';
+export {
+    useActors,
+    useCreateActorMutation,
+    useUpdateActorMutation,
+    useDeactivateActorMutation,
+    useActivateActorMutation,
+} from './useActorQueries';
+export {
+    useTools,
+    useCreateToolMutation,
+    useUpdateToolMutation,
+    useDeactivateToolMutation,
+    useActivateToolMutation,
+} from './useToolQueries';
