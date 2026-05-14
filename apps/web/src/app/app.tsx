@@ -7,8 +7,18 @@ import { isOAuthEnabled } from '@flows/web-core';
 
 import { KeyCreationPage, KeySuccessPage, LoginPage, OAuthResponsePage } from './features/auth';
 import { PublicFlowsPage } from './features/flows';
-import { LandingPage, PolicyPage } from './features/landing';
+import { PolicyPage } from './features/landing';
 import { FlowEditorRouter } from './features/mobile-editor';
+import {
+    ActorManagerPage,
+    DashboardPage,
+    ItemBoardPage,
+    ItemDetailPage,
+    NavigatorLayout,
+    ProcessEditorPage,
+    ProcessListPage,
+    ToolManagerPage,
+} from './features/process';
 import { TutorialRouter } from './features/tutorial';
 
 export const App = () => {
@@ -26,11 +36,24 @@ export const App = () => {
                 <link rel="alternate" hreflang="x-default" href={`${SITE_URL}/`} />
             </Helmet>
             <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/tutorial" element={<TutorialRouter />} />
+                {/* Navigator routes */}
+                <Route element={<NavigatorLayout />}>
+                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/items" element={<ItemBoardPage />} />
+                    <Route path="/items/:id" element={<ItemDetailPage />} />
+                    <Route path="/processes" element={<ProcessListPage />} />
+                    <Route path="/processes/:id" element={<ProcessEditorPage />} />
+                    <Route path="/actors" element={<ActorManagerPage />} />
+                    <Route path="/tools" element={<ToolManagerPage />} />
+                </Route>
+
+                {/* Builder routes — unchanged */}
                 <Route path="/flows" element={<PublicFlowsPage />} />
                 <Route path="/editor" element={<FlowEditorRouter />} />
                 <Route path="/flows/:id" element={<FlowEditorRouter />} />
+
+                {/* Other routes */}
+                <Route path="/tutorial" element={<TutorialRouter />} />
                 <Route path="/policy/:type" element={<PolicyPage />} />
                 {isOAuthEnabled && (
                     <>

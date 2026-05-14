@@ -67,6 +67,9 @@ const isPublicRoute = (): boolean => {
     );
 };
 
+// Note: Navigator routes (/items/*, /processes/*, /actors, /tools) are NOT public.
+// They will be caught by the ApiKeyGate and require authentication.
+
 const CODES_URL = import.meta.env.VITE_CODES_URL;
 
 const ApiKeyGateDialog = ({
