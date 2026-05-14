@@ -7,6 +7,8 @@ import { Button, ThemeToggle } from '@flows/ui-kit';
 
 import { NAV_ITEMS } from '../consts';
 import { CurrentActorDropdown } from './CurrentActorDropdown';
+import { LivenessIndicator } from './LivenessIndicator';
+import { UnresolvedNotesBadge } from './UnresolvedNotesBadge';
 
 interface NavigatorHeaderProps {
     onMenuClick?: () => void;
@@ -31,6 +33,8 @@ export const NavigatorHeader = ({ onMenuClick }: NavigatorHeaderProps) => {
             </div>
 
             <div className="flex items-center gap-2">
+                <LivenessIndicator />
+                <UnresolvedNotesBadge />
                 <CurrentActorDropdown />
                 <ThemeToggle />
                 <Link to="/flows">

@@ -5,6 +5,7 @@ import { LayoutDashboard } from 'lucide-react';
 
 import { getNextAction, useItems } from '@flows/flows';
 
+import { ActorWorkload } from '../components/ActorWorkload';
 import { EmptyState } from '../components/EmptyState';
 import { NextActionCTA } from '../components/NextActionCTA';
 import { StatsBar } from '../components/StatsBar';
@@ -84,6 +85,8 @@ export const DashboardPage = () => {
                     )}
                 </div>
             )}
+
+            <ActorWorkload />
         </div>
     );
 };

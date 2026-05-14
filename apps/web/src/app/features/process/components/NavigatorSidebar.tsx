@@ -2,8 +2,10 @@ import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 
 import { cn } from '@flows/lib/utils';
+import { Separator } from '@flows/ui-kit';
 
 import { NAV_ITEMS } from '../consts';
+import { SidebarNextActions } from './SidebarNextActions';
 
 export const NavigatorSidebar = ({ className }: { className?: string }) => {
     const { t } = useTranslation();
@@ -35,11 +37,8 @@ export const NavigatorSidebar = ({ className }: { className?: string }) => {
                     </NavLink>
                 ))}
             </nav>
-            <div className="border-t border-border p-4">
-                <p className="text-xs text-muted-foreground/60">
-                    {t('navigator.currentActorPlaceholder', 'Current Actor — Phase 5')}
-                </p>
-            </div>
+            <Separator />
+            <SidebarNextActions />
         </aside>
     );
 };
