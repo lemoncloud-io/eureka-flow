@@ -41,14 +41,12 @@ export const App = () => {
             <Routes>
                 <Route path="/" element={<HomePage />} />
 
-                {/* Focus mode — outside NavigatorLayout (no sidebar) */}
-                <Route path="/items/:id/stages/:stageId" element={<StageFocusPage />} />
-
                 {/* Navigator routes */}
                 <Route element={<NavigatorLayout />}>
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/items" element={<ItemBoardPage />} />
                     <Route path="/items/:id" element={<ItemDetailPage />} />
+                    <Route path="/items/:id/stages/:stageId" element={<StageFocusPage />} />
                     <Route path="/processes" element={<ProcessListPage />} />
                     <Route path="/processes/:id" element={<ProcessEditorPage />} />
                     <Route path="/processes/:id/apply" element={<ProcessApplyPage />} />

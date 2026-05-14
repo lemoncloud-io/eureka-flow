@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { toast } from 'sonner';
 
@@ -26,14 +26,13 @@ import { ItemNotesList } from '../components/ItemNotesList';
 import { NextActionCTA } from '../components/NextActionCTA';
 import { ProgressBar } from '../components/ProgressBar';
 import { StageCard } from '../components/StageCard';
-import { StageDetailPanel } from '../components/StageDetailPanel';
 
 import type { Status } from '@flows/flows';
 
 export const ItemDetailPage = () => {
     const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
-    const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
     const { data: itemData, isLoading } = useItem(id ?? null);
     const { data: actorsData } = useActors();
     const changeStatusMutation = useChangeStageStatusMutation();
@@ -41,7 +40,6 @@ export const ItemDetailPage = () => {
 
     const item = itemData?.data;
     const actors = actorsData?.data ?? [];
-    const selectedStageId = searchParams.get('stage');
     const actorMap = useMemo(() => new Map(actors.map(a => [a.id, a.name])), [actors]);
 
     const handleStatusChange = (stageId: string, status: Status) => {
@@ -49,24 +47,14 @@ export const ItemDetailPage = () => {
             { id: stageId, input: { status } },
             {
                 onSuccess: result => {
-                    const warnings = result.warnings ?? [];
-                    if (warnings.length > 0) {
-                        warnings.forEach(w => toast.warning(w));
-                    }
+                    (result.warnings ?? []).forEach(w => toast.warning(w));
                 },
             }
         );
     };
 
     const handleStageSelect = (stageId: string) => {
-        setSearchParams(prev => {
-            if (prev.get('stage') === stageId) {
-                prev.delete('stage');
-            } else {
-                prev.set('stage', stageId);
-            }
-            return prev;
-        });
+        navigate(`/items/${id}/stages/${stageId}`);
     };
 
     if (isLoading || !item) {
@@ -85,13 +73,11 @@ export const ItemDetailPage = () => {
 
     const progress = calculateProgress(item);
     const nextAction = getNextAction(item);
-    const getActorName = (actorId?: string) => (actorId ? actorMap.get(actorId) : undefined);
     const currentStage = item.stages.find(s => s.status === 'doing');
     const totalNoteCount = item.stages.reduce((sum, s) => sum + s.notes.length, 0);
 
     return (
-        <div className="space-y-6">
-            {/* Breadcrumb */}
+        <div className="space-y-5">
             <Breadcrumb>
                 <BreadcrumbList>
                     <BreadcrumbItem>
@@ -106,7 +92,6 @@ export const ItemDetailPage = () => {
                 </BreadcrumbList>
             </Breadcrumb>
 
-            {/* Compact Header */}
             <div className="flex items-center gap-4">
                 {item.thumbnailUrl ? (
                     <img
@@ -124,18 +109,16 @@ export const ItemDetailPage = () => {
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                         {currentStage && <span>{currentStage.name}</span>}
                         {currentStage && <span>·</span>}
-                        <span>{progress}%</span>
+                        <span className="tabular-nums">{progress}%</span>
                         <ProgressBar value={progress} className="h-1.5 w-24" />
                     </div>
                 </div>
             </div>
 
-            {/* Next Action */}
             {nextAction && (
                 <NextActionCTA item={item} action={nextAction} onAction={stageId => handleStageSelect(stageId)} />
             )}
 
-            {/* Tab Navigation */}
             <div className="border-b border-border">
                 <div className="flex gap-0">
                     <button
@@ -163,14 +146,13 @@ export const ItemDetailPage = () => {
                 </div>
             </div>
 
-            {/* Tab Content */}
             {activeTab === 'stages' && (
                 <div>
                     {item.stages.map((stage, index) => (
                         <StageCard
                             key={stage.id}
                             stage={stage}
-                            actorName={getActorName(stage.actorId)}
+                            actorName={actorMap.get(stage.actorId ?? '')}
                             unresolvedCount={getStageUnresolvedNotesCount(stage)}
                             isStatusChangePending={changeStatusMutation.isPending}
                             isLast={index === item.stages.length - 1}
@@ -181,19 +163,6 @@ export const ItemDetailPage = () => {
                 </div>
             )}
             {activeTab === 'notes' && <ItemNotesList stages={item.stages} />}
-
-            {/* Stage Detail Panel */}
-            <StageDetailPanel
-                stage={item.stages.find(s => s.id === selectedStageId) ?? null}
-                actors={actors}
-                itemName={item.name}
-                onClose={() =>
-                    setSearchParams(prev => {
-                        prev.delete('stage');
-                        return prev;
-                    })
-                }
-            />
         </div>
     );
 };
