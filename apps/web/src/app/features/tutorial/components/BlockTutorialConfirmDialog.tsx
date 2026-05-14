@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 import { X } from 'lucide-react';
 
@@ -11,8 +12,10 @@ interface BlockTutorialConfirmDialogProps {
 }
 
 /** Confirmation dialog shown when user tries to close block tutorial mid-way */
-export const BlockTutorialConfirmDialog: React.FC<BlockTutorialConfirmDialogProps> = ({ onCancel, onConfirm }) =>
-    createPortal(
+export const BlockTutorialConfirmDialog: React.FC<BlockTutorialConfirmDialogProps> = ({ onCancel, onConfirm }) => {
+    const { t } = useTranslation('tutorial');
+
+    return createPortal(
         <div className="fixed inset-0 z-[10000] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/46" onClick={onCancel} />
 
@@ -24,10 +27,10 @@ export const BlockTutorialConfirmDialog: React.FC<BlockTutorialConfirmDialogProp
                 <div className="flex flex-col items-center gap-5">
                     <div className="flex flex-col items-center gap-2 text-center">
                         <p className="text-lg font-medium leading-[1.4] tracking-[-0.54px] text-foreground">
-                            블록 사용법 확인을 중단하시겠어요?
+                            {t('blockTutorial.confirmDialog.title')}
                         </p>
                         <p className="text-base leading-[1.5] tracking-[-0.48px] text-muted-foreground">
-                            사용법은 메인 메뉴에서 다시 확인 가능합니다.
+                            {t('blockTutorial.confirmDialog.description')}
                         </p>
                     </div>
                 </div>
@@ -40,7 +43,7 @@ export const BlockTutorialConfirmDialog: React.FC<BlockTutorialConfirmDialogProp
                             'border border-border text-base font-semibold text-muted-foreground'
                         )}
                     >
-                        취소
+                        {t('blockTutorial.confirmDialog.cancel')}
                     </button>
                     <button
                         onClick={onConfirm}
@@ -49,10 +52,11 @@ export const BlockTutorialConfirmDialog: React.FC<BlockTutorialConfirmDialogProp
                             'bg-primary text-base font-semibold text-primary-foreground'
                         )}
                     >
-                        중단
+                        {t('blockTutorial.confirmDialog.stop')}
                     </button>
                 </div>
             </div>
         </div>,
         document.body
     );
+};

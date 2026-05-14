@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 
+import { LANGUAGE_KEY, getWebCoreOrNull, isOAuthEnabled } from '../core';
 import { clearStoredApiKey, getStoredApiKey, setStoredApiKey } from '../utils/apiKey';
+
+import type { AWSWebCoreState } from '@lemoncloud/lemon-web-core';
 
 export interface UserProfile {
     id: string;
@@ -13,6 +16,7 @@ export interface UserProfile {
 export type UserView = Partial<UserProfile>;
 
 export interface WebCoreState {
+    initState?: AWSWebCoreState;
     isInitialized: boolean;
     isAuthenticated: boolean;
     error: Error | null;
@@ -24,7 +28,7 @@ export interface WebCoreState {
 }
 
 export interface WebCoreStore extends WebCoreState {
-    initialize: () => void;
+    initialize: () => Promise<void>;
     logout: () => Promise<void>;
     setIsAuthenticated: (isAuth: boolean) => void;
     setProfile: (profile: UserProfile) => void;
@@ -36,6 +40,7 @@ export interface WebCoreStore extends WebCoreState {
 }
 
 const initialState: Pick<WebCoreStore, keyof WebCoreState> = {
+    initState: undefined,
     isInitialized: false,
     isAuthenticated: false,
     error: null,
@@ -52,8 +57,20 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
     return {
         ...initialState,
 
-        initialize: () => {
-            set({ isInitialized: true, error: null });
+        initialize: async () => {
+            set({ isInitialized: false, error: null });
+
+            const webCore = getWebCoreOrNull();
+            if (webCore) {
+                // OAuth mode: initialize webCore and check auth state
+                const initState = await webCore.init();
+                await webCore.setUseXLemonLanguage(true, LANGUAGE_KEY);
+                const isAuthenticated = await webCore.isAuthenticated();
+                set({ isInitialized: true, isAuthenticated, initState: initState as AWSWebCoreState });
+            } else {
+                // API-key-only mode: just mark as initialized
+                set({ isInitialized: true });
+            }
         },
 
         logout: async () => {
@@ -65,7 +82,24 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
                 }
             });
 
-            set({ isAuthenticated: false, profile: null, userName: '', hasGeminiKey: false, hasOpenaiKey: false });
+            const webCore = getWebCoreOrNull();
+            if (webCore) {
+                await webCore.logout();
+            }
+
+            clearStoredApiKey();
+            set({
+                isAuthenticated: false,
+                profile: null,
+                userName: '',
+                apiKey: null,
+                hasGeminiKey: false,
+                hasOpenaiKey: false,
+            });
+
+            if (isOAuthEnabled) {
+                window.location.href = '/auth/login';
+            }
         },
 
         setIsAuthenticated: (isAuthenticated: boolean) => set({ isAuthenticated }),

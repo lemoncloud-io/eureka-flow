@@ -1,5 +1,49 @@
 # Changelog
 
+## [2026-05-14] - root@0.46.1, @flows/web@0.46.1
+
+### Bug Fixes
+
+- (auth) adjust page height and enable scrolling
+
+## [2026-05-13] - root@0.46.0, @flows/web@0.46.0
+
+### Features
+
+- add i18n to tutorial
+
+### Chores
+
+- (ci) add OAuth env vars to force-deploy workflow
+
+## [2026-05-13] - root@0.45.1, @flows/web@0.45.1
+
+### Bug Fixes
+
+- (auth) clear lemon-web-core credentials after API key creation
+
+## [2026-05-13] - root@0.45.0, @flows/web@0.45.0, @flows/admin@0.25.0
+
+### Features
+
+- (auth) polish login, key dialog, and completion screen UI
+- (auth) add i18n translations and dark mode support
+- (auth) implement Figma design for login, key creation, and key success pages
+- (auth) add OAuth login and API key creation flow
+
+### Bug Fixes
+
+- (shared) replace Codes popup button with OAuth login redirect
+- (auth) skip login redirect when API key already exists
+
+### Refactor
+
+- refactor code
+
+### Other
+
+- style: (auth) polish KeyCreation and KeySuccess pages to match Figma
+
 ## [2026-05-07] - root@0.44.0, @flows/web@0.44.0, @flows/admin@0.24.0
 
 ### Features

@@ -2,6 +2,7 @@
     "loading": "Loading tutorial...",
     "flowName": "Model Synthesis",
     "retry": "Retry",
+    "title": "Tutorial",
     "steps": {
         "welcome": {
             "title": "Welcome!",
@@ -48,6 +49,110 @@
         "prev": "Back",
         "skip": "Skip tutorial",
         "later": "Maybe later",
+        "start": "Get Started",
+        "done": "Done",
+        "close": "Close",
+        "goToHelp": "Go to Help",
         "exploreFlows": "Explore Public Flows"
+    },
+    "guideTour": {
+        "welcome": {
+            "title": "Let's explore the editor!",
+            "description": "We'll take a quick tour of the workflow editor!\nYou can replay this tutorial anytime from the menu."
+        },
+        "blockLibrary": {
+            "title": "Block Library",
+            "description": "Click the block menu icon to open the Block Library!\nBrowse input, process, and output blocks, then drag or click\nto add them to the canvas.",
+            "iconLabel": "Block Library"
+        },
+        "flowInfo": {
+            "title": "Flow Info & Status",
+            "description": "Check the flow name, save status, and connection status here.\nClick the name to rename your workflow.",
+            "iconLabel": "Flow Info"
+        },
+        "quickActions": {
+            "title": "Quick Actions",
+            "description": "Save, undo, redo, and open the flow list.\nYou can also use keyboard shortcuts for quick access."
+        },
+        "mainMenu": {
+            "title": "Main Menu",
+            "description": "File operations (export, import), editing tools (auto layout, reset),\npublish, help, and more are available from the main menu.\nManage your Eureka API key in API Key Settings."
+        },
+        "ready": {
+            "title": "All Set!",
+            "description": "Start by adding blocks from the Block Library and connecting them!\nYou can always click Help in the main menu for guidance."
+        }
+    },
+    "blockTutorial": {
+        "intro": {
+            "title": "How to Use Block Library",
+            "description": "Before using Eureka Flow,\nlet us show you how to use the Block Library!"
+        },
+        "inputBlock": {
+            "title": "Input Block",
+            "description": "Blocks for entering data to send to AI, such as text and images.\nSelect an input block to add it to the canvas.",
+            "iconLabel": "Input"
+        },
+        "inputText": {
+            "title": "Input Block — Text Input",
+            "description": "Enter text in the text block to create results\nlike AI images or AI text.",
+            "iconLabel": "Text Input"
+        },
+        "processBlock": {
+            "title": "Process Block",
+            "description": "Blocks that process input data with AI to generate results.\nSelect a process block to add it to the canvas.",
+            "iconLabel": "Process"
+        },
+        "processAiImage": {
+            "title": "Process Block — AI Image",
+            "description": "Connect to the 'Text Input' from the input block,\nrun it, and check the AI image result.",
+            "iconLabel": "AI Image"
+        },
+        "outputBlock": {
+            "title": "Output Block",
+            "description": "Blocks for previewing processed results or checking logs.\nSelect an output block to add it to the canvas.",
+            "iconLabel": "Output"
+        },
+        "outputPreview": {
+            "title": "Output Block — Preview",
+            "description": "Preview the results from connecting input and process blocks.",
+            "iconLabel": "Preview"
+        },
+        "help": {
+            "title": "Check the Help section for anything you're unsure about.",
+            "iconLabel": "Help"
+        },
+        "confirmDialog": {
+            "title": "Stop the block tutorial?",
+            "description": "You can revisit this from the main menu anytime.",
+            "cancel": "Cancel",
+            "stop": "Stop"
+        }
+    },
+    "shortcuts": {
+        "save": "Save",
+        "undo": "Undo",
+        "redo": "Redo",
+        "flowList": "Flow List",
+        "runAll": "Run All",
+        "autoLayout": "Auto Layout"
+    },
+    "menuPreview": {
+        "file": "File",
+        "newFlow": "New Flow",
+        "save": "Save",
+        "exportJson": "Export JSON",
+        "exportPng": "Export PNG",
+        "canvas": "Canvas",
+        "autoLayout": "Auto Layout",
+        "collapseAll": "Collapse All",
+        "expandAll": "Expand All",
+        "clearCanvas": "Clear Canvas",
+        "publish": "Publish",
+        "publishAction": "Publish",
+        "settings": "Settings",
+        "apiKeySettings": "API Key Settings",
+        "help": "Help",
+        "replayTutorial": "Replay Tutorial"
     }
 }

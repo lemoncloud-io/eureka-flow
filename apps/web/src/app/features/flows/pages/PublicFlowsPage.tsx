@@ -9,7 +9,7 @@ import { usePublicFlowsInfiniteQuery, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { ApiKeyDialog, SITE_URL } from '@flows/shared';
 import { Badge, Button, Input, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
-import { useWebCoreStore } from '@flows/web-core';
+import { redirectToLogin, useWebCoreStore } from '@flows/web-core';
 
 import { formatRelativeTime } from '../utils';
 
@@ -272,7 +272,10 @@ export const PublicFlowsPage = () => {
                             <Button
                                 size="sm"
                                 className="ml-1 h-8 rounded-xl text-xs font-medium"
-                                onClick={() => setIsApiKeyDialogOpen(true)}
+                                onClick={() => {
+                                    if (redirectToLogin()) return;
+                                    setIsApiKeyDialogOpen(true);
+                                }}
                             >
                                 {t('publicFlows.signIn', 'Sign in')}
                             </Button>

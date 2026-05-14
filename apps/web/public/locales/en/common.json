@@ -95,8 +95,41 @@
         "createKey": "Get Free Key from Codes",
         "waitingForKey": "Waiting for key...",
         "hint": "Don't have a key? Click above to create one for free from Eureka Codes.",
+        "createNewKey": "Create API Key",
         "errors": {
             "popupBlocked": "Popup was blocked. Please allow popups and try again."
         }
+    },
+    "auth": {
+        "loginDescription": "Sign in to continue",
+        "googleLogin": "Continue with Google",
+        "or": "or",
+        "useApiKey": "Use API Key",
+        "marketingTitle": "Build AI workflows visually, no coding required",
+        "marketingLine1": "Connect and run with drag and drop.",
+        "marketingLine2": "Complete AI pipelines right in your browser, no installation needed.",
+        "loginFailed": "Login failed. Please try again.",
+        "keyRequiredTitle": "You need an <strong>EurekaAPI key</strong> to use EurekaFlow.\nPlease create an <strong>EurekaAPI key</strong>.",
+        "whatIsApiKey": "What is an EurekaAPI key?",
+        "apiKeyExplanation": "An API connects different services so they can exchange information with each other.",
+        "keyName": "Key Name",
+        "keyNamePlaceholder": "Enter key name (e.g., flow-api)",
+        "keyNameHint": "You can modify the default API key name.",
+        "createKey": "Create Key",
+        "keyCreationFailed": "Failed to create key. Please try again.",
+        "alreadyHaveKey": "I already have a key",
+        "skipForNow": "Maybe later",
+        "preparingKey": "Preparing your key...",
+        "keyCreatedTitle": "<strong>EurekaAPI key</strong> has been created.",
+        "securityNotice": "For security reasons, the generated EurekaAPI key cannot be viewed again.\nPlease copy your EurekaAPI key and store it safely, like a password.",
+        "apiKeyLabel": "API Key",
+        "copyApiKey": "Copy EurekaAPI Key",
+        "copied": "Copied",
+        "keyCopied": "API key copied.",
+        "copyFailed": "Copy failed.",
+        "createdAt": "Created: {{date}}",
+        "complete": "Done",
+        "regenerateKey": "Create EurekaAPI key again",
+        "keyCreatedSuccess": "API key creation complete."
     }
 }

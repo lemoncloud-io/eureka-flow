@@ -95,8 +95,41 @@
         "createKey": "Eureka Codes에서 무료 키 받기",
         "waitingForKey": "키 대기 중...",
         "hint": "키가 없으신가요? 위 버튼을 클릭하여 Eureka Codes에서 무료로 생성하세요.",
+        "createNewKey": "키 생성하기",
         "errors": {
             "popupBlocked": "팝업이 차단되었습니다. 팝업 차단을 해제하고 다시 시도해주세요."
         }
+    },
+    "auth": {
+        "loginDescription": "계속하려면 로그인하세요",
+        "googleLogin": "Google로 계속하기",
+        "or": "또는",
+        "useApiKey": "API 키 사용",
+        "marketingTitle": "AI 워크플로우, 비주얼하게 코딩 없이 만드세요",
+        "marketingLine1": "드래그앤 드롭으로 연결하고 실행하세요.",
+        "marketingLine2": "설치 없이 브라우저에서바로 AI 파이프라인을 완성합니다.",
+        "loginFailed": "로그인에 실패했습니다. 다시 시도해 주세요.",
+        "keyRequiredTitle": "EurekaFlow 사용에 필요한 <strong>EurekaAPI 키</strong>가 필요해요.\n<strong>EurekaAPI 키</strong>를 생성해 주세요.",
+        "whatIsApiKey": "EurekaAPI 키 란?",
+        "apiKeyExplanation": "API는 서로 다른 서비스 정보를 주고받을 수 있도록 연결해주는 기능입니다.",
+        "keyName": "키 이름",
+        "keyNamePlaceholder": "키 이름 입력 (예: 플로우 사용 api)",
+        "keyNameHint": "기본 설정된 API 키 이름은 수정이 가능합니다.",
+        "createKey": "키 생성",
+        "keyCreationFailed": "키 생성에 실패했습니다. 다시 시도해 주세요.",
+        "alreadyHaveKey": "이미 키가 있어요",
+        "skipForNow": "나중에 하기",
+        "preparingKey": "키를 준비하고 있어요...",
+        "keyCreatedTitle": "<strong>EurekaAPI 키</strong>가 생성되었어요.",
+        "securityNotice": "보안상의 이유로 생성된 EurekaAPI 키를 다시 확인할 수 없습니다.\nEurekaAPI를 복사하여, 비밀번호 처럼 안전하게 보관해주세요.",
+        "apiKeyLabel": "API 키",
+        "copyApiKey": "EurekaAPI 키 복사",
+        "copied": "복사됨",
+        "keyCopied": "API 키가 복사되었습니다.",
+        "copyFailed": "복사에 실패했습니다.",
+        "createdAt": "생성일: {{date}}",
+        "complete": "완료",
+        "regenerateKey": "EurekaAPI 키 다시 생성",
+        "keyCreatedSuccess": "API 키 생성이 완료되었습니다."
     }
 }

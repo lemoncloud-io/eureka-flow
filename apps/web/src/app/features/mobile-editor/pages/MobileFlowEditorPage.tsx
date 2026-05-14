@@ -8,7 +8,7 @@ import { useBlockRegistry, useCanvasStore, useFlows } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { ApiKeyDialog } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
-import { useWebCoreStore } from '@flows/web-core';
+import { redirectToLogin, useWebCoreStore } from '@flows/web-core';
 
 import { useDebugMode } from '../../../hooks/useDebugMode';
 import { AiKeyDialog } from '../../flows/components/AiKeyDialog';
@@ -298,7 +298,10 @@ export const MobileFlowEditorPage = () => {
                 onExport={handleExport}
                 onNew={role === 'owner' ? handleNew : undefined}
                 onClear={role === 'owner' ? handleClear : undefined}
-                onApiKeySettings={() => setIsApiKeyDialogOpen(true)}
+                onApiKeySettings={() => {
+                    if (!useWebCoreStore.getState().apiKey && redirectToLogin()) return;
+                    setIsApiKeyDialogOpen(true);
+                }}
                 role={role}
                 onVersionClick={handleVersionClick}
                 isDebugMode={isDebugMode}
@@ -490,7 +493,17 @@ export const MobileFlowEditorPage = () => {
 
             {isPublicMode && (
                 <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 mb-[env(safe-area-inset-bottom)]">
-                    <Button size="sm" className="shadow-lg gap-2" onClick={() => setIsApiKeyDialogOpen(true)}>
+                    <Button
+                        size="sm"
+                        className="shadow-lg gap-2"
+                        onClick={() => {
+                            if (isOAuthEnabled) {
+                                window.location.href = `/auth/login?from=${encodeURIComponent(window.location.pathname)}`;
+                                return;
+                            }
+                            setIsApiKeyDialogOpen(true);
+                        }}
+                    >
                         <KeyRound className="w-4 h-4" />
                         {t('flowEditor.signInToEdit', 'Sign in to edit')}
                     </Button>
