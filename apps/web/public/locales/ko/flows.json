@@ -523,7 +523,8 @@
             "disconnected": "연결 해제됨",
             "failedToConnect": "연결 생성 실패",
             "failedToDisconnect": "연결 해제 실패",
-            "addNewAndConnect": "새 블록 추가 & 연결",
+            "addConnection": "추가 연결",
+            "addNewAndConnect": "노드 추가",
             "tapToConnect": "탭하여 연결",
             "noCompatiblePorts": "호환되는 입력 포트가 없습니다.",
             "addMoreNodes": "일치하는 입력 타입의 노드를 추가하세요."
@@ -540,6 +541,28 @@
         "imageOutput": "이미지",
         "viewOnly": "보기 전용",
         "browseAllBlocks": "전체 블록 보기",
+        "stereo": {
+            "input": "입력 블록",
+            "process": "처리 블록",
+            "output": "출력 블록"
+        },
+        "nodeName": "노드 명",
+        "autoExecution": "자동 실행",
+        "value": "값",
+        "valuePlaceholder": "여기에 내용을 입력하세요.",
+        "connectedBlocks": "연결된 블록",
+        "input": "입력",
+        "output": "출력",
+        "runBlock": "블록 실행",
+        "runThisOnly": "지금만 실행",
+        "runAndPropagate": "다음도 실행",
+        "switchFlow": "플로우 전환",
+        "newFlow": {
+            "title": "새 플로우 만들기",
+            "name": "플로우 이름",
+            "namePlaceholder": "플로우 이름을 입력하세요",
+            "create": "플로우 만들기"
+        },
         "state": {
             "idle": "대기",
             "ready": "준비",

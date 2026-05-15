@@ -523,6 +523,7 @@
             "disconnected": "Disconnected",
             "failedToConnect": "Failed to create connection",
             "failedToDisconnect": "Failed to disconnect",
+            "addConnection": "Add connection",
             "addNewAndConnect": "Add new block & connect",
             "tapToConnect": "tap to connect",
             "noCompatiblePorts": "No compatible input ports found.",
@@ -540,6 +541,28 @@
         "imageOutput": "Image",
         "viewOnly": "View only",
         "browseAllBlocks": "Browse all blocks",
+        "stereo": {
+            "input": "Input Block",
+            "process": "Process Block",
+            "output": "Output Block"
+        },
+        "nodeName": "Node Name",
+        "autoExecution": "Auto Execution",
+        "value": "Value",
+        "valuePlaceholder": "Enter content here.",
+        "connectedBlocks": "Connected Blocks",
+        "input": "Input",
+        "output": "Output",
+        "runBlock": "Run Block",
+        "runThisOnly": "Run This Only",
+        "runAndPropagate": "Run & Propagate",
+        "switchFlow": "Switch flow",
+        "newFlow": {
+            "title": "Create New Flow",
+            "name": "Flow Name",
+            "namePlaceholder": "Enter flow name",
+            "create": "Create Flow"
+        },
         "state": {
             "idle": "Idle",
             "ready": "Ready",

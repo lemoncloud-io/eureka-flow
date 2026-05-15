@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AlertCircle, ArrowLeft, ArrowRight, Loader2, Play, Plus, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Loader2, Play, Plus, Trash2, Zap } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import { isAiBlock, isMissingAiKey, useBlockRegistry, useCanvasConnections, useCanvasStore } from '@flows/flows';
@@ -141,7 +141,7 @@ export const MobileStepDetail = ({
                             <div className="flex items-center gap-3">
                                 <div
                                     className={cn(
-                                        'w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
+                                        'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
                                         STEREO_ICON_BG[stereo] ?? 'bg-muted/50'
                                     )}
                                 >
@@ -172,7 +172,10 @@ export const MobileStepDetail = ({
                             {/* Auto toggle — separate row */}
                             <div className="flex items-center justify-between">
                                 <Label className="text-sm font-medium">{t('mobile.autoExecution', '자동 실행')}</Label>
-                                <Switch checked={isAuto} onCheckedChange={handleToggleAuto} disabled={!canEdit} />
+                                <div className="flex items-center gap-1.5">
+                                    <Zap className="w-3.5 h-3.5 text-muted-foreground/50" />
+                                    <Switch checked={isAuto} onCheckedChange={handleToggleAuto} disabled={!canEdit} />
+                                </div>
                             </div>
 
                             {/* Special UI for input blocks */}
@@ -254,12 +257,7 @@ export const MobileStepDetail = ({
                                             ) : (
                                                 <Play className="w-3.5 h-3.5 fill-current" />
                                             )}
-                                            <span>
-                                                {t('actions.runThisOnly', {
-                                                    ns: 'nodes',
-                                                    defaultValue: 'Run This Only',
-                                                })}
-                                            </span>
+                                            <span>{t('mobile.runThisOnly', '지금만 실행')}</span>
                                         </button>
                                         <button
                                             onClick={() => handleRun({ propagate: true })}
@@ -278,12 +276,7 @@ export const MobileStepDetail = ({
                                             ) : (
                                                 <Play className="w-3.5 h-3.5 fill-current" />
                                             )}
-                                            <span>
-                                                {t('actions.runAndPropagate', {
-                                                    ns: 'nodes',
-                                                    defaultValue: 'Run & Propagate',
-                                                })}
-                                            </span>
+                                            <span>{t('mobile.runAndPropagate', '다음도 실행')}</span>
                                         </button>
                                     </div>
                                 ) : (
@@ -368,6 +361,7 @@ const PortButton = ({
                 <span className="text-primary/40 flex-1 flex items-center gap-1">
                     <Plus className="w-3 h-3" />
                     {t('mobile.connection.addConnection', '추가 연결')}
+                    <span className="text-primary/30 ml-1">{t('mobile.connection.tapToConnect', '탭하여 연결')}</span>
                 </span>
             ) : null}
         </button>
