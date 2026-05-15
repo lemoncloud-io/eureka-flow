@@ -40,12 +40,24 @@ const HeroAction = ({ item, action, onAction }: HeroActionProps) => {
             onClick={onAction}
             onKeyDown={handleKeyDown}
         >
-            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-primary/60">
-                {t('navigator.nextUp', 'Next up')}
-            </p>
+            <div className="mb-3 flex items-center gap-3">
+                {item.thumbnailUrl ? (
+                    <img src={item.thumbnailUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                        {item.name.charAt(0).toUpperCase()}
+                    </div>
+                )}
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-primary/60">
+                        {t('navigator.nextUp', 'Next up')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{item.name}</p>
+                </div>
+            </div>
             <h2 className="mb-2 text-xl font-bold tracking-tight sm:text-2xl">{action.stage.name}</h2>
             <p className="mb-4 max-w-lg text-sm leading-relaxed text-muted-foreground">
-                {item.name} · {action.stage.guideText || t('navigator.readyToStart', 'Ready to start')}
+                {action.stage.guideText || t('navigator.readyToStart', 'Ready to start')}
             </p>
             <Button size="default" className="gap-2 rounded-xl font-semibold" tabIndex={-1}>
                 {action.stage.actionLabel || t('navigator.openAction', 'Open')}

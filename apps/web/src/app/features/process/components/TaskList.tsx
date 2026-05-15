@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Plus } from 'lucide-react';
+import { Eye, Pencil, Plus } from 'lucide-react';
 
 import { useAddTaskMutation, useChangeTaskStatusMutation } from '@flows/flows';
 import { Button, Input } from '@flows/ui-kit';
@@ -59,6 +59,12 @@ export const TaskList = ({ tasks, stageId, canAdd }: TaskListProps) => {
                 return (
                     <div key={task.id} className="flex items-center gap-3 rounded-md border border-border p-3">
                         <StatusBadge status={task.status} />
+                        {task.stereo === 'review' && (
+                            <Eye className="h-3.5 w-3.5 shrink-0 text-blue-500" title="Review" />
+                        )}
+                        {task.stereo === 'revision' && (
+                            <Pencil className="h-3.5 w-3.5 shrink-0 text-orange-500" title="Revision" />
+                        )}
                         <span className="text-sm flex-1 truncate">{task.title}</span>
                         {nextStatus && (
                             <Button

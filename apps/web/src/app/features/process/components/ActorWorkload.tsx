@@ -6,11 +6,13 @@ import { cn } from '@flows/lib/utils';
 import { Card, CardContent } from '@flows/ui-kit';
 
 import { STATUS_COLORS } from './StatusBadge';
+import { useCurrentActor } from '../hooks/useCurrentActor';
 
 export const ActorWorkload = () => {
     const { t } = useTranslation();
     const { data: itemsData } = useItems();
     const { data: actorsData } = useActors();
+    const { currentActor, setCurrentActor } = useCurrentActor();
     const items = itemsData?.data ?? [];
     const actors = actorsData?.data?.filter(a => a.isActive) ?? [];
 
@@ -41,7 +43,14 @@ export const ActorWorkload = () => {
             <h2 className="text-lg font-semibold">{t('navigator.actorWorkload', 'Team Workload')}</h2>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {workload.map(({ actor, doing, todo, unresolved }) => (
-                    <Card key={actor.id}>
+                    <Card
+                        key={actor.id}
+                        className={cn(
+                            'cursor-pointer transition-all duration-200 hover:shadow-md',
+                            currentActor?.id === actor.id && 'ring-2 ring-primary'
+                        )}
+                        onClick={() => setCurrentActor(actor.id === currentActor?.id ? null : actor)}
+                    >
                         <CardContent className="p-3">
                             <div className="flex items-center gap-2 mb-2">
                                 <div className={cn('h-3 w-3 rounded-full shrink-0', actor.color)} />

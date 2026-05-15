@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
-import { Check, ChevronRight, Circle, Loader2, MessageSquare, Pause } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { Check, ChevronRight, Circle, Loader2, MessageSquare, Pause, Repeat, Zap } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { Badge, Button } from '@flows/ui-kit';
@@ -23,6 +24,7 @@ interface StageCardProps {
     unresolvedCount: number;
     isStatusChangePending?: boolean;
     isLast?: boolean;
+    dependencyNames?: string[];
     onStatusChange: (stageId: string, status: Status) => void;
     onSelect: (stageId: string) => void;
 }
@@ -33,6 +35,7 @@ export const StageCard = ({
     unresolvedCount,
     isStatusChangePending,
     isLast,
+    dependencyNames,
     onStatusChange,
     onSelect,
 }: StageCardProps) => {
@@ -89,6 +92,12 @@ export const StageCard = ({
                             <span className={cn('text-sm font-semibold', isDone && 'line-through decoration-1')}>
                                 {stage.name}
                             </span>
+                            {stage.stereo === 'iterative' && (
+                                <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" title="Iterative" />
+                            )}
+                            {stage.stereo === 'flow' && (
+                                <Zap className="h-3 w-3 shrink-0 text-amber-500" title="Automated" />
+                            )}
                             {unresolvedCount > 0 && (
                                 <Badge variant="destructive" className="h-5 gap-0.5 px-1.5 text-xs">
                                     <MessageSquare className="h-3 w-3" />
@@ -105,6 +114,16 @@ export const StageCard = ({
                                 </>
                             )}
                         </div>
+                        {dependencyNames && dependencyNames.length > 0 && stage.status === 'todo' && (
+                            <p className="mt-0.5 text-[10px] text-muted-foreground/60">
+                                Requires: {dependencyNames.join(', ')}
+                            </p>
+                        )}
+                        {isDone && stage.completedAt && (
+                            <p className="mt-0.5 text-[10px] text-muted-foreground/60">
+                                {formatDistanceToNow(stage.completedAt, { addSuffix: true })}
+                            </p>
+                        )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                         {nextStatus && (

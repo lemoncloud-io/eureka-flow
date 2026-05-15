@@ -1,15 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { Search } from 'lucide-react';
 
-import { useItems } from '@flows/flows';
+import { getUnresolvedCount, useItems } from '@flows/flows';
 import { Input } from '@flows/ui-kit';
 
 import { EmptyState } from '../components/EmptyState';
 import { ItemRow } from '../components/ItemRow';
 import { useTrySample } from '../hooks';
+
+import type { Item } from '@flows/flows';
 
 export const ItemBoardPage = () => {
     const { t } = useTranslation();
@@ -19,7 +21,23 @@ export const ItemBoardPage = () => {
     const [search, setSearch] = useState('');
 
     const items = itemsData?.data ?? [];
-    const filtered = search ? items.filter(item => item.name.toLowerCase().includes(search.toLowerCase())) : items;
+
+    const sortedItems = useMemo(() => {
+        const score = (item: Item) => {
+            const hasDoing = item.stages.some(s => s.status === 'doing');
+            const isComplete = item.stages.every(s => s.status === 'done' || s.status === 'skip');
+            const unresolved = getUnresolvedCount(item);
+            if (unresolved > 0) return 0; // urgent first
+            if (hasDoing) return 1;
+            if (isComplete) return 3;
+            return 2; // todo
+        };
+        return [...items].sort((a, b) => score(a) - score(b));
+    }, [items]);
+
+    const filtered = search
+        ? sortedItems.filter(item => item.name.toLowerCase().includes(search.toLowerCase()))
+        : sortedItems;
 
     return (
         <div className="space-y-4">

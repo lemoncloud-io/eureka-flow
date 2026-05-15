@@ -67,7 +67,7 @@ export const NextActionCTA = ({ item, action, onAction, compact }: NextActionCTA
                         <p className="truncate font-medium">{action.stage.name}</p>
                     </div>
                 </div>
-                <Button size="sm" onClick={() => onAction(action.stage.id)} className="shrink-0">
+                <Button size="sm" variant="outline" onClick={() => onAction(action.stage.id)} className="shrink-0">
                     {action.stage.actionLabel || t('navigator.openAction', 'Open')}
                 </Button>
             </CardContent>

@@ -67,6 +67,7 @@ export const ItemDetailPage = () => {
     const nextAction = getNextAction(item);
     const currentStage = item.stages.find(s => s.status === 'doing');
     const totalNoteCount = item.stages.reduce((sum, s) => sum + s.notes.length, 0);
+    const stageNameMap = new Map(item.stages.map(s => [s.id, s.name]));
 
     return (
         <div className="space-y-5">
@@ -134,6 +135,9 @@ export const ItemDetailPage = () => {
                             unresolvedCount={getStageUnresolvedNotesCount(stage)}
                             isStatusChangePending={changeStatusMutation.isPending}
                             isLast={index === item.stages.length - 1}
+                            dependencyNames={
+                                stage.dependencyStageIds.map(id => stageNameMap.get(id)).filter(Boolean) as string[]
+                            }
                             onStatusChange={handleStatusChange}
                             onSelect={handleStageSelect}
                         />
