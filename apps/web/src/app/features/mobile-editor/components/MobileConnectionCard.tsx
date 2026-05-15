@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Check, ChevronDown, ChevronUp, Unlink } from 'lucide-react';
+import { AlertCircle, Check, ChevronDown, ChevronUp, Unlink } from 'lucide-react';
 
 import { useBlockRegistry, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -42,12 +42,20 @@ export const MobileConnectionCard = ({ nodeId, canEdit, onDisconnect, onTap }: M
     const stereo = blockDef.stereo ?? 'process';
     const displayName = node.customLabel || blockDef.label || node.type;
     const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${blockDef.label ?? node.type}`;
+    const nodeState = (node.state ?? 'IDLE') as string;
+    const isError = nodeState === 'ERROR';
+    const errorMessage =
+        (node as NodeData & { error?: string; errorMessage?: string }).error ||
+        (node as NodeData & { errorMessage?: string }).errorMessage ||
+        null;
 
     return (
         <div
             className={cn(
-                'rounded-xl border border-success/20 bg-success/[0.03] overflow-hidden',
-                'transition-all duration-200'
+                'rounded-xl overflow-hidden transition-all duration-200',
+                isError
+                    ? 'border border-destructive/30 bg-destructive/[0.03]'
+                    : 'border border-success/20 bg-success/[0.03]'
             )}
         >
             {/* Header */}
@@ -64,7 +72,11 @@ export const MobileConnectionCard = ({ nodeId, canEdit, onDisconnect, onTap }: M
                     <div className="text-[13px] font-medium truncate">{displayName}</div>
                     <div className="text-[10px] text-muted-foreground/50 truncate">{breadcrumb}</div>
                 </div>
-                <Check className="w-3.5 h-3.5 text-success/60 shrink-0" />
+                {isError ? (
+                    <AlertCircle className="w-3.5 h-3.5 text-destructive/60 shrink-0" />
+                ) : (
+                    <Check className="w-3.5 h-3.5 text-success/60 shrink-0" />
+                )}
                 {canEdit && onDisconnect && (
                     <button
                         onClick={e => {
@@ -82,6 +94,14 @@ export const MobileConnectionCard = ({ nodeId, canEdit, onDisconnect, onTap }: M
                     </button>
                 )}
             </div>
+
+            {/* Error banner */}
+            {isError && errorMessage && (
+                <div className="mx-3 mb-1 rounded-lg bg-destructive/5 border border-destructive/15 px-2.5 py-1.5">
+                    <div className="text-[10px] text-destructive font-medium">{t('mobile.state.error', '오류')}:</div>
+                    <div className="text-[10px] text-destructive/70 line-clamp-2">{errorMessage}</div>
+                </div>
+            )}
 
             {/* Content preview (collapsible) */}
             {contentPreview && (

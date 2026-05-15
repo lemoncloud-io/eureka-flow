@@ -10,10 +10,12 @@ import {
     Key,
     Loader2,
     Map as MapIcon,
+    Monitor,
     MoreVertical,
     Play,
     Save,
     Search,
+    Settings2,
     Trash2,
     WifiOff,
 } from 'lucide-react';
@@ -268,8 +270,22 @@ export const MobileHeader = ({
                         {t('header.menuGroup.canvas', 'Canvas')}
                     </DropdownMenuLabel>
                     <DropdownMenuItem onClick={onOpenFlowMap} className="gap-2">
+                        <Settings2 className="w-4 h-4" />
+                        {t('mobile.flowSettings', '플로우 설정')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onClick={() => {
+                            const url = window.location.href;
+                            window.location.href = url + (url.includes('?') ? '&' : '?') + 'desktop=1';
+                        }}
+                        className="gap-2"
+                    >
+                        <Monitor className="w-4 h-4" />
+                        {t('mobile.pcVersion', 'PC 버전 보기')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onOpenFlowMap} className="gap-2">
                         <MapIcon className="w-4 h-4" />
-                        {t('mobile.flowOverview', 'Flow Overview')}
+                        {t('mobile.flowOverview', '플로우 전체보기')}
                     </DropdownMenuItem>
                     {onClear && (
                         <DropdownMenuItem onClick={onClear} className="gap-2 text-destructive">
