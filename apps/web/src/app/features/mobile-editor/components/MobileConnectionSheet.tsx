@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ArrowLeft, ChevronDown, Link2, Link2Off, Plus, Unlink } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Link2, Link2Off, Plus, Unlink } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
@@ -139,6 +139,7 @@ export const MobileConnectionSheet = ({
                                                         {conn.breadcrumb}
                                                     </div>
                                                 </div>
+                                                <Check className="w-4 h-4 text-success shrink-0" />
                                                 {!readOnly && (
                                                     <button
                                                         onClick={() => onDisconnect(conn.connectionId)}
@@ -257,6 +258,9 @@ export const MobileConnectionSheet = ({
                                                             </div>
                                                         );
                                                     })()}
+                                                </div>
+                                                <div className="w-full flex justify-center pt-1">
+                                                    <ChevronDown className="w-4 h-4 text-muted-foreground/30" />
                                                 </div>
                                             </button>
                                         );
