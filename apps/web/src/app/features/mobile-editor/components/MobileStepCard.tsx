@@ -62,23 +62,39 @@ export const MobileStepCard = React.memo(
         );
 
         const contentPreview = useMemo(() => {
-            // Show output data if available (executed results)
-            if (node.outputData) {
-                const entries = Object.entries(node.outputData);
-                if (entries.length > 0) {
-                    const [, data] = entries[0];
-                    if (data?.type === 'image') return t('mobile.imageOutput', 'Image');
-                    const val = typeof data?.value === 'string' ? data.value : JSON.stringify(data?.value);
-                    if (val) return val.slice(0, 300);
+            const extractPortValue = (portData: Record<string, unknown> | undefined): string | null => {
+                if (!portData) return null;
+                for (const data of Object.values(portData)) {
+                    const d = data as { value?: unknown; type?: string } | null;
+                    if (!d?.value) continue;
+                    if (d.type === 'image') return t('mobile.imageOutput', 'Image');
+                    const val = typeof d.value === 'string' ? d.value : JSON.stringify(d.value);
+                    if (val && val !== 'null') return val.slice(0, 300);
                 }
-            }
-            // For input-text blocks, show config.text (blockDef.type is authoritative)
+                return null;
+            };
+
+            // 1. Output data (executed results)
+            const outputVal = extractPortValue(node.outputData as Record<string, unknown> | undefined);
+            if (outputVal) return outputVal;
+
+            // 2. Input data (received from upstream)
+            const inputVal = extractPortValue(node.inputData as Record<string, unknown> | undefined);
+            if (inputVal) return inputVal;
+
+            // 3. Config-based content for specific block types
             const blockType = blockDef?.type ?? node.type;
-            if (blockType === 'input-text' && typeof node.config?.text === 'string' && node.config.text) {
-                return node.config.text.slice(0, 300);
+            if (blockType === 'input-text') {
+                const text = node.config?.text as string | undefined;
+                if (text) return text.slice(0, 300);
             }
+            if (blockType === 'input-image') {
+                const img = node.config?.imageData as string | undefined;
+                if (img) return t('mobile.imageOutput', 'Image');
+            }
+
             return null;
-        }, [node.outputData, node.type, node.config?.text, blockDef?.type, t]);
+        }, [node.outputData, node.inputData, node.config, node.type, blockDef?.type, t]);
 
         const dotColor =
             state === 'RUNNING'
