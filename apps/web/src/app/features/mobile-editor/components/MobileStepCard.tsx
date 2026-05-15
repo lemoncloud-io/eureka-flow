@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AlertTriangle, Loader2, Maximize2, MoreVertical, Play, Trash2 } from 'lucide-react';
@@ -37,13 +37,29 @@ const extractPortContent = (portData: Record<string, unknown> | undefined): Cont
 /** Inline image thumbnail for card preview */
 const CardImagePreview = ({ src }: { src: string }) => {
     const { src: resolvedSrc } = useS3Image(src);
+    const [dims, setDims] = useState<string | null>(null);
     return (
-        <div className="w-full h-20 rounded-lg bg-black/20 border border-border/30 overflow-hidden flex items-center justify-center">
+        <div className="relative w-full h-40 rounded-lg bg-black/20 border border-border/30 overflow-hidden flex items-center justify-center">
             {resolvedSrc ? (
-                <img src={resolvedSrc} alt="" className="max-h-full max-w-full object-contain" />
+                <img
+                    src={resolvedSrc}
+                    alt=""
+                    className="max-h-full max-w-full object-contain"
+                    onLoad={e => setDims(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight}`)}
+                />
             ) : (
                 <div className="w-6 h-6 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
             )}
+            <div className="absolute bottom-1.5 right-1.5 flex gap-1">
+                {dims && (
+                    <span className="bg-black/70 text-[9px] px-1.5 py-0.5 rounded text-white/90 backdrop-blur-sm font-mono">
+                        {dims}
+                    </span>
+                )}
+                <span className="bg-port-type-image/80 text-[9px] px-1.5 py-0.5 rounded text-white font-semibold backdrop-blur-sm">
+                    IMG
+                </span>
+            </div>
         </div>
     );
 };
