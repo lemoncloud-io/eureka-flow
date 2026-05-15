@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ArrowLeft, Check, ChevronDown, Link2, Link2Off, Plus, Unlink } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Link2, Link2Off, Plus, Unlink } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
@@ -75,6 +75,15 @@ export const MobileConnectionSheet = ({
     const availableTargets = compatibleTargets.filter(t => !t.alreadyConnected);
     const hasConnections = existingWithNames.length > 0;
     const hasAvailable = availableTargets.length > 0;
+    const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+    const toggleCard = (id: string) => {
+        setExpandedCards(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     return (
         <AnimatePresence>
@@ -154,8 +163,35 @@ export const MobileConnectionSheet = ({
                                                     </button>
                                                 )}
                                             </div>
-                                            <button className="w-full flex justify-center py-1 hover:bg-success/5 transition-colors">
-                                                <ChevronDown className="w-4 h-4 text-muted-foreground/30" />
+                                            {expandedCards.has(conn.connectionId) &&
+                                                (() => {
+                                                    const otherNode = nodes.find(n => n.id === conn.targetNodeId);
+                                                    const outData = otherNode?.outputData as
+                                                        | Record<string, { value?: unknown; type?: string }>
+                                                        | undefined;
+                                                    const firstEntry = outData ? Object.values(outData)[0] : null;
+                                                    const text =
+                                                        firstEntry?.value && firstEntry.type !== 'image'
+                                                            ? typeof firstEntry.value === 'string'
+                                                                ? firstEntry.value
+                                                                : JSON.stringify(firstEntry.value)
+                                                            : null;
+                                                    if (!text || text === 'null') return null;
+                                                    return (
+                                                        <div className="mx-3 mb-2 rounded-md bg-muted/20 border border-border/20 p-2 text-[10px] text-muted-foreground leading-relaxed line-clamp-3">
+                                                            {text.slice(0, 200)}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            <button
+                                                onClick={() => toggleCard(conn.connectionId)}
+                                                className="w-full flex justify-center py-1 hover:bg-success/5 transition-colors"
+                                            >
+                                                {expandedCards.has(conn.connectionId) ? (
+                                                    <ChevronUp className="w-4 h-4 text-muted-foreground/30" />
+                                                ) : (
+                                                    <ChevronDown className="w-4 h-4 text-muted-foreground/30" />
+                                                )}
                                             </button>
                                         </div>
                                     ))}
@@ -246,8 +282,7 @@ export const MobileConnectionSheet = ({
                                                         | undefined;
                                                     if (!outData) return null;
                                                     const firstEntry = Object.values(outData)[0];
-                                                    if (!firstEntry?.value) return null;
-                                                    if (firstEntry.type === 'image') return null;
+                                                    if (!firstEntry?.value || firstEntry.type === 'image') return null;
                                                     const text =
                                                         typeof firstEntry.value === 'string'
                                                             ? firstEntry.value
@@ -259,9 +294,6 @@ export const MobileConnectionSheet = ({
                                                         </div>
                                                     );
                                                 })()}
-                                                <div className="flex justify-center py-1">
-                                                    <ChevronDown className="w-4 h-4 text-muted-foreground/30" />
-                                                </div>
                                             </button>
                                         );
                                     })}
