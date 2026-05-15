@@ -16,6 +16,7 @@ import type { FlowRole } from '@flows/flows';
 
 interface MobileStepListProps {
     onTapCard: (nodeId: string) => void;
+    onExpandContent?: (content: { value: unknown; type?: string }) => void;
     onAddStep: () => void;
     onAddBlockDirect?: (type: string) => void;
     onRunNode?: (nodeId: string) => void;
@@ -26,6 +27,7 @@ interface MobileStepListProps {
 
 export const MobileStepList = ({
     onTapCard,
+    onExpandContent,
     onAddStep,
     onAddBlockDirect,
     onRunNode,
@@ -259,6 +261,7 @@ export const MobileStepList = ({
                                                         node={node}
                                                         displayName={displayNames.get(nodeId) ?? node.type}
                                                         onTapCard={onTapCard}
+                                                        onExpandContent={onExpandContent}
                                                         onRun={onRunNode}
                                                         onDelete={handleDelete}
                                                         role={role}

@@ -68,13 +68,14 @@ interface MobileStepCardProps {
     node: NodeData;
     displayName: string;
     onTapCard: (nodeId: string) => void;
+    onExpandContent?: (content: { value: unknown; type?: string }) => void;
     onRun?: (nodeId: string) => void;
     onDelete?: (nodeId: string) => void;
     role?: FlowRole;
 }
 
 export const MobileStepCard = React.memo(
-    ({ node, displayName, onTapCard, onRun, onDelete, role = 'owner' }: MobileStepCardProps) => {
+    ({ node, displayName, onTapCard, onExpandContent, onRun, onDelete, role = 'owner' }: MobileStepCardProps) => {
         const { t } = useTranslation(['flows']);
         const blockRegistry = useBlockRegistry();
         const { canEdit, canRun } = useMemo(() => getPermissions(role), [role]);
@@ -250,7 +251,16 @@ export const MobileStepCard = React.memo(
                                 <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3 pr-6">
                                     {contentPreview.value}
                                 </div>
-                                <Maximize2 className="absolute bottom-2 right-2 w-3.5 h-3.5 text-muted-foreground/30" />
+                                <button
+                                    type="button"
+                                    onClick={e => {
+                                        e.stopPropagation();
+                                        onExpandContent?.({ value: contentPreview.value, type: 'text' });
+                                    }}
+                                    className="absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded bg-muted/50 hover:bg-primary/10 transition-colors"
+                                >
+                                    <Maximize2 className="w-3.5 h-3.5 text-muted-foreground/40" />
+                                </button>
                             </div>
                         )}
                     </div>

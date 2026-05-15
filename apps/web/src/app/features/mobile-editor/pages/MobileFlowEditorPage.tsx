@@ -12,6 +12,7 @@ import { redirectToLogin, useWebCoreStore } from '@flows/web-core';
 
 import { useDebugMode } from '../../../hooks/useDebugMode';
 import { AiKeyDialog } from '../../flows/components/AiKeyDialog';
+import { ContentPreviewModal } from '../../flows/components/ContentPreviewModal';
 import { DevSocketPanel } from '../../flows/components/DevSocketPanel';
 import { FlowListDialog } from '../../flows/components/FlowListDialog';
 import { useSocketRecorder } from '../../flows/hooks/useSocketRecorder';
@@ -70,6 +71,7 @@ export const MobileFlowEditorPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isNewFlowSheetOpen, setIsNewFlowSheetOpen] = useState(false);
     const [isAiKeyDialogOpen, setIsAiKeyDialogOpen] = useState(false);
+    const [previewContent, setPreviewContent] = useState<{ value: unknown; type?: string } | null>(null);
 
     // Step navigation (replaces configNodeId)
     const stepNav = useStepNavigation();
@@ -350,6 +352,7 @@ export const MobileFlowEditorPage = () => {
                 <div className="pt-2">
                     <MobileStepList
                         onTapCard={handleTapCard}
+                        onExpandContent={setPreviewContent}
                         onAddStep={() => setIsBlockLibraryOpen(true)}
                         onAddBlockDirect={handleAddBlockWithRecent}
                         onRunNode={handleRunNode}
@@ -442,6 +445,13 @@ export const MobileFlowEditorPage = () => {
             />
 
             {showDevTools && <AiKeyDialog open={isAiKeyDialogOpen} onOpenChange={setIsAiKeyDialogOpen} />}
+
+            {/* Content Preview Modal — expand from card */}
+            <ContentPreviewModal
+                open={!!previewContent}
+                onOpenChange={open => !open && setPreviewContent(null)}
+                content={previewContent}
+            />
 
             {/* Dev Role Toggle (hidden in production unless debug mode) */}
             {showDevTools && (
