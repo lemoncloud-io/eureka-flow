@@ -56,7 +56,7 @@ const CardImagePreview = ({ src }: { src: string }) => {
                         {dims}
                     </span>
                 )}
-                <span className="bg-port-type-image/80 text-[9px] px-1.5 py-0.5 rounded text-white font-semibold backdrop-blur-sm">
+                <span className="bg-purple-500/80 text-[9px] px-1.5 py-0.5 rounded text-white font-semibold backdrop-blur-sm">
                     IMG
                 </span>
             </div>
