@@ -1,9 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import {
-    ArrowLeft,
     Check,
     ChevronDown,
     Download,
@@ -90,7 +88,6 @@ export const MobileHeader = ({
     onDisableDebugMode,
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
-    const navigate = useNavigate();
     const { canEdit, canRun } = getPermissions(role);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(flowName);
@@ -116,20 +113,12 @@ export const MobileHeader = ({
         <header
             className={cn(
                 'fixed top-0 left-0 right-0 z-30',
-                'h-14 px-2 flex items-center gap-1',
+                'h-14 px-3 flex items-center gap-2',
                 'bg-glass-bg backdrop-blur-2xl border-b border-border/30',
                 'pt-[env(safe-area-inset-top)]'
             )}
         >
-            {/* Back */}
-            <button
-                onClick={() => navigate('/')}
-                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
-            >
-                <ArrowLeft className="w-5 h-5" />
-            </button>
-
-            {/* Flow name + switcher dropdown */}
+            {/* Flow name + switcher dropdown — no back arrow per Figma */}
             <div className="flex-1 min-w-0 flex items-center gap-1">
                 {isEditing ? (
                     <input
@@ -141,7 +130,7 @@ export const MobileHeader = ({
                             if (e.key === 'Enter') handleFinishEditing();
                             if (e.key === 'Escape') setIsEditing(false);
                         }}
-                        className="w-full text-sm font-bold bg-transparent border-b-2 border-primary outline-none"
+                        className="w-full text-lg font-bold bg-transparent border-b-2 border-primary outline-none"
                         autoFocus
                     />
                 ) : (
@@ -149,20 +138,20 @@ export const MobileHeader = ({
                         {canEdit ? (
                             <button
                                 onClick={handleStartEditing}
-                                className="truncate text-sm font-bold text-foreground leading-tight"
+                                className="truncate text-lg font-bold text-foreground leading-tight"
                             >
                                 {flowName}
                             </button>
                         ) : (
-                            <span className="truncate text-sm font-bold text-foreground leading-tight">{flowName}</span>
+                            <span className="truncate text-lg font-bold text-foreground leading-tight">{flowName}</span>
                         )}
                         {/* Flow switcher chevron */}
                         <button
                             onClick={onOpenFlowList}
-                            className="w-6 h-6 rounded flex items-center justify-center shrink-0 hover:bg-accent/50 transition-colors"
+                            className="w-7 h-7 rounded flex items-center justify-center shrink-0 hover:bg-accent/50 transition-colors"
                             aria-label={t('mobile.switchFlow', 'Switch flow')}
                         >
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            <ChevronDown className="w-5 h-5 text-foreground" />
                         </button>
                     </div>
                 )}
@@ -214,22 +203,22 @@ export const MobileHeader = ({
                     </button>
                 )}
 
-                {/* Run All */}
+                {/* Run All — circular purple background */}
                 {canRun && (
                     <button
                         onClick={onRunAll}
                         disabled={isRunning || nodeCount === 0}
                         className={cn(
-                            'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200',
+                            'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-200',
                             'active:scale-90 disabled:opacity-40',
-                            isRunning ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary hover:bg-primary/15'
+                            isRunning ? 'bg-warning/15 text-warning' : 'bg-primary/15 text-primary hover:bg-primary/20'
                         )}
                         aria-label="Run All"
                     >
                         {isRunning ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Loader2 className="w-4.5 h-4.5 animate-spin" />
                         ) : (
-                            <Play className="w-4 h-4 fill-current" />
+                            <Play className="w-4.5 h-4.5 fill-current" />
                         )}
                     </button>
                 )}
