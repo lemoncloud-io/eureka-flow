@@ -116,14 +116,14 @@ export const MobileStepList = ({
                             <div className="flex flex-col items-center gap-4 w-full">
                                 {/* Quick-add blocks — column layout */}
                                 {onAddBlockDirect && quickBlocks.length > 0 && (
-                                    <div className="flex justify-center gap-3">
+                                    <div className="flex justify-center gap-2">
                                         {quickBlocks.map(block => (
                                             <button
                                                 key={block.type}
                                                 onClick={() => onAddBlockDirect(block.type)}
                                                 className={cn(
-                                                    'flex flex-col items-center gap-2 px-5 py-4 rounded-xl',
-                                                    'border border-border/40 bg-card min-w-[120px]',
+                                                    'flex items-center gap-2 px-4 py-2.5 rounded-xl',
+                                                    'border border-border/40 bg-card',
                                                     'text-xs font-medium',
                                                     'hover:border-primary/30 hover:shadow-sm',
                                                     'active:scale-[0.97] transition-all'
@@ -131,11 +131,11 @@ export const MobileStepList = ({
                                             >
                                                 <div
                                                     className={cn(
-                                                        'w-10 h-10 rounded-lg flex items-center justify-center',
+                                                        'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
                                                         STEREO_ICON_BG.input
                                                     )}
                                                 >
-                                                    <BlockIcon icon={block.icon} size={20} />
+                                                    <BlockIcon icon={block.icon} size={16} />
                                                 </div>
                                                 {block.label}
                                             </button>
