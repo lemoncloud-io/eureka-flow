@@ -204,62 +204,62 @@ export const MobileConnectionSheet = ({
                                                 key={`${target.nodeId}-${target.portId}`}
                                                 onClick={() => onConnect(target.nodeId, target.portId)}
                                                 className={cn(
-                                                    'w-full flex items-center gap-2.5 px-3 py-3 rounded-xl',
+                                                    'w-full rounded-xl overflow-hidden',
                                                     'border border-border/40 bg-card',
                                                     'hover:border-primary/30 hover:bg-primary/5',
                                                     'active:scale-[0.97] transition-all duration-150',
                                                     'text-left'
                                                 )}
                                             >
-                                                <div
-                                                    className={cn(
-                                                        'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
-                                                        STEREO_ICON_BG[stereo] ?? 'bg-muted/50'
-                                                    )}
-                                                >
-                                                    <BlockIcon icon={target.nodeIcon} size={16} />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2.5 px-3 py-3">
+                                                    <div
+                                                        className={cn(
+                                                            'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
+                                                            STEREO_ICON_BG[stereo] ?? 'bg-muted/50'
+                                                        )}
+                                                    >
+                                                        <BlockIcon icon={target.nodeIcon} size={16} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
                                                         <div className="text-sm font-medium truncate">
                                                             {target.nodeName}
                                                         </div>
-                                                        <div className="text-[11px] font-medium shrink-0 ml-2">
-                                                            {target.occupiedByNode ? (
-                                                                <span className="text-warning/60">
-                                                                    {t('mobile.connection.replace', '교체')}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-primary/50">
-                                                                    {t('mobile.connection.connect', '+ 연결')}
-                                                                </span>
-                                                            )}
+                                                        <div className="text-[11px] text-muted-foreground/50 truncate">
+                                                            {breadcrumb}
                                                         </div>
                                                     </div>
-                                                    <div className="text-[11px] text-muted-foreground/50 truncate">
-                                                        {breadcrumb}
+                                                    <div className="text-[11px] font-medium shrink-0">
+                                                        {target.occupiedByNode ? (
+                                                            <span className="text-warning/60">
+                                                                {t('mobile.connection.replace', '교체')}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-primary/50">
+                                                                {t('mobile.connection.connect', '+ 연결')}
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                    {(() => {
-                                                        const outData = targetNode?.outputData as
-                                                            | Record<string, { value?: unknown; type?: string }>
-                                                            | undefined;
-                                                        if (!outData) return null;
-                                                        const firstEntry = Object.values(outData)[0];
-                                                        if (!firstEntry?.value) return null;
-                                                        if (firstEntry.type === 'image') return null;
-                                                        const text =
-                                                            typeof firstEntry.value === 'string'
-                                                                ? firstEntry.value
-                                                                : JSON.stringify(firstEntry.value);
-                                                        if (!text || text === 'null') return null;
-                                                        return (
-                                                            <div className="mt-1.5 rounded-md bg-muted/20 border border-border/20 p-2 text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
-                                                                {text.slice(0, 150)}
-                                                            </div>
-                                                        );
-                                                    })()}
                                                 </div>
-                                                <div className="w-full flex justify-center pt-1">
+                                                {(() => {
+                                                    const outData = targetNode?.outputData as
+                                                        | Record<string, { value?: unknown; type?: string }>
+                                                        | undefined;
+                                                    if (!outData) return null;
+                                                    const firstEntry = Object.values(outData)[0];
+                                                    if (!firstEntry?.value) return null;
+                                                    if (firstEntry.type === 'image') return null;
+                                                    const text =
+                                                        typeof firstEntry.value === 'string'
+                                                            ? firstEntry.value
+                                                            : JSON.stringify(firstEntry.value);
+                                                    if (!text || text === 'null') return null;
+                                                    return (
+                                                        <div className="mx-3 mb-2 rounded-md bg-muted/20 border border-border/20 p-2 text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
+                                                            {text.slice(0, 150)}
+                                                        </div>
+                                                    );
+                                                })()}
+                                                <div className="flex justify-center py-1">
                                                     <ChevronDown className="w-4 h-4 text-muted-foreground/30" />
                                                 </div>
                                             </button>
