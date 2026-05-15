@@ -8,6 +8,7 @@ import { Badge } from '@flows/ui-kit';
 import { ProgressBar } from './ProgressBar';
 
 import type { Item } from '@flows/flows';
+import type { KeyboardEvent } from 'react';
 
 interface ItemRowProps {
     item: Item;
@@ -34,14 +35,24 @@ export const ItemRow = ({ item, onClick }: ItemRowProps) => {
     const stageName = currentStage?.name ?? nextAction?.stage.name;
     const timeAgo = formatDistanceToNow(item.updatedAt, { addSuffix: false });
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick(item.id);
+        }
+    };
+
     return (
         <div
+            role="button"
+            tabIndex={0}
             className={cn(
                 'flex items-center gap-4 border-b border-border/50 px-4 py-3 cursor-pointer transition-colors duration-150',
-                'hover:bg-accent/30',
+                'hover:bg-accent/30 focus-visible:bg-accent/30 focus-visible:outline-none',
                 isComplete && 'opacity-60'
             )}
             onClick={() => onClick(item.id)}
+            onKeyDown={handleKeyDown}
         >
             {/* Status dot */}
             <div className={cn('h-2 w-2 shrink-0 rounded-full', statusColor)} />

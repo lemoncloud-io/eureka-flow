@@ -26,7 +26,7 @@ export const ItemBoardPage = () => {
             {/* Header */}
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-baseline gap-2">
-                    <h1 className="text-xl font-bold">{t('navigator.items', 'Items')}</h1>
+                    <h1 className="text-2xl font-bold">{t('navigator.items', 'Items')}</h1>
                     {items.length > 0 && <span className="text-sm text-muted-foreground">({items.length})</span>}
                 </div>
                 {items.length > 0 && (

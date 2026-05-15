@@ -14,6 +14,7 @@ import { StatsBar } from '../components/StatsBar';
 import { useCurrentActor, useTrySample } from '../hooks';
 
 import type { Item, NextAction } from '@flows/flows';
+import type { KeyboardEvent } from 'react';
 
 interface HeroActionProps {
     item: Item;
@@ -24,26 +25,32 @@ interface HeroActionProps {
 const HeroAction = ({ item, action, onAction }: HeroActionProps) => {
     const { t } = useTranslation();
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onAction();
+        }
+    };
+
     return (
         <div
-            className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/8 via-primary/3 to-transparent p-6 sm:p-8 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30"
+            role="button"
+            tabIndex={0}
+            className="overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/8 via-primary/3 to-transparent p-6 sm:p-8 cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             onClick={onAction}
+            onKeyDown={handleKeyDown}
         >
-            <div className="relative z-10">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-primary/60">
-                    {t('navigator.nextUp', 'Next up')}
-                </p>
-                <h2 className="mb-2 text-2xl font-bold tracking-tight sm:text-3xl">{action.stage.name}</h2>
-                <p className="mb-5 max-w-lg text-sm leading-relaxed text-muted-foreground">
-                    {item.name} · {action.stage.guideText || t('navigator.readyToStart', 'Ready to start')}
-                </p>
-                <Button size="lg" className="gap-2 rounded-xl font-semibold">
-                    {action.stage.actionLabel || t('navigator.openAction', 'Open')}
-                    <ArrowRight className="h-4 w-4" />
-                </Button>
-            </div>
-            {/* Decorative circle */}
-            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/5 blur-2xl" />
+            <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-primary/60">
+                {t('navigator.nextUp', 'Next up')}
+            </p>
+            <h2 className="mb-2 text-xl font-bold tracking-tight sm:text-2xl">{action.stage.name}</h2>
+            <p className="mb-4 max-w-lg text-sm leading-relaxed text-muted-foreground">
+                {item.name} · {action.stage.guideText || t('navigator.readyToStart', 'Ready to start')}
+            </p>
+            <Button size="default" className="gap-2 rounded-xl font-semibold" tabIndex={-1}>
+                {action.stage.actionLabel || t('navigator.openAction', 'Open')}
+                <ArrowRight className="h-4 w-4" />
+            </Button>
         </div>
     );
 };
@@ -68,27 +75,20 @@ const AllCaughtUp = () => {
     );
 };
 
-const CurrentActorPrompt = () => {
+const ActorPromptBanner = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
 
     return (
-        <Card className="border-dashed border-primary/30">
-            <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    <Compass className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                    <p className="font-medium">{t('navigator.selectIdentity', 'Select your role')}</p>
-                    <p className="text-sm text-muted-foreground">
-                        {t('navigator.selectIdentityHint', 'Choose an actor to see your personalized next actions.')}
-                    </p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => navigate('/actors')} className="shrink-0">
-                    {t('navigator.chooseActor', 'Choose')}
-                </Button>
-            </CardContent>
-        </Card>
+        <div className="flex items-center gap-3 rounded-md border border-dashed border-primary/30 bg-primary/5 px-4 py-2.5">
+            <Compass className="h-4 w-4 shrink-0 text-primary" />
+            <p className="flex-1 text-sm text-muted-foreground">
+                {t('navigator.selectIdentityHint', 'Choose an actor to see your personalized next actions.')}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => navigate('/actors')} className="h-7 shrink-0 text-xs">
+                {t('navigator.chooseActor', 'Choose')}
+            </Button>
+        </div>
     );
 };
 
@@ -121,7 +121,6 @@ export const DashboardPage = () => {
         return (
             <div className="space-y-4">
                 <div className="h-24 animate-pulse rounded-xl bg-muted" />
-                <div className="h-12 animate-pulse rounded-lg bg-muted" />
                 <div className="space-y-3">
                     {Array.from({ length: 2 }).map((_, i) => (
                         <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />
@@ -148,11 +147,12 @@ export const DashboardPage = () => {
     const [heroEntry, ...restActions] = itemsWithActions;
 
     return (
-        <div className="space-y-6">
-            {/* Hero: most urgent action or prompt */}
-            {!currentActor ? (
-                <CurrentActorPrompt />
-            ) : heroEntry ? (
+        <div className="space-y-5">
+            {/* Actor prompt — subtle banner, never blocks hero */}
+            {!currentActor && <ActorPromptBanner />}
+
+            {/* Hero: always show most urgent action */}
+            {heroEntry ? (
                 <HeroAction
                     item={heroEntry.item}
                     action={heroEntry.action}
@@ -162,12 +162,9 @@ export const DashboardPage = () => {
                 <AllCaughtUp />
             )}
 
-            {/* Stats — compact inline */}
-            <StatsBar items={items} />
-
-            {/* Remaining actions */}
+            {/* More actions */}
             {restActions.length > 0 && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                     <h2 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                         <Sparkles className="h-3.5 w-3.5" />
                         {t('navigator.moreActions', 'More actions')}
@@ -187,6 +184,9 @@ export const DashboardPage = () => {
                     </div>
                 </div>
             )}
+
+            {/* Stats — secondary info, below actions */}
+            <StatsBar items={items} />
 
             {/* Team workload */}
             <ActorWorkload />

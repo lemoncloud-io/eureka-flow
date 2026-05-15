@@ -69,7 +69,7 @@ export const UnresolvedNotesBadge = () => {
                 {entries.map(({ note, stage, item }) => (
                     <DropdownMenuItem
                         key={note.id}
-                        onClick={() => navigate(`/items/${item.id}?stage=${stage.id}`)}
+                        onClick={() => navigate(`/items/${item.id}/stages/${stage.id}`)}
                         className="flex-col items-start gap-0.5 py-2"
                     >
                         <p className="text-xs truncate w-full">{note.content}</p>

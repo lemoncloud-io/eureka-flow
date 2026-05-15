@@ -44,7 +44,18 @@ export const StageCard = ({
     const isActive = stage.status === 'doing';
 
     return (
-        <div className="relative flex gap-4" onClick={() => onSelect(stage.id)}>
+        <div
+            role="button"
+            tabIndex={0}
+            className="relative flex gap-4"
+            onClick={() => onSelect(stage.id)}
+            onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelect(stage.id);
+                }
+            }}
+        >
             {/* Timeline connector */}
             <div className="flex flex-col items-center">
                 <div
