@@ -160,16 +160,12 @@ export const useMobileFlowActions = ({
     }, [createNewFlow, updateUrl, t, serializeWorkflowState, lastSavedStateRef]);
 
     const handleNew = useCallback(async () => {
-        if (window.confirm(t('flowEditor.confirmNewFlow'))) {
-            await handleCreateNewFlow();
-        }
-    }, [handleCreateNewFlow, t]);
+        await handleCreateNewFlow();
+    }, [handleCreateNewFlow]);
 
     const handleClear = useCallback(() => {
-        if (window.confirm(t('flowEditor.confirmClearCanvas', 'Clear all nodes?'))) {
-            useCanvasStore.getState().clearWorkflow();
-            toast.success(t('flowEditor.canvasCleared', 'Canvas cleared'));
-        }
+        useCanvasStore.getState().clearWorkflow();
+        toast.success(t('flowEditor.canvasCleared', 'Canvas cleared'));
     }, [t]);
 
     return {

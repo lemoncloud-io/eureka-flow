@@ -103,14 +103,19 @@ export const MobileStepCard = React.memo(
             [node.id, onRun]
         );
 
+        const [confirmingDelete, setConfirmingDelete] = useState(false);
         const handleDelete = useCallback(
             (e: React.MouseEvent) => {
                 e.stopPropagation();
-                if (onDelete && window.confirm(t('mobile.deleteStep', 'Delete this step?'))) {
-                    onDelete(node.id);
+                if (!confirmingDelete) {
+                    setConfirmingDelete(true);
+                    setTimeout(() => setConfirmingDelete(false), 3000);
+                    return;
                 }
+                onDelete?.(node.id);
+                setConfirmingDelete(false);
             },
-            [node.id, onDelete]
+            [node.id, onDelete, confirmingDelete]
         );
 
         const contentPreview = useMemo((): ContentPreviewData | null => {
@@ -220,9 +225,19 @@ export const MobileStepCard = React.memo(
                                 </DropdownMenuItem>
                             )}
                             {canEdit && onDelete && (
-                                <DropdownMenuItem onClick={handleDelete} className="gap-2 text-destructive">
+                                <DropdownMenuItem
+                                    onClick={handleDelete}
+                                    className={cn(
+                                        'gap-2',
+                                        confirmingDelete
+                                            ? 'bg-destructive text-destructive-foreground'
+                                            : 'text-destructive'
+                                    )}
+                                >
                                     <Trash2 className="w-3.5 h-3.5" />
-                                    {t('mobile.delete', 'Delete')}
+                                    {confirmingDelete
+                                        ? t('mobile.confirmDelete', '정말 삭제하시겠습니까?')
+                                        : t('mobile.delete', 'Delete')}
                                 </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>

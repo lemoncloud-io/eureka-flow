@@ -91,6 +91,7 @@ export const MobileHeader = ({
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
     const { canEdit, canRun } = getPermissions(role);
+    const [confirmingClear, setConfirmingClear] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(flowName);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -288,9 +289,25 @@ export const MobileHeader = ({
                         {t('mobile.flowOverview', '플로우 전체보기')}
                     </DropdownMenuItem>
                     {onClear && (
-                        <DropdownMenuItem onClick={onClear} className="gap-2 text-destructive">
+                        <DropdownMenuItem
+                            onClick={() => {
+                                if (!confirmingClear) {
+                                    setConfirmingClear(true);
+                                    setTimeout(() => setConfirmingClear(false), 3000);
+                                    return;
+                                }
+                                onClear();
+                                setConfirmingClear(false);
+                            }}
+                            className={cn(
+                                'gap-2',
+                                confirmingClear ? 'bg-destructive text-destructive-foreground' : 'text-destructive'
+                            )}
+                        >
                             <Trash2 className="w-4 h-4" />
-                            {t('header.clearCanvas', 'Clear Canvas')}
+                            {confirmingClear
+                                ? t('mobile.confirmClear', '정말 모두 삭제하시겠습니까?')
+                                : t('header.clearCanvas', 'Clear Canvas')}
                         </DropdownMenuItem>
                     )}
 

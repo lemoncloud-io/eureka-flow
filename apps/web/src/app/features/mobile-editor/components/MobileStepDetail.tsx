@@ -1,10 +1,10 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, ArrowLeft, ArrowRight, Loader2, Play, Plus, Trash2, Zap } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-import { isAiBlock, isMissingAiKey, useBlockRegistry, useCanvasConnections, useCanvasStore } from '@flows/flows';
+import { isAiBlock, isMissingAiKey, useBlockRegistry, useCanvasConnections } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Input, Label, Switch } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -84,6 +84,7 @@ export const MobileStepDetail = ({
     const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
 
     const isOpen = nodeId !== null;
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
 
     if (!node || !blockDef) return null;
 
@@ -94,13 +95,14 @@ export const MobileStepDetail = ({
     const isAuto = !!(node as typeof node & { auto?: boolean }).auto;
 
     const stereoLabel = t(STEREO_I18N_KEY[stereo] ?? '', STEREO_FALLBACK_LABEL[stereo] ?? stereo);
-
     const handleDelete = () => {
         if (!canEdit || !nodeId) return;
-        if (window.confirm(t('detailPanel.confirmDelete', 'Delete this node?'))) {
-            deleteNodeWithSync(nodeId, flowId);
-            onClose();
+        if (!confirmingDelete) {
+            setConfirmingDelete(true);
+            return;
         }
+        deleteNodeWithSync(nodeId, flowId);
+        onClose();
     };
 
     return (
@@ -214,15 +216,22 @@ export const MobileStepDetail = ({
                                 t={t}
                             />
 
-                            {/* Delete */}
+                            {/* Delete — 2-stage confirm */}
                             {canEdit && (
-                                <div className="pt-4 border-t border-border/30 flex justify-center">
+                                <div className="pt-4 border-t border-border/30">
                                     <button
                                         onClick={handleDelete}
-                                        className="flex items-center gap-1.5 px-3 py-2 text-xs text-destructive/60 hover:text-destructive transition-colors"
+                                        className={cn(
+                                            'w-full flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium transition-all',
+                                            confirmingDelete
+                                                ? 'bg-destructive text-destructive-foreground'
+                                                : 'text-destructive/60 hover:text-destructive'
+                                        )}
                                     >
-                                        <Trash2 className="w-3 h-3" />
-                                        {t('detailPanel.deleteNode', 'Delete Node')}
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        {confirmingDelete
+                                            ? t('mobile.confirmDelete', '정말 삭제하시겠습니까?')
+                                            : t('detailPanel.deleteNode', 'Delete Node')}
                                     </button>
                                 </div>
                             )}
@@ -425,12 +434,6 @@ const ConnectionsSection = ({
     const outConns = allConnections.filter(c => c.sourceNodeId === nodeId);
 
     const displayName = node.customLabel || blockDef.label || node.type;
-
-    const resolveNodeName = (id: string) => {
-        const n = useCanvasStore.getState().nodes.find(x => x.id === id);
-        const def = n ? blockRegistry[n.type] : undefined;
-        return n?.customLabel || def?.label || id;
-    };
 
     return (
         <div className="space-y-2">
