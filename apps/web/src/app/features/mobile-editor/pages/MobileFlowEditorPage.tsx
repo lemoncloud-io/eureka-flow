@@ -21,6 +21,7 @@ import {
     MobileConnectionSheet,
     MobileFlowMap,
     MobileHeader,
+    MobileNewFlowSheet,
     MobileStepDetail,
     MobileStepList,
 } from '../components';
@@ -67,6 +68,7 @@ export const MobileFlowEditorPage = () => {
     const [isFlowMapOpen, setIsFlowMapOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isNewFlowSheetOpen, setIsNewFlowSheetOpen] = useState(false);
     const [isAiKeyDialogOpen, setIsAiKeyDialogOpen] = useState(false);
 
     // Step navigation (replaces configNodeId)
@@ -109,14 +111,13 @@ export const MobileFlowEditorPage = () => {
 
     const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ socketConnectionId });
 
-    const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleNew, handleClear } = useMobileFlowActions(
-        {
+    const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleNew, handleCreateNewFlow, handleClear } =
+        useMobileFlowActions({
             updateUrl,
             serializeWorkflowState,
             lastSavedStateRef,
             lastLocalUpdateTimestampRef,
-        }
-    );
+        });
 
     const connectionMode = useConnectionMode(blockRegistry, currentFlowId);
     const { recentIds, addRecent } = useRecentBlocks();
@@ -419,7 +420,17 @@ export const MobileFlowEditorPage = () => {
                 onOpenChange={setIsFlowListOpen}
                 currentFlowId={currentFlowId}
                 onSelectFlow={handleSelectFlow}
-                onNewFlow={handleNew}
+                onNewFlow={() => {
+                    setIsFlowListOpen(false);
+                    setIsNewFlowSheetOpen(true);
+                }}
+            />
+
+            <MobileNewFlowSheet
+                open={isNewFlowSheetOpen}
+                onOpenChange={setIsNewFlowSheetOpen}
+                onCreate={handleCreateNewFlow}
+                onNameChange={updateFlowName}
             />
 
             <ApiKeyDialog

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     ArrowLeft,
     Check,
+    ChevronDown,
     Download,
     FilePlus,
     FolderOpen,
@@ -128,8 +129,8 @@ export const MobileHeader = ({
                 <ArrowLeft className="w-5 h-5" />
             </button>
 
-            {/* Flow name */}
-            <div className="flex-1 min-w-0 flex items-center gap-2">
+            {/* Flow name + switcher dropdown */}
+            <div className="flex-1 min-w-0 flex items-center gap-1">
                 {isEditing ? (
                     <input
                         ref={inputRef}
@@ -143,15 +144,27 @@ export const MobileHeader = ({
                         className="w-full text-sm font-bold bg-transparent border-b-2 border-primary outline-none"
                         autoFocus
                     />
-                ) : canEdit ? (
-                    <button
-                        onClick={handleStartEditing}
-                        className="truncate text-sm font-bold text-foreground leading-tight"
-                    >
-                        {flowName}
-                    </button>
                 ) : (
-                    <span className="truncate text-sm font-bold text-foreground leading-tight">{flowName}</span>
+                    <div className="flex items-center gap-1 min-w-0">
+                        {canEdit ? (
+                            <button
+                                onClick={handleStartEditing}
+                                className="truncate text-sm font-bold text-foreground leading-tight"
+                            >
+                                {flowName}
+                            </button>
+                        ) : (
+                            <span className="truncate text-sm font-bold text-foreground leading-tight">{flowName}</span>
+                        )}
+                        {/* Flow switcher chevron */}
+                        <button
+                            onClick={onOpenFlowList}
+                            className="w-6 h-6 rounded flex items-center justify-center shrink-0 hover:bg-accent/50 transition-colors"
+                            aria-label={t('mobile.switchFlow', 'Switch flow')}
+                        >
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                    </div>
                 )}
 
                 {/* View-only badge for non-owner roles */}
@@ -160,7 +173,7 @@ export const MobileHeader = ({
                         {t('mobile.viewOnly', 'View only')}
                     </span>
                 )}
-                {/* Disconnected warning — only when socket is down */}
+                {/* Disconnected warning */}
                 {isDisconnected && <WifiOff className="w-3.5 h-3.5 text-destructive/60 shrink-0" />}
             </div>
 

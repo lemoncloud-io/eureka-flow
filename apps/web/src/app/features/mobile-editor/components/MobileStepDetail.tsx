@@ -1,17 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-    AlertCircle,
-    ArrowLeft,
-    ArrowRight,
-    ChevronDown,
-    ChevronRight,
-    Loader2,
-    Play,
-    Trash2,
-    Zap,
-} from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import { isAiBlock, isMissingAiKey, useBlockRegistry, useCanvasConnections, useCanvasStore } from '@flows/flows';
@@ -21,13 +11,11 @@ import { useWebCoreStore } from '@flows/web-core';
 
 import { AiKeyWarningBanner } from '../../flows/components/AiKeyWarningBanner';
 import { BlockIcon } from '../../flows/components/BlockIcon';
-import { RunHistoryPanel } from '../../flows/components/RunHistoryPanel';
 import { getPortStyleKey } from '../../flows/utils';
 import { useNodeConfig } from '../hooks/useNodeConfig';
 import { deleteNodeWithSync, executeNodeWithToast } from '../utils';
 import { ConfigFieldList } from './ConfigFieldList';
-import { STATE_STYLES, STEREO_ICON_BG, TYPE_DOT } from './consts';
-import { DataPreview } from './DataPreview';
+import { STEREO_FALLBACK_LABEL, STEREO_I18N_KEY, STEREO_ICON_BG, TYPE_DOT } from './consts';
 import { MobileImageUpload } from './MobileImageUpload';
 import { MobileTextInput } from './MobileTextInput';
 
@@ -77,7 +65,6 @@ export const MobileStepDetail = ({
         configFields,
         handleConfigChange,
         handleCustomLabelChange,
-        handleDescriptionChange,
         handleToggleAuto,
     } = useNodeConfig(nodeId, flowId, role);
 
@@ -95,20 +82,17 @@ export const MobileStepDetail = ({
     const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
     const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
 
-    const [showInputData, setShowInputData] = useState(false);
-    const [showOutputData, setShowOutputData] = useState(false);
-    const [expandedDataKey, setExpandedDataKey] = useState<string | null>(null);
-
     const isOpen = nodeId !== null;
 
     if (!node || !blockDef) return null;
 
     const state = (node.state ?? 'IDLE') as NodeState;
-    const stateStyle = STATE_STYLES[state] ?? STATE_STYLES.IDLE;
     const stereo = blockDef.stereo ?? 'process';
     const isInputImage = blockDef.type === 'input-image';
     const isInputText = blockDef.type === 'input-text';
     const isAuto = !!(node as typeof node & { auto?: boolean }).auto;
+
+    const stereoLabel = t(STEREO_I18N_KEY[stereo] ?? '', STEREO_FALLBACK_LABEL[stereo] ?? stereo);
 
     const handleDelete = () => {
         if (!canEdit || !nodeId) return;
@@ -128,64 +112,52 @@ export const MobileStepDetail = ({
                     exit={{ x: '100%' }}
                     transition={{ type: 'spring', damping: 28, stiffness: 300 }}
                 >
-                    {/* ── Header ── */}
+                    {/* ── Header: breadcrumb style ── */}
                     <header
                         className={cn(
-                            'flex items-center gap-2 px-2 h-14 shrink-0',
+                            'flex items-center gap-2 px-2 h-[71px] shrink-0',
                             'border-b border-border/40',
                             'pt-[env(safe-area-inset-top)]'
                         )}
                     >
                         <button
                             onClick={onClose}
-                            className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors"
+                            className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
                         >
-                            <ArrowLeft className="w-5 h-5" />
+                            <ArrowLeft className="w-4 h-4" />
                         </button>
-                        <span className="text-sm font-semibold text-foreground truncate">
-                            {node.customLabel || blockDef.label || node.type}
-                        </span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-sm font-semibold text-muted-foreground shrink-0">{stereoLabel}</span>
+                            <span className="text-sm font-semibold text-foreground truncate">
+                                {blockDef.label || node.type}
+                            </span>
+                        </div>
                     </header>
 
                     {/* ── Scrollable body ── */}
                     <div className="flex-1 overflow-y-auto overscroll-contain">
                         <div className="px-4 py-4 space-y-5">
-                            {/* Block info header */}
+                            {/* Node identity: icon + name input */}
                             <div className="flex items-center gap-3">
                                 <div
                                     className={cn(
-                                        'w-12 h-12 rounded-xl flex items-center justify-center shrink-0',
+                                        'w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
                                         STEREO_ICON_BG[stereo] ?? 'bg-muted/50'
                                     )}
                                 >
-                                    <BlockIcon icon={blockDef.icon} size={22} />
+                                    <BlockIcon icon={blockDef.icon} size={18} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-base font-semibold truncate">{blockDef.label}</span>
-                                        {state !== 'IDLE' && (
-                                            <span
-                                                className={cn(
-                                                    'flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0',
-                                                    stateStyle.bg,
-                                                    stateStyle.text
-                                                )}
-                                            >
-                                                {stateStyle.icon}
-                                                <span>
-                                                    {t(
-                                                        `mobile.state.${stateStyle.label.toLowerCase()}`,
-                                                        stateStyle.label
-                                                    )}
-                                                </span>
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className="text-[10px] font-mono text-muted-foreground/50">
-                                            {blockDef.type}
-                                        </span>
-                                    </div>
+                                    <Label className="text-xs text-muted-foreground mb-1 block">
+                                        {t('mobile.nodeName', '노드 명')}
+                                    </Label>
+                                    <Input
+                                        value={customLabel}
+                                        onChange={e => handleCustomLabelChange(e.target.value)}
+                                        placeholder={blockDef.label}
+                                        className="h-9 text-sm"
+                                        disabled={!canEdit}
+                                    />
                                 </div>
                             </div>
 
@@ -197,19 +169,10 @@ export const MobileStepDetail = ({
                                 </div>
                             )}
 
-                            {/* Label + Auto toggle */}
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    value={customLabel}
-                                    onChange={e => handleCustomLabelChange(e.target.value)}
-                                    placeholder={blockDef.label}
-                                    className="h-9 flex-1 text-sm"
-                                    disabled={!canEdit}
-                                />
-                                <div className="flex items-center gap-1.5 shrink-0 px-2 py-1.5 rounded-lg bg-muted/30">
-                                    <Zap className="w-3 h-3 text-muted-foreground/60" />
-                                    <Switch checked={isAuto} onCheckedChange={handleToggleAuto} disabled={!canEdit} />
-                                </div>
+                            {/* Auto toggle — separate row */}
+                            <div className="flex items-center justify-between">
+                                <Label className="text-sm font-medium">{t('mobile.autoExecution', '자동 실행')}</Label>
+                                <Switch checked={isAuto} onCheckedChange={handleToggleAuto} disabled={!canEdit} />
                             </div>
 
                             {/* Special UI for input blocks */}
@@ -234,283 +197,18 @@ export const MobileStepDetail = ({
                                 />
                             </div>
 
-                            {/* Description */}
-                            <div>
-                                <Label className="text-xs text-muted-foreground mb-1.5 block">
-                                    {t('detailPanel.description', 'Description')}
-                                </Label>
-                                <Input
-                                    value={node.description ?? ''}
-                                    onChange={e => handleDescriptionChange(e.target.value)}
-                                    placeholder={t('detailPanel.addDescription', 'Add a description...')}
-                                    className="h-9 text-xs"
-                                    disabled={!canEdit}
-                                />
-                            </div>
-
-                            {/* ── Connections / Ports ── */}
-                            {blockDef &&
-                                nodeId &&
-                                (() => {
-                                    const inputPorts = blockDef.inputs ?? [];
-                                    const outputPorts = blockDef.outputs ?? [];
-                                    const nodeConns = allConnections.filter(
-                                        c => c.sourceNodeId === nodeId || c.targetNodeId === nodeId
-                                    );
-                                    if (inputPorts.length === 0 && outputPorts.length === 0) return null;
-
-                                    const displayName = node.customLabel || blockDef.label || node.type;
-
-                                    return (
-                                        <div className="space-y-2">
-                                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider py-1">
-                                                {t('mobile.connections', 'Connections')}
-                                            </div>
-
-                                            {/* Input ports — tappable to connect sources */}
-                                            {inputPorts.length > 0 && (
-                                                <div className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider pt-1">
-                                                    {t('mobile.inputs', 'Inputs')}
-                                                </div>
-                                            )}
-                                            {inputPorts.map(port => {
-                                                const conn = nodeConns.find(
-                                                    c => c.targetNodeId === nodeId && c.targetPortId === port.id
-                                                );
-                                                const styleKey = getPortStyleKey(port.type ?? 'any');
-                                                const isConnected = !!conn;
-
-                                                if (isConnected) {
-                                                    const sourceNode = useCanvasStore
-                                                        .getState()
-                                                        .nodes.find(n => n.id === conn.sourceNodeId);
-                                                    const sourceDef = sourceNode
-                                                        ? blockRegistry[sourceNode.type]
-                                                        : undefined;
-                                                    const sourceName =
-                                                        sourceNode?.customLabel ||
-                                                        sourceDef?.label ||
-                                                        conn.sourceNodeId;
-                                                    return (
-                                                        <button
-                                                            key={`in-${port.id}`}
-                                                            type="button"
-                                                            onClick={
-                                                                canEdit
-                                                                    ? () =>
-                                                                          onOpenInputConnection?.(
-                                                                              nodeId,
-                                                                              port.id,
-                                                                              port.type ?? 'any',
-                                                                              displayName,
-                                                                              port.label || port.id
-                                                                          )
-                                                                    : undefined
-                                                            }
-                                                            className={cn(
-                                                                'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-success/5 text-xs text-left transition-all',
-                                                                canEdit && 'hover:bg-success/10 active:scale-[0.98]'
-                                                            )}
-                                                        >
-                                                            <ArrowLeft className="w-3 h-3 text-success/50 shrink-0" />
-                                                            <span
-                                                                className={cn(
-                                                                    'w-1.5 h-1.5 rounded-full shrink-0',
-                                                                    TYPE_DOT[styleKey]
-                                                                )}
-                                                            />
-                                                            <span className="font-medium">{port.label || port.id}</span>
-                                                            <span className="text-success/60 truncate flex-1">
-                                                                ← {sourceName}
-                                                            </span>
-                                                        </button>
-                                                    );
-                                                }
-
-                                                return (
-                                                    <button
-                                                        key={`in-${port.id}`}
-                                                        type="button"
-                                                        onClick={
-                                                            canEdit
-                                                                ? () =>
-                                                                      onOpenInputConnection?.(
-                                                                          nodeId,
-                                                                          port.id,
-                                                                          port.type ?? 'any',
-                                                                          displayName,
-                                                                          port.label || port.id
-                                                                      )
-                                                                : undefined
-                                                        }
-                                                        className={cn(
-                                                            'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs text-left',
-                                                            'border border-dashed border-primary/20 bg-primary/[0.02]',
-                                                            'transition-all',
-                                                            canEdit && 'hover:border-primary/40 active:scale-[0.98]'
-                                                        )}
-                                                    >
-                                                        <ArrowLeft className="w-3 h-3 text-primary/30 shrink-0" />
-                                                        <span
-                                                            className={cn(
-                                                                'w-1.5 h-1.5 rounded-full shrink-0',
-                                                                TYPE_DOT[styleKey]
-                                                            )}
-                                                        />
-                                                        <span className="font-medium">{port.label || port.id}</span>
-                                                        {canEdit && (
-                                                            <span className="text-primary/40 flex-1 italic">
-                                                                {t('mobile.connection.tapToConnect', 'tap to connect')}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })}
-
-                                            {/* Output ports — tappable to open connection sheet */}
-                                            {outputPorts.length > 0 && (
-                                                <div className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider pt-2">
-                                                    {t('mobile.outputs', 'Outputs')}
-                                                </div>
-                                            )}
-                                            {outputPorts.map(port => {
-                                                const conns = nodeConns.filter(
-                                                    c => c.sourceNodeId === nodeId && c.sourcePortId === port.id
-                                                );
-                                                const styleKey = getPortStyleKey(port.type ?? 'any');
-                                                const isConnected = conns.length > 0;
-
-                                                return (
-                                                    <button
-                                                        key={`out-${port.id}`}
-                                                        type="button"
-                                                        onClick={
-                                                            canEdit
-                                                                ? () =>
-                                                                      onOpenOutputConnection?.(
-                                                                          nodeId,
-                                                                          port.id,
-                                                                          port.type ?? 'any',
-                                                                          displayName,
-                                                                          port.label || port.id
-                                                                      )
-                                                                : undefined
-                                                        }
-                                                        className={cn(
-                                                            'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs text-left',
-                                                            'transition-all',
-                                                            canEdit && 'active:scale-[0.98]',
-                                                            isConnected
-                                                                ? 'bg-success/5'
-                                                                : 'border border-dashed border-primary/20 bg-primary/[0.02]',
-                                                            canEdit &&
-                                                                (isConnected
-                                                                    ? 'hover:bg-success/10'
-                                                                    : 'hover:border-primary/40')
-                                                        )}
-                                                    >
-                                                        <ArrowRight
-                                                            className={cn(
-                                                                'w-3 h-3 shrink-0',
-                                                                isConnected ? 'text-success/50' : 'text-primary/30'
-                                                            )}
-                                                        />
-                                                        <span
-                                                            className={cn(
-                                                                'w-1.5 h-1.5 rounded-full shrink-0',
-                                                                TYPE_DOT[styleKey]
-                                                            )}
-                                                        />
-                                                        <span className="font-medium">{port.label || port.id}</span>
-                                                        {isConnected ? (
-                                                            <span className="text-success/60 truncate flex-1">
-                                                                →{' '}
-                                                                {conns
-                                                                    .map(c => {
-                                                                        const targetNode = useCanvasStore
-                                                                            .getState()
-                                                                            .nodes.find(n => n.id === c.targetNodeId);
-                                                                        const targetDef = targetNode
-                                                                            ? blockRegistry[targetNode.type]
-                                                                            : undefined;
-                                                                        return (
-                                                                            targetNode?.customLabel ||
-                                                                            targetDef?.label ||
-                                                                            c.targetNodeId
-                                                                        );
-                                                                    })
-                                                                    .join(', ')}
-                                                            </span>
-                                                        ) : canEdit ? (
-                                                            <span className="text-primary/40 flex-1 italic">
-                                                                {t('mobile.connection.tapToConnect', 'tap to connect')}
-                                                            </span>
-                                                        ) : null}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    );
-                                })()}
-
-                            {/* Input Data */}
-                            {node.inputData && Object.keys(node.inputData).length > 0 && (
-                                <CollapsibleDataSection
-                                    title={t('mobile.inputs')}
-                                    isOpen={showInputData}
-                                    onToggle={() => setShowInputData(!showInputData)}
-                                >
-                                    <div className="space-y-2 pl-2">
-                                        {Object.entries(node.inputData).map(([key, data]) => (
-                                            <button
-                                                key={key}
-                                                onClick={() =>
-                                                    setExpandedDataKey(
-                                                        expandedDataKey === `in-${key}` ? null : `in-${key}`
-                                                    )
-                                                }
-                                                className="w-full text-left rounded-lg bg-muted/30 p-2.5"
-                                            >
-                                                <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                    {key}
-                                                </div>
-                                                <DataPreview data={data} expanded={expandedDataKey === `in-${key}`} />
-                                            </button>
-                                        ))}
-                                    </div>
-                                </CollapsibleDataSection>
-                            )}
-
-                            {/* Output Data */}
-                            {node.outputData && Object.keys(node.outputData).length > 0 && (
-                                <CollapsibleDataSection
-                                    title={t('mobile.outputs')}
-                                    isOpen={showOutputData}
-                                    onToggle={() => setShowOutputData(!showOutputData)}
-                                >
-                                    <div className="space-y-2 pl-2">
-                                        {Object.entries(node.outputData).map(([key, data]) => (
-                                            <button
-                                                key={key}
-                                                onClick={() =>
-                                                    setExpandedDataKey(
-                                                        expandedDataKey === `out-${key}` ? null : `out-${key}`
-                                                    )
-                                                }
-                                                className="w-full text-left rounded-lg bg-muted/30 p-2.5"
-                                            >
-                                                <div className="text-xs font-medium text-muted-foreground mb-1">
-                                                    {key}
-                                                </div>
-                                                <DataPreview data={data} expanded={expandedDataKey === `out-${key}`} />
-                                            </button>
-                                        ))}
-                                    </div>
-                                </CollapsibleDataSection>
-                            )}
-
-                            {/* Run History */}
-                            {node && <RunHistoryPanel nodeId={node.id} maxHeight="240px" />}
+                            {/* ── Connections ── */}
+                            <ConnectionsSection
+                                nodeId={nodeId}
+                                node={node}
+                                blockDef={blockDef}
+                                allConnections={allConnections}
+                                blockRegistry={blockRegistry}
+                                canEdit={canEdit}
+                                onOpenOutputConnection={onOpenOutputConnection}
+                                onOpenInputConnection={onOpenInputConnection}
+                                t={t}
+                            />
 
                             {/* Delete */}
                             {canEdit && (
@@ -527,7 +225,7 @@ export const MobileStepDetail = ({
                         </div>
                     </div>
 
-                    {/* ── Bottom Run bar — output nodes are view-only, no execution ── */}
+                    {/* ── Bottom Run bar ── */}
                     {canRun && stereo !== 'output' && blockDef.isRunnable !== false && (
                         <div
                             className={cn(
@@ -536,15 +234,14 @@ export const MobileStepDetail = ({
                                 'bg-glass-bg backdrop-blur-2xl'
                             )}
                         >
-                            <div className="px-4 py-2.5">
+                            <div className="px-4 py-3">
                                 {stereo === 'process' ? (
-                                    /* Process nodes: two buttons — Run This Only + Run & Propagate */
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => handleRun({ propagate: false })}
                                             disabled={isRunning}
                                             className={cn(
-                                                'flex-1 flex items-center justify-center gap-1.5 h-11 rounded-xl',
+                                                'flex-1 flex items-center justify-center gap-1.5 h-[51px] rounded-xl',
                                                 'text-xs font-semibold transition-all',
                                                 'active:scale-[0.98] disabled:opacity-40',
                                                 isRunning
@@ -568,7 +265,7 @@ export const MobileStepDetail = ({
                                             onClick={() => handleRun({ propagate: true })}
                                             disabled={isRunning}
                                             className={cn(
-                                                'flex-1 flex items-center justify-center gap-1.5 h-11 rounded-xl',
+                                                'flex-1 flex items-center justify-center gap-1.5 h-[51px] rounded-xl',
                                                 'text-xs font-semibold transition-all',
                                                 'active:scale-[0.98] disabled:opacity-40',
                                                 isRunning
@@ -590,12 +287,11 @@ export const MobileStepDetail = ({
                                         </button>
                                     </div>
                                 ) : (
-                                    /* Input nodes: single Run button */
                                     <button
                                         onClick={() => handleRun()}
                                         disabled={isRunning}
                                         className={cn(
-                                            'w-full flex items-center justify-center gap-2 h-11 rounded-xl',
+                                            'w-full flex items-center justify-center gap-2 h-[51px] rounded-xl',
                                             'text-sm font-semibold transition-all',
                                             'active:scale-[0.98] disabled:opacity-40',
                                             isRunning
@@ -604,12 +300,14 @@ export const MobileStepDetail = ({
                                         )}
                                     >
                                         {isRunning ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            <Loader2 className="w-[18px] h-[18px] animate-spin" />
                                         ) : (
-                                            <Play className="w-4 h-4 fill-current" />
+                                            <Play className="w-[18px] h-[18px] fill-current" />
                                         )}
                                         <span>
-                                            {isRunning ? t('mobile.running', 'Running...') : t('mobile.runStep', 'Run')}
+                                            {isRunning
+                                                ? t('mobile.running', 'Running...')
+                                                : t('mobile.runBlock', '블록 실행')}
                                         </span>
                                     </button>
                                 )}
@@ -622,26 +320,189 @@ export const MobileStepDetail = ({
     );
 };
 
-/** Collapsible section for Input/Output data */
-const CollapsibleDataSection = ({
-    title,
-    isOpen,
-    onToggle,
-    children,
+/** Single port row — shared between input and output ports */
+const PortButton = ({
+    portKey,
+    port,
+    direction,
+    connectedNames,
+    canEdit,
+    onConnect,
+    t,
 }: {
-    title: string;
-    isOpen: boolean;
-    onToggle: () => void;
-    children: React.ReactNode;
-}) => (
-    <div>
+    portKey: string;
+    port: { id: string; label?: string; type?: string };
+    direction: 'input' | 'output';
+    connectedNames: string | null;
+    canEdit: boolean;
+    onConnect?: () => void;
+    t: (key: string, defaultValue?: string) => string;
+}) => {
+    const styleKey = getPortStyleKey(port.type ?? 'any');
+    const isConnected = connectedNames !== null;
+    const Icon = direction === 'input' ? ArrowLeft : ArrowRight;
+    const arrow = direction === 'input' ? '←' : '→';
+
+    return (
         <button
-            onClick={onToggle}
-            className="flex items-center gap-2 w-full py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+            key={portKey}
+            type="button"
+            onClick={canEdit ? onConnect : undefined}
+            className={cn(
+                'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs text-left transition-all',
+                isConnected ? 'bg-success/5' : 'border border-dashed border-primary/20 bg-primary/[0.02]',
+                canEdit &&
+                    (isConnected
+                        ? 'hover:bg-success/10 active:scale-[0.98]'
+                        : 'hover:border-primary/40 active:scale-[0.98]')
+            )}
         >
-            {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-            {title}
+            <Icon className={cn('w-3 h-3 shrink-0', isConnected ? 'text-success/50' : 'text-primary/30')} />
+            <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', TYPE_DOT[styleKey])} />
+            <span className="font-medium">{port.label || port.id}</span>
+            {isConnected ? (
+                <span className="text-success/60 truncate flex-1">
+                    {arrow} {connectedNames}
+                </span>
+            ) : canEdit ? (
+                <span className="text-primary/40 flex-1 flex items-center gap-1">
+                    <Plus className="w-3 h-3" />
+                    {t('mobile.connection.addConnection', '추가 연결')}
+                </span>
+            ) : null}
         </button>
-        {isOpen && children}
-    </div>
-);
+    );
+};
+
+/** Connections section — extracted for readability */
+const ConnectionsSection = ({
+    nodeId,
+    node,
+    blockDef,
+    allConnections,
+    blockRegistry,
+    canEdit,
+    onOpenOutputConnection,
+    onOpenInputConnection,
+    t,
+}: {
+    nodeId: string | null;
+    node: { customLabel?: string; type: string };
+    blockDef: {
+        inputs?: Array<{ id: string; label?: string; type?: string }>;
+        outputs?: Array<{ id: string; label?: string; type?: string }>;
+        label?: string;
+    };
+    allConnections: Array<{
+        id: string;
+        sourceNodeId: string;
+        sourcePortId: string;
+        targetNodeId: string;
+        targetPortId: string;
+    }>;
+    blockRegistry: Record<string, { label?: string; icon?: string }>;
+    canEdit: boolean;
+    onOpenOutputConnection?: (
+        nodeId: string,
+        portId: string,
+        portDataType: string,
+        nodeName: string,
+        portName: string
+    ) => void;
+    onOpenInputConnection?: (
+        nodeId: string,
+        portId: string,
+        portDataType: string,
+        nodeName: string,
+        portName: string
+    ) => void;
+    t: (key: string, defaultValue?: string) => string;
+}) => {
+    if (!blockDef || !nodeId) return null;
+
+    const inputPorts = blockDef.inputs ?? [];
+    const outputPorts = blockDef.outputs ?? [];
+
+    if (inputPorts.length === 0 && outputPorts.length === 0) return null;
+
+    // Pre-split connections by direction
+    const inConns = allConnections.filter(c => c.targetNodeId === nodeId);
+    const outConns = allConnections.filter(c => c.sourceNodeId === nodeId);
+
+    const displayName = node.customLabel || blockDef.label || node.type;
+
+    const resolveNodeName = (id: string) => {
+        const n = useCanvasStore.getState().nodes.find(x => x.id === id);
+        const def = n ? blockRegistry[n.type] : undefined;
+        return n?.customLabel || def?.label || id;
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="text-xs font-semibold text-muted-foreground py-1">
+                {t('mobile.connectedBlocks', '연결 블록')}
+            </div>
+
+            {/* Input ports */}
+            {inputPorts.length > 0 && (
+                <div className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider pt-1">
+                    {t('mobile.input', '입력')}
+                </div>
+            )}
+            {inputPorts.map(port => {
+                const conn = inConns.find(c => c.targetPortId === port.id);
+                return (
+                    <PortButton
+                        key={`in-${port.id}`}
+                        portKey={`in-${port.id}`}
+                        port={port}
+                        direction="input"
+                        connectedNames={conn ? resolveNodeName(conn.sourceNodeId) : null}
+                        canEdit={canEdit}
+                        onConnect={() =>
+                            onOpenInputConnection?.(
+                                nodeId,
+                                port.id,
+                                port.type ?? 'any',
+                                displayName,
+                                port.label || port.id
+                            )
+                        }
+                        t={t}
+                    />
+                );
+            })}
+
+            {/* Output ports */}
+            {outputPorts.length > 0 && (
+                <div className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider pt-2">
+                    {t('mobile.output', '출력')}
+                </div>
+            )}
+            {outputPorts.map(port => {
+                const conns = outConns.filter(c => c.sourcePortId === port.id);
+                const names = conns.length > 0 ? conns.map(c => resolveNodeName(c.targetNodeId)).join(', ') : null;
+                return (
+                    <PortButton
+                        key={`out-${port.id}`}
+                        portKey={`out-${port.id}`}
+                        port={port}
+                        direction="output"
+                        connectedNames={names}
+                        canEdit={canEdit}
+                        onConnect={() =>
+                            onOpenOutputConnection?.(
+                                nodeId,
+                                port.id,
+                                port.type ?? 'any',
+                                displayName,
+                                port.label || port.id
+                            )
+                        }
+                        t={t}
+                    />
+                );
+            })}
+        </div>
+    );
+};

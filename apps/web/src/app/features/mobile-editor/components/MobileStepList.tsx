@@ -145,10 +145,14 @@ export const MobileStepList = ({
                                 {/* Browse all */}
                                 <button
                                     onClick={onAddStep}
-                                    className="flex items-center gap-1.5 text-xs text-primary/60 hover:text-primary transition-colors"
+                                    className={cn(
+                                        'flex items-center justify-center gap-2 w-full h-12 rounded-xl',
+                                        'border border-primary/20 bg-card text-sm font-semibold text-primary',
+                                        'hover:bg-primary/5 active:scale-[0.98] transition-all'
+                                    )}
                                 >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    {t('mobile.browseAllBlocks', 'Browse all blocks')}
+                                    <Plus className="w-4 h-4" />
+                                    {t('mobile.addNode', '노드 추가')}
                                 </button>
                             </div>
                         );

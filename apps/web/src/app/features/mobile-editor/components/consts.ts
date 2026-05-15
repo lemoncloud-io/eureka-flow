@@ -55,3 +55,17 @@ export const STEREO_ICON_BG: Record<string, string> = {
     process: 'bg-muted/50',
     output: 'bg-success/10',
 };
+
+/** Stereo category i18n keys for breadcrumb header */
+export const STEREO_I18N_KEY: Record<string, string> = {
+    input: 'mobile.stereo.input',
+    process: 'mobile.stereo.process',
+    output: 'mobile.stereo.output',
+};
+
+/** Stereo category fallback labels (Korean) */
+export const STEREO_FALLBACK_LABEL: Record<string, string> = {
+    input: '입력 블록',
+    process: '처리 블록',
+    output: '출력 블록',
+};

@@ -25,11 +25,11 @@ export const MobileBottomBar = ({ onAddNode, role = 'owner' }: MobileBottomBarPr
                 'border-t border-border/30'
             )}
         >
-            <div className="px-4 py-2.5">
+            <div className="px-4 py-6">
                 <button
                     onClick={onAddNode}
                     className={cn(
-                        'w-full h-12 rounded-xl',
+                        'w-full h-[51px] rounded-xl',
                         'flex items-center justify-center gap-2',
                         'text-sm font-semibold',
                         'bg-card border border-primary/20 text-primary',
@@ -39,7 +39,7 @@ export const MobileBottomBar = ({ onAddNode, role = 'owner' }: MobileBottomBarPr
                     )}
                 >
                     <Plus className="w-4.5 h-4.5" />
-                    <span>{t('mobile.addNode', 'Add Node')}</span>
+                    <span>{t('mobile.addNode', '노드 추가')}</span>
                 </button>
             </div>
         </div>

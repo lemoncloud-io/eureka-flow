@@ -15,15 +15,13 @@ export const MobileTextInput = ({ node, onConfigChange }: MobileTextInputProps) 
 
     return (
         <div>
-            <Label className="text-xs text-muted-foreground mb-1.5 block">
-                {t('detailPanel.textContent', 'Text Content')}
-            </Label>
+            <Label className="text-sm font-medium mb-1.5 block">{t('mobile.value', '값')}</Label>
             <Textarea
                 value={text}
                 onChange={e => onConfigChange('text', e.target.value)}
-                rows={3}
-                placeholder={t('detailPanel.enterText', 'Enter text...')}
-                className="text-sm font-mono resize-y min-h-[60px]"
+                rows={4}
+                placeholder={t('mobile.valuePlaceholder', '여기에 내용을 입력하세요.')}
+                className="text-sm resize-y min-h-[80px]"
             />
         </div>
     );

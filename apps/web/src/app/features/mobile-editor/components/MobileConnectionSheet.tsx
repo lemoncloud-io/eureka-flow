@@ -254,7 +254,7 @@ export const MobileConnectionSheet = ({
                                 )}
                             >
                                 <Plus className="w-4 h-4" />
-                                {t('mobile.connection.addNewAndConnect', 'Add new block & connect')}
+                                {t('mobile.connection.addNewAndConnect', '노드 추가')}
                             </button>
                         </div>
                     )}

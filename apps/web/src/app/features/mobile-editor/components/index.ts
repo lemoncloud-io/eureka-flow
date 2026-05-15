@@ -7,6 +7,7 @@ export { MobileFileField } from './MobileFileField';
 export { MobileFlowMap } from './MobileFlowMap';
 export { MobileHeader } from './MobileHeader';
 export { MobileImageUpload } from './MobileImageUpload';
+export { MobileNewFlowSheet } from './MobileNewFlowSheet';
 export { MobileStepCard } from './MobileStepCard';
 export { MobileStepDetail } from './MobileStepDetail';
 export { MobileStepList } from './MobileStepList';
