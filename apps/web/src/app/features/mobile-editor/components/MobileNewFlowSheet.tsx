@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ImagePlus, Loader2 } from 'lucide-react';
+import { ImagePlus, Loader2, X } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { Input, Label, Sheet, SheetContent, SheetTitle, Textarea } from '@flows/ui-kit';
@@ -17,6 +17,7 @@ export const MobileNewFlowSheet = ({ open, onOpenChange, onCreate, onNameChange 
     const { t } = useTranslation(['flows']);
     const [name, setName] = useState('Untitled Flow');
     const [description, setDescription] = useState('');
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [isCreating, setIsCreating] = useState(false);
 
     // Reset state when sheet closes
@@ -24,8 +25,20 @@ export const MobileNewFlowSheet = ({ open, onOpenChange, onCreate, onNameChange 
         if (!open) {
             setName('Untitled Flow');
             setDescription('');
+            setImagePreview(null);
         }
     }, [open]);
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = evt => {
+            if (typeof evt.target?.result === 'string') setImagePreview(evt.target.result);
+        };
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    };
 
     const handleCreate = async () => {
         if (isCreating) return;
@@ -98,17 +111,37 @@ export const MobileNewFlowSheet = ({ open, onOpenChange, onCreate, onNameChange 
                             <Label className="text-sm font-medium mb-1.5 block">
                                 {t('mobile.newFlow.image', '플로우 이미지(선택)')}
                             </Label>
-                            <button
-                                type="button"
-                                className={cn(
-                                    'w-20 h-20 rounded-xl border border-dashed border-border/60',
-                                    'flex flex-col items-center justify-center gap-1',
-                                    'text-muted-foreground/40 hover:border-primary/30 hover:text-primary/40',
-                                    'transition-colors'
-                                )}
-                            >
-                                <ImagePlus className="w-6 h-6" />
-                            </button>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                id="new-flow-image"
+                                onChange={handleImageSelect}
+                            />
+                            {imagePreview ? (
+                                <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-border/60">
+                                    <img src={imagePreview} alt="" className="w-full h-full object-cover" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setImagePreview(null)}
+                                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center"
+                                    >
+                                        <X className="w-3 h-3 text-white" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <label
+                                    htmlFor="new-flow-image"
+                                    className={cn(
+                                        'w-20 h-20 rounded-xl border border-dashed border-border/60 cursor-pointer',
+                                        'flex flex-col items-center justify-center gap-1',
+                                        'text-muted-foreground/40 hover:border-primary/30 hover:text-primary/40',
+                                        'transition-colors'
+                                    )}
+                                >
+                                    <ImagePlus className="w-6 h-6" />
+                                </label>
+                            )}
                         </div>
 
                         {/* Create button */}

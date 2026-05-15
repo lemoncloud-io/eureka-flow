@@ -219,23 +219,44 @@ export const MobileConnectionSheet = ({
                                                     <BlockIcon icon={target.nodeIcon} size={16} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-medium truncate">
-                                                        {target.nodeName}
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="text-sm font-medium truncate">
+                                                            {target.nodeName}
+                                                        </div>
+                                                        <div className="text-[11px] font-medium shrink-0 ml-2">
+                                                            {target.occupiedByNode ? (
+                                                                <span className="text-warning/60">
+                                                                    {t('mobile.connection.replace', '교체')}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-primary/50">
+                                                                    {t('mobile.connection.connect', '+ 연결')}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <div className="text-[11px] text-muted-foreground/50 truncate">
                                                         {breadcrumb}
                                                     </div>
-                                                </div>
-                                                <div className="flex items-center gap-1 text-[11px] font-medium shrink-0">
-                                                    {target.occupiedByNode ? (
-                                                        <span className="text-warning/60">
-                                                            {t('mobile.connection.replace', '교체')}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-primary/50">
-                                                                {t('mobile.connection.connect', '+ 연결')}
-                                                            </span>
-                                                    )}
+                                                    {(() => {
+                                                        const outData = targetNode?.outputData as
+                                                            | Record<string, { value?: unknown; type?: string }>
+                                                            | undefined;
+                                                        if (!outData) return null;
+                                                        const firstEntry = Object.values(outData)[0];
+                                                        if (!firstEntry?.value) return null;
+                                                        if (firstEntry.type === 'image') return null;
+                                                        const text =
+                                                            typeof firstEntry.value === 'string'
+                                                                ? firstEntry.value
+                                                                : JSON.stringify(firstEntry.value);
+                                                        if (!text || text === 'null') return null;
+                                                        return (
+                                                            <div className="mt-1.5 rounded-md bg-muted/20 border border-border/20 p-2 text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
+                                                                {text.slice(0, 150)}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </button>
                                         );
