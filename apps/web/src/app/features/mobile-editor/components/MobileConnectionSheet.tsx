@@ -1,15 +1,14 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ArrowRight, Check, CircleDot, Link2, Link2Off, PlugZap, Plus, Unlink, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Link2, Link2Off, Plus, Unlink } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 
 import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import { Sheet, SheetContent, SheetTitle } from '@flows/ui-kit';
 
-import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG, TYPE_DOT } from './consts';
+import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
-import { getPortStyleKey } from '../../flows/utils';
 
 import type { CompatibleTarget } from '../hooks/useConnectionMode';
 import type { FlowRole } from '@flows/flows';
@@ -25,9 +24,7 @@ interface MobileConnectionSheetProps {
     compatibleTargets: CompatibleTarget[];
     onConnect: (targetNodeId: string, targetPortId: string) => void;
     onDisconnect: (connectionId: string) => void;
-    /** Open block library to add a new block and auto-connect */
     onAddNewAndConnect?: () => void;
-    /** 'output' = connecting from output, 'input' = connecting to input */
     direction?: 'output' | 'input';
     role?: FlowRole;
 }
@@ -52,123 +49,101 @@ export const MobileConnectionSheet = ({
     const connections = useCanvasConnections();
     const nodes = useCanvasNodes();
     const blockRegistry = useBlockRegistry();
-    const sourceStyleKey = getPortStyleKey(sourcePortDataType);
 
     const isOutput = direction === 'output';
-    const sheetTitle = t('mobile.connection.nodeConnection', '노드 연결');
 
     const existingWithNames = useMemo(() => {
         const filtered = isOutput
             ? connections.filter(c => c.sourceNodeId === sourceNodeId && c.sourcePortId === sourcePortId)
             : connections.filter(c => c.targetNodeId === sourceNodeId && c.targetPortId === sourcePortId);
         return filtered.map(conn => {
-            // For 'input' direction, the "other" node is the source; for 'output', it's the target
             const otherNodeId = isOutput ? conn.targetNodeId : conn.sourceNodeId;
-            const otherPortId = isOutput ? conn.targetPortId : conn.sourcePortId;
             const otherNode = nodes.find(n => n.id === otherNodeId);
             const otherDef = otherNode ? blockRegistry[otherNode.type] : undefined;
+            const stereo = otherDef?.stereo ?? 'process';
             return {
                 connectionId: conn.id,
                 targetNodeId: otherNodeId,
-                targetPortId: otherPortId,
                 targetNodeName: otherNode?.customLabel || otherDef?.label || otherNodeId,
-                targetPortName: otherPortId,
                 targetIcon: otherDef?.icon,
+                breadcrumb: `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${otherDef?.label ?? otherNodeId}`,
+                stereo,
             };
         });
-    }, [connections, sourceNodeId, sourcePortId, nodes, blockRegistry]);
+    }, [connections, sourceNodeId, sourcePortId, nodes, blockRegistry, isOutput]);
 
     const availableTargets = compatibleTargets.filter(t => !t.alreadyConnected);
     const hasConnections = existingWithNames.length > 0;
     const hasAvailable = availableTargets.length > 0;
 
     return (
-        <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent
-                side="bottom"
-                className="max-h-[85vh] rounded-t-2xl px-0 pb-[calc(1.5rem+env(safe-area-inset-bottom))] [&>button:first-child]:hidden"
-            >
-                {/* Drag handle */}
-                <div className="flex justify-center pt-2 pb-2">
-                    <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
-                </div>
-
-                {/* Header — source info with visual pipe */}
-                <div className="px-4 pb-3">
-                    <div className="flex items-center justify-between mb-2">
-                        <SheetTitle className="text-sm font-semibold flex items-center gap-2">
-                            <PlugZap className="w-4 h-4 text-primary" />
-                            {sheetTitle}
-                        </SheetTitle>
+        <AnimatePresence>
+            {open && (
+                <motion.div
+                    className="fixed inset-0 z-40 bg-background flex flex-col"
+                    initial={{ x: '100%' }}
+                    animate={{ x: 0 }}
+                    exit={{ x: '100%' }}
+                    transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                >
+                    {/* Header */}
+                    <header
+                        className={cn(
+                            'flex items-center gap-2 px-2 h-14 shrink-0',
+                            'border-b border-border/40',
+                            'pt-[env(safe-area-inset-top)]'
+                        )}
+                    >
                         <button
-                            type="button"
-                            aria-label="Close"
                             onClick={() => onOpenChange(false)}
-                            className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors"
+                            className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
                         >
-                            <X className="w-4 h-4 text-muted-foreground" />
+                            <ArrowLeft className="w-4 h-4" />
                         </button>
-                    </div>
-
-                    {/* Source pill */}
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border/40">
-                        <CircleDot className="w-3.5 h-3.5 text-primary/60 shrink-0" />
-                        <span className="text-xs font-medium text-foreground truncate">{sourceNodeName}</span>
-                        <ArrowRight className="w-3 h-3 text-muted-foreground/40 shrink-0" />
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                            <span className={cn('w-2 h-2 rounded-full', TYPE_DOT[sourceStyleKey])} />
-                            {sourcePortName}
+                        <span className="text-sm font-semibold text-foreground">
+                            {t('mobile.connection.nodeConnection', '노드 연결')}
                         </span>
-                    </div>
-                </div>
+                    </header>
 
-                <div className="border-t border-border/40" />
-
-                <div className="overflow-y-auto max-h-[60vh]">
-                    {/* Connected nodes */}
-                    <div className="px-4 pt-3 pb-1">
-                        <div className="flex items-center gap-1.5 mb-2">
-                            <Link2 className="w-3 h-3 text-success" />
-                            <span className="text-[10px] font-semibold text-success uppercase tracking-wider">
-                                {t('mobile.connection.connectedNodes', '연결된 노드')} ({existingWithNames.length})
-                            </span>
-                        </div>
-                        {hasConnections && (
-                            <div className="space-y-1.5">
-                                {existingWithNames.map(conn => {
-                                    const otherNode = nodes.find(n => n.id === conn.targetNodeId);
-                                    const otherDef = otherNode ? blockRegistry[otherNode.type] : undefined;
-                                    const stereo = otherDef?.stereo ?? 'process';
-                                    const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${otherDef?.label ?? conn.targetNodeId}`;
-
-                                    return (
+                    {/* Scrollable body */}
+                    <div className="flex-1 overflow-y-auto overscroll-contain">
+                        {/* Connected nodes */}
+                        <div className="px-4 pt-4 pb-2">
+                            <div className="flex items-center gap-1.5 mb-3">
+                                <Link2 className="w-3.5 h-3.5 text-success" />
+                                <span className="text-xs font-semibold text-success">
+                                    {t('mobile.connection.connectedNodes', '연결된 노드')} ({existingWithNames.length})
+                                </span>
+                            </div>
+                            {hasConnections && (
+                                <div className="space-y-2">
+                                    {existingWithNames.map(conn => (
                                         <div
                                             key={conn.connectionId}
                                             className="rounded-xl bg-success/[0.03] border border-success/20 overflow-hidden"
                                         >
-                                            <div className="flex items-center gap-2.5 px-3 py-2.5">
+                                            <div className="flex items-center gap-2.5 px-3 py-3">
                                                 <div
                                                     className={cn(
-                                                        'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-                                                        STEREO_ICON_BG[stereo] ?? 'bg-muted/50'
+                                                        'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
+                                                        STEREO_ICON_BG[conn.stereo] ?? 'bg-muted/50'
                                                     )}
                                                 >
-                                                    <BlockIcon icon={conn.targetIcon} size={15} />
+                                                    <BlockIcon icon={conn.targetIcon} size={16} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-[13px] font-medium truncate">
+                                                    <div className="text-sm font-medium truncate">
                                                         {conn.targetNodeName}
                                                     </div>
-                                                    <div className="text-[10px] text-muted-foreground/50 truncate">
-                                                        {breadcrumb}
+                                                    <div className="text-[11px] text-muted-foreground/50 truncate">
+                                                        {conn.breadcrumb}
                                                     </div>
                                                 </div>
-                                                <Check className="w-3.5 h-3.5 text-success/60 shrink-0" />
                                                 {!readOnly && (
                                                     <button
                                                         onClick={() => onDisconnect(conn.connectionId)}
                                                         className={cn(
-                                                            'flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium shrink-0',
+                                                            'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium shrink-0',
                                                             'bg-primary/5 text-primary/60 border border-primary/15',
                                                             'hover:bg-primary/10 active:scale-95 transition-all'
                                                         )}
@@ -178,129 +153,132 @@ export const MobileConnectionSheet = ({
                                                     </button>
                                                 )}
                                             </div>
+                                            <button className="w-full flex justify-center py-1 hover:bg-success/5 transition-colors">
+                                                <ChevronDown className="w-4 h-4 text-muted-foreground/30" />
+                                            </button>
                                         </div>
-                                    );
-                                })}
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Add new block & connect */}
+                        {!readOnly && onAddNewAndConnect && (
+                            <div className="px-4 py-2">
+                                <button
+                                    onClick={onAddNewAndConnect}
+                                    className={cn(
+                                        'w-full flex items-center justify-center gap-2 py-3 rounded-xl',
+                                        'border border-dashed border-primary/30',
+                                        'text-sm font-medium text-primary',
+                                        'hover:bg-primary/5 hover:border-primary/50',
+                                        'active:scale-[0.98] transition-all'
+                                    )}
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    {t('mobile.connection.addNewAndConnect', '새 블록 추가 & 연결')}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Available targets */}
+                        {!readOnly && hasAvailable && (
+                            <div className="px-4 pt-3 pb-2">
+                                <div className="flex items-center gap-1.5 mb-3">
+                                    <Link2Off className="w-3.5 h-3.5 text-muted-foreground/60" />
+                                    <span className="text-xs font-semibold text-muted-foreground">
+                                        {t('mobile.connection.availableNodes', '연결 가능 노드')} (
+                                        {availableTargets.length})
+                                    </span>
+                                </div>
+                                <div className="space-y-2">
+                                    {availableTargets.map(target => {
+                                        const targetNode = nodes.find(n => n.id === target.nodeId);
+                                        const targetDef = targetNode ? blockRegistry[targetNode.type] : undefined;
+                                        const stereo = targetDef?.stereo ?? 'process';
+                                        const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${targetDef?.label ?? target.nodeId}`;
+
+                                        return (
+                                            <button
+                                                key={`${target.nodeId}-${target.portId}`}
+                                                onClick={() => onConnect(target.nodeId, target.portId)}
+                                                className={cn(
+                                                    'w-full flex items-center gap-2.5 px-3 py-3 rounded-xl',
+                                                    'border border-border/40 bg-card',
+                                                    'hover:border-primary/30 hover:bg-primary/5',
+                                                    'active:scale-[0.97] transition-all duration-150',
+                                                    'text-left'
+                                                )}
+                                            >
+                                                <div
+                                                    className={cn(
+                                                        'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
+                                                        STEREO_ICON_BG[stereo] ?? 'bg-muted/50'
+                                                    )}
+                                                >
+                                                    <BlockIcon icon={target.nodeIcon} size={16} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium truncate">
+                                                        {target.nodeName}
+                                                    </div>
+                                                    <div className="text-[11px] text-muted-foreground/50 truncate">
+                                                        {breadcrumb}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1 text-[11px] font-medium shrink-0">
+                                                    {target.occupiedByNode ? (
+                                                        <span className="text-warning/60">
+                                                            {t('mobile.connection.replace', '교체')}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-primary/50">
+                                                                {t('mobile.connection.connect', '+ 연결')}
+                                                            </span>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Empty state */}
+                        {!hasAvailable && !hasConnections && !onAddNewAndConnect && (
+                            <div className="px-4 py-10 text-center">
+                                <Link2Off className="w-8 h-8 text-muted-foreground/20 mx-auto mb-3" />
+                                <div className="text-sm text-muted-foreground">
+                                    {t('mobile.connection.noCompatiblePorts', '호환되는 입력 포트가 없습니다.')}
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Add new block & connect — between connected and available */}
-                    {!readOnly && onAddNewAndConnect && (
-                        <div className="px-4 pt-2 pb-1">
-                            <button
-                                onClick={onAddNewAndConnect}
-                                className={cn(
-                                    'w-full flex items-center justify-center gap-2 py-3 rounded-xl',
-                                    'border border-dashed border-primary/30',
-                                    'text-sm font-medium text-primary',
-                                    'hover:bg-primary/5 hover:border-primary/50',
-                                    'active:scale-[0.98] transition-all'
-                                )}
-                            >
-                                <Plus className="w-4 h-4" />
-                                {t('mobile.connection.addNewAndConnect', '노드 추가')}
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Available targets — owner only */}
-                    {!readOnly && hasAvailable && (
-                        <div className="px-4 pt-3 pb-2">
-                            <div className="flex items-center gap-1.5 mb-2">
-                                <Link2Off className="w-3 h-3 text-muted-foreground/60" />
-                                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                    {t('mobile.connection.availableNodes', '연결 가능 노드')} ({availableTargets.length}
-                                    )
-                                </span>
-                            </div>
-                            <div className="space-y-1.5">
-                                {availableTargets.map(target => {
-                                    const targetStyleKey = getPortStyleKey(target.portDataType);
-                                    return (
-                                        <button
-                                            key={`${target.nodeId}-${target.portId}`}
-                                            onClick={() => onConnect(target.nodeId, target.portId)}
-                                            className={cn(
-                                                'w-full flex items-center gap-2.5 px-3 py-2 min-h-[44px] rounded-xl',
-                                                'border border-border/40 bg-card',
-                                                'hover:border-primary/30 hover:bg-primary/5',
-                                                'active:scale-[0.97] transition-all duration-150',
-                                                'text-left'
-                                            )}
-                                        >
-                                            <div className="w-8 h-8 rounded-lg bg-muted/40 flex items-center justify-center shrink-0">
-                                                <BlockIcon icon={target.nodeIcon} size={15} />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-[13px] font-medium truncate">
-                                                    {target.nodeName}
-                                                </div>
-                                                <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                                    <span
-                                                        className={cn(
-                                                            'w-1.5 h-1.5 rounded-full',
-                                                            TYPE_DOT[targetStyleKey]
-                                                        )}
-                                                    />
-                                                    {target.portName}
-                                                    {target.occupiedByNode && (
-                                                        <span className="text-warning/70 ml-1">
-                                                            ← {target.occupiedByNode}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-1 text-[11px] font-medium shrink-0">
-                                                {target.occupiedByNode ? (
-                                                    <span className="text-warning/60">
-                                                        {t('mobile.connection.replace', '교체')}
-                                                    </span>
-                                                ) : (
-                                                    <>
-                                                        <span className="text-primary/50">
-                                                            {t('mobile.connection.connect', '연결')}
-                                                        </span>
-                                                        <ArrowRight className="w-3.5 h-3.5 text-primary/50" />
-                                                    </>
-                                                )}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Empty state */}
-                    {!hasAvailable && !hasConnections && !onAddNewAndConnect && (
-                        <div className="px-4 py-10 text-center">
-                            <Link2Off className="w-8 h-8 text-muted-foreground/20 mx-auto mb-3" />
-                            <div className="text-sm text-muted-foreground">
-                                {t('mobile.connection.noCompatiblePorts', 'No compatible input ports found.')}
-                            </div>
-                            <div className="text-xs text-muted-foreground/50 mt-1">
-                                {t('mobile.connection.addMoreNodes', 'Add more nodes with matching input types.')}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* 완료 button */}
-                <div className="px-4 pt-2 pb-2">
-                    <button
-                        onClick={() => onOpenChange(false)}
+                    {/* Bottom CTA */}
+                    <div
                         className={cn(
-                            'w-full flex items-center justify-center gap-2 h-[51px] rounded-xl',
-                            'text-sm font-semibold transition-all',
-                            'active:scale-[0.98]',
-                            'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                            'shrink-0 border-t border-border/40',
+                            'pb-[env(safe-area-inset-bottom)]',
+                            'bg-glass-bg backdrop-blur-2xl'
                         )}
                     >
-                        {t('mobile.connection.done', '완료')}
-                    </button>
-                </div>
-            </SheetContent>
-        </Sheet>
+                        <div className="px-4 py-3">
+                            <button
+                                onClick={() => onOpenChange(false)}
+                                className={cn(
+                                    'w-full flex items-center justify-center gap-2 h-[51px] rounded-xl',
+                                    'text-sm font-semibold transition-all',
+                                    'active:scale-[0.98]',
+                                    'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                                )}
+                            >
+                                {t('mobile.connection.done', '완료')}
+                            </button>
+                        </div>
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
     );
 };
