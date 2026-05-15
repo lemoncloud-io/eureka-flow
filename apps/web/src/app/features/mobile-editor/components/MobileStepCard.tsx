@@ -61,15 +61,24 @@ export const MobileStepCard = React.memo(
             [node.id, onDelete]
         );
 
-        const outputPreview = useMemo(() => {
-            if (!node.outputData) return null;
-            const entries = Object.entries(node.outputData);
-            if (entries.length === 0) return null;
-            const [, data] = entries[0];
-            if (data?.type === 'image') return { type: 'image' as const, value: t('mobile.imageOutput', 'Image') };
-            const val = typeof data?.value === 'string' ? data.value : JSON.stringify(data?.value);
-            return val ? { type: 'text' as const, value: val.slice(0, 300) } : null;
-        }, [node.outputData, t]);
+        const contentPreview = useMemo(() => {
+            // Show output data if available (executed results)
+            if (node.outputData) {
+                const entries = Object.entries(node.outputData);
+                if (entries.length > 0) {
+                    const [, data] = entries[0];
+                    if (data?.type === 'image') return t('mobile.imageOutput', 'Image');
+                    const val = typeof data?.value === 'string' ? data.value : JSON.stringify(data?.value);
+                    if (val) return val.slice(0, 300);
+                }
+            }
+            // For input-text blocks, show config.text (blockDef.type is authoritative)
+            const blockType = blockDef?.type ?? node.type;
+            if (blockType === 'input-text' && typeof node.config?.text === 'string' && node.config.text) {
+                return node.config.text.slice(0, 300);
+            }
+            return null;
+        }, [node.outputData, node.type, node.config?.text, blockDef?.type, t]);
 
         const dotColor =
             state === 'RUNNING'
@@ -161,12 +170,12 @@ export const MobileStepCard = React.memo(
                     </div>
                 </div>
 
-                {/* Output content preview box */}
-                {outputPreview && state === 'COMPLETED' && (
+                {/* Content preview box */}
+                {contentPreview && (
                     <div className="px-3 pb-3">
                         <div className="relative rounded-lg bg-muted/20 border border-border/30 p-3">
                             <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3 pr-6">
-                                {outputPreview.value}
+                                {contentPreview}
                             </div>
                             <Maximize2 className="absolute bottom-2 right-2 w-3.5 h-3.5 text-muted-foreground/30" />
                         </div>
