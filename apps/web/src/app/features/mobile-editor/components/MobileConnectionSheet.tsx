@@ -7,7 +7,7 @@ import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/f
 import { cn } from '@flows/lib/utils';
 import { Sheet, SheetContent, SheetTitle } from '@flows/ui-kit';
 
-import { TYPE_DOT } from './consts';
+import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG, TYPE_DOT } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
 import { getPortStyleKey } from '../../flows/utils';
 
@@ -125,49 +125,82 @@ export const MobileConnectionSheet = ({
                 <div className="border-t border-border/40" />
 
                 <div className="overflow-y-auto max-h-[60vh]">
-                    {/* Connected — prominent disconnect */}
-                    {hasConnections && (
-                        <div className="px-4 pt-3 pb-1">
-                            <div className="flex items-center gap-1.5 mb-2">
-                                <Link2 className="w-3 h-3 text-success" />
-                                <span className="text-[10px] font-semibold text-success uppercase tracking-wider">
-                                    {t('mobile.connection.connectedNodes', '연결된 노드')} ({existingWithNames.length})
-                                </span>
-                            </div>
+                    {/* Connected nodes */}
+                    <div className="px-4 pt-3 pb-1">
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <Link2 className="w-3 h-3 text-success" />
+                            <span className="text-[10px] font-semibold text-success uppercase tracking-wider">
+                                {t('mobile.connection.connectedNodes', '연결된 노드')} ({existingWithNames.length})
+                            </span>
+                        </div>
+                        {hasConnections && (
                             <div className="space-y-1.5">
-                                {existingWithNames.map(conn => (
-                                    <div
-                                        key={conn.connectionId}
-                                        className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-success/5 border border-success/15"
-                                    >
-                                        <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
-                                            <BlockIcon icon={conn.targetIcon} size={15} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-[13px] font-medium truncate">
-                                                {conn.targetNodeName}
-                                            </div>
-                                            <div className="text-[10px] text-muted-foreground">
-                                                {conn.targetPortName}
-                                            </div>
-                                        </div>
-                                        <Check className="w-3.5 h-3.5 text-success/60 shrink-0" />
-                                        {!readOnly && (
-                                            <button
-                                                onClick={() => onDisconnect(conn.connectionId)}
-                                                className={cn(
-                                                    'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium shrink-0',
-                                                    'bg-destructive/8 text-destructive/70 border border-destructive/15',
-                                                    'hover:bg-destructive/15 hover:text-destructive active:scale-95 transition-all'
+                                {existingWithNames.map(conn => {
+                                    const otherNode = nodes.find(n => n.id === conn.targetNodeId);
+                                    const otherDef = otherNode ? blockRegistry[otherNode.type] : undefined;
+                                    const stereo = otherDef?.stereo ?? 'process';
+                                    const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${otherDef?.label ?? conn.targetNodeId}`;
+
+                                    return (
+                                        <div
+                                            key={conn.connectionId}
+                                            className="rounded-xl bg-success/[0.03] border border-success/20 overflow-hidden"
+                                        >
+                                            <div className="flex items-center gap-2.5 px-3 py-2.5">
+                                                <div
+                                                    className={cn(
+                                                        'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                                                        STEREO_ICON_BG[stereo] ?? 'bg-muted/50'
+                                                    )}
+                                                >
+                                                    <BlockIcon icon={conn.targetIcon} size={15} />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-[13px] font-medium truncate">
+                                                        {conn.targetNodeName}
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground/50 truncate">
+                                                        {breadcrumb}
+                                                    </div>
+                                                </div>
+                                                <Check className="w-3.5 h-3.5 text-success/60 shrink-0" />
+                                                {!readOnly && (
+                                                    <button
+                                                        onClick={() => onDisconnect(conn.connectionId)}
+                                                        className={cn(
+                                                            'flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium shrink-0',
+                                                            'bg-primary/5 text-primary/60 border border-primary/15',
+                                                            'hover:bg-primary/10 active:scale-95 transition-all'
+                                                        )}
+                                                    >
+                                                        <Unlink className="w-3 h-3" />
+                                                        <span>{t('mobile.connection.disconnect', '연결 해제')}</span>
+                                                    </button>
                                                 )}
-                                            >
-                                                <Unlink className="w-3 h-3" />
-                                                <span>{t('mobile.connection.disconnect', '연결 해제')}</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
+                        )}
+                    </div>
+
+                    {/* Add new block & connect — between connected and available */}
+                    {!readOnly && onAddNewAndConnect && (
+                        <div className="px-4 pt-2 pb-1">
+                            <button
+                                onClick={onAddNewAndConnect}
+                                className={cn(
+                                    'w-full flex items-center justify-center gap-2 py-3 rounded-xl',
+                                    'border border-dashed border-primary/30',
+                                    'text-sm font-medium text-primary',
+                                    'hover:bg-primary/5 hover:border-primary/50',
+                                    'active:scale-[0.98] transition-all'
+                                )}
+                            >
+                                <Plus className="w-4 h-4" />
+                                {t('mobile.connection.addNewAndConnect', '노드 추가')}
+                            </button>
                         </div>
                     )}
 
@@ -239,25 +272,6 @@ export const MobileConnectionSheet = ({
                         </div>
                     )}
 
-                    {/* Add new block & connect */}
-                    {!readOnly && onAddNewAndConnect && (
-                        <div className="px-4 pt-3 pb-2">
-                            <button
-                                onClick={onAddNewAndConnect}
-                                className={cn(
-                                    'w-full flex items-center justify-center gap-2 py-3 rounded-xl',
-                                    'border border-dashed border-primary/30',
-                                    'text-sm font-medium text-primary',
-                                    'hover:bg-primary/5 hover:border-primary/50',
-                                    'active:scale-[0.98] transition-all'
-                                )}
-                            >
-                                <Plus className="w-4 h-4" />
-                                {t('mobile.connection.addNewAndConnect', '노드 추가')}
-                            </button>
-                        </div>
-                    )}
-
                     {/* Empty state */}
                     {!hasAvailable && !hasConnections && !onAddNewAndConnect && (
                         <div className="px-4 py-10 text-center">
@@ -270,6 +284,21 @@ export const MobileConnectionSheet = ({
                             </div>
                         </div>
                     )}
+                </div>
+
+                {/* 완료 button */}
+                <div className="px-4 pt-2 pb-2">
+                    <button
+                        onClick={() => onOpenChange(false)}
+                        className={cn(
+                            'w-full flex items-center justify-center gap-2 h-[51px] rounded-xl',
+                            'text-sm font-semibold transition-all',
+                            'active:scale-[0.98]',
+                            'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                        )}
+                    >
+                        {t('mobile.connection.done', '완료')}
+                    </button>
                 </div>
             </SheetContent>
         </Sheet>
