@@ -257,9 +257,9 @@ export const MobileStepCard = React.memo(
                                         e.stopPropagation();
                                         onExpandContent?.({ value: contentPreview.value, type: 'text' });
                                     }}
-                                    className="absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded bg-muted/50 hover:bg-primary/10 transition-colors"
+                                    className="absolute -bottom-1 -right-1 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-primary/10 transition-colors"
                                 >
-                                    <Maximize2 className="w-3.5 h-3.5 text-muted-foreground/40" />
+                                    <Maximize2 className="w-4 h-4 text-muted-foreground/40" />
                                 </button>
                             </div>
                         )}
