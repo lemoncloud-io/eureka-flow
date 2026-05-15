@@ -544,6 +544,10 @@
         "noSearchResults": "No matching nodes",
         "imageOutput": "Image",
         "viewOnly": "View only",
+        "flowSettings": "Flow Settings",
+        "pcVersion": "PC Version",
+        "confirmDelete": "Are you sure you want to delete?",
+        "confirmClear": "Are you sure you want to clear all?",
         "browseAllBlocks": "Browse all blocks",
         "stereo": {
             "input": "Input Block",

@@ -544,6 +544,10 @@
         "noSearchResults": "일치하는 노드 없음",
         "imageOutput": "이미지",
         "viewOnly": "보기 전용",
+        "flowSettings": "플로우 설정",
+        "pcVersion": "PC 버전 보기",
+        "confirmDelete": "정말 삭제하시겠습니까?",
+        "confirmClear": "정말 모두 삭제하시겠습니까?",
         "browseAllBlocks": "전체 블록 보기",
         "stereo": {
             "input": "입력 블록",
