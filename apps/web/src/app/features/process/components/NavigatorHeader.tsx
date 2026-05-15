@@ -1,10 +1,19 @@
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useParams } from 'react-router-dom';
 
-import { Blocks, ChevronRight, Menu } from 'lucide-react';
+import { Blocks, Menu } from 'lucide-react';
 
 import { useItem } from '@flows/flows';
-import { Button, ThemeToggle } from '@flows/ui-kit';
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+    Button,
+    ThemeToggle,
+} from '@flows/ui-kit';
 
 import { NAV_ITEMS } from '../consts';
 import { CurrentActorDropdown } from './CurrentActorDropdown';
@@ -14,9 +23,6 @@ import { UnresolvedNotesBadge } from './UnresolvedNotesBadge';
 interface NavigatorHeaderProps {
     onMenuClick?: () => void;
 }
-
-const CRUMB_LINK = 'text-muted-foreground hover:text-foreground transition-colors';
-const CRUMB_SEP = 'h-3 w-3 text-muted-foreground/50';
 
 const HeaderBreadcrumb = () => {
     const { t } = useTranslation();
@@ -29,23 +35,35 @@ const HeaderBreadcrumb = () => {
 
     if (id && item) {
         return (
-            <div className="flex items-center gap-1.5 text-sm">
-                <Link to="/items" className={CRUMB_LINK}>
-                    {t('navigator.items', 'Items')}
-                </Link>
-                <ChevronRight className={CRUMB_SEP} />
-                {stage ? (
-                    <>
-                        <Link to={`/items/${id}`} className={`max-w-[120px] truncate ${CRUMB_LINK}`}>
-                            {item.name}
-                        </Link>
-                        <ChevronRight className={CRUMB_SEP} />
-                        <span className="max-w-[120px] truncate font-semibold">{stage.name}</span>
-                    </>
-                ) : (
-                    <span className="max-w-[200px] truncate font-semibold">{item.name}</span>
-                )}
-            </div>
+            <Breadcrumb>
+                <BreadcrumbList>
+                    <BreadcrumbItem>
+                        <BreadcrumbLink asChild>
+                            <Link to="/items">{t('navigator.items', 'Items')}</Link>
+                        </BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    {stage ? (
+                        <>
+                            <BreadcrumbItem>
+                                <BreadcrumbLink asChild>
+                                    <Link to={`/items/${id}`} className="max-w-[120px] truncate">
+                                        {item.name}
+                                    </Link>
+                                </BreadcrumbLink>
+                            </BreadcrumbItem>
+                            <BreadcrumbSeparator />
+                            <BreadcrumbItem>
+                                <BreadcrumbPage className="max-w-[120px] truncate">{stage.name}</BreadcrumbPage>
+                            </BreadcrumbItem>
+                        </>
+                    ) : (
+                        <BreadcrumbItem>
+                            <BreadcrumbPage className="max-w-[200px] truncate">{item.name}</BreadcrumbPage>
+                        </BreadcrumbItem>
+                    )}
+                </BreadcrumbList>
+            </Breadcrumb>
         );
     }
 
