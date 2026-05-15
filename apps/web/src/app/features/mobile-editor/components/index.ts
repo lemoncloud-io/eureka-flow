@@ -2,6 +2,7 @@ export { ConfigFieldList } from './ConfigFieldList';
 export { DataPreview } from './DataPreview';
 export { MobileBlockLibrarySheet } from './MobileBlockLibrarySheet';
 export { MobileBottomBar } from './MobileBottomBar';
+export { MobileConnectionCard } from './MobileConnectionCard';
 export { MobileConnectionSheet } from './MobileConnectionSheet';
 export { MobileFileField } from './MobileFileField';
 export { MobileFlowMap } from './MobileFlowMap';

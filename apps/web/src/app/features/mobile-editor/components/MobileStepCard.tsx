@@ -8,7 +8,7 @@ import { cn } from '@flows/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
-import { STATE_STYLES, STEREO_ICON_BG } from './consts';
+import { STATE_STYLES, STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
 
 import type { FlowRole } from '@flows/flows';
@@ -69,7 +69,7 @@ export const MobileStepCard = React.memo(
             const [, data] = entries[0];
             if (data?.type === 'image') return t('mobile.imageOutput', 'Image');
             const val =
-                typeof data?.value === 'string' ? data.value.slice(0, 40) : JSON.stringify(data?.value)?.slice(0, 40);
+                typeof data?.value === 'string' ? data.value.slice(0, 120) : JSON.stringify(data?.value)?.slice(0, 120);
             return val || null;
         }, [state, node.outputData, t]);
 
@@ -110,13 +110,16 @@ export const MobileStepCard = React.memo(
                     <BlockIcon icon={blockDef?.icon} size={18} />
                 </div>
 
-                {/* Node name + subtitle */}
+                {/* Node name + breadcrumb + subtitle */}
                 <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-semibold truncate leading-tight">{displayName}</div>
+                    <div className="text-[10px] text-muted-foreground/50 truncate mt-0.5">
+                        {STEREO_FALLBACK_LABEL[stereo] ?? stereo} · {blockDef?.label ?? node.type}
+                    </div>
                     {state === 'ERROR' && 'error' in node && typeof node.error === 'string' && node.error ? (
-                        <div className="text-[11px] text-destructive/70 truncate mt-0.5">{node.error}</div>
+                        <div className="text-[11px] text-destructive/70 line-clamp-2 mt-1">{node.error}</div>
                     ) : outputSubtitle ? (
-                        <div className="text-[11px] text-success/50 truncate mt-0.5">{outputSubtitle}</div>
+                        <div className="text-[11px] text-success/50 line-clamp-2 mt-1">{outputSubtitle}</div>
                     ) : null}
                 </div>
 

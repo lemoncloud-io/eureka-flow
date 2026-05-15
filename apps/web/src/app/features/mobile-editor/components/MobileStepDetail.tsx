@@ -16,6 +16,7 @@ import { useNodeConfig } from '../hooks/useNodeConfig';
 import { deleteNodeWithSync, executeNodeWithToast } from '../utils';
 import { ConfigFieldList } from './ConfigFieldList';
 import { STEREO_FALLBACK_LABEL, STEREO_I18N_KEY, STEREO_ICON_BG, TYPE_DOT } from './consts';
+import { MobileConnectionCard } from './MobileConnectionCard';
 import { MobileImageUpload } from './MobileImageUpload';
 import { MobileTextInput } from './MobileTextInput';
 
@@ -434,7 +435,7 @@ const ConnectionsSection = ({
     return (
         <div className="space-y-2">
             <div className="text-xs font-semibold text-muted-foreground py-1">
-                {t('mobile.connectedBlocks', '연결 블록')}
+                {t('mobile.connectedBlocks', '연결된 블록')}
             </div>
 
             {/* Input ports */}
@@ -445,13 +446,40 @@ const ConnectionsSection = ({
             )}
             {inputPorts.map(port => {
                 const conn = inConns.find(c => c.targetPortId === port.id);
+                if (conn) {
+                    return (
+                        <MobileConnectionCard
+                            key={`in-${port.id}`}
+                            nodeId={conn.sourceNodeId}
+                            canEdit={canEdit}
+                            onDisconnect={() =>
+                                onOpenInputConnection?.(
+                                    nodeId,
+                                    port.id,
+                                    port.type ?? 'any',
+                                    displayName,
+                                    port.label || port.id
+                                )
+                            }
+                            onTap={() =>
+                                onOpenInputConnection?.(
+                                    nodeId,
+                                    port.id,
+                                    port.type ?? 'any',
+                                    displayName,
+                                    port.label || port.id
+                                )
+                            }
+                        />
+                    );
+                }
                 return (
                     <PortButton
                         key={`in-${port.id}`}
                         portKey={`in-${port.id}`}
                         port={port}
                         direction="input"
-                        connectedNames={conn ? resolveNodeName(conn.sourceNodeId) : null}
+                        connectedNames={null}
                         canEdit={canEdit}
                         onConnect={() =>
                             onOpenInputConnection?.(
@@ -475,14 +503,40 @@ const ConnectionsSection = ({
             )}
             {outputPorts.map(port => {
                 const conns = outConns.filter(c => c.sourcePortId === port.id);
-                const names = conns.length > 0 ? conns.map(c => resolveNodeName(c.targetNodeId)).join(', ') : null;
+                if (conns.length > 0) {
+                    return conns.map(conn => (
+                        <MobileConnectionCard
+                            key={`out-${port.id}-${conn.targetNodeId}`}
+                            nodeId={conn.targetNodeId}
+                            canEdit={canEdit}
+                            onDisconnect={() =>
+                                onOpenOutputConnection?.(
+                                    nodeId,
+                                    port.id,
+                                    port.type ?? 'any',
+                                    displayName,
+                                    port.label || port.id
+                                )
+                            }
+                            onTap={() =>
+                                onOpenOutputConnection?.(
+                                    nodeId,
+                                    port.id,
+                                    port.type ?? 'any',
+                                    displayName,
+                                    port.label || port.id
+                                )
+                            }
+                        />
+                    ));
+                }
                 return (
                     <PortButton
                         key={`out-${port.id}`}
                         portKey={`out-${port.id}`}
                         port={port}
                         direction="output"
-                        connectedNames={names}
+                        connectedNames={null}
                         canEdit={canEdit}
                         onConnect={() =>
                             onOpenOutputConnection?.(

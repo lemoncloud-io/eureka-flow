@@ -97,7 +97,7 @@ export const MobileStepList = ({
                 </div>
 
                 <p className="text-sm font-medium text-foreground/70 mb-1">
-                    {t('mobile.emptyState.title', 'Start building your flow')}
+                    {t('mobile.emptyState.title', '입력 노드를 선택하세요')}
                 </p>
                 <p className="text-xs text-muted-foreground/60 mb-6 text-center leading-relaxed">
                     {t(
@@ -110,20 +110,20 @@ export const MobileStepList = ({
                     (() => {
                         const quickBlocks = Object.values(blockRegistry)
                             .filter(b => b.stereo === 'input')
-                            .slice(0, 3);
+                            .slice(0, 2);
 
                         return (
-                            <div className="flex flex-col items-center gap-4">
-                                {/* Quick-add blocks */}
+                            <div className="flex flex-col items-center gap-4 w-full">
+                                {/* Quick-add blocks — column layout */}
                                 {onAddBlockDirect && quickBlocks.length > 0 && (
-                                    <div className="flex flex-wrap justify-center gap-2">
+                                    <div className="flex justify-center gap-3">
                                         {quickBlocks.map(block => (
                                             <button
                                                 key={block.type}
                                                 onClick={() => onAddBlockDirect(block.type)}
                                                 className={cn(
-                                                    'flex items-center gap-2 px-3 py-2 rounded-xl',
-                                                    'border border-border/40 bg-card',
+                                                    'flex flex-col items-center gap-2 px-5 py-4 rounded-xl',
+                                                    'border border-border/40 bg-card min-w-[120px]',
                                                     'text-xs font-medium',
                                                     'hover:border-primary/30 hover:shadow-sm',
                                                     'active:scale-[0.97] transition-all'
@@ -131,11 +131,11 @@ export const MobileStepList = ({
                                             >
                                                 <div
                                                     className={cn(
-                                                        'w-7 h-7 rounded-lg flex items-center justify-center',
+                                                        'w-10 h-10 rounded-lg flex items-center justify-center',
                                                         STEREO_ICON_BG.input
                                                     )}
                                                 >
-                                                    <BlockIcon icon={block.icon} size={14} />
+                                                    <BlockIcon icon={block.icon} size={20} />
                                                 </div>
                                                 {block.label}
                                             </button>

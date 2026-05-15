@@ -504,7 +504,7 @@
         "allNodesCompleted": "모든 {{count}}개 노드 완료",
         "failedToCreateNode": "노드 생성 실패",
         "emptyState": {
-            "title": "플로우를 만들어 보세요",
+            "title": "입력 노드를 선택하세요",
             "description": "블록을 추가하여 AI 워크플로우를 만들고, 연결하여 데이터를 전달하세요."
         },
         "groupLabel": {
@@ -527,7 +527,10 @@
             "addNewAndConnect": "노드 추가",
             "tapToConnect": "탭하여 연결",
             "noCompatiblePorts": "호환되는 입력 포트가 없습니다.",
-            "addMoreNodes": "일치하는 입력 타입의 노드를 추가하세요."
+            "addMoreNodes": "일치하는 입력 타입의 노드를 추가하세요.",
+            "nodeConnection": "노드 연결",
+            "connectedNodes": "연결된 노드",
+            "availableNodes": "연결 가능 노드"
         },
         "connections": "연결",
         "inputs": "입력",

@@ -215,7 +215,7 @@ export const MobileHeader = ({
                 )}
 
                 {/* Run All */}
-                {canRun && nodeCount > 0 && (
+                {canRun && (
                     <button
                         onClick={onRunAll}
                         disabled={isRunning || nodeCount === 0}

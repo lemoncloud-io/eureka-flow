@@ -504,7 +504,7 @@
         "allNodesCompleted": "All {{count}} nodes completed",
         "failedToCreateNode": "Failed to create node",
         "emptyState": {
-            "title": "Start building your flow",
+            "title": "Select an input node",
             "description": "Add blocks to create an AI workflow. Connect them to pass data between steps."
         },
         "groupLabel": {
@@ -527,7 +527,10 @@
             "addNewAndConnect": "Add new block & connect",
             "tapToConnect": "tap to connect",
             "noCompatiblePorts": "No compatible input ports found.",
-            "addMoreNodes": "Add more nodes with matching input types."
+            "addMoreNodes": "Add more nodes with matching input types.",
+            "nodeConnection": "Node Connection",
+            "connectedNodes": "Connected Nodes",
+            "availableNodes": "Available Nodes"
         },
         "connections": "Connections",
         "inputs": "Inputs",

@@ -55,9 +55,7 @@ export const MobileConnectionSheet = ({
     const sourceStyleKey = getPortStyleKey(sourcePortDataType);
 
     const isOutput = direction === 'output';
-    const sheetTitle = isOutput
-        ? t('mobile.connection.connectOutput', 'Connect output')
-        : t('mobile.connection.connectInput', 'Connect input');
+    const sheetTitle = t('mobile.connection.nodeConnection', '노드 연결');
 
     const existingWithNames = useMemo(() => {
         const filtered = isOutput
@@ -133,7 +131,7 @@ export const MobileConnectionSheet = ({
                             <div className="flex items-center gap-1.5 mb-2">
                                 <Link2 className="w-3 h-3 text-success" />
                                 <span className="text-[10px] font-semibold text-success uppercase tracking-wider">
-                                    {t('mobile.connection.connected', 'Connected')} ({existingWithNames.length})
+                                    {t('mobile.connection.connectedNodes', '연결된 노드')} ({existingWithNames.length})
                                 </span>
                             </div>
                             <div className="space-y-1.5">
@@ -164,7 +162,7 @@ export const MobileConnectionSheet = ({
                                                 )}
                                             >
                                                 <Unlink className="w-3 h-3" />
-                                                <span>{t('mobile.connection.disconnect', 'Disconnect')}</span>
+                                                <span>{t('mobile.connection.disconnect', '연결 해제')}</span>
                                             </button>
                                         )}
                                     </div>
@@ -179,7 +177,8 @@ export const MobileConnectionSheet = ({
                             <div className="flex items-center gap-1.5 mb-2">
                                 <Link2Off className="w-3 h-3 text-muted-foreground/60" />
                                 <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                    Available ({availableTargets.length})
+                                    {t('mobile.connection.availableNodes', '연결 가능 노드')} ({availableTargets.length}
+                                    )
                                 </span>
                             </div>
                             <div className="space-y-1.5">
@@ -222,12 +221,12 @@ export const MobileConnectionSheet = ({
                                             <div className="flex items-center gap-1 text-[11px] font-medium shrink-0">
                                                 {target.occupiedByNode ? (
                                                     <span className="text-warning/60">
-                                                        {t('mobile.connection.replace', 'Replace')}
+                                                        {t('mobile.connection.replace', '교체')}
                                                     </span>
                                                 ) : (
                                                     <>
                                                         <span className="text-primary/50">
-                                                            {t('mobile.connection.connect', 'Connect')}
+                                                            {t('mobile.connection.connect', '연결')}
                                                         </span>
                                                         <ArrowRight className="w-3.5 h-3.5 text-primary/50" />
                                                     </>
