@@ -182,14 +182,14 @@ export const MobileStepCard = React.memo(
                 )}
             >
                 {/* Header row: icon + status dot + menu */}
-                <div className="flex items-center gap-2 px-3 pt-3 pb-1">
+                <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
                     <div
                         className={cn(
-                            'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+                            'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
                             STEREO_ICON_BG[stereo] ?? 'bg-muted/50'
                         )}
                     >
-                        <BlockIcon icon={blockDef?.icon} size={18} />
+                        <BlockIcon icon={blockDef?.icon} size={16} />
                     </div>
                     <div className="flex-1" />
 
@@ -230,9 +230,9 @@ export const MobileStepCard = React.memo(
                 </div>
 
                 {/* Node name + breadcrumb */}
-                <div className="px-3 pb-2">
-                    <div className="text-base font-bold truncate leading-tight">{displayName}</div>
-                    <div className="text-xs text-muted-foreground/50 mt-0.5">
+                <div className="px-3 pb-1.5">
+                    <div className="text-sm font-semibold truncate leading-tight">{displayName}</div>
+                    <div className="text-[10px] text-muted-foreground/50 mt-0.5">
                         {STEREO_FALLBACK_LABEL[stereo] ?? stereo} · {blockDef?.label ?? node.type}
                     </div>
                 </div>
@@ -247,8 +247,8 @@ export const MobileStepCard = React.memo(
                                 <div className="text-xs text-muted-foreground/40 italic">{contentPreview.value}</div>
                             </div>
                         ) : (
-                            <div className="relative rounded-lg bg-muted/20 border border-border/30 p-3">
-                                <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3 pr-6">
+                            <div className="relative rounded-lg bg-muted/20 border border-border/30 p-2.5">
+                                <div className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3 pr-6">
                                     {contentPreview.value}
                                 </div>
                                 <button

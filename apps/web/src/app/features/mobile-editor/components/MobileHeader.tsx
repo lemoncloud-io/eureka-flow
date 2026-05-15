@@ -130,7 +130,7 @@ export const MobileHeader = ({
                             if (e.key === 'Enter') handleFinishEditing();
                             if (e.key === 'Escape') setIsEditing(false);
                         }}
-                        className="w-full text-lg font-bold bg-transparent border-b-2 border-primary outline-none"
+                        className="w-full text-base font-bold bg-transparent border-b-2 border-primary outline-none"
                         autoFocus
                     />
                 ) : (
@@ -138,12 +138,14 @@ export const MobileHeader = ({
                         {canEdit ? (
                             <button
                                 onClick={handleStartEditing}
-                                className="truncate text-lg font-bold text-foreground leading-tight"
+                                className="truncate text-base font-bold text-foreground leading-tight"
                             >
                                 {flowName}
                             </button>
                         ) : (
-                            <span className="truncate text-lg font-bold text-foreground leading-tight">{flowName}</span>
+                            <span className="truncate text-base font-bold text-foreground leading-tight">
+                                {flowName}
+                            </span>
                         )}
                         {/* Flow switcher chevron */}
                         <button
@@ -209,7 +211,7 @@ export const MobileHeader = ({
                         onClick={onRunAll}
                         disabled={isRunning || nodeCount === 0}
                         className={cn(
-                            'w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-200',
+                            'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200',
                             'active:scale-90 disabled:opacity-40',
                             isRunning ? 'bg-warning/15 text-warning' : 'bg-primary/15 text-primary hover:bg-primary/20'
                         )}
