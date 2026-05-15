@@ -213,14 +213,14 @@ export const MobileHeader = ({
                         className={cn(
                             'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200',
                             'active:scale-90 disabled:opacity-40',
-                            isRunning ? 'bg-warning/15 text-warning' : 'bg-primary/15 text-primary hover:bg-primary/20'
+                            isRunning ? 'bg-warning/20 text-warning' : 'bg-primary/20 text-primary hover:bg-primary/25'
                         )}
                         aria-label="Run All"
                     >
                         {isRunning ? (
-                            <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                            <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                            <Play className="w-4.5 h-4.5 fill-current" />
+                            <Play className="w-4 h-4 fill-current" />
                         )}
                     </button>
                 )}
