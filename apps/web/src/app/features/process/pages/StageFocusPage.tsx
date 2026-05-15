@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
-import { AlertCircle, ArrowRight, ChevronRight, Loader2, MoreHorizontal, Pause, Play } from 'lucide-react';
+import { AlertCircle, ArrowRight, ChevronLeft, ChevronRight, Loader2, MoreHorizontal, Pause, Play } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { getNextAction, useActors, useChangeStageStatusMutation, useItem } from '@flows/flows';
@@ -15,12 +15,6 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
     Button,
     DropdownMenu,
     DropdownMenuContent,
@@ -114,6 +108,9 @@ export const StageFocusPage = () => {
     const tasksDone = stage.tasks.filter(t => t.status === 'done').length;
     const tasksTotal = stage.tasks.length;
     const incompleteTaskCount = tasksTotal - tasksDone;
+    const stageIndex = item.stages.findIndex(s => s.id === stageId);
+    const prevStage = stageIndex > 0 ? item.stages[stageIndex - 1] : undefined;
+    const nextStage = stageIndex < item.stages.length - 1 ? item.stages[stageIndex + 1] : undefined;
 
     const toolContext: ToolContext = {
         itemId: item.id,
@@ -124,25 +121,32 @@ export const StageFocusPage = () => {
 
     return (
         <div className="space-y-5">
-            <Breadcrumb>
-                <BreadcrumbList>
-                    <BreadcrumbItem>
-                        <BreadcrumbLink asChild>
-                            <Link to="/items">{t('navigator.items', 'Items')}</Link>
-                        </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                        <BreadcrumbLink asChild>
-                            <Link to={`/items/${itemId}`}>{item.name}</Link>
-                        </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                        <BreadcrumbPage>{stage.name}</BreadcrumbPage>
-                    </BreadcrumbItem>
-                </BreadcrumbList>
-            </Breadcrumb>
+            {/* Stage navigation */}
+            <div className="flex items-center justify-between">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 text-xs"
+                    disabled={!prevStage}
+                    onClick={() => prevStage && navigate(`/items/${itemId}/stages/${prevStage.id}`, { replace: true })}
+                >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    {prevStage?.name ?? t('navigator.prev', 'Prev')}
+                </Button>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                    {stageIndex + 1} / {item.stages.length}
+                </span>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 text-xs"
+                    disabled={!nextStage}
+                    onClick={() => nextStage && navigate(`/items/${itemId}/stages/${nextStage.id}`, { replace: true })}
+                >
+                    {nextStage?.name ?? t('navigator.next', 'Next')}
+                    <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+            </div>
 
             {/* Unresolved alert */}
             {unresolvedNotes.length > 0 && (

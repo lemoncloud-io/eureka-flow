@@ -86,11 +86,6 @@ export const ToolManagerPage = () => {
                                         </Badge>
                                     </div>
                                     <p className="text-xs text-muted-foreground mt-0.5">{tool.actionLabel}</p>
-                                    {tool.urlTemplate && (
-                                        <p className="text-[10px] text-muted-foreground/60 mt-0.5 truncate font-mono">
-                                            {tool.urlTemplate}
-                                        </p>
-                                    )}
                                 </div>
                                 <div className="flex items-center gap-3 shrink-0">
                                     <Button

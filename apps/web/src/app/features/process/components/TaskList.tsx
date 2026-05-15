@@ -77,10 +77,13 @@ export const TaskList = ({ tasks, stageId, canAdd }: TaskListProps) => {
                 );
             })}
             {canAdd && !showForm && (
-                <Button variant="ghost" size="sm" className="w-full gap-1.5" onClick={() => setShowForm(true)}>
+                <button
+                    onClick={() => setShowForm(true)}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-xs text-muted-foreground transition-colors hover:border-border/80 hover:text-foreground"
+                >
                     <Plus className="h-3.5 w-3.5" />
                     {t('navigator.addTask', 'Add Task')}
-                </Button>
+                </button>
             )}
             {showForm && (
                 <div className="flex gap-2">

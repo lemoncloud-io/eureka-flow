@@ -11,6 +11,8 @@ import { useInView, useLandingContext, useStartNavigation } from '../hooks';
 
 import type { LucideIcon } from 'lucide-react';
 
+const asStringArray = (val: unknown): string[] => (Array.isArray(val) ? val : []);
+
 interface ModeCardProps {
     icon: LucideIcon;
     title: string;
@@ -126,7 +128,7 @@ export const ModePickerSection = () => {
                         title={t('mode_picker.navigator.title')}
                         subtitle={navigatorSubtitle}
                         description={t('mode_picker.navigator.description')}
-                        features={t('mode_picker.navigator.features', { returnObjects: true }) as string[]}
+                        features={asStringArray(t('mode_picker.navigator.features', { returnObjects: true }))}
                         cta={navigatorCta}
                         onAction={handleNavigatorAction}
                         variant="primary"
@@ -138,7 +140,7 @@ export const ModePickerSection = () => {
                         title={t('mode_picker.builder.title')}
                         subtitle={t('mode_picker.builder.subtitle')}
                         description={t('mode_picker.builder.description')}
-                        features={t('mode_picker.builder.features', { returnObjects: true }) as string[]}
+                        features={asStringArray(t('mode_picker.builder.features', { returnObjects: true }))}
                         cta={t('mode_picker.builder.cta')}
                         onAction={() => navigate(ROUTES.EXPLORE)}
                         variant="secondary"

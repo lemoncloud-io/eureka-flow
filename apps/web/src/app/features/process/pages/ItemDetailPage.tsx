@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { toast } from 'sonner';
 
@@ -13,14 +13,6 @@ import {
     useItem,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
-} from '@flows/ui-kit';
 
 import { ItemNotesList } from '../components/ItemNotesList';
 import { NextActionCTA } from '../components/NextActionCTA';
@@ -78,20 +70,6 @@ export const ItemDetailPage = () => {
 
     return (
         <div className="space-y-5">
-            <Breadcrumb>
-                <BreadcrumbList>
-                    <BreadcrumbItem>
-                        <BreadcrumbLink asChild>
-                            <Link to="/items">{t('navigator.items', 'Items')}</Link>
-                        </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                        <BreadcrumbPage>{item.name}</BreadcrumbPage>
-                    </BreadcrumbItem>
-                </BreadcrumbList>
-            </Breadcrumb>
-
             <div className="flex items-center gap-4">
                 {item.thumbnailUrl ? (
                     <img
