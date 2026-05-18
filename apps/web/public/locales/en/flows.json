@@ -160,7 +160,7 @@
         },
         "editImage": "Edit Image",
         "fileOrImage": "Image / File",
-        "supportedFormats": "Image or text file (.txt, .html, .json)",
+        "supportedFormats": "Image, ZIP, or text file (.txt, .html, .json)",
         "viewFile": "View File",
         "editFile": "Edit",
         "saveFile": "Save",

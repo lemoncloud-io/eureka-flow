@@ -170,7 +170,7 @@ export const MobileImageUpload = ({ node, onConfigChange }: MobileImageUploadPro
                                 {t('detailPanel.clickToUpload', 'Tap to upload')}
                             </div>
                             <div className="text-[10px] text-muted-foreground/50">
-                                {t('detailPanel.supportedFormats', 'Images, TXT, HTML, JSON')}
+                                {t('detailPanel.supportedFormats', 'Images, ZIP, TXT, HTML, JSON')}
                             </div>
                         </div>
                     </button>

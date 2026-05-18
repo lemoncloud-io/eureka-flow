@@ -250,8 +250,9 @@ export { captureCanvasAsDataUrl, captureCanvasForThumbnail, exportCanvasAsPng } 
 // Input File Upload Utilities
 // ============================================================
 
-/** Accepted file types for the input-image block (images + text/json files) */
-export const INPUT_FILE_ACCEPT = 'image/*,.txt,.text,.html,.json,text/plain,text/html,application/json';
+/** Accepted file types for the input-image block (images + text/json + zip files) */
+export const INPUT_FILE_ACCEPT =
+    'image/*,.txt,.text,.html,.json,.zip,text/plain,text/html,application/json,application/zip,application/x-zip-compressed';
 
 /** Check if a file is a text-based file (not image) */
 export const isTextFile = (file: File): boolean =>
@@ -259,6 +260,16 @@ export const isTextFile = (file: File): boolean =>
     file.type === 'text/html' ||
     file.type === 'application/json' ||
     /\.(txt|text|html?|json)$/i.test(file.name);
+
+/** Check if a file is a zip archive */
+export const isZipFile = (file: File): boolean =>
+    file.type === 'application/zip' || file.type === 'application/x-zip-compressed' || /\.zip$/i.test(file.name);
+
+/** Extract raw base64 content from a data URL (strips "data:...;base64," prefix) */
+export const extractBase64 = (dataUrl: string): string => {
+    const idx = dataUrl.indexOf(',');
+    return idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
+};
 
 /** Clear all file-related config keys */
 export const clearFileConfig = (onConfigChange: (key: string, value: unknown) => void): void => {
@@ -285,7 +296,12 @@ export const processUploadedFile = async (
                 return;
             }
 
-            if (isTextFile(file)) {
+            if (isZipFile(file)) {
+                const raw = extractBase64(dataUrl);
+                onConfigChange('imageData', raw);
+                onConfigChange('fileName', file.name);
+                clearFileConfig(onConfigChange);
+            } else if (isTextFile(file)) {
                 onConfigChange('fileData', dataUrl);
                 onConfigChange('fileName', file.name);
                 onConfigChange('fileType', file.type || 'text/plain');

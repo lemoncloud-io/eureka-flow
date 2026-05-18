@@ -15,7 +15,14 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { getNextAction, useActors, useChangeStageStatusMutation, useHydrateItemStages, useItem } from '@flows/flows';
+import {
+    getNextAction,
+    useActors,
+    useChangeStageStatusMutation,
+    useHydrateItemStages,
+    useItem,
+    useUpdateStageMutation,
+} from '@flows/flows';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -30,6 +37,11 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
     Separator,
 } from '@flows/ui-kit';
 
@@ -50,6 +62,7 @@ export const StageFocusPage = () => {
     useHydrateItemStages(itemData?.data);
     const { data: actorsData } = useActors();
     const changeStatusMutation = useChangeStageStatusMutation();
+    const updateStageMutation = useUpdateStageMutation();
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);
     const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
     const flowExecution = useFlowExecution(stageId ?? '');
@@ -137,9 +150,7 @@ export const StageFocusPage = () => {
             }),
         });
     }
-    if (!isDone && !stage.actorId) {
-        warnings.push({ key: 'actor', message: t('navigator.noActorWarning', 'No actor assigned') });
-    }
+    // Actor warning removed — replaced with inline actor select UI
     if (!isDone && !stage.toolId && stage.stereo === 'flow') {
         warnings.push({ key: 'tool', message: t('navigator.noToolWarning', 'No automation tool linked') });
     }
@@ -218,7 +229,27 @@ export const StageFocusPage = () => {
                     <h1 className="text-xl font-bold sm:text-2xl">{stage.name}</h1>
                     <div className="mt-1 flex items-center gap-2">
                         <StatusBadge status={stage.status} />
-                        {actorName && <span className="text-xs text-muted-foreground">{actorName}</span>}
+                        <Select
+                            value={stage.actorId || '__none__'}
+                            onValueChange={val => {
+                                const newActorId = val === '__none__' ? '' : val;
+                                updateStageMutation.mutate({ id: stage.id, input: { actorId: newActorId } });
+                            }}
+                        >
+                            <SelectTrigger className="h-6 w-auto gap-1 border-none bg-transparent px-1 text-xs text-muted-foreground shadow-none hover:bg-accent">
+                                <SelectValue placeholder={t('navigator.assignActor', 'Assign actor')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="__none__">{t('navigator.unassigned', 'Unassigned')}</SelectItem>
+                                {actors
+                                    .filter(a => a.isActive)
+                                    .map(a => (
+                                        <SelectItem key={a.id} value={a.id}>
+                                            {a.name}
+                                        </SelectItem>
+                                    ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     {stage.guideText && (
                         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{stage.guideText}</p>

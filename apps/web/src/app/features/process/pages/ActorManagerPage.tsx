@@ -8,6 +8,7 @@ import { cn } from '@flows/lib/utils';
 import { Badge, Button, Card, CardContent, Switch } from '@flows/ui-kit';
 
 import { ActorFormDialog } from '../components/ActorFormDialog';
+import { ActorWorkload } from '../components/ActorWorkload';
 import { useCurrentActor } from '../hooks/useCurrentActor';
 
 import type { Actor } from '@flows/flows';
@@ -123,6 +124,8 @@ export const ActorManagerPage = () => {
                     ))}
                 </div>
             )}
+
+            <ActorWorkload />
 
             <ActorFormDialog
                 key={editActor?.id ?? 'create'}

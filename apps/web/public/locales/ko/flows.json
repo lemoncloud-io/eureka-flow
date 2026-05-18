@@ -160,7 +160,7 @@
         },
         "editImage": "이미지 편집",
         "fileOrImage": "이미지 / 파일",
-        "supportedFormats": "이미지 또는 텍스트 파일 (.txt, .html, .json)",
+        "supportedFormats": "이미지, ZIP 또는 텍스트 파일 (.txt, .html, .json)",
         "viewFile": "파일 보기",
         "editFile": "편집",
         "saveFile": "저장",

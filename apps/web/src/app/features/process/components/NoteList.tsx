@@ -69,9 +69,9 @@ export const NoteList = ({ notes, stageId }: NoteListProps) => {
                                 )}
                             </div>
                             <p
-                                className={`mt-1 text-sm ${note.isResolved ? 'text-muted-foreground line-through' : ''}`}
+                                className={`mt-1 text-sm ${note.isResolved ? 'text-muted-foreground line-through' : ''} ${!note.content ? 'italic text-muted-foreground/60' : ''}`}
                             >
-                                {note.content}
+                                {note.content || t('navigator.emptyNote', '(no content)')}
                             </p>
                         </div>
                     </div>
