@@ -249,7 +249,10 @@ export const StageFocusPage = () => {
                                     .filter(a => a.isActive)
                                     .map(a => (
                                         <SelectItem key={a.id} value={a.id}>
-                                            {a.name}
+                                            <span className="flex items-center gap-2">
+                                                <span className={`h-2 w-2 rounded-full shrink-0 ${a.color}`} />
+                                                {a.name}
+                                            </span>
                                         </SelectItem>
                                     ))}
                             </SelectContent>
@@ -386,10 +389,26 @@ export const StageFocusPage = () => {
                     <Separator />
                     <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-4 py-3 dark:border-green-500/20 dark:bg-green-500/10">
                         <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                            <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                                {t('navigator.stageCompleted', 'Stage completed')}
-                            </span>
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+                            <div>
+                                <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                                    {t('navigator.stageCompleted', 'Stage completed')}
+                                </span>
+                                {(stage.completedAt || stage.completedByActorId) && (
+                                    <p className="text-[11px] text-green-600/70 dark:text-green-400/60">
+                                        {stage.completedByActorId &&
+                                            actors.find(a => a.id === stage.completedByActorId)?.name}
+                                        {stage.completedByActorId && stage.completedAt && ' · '}
+                                        {stage.completedAt &&
+                                            new Date(stage.completedAt).toLocaleString(undefined, {
+                                                month: 'short',
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                            })}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                         {hasNextStage ? (
                             <Button

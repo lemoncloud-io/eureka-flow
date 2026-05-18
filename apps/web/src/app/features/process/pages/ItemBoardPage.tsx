@@ -202,11 +202,14 @@ export const ItemBoardPage = () => {
                     onAction={() => navigate(`/items/${heroEntry.item.id}/stages/${heroEntry.action.stage.id}`)}
                 />
             ) : (
-                <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4">
-                    <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
-                    <p className="text-sm text-muted-foreground">
-                        {t('navigator.allCaughtUp', 'All caught up! No pending actions right now.')}
-                    </p>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4">
+                    <div className="flex items-center gap-3">
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
+                        <p className="text-sm text-muted-foreground">
+                            {t('navigator.allCaughtUp', 'All caught up! No pending actions right now.')}
+                        </p>
+                    </div>
+                    <NewItemDialog />
                 </div>
             )}
 
