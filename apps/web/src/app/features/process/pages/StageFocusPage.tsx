@@ -25,14 +25,6 @@ import {
     useUpdateStageMutation,
 } from '@flows/flows';
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
     Button,
     DropdownMenu,
     DropdownMenuContent,
@@ -67,7 +59,6 @@ export const StageFocusPage = () => {
     const changeStatusMutation = useChangeStageStatusMutation();
     const updateStageMutation = useUpdateStageMutation();
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);
-    const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
     const { currentActorId } = useCurrentActor();
     const flowExecution = useFlowExecution(stageId ?? '');
     const notesRef = useRef<HTMLDivElement>(null);
@@ -83,7 +74,6 @@ export const StageFocusPage = () => {
             {
                 onSuccess: result => {
                     (result.warnings ?? []).forEach(w => toast.warning(w));
-                    setShowCompleteConfirm(false);
                     const updatedItem = {
                         ...item,
                         stages: item.stages.map(s => (s.id === stage.id ? { ...s, status: 'done' as Status } : s)),
@@ -109,11 +99,7 @@ export const StageFocusPage = () => {
 
     const onCompleteClick = () => {
         if (!stage) return;
-        if (stage.notes.some(n => !n.isResolved) || stage.tasks.some(t => t.status !== 'done')) {
-            setShowCompleteConfirm(true);
-        } else {
-            handleComplete();
-        }
+        handleComplete();
     };
 
     const toolContext = useMemo<ToolContext>(
@@ -138,13 +124,11 @@ export const StageFocusPage = () => {
         );
     }
 
-    const unresolvedNotes = stage.notes.filter(n => !n.isResolved);
     const isIterative = stage.stereo === 'iterative';
     const nextAction = getNextAction(item);
     const hasNextStage = nextAction && nextAction.stage.id !== stage.id;
     const tasksDone = stage.tasks.filter(t => t.status === 'done').length;
     const tasksTotal = stage.tasks.length;
-    const incompleteTaskCount = tasksTotal - tasksDone;
 
     const isDone = stage.status === 'done' || stage.status === 'skip';
     const incompleteDeps = stage.dependencyStageIds
@@ -180,23 +164,6 @@ export const StageFocusPage = () => {
                             <p className="text-sm text-amber-700 dark:text-amber-400">{w.message}</p>
                         </div>
                     ))}
-                </div>
-            )}
-
-            {/* Unresolved alert */}
-            {unresolvedNotes.length > 0 && (
-                <div className="flex items-center gap-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 dark:border-orange-500/20 dark:bg-orange-500/5">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                    <p className="flex-1 truncate text-sm text-orange-700 dark:text-orange-400">
-                        {unresolvedNotes.length} {t('navigator.unresolved', 'unresolved')} —{' '}
-                        {unresolvedNotes[0].content}
-                    </p>
-                    <button
-                        onClick={() => notesRef.current?.scrollIntoView({ behavior: 'smooth' })}
-                        className="shrink-0 text-xs font-medium text-orange-600 hover:underline dark:text-orange-400"
-                    >
-                        {t('navigator.view', 'View')}
-                    </button>
                 </div>
             )}
 
@@ -419,38 +386,6 @@ export const StageFocusPage = () => {
                     </div>
                 </>
             )}
-
-            {/* Complete confirmation */}
-            <AlertDialog open={showCompleteConfirm} onOpenChange={setShowCompleteConfirm}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{t('navigator.completeAnyway', 'Complete this stage?')}</AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-1">
-                            {incompleteTaskCount > 0 && (
-                                <span className="block">
-                                    {t('navigator.incompleteTasksWarning', '{{count}} task(s) are not done yet.', {
-                                        count: incompleteTaskCount,
-                                    })}
-                                </span>
-                            )}
-                            {unresolvedNotes.length > 0 && (
-                                <span className="block">
-                                    {t('navigator.unresolvedNotesWarning', '{{count}} note(s) are still unresolved.', {
-                                        count: unresolvedNotes.length,
-                                    })}
-                                </span>
-                            )}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>{t('navigator.cancel', 'Cancel')}</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleComplete} disabled={changeStatusMutation.isPending}>
-                            {changeStatusMutation.isPending && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-                            {t('navigator.completeAnyway', 'Complete anyway')}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 };
