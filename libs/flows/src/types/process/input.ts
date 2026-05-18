@@ -77,6 +77,7 @@ export interface CreateToolInput {
     stereo: 'link' | 'embed' | 'flow';
     actionLabel: string;
     urlTemplate?: string;
+    flowRef?: { flowId: string };
     taskTemplates?: {
         id: string;
         title: string;

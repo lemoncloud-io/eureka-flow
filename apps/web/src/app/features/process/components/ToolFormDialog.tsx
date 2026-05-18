@@ -80,6 +80,7 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                     stereo,
                     actionLabel: actionLabel.trim(),
                     urlTemplate: urlTemplate.trim() || undefined,
+                    flowRef: flowRefId ? { flowId: flowRefId } : undefined,
                     memo: memo || undefined,
                 },
                 {
