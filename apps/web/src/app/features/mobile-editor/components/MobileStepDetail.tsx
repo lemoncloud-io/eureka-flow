@@ -119,13 +119,13 @@ export const MobileStepDetail = ({
                     <header
                         className={cn(
                             'flex items-center gap-2 px-2 h-[71px] shrink-0',
-                            'border-b border-border/40',
+                            'border-b border-border',
                             'pt-[env(safe-area-inset-top)]'
                         )}
                     >
                         <button
                             onClick={onClose}
-                            className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
+                            className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent transition-colors shrink-0"
                         >
                             <ArrowLeft className="w-4 h-4" />
                         </button>
@@ -166,7 +166,7 @@ export const MobileStepDetail = ({
 
                             {/* Error message */}
                             {state === 'ERROR' && 'error' in node && typeof node.error === 'string' && node.error && (
-                                <div className="flex items-start gap-2 rounded-xl bg-destructive/5 border border-destructive/20 px-3 py-2.5">
+                                <div className="flex items-start gap-2 rounded-xl bg-destructive/8 px-3 py-2.5">
                                     <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
                                     <p className="text-xs text-destructive break-all">{node.error}</p>
                                 </div>
@@ -220,11 +220,11 @@ export const MobileStepDetail = ({
 
                             {/* Delete — 2-stage confirm */}
                             {canEdit && (
-                                <div className="pt-4 border-t border-border/30">
+                                <div className="pt-4 border-t border-border">
                                     <button
                                         onClick={handleDelete}
                                         className={cn(
-                                            'w-full flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium transition-all',
+                                            'w-full flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-medium transition-colors',
                                             confirmingDelete
                                                 ? 'bg-destructive text-destructive-foreground'
                                                 : 'text-destructive/60 hover:text-destructive'
@@ -244,9 +244,9 @@ export const MobileStepDetail = ({
                     {canRun && stereo !== 'output' && blockDef.isRunnable !== false && (
                         <div
                             className={cn(
-                                'shrink-0 border-t border-border/40',
+                                'shrink-0 border-t border-border',
                                 'pb-[env(safe-area-inset-bottom)]',
-                                'bg-glass-bg backdrop-blur-2xl'
+                                'bg-background/80 backdrop-blur-xl'
                             )}
                         >
                             <div className="px-4 py-3">
@@ -257,8 +257,8 @@ export const MobileStepDetail = ({
                                             disabled={isRunning}
                                             className={cn(
                                                 'flex-1 flex items-center justify-center gap-1.5 h-[51px] rounded-xl',
-                                                'text-xs font-semibold transition-all',
-                                                'active:scale-[0.98] disabled:opacity-40',
+                                                'text-xs font-semibold transition-colors',
+                                                'disabled:opacity-40',
                                                 isRunning
                                                     ? 'bg-muted/30 text-muted-foreground border border-muted'
                                                     : 'bg-primary/10 text-primary border border-primary/20 hover:bg-primary/15'
@@ -276,8 +276,8 @@ export const MobileStepDetail = ({
                                             disabled={isRunning}
                                             className={cn(
                                                 'flex-1 flex items-center justify-center gap-1.5 h-[51px] rounded-xl',
-                                                'text-xs font-semibold transition-all',
-                                                'active:scale-[0.98] disabled:opacity-40',
+                                                'text-xs font-semibold transition-colors',
+                                                'disabled:opacity-40',
                                                 isRunning
                                                     ? 'bg-muted/30 text-muted-foreground border border-muted'
                                                     : 'bg-success/10 text-success border border-success/20 hover:bg-success/15'
@@ -297,8 +297,8 @@ export const MobileStepDetail = ({
                                         disabled={isRunning}
                                         className={cn(
                                             'w-full flex items-center justify-center gap-2 h-[51px] rounded-xl',
-                                            'text-sm font-semibold transition-all',
-                                            'active:scale-[0.98] disabled:opacity-40',
+                                            'text-sm font-semibold transition-colors',
+                                            'disabled:opacity-40',
                                             isRunning
                                                 ? 'bg-warning/10 text-warning border border-warning/25'
                                                 : 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
@@ -354,26 +354,23 @@ const PortButton = ({
             type="button"
             onClick={canEdit ? onConnect : undefined}
             className={cn(
-                'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs text-left transition-all',
-                isConnected ? 'bg-success/5' : 'border border-dashed border-primary/20 bg-primary/[0.02]',
-                canEdit &&
-                    (isConnected
-                        ? 'hover:bg-success/10 active:scale-[0.98]'
-                        : 'hover:border-primary/40 active:scale-[0.98]')
+                'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs text-left transition-colors',
+                isConnected ? 'bg-success/8' : 'border border-dashed border-primary/30',
+                canEdit && (isConnected ? 'hover:bg-success/12' : 'hover:border-primary/50')
             )}
         >
-            <Icon className={cn('w-3 h-3 shrink-0', isConnected ? 'text-success/50' : 'text-primary/30')} />
+            <Icon className={cn('w-3 h-3 shrink-0', isConnected ? 'text-success' : 'text-primary/40')} />
             <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', TYPE_DOT[styleKey])} />
             <span className="font-medium">{port.label || port.id}</span>
             {isConnected ? (
-                <span className="text-success/60 truncate flex-1">
+                <span className="text-success truncate flex-1">
                     {arrow} {connectedNames}
                 </span>
             ) : canEdit ? (
-                <span className="text-primary/40 flex-1 flex items-center gap-1">
+                <span className="text-primary/50 flex-1 flex items-center gap-1">
                     <Plus className="w-3 h-3" />
                     {t('mobile.connection.addConnection', '추가 연결')}
-                    <span className="text-primary/30 ml-1">{t('mobile.connection.tapToConnect', '탭하여 연결')}</span>
+                    <span className="text-primary/40 ml-1">{t('mobile.connection.tapToConnect', '탭하여 연결')}</span>
                 </span>
             ) : null}
         </button>
@@ -445,7 +442,7 @@ const ConnectionsSection = ({
 
             {/* Input ports */}
             {inputPorts.length > 0 && (
-                <div className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider pt-1">
+                <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider pt-1">
                     {t('mobile.input', '입력')}
                 </div>
             )}
@@ -502,7 +499,7 @@ const ConnectionsSection = ({
 
             {/* Output ports */}
             {outputPorts.length > 0 && (
-                <div className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider pt-2">
+                <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider pt-2">
                     {t('mobile.output', '출력')}
                 </div>
             )}

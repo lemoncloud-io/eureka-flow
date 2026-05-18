@@ -129,13 +129,13 @@ export const MobileConnectionSheet = ({
                     <header
                         className={cn(
                             'flex items-center gap-2 px-2 h-[71px] shrink-0',
-                            'border-b border-border/40',
+                            'border-b border-border',
                             'pt-[env(safe-area-inset-top)]'
                         )}
                     >
                         <button
                             onClick={() => onOpenChange(false)}
-                            className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
+                            className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent transition-colors shrink-0"
                         >
                             <ArrowLeft className="w-4 h-4" />
                         </button>
@@ -174,7 +174,7 @@ export const MobileConnectionSheet = ({
                                                     <div className="text-sm font-medium truncate">
                                                         {conn.targetNodeName}
                                                     </div>
-                                                    <div className="text-[11px] text-muted-foreground/50 truncate">
+                                                    <div className="text-[11px] text-muted-foreground truncate">
                                                         {conn.breadcrumb}
                                                     </div>
                                                 </div>
@@ -192,7 +192,7 @@ export const MobileConnectionSheet = ({
                                                         className={cn(
                                                             'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium shrink-0',
                                                             'bg-primary/5 text-primary/60 border border-primary/15',
-                                                            'hover:bg-primary/10 active:scale-95 transition-all'
+                                                            'hover:bg-primary/10 transition-colors'
                                                         )}
                                                     >
                                                         <Unlink className="w-3 h-3" />
@@ -215,7 +215,7 @@ export const MobileConnectionSheet = ({
                                                             : null;
                                                     if (!text || text === 'null') return null;
                                                     return (
-                                                        <div className="mx-3 mb-2 rounded-md bg-muted/20 border border-border/20 p-2 text-[10px] text-muted-foreground leading-relaxed line-clamp-3">
+                                                        <div className="mx-3 mb-2 rounded-md bg-muted/15 p-2 text-[10px] text-muted-foreground leading-relaxed line-clamp-3">
                                                             {text.slice(0, 200)}
                                                         </div>
                                                     );
@@ -246,7 +246,7 @@ export const MobileConnectionSheet = ({
                                         'border border-dashed border-primary/30',
                                         'text-sm font-medium text-primary',
                                         'hover:bg-primary/5 hover:border-primary/50',
-                                        'active:scale-[0.98] transition-all'
+                                        ' transition-all'
                                     )}
                                 >
                                     <Plus className="w-4 h-4" />
@@ -259,7 +259,7 @@ export const MobileConnectionSheet = ({
                         {!readOnly && hasAvailable && (
                             <div className="px-4 pt-3 pb-2">
                                 <div className="flex items-center gap-1.5 mb-3">
-                                    <Link2Off className="w-3.5 h-3.5 text-muted-foreground/60" />
+                                    <Link2Off className="w-3.5 h-3.5 text-muted-foreground" />
                                     <span className="text-xs font-semibold text-muted-foreground">
                                         {t('mobile.connection.availableNodes', '연결 가능 노드')} (
                                         {availableTargets.length})
@@ -278,9 +278,9 @@ export const MobileConnectionSheet = ({
                                                 onClick={() => handleConnect(target.nodeId, target.portId)}
                                                 className={cn(
                                                     'w-full rounded-xl overflow-hidden',
-                                                    'border border-border/40 bg-card',
+                                                    'border border-border bg-card',
                                                     'hover:border-primary/30 hover:bg-primary/5',
-                                                    'active:scale-[0.97] transition-all duration-150',
+                                                    'transition-colors',
                                                     'text-left'
                                                 )}
                                             >
@@ -297,17 +297,17 @@ export const MobileConnectionSheet = ({
                                                         <div className="text-sm font-medium truncate">
                                                             {target.nodeName}
                                                         </div>
-                                                        <div className="text-[11px] text-muted-foreground/50 truncate">
+                                                        <div className="text-[11px] text-muted-foreground truncate">
                                                             {breadcrumb}
                                                         </div>
                                                     </div>
                                                     <div className="text-[11px] font-medium shrink-0">
                                                         {target.occupiedByNode ? (
-                                                            <span className="text-warning/60">
+                                                            <span className="text-warning">
                                                                 {t('mobile.connection.replace', '교체')}
                                                             </span>
                                                         ) : (
-                                                            <span className="text-primary/50">
+                                                            <span className="text-primary">
                                                                 {t('mobile.connection.connect', '+ 연결')}
                                                             </span>
                                                         )}
@@ -326,7 +326,7 @@ export const MobileConnectionSheet = ({
                                                             : JSON.stringify(firstEntry.value);
                                                     if (!text || text === 'null') return null;
                                                     return (
-                                                        <div className="mx-3 mb-2 rounded-md bg-muted/20 border border-border/20 p-2 text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
+                                                        <div className="mx-3 mb-2 rounded-md bg-muted/15 p-2 text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
                                                             {text.slice(0, 150)}
                                                         </div>
                                                     );
@@ -341,7 +341,7 @@ export const MobileConnectionSheet = ({
                         {/* Empty state */}
                         {!hasAvailable && !hasConnections && !onAddNewAndConnect && (
                             <div className="px-4 py-10 text-center">
-                                <Link2Off className="w-8 h-8 text-muted-foreground/20 mx-auto mb-3" />
+                                <Link2Off className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
                                 <div className="text-sm text-muted-foreground">
                                     {t('mobile.connection.noCompatiblePorts', '호환되는 입력 포트가 없습니다.')}
                                 </div>
@@ -352,9 +352,9 @@ export const MobileConnectionSheet = ({
                     {/* Bottom CTA */}
                     <div
                         className={cn(
-                            'shrink-0 border-t border-border/40',
+                            'shrink-0 border-t border-border',
                             'pb-[env(safe-area-inset-bottom)]',
-                            'bg-glass-bg backdrop-blur-2xl'
+                            'bg-background/80 backdrop-blur-xl'
                         )}
                     >
                         <div className="px-4 py-3">
@@ -363,7 +363,7 @@ export const MobileConnectionSheet = ({
                                 className={cn(
                                     'w-full flex items-center justify-center gap-2 h-[51px] rounded-xl',
                                     'text-sm font-semibold transition-all',
-                                    'active:scale-[0.98]',
+                                    '',
                                     'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
                                 )}
                             >

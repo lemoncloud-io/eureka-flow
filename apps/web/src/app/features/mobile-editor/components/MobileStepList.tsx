@@ -79,11 +79,11 @@ export const MobileStepList = ({
     if (nodes.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-20 px-6">
-                <div className="w-full rounded-2xl border border-border/40 bg-card p-6 flex flex-col items-center">
-                    <p className="text-sm font-medium text-foreground/70 mb-1">
+                <div className="w-full rounded-2xl border border-border bg-card p-6 flex flex-col items-center">
+                    <p className="text-sm font-medium text-foreground mb-1">
                         + {t('mobile.emptyState.title', '입력 노드 선택')}
                     </p>
-                    <p className="text-xs text-muted-foreground/60 mb-5 text-center leading-relaxed">
+                    <p className="text-xs text-muted-foreground mb-5 text-center leading-relaxed">
                         {t(
                             'mobile.emptyState.description',
                             '블록을 추가하여 AI 워크플로우를 만들고, 연결하여 데이터를 전달하세요.'
@@ -105,10 +105,9 @@ export const MobileStepList = ({
                                             onClick={() => onAddBlockDirect(block.type)}
                                             className={cn(
                                                 'flex items-center gap-2 px-4 py-2.5 rounded-xl',
-                                                'border border-border/40 bg-background',
+                                                'border border-border bg-background',
                                                 'text-xs font-medium',
-                                                'hover:border-primary/30 hover:shadow-sm',
-                                                'active:scale-[0.97] transition-all'
+                                                'hover:border-primary/40 transition-colors'
                                             )}
                                         >
                                             <div

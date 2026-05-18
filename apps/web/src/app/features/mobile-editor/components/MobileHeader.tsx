@@ -117,7 +117,7 @@ export const MobileHeader = ({
             className={cn(
                 'fixed top-0 left-0 right-0 z-30',
                 'h-14 px-3 flex items-center gap-2',
-                'bg-glass-bg backdrop-blur-2xl border-b border-border/30',
+                'bg-background/80 backdrop-blur-xl border-b border-border',
                 'pt-[env(safe-area-inset-top)]'
             )}
         >
@@ -153,7 +153,7 @@ export const MobileHeader = ({
                         {/* Flow switcher chevron */}
                         <button
                             onClick={onOpenFlowList}
-                            className="w-7 h-7 rounded flex items-center justify-center shrink-0 hover:bg-accent/50 transition-colors"
+                            className="w-7 h-7 rounded flex items-center justify-center shrink-0 hover:bg-accent transition-colors"
                             aria-label={t('mobile.switchFlow', 'Switch flow')}
                         >
                             <ChevronDown className="w-5 h-5 text-foreground" />
@@ -177,7 +177,7 @@ export const MobileHeader = ({
                 {onToggleSearch && nodeCount > 0 && (
                     <button
                         onClick={onToggleSearch}
-                        className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
+                        className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-accent transition-colors shrink-0"
                         aria-label="Search nodes"
                     >
                         <Search className="w-4 h-4 text-muted-foreground" />
@@ -189,13 +189,13 @@ export const MobileHeader = ({
                         onClick={onSave}
                         disabled={isSaving}
                         className={cn(
-                            'w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 shrink-0',
-                            'active:scale-90 disabled:opacity-40',
+                            'w-9 h-9 rounded-xl flex items-center justify-center transition-colors shrink-0',
+                            'disabled:opacity-40',
                             isSaving
-                                ? 'bg-muted/50'
+                                ? 'bg-muted'
                                 : saveStatus === 'success'
-                                  ? 'bg-success/10 text-success'
-                                  : 'hover:bg-muted/60 text-muted-foreground'
+                                  ? 'bg-success/15 text-success'
+                                  : 'hover:bg-accent text-muted-foreground'
                         )}
                     >
                         {isSaving ? (
@@ -214,9 +214,9 @@ export const MobileHeader = ({
                         onClick={onRunAll}
                         disabled={isRunning || nodeCount === 0}
                         className={cn(
-                            'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-200',
-                            'active:scale-90 disabled:opacity-40',
-                            isRunning ? 'bg-warning/20 text-warning' : 'bg-primary/20 text-primary hover:bg-primary/25'
+                            'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                            'disabled:opacity-40',
+                            isRunning ? 'bg-warning/15 text-warning' : 'bg-primary/15 text-primary hover:bg-primary/25'
                         )}
                         aria-label="Run All"
                     >
@@ -232,8 +232,8 @@ export const MobileHeader = ({
             {/* More menu */}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <button className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0">
-                        <MoreVertical className="w-5 h-5" />
+                    <button className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent transition-colors shrink-0">
+                        <MoreVertical className="w-[18px] h-[18px]" />
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
@@ -335,7 +335,7 @@ export const MobileHeader = ({
 
                     {/* Version */}
                     <div
-                        className="px-2 py-1.5 text-[10px] text-muted-foreground/50 text-center select-none cursor-default"
+                        className="px-2 py-1.5 text-[10px] text-muted-foreground text-center select-none cursor-default"
                         onClick={onVersionClick}
                     >
                         Web v{__APP_VERSION__} {apiVersion && `/ API v${apiVersion}`}

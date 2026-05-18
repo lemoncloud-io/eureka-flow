@@ -71,13 +71,13 @@ export const MobileConnectionCard = ({ nodeId, canEdit, isNew, onDisconnect, onT
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium truncate">{displayName}</div>
-                    <div className="text-[10px] text-muted-foreground/50 truncate">{breadcrumb}</div>
+                    <div className="text-[10px] text-muted-foreground truncate">{breadcrumb}</div>
                 </div>
                 {isError ? (
-                    <AlertCircle className="w-3.5 h-3.5 text-destructive/60 shrink-0" />
+                    <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
                 ) : (
                     <div className="flex items-center gap-1 shrink-0">
-                        <Check className="w-3.5 h-3.5 text-success/60" />
+                        <Check className="w-3.5 h-3.5 text-success" />
                         {isNew && (
                             <span className="text-[9px] font-bold text-success bg-success/10 px-1.5 py-0.5 rounded-full">
                                 new
@@ -94,7 +94,7 @@ export const MobileConnectionCard = ({ nodeId, canEdit, isNew, onDisconnect, onT
                         className={cn(
                             'flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium shrink-0',
                             'bg-primary/5 text-primary/60 border border-primary/15',
-                            'hover:bg-primary/10 active:scale-95 transition-all'
+                            'hover:bg-primary/10 transition-colors'
                         )}
                     >
                         <Unlink className="w-3 h-3" />
@@ -126,9 +126,9 @@ export const MobileConnectionCard = ({ nodeId, canEdit, isNew, onDisconnect, onT
                         className="w-full flex justify-center py-1.5 hover:bg-success/5 transition-colors"
                     >
                         {expanded ? (
-                            <ChevronUp className="w-4 h-4 text-muted-foreground/40" />
+                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
                         ) : (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground/40" />
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
                         )}
                     </button>
                 </>

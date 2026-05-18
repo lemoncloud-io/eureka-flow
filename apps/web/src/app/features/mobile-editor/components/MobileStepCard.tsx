@@ -39,7 +39,7 @@ const CardImagePreview = ({ src }: { src: string }) => {
     const { src: resolvedSrc } = useS3Image(src);
     const [dims, setDims] = useState<string | null>(null);
     return (
-        <div className="relative w-full h-40 rounded-lg bg-black/20 border border-border/30 overflow-hidden flex items-center justify-center">
+        <div className="relative w-full h-40 rounded-lg bg-black/5 dark:bg-white/5 overflow-hidden flex items-center justify-center">
             {resolvedSrc ? (
                 <img
                     src={resolvedSrc}
@@ -48,7 +48,7 @@ const CardImagePreview = ({ src }: { src: string }) => {
                     onLoad={e => setDims(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight}`)}
                 />
             ) : (
-                <div className="w-6 h-6 border-2 border-border/40 border-t-primary rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-border border-t-primary rounded-full animate-spin" />
             )}
             <div className="absolute bottom-1.5 right-1.5 flex gap-1">
                 {dims && (
@@ -167,12 +167,12 @@ export const MobileStepCard = React.memo(
                       : 'bg-muted-foreground/25';
 
         const borderColor = isRunning
-            ? 'border-warning/30'
+            ? 'border-warning/40'
             : state === 'ERROR'
-              ? 'border-destructive/30'
+              ? 'border-destructive/40'
               : state === 'COMPLETED'
-                ? 'border-success/30'
-                : 'border-border/40';
+                ? 'border-success/40'
+                : 'border-border';
 
         return (
             <button
@@ -181,8 +181,7 @@ export const MobileStepCard = React.memo(
                 onClick={() => onTapCard(node.id)}
                 className={cn(
                     'w-full rounded-xl border bg-card text-left',
-                    'active:scale-[0.98] transition-all duration-150',
-                    'hover:shadow-sm overflow-hidden',
+                    'transition-colors overflow-hidden',
                     borderColor,
                     STEREO_LEFT_BORDER[stereo]
                 )}
@@ -213,9 +212,9 @@ export const MobileStepCard = React.memo(
                                 role="button"
                                 tabIndex={0}
                                 onClick={e => e.stopPropagation()}
-                                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 hover:bg-accent/50 transition-colors"
+                                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 hover:bg-accent transition-colors"
                             >
-                                <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                                <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
                             </div>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
@@ -248,7 +247,7 @@ export const MobileStepCard = React.memo(
                 {/* Node name + breadcrumb */}
                 <div className="px-3 pb-1.5">
                     <div className="text-sm font-semibold truncate leading-tight">{displayName}</div>
-                    <div className="text-[10px] text-muted-foreground/50 mt-0.5">
+                    <div className="text-[10px] text-muted-foreground mt-0.5">
                         {STEREO_FALLBACK_LABEL[stereo] ?? stereo} · {blockDef?.label ?? node.type}
                     </div>
                 </div>
@@ -259,11 +258,11 @@ export const MobileStepCard = React.memo(
                         {contentPreview.type === 'image' ? (
                             <CardImagePreview src={contentPreview.value} />
                         ) : contentPreview.type === 'waiting' ? (
-                            <div className="rounded-lg bg-muted/10 border border-border/20 p-3 text-center">
-                                <div className="text-xs text-muted-foreground/40 italic">{contentPreview.value}</div>
+                            <div className="rounded-lg bg-muted/15 p-3 text-center">
+                                <div className="text-xs text-muted-foreground italic">{contentPreview.value}</div>
                             </div>
                         ) : (
-                            <div className="relative rounded-lg bg-muted/20 border border-border/30 p-2.5">
+                            <div className="relative rounded-lg bg-muted/15 p-2.5">
                                 <div className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3 pr-6">
                                     {contentPreview.value}
                                 </div>
@@ -273,9 +272,9 @@ export const MobileStepCard = React.memo(
                                         e.stopPropagation();
                                         onExpandContent?.({ value: contentPreview.value, type: 'text' });
                                     }}
-                                    className="absolute -bottom-1 -right-1 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-primary/10 transition-colors"
+                                    className="absolute -bottom-1 -right-1 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
                                 >
-                                    <Maximize2 className="w-4 h-4 text-muted-foreground/40" />
+                                    <Maximize2 className="w-4 h-4 text-muted-foreground" />
                                 </button>
                             </div>
                         )}
@@ -284,9 +283,9 @@ export const MobileStepCard = React.memo(
 
                 {/* Error banner */}
                 {state === 'ERROR' && errorMessage && (
-                    <div className="mx-3 mb-3 rounded-lg bg-destructive/5 border border-destructive/20 px-3 py-2">
+                    <div className="mx-3 mb-3 rounded-lg bg-destructive/8 px-3 py-2">
                         <div className="text-xs text-destructive font-medium">{t('mobile.state.error', '오류')}:</div>
-                        <div className="text-[11px] text-destructive/70 line-clamp-2 mt-0.5">{errorMessage}</div>
+                        <div className="text-[11px] text-destructive line-clamp-2 mt-0.5">{errorMessage}</div>
                     </div>
                 )}
             </button>
