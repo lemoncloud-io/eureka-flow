@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AlertCircle, ArrowLeft, ArrowRight, Loader2, Play, Plus, Trash2 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, FileText, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import { isAiBlock, isMissingAiKey, useBlockRegistry, useCanvasConnections } from '@flows/flows';
@@ -201,6 +201,9 @@ export const MobileStepDetail = ({
                                     blockType={blockDef.type}
                                 />
                             </div>
+
+                            {/* ── Result preview (output data) ── */}
+                            <OutputPreviewSection node={node} t={t} />
 
                             {/* ── Connections ── */}
                             <ConnectionsSection
@@ -551,6 +554,50 @@ const ConnectionsSection = ({
                         }
                         t={t}
                     />
+                );
+            })}
+        </div>
+    );
+};
+
+/** Output data preview — shows result after node execution */
+const OutputPreviewSection = ({
+    node,
+    t,
+}: {
+    node: { outputData?: unknown; state?: string };
+    t: (key: string, defaultValue?: string) => string;
+}) => {
+    const outputData = node.outputData as Record<string, { value?: unknown; type?: string }> | undefined;
+    if (!outputData) return null;
+
+    const entries = Object.entries(outputData).filter(
+        ([, d]) => d?.value != null && d.value !== '' && JSON.stringify(d.value) !== 'null'
+    );
+    if (entries.length === 0) return null;
+
+    return (
+        <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-muted-foreground/50" />
+                <span className="text-xs font-semibold text-muted-foreground">{t('mobile.result', '결과')}</span>
+            </div>
+            {entries.map(([key, data]) => {
+                if (data.type === 'image' && typeof data.value === 'string') {
+                    return (
+                        <div key={key} className="rounded-lg bg-muted/20 border border-border/30 p-2 overflow-hidden">
+                            <img src={data.value} alt="" className="max-h-40 rounded object-contain mx-auto" />
+                        </div>
+                    );
+                }
+                const text = typeof data.value === 'string' ? data.value : JSON.stringify(data.value);
+                return (
+                    <div
+                        key={key}
+                        className="rounded-lg bg-muted/20 border border-border/30 p-2.5 text-[11px] text-muted-foreground leading-relaxed line-clamp-6 whitespace-pre-wrap break-all"
+                    >
+                        {text.slice(0, 500)}
+                    </div>
                 );
             })}
         </div>

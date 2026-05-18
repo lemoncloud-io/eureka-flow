@@ -561,6 +561,7 @@
         "connectedBlocks": "연결된 블록",
         "input": "입력",
         "output": "출력",
+        "result": "결과",
         "runBlock": "블록 실행",
         "runThisOnly": "이전만 실행",
         "runAndPropagate": "이후로 실행",

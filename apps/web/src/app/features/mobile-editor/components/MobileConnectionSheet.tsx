@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ArrowLeft, Check, ChevronDown, ChevronUp, Link2, Link2Off, Plus, Unlink } from 'lucide-react';
@@ -51,6 +51,36 @@ export const MobileConnectionSheet = ({
     const blockRegistry = useBlockRegistry();
 
     const isOutput = direction === 'output';
+
+    // Track newly connected node IDs for "new" badge
+    const [newConnectionIds, setNewConnectionIds] = useState<Set<string>>(new Set());
+    const newTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+    const markAsNew = useCallback((connectionId: string) => {
+        setNewConnectionIds(prev => new Set(prev).add(connectionId));
+        // Clear existing timer if any
+        const existing = newTimers.current.get(connectionId);
+        if (existing) clearTimeout(existing);
+        // Auto-remove after 5s
+        const timer = setTimeout(() => {
+            setNewConnectionIds(prev => {
+                const next = new Set(prev);
+                next.delete(connectionId);
+                return next;
+            });
+            newTimers.current.delete(connectionId);
+        }, 5000);
+        newTimers.current.set(connectionId, timer);
+    }, []);
+
+    const handleConnect = useCallback(
+        (targetNodeId: string, targetPortId: string) => {
+            onConnect(targetNodeId, targetPortId);
+            // Mark the target node as "new" — connection ID will match after re-render
+            markAsNew(targetNodeId);
+        },
+        [onConnect, markAsNew]
+    );
 
     const existingWithNames = useMemo(() => {
         const filtered = isOutput
@@ -148,7 +178,14 @@ export const MobileConnectionSheet = ({
                                                         {conn.breadcrumb}
                                                     </div>
                                                 </div>
-                                                <Check className="w-4 h-4 text-success shrink-0" />
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    <Check className="w-4 h-4 text-success" />
+                                                    {newConnectionIds.has(conn.targetNodeId) && (
+                                                        <span className="text-[9px] font-bold text-success bg-success/10 px-1.5 py-0.5 rounded-full">
+                                                            new
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {!readOnly && (
                                                     <button
                                                         onClick={() => onDisconnect(conn.connectionId)}
@@ -238,7 +275,7 @@ export const MobileConnectionSheet = ({
                                         return (
                                             <button
                                                 key={`${target.nodeId}-${target.portId}`}
-                                                onClick={() => onConnect(target.nodeId, target.portId)}
+                                                onClick={() => handleConnect(target.nodeId, target.portId)}
                                                 className={cn(
                                                     'w-full rounded-xl overflow-hidden',
                                                     'border border-border/40 bg-card',

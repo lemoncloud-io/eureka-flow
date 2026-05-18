@@ -14,11 +14,12 @@ import type { NodeData } from '@lemoncloud/eureka-flows-api';
 interface MobileConnectionCardProps {
     nodeId: string;
     canEdit: boolean;
+    isNew?: boolean;
     onDisconnect?: () => void;
     onTap?: () => void;
 }
 
-export const MobileConnectionCard = ({ nodeId, canEdit, onDisconnect, onTap }: MobileConnectionCardProps) => {
+export const MobileConnectionCard = ({ nodeId, canEdit, isNew, onDisconnect, onTap }: MobileConnectionCardProps) => {
     const { t } = useTranslation(['flows']);
     const [expanded, setExpanded] = useState(false);
     const blockRegistry = useBlockRegistry();
@@ -75,7 +76,14 @@ export const MobileConnectionCard = ({ nodeId, canEdit, onDisconnect, onTap }: M
                 {isError ? (
                     <AlertCircle className="w-3.5 h-3.5 text-destructive/60 shrink-0" />
                 ) : (
-                    <Check className="w-3.5 h-3.5 text-success/60 shrink-0" />
+                    <div className="flex items-center gap-1 shrink-0">
+                        <Check className="w-3.5 h-3.5 text-success/60" />
+                        {isNew && (
+                            <span className="text-[9px] font-bold text-success bg-success/10 px-1.5 py-0.5 rounded-full">
+                                new
+                            </span>
+                        )}
+                    </div>
                 )}
                 {canEdit && onDisconnect && (
                     <button

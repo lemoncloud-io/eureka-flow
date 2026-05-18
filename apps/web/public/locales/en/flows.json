@@ -561,6 +561,7 @@
         "connectedBlocks": "Connected Blocks",
         "input": "Input",
         "output": "Output",
+        "result": "Result",
         "runBlock": "Run Block",
         "runThisOnly": "Run Previous Only",
         "runAndPropagate": "Run Forward",
