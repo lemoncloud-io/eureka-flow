@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { Blocks, Compass, Link2 } from 'lucide-react';
+import { Cable, Play, Plus } from 'lucide-react';
 
 import { useInView } from '../hooks';
 
@@ -9,9 +9,9 @@ import type { LucideIcon } from 'lucide-react';
 const STAGGER_MS = 150;
 
 const STEPS: { key: string; Icon: LucideIcon }[] = [
-    { key: 'navigate', Icon: Compass },
-    { key: 'build', Icon: Blocks },
-    { key: 'connect', Icon: Link2 },
+    { key: 'add_blocks', Icon: Plus },
+    { key: 'connect_flow', Icon: Cable },
+    { key: 'run_iterate', Icon: Play },
 ];
 
 export const HowItWorksSection = () => {
