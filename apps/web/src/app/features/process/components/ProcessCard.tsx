@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { GitBranch, Trash2 } from 'lucide-react';
+import { GitBranch, Play, Trash2 } from 'lucide-react';
 
 import {
     AlertDialog,
@@ -24,9 +24,10 @@ interface ProcessCardProps {
     process: Process;
     onClick: (id: string) => void;
     onDelete: (id: string) => void;
+    onApply?: (id: string) => void;
 }
 
-export const ProcessCard = ({ process, onClick, onDelete }: ProcessCardProps) => {
+export const ProcessCard = ({ process, onClick, onDelete, onApply }: ProcessCardProps) => {
     const { t } = useTranslation();
 
     return (
@@ -82,13 +83,29 @@ export const ProcessCard = ({ process, onClick, onDelete }: ProcessCardProps) =>
                         </AlertDialogContent>
                     </AlertDialog>
                 </div>
-                <div className="mt-3 flex items-center gap-2">
-                    <Badge variant="secondary" className="text-[10px]">
-                        {process.stereo}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                        {process.stages.length} {t('navigator.stages', 'stages')}
-                    </span>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-[10px]">
+                            {process.stereo}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                            {process.stages.length} {t('navigator.stages', 'stages')}
+                        </span>
+                    </div>
+                    {onApply && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 gap-1 text-xs text-primary"
+                            onClick={e => {
+                                e.stopPropagation();
+                                onApply(process.id);
+                            }}
+                        >
+                            <Play className="h-3 w-3" />
+                            {t('navigator.apply', 'Apply')}
+                        </Button>
+                    )}
                 </div>
             </CardContent>
         </Card>

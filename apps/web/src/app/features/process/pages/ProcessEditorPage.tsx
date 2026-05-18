@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { ArrowLeft, Loader2, Play, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, Play, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useApplyProcessMutation, useCreateProcessMutation, useProcess, useUpdateProcessMutation } from '@flows/flows';
-import { Button, Separator } from '@flows/ui-kit';
+import { Button, Input, Separator } from '@flows/ui-kit';
 
 import { ProcessMetaForm } from '../components/ProcessMetaForm';
 import { StageTemplateEditPanel } from '../components/StageTemplateEditPanel';
@@ -38,6 +38,8 @@ export const ProcessEditorPage = () => {
     const [stages, setStages] = useState<LocalStage[]>([]);
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [loadedId, setLoadedId] = useState<string | null>(null);
+    const [showApplyForm, setShowApplyForm] = useState(false);
+    const [applyItemName, setApplyItemName] = useState('');
 
     // Load existing process data (resets when id changes)
     useEffect(() => {
@@ -148,16 +150,22 @@ export const ProcessEditorPage = () => {
         }
     };
 
-    const handleApply = () => {
-        const processId = isNew ? undefined : id;
-        if (!processId) {
+    const handleApplyClick = () => {
+        if (isNew || !id) {
             toast.error(t('navigator.saveFirst', 'Save the process first'));
             return;
         }
+        setApplyItemName('');
+        setShowApplyForm(true);
+    };
+
+    const handleApplySubmit = () => {
+        if (!id || !applyItemName.trim()) return;
         applyMutation.mutate(
-            { processId, input: { name: 'New Item', thumbnailUrl: '', processId } },
+            { processId: id, input: { name: applyItemName.trim(), thumbnailUrl: '', processId: id } },
             {
                 onSuccess: result => {
+                    setShowApplyForm(false);
                     navigate(`/items/${result.data.id}`);
                     toast.success(t('navigator.itemCreated', 'Item created from process'));
                 },
@@ -183,7 +191,7 @@ export const ProcessEditorPage = () => {
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={handleApply}
+                            onClick={handleApplyClick}
                             disabled={applyMutation.isPending}
                             className="gap-1.5"
                         >
@@ -205,6 +213,38 @@ export const ProcessEditorPage = () => {
                     </Button>
                 </div>
             </div>
+
+            {showApplyForm && (
+                <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                    <Input
+                        value={applyItemName}
+                        onChange={e => setApplyItemName(e.target.value)}
+                        placeholder={t('navigator.itemNamePlaceholder', 'Enter item name...')}
+                        className="flex-1"
+                        autoFocus
+                        onKeyDown={e => {
+                            if (e.key === 'Enter') handleApplySubmit();
+                            if (e.key === 'Escape') setShowApplyForm(false);
+                        }}
+                    />
+                    <Button
+                        size="sm"
+                        onClick={handleApplySubmit}
+                        disabled={!applyItemName.trim() || applyMutation.isPending}
+                        className="gap-1.5"
+                    >
+                        {applyMutation.isPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <Play className="h-3.5 w-3.5" />
+                        )}
+                        {t('navigator.createItem', 'Create Item')}
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowApplyForm(false)}>
+                        <X className="h-3.5 w-3.5" />
+                    </Button>
+                </div>
+            )}
 
             <ProcessMetaForm
                 name={name}

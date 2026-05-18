@@ -1,11 +1,12 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { GitBranch, Plus } from 'lucide-react';
+import { GitBranch, Loader2, Play, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { useDeleteProcessMutation, useProcesses } from '@flows/flows';
-import { Button, Card, CardContent } from '@flows/ui-kit';
+import { useApplyProcessMutation, useDeleteProcessMutation, useProcesses } from '@flows/flows';
+import { Button, Card, CardContent, Input } from '@flows/ui-kit';
 
 import { ProcessCard } from '../components/ProcessCard';
 
@@ -14,6 +15,9 @@ export const ProcessListPage = () => {
     const navigate = useNavigate();
     const { data: processesData, isLoading } = useProcesses();
     const deleteMutation = useDeleteProcessMutation();
+    const applyMutation = useApplyProcessMutation();
+    const [applyTarget, setApplyTarget] = useState<string | null>(null);
+    const [applyItemName, setApplyItemName] = useState('');
 
     const processes = processesData?.data ?? [];
 
@@ -21,6 +25,25 @@ export const ProcessListPage = () => {
         deleteMutation.mutate(id, {
             onSuccess: () => toast.success(t('navigator.processDeleted', 'Process deleted')),
         });
+    };
+
+    const handleApply = (processId: string) => {
+        setApplyTarget(processId);
+        setApplyItemName('');
+    };
+
+    const handleApplySubmit = () => {
+        if (!applyTarget || !applyItemName.trim()) return;
+        applyMutation.mutate(
+            { processId: applyTarget, input: { name: applyItemName.trim(), thumbnailUrl: '', processId: applyTarget } },
+            {
+                onSuccess: result => {
+                    setApplyTarget(null);
+                    navigate(`/items/${result.data.id}`);
+                    toast.success(t('navigator.itemCreated', 'Item created from process'));
+                },
+            }
+        );
     };
 
     return (
@@ -54,16 +77,55 @@ export const ProcessListPage = () => {
                     </CardContent>
                 </Card>
             ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {processes.map(p => (
-                        <ProcessCard
-                            key={p.id}
-                            process={p}
-                            onClick={id => navigate(`/processes/${id}`)}
-                            onDelete={handleDelete}
-                        />
-                    ))}
-                </div>
+                <>
+                    {applyTarget && (
+                        <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                            <Input
+                                value={applyItemName}
+                                onChange={e => setApplyItemName(e.target.value)}
+                                placeholder={t('navigator.itemNamePlaceholder', 'Enter item name...')}
+                                className="flex-1"
+                                autoFocus
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') handleApplySubmit();
+                                    if (e.key === 'Escape') setApplyTarget(null);
+                                }}
+                            />
+                            <Button
+                                size="sm"
+                                onClick={handleApplySubmit}
+                                disabled={!applyItemName.trim() || applyMutation.isPending}
+                                className="gap-1.5"
+                            >
+                                {applyMutation.isPending ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <Play className="h-3.5 w-3.5" />
+                                )}
+                                {t('navigator.createItem', 'Create Item')}
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setApplyTarget(null)}
+                            >
+                                <X className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    )}
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {processes.map(p => (
+                            <ProcessCard
+                                key={p.id}
+                                process={p}
+                                onClick={id => navigate(`/processes/${id}`)}
+                                onDelete={handleDelete}
+                                onApply={handleApply}
+                            />
+                        ))}
+                    </div>
+                </>
             )}
         </div>
     );
