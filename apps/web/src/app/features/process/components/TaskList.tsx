@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Circle, Plus } from 'lucide-react';
+import { Circle, Loader2, Plus } from 'lucide-react';
 
 import { useAddTaskMutation } from '@flows/flows';
 import { Button, Input } from '@flows/ui-kit';
@@ -69,6 +69,7 @@ export const TaskList = ({ tasks, stageId, canAdd }: TaskListProps) => {
                         onKeyDown={e => e.key === 'Enter' && handleAdd()}
                     />
                     <Button size="sm" onClick={handleAdd} disabled={!title.trim() || addTaskMutation.isPending}>
+                        {addTaskMutation.isPending && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
                         {t('navigator.add', 'Add')}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>

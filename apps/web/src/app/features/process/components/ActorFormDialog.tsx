@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useCreateActorMutation, useUpdateActorMutation } from '@flows/flows';
@@ -60,6 +61,7 @@ export const ActorFormDialog = ({ open, onOpenChange, actor }: ActorFormDialogPr
                 {
                     onSuccess: result => {
                         result.warnings?.forEach(w => toast.warning(w));
+                        toast.success(t('navigator.actorSaved', 'Actor saved'));
                         onOpenChange(false);
                     },
                 }
@@ -70,6 +72,7 @@ export const ActorFormDialog = ({ open, onOpenChange, actor }: ActorFormDialogPr
                 {
                     onSuccess: result => {
                         result.warnings?.forEach(w => toast.warning(w));
+                        toast.success(t('navigator.actorCreated', 'Actor created'));
                         onOpenChange(false);
                     },
                 }
@@ -135,6 +138,7 @@ export const ActorFormDialog = ({ open, onOpenChange, actor }: ActorFormDialogPr
                             {t('navigator.cancel', 'Cancel')}
                         </Button>
                         <Button onClick={handleSubmit} disabled={!name.trim() || isPending}>
+                            {isPending && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
                             {isEdit ? t('navigator.save', 'Save') : t('navigator.create', 'Create')}
                         </Button>
                     </div>

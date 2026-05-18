@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Loader2 } from 'lucide-react';
+
 import { useAddNoteMutation } from '@flows/flows';
 import { Button, Textarea } from '@flows/ui-kit';
 
@@ -38,6 +40,7 @@ export const NoteForm = ({ stageId }: NoteFormProps) => {
             />
             <div className="flex justify-end">
                 <Button size="sm" onClick={handleSubmit} disabled={!content.trim() || addNoteMutation.isPending}>
+                    {addNoteMutation.isPending && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
                     {t('navigator.addNote', 'Add Note')}
                 </Button>
             </div>

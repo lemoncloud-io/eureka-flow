@@ -41,7 +41,7 @@ import {
 import { EmbedBrowser } from '../components/EmbedBrowser';
 import { NoteList } from '../components/NoteList';
 import { StageStepper } from '../components/StageStepper';
-import { StatusBadge } from '../components/StatusBadge';
+import { STATUS_CONFIG, StatusBadge } from '../components/StatusBadge';
 import { TaskList } from '../components/TaskList';
 import { ToolAction } from '../components/ToolAction';
 import { useCurrentActor } from '../hooks/useCurrentActor';
@@ -74,6 +74,7 @@ export const StageFocusPage = () => {
             {
                 onSuccess: result => {
                     (result.warnings ?? []).forEach(w => toast.warning(w));
+                    toast.success(t('navigator.stageCompleted', 'Stage completed'));
                     const updatedItem = {
                         ...item,
                         stages: item.stages.map(s => (s.id === stage.id ? { ...s, status: 'done' as Status } : s)),
@@ -93,7 +94,12 @@ export const StageFocusPage = () => {
         if (!stage) return;
         changeStatusMutation.mutate(
             { id: stage.id, input: { status: newStatus, actorId: currentActorId ?? undefined } },
-            { onSuccess: result => (result.warnings ?? []).forEach(w => toast.warning(w)) }
+            {
+                onSuccess: result => {
+                    (result.warnings ?? []).forEach(w => toast.warning(w));
+                    toast.success(`${stage.name} → ${STATUS_CONFIG[newStatus].label}`);
+                },
+            }
         );
     };
 

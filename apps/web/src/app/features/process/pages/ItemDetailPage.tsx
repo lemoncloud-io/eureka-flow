@@ -34,6 +34,7 @@ import { ItemNotesList } from '../components/ItemNotesList';
 import { NextActionCTA } from '../components/NextActionCTA';
 import { ProgressBar } from '../components/ProgressBar';
 import { StageCard } from '../components/StageCard';
+import { STATUS_CONFIG } from '../components/StatusBadge';
 
 import type { Status } from '@flows/flows';
 
@@ -63,11 +64,13 @@ export const ItemDetailPage = () => {
     const actorMap = useMemo(() => new Map(actors.map(a => [a.id, a.name])), [actors]);
 
     const handleStatusChange = (stageId: string, status: Status) => {
+        const stageName = item?.stages.find(s => s.id === stageId)?.name ?? '';
         changeStatusMutation.mutate(
             { id: stageId, input: { status } },
             {
                 onSuccess: result => {
                     (result.warnings ?? []).forEach(w => toast.warning(w));
+                    toast.success(`${stageName} → ${STATUS_CONFIG[status].label}`);
                 },
             }
         );

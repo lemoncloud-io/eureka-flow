@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AlertTriangle, ExternalLink, GitBranch, Maximize2 } from 'lucide-react';
+import { AlertTriangle, ExternalLink, GitBranch, Loader2, Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useCreateToolMutation, useFlowsListQuery, useUpdateToolMutation } from '@flows/flows';
@@ -76,6 +76,7 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                 {
                     onSuccess: result => {
                         result.warnings?.forEach(w => toast.warning(w));
+                        toast.success(t('navigator.toolSaved', 'Tool saved'));
                         onOpenChange(false);
                     },
                 }
@@ -93,6 +94,7 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                 {
                     onSuccess: result => {
                         result.warnings?.forEach(w => toast.warning(w));
+                        toast.success(t('navigator.toolCreated', 'Tool created'));
                         onOpenChange(false);
                     },
                 }
@@ -225,6 +227,7 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                                 !name.trim() || !actionLabel.trim() || (needsUrl && !urlTemplate.trim()) || isPending
                             }
                         >
+                            {isPending && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
                             {isEdit ? t('navigator.save', 'Save') : t('navigator.create', 'Create')}
                         </Button>
                     </div>
