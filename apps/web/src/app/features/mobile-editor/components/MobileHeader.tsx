@@ -1,20 +1,21 @@
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 
 import {
-    ArrowLeft,
     Check,
+    ChevronDown,
     Download,
     FilePlus,
     FolderOpen,
     Key,
     Loader2,
     Map as MapIcon,
+    Monitor,
     MoreVertical,
     Play,
     Save,
     Search,
+    Settings2,
     Trash2,
     WifiOff,
 } from 'lucide-react';
@@ -89,8 +90,8 @@ export const MobileHeader = ({
     onDisableDebugMode,
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
-    const navigate = useNavigate();
     const { canEdit, canRun } = getPermissions(role);
+    const [confirmingClear, setConfirmingClear] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(flowName);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -115,21 +116,13 @@ export const MobileHeader = ({
         <header
             className={cn(
                 'fixed top-0 left-0 right-0 z-30',
-                'h-14 px-2 flex items-center gap-1',
-                'bg-glass-bg backdrop-blur-2xl border-b border-border/30',
+                'h-14 px-3 flex items-center gap-2',
+                'bg-background/80 backdrop-blur-xl border-b border-border',
                 'pt-[env(safe-area-inset-top)]'
             )}
         >
-            {/* Back */}
-            <button
-                onClick={() => navigate('/')}
-                className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
-            >
-                <ArrowLeft className="w-5 h-5" />
-            </button>
-
-            {/* Flow name */}
-            <div className="flex-1 min-w-0 flex items-center gap-2">
+            {/* Flow name + switcher dropdown — no back arrow per Figma */}
+            <div className="flex-1 min-w-0 flex items-center gap-1">
                 {isEditing ? (
                     <input
                         ref={inputRef}
@@ -140,18 +133,32 @@ export const MobileHeader = ({
                             if (e.key === 'Enter') handleFinishEditing();
                             if (e.key === 'Escape') setIsEditing(false);
                         }}
-                        className="w-full text-sm font-bold bg-transparent border-b-2 border-primary outline-none"
+                        className="w-full text-base font-bold bg-transparent border-b-2 border-primary outline-none"
                         autoFocus
                     />
-                ) : canEdit ? (
-                    <button
-                        onClick={handleStartEditing}
-                        className="truncate text-sm font-bold text-foreground leading-tight"
-                    >
-                        {flowName}
-                    </button>
                 ) : (
-                    <span className="truncate text-sm font-bold text-foreground leading-tight">{flowName}</span>
+                    <div className="flex items-center gap-1 min-w-0">
+                        {canEdit ? (
+                            <button
+                                onClick={handleStartEditing}
+                                className="truncate text-base font-bold text-foreground leading-tight"
+                            >
+                                {flowName}
+                            </button>
+                        ) : (
+                            <span className="truncate text-base font-bold text-foreground leading-tight">
+                                {flowName}
+                            </span>
+                        )}
+                        {/* Flow switcher chevron */}
+                        <button
+                            onClick={onOpenFlowList}
+                            className="w-7 h-7 rounded flex items-center justify-center shrink-0 hover:bg-accent transition-colors"
+                            aria-label={t('mobile.switchFlow', 'Switch flow')}
+                        >
+                            <ChevronDown className="w-5 h-5 text-foreground" />
+                        </button>
+                    </div>
                 )}
 
                 {/* View-only badge for non-owner roles */}
@@ -160,7 +167,7 @@ export const MobileHeader = ({
                         {t('mobile.viewOnly', 'View only')}
                     </span>
                 )}
-                {/* Disconnected warning — only when socket is down */}
+                {/* Disconnected warning */}
                 {isDisconnected && <WifiOff className="w-3.5 h-3.5 text-destructive/60 shrink-0" />}
             </div>
 
@@ -170,7 +177,7 @@ export const MobileHeader = ({
                 {onToggleSearch && nodeCount > 0 && (
                     <button
                         onClick={onToggleSearch}
-                        className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0"
+                        className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-accent transition-colors shrink-0"
                         aria-label="Search nodes"
                     >
                         <Search className="w-4 h-4 text-muted-foreground" />
@@ -182,13 +189,13 @@ export const MobileHeader = ({
                         onClick={onSave}
                         disabled={isSaving}
                         className={cn(
-                            'w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 shrink-0',
-                            'active:scale-90 disabled:opacity-40',
+                            'w-9 h-9 rounded-xl flex items-center justify-center transition-colors shrink-0',
+                            'disabled:opacity-40',
                             isSaving
-                                ? 'bg-muted/50'
+                                ? 'bg-muted'
                                 : saveStatus === 'success'
-                                  ? 'bg-success/10 text-success'
-                                  : 'hover:bg-muted/60 text-muted-foreground'
+                                  ? 'bg-success/15 text-success'
+                                  : 'hover:bg-accent text-muted-foreground'
                         )}
                     >
                         {isSaving ? (
@@ -201,15 +208,15 @@ export const MobileHeader = ({
                     </button>
                 )}
 
-                {/* Run All */}
-                {canRun && nodeCount > 0 && (
+                {/* Run All — circular purple background */}
+                {canRun && (
                     <button
                         onClick={onRunAll}
                         disabled={isRunning || nodeCount === 0}
                         className={cn(
-                            'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200',
-                            'active:scale-90 disabled:opacity-40',
-                            isRunning ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary hover:bg-primary/15'
+                            'w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                            'disabled:opacity-40',
+                            isRunning ? 'bg-warning/15 text-warning' : 'bg-primary/15 text-primary hover:bg-primary/25'
                         )}
                         aria-label="Run All"
                     >
@@ -225,8 +232,8 @@ export const MobileHeader = ({
             {/* More menu */}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <button className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors shrink-0">
-                        <MoreVertical className="w-5 h-5" />
+                    <button className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-accent transition-colors shrink-0">
+                        <MoreVertical className="w-[18px] h-[18px]" />
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
@@ -264,13 +271,43 @@ export const MobileHeader = ({
                         {t('header.menuGroup.canvas', 'Canvas')}
                     </DropdownMenuLabel>
                     <DropdownMenuItem onClick={onOpenFlowMap} className="gap-2">
+                        <Settings2 className="w-4 h-4" />
+                        {t('mobile.flowSettings', '플로우 설정')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                        onClick={() => {
+                            const url = window.location.href;
+                            window.location.href = url + (url.includes('?') ? '&' : '?') + 'desktop=1';
+                        }}
+                        className="gap-2"
+                    >
+                        <Monitor className="w-4 h-4" />
+                        {t('mobile.pcVersion', 'PC 버전 보기')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onOpenFlowMap} className="gap-2">
                         <MapIcon className="w-4 h-4" />
-                        {t('mobile.flowOverview', 'Flow Overview')}
+                        {t('mobile.flowOverview', '플로우 전체보기')}
                     </DropdownMenuItem>
                     {onClear && (
-                        <DropdownMenuItem onClick={onClear} className="gap-2 text-destructive">
+                        <DropdownMenuItem
+                            onClick={() => {
+                                if (!confirmingClear) {
+                                    setConfirmingClear(true);
+                                    setTimeout(() => setConfirmingClear(false), 3000);
+                                    return;
+                                }
+                                onClear();
+                                setConfirmingClear(false);
+                            }}
+                            className={cn(
+                                'gap-2',
+                                confirmingClear ? 'bg-destructive text-destructive-foreground' : 'text-destructive'
+                            )}
+                        >
                             <Trash2 className="w-4 h-4" />
-                            {t('header.clearCanvas', 'Clear Canvas')}
+                            {confirmingClear
+                                ? t('mobile.confirmClear', '정말 모두 삭제하시겠습니까?')
+                                : t('header.clearCanvas', 'Clear Canvas')}
                         </DropdownMenuItem>
                     )}
 
@@ -298,7 +335,7 @@ export const MobileHeader = ({
 
                     {/* Version */}
                     <div
-                        className="px-2 py-1.5 text-[10px] text-muted-foreground/50 text-center select-none cursor-default"
+                        className="px-2 py-1.5 text-[10px] text-muted-foreground text-center select-none cursor-default"
                         onClick={onVersionClick}
                     >
                         Web v{__APP_VERSION__} {apiVersion && `/ API v${apiVersion}`}

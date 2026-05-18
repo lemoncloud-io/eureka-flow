@@ -504,7 +504,7 @@
         "allNodesCompleted": "All {{count}} nodes completed",
         "failedToCreateNode": "Failed to create node",
         "emptyState": {
-            "title": "Start building your flow",
+            "title": "Select Input Node",
             "description": "Add blocks to create an AI workflow. Connect them to pass data between steps."
         },
         "groupLabel": {
@@ -523,10 +523,15 @@
             "disconnected": "Disconnected",
             "failedToConnect": "Failed to create connection",
             "failedToDisconnect": "Failed to disconnect",
+            "addConnection": "Add connection",
             "addNewAndConnect": "Add new block & connect",
             "tapToConnect": "tap to connect",
             "noCompatiblePorts": "No compatible input ports found.",
-            "addMoreNodes": "Add more nodes with matching input types."
+            "addMoreNodes": "Add more nodes with matching input types.",
+            "nodeConnection": "Node Connection",
+            "connectedNodes": "Connected Nodes",
+            "availableNodes": "Available Nodes",
+            "done": "Done"
         },
         "connections": "Connections",
         "inputs": "Inputs",
@@ -539,7 +544,38 @@
         "noSearchResults": "No matching nodes",
         "imageOutput": "Image",
         "viewOnly": "View only",
+        "flowSettings": "Flow Settings",
+        "pcVersion": "PC Version",
+        "confirmDelete": "Are you sure you want to delete?",
+        "confirmClear": "Are you sure you want to clear all?",
         "browseAllBlocks": "Browse all blocks",
+        "stereo": {
+            "input": "Input Block",
+            "process": "Process Block",
+            "output": "Output Block"
+        },
+        "nodeName": "Node Name",
+        "autoExecution": "Auto Execution",
+        "value": "Value",
+        "valuePlaceholder": "Enter content here.",
+        "connectedBlocks": "Connected Blocks",
+        "input": "Input",
+        "output": "Output",
+        "result": "Result",
+        "runBlock": "Run Block",
+        "runThisOnly": "Run Previous Only",
+        "runAndPropagate": "Run Forward",
+        "switchFlow": "Switch flow",
+        "newFlow": {
+            "title": "New Flow",
+            "name": "Name",
+            "namePlaceholder": "Enter flow name",
+            "nameHelper": "The default flow name can be changed later.",
+            "description": "Description (optional)",
+            "descriptionPlaceholder": "Describe the AI workflow you want to create.",
+            "image": "Flow Image (optional)",
+            "create": "Create Flow"
+        },
         "state": {
             "idle": "Idle",
             "ready": "Ready",
