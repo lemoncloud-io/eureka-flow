@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import {
     AlertTriangle,
+    Archive,
     ArrowDown,
     ArrowDownToLine,
     ArrowUpFromLine,
@@ -163,6 +164,7 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
     const fileData = node.config?.fileData as string | undefined;
     const fileName = node.config?.fileName as string | undefined;
 
+    const isZipData = !!img && !fileData && /\.zip$/i.test(fileName || '');
     const { src: resolvedSrc, isLoading } = useS3Image(img || '');
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [isFilePreviewOpen, setIsFilePreviewOpen] = useState(false);
@@ -223,8 +225,40 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
                 onChange={handleFileUpload}
             />
 
-            {/* Image mode */}
-            {img && !fileData ? (
+            {/* Zip mode */}
+            {isZipData ? (
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2.5 p-3 rounded-lg border border-border bg-muted/30">
+                        <div className="w-8 h-8 rounded-md bg-orange-500/10 flex items-center justify-center shrink-0">
+                            <Archive className="w-4 h-4 text-orange-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-foreground truncate">{fileName}</div>
+                            <div className="text-[10px] text-muted-foreground">ZIP archive</div>
+                        </div>
+                    </div>
+                    <div className="flex gap-1.5">
+                        <label
+                            htmlFor={fileInputId}
+                            className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-md text-[11px] font-medium bg-muted/50 hover:bg-muted text-foreground/70 hover:text-foreground border border-border/50 cursor-pointer transition-colors"
+                        >
+                            <Upload className="w-3 h-3" />
+                            {t('flows:detailPanel.changeFile')}
+                        </label>
+                        <button
+                            onClick={() => {
+                                onConfigChange('imageData', '');
+                                onConfigChange('fileName', '');
+                            }}
+                            className="flex items-center justify-center py-1.5 px-2.5 rounded-md text-[11px] font-medium bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/30 transition-colors"
+                            title={t('flows:detailPanel.removeImage')}
+                        >
+                            <X className="w-3 h-3" />
+                        </button>
+                    </div>
+                </div>
+            ) : /* Image mode */
+            img && !fileData ? (
                 <div className="space-y-2">
                     {/* Image Preview */}
                     <div className="w-full h-28 bg-black/30 rounded-lg border border-border flex items-center justify-center overflow-hidden relative group">

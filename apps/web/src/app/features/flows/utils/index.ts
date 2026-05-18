@@ -299,8 +299,9 @@ export const processUploadedFile = async (
             if (isZipFile(file)) {
                 const raw = extractBase64(dataUrl);
                 onConfigChange('imageData', raw);
+                onConfigChange('fileData', '');
                 onConfigChange('fileName', file.name);
-                clearFileConfig(onConfigChange);
+                onConfigChange('fileType', '');
             } else if (isTextFile(file)) {
                 onConfigChange('fileData', dataUrl);
                 onConfigChange('fileName', file.name);
