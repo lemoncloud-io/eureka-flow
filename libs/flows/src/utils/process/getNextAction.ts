@@ -24,5 +24,9 @@ export const getNextAction = (item: Item): NextAction | undefined => {
     const todoStage = stages.find(s => s.status === 'todo' && s.isRequired);
     if (todoStage) return { stage: todoStage, reason: 'next_todo' };
 
+    // Priority 4: any todo (fallback when isRequired is not set)
+    const anyTodo = stages.find(s => s.status === 'todo');
+    if (anyTodo) return { stage: anyTodo, reason: 'next_todo' };
+
     return undefined;
 };

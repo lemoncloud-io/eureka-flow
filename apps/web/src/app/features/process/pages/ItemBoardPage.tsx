@@ -10,6 +10,7 @@ import { Button, Input } from '@flows/ui-kit';
 
 import { EmptyState } from '../components/EmptyState';
 import { ItemRow } from '../components/ItemRow';
+import { NewItemDialog } from '../components/NewItemDialog';
 import { useCurrentActor, useTrySample } from '../hooks';
 
 import type { Item, NextAction } from '@flows/flows';
@@ -200,20 +201,23 @@ export const ItemBoardPage = () => {
                 />
             )}
 
-            {/* Header + Search */}
+            {/* Header + Search + New */}
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-baseline gap-2">
                     <h2 className="text-lg font-semibold">{t('navigator.items', 'Items')}</h2>
                     <span className="text-sm text-muted-foreground">({items.length})</span>
                 </div>
-                <div className="relative w-56">
-                    <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        placeholder={t('navigator.searchItems', 'Search items...')}
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="h-8 pl-9 text-sm"
-                    />
+                <div className="flex items-center gap-2">
+                    <div className="relative w-56">
+                        <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            placeholder={t('navigator.searchItems', 'Search items...')}
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="h-8 pl-9 text-sm"
+                        />
+                    </div>
+                    <NewItemDialog />
                 </div>
             </div>
 

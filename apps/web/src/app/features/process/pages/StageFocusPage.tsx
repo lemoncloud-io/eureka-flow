@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { getNextAction, useActors, useChangeStageStatusMutation, useItem } from '@flows/flows';
+import { getNextAction, useActors, useChangeStageStatusMutation, useHydrateItemStages, useItem } from '@flows/flows';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -47,6 +47,7 @@ export const StageFocusPage = () => {
     const { id: itemId, stageId } = useParams<{ id: string; stageId: string }>();
     const navigate = useNavigate();
     const { data: itemData, isLoading } = useItem(itemId ?? null);
+    useHydrateItemStages(itemData?.data);
     const { data: actorsData } = useActors();
     const changeStatusMutation = useChangeStageStatusMutation();
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);

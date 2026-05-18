@@ -9,6 +9,7 @@ export { ItemRow } from './ItemRow';
 export { LivenessIndicator } from './LivenessIndicator';
 export { ModeRail } from './ModeRail';
 export { NavigatorHeader } from './NavigatorHeader';
+export { NewItemDialog } from './NewItemDialog';
 export { NavigatorLayout } from './NavigatorLayout';
 export { NavigatorSidebar } from './NavigatorSidebar';
 export { NextActionCTA } from './NextActionCTA';

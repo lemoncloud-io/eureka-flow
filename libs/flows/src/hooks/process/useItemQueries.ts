@@ -1,9 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 
-import { itemKeys } from './keys';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { itemKeys, stageKeys } from './keys';
 import { processApi } from '../../api/process';
 
-import type { CreateItemInput, Item, ProcessApiListResponse, ProcessApiResponse } from '../../types/process';
+import type { CreateItemInput, Item, ProcessApiListResponse, ProcessApiResponse, Stage } from '../../types/process';
 
 export const useItems = () => {
     return useQuery({
@@ -20,6 +22,55 @@ export const useItem = (id: string | null) => {
         enabled: !!id,
         staleTime: 30_000,
     });
+};
+
+/**
+ * Hydrate item's stale stage$$ snapshot with fresh stage data.
+ * Server's items.get returns a denormalized stage snapshot from creation time.
+ * This hook fetches each stage individually and patches the item cache.
+ */
+export const useHydrateItemStages = (item: Item | undefined) => {
+    const qc = useQueryClient();
+    const hydratedRef = useRef<string | null>(null);
+    const itemId = item?.id;
+    const stageIds = item?.stages.map(s => s.id) ?? [];
+    const stageIdsKey = stageIds.join(',');
+    const stageQueries = useQueries({
+        queries: stageIds.map(id => ({
+            queryKey: stageKeys.detail(id),
+            queryFn: () => processApi.stages.get(id),
+            staleTime: 30_000,
+            enabled: !!item && hydratedRef.current !== item.id,
+        })),
+    });
+
+    const allDone = stageQueries.length > 0 && stageQueries.every(q => q.isSuccess);
+
+    useEffect(() => {
+        if (!itemId || !allDone || hydratedRef.current === itemId) return;
+        hydratedRef.current = itemId;
+
+        // Read fresh stages from query cache
+        const freshStages = stageIds
+            .map(id => qc.getQueryData<ProcessApiResponse<Stage>>(stageKeys.detail(id))?.data)
+            .filter((s): s is Stage => !!s);
+
+        if (freshStages.length === 0) return;
+
+        const patchItem = (old: Item): Item => ({
+            ...old,
+            stages: old.stages.map(s => freshStages.find(f => f.id === s.id) ?? s),
+        });
+
+        qc.setQueryData<ProcessApiResponse<Item>>(itemKeys.detail(itemId), old => {
+            if (!old) return old;
+            return { ...old, data: patchItem(old.data) };
+        });
+        qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
+            if (!old) return old;
+            return { ...old, data: old.data.map(i => (i.id === itemId ? patchItem(i) : i)) };
+        });
+    }, [itemId, allDone, qc, stageIdsKey]);
 };
 
 export const useCreateItemMutation = () => {

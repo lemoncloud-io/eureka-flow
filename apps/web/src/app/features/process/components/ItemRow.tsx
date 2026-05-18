@@ -22,6 +22,7 @@ export const ItemRow = ({ item, onClick }: ItemRowProps) => {
     const currentStage = item.stages.find(s => s.status === 'doing');
     const isComplete = item.stages.every(s => s.status === 'done' || s.status === 'skip');
     const hasDoing = item.stages.some(s => s.status === 'doing');
+    const doneCount = item.stages.filter(s => s.status === 'done' || s.status === 'skip').length;
     const firstLetter = item.name.charAt(0).toUpperCase();
 
     const statusColor = isComplete
@@ -74,7 +75,10 @@ export const ItemRow = ({ item, onClick }: ItemRowProps) => {
                 >
                     {item.name}
                 </span>
-                {stageName && <span className="block truncate text-xs text-muted-foreground">{stageName}</span>}
+                <span className="block truncate text-xs text-muted-foreground">
+                    {stageName ? `${stageName} · ` : ''}
+                    {doneCount}/{item.stages.length} stages
+                </span>
             </div>
 
             {/* Progress */}

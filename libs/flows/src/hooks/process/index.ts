@@ -10,6 +10,7 @@ export {
 export {
     useItems,
     useItem,
+    useHydrateItemStages,
     useCreateItemMutation,
     useUpdateItemMutation,
     useDeleteItemMutation,

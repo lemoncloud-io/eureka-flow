@@ -10,6 +10,7 @@ import {
     getStageUnresolvedNotesCount,
     useActors,
     useChangeStageStatusMutation,
+    useHydrateItemStages,
     useItem,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -31,6 +32,7 @@ export const ItemDetailPage = () => {
     const [activeTab, setActiveTab] = useState<'stages' | 'notes'>('stages');
 
     const item = itemData?.data;
+    useHydrateItemStages(item);
     const actors = actorsData?.data ?? [];
     const actorMap = useMemo(() => new Map(actors.map(a => [a.id, a.name])), [actors]);
 
