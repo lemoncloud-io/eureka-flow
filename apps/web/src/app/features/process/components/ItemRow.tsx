@@ -67,16 +67,14 @@ export const ItemRow = ({ item, onClick }: ItemRowProps) => {
             )}
 
             {/* Name + current stage */}
-            <div className="flex min-w-0 flex-1 items-baseline gap-2">
+            <div className="min-w-0 flex-1">
                 <span
-                    className={cn('truncate font-medium', isComplete && 'line-through decoration-1')}
+                    className={cn('block truncate text-sm font-medium', isComplete && 'line-through decoration-1')}
                     title={item.name}
                 >
                     {item.name}
                 </span>
-                {stageName && (
-                    <span className="hidden truncate text-xs text-muted-foreground sm:inline">{stageName}</span>
-                )}
+                {stageName && <span className="block truncate text-xs text-muted-foreground">{stageName}</span>}
             </div>
 
             {/* Progress */}

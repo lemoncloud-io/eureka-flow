@@ -50,12 +50,14 @@ export const StatsBar = ({ items }: StatsBarProps) => {
     ];
 
     return (
-        <dl className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-3">
+        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border/50 bg-border/50 sm:grid-cols-4">
             {stats.map(({ icon: Icon, label, value, color }) => (
-                <div key={label} className="flex items-center gap-2">
-                    <Icon className={cn('h-3.5 w-3.5 shrink-0', color)} />
-                    <dd className={cn('text-sm font-semibold tabular-nums', color)}>{value}</dd>
-                    <dt className="text-xs text-muted-foreground">{label}</dt>
+                <div key={label} className="flex items-center gap-2.5 bg-card px-4 py-3">
+                    <Icon className={cn('h-4 w-4 shrink-0', color)} />
+                    <div>
+                        <dd className={cn('text-base font-semibold tabular-nums leading-tight', color)}>{value}</dd>
+                        <dt className="text-[11px] text-muted-foreground">{label}</dt>
+                    </div>
                 </div>
             ))}
         </dl>

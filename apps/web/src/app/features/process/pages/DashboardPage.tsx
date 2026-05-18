@@ -36,33 +36,36 @@ const HeroAction = ({ item, action, onAction }: HeroActionProps) => {
         <div
             role="button"
             tabIndex={0}
-            className="overflow-hidden rounded-xl border border-border bg-card p-6 sm:p-8 cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="overflow-hidden rounded-xl border border-border bg-card p-5 sm:p-6 cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             onClick={onAction}
             onKeyDown={handleKeyDown}
         >
-            <div className="mb-3 flex items-center gap-3">
+            <div className="flex items-start gap-4">
                 {item.thumbnailUrl ? (
-                    <img src={item.thumbnailUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                    <img
+                        src={item.thumbnailUrl}
+                        alt=""
+                        className="h-12 w-12 shrink-0 rounded-lg object-cover sm:h-14 sm:w-14"
+                    />
                 ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-sm font-bold text-foreground">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted text-base font-bold text-foreground sm:h-14 sm:w-14">
                         {item.name.charAt(0).toUpperCase()}
                     </div>
                 )}
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                        {t('navigator.nextUp', 'Next up')}
+                <div className="min-w-0 flex-1">
+                    <p className="mb-0.5 text-xs font-medium text-muted-foreground">
+                        {item.name} · {t('navigator.nextUp', 'Next up')}
                     </p>
-                    <p className="text-sm text-muted-foreground">{item.name}</p>
+                    <h2 className="mb-1 text-lg font-bold tracking-tight sm:text-xl">{action.stage.name}</h2>
+                    <p className="mb-3 text-sm leading-relaxed text-muted-foreground line-clamp-2">
+                        {action.stage.guideText || t('navigator.readyToStart', 'Ready to start')}
+                    </p>
+                    <Button size="sm" className="gap-2 rounded-lg font-semibold" tabIndex={-1}>
+                        {action.stage.actionLabel || t('navigator.openAction', 'Open')}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
                 </div>
             </div>
-            <h2 className="mb-2 text-xl font-bold tracking-tight sm:text-2xl">{action.stage.name}</h2>
-            <p className="mb-4 max-w-lg text-sm leading-relaxed text-muted-foreground">
-                {action.stage.guideText || t('navigator.readyToStart', 'Ready to start')}
-            </p>
-            <Button size="default" className="gap-2 rounded-xl font-semibold" tabIndex={-1}>
-                {action.stage.actionLabel || t('navigator.openAction', 'Open')}
-                <ArrowRight className="h-4 w-4" />
-            </Button>
         </div>
     );
 };
@@ -109,11 +112,11 @@ export const DashboardPage = () => {
     const navigate = useNavigate();
     const { data: itemsData, isLoading } = useItems();
     const { handleTrySample, isPending: trySamplePending } = useTrySample();
-    const { currentActor } = useCurrentActor();
+    const { currentActor, setCurrentActor } = useCurrentActor();
 
     const items = itemsData?.data ?? [];
 
-    const itemsWithActions = useMemo(
+    const allItemsWithActions = useMemo(
         () =>
             items
                 .filter(item => !item.stages.every(s => s.status === 'done' || s.status === 'skip'))
@@ -124,6 +127,13 @@ export const DashboardPage = () => {
                 ),
         [items]
     );
+
+    const itemsWithActions = useMemo(() => {
+        if (!currentActor) return allItemsWithActions;
+        const mine = allItemsWithActions.filter(e => e.action.stage.actorId === currentActor.id);
+        const others = allItemsWithActions.filter(e => e.action.stage.actorId !== currentActor.id);
+        return [...mine, ...others];
+    }, [allItemsWithActions, currentActor]);
 
     const handleAction = (itemId: string, stageId: string) => {
         navigate(`/items/${itemId}/stages/${stageId}`);
@@ -160,8 +170,22 @@ export const DashboardPage = () => {
 
     return (
         <div className="space-y-5">
-            {/* Actor prompt — subtle banner, never blocks hero */}
-            {!currentActor && <ActorPromptBanner />}
+            {/* Actor prompt or active filter */}
+            {!currentActor ? (
+                <ActorPromptBanner />
+            ) : (
+                <div className="flex items-center justify-between rounded-md bg-accent/50 px-3 py-2">
+                    <p className="text-sm">
+                        <span className="text-muted-foreground">
+                            {t('navigator.showingActionsFor', 'Showing actions for')}
+                        </span>{' '}
+                        <span className="font-medium">{currentActor.name}</span>
+                    </p>
+                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setCurrentActor(null)}>
+                        {t('navigator.showAll', 'Show all')}
+                    </Button>
+                </div>
+            )}
 
             {/* Hero: always show most urgent action */}
             {heroEntry ? (

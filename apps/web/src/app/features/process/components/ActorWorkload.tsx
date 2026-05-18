@@ -49,7 +49,7 @@ export const ActorWorkload = () => {
                             'cursor-pointer transition-all duration-200 hover:shadow-md',
                             currentActor?.id === actor.id && 'ring-2 ring-primary'
                         )}
-                        onClick={() => setCurrentActor(actor.id === currentActor?.id ? null : actor)}
+                        onClick={() => setCurrentActor(actor.id === currentActor?.id ? null : actor.id)}
                     >
                         <CardContent className="p-3">
                             <div className="flex items-center gap-2 mb-2">

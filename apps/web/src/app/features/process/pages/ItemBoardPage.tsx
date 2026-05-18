@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 
 import { getUnresolvedCount, useItems } from '@flows/flows';
+import { cn } from '@flows/lib/utils';
 import { Input } from '@flows/ui-kit';
 
 import { EmptyState } from '../components/EmptyState';
@@ -13,12 +14,29 @@ import { useTrySample } from '../hooks';
 
 import type { Item } from '@flows/flows';
 
+type FilterTab = 'all' | 'active' | 'issues' | 'completed';
+
+const FILTER_TABS: { key: FilterTab; labelKey: string; fallback: string }[] = [
+    { key: 'all', labelKey: 'navigator.filterAll', fallback: 'All' },
+    { key: 'active', labelKey: 'navigator.filterActive', fallback: 'Active' },
+    { key: 'issues', labelKey: 'navigator.filterIssues', fallback: 'Issues' },
+    { key: 'completed', labelKey: 'navigator.filterCompleted', fallback: 'Done' },
+];
+
+const classifyItem = (item: Item): FilterTab => {
+    const isComplete = item.stages.every(s => s.status === 'done' || s.status === 'skip');
+    if (isComplete) return 'completed';
+    if (getUnresolvedCount(item) > 0) return 'issues';
+    return 'active';
+};
+
 export const ItemBoardPage = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const { data: itemsData, isLoading } = useItems();
     const { handleTrySample, isPending: trySamplePending } = useTrySample();
     const [search, setSearch] = useState('');
+    const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
     const items = itemsData?.data ?? [];
 
@@ -27,17 +45,44 @@ export const ItemBoardPage = () => {
             const hasDoing = item.stages.some(s => s.status === 'doing');
             const isComplete = item.stages.every(s => s.status === 'done' || s.status === 'skip');
             const unresolved = getUnresolvedCount(item);
-            if (unresolved > 0) return 0; // urgent first
+            if (unresolved > 0) return 0;
             if (hasDoing) return 1;
             if (isComplete) return 3;
-            return 2; // todo
+            return 2;
         };
         return [...items].sort((a, b) => score(a) - score(b));
     }, [items]);
 
-    const filtered = search
-        ? sortedItems.filter(item => item.name.toLowerCase().includes(search.toLowerCase()))
-        : sortedItems;
+    const classificationMap = useMemo(() => {
+        const map = new Map<string, FilterTab>();
+        for (const item of items) {
+            map.set(item.id, classifyItem(item));
+        }
+        return map;
+    }, [items]);
+
+    const filterCounts = useMemo(() => {
+        const counts: Record<FilterTab, number> = { all: items.length, active: 0, issues: 0, completed: 0 };
+        for (const [, cat] of classificationMap) {
+            counts[cat]++;
+        }
+        return counts;
+    }, [items.length, classificationMap]);
+
+    const filtered = useMemo(() => {
+        let result = sortedItems;
+        if (activeFilter !== 'all') {
+            result = result.filter(item => {
+                const cat = classificationMap.get(item.id) ?? 'active';
+                if (activeFilter === 'active') return cat === 'active' || cat === 'issues';
+                return cat === activeFilter;
+            });
+        }
+        if (search) {
+            result = result.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
+        }
+        return result;
+    }, [sortedItems, activeFilter, search, classificationMap]);
 
     return (
         <div className="space-y-4">
@@ -60,6 +105,38 @@ export const ItemBoardPage = () => {
                 )}
             </div>
 
+            {/* Filter tabs */}
+            {items.length > 0 && (
+                <div className="flex gap-1 border-b border-border">
+                    {FILTER_TABS.map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveFilter(tab.key)}
+                            className={cn(
+                                'px-3 py-2 text-sm font-medium border-b-2 transition-colors',
+                                activeFilter === tab.key
+                                    ? 'border-primary text-foreground'
+                                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                            )}
+                        >
+                            {t(tab.labelKey, tab.fallback)}
+                            {tab.key !== 'all' && filterCounts[tab.key] > 0 && (
+                                <span
+                                    className={cn(
+                                        'ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs',
+                                        tab.key === 'issues'
+                                            ? 'bg-orange-500/10 text-orange-500'
+                                            : 'bg-muted text-muted-foreground'
+                                    )}
+                                >
+                                    {filterCounts[tab.key]}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {/* Content */}
             {isLoading ? (
                 <div className="rounded-lg border border-border/50">
@@ -80,9 +157,11 @@ export const ItemBoardPage = () => {
                     {filtered.map(item => (
                         <ItemRow key={item.id} item={item} onClick={id => navigate(`/items/${id}`)} />
                     ))}
-                    {filtered.length === 0 && search && (
+                    {filtered.length === 0 && (
                         <p className="py-8 text-center text-sm text-muted-foreground">
-                            {t('navigator.noResults', 'No items match your search.')}
+                            {search
+                                ? t('navigator.noResults', 'No items match your search.')
+                                : t('navigator.noItemsInFilter', 'No items in this category.')}
                         </p>
                     )}
                 </div>

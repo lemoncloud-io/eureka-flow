@@ -2,7 +2,17 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { AlertCircle, ArrowRight, ChevronLeft, ChevronRight, Loader2, MoreHorizontal, Pause, Play } from 'lucide-react';
+import {
+    AlertCircle,
+    ArrowRight,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    Loader2,
+    MoreHorizontal,
+    Pause,
+    Play,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { getNextAction, useActors, useChangeStageStatusMutation, useItem } from '@flows/flows';
@@ -30,7 +40,7 @@ import { TaskList } from '../components/TaskList';
 import { ToolAction } from '../components/ToolAction';
 import { useFlowExecution } from '../hooks/useFlowExecution';
 
-import type { Status, ToolContext } from '@flows/flows';
+import type { Stage, Status, ToolContext } from '@flows/flows';
 
 export const StageFocusPage = () => {
     const { t } = useTranslation();
@@ -112,6 +122,27 @@ export const StageFocusPage = () => {
     const prevStage = stageIndex > 0 ? item.stages[stageIndex - 1] : undefined;
     const nextStage = stageIndex < item.stages.length - 1 ? item.stages[stageIndex + 1] : undefined;
 
+    // Warnings (inform, never block)
+    const isDone = stage.status === 'done' || stage.status === 'skip';
+    const incompleteDeps = stage.dependencyStageIds
+        .map(depId => item.stages.find(s => s.id === depId))
+        .filter((s): s is Stage => !!s && s.status !== 'done' && s.status !== 'skip');
+    const warnings: { key: string; message: string }[] = [];
+    if (!isDone && incompleteDeps.length > 0) {
+        warnings.push({
+            key: 'dep',
+            message: t('navigator.depWarning', 'Depends on: {{names}}', {
+                names: incompleteDeps.map(s => s.name).join(', '),
+            }),
+        });
+    }
+    if (!isDone && !stage.actorId) {
+        warnings.push({ key: 'actor', message: t('navigator.noActorWarning', 'No actor assigned') });
+    }
+    if (!isDone && !stage.toolId && stage.stereo === 'flow') {
+        warnings.push({ key: 'tool', message: t('navigator.noToolWarning', 'No automation tool linked') });
+    }
+
     const toolContext: ToolContext = {
         itemId: item.id,
         itemName: item.name,
@@ -122,31 +153,46 @@ export const StageFocusPage = () => {
     return (
         <div className="space-y-5">
             {/* Stage navigation */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between rounded-lg bg-muted/30 px-1 py-1">
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 gap-1 text-xs"
+                    className="h-7 max-w-[140px] gap-1 text-xs"
                     disabled={!prevStage}
                     onClick={() => prevStage && navigate(`/items/${itemId}/stages/${prevStage.id}`, { replace: true })}
                 >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                    {prevStage?.name ?? t('navigator.prev', 'Prev')}
+                    <ChevronLeft className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{prevStage?.name ?? t('navigator.prev', 'Prev')}</span>
                 </Button>
-                <span className="text-xs tabular-nums text-muted-foreground">
+                <span className="text-[11px] tabular-nums text-muted-foreground">
                     {stageIndex + 1} / {item.stages.length}
                 </span>
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 gap-1 text-xs"
+                    className="h-7 max-w-[140px] gap-1 text-xs"
                     disabled={!nextStage}
                     onClick={() => nextStage && navigate(`/items/${itemId}/stages/${nextStage.id}`, { replace: true })}
                 >
-                    {nextStage?.name ?? t('navigator.next', 'Next')}
-                    <ChevronRight className="h-3.5 w-3.5" />
+                    <span className="truncate">{nextStage?.name ?? t('navigator.next', 'Next')}</span>
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0" />
                 </Button>
             </div>
+
+            {/* Warnings — inform, never block */}
+            {warnings.length > 0 && (
+                <div className="space-y-1.5">
+                    {warnings.map(w => (
+                        <div
+                            key={w.key}
+                            className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-500/20 dark:bg-amber-500/5"
+                        >
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                            <p className="text-sm text-amber-700 dark:text-amber-400">{w.message}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* Unresolved alert */}
             {unresolvedNotes.length > 0 && (
@@ -168,12 +214,14 @@ export const StageFocusPage = () => {
             {/* Stage header + actions */}
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-bold sm:text-2xl">{stage.name}</h1>
+                    <div className="mt-1 flex items-center gap-2">
                         <StatusBadge status={stage.status} />
                         {actorName && <span className="text-xs text-muted-foreground">{actorName}</span>}
                     </div>
-                    <h1 className="mt-1 text-xl font-bold">{stage.name}</h1>
-                    {stage.guideText && <p className="mt-1 text-sm text-muted-foreground">{stage.guideText}</p>}
+                    {stage.guideText && (
+                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{stage.guideText}</p>
+                    )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                     {stage.status === 'doing' && (
@@ -271,11 +319,14 @@ export const StageFocusPage = () => {
                     <Separator />
                     <button
                         onClick={() => navigate(`/items/${itemId}/stages/${nextAction.stage.id}`, { replace: true })}
-                        className="flex w-full items-center gap-3 rounded-md border border-border/40 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/30"
+                        className="group flex w-full items-center gap-3 rounded-lg border border-border/40 bg-muted/20 px-4 py-3 text-left text-sm transition-all duration-200 hover:bg-accent/40 hover:border-border"
                     >
-                        <span className="text-xs text-muted-foreground">{t('navigator.nextStage', 'Next')}</span>
-                        <span className="flex-1 font-medium">{nextAction.stage.name}</span>
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[11px] text-muted-foreground">{t('navigator.nextStage', 'Next')}</p>
+                            <p className="truncate font-medium">{nextAction.stage.name}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                     </button>
                 </>
             )}
@@ -284,15 +335,18 @@ export const StageFocusPage = () => {
             {stage.status === 'done' && (
                 <>
                     <Separator />
-                    <div className="flex items-center justify-between rounded-md bg-green-50 px-3 py-2.5 dark:bg-green-500/10">
-                        <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                            {t('navigator.stageCompleted', 'Stage completed')}
-                        </span>
+                    <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-4 py-3 dark:border-green-500/20 dark:bg-green-500/10">
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                                {t('navigator.stageCompleted', 'Stage completed')}
+                            </span>
+                        </div>
                         {hasNextStage ? (
                             <Button
                                 size="sm"
-                                variant="ghost"
-                                className="h-7 gap-1 text-xs text-green-700 dark:text-green-400"
+                                variant="outline"
+                                className="h-7 gap-1 text-xs"
                                 onClick={() =>
                                     navigate(`/items/${itemId}/stages/${nextAction.stage.id}`, { replace: true })
                                 }
@@ -303,7 +357,7 @@ export const StageFocusPage = () => {
                         ) : (
                             <Button
                                 size="sm"
-                                variant="ghost"
+                                variant="outline"
                                 className="h-7 text-xs"
                                 onClick={() => navigate(`/items/${itemId}`)}
                             >
