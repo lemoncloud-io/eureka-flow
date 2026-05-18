@@ -305,6 +305,7 @@ export const StageFocusPage = () => {
                     onEmbed={setEmbedUrl}
                     onFlowExecute={flowExecution.execute}
                     flowState={{ status: flowExecution.status, error: flowExecution.error }}
+                    onFlowReset={flowExecution.reset}
                 />
             )}
 
