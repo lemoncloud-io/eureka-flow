@@ -6,7 +6,6 @@ import {
     AlertCircle,
     ArrowRight,
     CheckCircle2,
-    ChevronLeft,
     ChevronRight,
     Loader2,
     MoreHorizontal,
@@ -49,6 +48,7 @@ import {
 
 import { EmbedBrowser } from '../components/EmbedBrowser';
 import { NoteList } from '../components/NoteList';
+import { StageStepper } from '../components/StageStepper';
 import { StatusBadge } from '../components/StatusBadge';
 import { TaskList } from '../components/TaskList';
 import { ToolAction } from '../components/ToolAction';
@@ -145,9 +145,6 @@ export const StageFocusPage = () => {
     const tasksDone = stage.tasks.filter(t => t.status === 'done').length;
     const tasksTotal = stage.tasks.length;
     const incompleteTaskCount = tasksTotal - tasksDone;
-    const stageIndex = item.stages.findIndex(s => s.id === stageId);
-    const prevStage = stageIndex > 0 ? item.stages[stageIndex - 1] : undefined;
-    const nextStage = stageIndex < item.stages.length - 1 ? item.stages[stageIndex + 1] : undefined;
 
     const isDone = stage.status === 'done' || stage.status === 'skip';
     const incompleteDeps = stage.dependencyStageIds
@@ -168,32 +165,8 @@ export const StageFocusPage = () => {
 
     return (
         <div className="space-y-5">
-            {/* Stage navigation */}
-            <div className="flex items-center justify-between rounded-lg bg-muted/30 px-1 py-1">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 max-w-[140px] gap-1 text-xs"
-                    disabled={!prevStage}
-                    onClick={() => prevStage && navigate(`/items/${itemId}/stages/${prevStage.id}`, { replace: true })}
-                >
-                    <ChevronLeft className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{prevStage?.name ?? t('navigator.prev', 'Prev')}</span>
-                </Button>
-                <span className="text-[11px] tabular-nums text-muted-foreground">
-                    {stageIndex + 1} / {item.stages.length}
-                </span>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 max-w-[140px] gap-1 text-xs"
-                    disabled={!nextStage}
-                    onClick={() => nextStage && navigate(`/items/${itemId}/stages/${nextStage.id}`, { replace: true })}
-                >
-                    <span className="truncate">{nextStage?.name ?? t('navigator.next', 'Next')}</span>
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-                </Button>
-            </div>
+            {/* Stage stepper — shows all stages with status */}
+            <StageStepper stages={item.stages} currentStageId={stage.id} itemId={item.id} />
 
             {/* Warnings — inform, never block */}
             {warnings.length > 0 && (
@@ -258,7 +231,7 @@ export const StageFocusPage = () => {
                             </SelectContent>
                         </Select>
                     </div>
-                    {stage.guideText && (
+                    {stage.guideText && stage.toolId && (
                         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{stage.guideText}</p>
                     )}
                 </div>
@@ -316,6 +289,13 @@ export const StageFocusPage = () => {
                 </div>
             </div>
 
+            {/* Guide text hero — shown when no tool linked */}
+            {stage.guideText && !stage.toolId && (
+                <div className="rounded-lg border border-border bg-muted/30 p-4">
+                    <p className="text-sm leading-relaxed text-foreground">{stage.guideText}</p>
+                </div>
+            )}
+
             {/* Tool */}
             {stage.toolId && (
                 <ToolAction
@@ -356,12 +336,16 @@ export const StageFocusPage = () => {
                 </>
             )}
 
-            {/* Notes */}
+            {/* Notes — collapsed when empty, always visible when has notes */}
             <Separator />
             <div ref={notesRef}>
-                <span className="mb-2 block text-xs font-medium text-muted-foreground">
-                    {t('navigator.notes', 'Notes')} ({stage.notes.length})
-                </span>
+                <button
+                    onClick={() => notesRef.current?.querySelector('textarea')?.focus()}
+                    className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    {t('navigator.notes', 'Notes')}
+                    {stage.notes.length > 0 && <span>({stage.notes.length})</span>}
+                </button>
                 <NoteList notes={stage.notes} stageId={stage.id} />
             </div>
 
