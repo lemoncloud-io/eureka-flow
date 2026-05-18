@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ExternalLink, GitBranch, Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useCreateToolMutation, useFlowsListQuery, useUpdateToolMutation } from '@flows/flows';
@@ -118,16 +118,45 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                     {!isEdit && (
                         <div className="space-y-2">
                             <Label>{t('navigator.toolStereo', 'Type')}</Label>
-                            <Select value={stereo} onValueChange={v => setStereo(v as typeof stereo)}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="link">Link (new tab)</SelectItem>
-                                    <SelectItem value="embed">Embed (iframe)</SelectItem>
-                                    <SelectItem value="flow">Flow (pipeline)</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <div className="grid grid-cols-3 gap-2">
+                                {(
+                                    [
+                                        {
+                                            value: 'link' as const,
+                                            icon: ExternalLink,
+                                            label: 'Link',
+                                            desc: 'Opens in new tab',
+                                        },
+                                        {
+                                            value: 'embed' as const,
+                                            icon: Maximize2,
+                                            label: 'Embed',
+                                            desc: 'Inline iframe',
+                                        },
+                                        {
+                                            value: 'flow' as const,
+                                            icon: GitBranch,
+                                            label: 'Flow',
+                                            desc: 'AI pipeline',
+                                        },
+                                    ] as const
+                                ).map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setStereo(opt.value)}
+                                        className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-all ${
+                                            stereo === opt.value
+                                                ? 'border-primary bg-primary/5 text-foreground'
+                                                : 'border-border text-muted-foreground hover:border-border/80 hover:bg-accent/30'
+                                        }`}
+                                    >
+                                        <opt.icon className="h-5 w-5" />
+                                        <span className="text-xs font-medium">{opt.label}</span>
+                                        <span className="text-[10px] leading-tight opacity-60">{opt.desc}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     )}
                     <div className="space-y-2">
