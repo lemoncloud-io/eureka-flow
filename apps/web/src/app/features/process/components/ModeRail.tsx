@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Blocks, Compass } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
-import { Button } from '@flows/ui-kit';
 
 import { NAV_ITEMS } from '../consts';
 
@@ -21,27 +20,33 @@ export const ModeRail = () => {
     const isBuilderActive = location.pathname.startsWith('/editor') || location.pathname.startsWith('/flows');
 
     return (
-        <div className="flex w-12 flex-col items-center gap-1 border-r border-border bg-background py-3">
-            <Button
-                variant="ghost"
-                size="icon"
-                className={cn('h-9 w-9 rounded-lg', isNavigatorActive && 'bg-accent text-accent-foreground')}
+        <div className="flex w-14 flex-col items-center gap-1 border-r border-border bg-muted/30 pt-3">
+            <button
+                className={cn(
+                    'flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors',
+                    isNavigatorActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                )}
                 onClick={() => navigate('/dashboard')}
-                title="Navigator"
                 aria-label="Navigator"
             >
-                <Compass className="h-4 w-4" />
-            </Button>
-            <Button
-                variant="ghost"
-                size="icon"
-                className={cn('h-9 w-9 rounded-lg', isBuilderActive && 'bg-accent text-accent-foreground')}
+                <Compass className="h-5 w-5" />
+                <span>Nav</span>
+            </button>
+            <button
+                className={cn(
+                    'flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors',
+                    isBuilderActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                )}
                 onClick={() => navigate('/editor')}
-                title="Builder"
                 aria-label="Builder"
             >
-                <Blocks className="h-4 w-4" />
-            </Button>
+                <Blocks className="h-5 w-5" />
+                <span>Build</span>
+            </button>
         </div>
     );
 };

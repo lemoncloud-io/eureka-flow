@@ -46,10 +46,12 @@ export const SidebarNextActions = () => {
 
     if (!currentActorId) {
         return (
-            <div className="px-4 py-3">
+            <div className="mx-2 my-3 rounded-md border border-dashed border-border bg-muted/40 px-3 py-2.5">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <UserCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span>{t('navigator.selectActorFirst', 'Select an actor to see your next actions')}</span>
+                    <UserCircle className="h-4 w-4 shrink-0 text-primary/60" />
+                    <span className="leading-tight">
+                        {t('navigator.selectActorFirst', 'Select an actor to see your next actions')}
+                    </span>
                 </div>
             </div>
         );

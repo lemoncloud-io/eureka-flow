@@ -36,7 +36,7 @@ const HeroAction = ({ item, action, onAction }: HeroActionProps) => {
         <div
             role="button"
             tabIndex={0}
-            className="overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/8 via-primary/3 to-transparent p-6 sm:p-8 cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="overflow-hidden rounded-xl border border-border bg-card p-6 sm:p-8 cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             onClick={onAction}
             onKeyDown={handleKeyDown}
         >
@@ -44,12 +44,12 @@ const HeroAction = ({ item, action, onAction }: HeroActionProps) => {
                 {item.thumbnailUrl ? (
                     <img src={item.thumbnailUrl} alt="" className="h-10 w-10 rounded-lg object-cover" />
                 ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-sm font-bold text-foreground">
                         {item.name.charAt(0).toUpperCase()}
                     </div>
                 )}
                 <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-primary/60">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                         {t('navigator.nextUp', 'Next up')}
                     </p>
                     <p className="text-sm text-muted-foreground">{item.name}</p>
@@ -92,8 +92,8 @@ const ActorPromptBanner = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="flex items-center gap-3 rounded-md border border-dashed border-primary/30 bg-primary/5 px-4 py-2.5">
-            <Compass className="h-4 w-4 shrink-0 text-primary" />
+        <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-muted/30 px-4 py-2.5">
+            <Compass className="h-4 w-4 shrink-0 text-muted-foreground" />
             <p className="flex-1 text-sm text-muted-foreground">
                 {t('navigator.selectIdentityHint', 'Choose an actor to see your personalized next actions.')}
             </p>

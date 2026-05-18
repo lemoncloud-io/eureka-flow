@@ -53,7 +53,7 @@ export const ActorWorkload = () => {
                     >
                         <CardContent className="p-3">
                             <div className="flex items-center gap-2 mb-2">
-                                <div className={cn('h-3 w-3 rounded-full shrink-0', actor.color)} />
+                                <div className={cn('h-2.5 w-2.5 rounded-full shrink-0', actor.color)} />
                                 <span className="text-sm font-medium truncate" title={actor.name}>
                                     {actor.name}
                                 </span>

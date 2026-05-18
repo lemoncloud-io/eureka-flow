@@ -56,7 +56,7 @@ export const NextActionCTA = ({ item, action, onAction, compact }: NextActionCTA
     }
 
     return (
-        <Card className="border-primary/20 bg-primary/5 hover:shadow-md transition-all duration-200">
+        <Card className="border-border hover:shadow-md transition-all duration-200">
             <CardContent className="flex items-center justify-between gap-4 p-4">
                 <div className="flex items-center gap-3 min-w-0">
                     <Icon className={cn('h-5 w-5 shrink-0', config.color)} />

@@ -87,7 +87,7 @@ const TeamSection = () => {
                     const doingCount = doingCountByActor[actor.id] ?? 0;
                     return (
                         <div key={actor.id} className="flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm">
-                            <div className={cn('h-2 w-2 rounded-full shrink-0', actor.color)} />
+                            <div className={cn('h-2.5 w-2.5 rounded-full shrink-0', actor.color)} />
                             <span className="flex-1 truncate text-muted-foreground">{actor.name}</span>
                             {doingCount > 0 && <span className="text-xs text-blue-500">{doingCount}</span>}
                         </div>

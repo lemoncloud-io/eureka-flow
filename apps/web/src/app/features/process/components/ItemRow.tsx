@@ -80,8 +80,8 @@ export const ItemRow = ({ item, onClick }: ItemRowProps) => {
             </div>
 
             {/* Progress */}
-            <div className="hidden items-center gap-2 sm:flex">
-                <ProgressBar value={progress} className="h-1 w-16" />
+            <div className="flex items-center gap-2">
+                <ProgressBar value={progress} className="h-1 w-12 sm:w-16" />
                 <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">{progress}%</span>
             </div>
 
