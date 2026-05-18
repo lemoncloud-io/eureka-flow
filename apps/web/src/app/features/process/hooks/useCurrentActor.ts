@@ -1,23 +1,31 @@
-import { useCallback, useState } from 'react';
+import { create } from 'zustand';
 
 import { useActors } from '@flows/flows';
 
 const STORAGE_KEY = 'process-navigator:current-actor-id';
 
-export const useCurrentActor = () => {
-    const [actorId, setActorIdState] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY));
-    const { data: actorsData } = useActors();
-    const actors = actorsData?.data ?? [];
-    const currentActor = actors.find(a => a.id === actorId) ?? null;
+interface CurrentActorState {
+    actorId: string | null;
+    setActorId: (id: string | null) => void;
+}
 
-    const setCurrentActor = useCallback((id: string | null) => {
+const useCurrentActorStore = create<CurrentActorState>(set => ({
+    actorId: localStorage.getItem(STORAGE_KEY),
+    setActorId: (id: string | null) => {
         if (id) {
             localStorage.setItem(STORAGE_KEY, id);
         } else {
             localStorage.removeItem(STORAGE_KEY);
         }
-        setActorIdState(id);
-    }, []);
+        set({ actorId: id });
+    },
+}));
 
-    return { currentActor, currentActorId: actorId, setCurrentActor, actors };
+export const useCurrentActor = () => {
+    const { actorId, setActorId } = useCurrentActorStore();
+    const { data: actorsData } = useActors();
+    const actors = actorsData?.data ?? [];
+    const currentActor = actors.find(a => a.id === actorId) ?? null;
+
+    return { currentActor, currentActorId: actorId, setCurrentActor: setActorId, actors };
 };
