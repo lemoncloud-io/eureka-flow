@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { ArrowRight, Search } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Search } from 'lucide-react';
 
 import { getNextAction, getUnresolvedCount, isItemComplete, useHydrateAllItemStages, useItems } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -195,12 +195,19 @@ export const ItemBoardPage = () => {
             )}
 
             {/* Next Action Hero */}
-            {heroEntry && (
+            {heroEntry ? (
                 <HeroAction
                     item={heroEntry.item}
                     action={heroEntry.action}
                     onAction={() => navigate(`/items/${heroEntry.item.id}/stages/${heroEntry.action.stage.id}`)}
                 />
+            ) : (
+                <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4">
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
+                    <p className="text-sm text-muted-foreground">
+                        {t('navigator.allCaughtUp', 'All caught up! No pending actions right now.')}
+                    </p>
+                </div>
             )}
 
             {/* Header + Search + New */}

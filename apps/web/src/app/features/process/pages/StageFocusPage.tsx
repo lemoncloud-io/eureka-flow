@@ -12,6 +12,8 @@ import {
     MoreHorizontal,
     Pause,
     Play,
+    RotateCcw,
+    SkipForward,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -288,10 +290,22 @@ export const StageFocusPage = () => {
                                     {t('navigator.hold', 'Hold')}
                                 </DropdownMenuItem>
                             )}
+                            {stage.status !== 'skip' && stage.status !== 'done' && (
+                                <DropdownMenuItem onClick={() => handleStatusChange('skip')}>
+                                    <SkipForward className="mr-2 h-3.5 w-3.5" />
+                                    {t('navigator.skip', 'Skip')}
+                                </DropdownMenuItem>
+                            )}
                             {stage.status === 'hold' && (
                                 <DropdownMenuItem onClick={() => handleStatusChange('todo')}>
                                     <Play className="mr-2 h-3.5 w-3.5" />
                                     {t('navigator.resume', 'Resume')}
+                                </DropdownMenuItem>
+                            )}
+                            {(stage.status === 'done' || stage.status === 'skip') && (
+                                <DropdownMenuItem onClick={() => handleStatusChange('todo')}>
+                                    <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                                    {t('navigator.reopen', 'Reopen')}
                                 </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>

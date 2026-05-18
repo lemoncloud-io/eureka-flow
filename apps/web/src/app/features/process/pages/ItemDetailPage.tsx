@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { Trash2 } from 'lucide-react';
+import { CheckCircle2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
     calculateProgress,
     getNextAction,
     getStageUnresolvedNotesCount,
+    isItemComplete,
     useActors,
     useChangeStageStatusMutation,
     useDeleteItemMutation,
@@ -152,6 +153,15 @@ export const ItemDetailPage = () => {
                     </AlertDialogContent>
                 </AlertDialog>
             </div>
+
+            {isItemComplete(item) && (
+                <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 dark:border-green-500/20 dark:bg-green-500/10">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+                    <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                        {t('navigator.itemComplete', 'All stages completed')}
+                    </p>
+                </div>
+            )}
 
             {nextAction && (
                 <NextActionCTA item={item} action={nextAction} onAction={stageId => handleStageSelect(stageId)} />
