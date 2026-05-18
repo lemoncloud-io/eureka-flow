@@ -1,8 +1,9 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CheckCircle2, Circle } from 'lucide-react';
 
-import { useReopenNoteMutation, useResolveNoteMutation } from '@flows/flows';
+import { useActors, useReopenNoteMutation, useResolveNoteMutation } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Badge, Button } from '@flows/ui-kit';
 
@@ -25,6 +26,8 @@ export const NoteList = ({ notes, stageId }: NoteListProps) => {
     const { t } = useTranslation();
     const resolveMutation = useResolveNoteMutation();
     const reopenMutation = useReopenNoteMutation();
+    const { data: actorsData } = useActors();
+    const actorMap = useMemo(() => new Map((actorsData?.data ?? []).map(a => [a.id, a.name])), [actorsData?.data]);
 
     const handleToggle = (note: Note) => {
         if (note.isResolved) {
@@ -63,6 +66,11 @@ export const NoteList = ({ notes, stageId }: NoteListProps) => {
                                 <Badge variant="secondary" className={`text-[10px] ${config.className}`}>
                                     {config.label}
                                 </Badge>
+                                {note.actorId && actorMap.get(note.actorId) && (
+                                    <span className="text-[10px] font-medium text-muted-foreground">
+                                        {actorMap.get(note.actorId)}
+                                    </span>
+                                )}
                                 {note.isResolved && (
                                     <span className="text-[10px] text-green-500">
                                         {t('navigator.resolved', 'Resolved')}

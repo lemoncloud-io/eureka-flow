@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AlertCircle, CheckCircle2, ExternalLink, Loader2, Maximize2, Play, RotateCcw } from 'lucide-react';
+import { AlertCircle, Check, CheckCircle2, ExternalLink, Loader2, Maximize2, Play, RotateCcw } from 'lucide-react';
 
 import { Button } from '@flows/ui-kit';
 
@@ -27,6 +28,7 @@ const STEREO_LABELS: Record<string, string> = {
 export const ToolAction = ({ toolId, context, onEmbed, onFlowExecute, flowState, onFlowReset }: ToolActionProps) => {
     const { t } = useTranslation();
     const { tool, url } = useToolUrl(toolId, context);
+    const [opened, setOpened] = useState(false);
 
     if (!tool) return null;
 
@@ -39,14 +41,24 @@ export const ToolAction = ({ toolId, context, onEmbed, onFlowExecute, flowState,
     const handleClick = () => {
         if (tool.stereo === 'link' && url) {
             window.open(url, '_blank', 'noopener,noreferrer');
+            setOpened(true);
         } else if (tool.stereo === 'embed' && url) {
             onEmbed(url);
+            setOpened(true);
         } else if (isFlow && flowId && onFlowExecute) {
             onFlowExecute(flowId);
         }
     };
 
-    const Icon = isFlowRunning ? Loader2 : tool.stereo === 'embed' ? Maximize2 : isFlow ? Play : ExternalLink;
+    const Icon = isFlowRunning
+        ? Loader2
+        : !isFlow && opened
+          ? Check
+          : tool.stereo === 'embed'
+            ? Maximize2
+            : isFlow
+              ? Play
+              : ExternalLink;
     const isDisabled = isFlow && (!flowId || isFlowRunning);
     const stereoLabel = STEREO_LABELS[tool.stereo] ?? tool.stereo;
 
@@ -61,10 +73,11 @@ export const ToolAction = ({ toolId, context, onEmbed, onFlowExecute, flowState,
                         <span className="text-sm font-medium truncate">{tool.name}</span>
                         <span className="text-[10px] text-muted-foreground">{stereoLabel}</span>
                     </div>
+                    {url && !isFlow && <p className="mt-0.5 truncate text-xs text-muted-foreground/60 pl-6">{url}</p>}
                     {tool.memo && <p className="mt-0.5 truncate text-xs text-muted-foreground pl-6">{tool.memo}</p>}
                 </div>
                 <Button
-                    variant={isFlowDone ? 'secondary' : 'outline'}
+                    variant={isFlowDone || (!isFlow && opened) ? 'secondary' : 'outline'}
                     size="sm"
                     onClick={handleClick}
                     disabled={isDisabled}
@@ -75,7 +88,9 @@ export const ToolAction = ({ toolId, context, onEmbed, onFlowExecute, flowState,
                         ? t('navigator.running', 'Running...')
                         : isFlowDone
                           ? t('navigator.completed', 'Done')
-                          : tool.actionLabel || t('navigator.open', 'Open')}
+                          : !isFlow && opened
+                            ? t('navigator.openAgain', 'Open again')
+                            : tool.actionLabel || t('navigator.open', 'Open')}
                 </Button>
             </div>
 
