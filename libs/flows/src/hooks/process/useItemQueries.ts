@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { itemKeys } from './keys';
 import { processApi } from '../../api/process';
 
-import type { CreateItemInput, Item, ProcessApiListResponse } from '../../types/process';
+import type { CreateItemInput, Item, ProcessApiListResponse, ProcessApiResponse } from '../../types/process';
 
 export const useItems = () => {
     return useQuery({
@@ -27,14 +27,11 @@ export const useCreateItemMutation = () => {
     return useMutation({
         mutationFn: (input: CreateItemInput) => processApi.items.create(input),
         onSuccess: result => {
-            // Push new item into list cache
             qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
                 if (!old) return old;
                 return { ...old, data: [...old.data, result.data] };
             });
-        },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: itemKeys.lists() });
+            qc.setQueryData(itemKeys.detail(result.data.id), result);
         },
     });
 };
@@ -45,20 +42,28 @@ export const useUpdateItemMutation = () => {
         mutationFn: ({ id, input }: { id: string; input: Partial<Item> }) => processApi.items.update(id, input),
         onMutate: async ({ id, input }) => {
             await qc.cancelQueries({ queryKey: itemKeys.detail(id) });
-            const prev = qc.getQueryData(itemKeys.detail(id));
-            // Optimistic update detail cache
-            qc.setQueryData(itemKeys.detail(id), (old: any) => {
+            const prevDetail = qc.getQueryData<ProcessApiResponse<Item>>(itemKeys.detail(id));
+            const prevList = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
+            qc.setQueryData<ProcessApiResponse<Item>>(itemKeys.detail(id), old => {
                 if (!old) return old;
                 return { ...old, data: { ...old.data, ...input } };
             });
-            return { prev };
+            qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(i => (i.id === id ? { ...i, ...input } : i)) };
+            });
+            return { prevDetail, prevList };
         },
         onError: (_, { id }, ctx) => {
-            if (ctx?.prev) qc.setQueryData(itemKeys.detail(id), ctx.prev);
+            if (ctx?.prevDetail) qc.setQueryData(itemKeys.detail(id), ctx.prevDetail);
+            if (ctx?.prevList) qc.setQueryData(itemKeys.lists(), ctx.prevList);
         },
-        onSettled: (_, __, { id }) => {
-            qc.invalidateQueries({ queryKey: itemKeys.detail(id) });
-            qc.invalidateQueries({ queryKey: itemKeys.lists() });
+        onSuccess: (result, { id }) => {
+            qc.setQueryData(itemKeys.detail(id), result);
+            qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(i => (i.id === id ? result.data : i)) };
+            });
         },
     });
 };
@@ -69,19 +74,16 @@ export const useDeleteItemMutation = () => {
         mutationFn: (id: string) => processApi.items.remove(id),
         onMutate: async id => {
             await qc.cancelQueries({ queryKey: itemKeys.lists() });
-            const prev = qc.getQueryData(itemKeys.lists());
-            // Optimistic remove from list
+            const prev = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
             qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
                 if (!old) return old;
                 return { ...old, data: old.data.filter(i => i.id !== id) };
             });
+            qc.removeQueries({ queryKey: itemKeys.detail(id) });
             return { prev };
         },
         onError: (_, __, ctx) => {
             if (ctx?.prev) qc.setQueryData(itemKeys.lists(), ctx.prev);
-        },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: itemKeys.lists() });
         },
     });
 };

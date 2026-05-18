@@ -23,9 +23,6 @@ export const useCreateToolMutation = () => {
                 return { ...old, data: [...old.data, result.data] };
             });
         },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: toolKeys.lists() });
-        },
     });
 };
 
@@ -35,7 +32,7 @@ export const useUpdateToolMutation = () => {
         mutationFn: ({ id, input }: { id: string; input: Partial<Tool> }) => processApi.tools.update(id, input),
         onMutate: async ({ id, input }) => {
             await qc.cancelQueries({ queryKey: toolKeys.lists() });
-            const prev = qc.getQueryData(toolKeys.lists());
+            const prev = qc.getQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists());
             qc.setQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists(), old => {
                 if (!old) return old;
                 return { ...old, data: old.data.map(t => (t.id === id ? { ...t, ...input } : t)) };
@@ -45,8 +42,11 @@ export const useUpdateToolMutation = () => {
         onError: (_, __, ctx) => {
             if (ctx?.prev) qc.setQueryData(toolKeys.lists(), ctx.prev);
         },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: toolKeys.lists() });
+        onSuccess: result => {
+            qc.setQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(t => (t.id === result.data.id ? result.data : t)) };
+            });
         },
     });
 };
@@ -57,7 +57,7 @@ export const useDeactivateToolMutation = () => {
         mutationFn: (id: string) => processApi.tools.deactivate(id),
         onMutate: async id => {
             await qc.cancelQueries({ queryKey: toolKeys.lists() });
-            const prev = qc.getQueryData(toolKeys.lists());
+            const prev = qc.getQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists());
             qc.setQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists(), old => {
                 if (!old) return old;
                 return { ...old, data: old.data.map(t => (t.id === id ? { ...t, isActive: false } : t)) };
@@ -66,9 +66,6 @@ export const useDeactivateToolMutation = () => {
         },
         onError: (_, __, ctx) => {
             if (ctx?.prev) qc.setQueryData(toolKeys.lists(), ctx.prev);
-        },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: toolKeys.lists() });
         },
     });
 };
@@ -79,7 +76,7 @@ export const useActivateToolMutation = () => {
         mutationFn: (id: string) => processApi.tools.activate(id),
         onMutate: async id => {
             await qc.cancelQueries({ queryKey: toolKeys.lists() });
-            const prev = qc.getQueryData(toolKeys.lists());
+            const prev = qc.getQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists());
             qc.setQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists(), old => {
                 if (!old) return old;
                 return { ...old, data: old.data.map(t => (t.id === id ? { ...t, isActive: true } : t)) };
@@ -88,9 +85,6 @@ export const useActivateToolMutation = () => {
         },
         onError: (_, __, ctx) => {
             if (ctx?.prev) qc.setQueryData(toolKeys.lists(), ctx.prev);
-        },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: toolKeys.lists() });
         },
     });
 };

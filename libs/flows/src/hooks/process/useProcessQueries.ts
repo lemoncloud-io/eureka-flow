@@ -6,8 +6,10 @@ import { processApi } from '../../api/process';
 import type {
     CreateItemInput,
     CreateProcessInput,
+    Item,
     Process,
     ProcessApiListResponse,
+    ProcessApiResponse,
     UpdateProcessInput,
 } from '../../types/process';
 
@@ -37,9 +39,7 @@ export const useCreateProcessMutation = () => {
                 if (!old) return old;
                 return { ...old, data: [...old.data, result.data] };
             });
-        },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: processKeys.lists() });
+            qc.setQueryData(processKeys.detail(result.data.id), result);
         },
     });
 };
@@ -51,19 +51,28 @@ export const useUpdateProcessMutation = () => {
             processApi.processes.update(id, input),
         onMutate: async ({ id, input }) => {
             await qc.cancelQueries({ queryKey: processKeys.detail(id) });
-            const prev = qc.getQueryData(processKeys.detail(id));
-            qc.setQueryData(processKeys.detail(id), (old: any) => {
+            const prevDetail = qc.getQueryData<ProcessApiResponse<Process>>(processKeys.detail(id));
+            const prevList = qc.getQueryData<ProcessApiListResponse<Process>>(processKeys.lists());
+            qc.setQueryData<ProcessApiResponse<Process>>(processKeys.detail(id), old => {
                 if (!old) return old;
                 return { ...old, data: { ...old.data, ...input } };
             });
-            return { prev };
+            qc.setQueryData<ProcessApiListResponse<Process>>(processKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(p => (p.id === id ? { ...p, ...input } : p)) };
+            });
+            return { prevDetail, prevList };
         },
         onError: (_, { id }, ctx) => {
-            if (ctx?.prev) qc.setQueryData(processKeys.detail(id), ctx.prev);
+            if (ctx?.prevDetail) qc.setQueryData(processKeys.detail(id), ctx.prevDetail);
+            if (ctx?.prevList) qc.setQueryData(processKeys.lists(), ctx.prevList);
         },
-        onSettled: (_, __, { id }) => {
-            qc.invalidateQueries({ queryKey: processKeys.detail(id) });
-            qc.invalidateQueries({ queryKey: processKeys.lists() });
+        onSuccess: (result, { id }) => {
+            qc.setQueryData(processKeys.detail(id), result);
+            qc.setQueryData<ProcessApiListResponse<Process>>(processKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(p => (p.id === id ? result.data : p)) };
+            });
         },
     });
 };
@@ -74,18 +83,16 @@ export const useDeleteProcessMutation = () => {
         mutationFn: (id: string) => processApi.processes.remove(id),
         onMutate: async id => {
             await qc.cancelQueries({ queryKey: processKeys.lists() });
-            const prev = qc.getQueryData(processKeys.lists());
+            const prev = qc.getQueryData<ProcessApiListResponse<Process>>(processKeys.lists());
             qc.setQueryData<ProcessApiListResponse<Process>>(processKeys.lists(), old => {
                 if (!old) return old;
                 return { ...old, data: old.data.filter(p => p.id !== id) };
             });
+            qc.removeQueries({ queryKey: processKeys.detail(id) });
             return { prev };
         },
         onError: (_, __, ctx) => {
             if (ctx?.prev) qc.setQueryData(processKeys.lists(), ctx.prev);
-        },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: processKeys.lists() });
         },
     });
 };
@@ -95,8 +102,12 @@ export const useApplyProcessMutation = () => {
     return useMutation({
         mutationFn: ({ processId, input }: { processId: string; input: CreateItemInput }) =>
             processApi.processes.apply(processId, input),
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: itemKeys.lists() });
+        onSuccess: result => {
+            qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: [...old.data, result.data] };
+            });
+            qc.setQueryData(itemKeys.detail(result.data.id), result);
         },
     });
 };

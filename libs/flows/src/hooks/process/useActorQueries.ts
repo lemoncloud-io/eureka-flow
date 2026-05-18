@@ -23,9 +23,6 @@ export const useCreateActorMutation = () => {
                 return { ...old, data: [...old.data, result.data] };
             });
         },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: actorKeys.lists() });
-        },
     });
 };
 
@@ -35,7 +32,7 @@ export const useUpdateActorMutation = () => {
         mutationFn: ({ id, input }: { id: string; input: Partial<Actor> }) => processApi.actors.update(id, input),
         onMutate: async ({ id, input }) => {
             await qc.cancelQueries({ queryKey: actorKeys.lists() });
-            const prev = qc.getQueryData(actorKeys.lists());
+            const prev = qc.getQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists());
             qc.setQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists(), old => {
                 if (!old) return old;
                 return { ...old, data: old.data.map(a => (a.id === id ? { ...a, ...input } : a)) };
@@ -45,8 +42,11 @@ export const useUpdateActorMutation = () => {
         onError: (_, __, ctx) => {
             if (ctx?.prev) qc.setQueryData(actorKeys.lists(), ctx.prev);
         },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: actorKeys.lists() });
+        onSuccess: result => {
+            qc.setQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(a => (a.id === result.data.id ? result.data : a)) };
+            });
         },
     });
 };
@@ -57,7 +57,7 @@ export const useDeactivateActorMutation = () => {
         mutationFn: (id: string) => processApi.actors.deactivate(id),
         onMutate: async id => {
             await qc.cancelQueries({ queryKey: actorKeys.lists() });
-            const prev = qc.getQueryData(actorKeys.lists());
+            const prev = qc.getQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists());
             qc.setQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists(), old => {
                 if (!old) return old;
                 return { ...old, data: old.data.map(a => (a.id === id ? { ...a, isActive: false } : a)) };
@@ -66,9 +66,6 @@ export const useDeactivateActorMutation = () => {
         },
         onError: (_, __, ctx) => {
             if (ctx?.prev) qc.setQueryData(actorKeys.lists(), ctx.prev);
-        },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: actorKeys.lists() });
         },
     });
 };
@@ -79,7 +76,7 @@ export const useActivateActorMutation = () => {
         mutationFn: (id: string) => processApi.actors.activate(id),
         onMutate: async id => {
             await qc.cancelQueries({ queryKey: actorKeys.lists() });
-            const prev = qc.getQueryData(actorKeys.lists());
+            const prev = qc.getQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists());
             qc.setQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists(), old => {
                 if (!old) return old;
                 return { ...old, data: old.data.map(a => (a.id === id ? { ...a, isActive: true } : a)) };
@@ -88,9 +85,6 @@ export const useActivateActorMutation = () => {
         },
         onError: (_, __, ctx) => {
             if (ctx?.prev) qc.setQueryData(actorKeys.lists(), ctx.prev);
-        },
-        onSettled: () => {
-            qc.invalidateQueries({ queryKey: actorKeys.lists() });
         },
     });
 };
