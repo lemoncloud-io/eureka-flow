@@ -3,9 +3,9 @@ import { realApi } from './realApi';
 
 import type { ProcessApi } from './interface';
 
-const useMock = !import.meta.env.VITE_PROCESS_API || import.meta.env.VITE_PROCESS_API === 'mock';
+const useReal = import.meta.env.VITE_PROCESS_API === 'real';
 
-export const processApi: ProcessApi = useMock ? mockApi : realApi;
+export const processApi: ProcessApi = useReal ? realApi : mockApi;
 
 export type { ProcessApi } from './interface';
 export { mockApi, resetMockDb } from './mockApi';
