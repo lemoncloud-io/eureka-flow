@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { ExternalLink, RefreshCw, X } from 'lucide-react';
 
@@ -10,7 +10,6 @@ interface EmbedBrowserProps {
 }
 
 export const EmbedBrowser = ({ url, onClose }: EmbedBrowserProps) => {
-    const iframeRef = useRef<HTMLIFrameElement>(null);
     const [reloadKey, setReloadKey] = useState(0);
 
     useEffect(() => {
@@ -50,7 +49,6 @@ export const EmbedBrowser = ({ url, onClose }: EmbedBrowserProps) => {
             {/* allow-scripts + allow-same-origin: accepted risk for SSO-dependent tools. URLs are admin-configured via Tool records. */}
             <iframe
                 key={reloadKey}
-                ref={iframeRef}
                 src={url}
                 className="flex-1"
                 sandbox="allow-scripts allow-same-origin allow-forms"

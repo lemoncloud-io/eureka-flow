@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -112,6 +112,16 @@ export const StageFocusPage = () => {
         }
     };
 
+    const toolContext = useMemo<ToolContext>(
+        () => ({
+            itemId: item?.id ?? '',
+            itemName: item?.name ?? '',
+            stageId: stage?.id ?? '',
+            stageName: stage?.name ?? '',
+        }),
+        [item?.id, item?.name, stage?.id, stage?.name]
+    );
+
     if (embedUrl) {
         return <EmbedBrowser url={embedUrl} onClose={() => setEmbedUrl(null)} />;
     }
@@ -124,7 +134,6 @@ export const StageFocusPage = () => {
         );
     }
 
-    const actorName = stage.actorId ? actors.find(a => a.id === stage.actorId)?.name : undefined;
     const unresolvedNotes = stage.notes.filter(n => !n.isResolved);
     const isIterative = stage.stereo === 'iterative';
     const nextAction = getNextAction(item);
@@ -136,7 +145,6 @@ export const StageFocusPage = () => {
     const prevStage = stageIndex > 0 ? item.stages[stageIndex - 1] : undefined;
     const nextStage = stageIndex < item.stages.length - 1 ? item.stages[stageIndex + 1] : undefined;
 
-    // Warnings (inform, never block)
     const isDone = stage.status === 'done' || stage.status === 'skip';
     const incompleteDeps = stage.dependencyStageIds
         .map(depId => item.stages.find(s => s.id === depId))
@@ -150,17 +158,9 @@ export const StageFocusPage = () => {
             }),
         });
     }
-    // Actor warning removed — replaced with inline actor select UI
     if (!isDone && !stage.toolId && stage.stereo === 'flow') {
         warnings.push({ key: 'tool', message: t('navigator.noToolWarning', 'No automation tool linked') });
     }
-
-    const toolContext: ToolContext = {
-        itemId: item.id,
-        itemName: item.name,
-        stageId: stage.id,
-        stageName: stage.name,
-    };
 
     return (
         <div className="space-y-5">

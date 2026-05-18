@@ -1,7 +1,9 @@
+import { memo } from 'react';
+
 import { formatDistanceToNow } from 'date-fns';
 import { MessageSquare } from 'lucide-react';
 
-import { calculateProgress, getNextAction, getUnresolvedCount } from '@flows/flows';
+import { calculateProgress, getNextAction, getUnresolvedCount, isItemComplete } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Badge } from '@flows/ui-kit';
 
@@ -15,12 +17,12 @@ interface ItemRowProps {
     onClick: (id: string) => void;
 }
 
-export const ItemRow = ({ item, onClick }: ItemRowProps) => {
+export const ItemRow = memo(({ item, onClick }: ItemRowProps) => {
     const progress = calculateProgress(item);
     const nextAction = getNextAction(item);
     const unresolvedCount = getUnresolvedCount(item);
     const currentStage = item.stages.find(s => s.status === 'doing');
-    const isComplete = item.stages.every(s => s.status === 'done' || s.status === 'skip');
+    const isComplete = isItemComplete(item);
     const hasDoing = item.stages.some(s => s.status === 'doing');
     const doneCount = item.stages.filter(s => s.status === 'done' || s.status === 'skip').length;
     const firstLetter = item.name.charAt(0).toUpperCase();
@@ -99,4 +101,4 @@ export const ItemRow = ({ item, onClick }: ItemRowProps) => {
             <span className="hidden text-xs text-muted-foreground/60 lg:inline">{timeAgo}</span>
         </div>
     );
-};
+});

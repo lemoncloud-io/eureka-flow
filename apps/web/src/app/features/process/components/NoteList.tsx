@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { CheckCircle2, Circle } from 'lucide-react';
 
 import { useReopenNoteMutation, useResolveNoteMutation } from '@flows/flows';
+import { cn } from '@flows/lib/utils';
 import { Badge, Button } from '@flows/ui-kit';
 
 import { NoteForm } from './NoteForm';
@@ -69,7 +70,11 @@ export const NoteList = ({ notes, stageId }: NoteListProps) => {
                                 )}
                             </div>
                             <p
-                                className={`mt-1 text-sm ${note.isResolved ? 'text-muted-foreground line-through' : ''} ${!note.content ? 'italic text-muted-foreground/60' : ''}`}
+                                className={cn(
+                                    'mt-1 text-sm',
+                                    note.isResolved && 'text-muted-foreground line-through',
+                                    !note.content && 'italic text-muted-foreground/60'
+                                )}
                             >
                                 {note.content || t('navigator.emptyNote', '(no content)')}
                             </p>

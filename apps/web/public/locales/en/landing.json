@@ -12,7 +12,9 @@
             "accent": "Forward",
             "line2": "For People and Machines"
         },
-        "subtitle": "One platform where team workflows and AI pipelines run side by side. Navigate progress. Automate the rest."
+        "subtitle": "One platform where team workflows and AI pipelines run side by side. Navigate progress. Automate the rest.",
+        "cta_primary": "Get Started",
+        "cta_explore": "Explore Public Flows"
     },
     "mode_picker": {
         "navigator": {

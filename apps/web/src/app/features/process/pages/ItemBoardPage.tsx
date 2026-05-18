@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { ArrowRight, Search } from 'lucide-react';
 
-import { getNextAction, getUnresolvedCount, useHydrateAllItemStages, useItems } from '@flows/flows';
+import { getNextAction, getUnresolvedCount, isItemComplete, useHydrateAllItemStages, useItems } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Button, Input } from '@flows/ui-kit';
 
@@ -26,8 +26,7 @@ const FILTER_TABS: { key: FilterTab; labelKey: string; fallback: string }[] = [
 ];
 
 const classifyItem = (item: Item): FilterTab => {
-    const isComplete = item.stages.every(s => s.status === 'done' || s.status === 'skip');
-    if (isComplete) return 'completed';
+    if (isItemComplete(item)) return 'completed';
     if (getUnresolvedCount(item) > 0) return 'issues';
     return 'active';
 };
@@ -101,7 +100,7 @@ export const ItemBoardPage = () => {
     // Next action hero — prioritize current actor's items
     const heroEntry = useMemo(() => {
         const withActions = items
-            .filter(item => !item.stages.every(s => s.status === 'done' || s.status === 'skip'))
+            .filter(item => !isItemComplete(item))
             .map(item => ({ item, action: getNextAction(item) }))
             .filter((e): e is { item: Item; action: NextAction } => !!e.action);
         if (!currentActor) return withActions[0] ?? null;
@@ -112,7 +111,7 @@ export const ItemBoardPage = () => {
     const sortedItems = useMemo(() => {
         const score = (item: Item) => {
             const hasDoing = item.stages.some(s => s.status === 'doing');
-            const isComplete = item.stages.every(s => s.status === 'done' || s.status === 'skip');
+            const isComplete = isItemComplete(item);
             const unresolved = getUnresolvedCount(item);
             if (unresolved > 0) return 0;
             if (hasDoing) return 1;
@@ -152,6 +151,8 @@ export const ItemBoardPage = () => {
         }
         return result;
     }, [sortedItems, activeFilter, search, classificationMap]);
+
+    const handleItemClick = useCallback((id: string) => navigate(`/items/${id}`), [navigate]);
 
     if (isLoading) {
         return (
@@ -255,7 +256,7 @@ export const ItemBoardPage = () => {
             {/* Item list */}
             <div className="rounded-lg border border-border/50">
                 {filtered.map(item => (
-                    <ItemRow key={item.id} item={item} onClick={id => navigate(`/items/${id}`)} />
+                    <ItemRow key={item.id} item={item} onClick={handleItemClick} />
                 ))}
                 {filtered.length === 0 && (
                     <p className="py-8 text-center text-sm text-muted-foreground">

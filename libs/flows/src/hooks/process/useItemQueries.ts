@@ -79,7 +79,7 @@ export const useHydrateItemStages = (item: Item | undefined) => {
  */
 export const useHydrateAllItemStages = (items: Item[] | undefined) => {
     const qc = useQueryClient();
-    const hydratedRef = useRef(false);
+    const hydratedRef = useRef('');
 
     const allStageIds = items?.flatMap(item => item.stages.map(s => s.id)) ?? [];
     const stageIdsKey = allStageIds.join(',');
@@ -89,15 +89,15 @@ export const useHydrateAllItemStages = (items: Item[] | undefined) => {
             queryKey: stageKeys.detail(id),
             queryFn: () => processApi.stages.get(id),
             staleTime: 30_000,
-            enabled: !!items && items.length > 0 && !hydratedRef.current,
+            enabled: !!items && items.length > 0 && hydratedRef.current !== stageIdsKey,
         })),
     });
 
     const allDone = stageQueries.length > 0 && stageQueries.every(q => q.isSuccess);
 
     useEffect(() => {
-        if (!items || !allDone || hydratedRef.current) return;
-        hydratedRef.current = true;
+        if (!stageIdsKey || !allDone || hydratedRef.current === stageIdsKey) return;
+        hydratedRef.current = stageIdsKey;
 
         const freshStages = allStageIds
             .map(id => qc.getQueryData<ProcessApiResponse<Stage>>(stageKeys.detail(id))?.data)
@@ -115,14 +115,7 @@ export const useHydrateAllItemStages = (items: Item[] | undefined) => {
             if (!old) return old;
             return { ...old, data: old.data.map(patchItem) };
         });
-        // Also patch individual detail caches
-        for (const item of items) {
-            qc.setQueryData<ProcessApiResponse<Item>>(itemKeys.detail(item.id), old => {
-                if (!old) return old;
-                return { ...old, data: patchItem(old.data) };
-            });
-        }
-    }, [items, allDone, qc, stageIdsKey]);
+    }, [stageIdsKey, allDone, qc, allStageIds]);
 };
 
 export const useCreateItemMutation = () => {
