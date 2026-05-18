@@ -28,7 +28,7 @@ export const ModeRail = () => {
                         ? 'bg-primary/10 text-primary'
                         : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                 )}
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/items')}
                 aria-label="Navigator"
             >
                 <Compass className="h-5 w-5" />

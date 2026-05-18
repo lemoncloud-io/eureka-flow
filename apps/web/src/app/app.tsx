@@ -1,6 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { SITE_URL } from '@flows/shared';
 import { isOAuthEnabled } from '@flows/web-core';
@@ -12,7 +12,6 @@ import { PolicyPage } from './features/landing';
 import { FlowEditorRouter } from './features/mobile-editor';
 import {
     ActorManagerPage,
-    DashboardPage,
     ItemBoardPage,
     ItemDetailPage,
     NavigatorLayout,
@@ -43,7 +42,6 @@ export const App = () => {
 
                 {/* Navigator routes */}
                 <Route element={<NavigatorLayout />}>
-                    <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/items" element={<ItemBoardPage />} />
                     <Route path="/items/:id" element={<ItemDetailPage />} />
                     <Route path="/items/:id/stages/:stageId" element={<StageFocusPage />} />
@@ -53,6 +51,8 @@ export const App = () => {
                     <Route path="/actors" element={<ActorManagerPage />} />
                     <Route path="/tools" element={<ToolManagerPage />} />
                 </Route>
+                {/* Legacy redirect */}
+                <Route path="/dashboard" element={<Navigate to="/items" replace />} />
 
                 {/* Builder routes */}
                 <Route path="/flows" element={<PublicFlowsPage />} />

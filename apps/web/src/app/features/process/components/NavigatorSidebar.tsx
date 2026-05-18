@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
-import { ChevronRight } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 import { useActors, useItems } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -16,6 +16,58 @@ import type { Actor } from '@flows/flows';
 
 const NavGroupSection = ({ group }: { group: NavGroup }) => {
     const { t } = useTranslation();
+    const location = useLocation();
+    const isAnyActive = group.items.some(item => location.pathname.startsWith(item.to));
+    const [collapsed, setCollapsed] = useState(group.collapsible && !isAnyActive);
+
+    if (group.collapsible) {
+        return (
+            <div>
+                <button
+                    onClick={() => setCollapsed(c => !c)}
+                    className="flex w-full items-center justify-between px-3 pt-4 pb-1"
+                >
+                    <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                        {t(group.labelKey, group.fallback)}
+                    </span>
+                    <ChevronDown
+                        className={cn(
+                            'h-3 w-3 text-muted-foreground/40 transition-transform',
+                            collapsed && '-rotate-90'
+                        )}
+                    />
+                </button>
+                {!collapsed && (
+                    <div className="space-y-0.5">
+                        {group.items.map(({ to, icon: Icon, labelKey, fallback }) => (
+                            <NavLink
+                                key={to}
+                                to={to}
+                                className={({ isActive }) =>
+                                    cn(
+                                        'relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200',
+                                        isActive
+                                            ? 'bg-accent text-accent-foreground'
+                                            : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                                    )
+                                }
+                            >
+                                {({ isActive }) => (
+                                    <>
+                                        {isActive && (
+                                            <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+                                        )}
+                                        <Icon className="h-4 w-4" />
+                                        {t(labelKey, fallback)}
+                                    </>
+                                )}
+                            </NavLink>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div>
@@ -27,7 +79,7 @@ const NavGroupSection = ({ group }: { group: NavGroup }) => {
                     <NavLink
                         key={to}
                         to={to}
-                        end={to === '/dashboard'}
+                        end={to === '/items'}
                         className={({ isActive }) =>
                             cn(
                                 'relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200',
@@ -93,27 +145,6 @@ const TeamSection = () => {
                         </div>
                     );
                 })}
-                <NavLink
-                    to="/actors"
-                    className={({ isActive }) =>
-                        cn(
-                            'relative flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm transition-all duration-200',
-                            isActive
-                                ? 'bg-accent text-accent-foreground font-medium'
-                                : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-accent/50'
-                        )
-                    }
-                >
-                    {({ isActive }) => (
-                        <>
-                            {isActive && (
-                                <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
-                            )}
-                            <span className="flex-1">{t('navigator.manageActors', 'Manage Actors')}</span>
-                            <ChevronRight className="h-3 w-3" />
-                        </>
-                    )}
-                </NavLink>
             </div>
         </div>
     );
@@ -129,14 +160,14 @@ export const NavigatorSidebar = ({ className }: { className?: string }) => {
                     {t('navigator.title', 'Navigator')}
                 </p>
             </div>
-            <nav className="flex-1 px-2">
+            <SidebarNextActions />
+            <Separator className="mx-2" />
+            <nav className="flex-1 overflow-y-auto px-2">
                 {NAV_GROUPS.map(group => (
                     <NavGroupSection key={group.labelKey} group={group} />
                 ))}
                 <TeamSection />
             </nav>
-            <Separator />
-            <SidebarNextActions />
         </aside>
     );
 };

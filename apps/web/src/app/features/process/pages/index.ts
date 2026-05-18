@@ -1,4 +1,3 @@
-export { DashboardPage } from './DashboardPage';
 export { ItemBoardPage } from './ItemBoardPage';
 export { ItemDetailPage } from './ItemDetailPage';
 export { ProcessListPage } from './ProcessListPage';

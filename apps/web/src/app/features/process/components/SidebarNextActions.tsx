@@ -90,10 +90,7 @@ export const SidebarNextActions = () => {
                 </div>
             )}
             {actionsForActor.length > MAX_ITEMS && (
-                <button
-                    onClick={() => navigate('/dashboard')}
-                    className="mt-1 px-2 text-xs text-primary hover:underline"
-                >
+                <button onClick={() => navigate('/items')} className="mt-1 px-2 text-xs text-primary hover:underline">
                     {t('navigator.viewAll', 'View all')} ({actionsForActor.length})
                 </button>
             )}

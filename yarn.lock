@@ -1758,10 +1758,10 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@lemoncloud/eureka-flows-api@^0.26.515":
-  version "0.26.515"
-  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-flows-api/-/eureka-flows-api-0.26.515.tgz#cc7850c934195fc92c1605b6bd37ab338fdb7631"
-  integrity sha512-eTwZRbb5m66DtkJesz7d5r+X5WRdyjs6/SluIEqVmqfNknPoV9Wc8WNEX1E8X50LQNgbJGI4SjPiozO7Xp46Og==
+"@lemoncloud/eureka-flows-api@^0.26.516":
+  version "0.26.516"
+  resolved "https://registry.yarnpkg.com/@lemoncloud/eureka-flows-api/-/eureka-flows-api-0.26.516.tgz#f1fd7766823d236e32afc28896035b3baae0425c"
+  integrity sha512-WsxOvEfb+ikQD+yaxLa0OlGM+8kTD3SMGgijk6+TD+HZ4camV/EHole9QgdXIWXDk2Csj94GoiW1+eoFFr+zCA==
   dependencies:
     lemon-model "^1.1.1"
 

@@ -69,7 +69,7 @@ const HeaderBreadcrumb = () => {
 
     const match =
         NAV_ITEMS.find(nav => nav.to === location.pathname) ??
-        NAV_ITEMS.find(nav => nav.to !== '/dashboard' && location.pathname.startsWith(nav.to));
+        NAV_ITEMS.find(nav => nav.to !== '/items' && location.pathname.startsWith(nav.to));
     const title = match ? t(match.labelKey, match.fallback) : 'Navigator';
 
     return <span className="text-lg font-semibold">{title}</span>;

@@ -669,7 +669,7 @@ export const Header: React.FC<HeaderProps> = ({
                             {import.meta.env.DEV && (
                                 <>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                                    <DropdownMenuItem onClick={() => navigate('/items')}>
                                         <Compass className="w-4 h-4 mr-2" />
                                         {t('header.navigator', 'Navigator')}
                                     </DropdownMenuItem>
