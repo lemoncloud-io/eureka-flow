@@ -75,7 +75,7 @@ export const MobileNewFlowSheet = ({ open, onOpenChange, onCreate, onNameChange 
                         {/* Flow name */}
                         <div>
                             <Label className="text-sm font-medium mb-1.5 block">
-                                {t('mobile.newFlow.name', '키 이름')}
+                                {t('mobile.newFlow.name', '이름')}
                             </Label>
                             <Input
                                 value={name}

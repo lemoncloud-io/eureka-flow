@@ -98,7 +98,7 @@ export const MobileConnectionSheet = ({
                     {/* Header */}
                     <header
                         className={cn(
-                            'flex items-center gap-2 px-2 h-14 shrink-0',
+                            'flex items-center gap-2 px-2 h-[71px] shrink-0',
                             'border-b border-border/40',
                             'pt-[env(safe-area-inset-top)]'
                         )}

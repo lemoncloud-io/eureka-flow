@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AlertCircle, ArrowLeft, ArrowRight, Loader2, Play, Plus, Trash2, Zap } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 import { isAiBlock, isMissingAiKey, useBlockRegistry, useCanvasConnections } from '@flows/flows';
@@ -176,7 +176,6 @@ export const MobileStepDetail = ({
                             <div className="flex items-center justify-between">
                                 <Label className="text-sm font-medium">{t('mobile.autoExecution', '자동 실행')}</Label>
                                 <div className="flex items-center gap-1.5">
-                                    <Zap className="w-3.5 h-3.5 text-muted-foreground/50" />
                                     <Switch checked={isAuto} onCheckedChange={handleToggleAuto} disabled={!canEdit} />
                                 </div>
                             </div>
@@ -267,7 +266,7 @@ export const MobileStepDetail = ({
                                             ) : (
                                                 <Play className="w-3.5 h-3.5 fill-current" />
                                             )}
-                                            <span>{t('mobile.runThisOnly', '지금만 실행')}</span>
+                                            <span>{t('mobile.runThisOnly', '이전만 실행')}</span>
                                         </button>
                                         <button
                                             onClick={() => handleRun({ propagate: true })}
@@ -286,7 +285,7 @@ export const MobileStepDetail = ({
                                             ) : (
                                                 <Play className="w-3.5 h-3.5 fill-current" />
                                             )}
-                                            <span>{t('mobile.runAndPropagate', '다음도 실행')}</span>
+                                            <span>{t('mobile.runAndPropagate', '이후로 실행')}</span>
                                         </button>
                                     </div>
                                 ) : (
