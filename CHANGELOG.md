@@ -1,5 +1,46 @@
 # Changelog
 
+## [2026-05-18] - root@0.48.0, @flows/web@0.48.0
+
+### Features
+
+- (mobile) add "new" connection badge and output result preview
+- (mobile) replace window.confirm with 2-stage inline confirm buttons
+- (mobile) add flow settings menu items and error state to connection cards
+- (mobile) add image upload to new flow sheet and content preview to connection targets
+- (mobile) convert connection sheet to fullscreen slide-in page
+- (mobile) expand icon opens ContentPreviewModal overlay
+- (mobile) add image thumbnails, error banners, waiting state to cards
+- (mobile) rewrite MobileStepCard to match Figma vertical card layout
+- (mobile) upgrade connection sheet and new flow sheet
+- (mobile) fix Figma gaps — rich cards, breadcrumbs, Korean labels
+- (mobile) redesign mobile editor UI to match Figma TO-BE
+
+### Bug Fixes
+
+- (mobile) revert stereo left border and restore group container
+- (mobile) match empty state card layout and add stereo left border
+- (mobile) align UI with Figma design spec
+- (mobile) support desktop=1 query param to force PC view
+- (mobile) add missing i18n keys for flow settings, pc version, confirm messages
+- (mobile) remove chevron from available cards, add toggle expand to connected cards
+- (mobile) fix available card layout — separate row content from chevron
+- (mobile) add checkmark to connected cards and chevron to available cards
+- (mobile) fix run button icon size (w-4.5 invalid) and darken background
+- (mobile) reduce oversized text and buttons for mobile viewport
+- (mobile) match header to Figma — no back arrow, larger name, round play
+- (mobile) enlarge expand button touch target to 44px minimum
+- (mobile) revert quick-add cards to row layout matching Figma
+- (mobile) change IMG badge color to purple to match Figma
+- (mobile) enlarge card image preview and add resolution/IMG badge
+- (mobile) show content preview for all block types in step cards
+- (mobile) show config.text in step card content preview
+- (mobile) align with Figma TO-BE and add i18n keys
+
+### Refactor
+
+- (mobile) remove AI slop patterns from mobile editor UI
+
 ## [2026-05-14] - root@0.47.0, @flows/web@0.47.0, @flows/admin@0.26.0
 
 ### Features
