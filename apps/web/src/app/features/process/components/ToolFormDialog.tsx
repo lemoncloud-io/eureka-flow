@@ -189,21 +189,23 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                     {stereo === 'flow' && (
                         <div className="space-y-2">
                             <Label>{t('navigator.flowRef', 'Connected Flow')}</Label>
-                            <Select value={flowRefId} onValueChange={setFlowRefId}>
+                            <Select value={flowRefId || undefined} onValueChange={setFlowRefId}>
                                 <SelectTrigger>
                                     <SelectValue placeholder={t('navigator.selectFlow', 'Select a flow...')} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {flows.length === 0 ? (
-                                        <SelectItem value="" disabled>
+                                        <SelectItem value="__empty__" disabled>
                                             {t('navigator.noFlows', 'No flows available')}
                                         </SelectItem>
                                     ) : (
-                                        flows.map(f => (
-                                            <SelectItem key={f.id} value={f.id ?? ''}>
-                                                {f.name || `Flow ${f.id}`}
-                                            </SelectItem>
-                                        ))
+                                        flows
+                                            .filter(f => f.id)
+                                            .map(f => (
+                                                <SelectItem key={f.id} value={f.id!}>
+                                                    {f.name || `Flow ${f.id}`}
+                                                </SelectItem>
+                                            ))
                                     )}
                                 </SelectContent>
                             </Select>
