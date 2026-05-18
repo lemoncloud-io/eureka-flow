@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Plus } from 'lucide-react';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 
 import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
@@ -79,68 +78,54 @@ export const MobileStepList = ({
     // Empty state
     if (nodes.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 px-6 text-muted-foreground">
-                <p className="text-sm font-medium text-foreground/70 mb-1">
-                    {t('mobile.emptyState.title', '입력 노드를 선택하세요')}
-                </p>
-                <p className="text-xs text-muted-foreground/60 mb-6 text-center leading-relaxed">
-                    {t(
-                        'mobile.emptyState.description',
-                        '블록을 추가하여 AI 워크플로우를 만들고, 연결하여 데이터를 전달하세요.'
-                    )}
-                </p>
+            <div className="flex flex-col items-center justify-center py-20 px-6">
+                <div className="w-full rounded-2xl border border-border/40 bg-card p-6 flex flex-col items-center">
+                    <p className="text-sm font-medium text-foreground/70 mb-1">
+                        + {t('mobile.emptyState.title', '입력 노드 선택')}
+                    </p>
+                    <p className="text-xs text-muted-foreground/60 mb-5 text-center leading-relaxed">
+                        {t(
+                            'mobile.emptyState.description',
+                            '블록을 추가하여 AI 워크플로우를 만들고, 연결하여 데이터를 전달하세요.'
+                        )}
+                    </p>
 
-                {role === 'owner' &&
-                    (() => {
-                        const quickBlocks = Object.values(blockRegistry)
-                            .filter(b => b.stereo === 'input')
-                            .slice(0, 2);
-
-                        return (
-                            <div className="flex flex-col items-center gap-4 w-full">
-                                {/* Quick-add blocks — column layout */}
-                                {onAddBlockDirect && quickBlocks.length > 0 && (
-                                    <div className="flex justify-center gap-2">
-                                        {quickBlocks.map(block => (
-                                            <button
-                                                key={block.type}
-                                                onClick={() => onAddBlockDirect(block.type)}
+                    {role === 'owner' &&
+                        onAddBlockDirect &&
+                        (() => {
+                            const quickBlocks = Object.values(blockRegistry)
+                                .filter(b => b.stereo === 'input')
+                                .slice(0, 2);
+                            if (quickBlocks.length === 0) return null;
+                            return (
+                                <div className="flex justify-center gap-2">
+                                    {quickBlocks.map(block => (
+                                        <button
+                                            key={block.type}
+                                            onClick={() => onAddBlockDirect(block.type)}
+                                            className={cn(
+                                                'flex items-center gap-2 px-4 py-2.5 rounded-xl',
+                                                'border border-border/40 bg-background',
+                                                'text-xs font-medium',
+                                                'hover:border-primary/30 hover:shadow-sm',
+                                                'active:scale-[0.97] transition-all'
+                                            )}
+                                        >
+                                            <div
                                                 className={cn(
-                                                    'flex items-center gap-2 px-4 py-2.5 rounded-xl',
-                                                    'border border-border/40 bg-card',
-                                                    'text-xs font-medium',
-                                                    'hover:border-primary/30 hover:shadow-sm',
-                                                    'active:scale-[0.97] transition-all'
+                                                    'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                                                    STEREO_ICON_BG.input
                                                 )}
                                             >
-                                                <div
-                                                    className={cn(
-                                                        'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-                                                        STEREO_ICON_BG.input
-                                                    )}
-                                                >
-                                                    <BlockIcon icon={block.icon} size={16} />
-                                                </div>
-                                                {block.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                                {/* Browse all */}
-                                <button
-                                    onClick={onAddStep}
-                                    className={cn(
-                                        'flex items-center justify-center gap-2 w-full h-12 rounded-xl',
-                                        'border border-primary/20 bg-card text-sm font-semibold text-primary',
-                                        'hover:bg-primary/5 active:scale-[0.98] transition-all'
-                                    )}
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    {t('mobile.addNode', '노드 추가')}
-                                </button>
-                            </div>
-                        );
-                    })()}
+                                                <BlockIcon icon={block.icon} size={16} />
+                                            </div>
+                                            {block.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+                </div>
             </div>
         );
     }

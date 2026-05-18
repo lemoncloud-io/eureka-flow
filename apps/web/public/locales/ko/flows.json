@@ -504,7 +504,7 @@
         "allNodesCompleted": "모든 {{count}}개 노드 완료",
         "failedToCreateNode": "노드 생성 실패",
         "emptyState": {
-            "title": "입력 노드를 선택하세요",
+            "title": "입력 노드 선택",
             "description": "블록을 추가하여 AI 워크플로우를 만들고, 연결하여 데이터를 전달하세요."
         },
         "groupLabel": {

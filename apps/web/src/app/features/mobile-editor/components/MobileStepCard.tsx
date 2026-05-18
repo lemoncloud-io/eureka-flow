@@ -8,7 +8,7 @@ import { cn } from '@flows/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
-import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
+import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG, STEREO_LEFT_BORDER } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
 
 import type { FlowRole } from '@flows/flows';
@@ -183,7 +183,8 @@ export const MobileStepCard = React.memo(
                     'w-full rounded-xl border bg-card text-left',
                     'active:scale-[0.98] transition-all duration-150',
                     'hover:shadow-sm overflow-hidden',
-                    borderColor
+                    borderColor,
+                    STEREO_LEFT_BORDER[stereo]
                 )}
             >
                 {/* Header row: icon + status dot + menu */}

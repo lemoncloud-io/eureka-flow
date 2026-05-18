@@ -63,6 +63,13 @@ export const STEREO_I18N_KEY: Record<string, string> = {
     output: 'mobile.stereo.output',
 };
 
+/** Stereo-based left border stripe color for node cards */
+export const STEREO_LEFT_BORDER: Record<string, string> = {
+    input: 'border-l-[3px] border-l-pink-300/60',
+    process: 'border-l-[3px] border-l-emerald-300/60',
+    output: 'border-l-[3px] border-l-violet-300/60',
+};
+
 /** Stereo category fallback labels (Korean) */
 export const STEREO_FALLBACK_LABEL: Record<string, string> = {
     input: '입력 블록',

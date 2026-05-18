@@ -504,7 +504,7 @@
         "allNodesCompleted": "All {{count}} nodes completed",
         "failedToCreateNode": "Failed to create node",
         "emptyState": {
-            "title": "Select an input node",
+            "title": "Select Input Node",
             "description": "Add blocks to create an AI workflow. Connect them to pass data between steps."
         },
         "groupLabel": {
