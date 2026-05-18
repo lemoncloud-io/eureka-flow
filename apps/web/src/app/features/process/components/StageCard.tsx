@@ -78,7 +78,7 @@ export const StageCard = ({
             {/* Content */}
             <div
                 className={cn(
-                    'group flex-1 cursor-pointer rounded-lg border p-3 pb-4 transition-all duration-200',
+                    'group flex-1 cursor-pointer rounded-lg border px-4 py-4 transition-all duration-200',
                     isActive
                         ? 'border-blue-500/30 bg-blue-500/5 shadow-sm'
                         : isDone
