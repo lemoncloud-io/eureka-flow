@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ChevronDown } from 'lucide-react';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 
 import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
@@ -53,6 +54,16 @@ export const MobileStepList = ({
         }
         return pairs;
     }, [connections]);
+
+    const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+    const toggleGroupCollapse = (groupId: string) => {
+        setCollapsedGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(groupId)) next.delete(groupId);
+            else next.add(groupId);
+            return next;
+        });
+    };
 
     /** Filter groups/nodes by search query */
     const filteredGroups = useMemo(() => {
@@ -134,6 +145,21 @@ export const MobileStepList = ({
             <div className="flex flex-col gap-5 px-4 pb-28">
                 <AnimatePresence mode="popLayout">
                     {filteredGroups.map((group, groupIdx) => {
+                        const stereos = group.nodeIds
+                            .map(id => {
+                                const node = nodeMap.get(id);
+                                return node ? blockRegistry[node.type]?.stereo : undefined;
+                            })
+                            .filter(Boolean);
+                        const hasInput = stereos.includes('input');
+                        const hasProcess = stereos.includes('process');
+                        const hasOutput = stereos.includes('output');
+                        const groupLabel = group.isMultiNode
+                            ? [hasInput && 'INPUT', hasProcess && 'PROCESS', hasOutput && 'OUTPUT']
+                                  .filter(Boolean)
+                                  .join(' → ')
+                            : undefined;
+
                         return (
                             <motion.div
                                 key={group.id}
@@ -143,42 +169,76 @@ export const MobileStepList = ({
                                 exit={{ opacity: 0, y: -16 }}
                                 transition={{ duration: 0.2, delay: groupIdx * 0.03 }}
                             >
-                                <div>
-                                    {/* Nodes within the group */}
-                                    {group.nodeIds.map((nodeId, idx) => {
-                                        const node = nodeMap.get(nodeId);
-                                        if (!node) return null;
-
-                                        const prevId = idx > 0 ? group.nodeIds[idx - 1] : null;
-                                        const showConnector = prevId !== null && isDirectlyConnected(prevId, nodeId);
-
-                                        return (
-                                            <div key={nodeId}>
-                                                {/* Connector line between connected nodes */}
-                                                {idx > 0 && (
-                                                    <div className="flex justify-center py-0.5">
-                                                        <div
-                                                            className={cn(
-                                                                'w-px h-4',
-                                                                showConnector
-                                                                    ? 'bg-primary/25'
-                                                                    : 'bg-border/30 border-l border-dashed border-border/40'
-                                                            )}
-                                                        />
-                                                    </div>
+                                <div
+                                    className={cn(
+                                        group.isMultiNode
+                                            ? cn(
+                                                  'rounded-2xl border border-border px-3 pt-3 space-y-0',
+                                                  collapsedGroups.has(group.id) ? 'pb-0' : 'pb-3'
+                                              )
+                                            : ''
+                                    )}
+                                >
+                                    {/* Group header */}
+                                    {group.isMultiNode && groupLabel && (
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleGroupCollapse(group.id)}
+                                            className="w-full flex items-center gap-2 pb-3 px-1"
+                                        >
+                                            <ChevronDown
+                                                className={cn(
+                                                    'w-3.5 h-3.5 text-muted-foreground transition-transform duration-200',
+                                                    collapsedGroups.has(group.id) && '-rotate-90'
                                                 )}
-                                                <MobileStepCard
-                                                    node={node}
-                                                    displayName={displayNames.get(nodeId) ?? node.type}
-                                                    onTapCard={onTapCard}
-                                                    onExpandContent={onExpandContent}
-                                                    onRun={onRunNode}
-                                                    onDelete={handleDelete}
-                                                    role={role}
-                                                />
-                                            </div>
-                                        );
-                                    })}
+                                            />
+                                            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+                                                {groupLabel}
+                                            </span>
+                                            <div className="flex-1 h-px bg-border" />
+                                            <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
+                                                {group.nodeIds.length}
+                                            </span>
+                                        </button>
+                                    )}
+
+                                    {/* Nodes */}
+                                    {!collapsedGroups.has(group.id) &&
+                                        group.nodeIds.map((nodeId, idx) => {
+                                            const node = nodeMap.get(nodeId);
+                                            if (!node) return null;
+
+                                            const prevId = idx > 0 ? group.nodeIds[idx - 1] : null;
+                                            const showConnector =
+                                                prevId !== null && isDirectlyConnected(prevId, nodeId);
+
+                                            return (
+                                                <div key={nodeId}>
+                                                    {/* Connector line between connected nodes */}
+                                                    {idx > 0 && (
+                                                        <div className="flex justify-center py-0.5">
+                                                            <div
+                                                                className={cn(
+                                                                    'w-px h-4',
+                                                                    showConnector
+                                                                        ? 'bg-primary/25'
+                                                                        : 'bg-border/30 border-l border-dashed border-border/40'
+                                                                )}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    <MobileStepCard
+                                                        node={node}
+                                                        displayName={displayNames.get(nodeId) ?? node.type}
+                                                        onTapCard={onTapCard}
+                                                        onExpandContent={onExpandContent}
+                                                        onRun={onRunNode}
+                                                        onDelete={handleDelete}
+                                                        role={role}
+                                                    />
+                                                </div>
+                                            );
+                                        })}
                                 </div>
                             </motion.div>
                         );
