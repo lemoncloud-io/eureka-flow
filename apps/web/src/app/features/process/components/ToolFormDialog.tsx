@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AlertTriangle } from 'lucide-react';
@@ -39,6 +39,13 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
 
     const flowsQuery = useFlowsListQuery(open && (tool?.stereo === 'flow' || !isEdit));
     const flows = flowsQuery.data?.pages?.flatMap(p => p.list) ?? [];
+
+    // Auto-fetch all pages so the full flow list is available in the dropdown
+    useEffect(() => {
+        if (flowsQuery.hasNextPage && !flowsQuery.isFetchingNextPage) {
+            flowsQuery.fetchNextPage();
+        }
+    }, [flowsQuery.hasNextPage, flowsQuery.isFetchingNextPage, flowsQuery.fetchNextPage]);
 
     const [name, setName] = useState(tool?.name ?? '');
     const [stereo, setStereo] = useState<'link' | 'embed' | 'flow'>(tool?.stereo ?? 'link');
