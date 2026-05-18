@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { actorKeys } from './keys';
 import { processApi } from '../../api/process';
 
-import type { Actor, CreateActorInput } from '../../types/process';
+import type { Actor, CreateActorInput, ProcessApiListResponse } from '../../types/process';
 
 export const useActors = () => {
     return useQuery({
@@ -14,41 +14,83 @@ export const useActors = () => {
 };
 
 export const useCreateActorMutation = () => {
-    const queryClient = useQueryClient();
+    const qc = useQueryClient();
     return useMutation({
         mutationFn: (input: CreateActorInput) => processApi.actors.create(input),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: actorKeys.lists() });
+        onSuccess: result => {
+            qc.setQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: [...old.data, result.data] };
+            });
+        },
+        onSettled: () => {
+            qc.invalidateQueries({ queryKey: actorKeys.lists() });
         },
     });
 };
 
 export const useUpdateActorMutation = () => {
-    const queryClient = useQueryClient();
+    const qc = useQueryClient();
     return useMutation({
         mutationFn: ({ id, input }: { id: string; input: Partial<Actor> }) => processApi.actors.update(id, input),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: actorKeys.lists() });
+        onMutate: async ({ id, input }) => {
+            await qc.cancelQueries({ queryKey: actorKeys.lists() });
+            const prev = qc.getQueryData(actorKeys.lists());
+            qc.setQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(a => (a.id === id ? { ...a, ...input } : a)) };
+            });
+            return { prev };
+        },
+        onError: (_, __, ctx) => {
+            if (ctx?.prev) qc.setQueryData(actorKeys.lists(), ctx.prev);
+        },
+        onSettled: () => {
+            qc.invalidateQueries({ queryKey: actorKeys.lists() });
         },
     });
 };
 
 export const useDeactivateActorMutation = () => {
-    const queryClient = useQueryClient();
+    const qc = useQueryClient();
     return useMutation({
         mutationFn: (id: string) => processApi.actors.deactivate(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: actorKeys.lists() });
+        onMutate: async id => {
+            await qc.cancelQueries({ queryKey: actorKeys.lists() });
+            const prev = qc.getQueryData(actorKeys.lists());
+            qc.setQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(a => (a.id === id ? { ...a, isActive: false } : a)) };
+            });
+            return { prev };
+        },
+        onError: (_, __, ctx) => {
+            if (ctx?.prev) qc.setQueryData(actorKeys.lists(), ctx.prev);
+        },
+        onSettled: () => {
+            qc.invalidateQueries({ queryKey: actorKeys.lists() });
         },
     });
 };
 
 export const useActivateActorMutation = () => {
-    const queryClient = useQueryClient();
+    const qc = useQueryClient();
     return useMutation({
         mutationFn: (id: string) => processApi.actors.activate(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: actorKeys.lists() });
+        onMutate: async id => {
+            await qc.cancelQueries({ queryKey: actorKeys.lists() });
+            const prev = qc.getQueryData(actorKeys.lists());
+            qc.setQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(a => (a.id === id ? { ...a, isActive: true } : a)) };
+            });
+            return { prev };
+        },
+        onError: (_, __, ctx) => {
+            if (ctx?.prev) qc.setQueryData(actorKeys.lists(), ctx.prev);
+        },
+        onSettled: () => {
+            qc.invalidateQueries({ queryKey: actorKeys.lists() });
         },
     });
 };

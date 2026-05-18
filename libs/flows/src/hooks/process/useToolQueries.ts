@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toolKeys } from './keys';
 import { processApi } from '../../api/process';
 
-import type { CreateToolInput, Tool } from '../../types/process';
+import type { CreateToolInput, ProcessApiListResponse, Tool } from '../../types/process';
 
 export const useTools = () => {
     return useQuery({
@@ -14,41 +14,83 @@ export const useTools = () => {
 };
 
 export const useCreateToolMutation = () => {
-    const queryClient = useQueryClient();
+    const qc = useQueryClient();
     return useMutation({
         mutationFn: (input: CreateToolInput) => processApi.tools.create(input),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: toolKeys.lists() });
+        onSuccess: result => {
+            qc.setQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: [...old.data, result.data] };
+            });
+        },
+        onSettled: () => {
+            qc.invalidateQueries({ queryKey: toolKeys.lists() });
         },
     });
 };
 
 export const useUpdateToolMutation = () => {
-    const queryClient = useQueryClient();
+    const qc = useQueryClient();
     return useMutation({
         mutationFn: ({ id, input }: { id: string; input: Partial<Tool> }) => processApi.tools.update(id, input),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: toolKeys.lists() });
+        onMutate: async ({ id, input }) => {
+            await qc.cancelQueries({ queryKey: toolKeys.lists() });
+            const prev = qc.getQueryData(toolKeys.lists());
+            qc.setQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(t => (t.id === id ? { ...t, ...input } : t)) };
+            });
+            return { prev };
+        },
+        onError: (_, __, ctx) => {
+            if (ctx?.prev) qc.setQueryData(toolKeys.lists(), ctx.prev);
+        },
+        onSettled: () => {
+            qc.invalidateQueries({ queryKey: toolKeys.lists() });
         },
     });
 };
 
 export const useDeactivateToolMutation = () => {
-    const queryClient = useQueryClient();
+    const qc = useQueryClient();
     return useMutation({
         mutationFn: (id: string) => processApi.tools.deactivate(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: toolKeys.lists() });
+        onMutate: async id => {
+            await qc.cancelQueries({ queryKey: toolKeys.lists() });
+            const prev = qc.getQueryData(toolKeys.lists());
+            qc.setQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(t => (t.id === id ? { ...t, isActive: false } : t)) };
+            });
+            return { prev };
+        },
+        onError: (_, __, ctx) => {
+            if (ctx?.prev) qc.setQueryData(toolKeys.lists(), ctx.prev);
+        },
+        onSettled: () => {
+            qc.invalidateQueries({ queryKey: toolKeys.lists() });
         },
     });
 };
 
 export const useActivateToolMutation = () => {
-    const queryClient = useQueryClient();
+    const qc = useQueryClient();
     return useMutation({
         mutationFn: (id: string) => processApi.tools.activate(id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: toolKeys.lists() });
+        onMutate: async id => {
+            await qc.cancelQueries({ queryKey: toolKeys.lists() });
+            const prev = qc.getQueryData(toolKeys.lists());
+            qc.setQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists(), old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(t => (t.id === id ? { ...t, isActive: true } : t)) };
+            });
+            return { prev };
+        },
+        onError: (_, __, ctx) => {
+            if (ctx?.prev) qc.setQueryData(toolKeys.lists(), ctx.prev);
+        },
+        onSettled: () => {
+            qc.invalidateQueries({ queryKey: toolKeys.lists() });
         },
     });
 };
