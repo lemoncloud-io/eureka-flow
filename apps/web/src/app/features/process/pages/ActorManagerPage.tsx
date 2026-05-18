@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Plus, Users } from 'lucide-react';
+import { Building2, Plus, User, Users } from 'lucide-react';
 
 import { useActivateActorMutation, useActors, useDeactivateActorMutation } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -12,6 +12,12 @@ import { ActorWorkload } from '../components/ActorWorkload';
 import { useCurrentActor } from '../hooks/useCurrentActor';
 
 import type { Actor } from '@flows/flows';
+
+const STEREO_ICON: Record<Actor['stereo'], React.ElementType> = {
+    person: User,
+    team: Users,
+    vendor: Building2,
+};
 
 export const ActorManagerPage = () => {
     const { t } = useTranslation();
@@ -73,50 +79,74 @@ export const ActorManagerPage = () => {
             ) : (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {actors.map(actor => (
-                        <Card key={actor.id} className={cn(!actor.isActive && 'opacity-50')}>
+                        <Card
+                            key={actor.id}
+                            className={cn(
+                                'transition-all',
+                                !actor.isActive && 'opacity-50',
+                                currentActor?.id === actor.id && 'ring-2 ring-primary/30'
+                            )}
+                        >
                             <CardContent className="p-4">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <div className={cn('h-4 w-4 rounded-full shrink-0', actor.color)} />
-                                        <div className="min-w-0">
+                                <div className="flex items-start gap-3">
+                                    {(() => {
+                                        const StereoIcon = STEREO_ICON[actor.stereo];
+                                        return (
+                                            <div
+                                                className={cn(
+                                                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+                                                    actor.color
+                                                        ? `${actor.color} text-white`
+                                                        : 'bg-muted text-muted-foreground'
+                                                )}
+                                            >
+                                                <StereoIcon className="h-4 w-4" />
+                                            </div>
+                                        );
+                                    })()}
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center justify-between gap-2">
                                             <p className="font-medium truncate">{actor.name}</p>
-                                            <Badge variant="secondary" className="text-[10px] mt-0.5">
+                                            <Switch
+                                                checked={actor.isActive}
+                                                onCheckedChange={() => handleToggleActive(actor)}
+                                            />
+                                        </div>
+                                        <div className="mt-0.5 flex items-center gap-2">
+                                            <Badge variant="secondary" className="text-[10px]">
                                                 {actor.stereo}
                                             </Badge>
+                                            {currentActor?.id === actor.id && (
+                                                <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">
+                                                    {t('navigator.currentActor', 'Current')}
+                                                </Badge>
+                                            )}
                                         </div>
+                                        {actor.memo && (
+                                            <p className="mt-1.5 text-xs text-muted-foreground truncate">
+                                                {actor.memo}
+                                            </p>
+                                        )}
                                     </div>
-                                    <Switch
-                                        checked={actor.isActive}
-                                        onCheckedChange={() => handleToggleActive(actor)}
-                                    />
                                 </div>
-                                {actor.memo && (
-                                    <p className="mt-2 text-xs text-muted-foreground truncate">{actor.memo}</p>
-                                )}
-                                <div className="mt-3 flex items-center gap-2">
+                                <div className="mt-3 flex items-center gap-2 border-t border-border/50 pt-3">
                                     <Button
-                                        variant="ghost"
+                                        variant="outline"
                                         size="sm"
                                         onClick={() => handleEdit(actor)}
                                         className="h-7 text-xs"
                                     >
                                         {t('navigator.edit', 'Edit')}
                                     </Button>
-                                    {currentActor?.id === actor.id ? (
-                                        <Badge className="text-[10px] bg-primary/10 text-primary">
-                                            {t('navigator.currentActor', 'Current')}
-                                        </Badge>
-                                    ) : (
-                                        actor.isActive && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => setCurrentActor(actor.id)}
-                                                className="h-7 text-xs"
-                                            >
-                                                {t('navigator.setAsCurrent', 'Set as Current')}
-                                            </Button>
-                                        )
+                                    {currentActor?.id !== actor.id && actor.isActive && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setCurrentActor(actor.id)}
+                                            className="h-7 text-xs"
+                                        >
+                                            {t('navigator.setAsCurrent', 'Set as me')}
+                                        </Button>
                                     )}
                                 </div>
                             </CardContent>
