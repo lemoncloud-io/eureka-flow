@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Plus, Wrench } from 'lucide-react';
+import { ExternalLink, GitBranch, Maximize2, Plus, Wrench } from 'lucide-react';
 
 import { useActivateToolMutation, useDeactivateToolMutation, useTools } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -11,10 +11,10 @@ import { ToolFormDialog } from '../components/ToolFormDialog';
 
 import type { Tool } from '@flows/flows';
 
-const STEREO_LABELS: Record<Tool['stereo'], string> = {
-    link: 'Link',
-    embed: 'Embed',
-    flow: 'Flow',
+const STEREO_CONFIG: Record<Tool['stereo'], { label: string; icon: React.ElementType }> = {
+    link: { label: 'Link', icon: ExternalLink },
+    embed: { label: 'Embed', icon: Maximize2 },
+    flow: { label: 'Flow', icon: GitBranch },
 };
 
 export const ToolManagerPage = () => {
@@ -78,14 +78,30 @@ export const ToolManagerPage = () => {
                     {tools.map(tool => (
                         <Card key={tool.id} className={cn(!tool.isActive && 'opacity-50')}>
                             <CardContent className="flex items-center gap-4 p-4">
+                                {(() => {
+                                    const config = STEREO_CONFIG[tool.stereo];
+                                    const StereoIcon = config.icon;
+                                    return (
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                                            <StereoIcon className="h-4 w-4 text-muted-foreground" />
+                                        </div>
+                                    );
+                                })()}
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
                                         <p className="font-medium truncate">{tool.name}</p>
                                         <Badge variant="secondary" className="text-[10px] shrink-0">
-                                            {STEREO_LABELS[tool.stereo]}
+                                            {STEREO_CONFIG[tool.stereo].label}
                                         </Badge>
                                     </div>
-                                    <p className="text-xs text-muted-foreground mt-0.5">{tool.actionLabel}</p>
+                                    {tool.urlTemplate && (
+                                        <p className="text-[11px] text-muted-foreground/60 mt-0.5 truncate">
+                                            {tool.urlTemplate}
+                                        </p>
+                                    )}
+                                    {tool.memo && (
+                                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{tool.memo}</p>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-3 shrink-0">
                                     <Button

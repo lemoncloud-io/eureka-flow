@@ -27,13 +27,13 @@ export const ItemRow = memo(({ item, onClick }: ItemRowProps) => {
     const doneCount = item.stages.filter(s => s.status === 'done' || s.status === 'skip').length;
     const firstLetter = item.name.charAt(0).toUpperCase();
 
-    const statusColor = isComplete
-        ? 'bg-green-500'
+    const statusConfig = isComplete
+        ? { color: 'bg-green-500', label: 'Done' }
         : hasDoing
-          ? 'bg-blue-500'
+          ? { color: 'bg-blue-500', label: 'Active' }
           : unresolvedCount > 0
-            ? 'bg-orange-500'
-            : 'bg-muted-foreground/40';
+            ? { color: 'bg-orange-500', label: 'Issues' }
+            : { color: 'bg-muted-foreground/40', label: 'Pending' };
 
     const stageName = currentStage?.name ?? nextAction?.stage.name;
     const timeAgo = formatDistanceToNow(item.updatedAt, { addSuffix: false });
@@ -57,8 +57,11 @@ export const ItemRow = memo(({ item, onClick }: ItemRowProps) => {
             onClick={() => onClick(item.id)}
             onKeyDown={handleKeyDown}
         >
-            {/* Status dot */}
-            <div className={cn('h-2 w-2 shrink-0 rounded-full', statusColor)} />
+            {/* Status indicator */}
+            <div className="flex items-center gap-1.5 shrink-0 w-[52px]">
+                <div className={cn('h-2 w-2 rounded-full', statusConfig.color)} />
+                <span className="text-[10px] text-muted-foreground">{statusConfig.label}</span>
+            </div>
 
             {/* Thumbnail */}
             {item.thumbnailUrl ? (
