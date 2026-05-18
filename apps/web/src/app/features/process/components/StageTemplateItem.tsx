@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Trash2, User, Wrench } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import {
@@ -51,6 +51,22 @@ export const StageTemplateItem = ({
             <span className="text-xs text-muted-foreground w-5 text-center shrink-0">{index + 1}</span>
             <div className="min-w-0 flex-1">
                 <span className="text-sm font-medium truncate block">{stage.name || 'Untitled Stage'}</span>
+                {(stage.actorId || stage.toolId) && (
+                    <div className="flex items-center gap-2 mt-0.5">
+                        {stage.actorId && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                                <User className="h-2.5 w-2.5" />
+                                assigned
+                            </span>
+                        )}
+                        {stage.toolId && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+                                <Wrench className="h-2.5 w-2.5" />
+                                linked
+                            </span>
+                        )}
+                    </div>
+                )}
             </div>
             <Badge variant="secondary" className="text-[10px] shrink-0">
                 {stage.stereo}
