@@ -665,8 +665,8 @@ export const Header: React.FC<HeaderProps> = ({
                                 </>
                             )}
 
-                            {/* Navigator (dev only) */}
-                            {import.meta.env.DEV && (
+                            {/* Navigator (local + dev server) */}
+                            {(import.meta.env.DEV || import.meta.env.VITE_ENV === 'DEV') && (
                                 <>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={() => navigate('/items')}>
