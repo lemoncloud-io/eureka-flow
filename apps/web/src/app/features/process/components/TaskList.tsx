@@ -7,6 +7,7 @@ import { useAddTaskMutation, useChangeTaskStatusMutation } from '@flows/flows';
 import { Button, Input } from '@flows/ui-kit';
 
 import { StatusBadge } from './StatusBadge';
+import { useCurrentActor } from '../hooks/useCurrentActor';
 
 import type { Status, Task } from '@flows/flows';
 
@@ -27,11 +28,12 @@ export const TaskList = ({ tasks, stageId, canAdd }: TaskListProps) => {
     const [title, setTitle] = useState('');
     const addTaskMutation = useAddTaskMutation();
     const changeStatusMutation = useChangeTaskStatusMutation();
+    const { currentActorId } = useCurrentActor();
 
     const handleAdd = () => {
         if (!title.trim()) return;
         addTaskMutation.mutate(
-            { stageId, input: { title: title.trim() } },
+            { stageId, input: { title: title.trim(), authorId: currentActorId ?? undefined } },
             {
                 onSuccess: () => {
                     setTitle('');
@@ -44,7 +46,10 @@ export const TaskList = ({ tasks, stageId, canAdd }: TaskListProps) => {
     const handleStatusToggle = (task: Task) => {
         const nextStatus = NEXT_TASK_STATUS[task.status];
         if (!nextStatus) return;
-        changeStatusMutation.mutate({ id: task.id, input: { status: nextStatus } });
+        changeStatusMutation.mutate({
+            id: task.id,
+            input: { status: nextStatus, actorId: currentActorId ?? undefined },
+        });
     };
 
     return (

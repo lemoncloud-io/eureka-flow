@@ -50,6 +50,7 @@ import { NoteList } from '../components/NoteList';
 import { StatusBadge } from '../components/StatusBadge';
 import { TaskList } from '../components/TaskList';
 import { ToolAction } from '../components/ToolAction';
+import { useCurrentActor } from '../hooks/useCurrentActor';
 import { useFlowExecution } from '../hooks/useFlowExecution';
 
 import type { Stage, Status, ToolContext } from '@flows/flows';
@@ -65,6 +66,7 @@ export const StageFocusPage = () => {
     const updateStageMutation = useUpdateStageMutation();
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);
     const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+    const { currentActorId } = useCurrentActor();
     const flowExecution = useFlowExecution(stageId ?? '');
     const notesRef = useRef<HTMLDivElement>(null);
 
@@ -75,7 +77,7 @@ export const StageFocusPage = () => {
     const handleComplete = () => {
         if (!stage || !item) return;
         changeStatusMutation.mutate(
-            { id: stage.id, input: { status: 'done' } },
+            { id: stage.id, input: { status: 'done', actorId: currentActorId ?? undefined } },
             {
                 onSuccess: result => {
                     (result.warnings ?? []).forEach(w => toast.warning(w));
@@ -98,7 +100,7 @@ export const StageFocusPage = () => {
     const handleStatusChange = (newStatus: Status) => {
         if (!stage) return;
         changeStatusMutation.mutate(
-            { id: stage.id, input: { status: newStatus } },
+            { id: stage.id, input: { status: newStatus, actorId: currentActorId ?? undefined } },
             { onSuccess: result => (result.warnings ?? []).forEach(w => toast.warning(w)) }
         );
     };

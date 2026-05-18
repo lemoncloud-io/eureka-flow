@@ -8,9 +8,11 @@ import type {
     CreateNoteInput,
     CreateTaskInput,
     Item,
+    Note,
     ProcessApiListResponse,
     ProcessApiResponse,
     Stage,
+    Task,
     UpdateStageInput,
 } from '../../types/process';
 
@@ -124,64 +126,164 @@ export const useAddTaskMutation = () => {
     });
 };
 
+/** Find stage containing a task from item list cache */
+const findStageForTask = (qc: ReturnType<typeof useQueryClient>, taskId: string): Stage | undefined => {
+    const listData = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
+    if (!listData) return undefined;
+    for (const item of listData.data) {
+        for (const stage of item.stages) {
+            if (stage.tasks.some(t => t.id === taskId)) return stage;
+        }
+    }
+    return undefined;
+};
+
+/** Find stage containing a note from item list cache */
+const findStageForNote = (qc: ReturnType<typeof useQueryClient>, noteId: string): Stage | undefined => {
+    const listData = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
+    if (!listData) return undefined;
+    for (const item of listData.data) {
+        for (const stage of item.stages) {
+            if (stage.notes.some(n => n.id === noteId)) return stage;
+        }
+    }
+    return undefined;
+};
+
+/**
+ * Change task status via stages.update.
+ * Server has no `tasks` proxy domain — route through stage's tasks array.
+ */
 export const useChangeTaskStatusMutation = () => {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, input }: { id: string; input: ChangeStatusInput }) =>
-            processApi.tasks.changeStatus(id, input),
-        onSuccess: result => {
-            const task = result.data;
-            const listData = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
-            if (!listData) return;
-            for (const item of listData.data) {
-                for (const stage of item.stages) {
-                    if (stage.tasks.some(t => t.id === task.id)) {
-                        patchStageInCache(qc, stage.id, s => ({
-                            ...s,
-                            tasks: s.tasks.map(t => (t.id === task.id ? task : t)),
-                        }));
-                        return;
-                    }
-                }
+        mutationFn: async ({ id, input }: { id: string; input: ChangeStatusInput }) => {
+            const stage = findStageForTask(qc, id);
+            if (!stage) throw new Error(`Stage not found for task ${id}`);
+            const now = Date.now();
+            const updatedTasks: Task[] = stage.tasks.map(t =>
+                t.id === id
+                    ? {
+                          ...t,
+                          status: input.status,
+                          ...(input.status === 'done' ? { completedAt: now, completedByActorId: input.actorId } : {}),
+                      }
+                    : t
+            );
+            const result = await processApi.stages.update(stage.id, { tasks: updatedTasks });
+            const updatedTask = result.data.tasks?.find((t: Task) => t.id === id);
+            return { data: updatedTask ?? { ...stage.tasks.find(t => t.id === id)!, status: input.status } };
+        },
+        onMutate: async ({ id, input }) => {
+            await qc.cancelQueries({ queryKey: itemKeys.all });
+            const prev = snapshotItemCaches(qc);
+            const stage = findStageForTask(qc, id);
+            if (stage) {
+                const now = Date.now();
+                patchStageInCache(qc, stage.id, s => ({
+                    ...s,
+                    tasks: s.tasks.map(t =>
+                        t.id === id
+                            ? {
+                                  ...t,
+                                  status: input.status,
+                                  ...(input.status === 'done'
+                                      ? { completedAt: now, completedByActorId: input.actorId }
+                                      : {}),
+                              }
+                            : t
+                    ),
+                }));
             }
+            return { prev };
+        },
+        onError: (_, __, ctx) => {
+            if (ctx?.prev) restoreItemCaches(qc, ctx.prev);
         },
     });
 };
 
 export const useAddTaskNoteMutation = () => {
     return useMutation({
-        mutationFn: ({ taskId, input }: { taskId: string; input: CreateNoteInput }) =>
-            processApi.tasks.addNote(taskId, input),
-    });
-};
-
-export const useResolveNoteMutation = () => {
-    const qc = useQueryClient();
-    return useMutation({
-        mutationFn: ({ id, resolvedByActorId }: { id: string; resolvedByActorId?: string }) =>
-            processApi.notes.resolve(id, { resolvedByActorId }),
-        onSuccess: result => {
-            const note = result.data;
-            if (!note.stageId) return;
-            patchStageInCache(qc, note.stageId, s => ({
-                ...s,
-                notes: s.notes.map(n => (n.id === note.id ? note : n)),
-            }));
+        mutationFn: async ({ taskId, input }: { taskId: string; input: CreateNoteInput }) => {
+            // Task-level notes not yet supported by server — throw clear error
+            throw new Error(`Task-level notes not yet supported. Task: ${taskId}, content: ${input.content}`);
         },
     });
 };
 
+/**
+ * Resolve note via stages.update.
+ * Server has no `notes` proxy domain — toggle isResolved in stage's notes array.
+ */
+export const useResolveNoteMutation = () => {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, resolvedByActorId }: { id: string; resolvedByActorId?: string }) => {
+            const stage = findStageForNote(qc, id);
+            if (!stage) throw new Error(`Stage not found for note ${id}`);
+            const now = Date.now();
+            const updatedNotes: Note[] = stage.notes.map(n =>
+                n.id === id ? { ...n, isResolved: true, resolvedAt: now, resolvedByActorId } : n
+            );
+            const result = await processApi.stages.update(stage.id, { notes: updatedNotes });
+            const updatedNote = result.data.notes?.find((n: Note) => n.id === id);
+            return {
+                data: updatedNote ?? { ...stage.notes.find(n => n.id === id)!, isResolved: true, resolvedAt: now },
+            };
+        },
+        onMutate: async ({ id }) => {
+            await qc.cancelQueries({ queryKey: itemKeys.all });
+            const prev = snapshotItemCaches(qc);
+            const stage = findStageForNote(qc, id);
+            if (stage) {
+                patchStageInCache(qc, stage.id, s => ({
+                    ...s,
+                    notes: s.notes.map(n => (n.id === id ? { ...n, isResolved: true, resolvedAt: Date.now() } : n)),
+                }));
+            }
+            return { prev };
+        },
+        onError: (_, __, ctx) => {
+            if (ctx?.prev) restoreItemCaches(qc, ctx.prev);
+        },
+    });
+};
+
+/**
+ * Reopen note via stages.update.
+ */
 export const useReopenNoteMutation = () => {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: (id: string) => processApi.notes.reopen(id),
-        onSuccess: result => {
-            const note = result.data;
-            if (!note.stageId) return;
-            patchStageInCache(qc, note.stageId, s => ({
-                ...s,
-                notes: s.notes.map(n => (n.id === note.id ? note : n)),
-            }));
+        mutationFn: async (id: string) => {
+            const stage = findStageForNote(qc, id);
+            if (!stage) throw new Error(`Stage not found for note ${id}`);
+            const updatedNotes: Note[] = stage.notes.map(n =>
+                n.id === id ? { ...n, isResolved: false, resolvedAt: undefined, resolvedByActorId: undefined } : n
+            );
+            const result = await processApi.stages.update(stage.id, { notes: updatedNotes });
+            const updatedNote = result.data.notes?.find((n: Note) => n.id === id);
+            return { data: updatedNote ?? { ...stage.notes.find(n => n.id === id)!, isResolved: false } };
+        },
+        onMutate: async id => {
+            await qc.cancelQueries({ queryKey: itemKeys.all });
+            const prev = snapshotItemCaches(qc);
+            const stage = findStageForNote(qc, id);
+            if (stage) {
+                patchStageInCache(qc, stage.id, s => ({
+                    ...s,
+                    notes: s.notes.map(n =>
+                        n.id === id
+                            ? { ...n, isResolved: false, resolvedAt: undefined, resolvedByActorId: undefined }
+                            : n
+                    ),
+                }));
+            }
+            return { prev };
+        },
+        onError: (_, __, ctx) => {
+            if (ctx?.prev) restoreItemCaches(qc, ctx.prev);
         },
     });
 };
