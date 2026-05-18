@@ -5,6 +5,7 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
     ChevronsDownUp,
     ChevronsUpDown,
+    Compass,
     Download,
     EyeOff,
     FileText,
@@ -660,6 +661,17 @@ export const Header: React.FC<HeaderProps> = ({
                                     <DropdownMenuItem onClick={onGraphView}>
                                         <LayoutGrid className="w-4 h-4 mr-2" />
                                         {t('header.graphView', 'Graph View')}
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+
+                            {/* Navigator (dev only) */}
+                            {import.meta.env.DEV && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                                        <Compass className="w-4 h-4 mr-2" />
+                                        {t('header.navigator', 'Navigator')}
                                     </DropdownMenuItem>
                                 </>
                             )}

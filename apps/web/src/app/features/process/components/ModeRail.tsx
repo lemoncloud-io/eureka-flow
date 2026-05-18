@@ -18,7 +18,7 @@ export const ModeRail = () => {
         location.pathname.startsWith('/items/') ||
         location.pathname.startsWith('/processes/');
 
-    const isBuilderActive = location.pathname.startsWith('/flows');
+    const isBuilderActive = location.pathname.startsWith('/editor') || location.pathname.startsWith('/flows');
 
     return (
         <div className="flex w-12 flex-col items-center gap-1 border-r border-border bg-background py-3">
@@ -36,7 +36,7 @@ export const ModeRail = () => {
                 variant="ghost"
                 size="icon"
                 className={cn('h-9 w-9 rounded-lg', isBuilderActive && 'bg-accent text-accent-foreground')}
-                onClick={() => navigate('/flows')}
+                onClick={() => navigate('/editor')}
                 title="Builder"
                 aria-label="Builder"
             >

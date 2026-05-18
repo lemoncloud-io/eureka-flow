@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useParams } from 'react-router-dom';
 
-import { Blocks, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
 
 import { useItem } from '@flows/flows';
 import {
@@ -92,12 +92,6 @@ export const NavigatorHeader = ({ onMenuClick }: NavigatorHeaderProps) => {
                 <UnresolvedNotesBadge />
                 <CurrentActorDropdown />
                 <ThemeToggle />
-                <Link to="/flows">
-                    <Button variant="outline" size="sm" className="gap-1.5">
-                        <Blocks className="h-3.5 w-3.5" />
-                        {t('navigator.buildFlow', 'Build Flow')}
-                    </Button>
-                </Link>
             </div>
         </header>
     );
