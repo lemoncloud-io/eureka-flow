@@ -50,7 +50,10 @@ export const useUpdateProcessMutation = () => {
         mutationFn: ({ id, input }: { id: string; input: UpdateProcessInput }) =>
             processApi.processes.update(id, input),
         onMutate: async ({ id, input }) => {
-            await qc.cancelQueries({ queryKey: processKeys.detail(id) });
+            await Promise.all([
+                qc.cancelQueries({ queryKey: processKeys.detail(id) }),
+                qc.cancelQueries({ queryKey: processKeys.lists() }),
+            ]);
             const prevDetail = qc.getQueryData<ProcessApiResponse<Process>>(processKeys.detail(id));
             const prevList = qc.getQueryData<ProcessApiListResponse<Process>>(processKeys.lists());
             qc.setQueryData<ProcessApiResponse<Process>>(processKeys.detail(id), old => {

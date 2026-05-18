@@ -30,34 +30,32 @@ const patchStageInCache = (
 ) => {
     const mapStages = (stages: Stage[]) => stages.map(s => (s.id === stageId ? updater(s) : s));
 
+    // Find parent item BEFORE mutating
+    const listData = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
+    const parentItemId = listData?.data.find(item => item.stages.some(s => s.id === stageId))?.id;
+
     // Update list cache
     qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
         if (!old) return old;
         return { ...old, data: old.data.map(item => ({ ...item, stages: mapStages(item.stages) })) };
     });
 
-    // Update matching detail cache
-    const listData = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
-    const parentItem = listData?.data.find(item => item.stages.some(s => s.id === stageId));
-    if (parentItem) {
-        qc.setQueryData<ProcessApiResponse<Item>>(itemKeys.detail(parentItem.id), old => {
+    // Update detail cache
+    if (parentItemId) {
+        qc.setQueryData<ProcessApiResponse<Item>>(itemKeys.detail(parentItemId), old => {
             if (!old) return old;
             return { ...old, data: { ...old.data, stages: mapStages(old.data.stages) } };
         });
     }
 };
 
-/** Snapshot all item caches for rollback */
-const snapshotItemCaches = (qc: ReturnType<typeof useQueryClient>) => {
-    const list = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
-    const details = qc.getQueriesData<ProcessApiResponse<Item>>({ queryKey: itemKeys.all });
-    return { list, details };
-};
+/** Snapshot all item caches (list + details) for rollback */
+const snapshotItemCaches = (qc: ReturnType<typeof useQueryClient>) =>
+    qc.getQueriesData<unknown>({ queryKey: itemKeys.all });
 
 /** Restore item caches from snapshot */
 const restoreItemCaches = (qc: ReturnType<typeof useQueryClient>, snapshot: ReturnType<typeof snapshotItemCaches>) => {
-    if (snapshot.list) qc.setQueryData(itemKeys.lists(), snapshot.list);
-    snapshot.details.forEach(([key, data]) => qc.setQueryData(key, data));
+    snapshot.forEach(([key, data]) => qc.setQueryData(key, data));
 };
 
 export const useUpdateStageMutation = () => {
@@ -125,10 +123,8 @@ export const useChangeTaskStatusMutation = () => {
     return useMutation({
         mutationFn: ({ id, input }: { id: string; input: ChangeStatusInput }) =>
             processApi.tasks.changeStatus(id, input),
-        // Task status change — update task inside stage cache
         onSuccess: result => {
             const task = result.data;
-            // Find stage containing this task and update it
             const listData = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
             if (!listData) return;
             for (const item of listData.data) {
@@ -147,7 +143,6 @@ export const useChangeTaskStatusMutation = () => {
 };
 
 export const useAddTaskNoteMutation = () => {
-    const qc = useQueryClient();
     return useMutation({
         mutationFn: ({ taskId, input }: { taskId: string; input: CreateNoteInput }) =>
             processApi.tasks.addNote(taskId, input),

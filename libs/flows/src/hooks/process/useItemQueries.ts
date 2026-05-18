@@ -41,7 +41,10 @@ export const useUpdateItemMutation = () => {
     return useMutation({
         mutationFn: ({ id, input }: { id: string; input: Partial<Item> }) => processApi.items.update(id, input),
         onMutate: async ({ id, input }) => {
-            await qc.cancelQueries({ queryKey: itemKeys.detail(id) });
+            await Promise.all([
+                qc.cancelQueries({ queryKey: itemKeys.detail(id) }),
+                qc.cancelQueries({ queryKey: itemKeys.lists() }),
+            ]);
             const prevDetail = qc.getQueryData<ProcessApiResponse<Item>>(itemKeys.detail(id));
             const prevList = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
             qc.setQueryData<ProcessApiResponse<Item>>(itemKeys.detail(id), old => {
