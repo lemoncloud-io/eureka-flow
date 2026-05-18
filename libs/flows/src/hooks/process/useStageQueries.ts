@@ -101,8 +101,14 @@ export const useAddNoteMutation = () => {
     return useMutation({
         mutationFn: ({ stageId, input }: { stageId: string; input: CreateNoteInput }) =>
             processApi.stages.addNote(stageId, input),
-        onSuccess: (result, { stageId }) => {
-            patchStageInCache(qc, stageId, s => ({ ...s, notes: [...s.notes, result.data] }));
+        onSuccess: (result, { stageId, input }) => {
+            // Server may return empty content — merge input data as fallback
+            const note = {
+                ...result.data,
+                content: result.data.content || input.content,
+                stereo: result.data.stereo || input.stereo || 'comment',
+            };
+            patchStageInCache(qc, stageId, s => ({ ...s, notes: [...s.notes, note] }));
         },
     });
 };

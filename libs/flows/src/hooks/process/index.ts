@@ -11,6 +11,7 @@ export {
     useItems,
     useItem,
     useHydrateItemStages,
+    useHydrateAllItemStages,
     useCreateItemMutation,
     useUpdateItemMutation,
     useDeleteItemMutation,

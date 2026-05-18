@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { ArrowRight, Search } from 'lucide-react';
 
-import { getNextAction, getUnresolvedCount, useItems } from '@flows/flows';
+import { getNextAction, getUnresolvedCount, useHydrateAllItemStages, useItems } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Button, Input } from '@flows/ui-kit';
 
@@ -96,6 +96,7 @@ export const ItemBoardPage = () => {
     const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
     const items = itemsData?.data ?? [];
+    useHydrateAllItemStages(itemsData?.data);
 
     // Next action hero — prioritize current actor's items
     const heroEntry = useMemo(() => {

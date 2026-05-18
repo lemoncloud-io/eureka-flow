@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -10,10 +11,23 @@ import {
     getStageUnresolvedNotesCount,
     useActors,
     useChangeStageStatusMutation,
+    useDeleteItemMutation,
     useHydrateItemStages,
     useItem,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+    Button,
+} from '@flows/ui-kit';
 
 import { ItemNotesList } from '../components/ItemNotesList';
 import { NextActionCTA } from '../components/NextActionCTA';
@@ -29,7 +43,18 @@ export const ItemDetailPage = () => {
     const { data: itemData, isLoading } = useItem(id ?? null);
     const { data: actorsData } = useActors();
     const changeStatusMutation = useChangeStageStatusMutation();
+    const deleteItemMutation = useDeleteItemMutation();
     const [activeTab, setActiveTab] = useState<'stages' | 'notes'>('stages');
+
+    const handleDelete = () => {
+        if (!id) return;
+        deleteItemMutation.mutate(id, {
+            onSuccess: () => {
+                navigate('/items', { replace: true });
+                toast.success(t('navigator.itemDeleted', 'Item deleted'));
+            },
+        });
+    };
 
     const item = itemData?.data;
     useHydrateItemStages(item);
@@ -94,6 +119,38 @@ export const ItemDetailPage = () => {
                         <ProgressBar value={progress} className="h-1.5 w-24" />
                     </div>
                 </div>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0 text-muted-foreground hover:text-destructive"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>{t('navigator.deleteItem', 'Delete item?')}</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {t(
+                                    'navigator.deleteItemDesc',
+                                    'This will permanently delete "{{name}}" and all its stages.',
+                                    { name: item.name }
+                                )}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={handleDelete}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                                {t('common.delete', 'Delete')}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
 
             {nextAction && (

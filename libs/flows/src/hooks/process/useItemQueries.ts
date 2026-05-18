@@ -73,6 +73,58 @@ export const useHydrateItemStages = (item: Item | undefined) => {
     }, [itemId, allDone, qc, stageIdsKey]);
 };
 
+/**
+ * Hydrate ALL items' stages from the list cache.
+ * Runs once after items list loads — fetches every stage in parallel.
+ */
+export const useHydrateAllItemStages = (items: Item[] | undefined) => {
+    const qc = useQueryClient();
+    const hydratedRef = useRef(false);
+
+    const allStageIds = items?.flatMap(item => item.stages.map(s => s.id)) ?? [];
+    const stageIdsKey = allStageIds.join(',');
+
+    const stageQueries = useQueries({
+        queries: allStageIds.map(id => ({
+            queryKey: stageKeys.detail(id),
+            queryFn: () => processApi.stages.get(id),
+            staleTime: 30_000,
+            enabled: !!items && items.length > 0 && !hydratedRef.current,
+        })),
+    });
+
+    const allDone = stageQueries.length > 0 && stageQueries.every(q => q.isSuccess);
+
+    useEffect(() => {
+        if (!items || !allDone || hydratedRef.current) return;
+        hydratedRef.current = true;
+
+        const freshStages = allStageIds
+            .map(id => qc.getQueryData<ProcessApiResponse<Stage>>(stageKeys.detail(id))?.data)
+            .filter((s): s is Stage => !!s);
+
+        if (freshStages.length === 0) return;
+
+        const stageMap = new Map(freshStages.map(s => [s.id, s]));
+        const patchItem = (item: Item): Item => ({
+            ...item,
+            stages: item.stages.map(s => stageMap.get(s.id) ?? s),
+        });
+
+        qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
+            if (!old) return old;
+            return { ...old, data: old.data.map(patchItem) };
+        });
+        // Also patch individual detail caches
+        for (const item of items) {
+            qc.setQueryData<ProcessApiResponse<Item>>(itemKeys.detail(item.id), old => {
+                if (!old) return old;
+                return { ...old, data: patchItem(old.data) };
+            });
+        }
+    }, [items, allDone, qc, stageIdsKey]);
+};
+
 export const useCreateItemMutation = () => {
     const qc = useQueryClient();
     return useMutation({
