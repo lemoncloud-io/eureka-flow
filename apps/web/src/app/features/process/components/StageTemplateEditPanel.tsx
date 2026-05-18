@@ -81,14 +81,14 @@ export const StageTemplateEditPanel = ({
                             <div className="space-y-2">
                                 <Label>{t('navigator.actor', 'Actor')}</Label>
                                 <Select
-                                    value={stage.actorId ?? ''}
-                                    onValueChange={v => handleChange({ actorId: v || undefined })}
+                                    value={stage.actorId ?? '__none__'}
+                                    onValueChange={v => handleChange({ actorId: v === '__none__' ? undefined : v })}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder={t('navigator.selectActor', 'Select Actor')} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">{t('navigator.none', 'None')}</SelectItem>
+                                        <SelectItem value="__none__">{t('navigator.none', 'None')}</SelectItem>
                                         {actors.map(a => (
                                             <SelectItem key={a.id} value={a.id}>
                                                 {a.name}
@@ -100,14 +100,14 @@ export const StageTemplateEditPanel = ({
                             <div className="space-y-2">
                                 <Label>{t('navigator.tool', 'Tool')}</Label>
                                 <Select
-                                    value={stage.toolId ?? ''}
-                                    onValueChange={v => handleChange({ toolId: v || undefined })}
+                                    value={stage.toolId ?? '__none__'}
+                                    onValueChange={v => handleChange({ toolId: v === '__none__' ? undefined : v })}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder={t('navigator.selectTool', 'Select Tool')} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">{t('navigator.none', 'None')}</SelectItem>
+                                        <SelectItem value="__none__">{t('navigator.none', 'None')}</SelectItem>
                                         {activeTools.map(tl => (
                                             <SelectItem key={tl.id} value={tl.id}>
                                                 {tl.name}
