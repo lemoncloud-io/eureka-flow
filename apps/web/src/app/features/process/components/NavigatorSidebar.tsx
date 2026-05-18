@@ -17,8 +17,7 @@ import type { Actor } from '@flows/flows';
 const NavGroupSection = ({ group }: { group: NavGroup }) => {
     const { t } = useTranslation();
     const location = useLocation();
-    const isAnyActive = group.items.some(item => location.pathname.startsWith(item.to));
-    const [collapsed, setCollapsed] = useState(group.collapsible && !isAnyActive);
+    const [collapsed, setCollapsed] = useState(false);
 
     if (group.collapsible) {
         return (
