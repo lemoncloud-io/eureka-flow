@@ -28,7 +28,8 @@ const HeaderBreadcrumb = () => {
     const { t } = useTranslation();
     const { id, stageId } = useParams<{ id: string; stageId: string }>();
     const location = useLocation();
-    const { data: itemData } = useItem(id ?? null);
+    const isItemRoute = location.pathname.startsWith('/items/');
+    const { data: itemData } = useItem(isItemRoute ? (id ?? null) : null);
 
     const item = itemData?.data;
     const stage = stageId ? item?.stages.find(s => s.id === stageId) : undefined;
