@@ -25,6 +25,8 @@ interface UseMobileFlowActionsReturn {
     handleAddBlock: (type: string) => Promise<string | null>;
     handleExport: () => void;
     handleNew: () => Promise<void>;
+    /** Creates new flow without confirm — for MobileNewFlowSheet */
+    handleCreateNewFlow: () => Promise<string | null>;
     handleClear: () => void;
 }
 
@@ -145,23 +147,25 @@ export const useMobileFlowActions = ({
         toast.success(t('flowEditor.exportedToJson'));
     }, [flowName, currentFlowId, t]);
 
-    const handleNew = useCallback(async () => {
-        if (window.confirm(t('flowEditor.confirmNewFlow'))) {
-            useCanvasStore.getState().clearWorkflow();
-            lastSavedStateRef.current = serializeWorkflowState({ nodes: [], connections: [] });
-            const newId = await createNewFlow();
-            if (newId) {
-                updateUrl(newId);
-                toast.success(t('flowEditor.newFlowCreated'));
-            }
+    /** Creates new flow without confirmation — for use by MobileNewFlowSheet */
+    const handleCreateNewFlow = useCallback(async (): Promise<string | null> => {
+        useCanvasStore.getState().clearWorkflow();
+        lastSavedStateRef.current = serializeWorkflowState({ nodes: [], connections: [] });
+        const newId = await createNewFlow();
+        if (newId) {
+            updateUrl(newId);
+            toast.success(t('flowEditor.newFlowCreated'));
         }
+        return newId;
     }, [createNewFlow, updateUrl, t, serializeWorkflowState, lastSavedStateRef]);
 
+    const handleNew = useCallback(async () => {
+        await handleCreateNewFlow();
+    }, [handleCreateNewFlow]);
+
     const handleClear = useCallback(() => {
-        if (window.confirm(t('flowEditor.confirmClearCanvas', 'Clear all nodes?'))) {
-            useCanvasStore.getState().clearWorkflow();
-            toast.success(t('flowEditor.canvasCleared', 'Canvas cleared'));
-        }
+        useCanvasStore.getState().clearWorkflow();
+        toast.success(t('flowEditor.canvasCleared', 'Canvas cleared'));
     }, [t]);
 
     return {
@@ -170,6 +174,7 @@ export const useMobileFlowActions = ({
         handleAddBlock,
         handleExport,
         handleNew,
+        handleCreateNewFlow,
         handleClear,
     };
 };

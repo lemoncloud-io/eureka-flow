@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChevronDown, Plus, Workflow } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 
 import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
@@ -16,6 +16,7 @@ import type { FlowRole } from '@flows/flows';
 
 interface MobileStepListProps {
     onTapCard: (nodeId: string) => void;
+    onExpandContent?: (content: { value: unknown; type?: string }) => void;
     onAddStep: () => void;
     onAddBlockDirect?: (type: string) => void;
     onRunNode?: (nodeId: string) => void;
@@ -26,6 +27,7 @@ interface MobileStepListProps {
 
 export const MobileStepList = ({
     onTapCard,
+    onExpandContent,
     onAddStep,
     onAddBlockDirect,
     onRunNode,
@@ -87,72 +89,53 @@ export const MobileStepList = ({
     // Empty state
     if (nodes.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 px-6 text-muted-foreground">
-                <div className="relative w-20 h-20 mb-6">
-                    <div className="absolute inset-0 rounded-2xl bg-primary/5 border border-primary/10" />
-                    <Workflow className="absolute inset-0 m-auto w-10 h-10 text-primary/25" />
-                    <div className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Plus className="w-4 h-4 text-primary/50" />
-                    </div>
-                </div>
+            <div className="flex flex-col items-center justify-center py-20 px-6">
+                <div className="w-full rounded-2xl border border-border bg-card p-6 flex flex-col items-center">
+                    <p className="text-sm font-medium text-foreground mb-1">
+                        + {t('mobile.emptyState.title', '입력 노드 선택')}
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-5 text-center leading-relaxed">
+                        {t(
+                            'mobile.emptyState.description',
+                            '블록을 추가하여 AI 워크플로우를 만들고, 연결하여 데이터를 전달하세요.'
+                        )}
+                    </p>
 
-                <p className="text-sm font-medium text-foreground/70 mb-1">
-                    {t('mobile.emptyState.title', 'Start building your flow')}
-                </p>
-                <p className="text-xs text-muted-foreground/60 mb-6 text-center leading-relaxed">
-                    {t(
-                        'mobile.emptyState.description',
-                        'Add blocks to create an AI workflow. Connect them to pass data between steps.'
-                    )}
-                </p>
-
-                {role === 'owner' &&
-                    (() => {
-                        const quickBlocks = Object.values(blockRegistry)
-                            .filter(b => b.stereo === 'input')
-                            .slice(0, 3);
-
-                        return (
-                            <div className="flex flex-col items-center gap-4">
-                                {/* Quick-add blocks */}
-                                {onAddBlockDirect && quickBlocks.length > 0 && (
-                                    <div className="flex flex-wrap justify-center gap-2">
-                                        {quickBlocks.map(block => (
-                                            <button
-                                                key={block.type}
-                                                onClick={() => onAddBlockDirect(block.type)}
+                    {role === 'owner' &&
+                        onAddBlockDirect &&
+                        (() => {
+                            const quickBlocks = Object.values(blockRegistry)
+                                .filter(b => b.stereo === 'input')
+                                .slice(0, 2);
+                            if (quickBlocks.length === 0) return null;
+                            return (
+                                <div className="flex justify-center gap-2">
+                                    {quickBlocks.map(block => (
+                                        <button
+                                            key={block.type}
+                                            onClick={() => onAddBlockDirect(block.type)}
+                                            className={cn(
+                                                'flex items-center gap-2 px-4 py-2.5 rounded-xl',
+                                                'border border-border bg-background',
+                                                'text-xs font-medium',
+                                                'hover:border-primary/40 transition-colors'
+                                            )}
+                                        >
+                                            <div
                                                 className={cn(
-                                                    'flex items-center gap-2 px-3 py-2 rounded-xl',
-                                                    'border border-border/40 bg-card',
-                                                    'text-xs font-medium',
-                                                    'hover:border-primary/30 hover:shadow-sm',
-                                                    'active:scale-[0.97] transition-all'
+                                                    'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                                                    STEREO_ICON_BG.input
                                                 )}
                                             >
-                                                <div
-                                                    className={cn(
-                                                        'w-7 h-7 rounded-lg flex items-center justify-center',
-                                                        STEREO_ICON_BG.input
-                                                    )}
-                                                >
-                                                    <BlockIcon icon={block.icon} size={14} />
-                                                </div>
-                                                {block.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                                {/* Browse all */}
-                                <button
-                                    onClick={onAddStep}
-                                    className="flex items-center gap-1.5 text-xs text-primary/60 hover:text-primary transition-colors"
-                                >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    {t('mobile.browseAllBlocks', 'Browse all blocks')}
-                                </button>
-                            </div>
-                        );
-                    })()}
+                                                <BlockIcon icon={block.icon} size={16} />
+                                            </div>
+                                            {block.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+                </div>
             </div>
         );
     }
@@ -168,17 +151,11 @@ export const MobileStepList = ({
                                 return node ? blockRegistry[node.type]?.stereo : undefined;
                             })
                             .filter(Boolean);
-
-                        // Determine group label based on node types
                         const hasInput = stereos.includes('input');
                         const hasProcess = stereos.includes('process');
                         const hasOutput = stereos.includes('output');
                         const groupLabel = group.isMultiNode
-                            ? [
-                                  hasInput && t('mobile.groupLabel.input', 'Input'),
-                                  hasProcess && t('mobile.groupLabel.process', 'Process'),
-                                  hasOutput && t('mobile.groupLabel.output', 'Output'),
-                              ]
+                            ? [hasInput && 'INPUT', hasProcess && 'PROCESS', hasOutput && 'OUTPUT']
                                   .filter(Boolean)
                                   .join(' → ')
                             : undefined;
@@ -192,18 +169,17 @@ export const MobileStepList = ({
                                 exit={{ opacity: 0, y: -16 }}
                                 transition={{ duration: 0.2, delay: groupIdx * 0.03 }}
                             >
-                                {/* Group container */}
                                 <div
                                     className={cn(
                                         group.isMultiNode
                                             ? cn(
-                                                  'rounded-2xl border-[1.3px] border-border px-3 pt-3 space-y-0',
+                                                  'rounded-2xl border border-border px-3 pt-3 space-y-0',
                                                   collapsedGroups.has(group.id) ? 'pb-0' : 'pb-3'
                                               )
                                             : ''
                                     )}
                                 >
-                                    {/* Group header — tappable to collapse/expand */}
+                                    {/* Group header */}
                                     {group.isMultiNode && groupLabel && (
                                         <button
                                             type="button"
@@ -212,21 +188,21 @@ export const MobileStepList = ({
                                         >
                                             <ChevronDown
                                                 className={cn(
-                                                    'w-3.5 h-3.5 text-muted-foreground/50 transition-transform duration-200',
+                                                    'w-3.5 h-3.5 text-muted-foreground transition-transform duration-200',
                                                     collapsedGroups.has(group.id) && '-rotate-90'
                                                 )}
                                             />
-                                            <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-widest">
+                                            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
                                                 {groupLabel}
                                             </span>
-                                            <div className="flex-1 h-px bg-border/40" />
-                                            <span className="text-[10px] font-medium text-muted-foreground/50 tabular-nums">
+                                            <div className="flex-1 h-px bg-border" />
+                                            <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
                                                 {group.nodeIds.length}
                                             </span>
                                         </button>
                                     )}
 
-                                    {/* Nodes within the group — hidden when collapsed */}
+                                    {/* Nodes */}
                                     {!collapsedGroups.has(group.id) &&
                                         group.nodeIds.map((nodeId, idx) => {
                                             const node = nodeMap.get(nodeId);
@@ -255,6 +231,7 @@ export const MobileStepList = ({
                                                         node={node}
                                                         displayName={displayNames.get(nodeId) ?? node.type}
                                                         onTapCard={onTapCard}
+                                                        onExpandContent={onExpandContent}
                                                         onRun={onRunNode}
                                                         onDelete={handleDelete}
                                                         role={role}
