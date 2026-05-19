@@ -1,5 +1,77 @@
 # Changelog
 
+## [2026-05-19] - root@0.49.0, @flows/web@0.49.0, @flows/admin@0.27.0
+
+### Features
+
+- (process) add loading indicators and success messages
+- show actor/tool assignment indicators on stage template items
+- improve actor card with stereo icons and current ring
+- polish tools page, process cards, and item row indicators
+- replace prev/next nav with horizontal stage stepper
+- replace tool type dropdown with icon radio cards
+- note author display and tool opened feedback
+- process apply with item name prompt and list shortcut
+- polish stage completion info and actor color dots
+- add reopen, skip, and completion state UX improvements
+- show navigator button on dev server (VITE_ENV=DEV)
+- support zip file upload in image input block
+- improve tool action UX and embed browser
+- stage detail and actor page UX improvements
+- ux batch — hydration, delete item, notes fix, cleanup
+- items page UX improvements and stage hydration
+- optimistic UI for all process navigator mutations
+- implement realApi proxy client and remove Dashboard
+- navigator UX improvements — actor filtering, item filters, stage warnings
+- (flows) add navigator feature
+- enhance navigator with type-aware UI improvements
+- improve dashboard
+- improve ui
+- implement phase8
+- implement phase7
+- implement phase6
+- implement phase5
+- implement phase4
+- implement phase3
+- implement phase2
+- implement phase1
+
+### Bug Fixes
+
+- increase stage card vertical padding
+- prevent crash from empty SelectItem value in tool form
+- auto-fetch all flow pages in tool form dropdown
+- pass flowRef on tool creation, not just update
+- expand sidebar setup section by default
+- route task/note mutations through stages.update for real API
+- share actor selection across components via Zustand store
+- cache update correctness in optimistic mutations
+- use sentinel value for empty SelectItem in stage editor
+- only call useItem on /items/* routes in header breadcrumb
+- use entity-specific proxy path (/:type/:id/proxy) instead of /flows/
+- default to mockApi, switch to realApi only with VITE_PROCESS_API=real
+- improve navigator UX with contextual header and stage navigation
+- improve navigator accessibility and dashboard UX
+
+### Refactor
+
+- (process) remove unused hydration
+- remove server-unsupported UI features
+- simplify review — fix hydration, memo, dedup
+- replace invalidateQueries with direct cache updates
+- improve navigator UI with design review fixes
+- use ui-kit Breadcrumb components and extract helpers
+- (process) simplify incomplete task tracking
+
+### Chores
+
+- resolve merge conflicts with origin/develop
+- add type dependency
+
+### Other
+
+- revert: restore landing page to original state
+
 ## [2026-05-18] - root@0.48.0, @flows/web@0.48.0
 
 ### Features
