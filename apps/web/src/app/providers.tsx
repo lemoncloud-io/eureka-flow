@@ -4,7 +4,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { I18nextProvider } from 'react-i18next';
 
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 
 import { flowStorage } from '@flows/flows';
 import {
@@ -34,6 +34,7 @@ import type { ErrorInfo, ReactNode } from 'react';
 const mutationCache = new MutationCache({
     onError: (error: Error): void => {
         reportError(error, {}, 'web');
+        toast.error(error.message || 'Something went wrong');
     },
 });
 
@@ -66,6 +67,9 @@ const isPublicRoute = (): boolean => {
         pathname.startsWith('/auth/')
     );
 };
+
+// Note: Navigator routes (/items/*, /processes/*, /actors, /tools) are NOT public.
+// They will be caught by the ApiKeyGate and require authentication.
 
 const CODES_URL = import.meta.env.VITE_CODES_URL;
 

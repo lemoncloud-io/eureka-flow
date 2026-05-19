@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Camera, FileText, Image, Loader2, Upload, X } from 'lucide-react';
+import { Archive, Camera, FileText, Image, Loader2, Upload, X } from 'lucide-react';
 
 import { processImageWithConfig } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -51,9 +51,10 @@ export const MobileImageUpload = ({ node, onConfigChange }: MobileImageUploadPro
         clearFileConfig(onConfigChange);
     };
 
-    const hasImage = !!img && !fileData;
+    const isZipData = !!img && !fileData && /\.zip$/i.test(fileName || '');
+    const hasImage = !!img && !fileData && !isZipData;
     const hasFile = !!fileData;
-    const isEmpty = !hasImage && !hasFile;
+    const isEmpty = !hasImage && !hasFile && !isZipData;
 
     return (
         <div>
@@ -120,6 +121,36 @@ export const MobileImageUpload = ({ node, onConfigChange }: MobileImageUploadPro
                 </div>
             )}
 
+            {!isUploading && isZipData && (
+                <div className="space-y-2">
+                    <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/20">
+                        <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0">
+                            <Archive className="w-5 h-5 text-orange-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{fileName}</div>
+                            <div className="text-[10px] text-muted-foreground">ZIP archive</div>
+                        </div>
+                        <button
+                            onClick={handleRemove}
+                            className="w-8 h-8 rounded-lg bg-destructive/10 text-destructive flex items-center justify-center active:scale-90 transition-transform"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className={cn(
+                            'w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium',
+                            'bg-muted/50 hover:bg-muted active:scale-[0.98] transition-all border border-border/50'
+                        )}
+                    >
+                        <Upload className="w-3.5 h-3.5" />
+                        {t('detailPanel.changeFile', 'Change')}
+                    </button>
+                </div>
+            )}
+
             {!isUploading && hasFile && (
                 <div className="space-y-2">
                     <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/20">
@@ -170,7 +201,7 @@ export const MobileImageUpload = ({ node, onConfigChange }: MobileImageUploadPro
                                 {t('detailPanel.clickToUpload', 'Tap to upload')}
                             </div>
                             <div className="text-[10px] text-muted-foreground/50">
-                                {t('detailPanel.supportedFormats', 'Images, TXT, HTML, JSON')}
+                                {t('detailPanel.supportedFormats', 'Images, ZIP, TXT, HTML, JSON')}
                             </div>
                         </div>
                     </button>

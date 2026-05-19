@@ -1,5 +1,6 @@
 export * from './graph';
 export * from './permissions';
+export * from './process';
 
 export type {
     BlockDefinition,
