@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-05-19] - root@0.50.0, @flows/web@0.50.0
+
+### Features
+
+- enable real process API in CI deployments
+
 ## [2026-05-19] - root@0.49.0, @flows/web@0.49.0, @flows/admin@0.27.0
 
 ### Features
