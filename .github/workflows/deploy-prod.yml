@@ -194,6 +194,7 @@ jobs:
                   PROD_CF_DISTRIBUTION_ID: ${{ matrix.project == 'admin' && secrets.ADMIN_PROD_CF_DISTRIBUTION_ID || secrets.PROD_CF_DISTRIBUTION_ID }}
                   VITE_ENV: PROD
                   VITE_PROJECT: FLOWS
+                  VITE_PROCESS_API: real
                   VITE_API_URL: ${{ secrets.VITE_PROD_API_URL }}
                   VITE_WS_ENDPOINT: ${{ secrets.VITE_PROD_WS_ENDPOINT }}
                   VITE_CODES_URL: ${{ secrets.VITE_PROD_CODES_URL }}
