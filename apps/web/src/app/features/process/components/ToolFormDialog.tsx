@@ -50,16 +50,23 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
     const [name, setName] = useState(tool?.name ?? '');
     const [stereo, setStereo] = useState<'link' | 'embed' | 'flow'>(tool?.stereo ?? 'link');
     const [actionLabel, setActionLabel] = useState(tool?.actionLabel ?? '');
-    const [urlTemplate, setUrlTemplate] = useState(tool?.urlTemplate ?? '');
-    const [flowRefId, setFlowRefId] = useState(tool?.flowRef?.flowId ?? '');
+    // For 'link'/'embed' urlTemplate is the URL. For 'flow' it carries the flowId.
+    const initialUrl = tool?.stereo === 'flow' ? '' : (tool?.urlTemplate ?? '');
+    const initialFlowId = tool?.stereo === 'flow' ? (tool?.urlTemplate ?? '') : '';
+    const [urlTemplate, setUrlTemplate] = useState(initialUrl);
+    const [flowRefId, setFlowRefId] = useState(initialFlowId);
     const [memo, setMemo] = useState(tool?.memo ?? '');
 
     const hasInvalidPlaceholder = urlTemplate && INVALID_PLACEHOLDER_RE.test(urlTemplate);
     const needsUrl = stereo === 'link' || stereo === 'embed';
+    const isFlow = stereo === 'flow';
+
+    const resolvedUrlTemplate = isFlow ? flowRefId || undefined : urlTemplate.trim() || undefined;
 
     const handleSubmit = () => {
         if (!name.trim() || !actionLabel.trim()) return;
         if (needsUrl && !urlTemplate.trim()) return;
+        if (isFlow && !flowRefId) return;
 
         if (isEdit) {
             updateMutation.mutate(
@@ -68,8 +75,7 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                     input: {
                         name: name.trim(),
                         actionLabel: actionLabel.trim(),
-                        urlTemplate: urlTemplate.trim() || undefined,
-                        flowRef: flowRefId ? { flowId: flowRefId } : undefined,
+                        urlTemplate: resolvedUrlTemplate,
                         memo: memo || undefined,
                     },
                 },
@@ -87,8 +93,7 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                     name: name.trim(),
                     stereo,
                     actionLabel: actionLabel.trim(),
-                    urlTemplate: urlTemplate.trim() || undefined,
-                    flowRef: flowRefId ? { flowId: flowRefId } : undefined,
+                    urlTemplate: resolvedUrlTemplate,
                     memo: memo || undefined,
                 },
                 {
@@ -224,7 +229,11 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                         <Button
                             onClick={handleSubmit}
                             disabled={
-                                !name.trim() || !actionLabel.trim() || (needsUrl && !urlTemplate.trim()) || isPending
+                                !name.trim() ||
+                                !actionLabel.trim() ||
+                                (needsUrl && !urlTemplate.trim()) ||
+                                (isFlow && !flowRefId) ||
+                                isPending
                             }
                         >
                             {isPending && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
