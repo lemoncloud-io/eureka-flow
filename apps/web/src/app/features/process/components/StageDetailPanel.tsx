@@ -114,8 +114,8 @@ export const StageDetailPanel = ({ item, stageId, actors, onClose, onSelectStage
 
     return (
         <Sheet open={open} onOpenChange={o => !o && onClose()}>
-            <SheetContent side="right" className="w-full sm:w-[460px] overflow-y-auto p-0">
-                <SheetHeader className="px-6 pt-6 pb-3">
+            <SheetContent side="right" className="flex w-full flex-col sm:w-[460px] p-0">
+                <SheetHeader className="shrink-0 px-6 pt-6 pb-3">
                     <StageHeaderActions
                         stage={stage}
                         actorName={actorName}
@@ -127,7 +127,7 @@ export const StageDetailPanel = ({ item, stageId, actors, onClose, onSelectStage
                     />
                 </SheetHeader>
 
-                <div className="space-y-5 px-6 pb-6">
+                <div className="flex-1 overflow-y-auto space-y-5 px-6 pb-6">
                     {/* Dependency warning — informational, never blocks */}
                     {!isDone && incompleteDeps.length > 0 && (
                         <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-500/20 dark:bg-amber-500/5">
@@ -226,6 +226,20 @@ export const StageDetailPanel = ({ item, stageId, actors, onClose, onSelectStage
                         </button>
                     )}
                 </div>
+
+                {/* Sticky footer — Mark as Done */}
+                {stage.status !== 'done' && stage.status !== 'skip' && (
+                    <div className="shrink-0 border-t border-border bg-background px-6 py-4">
+                        <Button
+                            className="w-full bg-emerald-500 text-white hover:bg-emerald-600"
+                            onClick={() => handleStatusChange('done')}
+                            disabled={changeStatusMutation.isPending}
+                        >
+                            {changeStatusMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {t('navigator.markAsDone', 'Mark as Done')}
+                        </Button>
+                    </div>
+                )}
             </SheetContent>
         </Sheet>
     );

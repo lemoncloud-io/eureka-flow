@@ -10,6 +10,7 @@ import { Separator, ThemeToggle } from '@flows/ui-kit';
 
 import { CurrentActorDropdown } from './CurrentActorDropdown';
 import { NAV_GROUPS } from '../consts';
+import { useCurrentActor } from '../hooks/useCurrentActor';
 
 import type { NavGroup } from '../consts';
 import type { Actor } from '@flows/flows';
@@ -122,6 +123,47 @@ const TeamSection = () => {
     );
 };
 
+const SidebarActorCard = () => {
+    const { t } = useTranslation();
+    const { currentActor } = useCurrentActor();
+
+    if (!currentActor) {
+        return (
+            <div className="flex items-center justify-between gap-1 px-2 py-2">
+                <CurrentActorDropdown />
+                <ThemeToggle />
+            </div>
+        );
+    }
+
+    const initials = currentActor.name
+        .split(/\s+/)
+        .map(part => part.charAt(0).toUpperCase())
+        .slice(0, 2)
+        .join('');
+
+    return (
+        <div className="flex items-center gap-2 px-3 py-2">
+            <div
+                className={cn(
+                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white',
+                    currentActor.color
+                )}
+            >
+                {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{currentActor.name}</p>
+                <p className="truncate text-[11px] uppercase tracking-wider text-muted-foreground">
+                    {t(`actor.stereo.${currentActor.stereo}`, currentActor.stereo)}
+                </p>
+            </div>
+            <CurrentActorDropdown />
+            <ThemeToggle />
+        </div>
+    );
+};
+
 export const NavigatorSidebar = ({ className }: { className?: string }) => {
     const { t } = useTranslation();
 
@@ -139,10 +181,7 @@ export const NavigatorSidebar = ({ className }: { className?: string }) => {
                 <TeamSection />
             </nav>
             <Separator />
-            <div className="flex items-center justify-between gap-1 px-2 py-2">
-                <CurrentActorDropdown />
-                <ThemeToggle />
-            </div>
+            <SidebarActorCard />
         </aside>
     );
 };
