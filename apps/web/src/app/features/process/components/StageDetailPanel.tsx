@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -68,6 +68,35 @@ export const StageDetailPanel = ({ item, stageId, actors, onClose, onSelectStage
     const stage = item?.stages.find(s => s.id === stageId) ?? null;
     const open = !!stage && !!item;
 
+    const actorName = useMemo(
+        () => (stage?.actorId ? actors.find(a => a.id === stage.actorId)?.name : undefined),
+        [stage?.actorId, actors]
+    );
+
+    const incompleteDeps = useMemo(() => {
+        if (!stage || !item) return [];
+        return stage.dependencyStageIds
+            .map(depId => item.stages.find(s => s.id === depId))
+            .filter((s): s is Stage => !!s && s.status !== 'done' && s.status !== 'skip');
+    }, [stage, item]);
+
+    const nextAction = useMemo(() => (item ? getNextAction(item) : undefined), [item]);
+
+    const toolContext = useMemo<ToolContext>(
+        () => ({
+            itemId: item?.id ?? '',
+            itemName: item?.name ?? '',
+            stageId: stage?.id ?? '',
+            stageName: stage?.name ?? '',
+        }),
+        [item?.id, item?.name, stage?.id, stage?.name]
+    );
+
+    const activeActors = useMemo(
+        () => actors.filter(a => a.isActive || a.id === stage?.actorId),
+        [actors, stage?.actorId]
+    );
+
     const handleStatusChange = (newStatus: Status) => {
         if (!stage) return;
         changeStatusMutation.mutate(
@@ -89,28 +118,12 @@ export const StageDetailPanel = ({ item, stageId, actors, onClose, onSelectStage
         return <Sheet open={open} onOpenChange={o => !o && onClose()} />;
     }
 
-    const actorName = stage.actorId ? actors.find(a => a.id === stage.actorId)?.name : undefined;
     const unresolvedCount = getStageUnresolvedNotesCount(stage);
     const isIterative = stage.stereo === 'iterative';
     const isDone = stage.status === 'done' || stage.status === 'skip';
     const tasksDone = stage.tasks.filter(task => task.status === 'done').length;
     const tasksTotal = stage.tasks.length;
-
-    const incompleteDeps = stage.dependencyStageIds
-        .map(depId => item.stages.find(s => s.id === depId))
-        .filter((s): s is Stage => !!s && s.status !== 'done' && s.status !== 'skip');
-
-    const nextAction = getNextAction(item);
     const hasNextStage = nextAction && nextAction.stage.id !== stage.id;
-
-    const toolContext: ToolContext = {
-        itemId: item.id,
-        itemName: item.name,
-        stageId: stage.id,
-        stageName: stage.name,
-    };
-
-    const activeActors = actors.filter(a => a.isActive || a.id === stage.actorId);
 
     return (
         <Sheet open={open} onOpenChange={o => !o && onClose()}>

@@ -1,3 +1,4 @@
+export { ActorFilterPills } from './ActorFilterPills';
 export { ActorFormDialog } from './ActorFormDialog';
 export { ActorWorkload } from './ActorWorkload';
 export { CurrentActorDropdown } from './CurrentActorDropdown';

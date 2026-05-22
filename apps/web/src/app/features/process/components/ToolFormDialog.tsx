@@ -50,7 +50,6 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
     const [name, setName] = useState(tool?.name ?? '');
     const [stereo, setStereo] = useState<'link' | 'embed' | 'flow'>(tool?.stereo ?? 'link');
     const [actionLabel, setActionLabel] = useState(tool?.actionLabel ?? '');
-    // For 'link'/'embed' urlTemplate is the URL. For 'flow' it carries the flowId.
     const initialUrl = tool?.stereo === 'flow' ? '' : (tool?.urlTemplate ?? '');
     const initialFlowId = tool?.stereo === 'flow' ? (tool?.urlTemplate ?? '') : '';
     const [urlTemplate, setUrlTemplate] = useState(initialUrl);

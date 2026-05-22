@@ -52,8 +52,8 @@ export const ItemDetailPage = () => {
     const deleteItemMutation = useDeleteItemMutation();
     const updateItemMutation = useUpdateItemMutation();
     const [activeTab, setActiveTab] = useState<'stages' | 'notes'>('stages');
-    const [isEditingMemo, setIsEditingMemo] = useState(false);
-    const [memoDraft, setMemoDraft] = useState('');
+    const [memoDraft, setMemoDraft] = useState<string | null>(null);
+    const isEditingMemo = memoDraft !== null;
 
     const selectedStageId = searchParams.get('stage');
 
@@ -100,19 +100,11 @@ export const ItemDetailPage = () => {
         setSearchParams(params, { replace: true });
     }, [searchParams, setSearchParams]);
 
-    const handleStartEditMemo = () => {
-        setMemoDraft(item?.memo ?? '');
-        setIsEditingMemo(true);
-    };
-
+    const handleStartEditMemo = () => setMemoDraft(item?.memo ?? '');
+    const handleCancelEditMemo = () => setMemoDraft(null);
     const handleSaveMemo = () => {
-        if (!id) return;
-        updateItemMutation.mutate({ id, input: { memo: memoDraft } }, { onSuccess: () => setIsEditingMemo(false) });
-    };
-
-    const handleCancelEditMemo = () => {
-        setIsEditingMemo(false);
-        setMemoDraft('');
+        if (!id || memoDraft === null) return;
+        updateItemMutation.mutate({ id, input: { memo: memoDraft } }, { onSuccess: () => setMemoDraft(null) });
     };
 
     if (isLoading || !item) {
@@ -159,7 +151,7 @@ export const ItemDetailPage = () => {
                     {isEditingMemo ? (
                         <div className="flex items-center gap-1.5">
                             <Input
-                                value={memoDraft}
+                                value={memoDraft ?? ''}
                                 onChange={e => setMemoDraft(e.target.value)}
                                 placeholder={t('navigator.memoPlaceholder', 'Add memo...')}
                                 className="h-8 max-w-md text-sm"

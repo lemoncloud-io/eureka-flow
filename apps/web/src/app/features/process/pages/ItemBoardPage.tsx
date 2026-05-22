@@ -4,10 +4,10 @@ import { useNavigate } from 'react-router-dom';
 
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 
-import { getNextAction, getUnresolvedCount, isItemComplete, useActors, useItems } from '@flows/flows';
-import { cn } from '@flows/lib/utils';
+import { getNextAction, getUnresolvedCount, isItemComplete, matchesActor, useActors, useItems } from '@flows/flows';
 import { Button } from '@flows/ui-kit';
 
+import { ActorFilterPills } from '../components/ActorFilterPills';
 import { EmptyState } from '../components/EmptyState';
 import { ItemRow } from '../components/ItemRow';
 import { NewItemDialog } from '../components/NewItemDialog';
@@ -69,14 +69,6 @@ const HeroAction = ({ item, action, onAction }: HeroActionProps) => {
         </div>
     );
 };
-
-const matchesActor = (item: Item, actorId: string): boolean =>
-    item.stages.some(
-        s =>
-            s.actorId === actorId ||
-            s.tasks.some(task => task.actorId === actorId) ||
-            s.notes.some(note => note.targetActorId === actorId && !note.isResolved)
-    );
 
 export const ItemBoardPage = () => {
     const { t } = useTranslation();
@@ -144,35 +136,11 @@ export const ItemBoardPage = () => {
 
     return (
         <div className="space-y-4">
-            {/* Actor filter pills */}
-            <div className="flex flex-wrap gap-1.5">
-                <button
-                    onClick={() => setCurrentActor(null)}
-                    className={cn(
-                        'rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
-                        !currentActor
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'
-                    )}
-                >
-                    {t('common.all', 'All')}
-                </button>
-                {activeActors.map(actor => (
-                    <button
-                        key={actor.id}
-                        onClick={() => setCurrentActor(actor.id)}
-                        className={cn(
-                            'flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
-                            currentActor?.id === actor.id
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'
-                        )}
-                    >
-                        <span className={cn('h-2 w-2 rounded-full', actor.color)} />
-                        {actor.name}
-                    </button>
-                ))}
-            </div>
+            <ActorFilterPills
+                actors={activeActors}
+                selectedActorId={currentActor?.id ?? null}
+                onSelect={setCurrentActor}
+            />
 
             {/* Next Action Hero */}
             {heroEntry ? (

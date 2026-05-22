@@ -9,11 +9,13 @@ import {
     getNextAction,
     getStageUnresolvedNotesCount,
     getUnresolvedCount,
+    matchesActor,
     useActors,
     useItems,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
+import { ActorFilterPills } from '../components/ActorFilterPills';
 import { ProgressBar } from '../components/ProgressBar';
 
 import type { Item, NextAction } from '@flows/flows';
@@ -33,14 +35,7 @@ export const DashboardPage = () => {
     const filteredItems = useMemo(() => {
         const items = itemsData?.data ?? [];
         if (!selectedActorId) return items;
-        return items.filter(item =>
-            item.stages.some(
-                s =>
-                    s.actorId === selectedActorId ||
-                    s.tasks.some(task => task.actorId === selectedActorId) ||
-                    s.notes.some(note => note.targetActorId === selectedActorId && !note.isResolved)
-            )
-        );
+        return items.filter(item => matchesActor(item, selectedActorId));
     }, [itemsData?.data, selectedActorId]);
 
     const ongoingItems = useMemo(() => filteredItems.filter(item => calculateProgress(item) < 100), [filteredItems]);
@@ -85,35 +80,7 @@ export const DashboardPage = () => {
 
     return (
         <div className="space-y-6">
-            {/* Actor filter */}
-            <div className="flex flex-wrap gap-1.5">
-                <button
-                    onClick={() => setSelectedActorId(null)}
-                    className={cn(
-                        'rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
-                        !selectedActorId
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'
-                    )}
-                >
-                    {t('common.all', 'All')}
-                </button>
-                {activeActors.map(actor => (
-                    <button
-                        key={actor.id}
-                        onClick={() => setSelectedActorId(actor.id)}
-                        className={cn(
-                            'flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
-                            selectedActorId === actor.id
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'
-                        )}
-                    >
-                        <span className={cn('h-2 w-2 rounded-full', actor.color)} />
-                        {actor.name}
-                    </button>
-                ))}
-            </div>
+            <ActorFilterPills actors={activeActors} selectedActorId={selectedActorId} onSelect={setSelectedActorId} />
 
             {/* Stats grid */}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
