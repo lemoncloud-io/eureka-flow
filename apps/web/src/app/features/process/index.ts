@@ -1,11 +1,10 @@
 export { NavigatorLayout } from './components';
 export {
+    ActorManagerPage,
+    DashboardPage,
     ItemBoardPage,
     ItemDetailPage,
-    ProcessApplyPage,
     ProcessEditorPage,
     ProcessListPage,
-    StageFocusPage,
-    ActorManagerPage,
     ToolManagerPage,
 } from './pages';

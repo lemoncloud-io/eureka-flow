@@ -7,16 +7,19 @@ import {
     NODE_CONTENT_OVERHEAD,
     NODE_WIDTH_BOUNDS,
     PORT_LAYOUT,
+    averageProgress,
     clampNodeHeight,
     clampWidth,
     getBlockDefinition,
     getEffectiveState,
+    getNodeProductId,
     getNodeWidth,
     isAiBlock,
     isMissingAiKey,
     useBlockRegistry,
     useCanvasStore,
     useNodeTraceLogs,
+    useProductProgressStore,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { useWebCoreStore } from '@flows/web-core';
@@ -202,6 +205,8 @@ export const NodeBlock = memo<NodeBlockProps>(
         const { t } = useTranslation(['nodes', 'flows']);
         const blockRegistry = useBlockRegistry();
         const tutorialHint = useCanvasStore(s => s.tutorialHint);
+        const productId = getNodeProductId(node);
+        const productProgress = useProductProgressStore(state => (productId ? state.entries[productId] : undefined));
 
         // Try direct lookup first, then fallback to config-based matching
         const definition = getBlockDefinition(node, blockRegistry);
@@ -519,6 +524,14 @@ export const NodeBlock = memo<NodeBlockProps>(
 
                     {/* Compact Actions */}
                     <div className="flex items-center gap-0.5 shrink-0">
+                        {productProgress && !productProgress.isTerminal && (
+                            <span
+                                className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-primary"
+                                title={`${productProgress.state} • ${productProgress.productId}`}
+                            >
+                                {averageProgress(productProgress.progress$)}%
+                            </span>
+                        )}
                         {/* Run buttons: input=single, process=split button, output=none */}
                         {definition?.stereo !== 'output' &&
                             definition?.isRunnable !== false &&

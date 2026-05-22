@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { CheckCircle2, Trash2 } from 'lucide-react';
+import { Check, CheckCircle2, Edit2, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -15,6 +15,7 @@ import {
     useDeleteItemMutation,
     useHydrateItemStages,
     useItem,
+    useUpdateItemMutation,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
@@ -28,12 +29,14 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
     Button,
+    Input,
 } from '@flows/ui-kit';
 
 import { ItemNotesList } from '../components/ItemNotesList';
 import { NextActionCTA } from '../components/NextActionCTA';
 import { ProgressBar } from '../components/ProgressBar';
 import { StageCard } from '../components/StageCard';
+import { StageDetailPanel } from '../components/StageDetailPanel';
 import { STATUS_CONFIG } from '../components/StatusBadge';
 
 import type { Status } from '@flows/flows';
@@ -42,11 +45,17 @@ export const ItemDetailPage = () => {
     const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { data: itemData, isLoading } = useItem(id ?? null);
     const { data: actorsData } = useActors();
     const changeStatusMutation = useChangeStageStatusMutation();
     const deleteItemMutation = useDeleteItemMutation();
+    const updateItemMutation = useUpdateItemMutation();
     const [activeTab, setActiveTab] = useState<'stages' | 'notes'>('stages');
+    const [memoDraft, setMemoDraft] = useState<string | null>(null);
+    const isEditingMemo = memoDraft !== null;
+
+    const selectedStageId = searchParams.get('stage');
 
     const handleDelete = () => {
         if (!id) return;
@@ -60,7 +69,7 @@ export const ItemDetailPage = () => {
 
     const item = itemData?.data;
     useHydrateItemStages(item);
-    const actors = actorsData?.data ?? [];
+    const actors = useMemo(() => actorsData?.data ?? [], [actorsData?.data]);
     const actorMap = useMemo(() => new Map(actors.map(a => [a.id, a.name])), [actors]);
 
     const handleStatusChange = (stageId: string, status: Status) => {
@@ -76,8 +85,26 @@ export const ItemDetailPage = () => {
         );
     };
 
-    const handleStageSelect = (stageId: string) => {
-        navigate(`/items/${id}/stages/${stageId}`);
+    const handleStageSelect = useCallback(
+        (stageId: string) => {
+            const params = new URLSearchParams(searchParams);
+            params.set('stage', stageId);
+            setSearchParams(params, { replace: false });
+        },
+        [searchParams, setSearchParams]
+    );
+
+    const handleStageClose = useCallback(() => {
+        const params = new URLSearchParams(searchParams);
+        params.delete('stage');
+        setSearchParams(params, { replace: true });
+    }, [searchParams, setSearchParams]);
+
+    const handleStartEditMemo = () => setMemoDraft(item?.memo ?? '');
+    const handleCancelEditMemo = () => setMemoDraft(null);
+    const handleSaveMemo = () => {
+        if (!id || memoDraft === null) return;
+        updateItemMutation.mutate({ id, input: { memo: memoDraft } }, { onSuccess: () => setMemoDraft(null) });
     };
 
     if (isLoading || !item) {
@@ -102,26 +129,73 @@ export const ItemDetailPage = () => {
 
     return (
         <div className="space-y-5">
-            <div className="flex items-center gap-4">
+            <div className="flex items-start gap-4">
                 {item.thumbnailUrl ? (
                     <img
                         src={item.thumbnailUrl}
                         alt={item.name}
-                        className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                        className="h-20 w-20 shrink-0 rounded-xl object-cover"
                     />
                 ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary text-2xl font-bold">
                         {item.name.charAt(0).toUpperCase()}
                     </div>
                 )}
-                <div className="min-w-0 flex-1">
-                    <h1 className="text-xl font-bold truncate">{item.name}</h1>
+                <div className="min-w-0 flex-1 space-y-2">
+                    <h1 className="text-2xl font-bold truncate">{item.name}</h1>
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                         {currentStage && <span>{currentStage.name}</span>}
                         {currentStage && <span>·</span>}
-                        <span className="tabular-nums">{progress}%</span>
                         <ProgressBar value={progress} className="h-1.5 w-24" />
                     </div>
+                    {isEditingMemo ? (
+                        <div className="flex items-center gap-1.5">
+                            <Input
+                                value={memoDraft ?? ''}
+                                onChange={e => setMemoDraft(e.target.value)}
+                                placeholder={t('navigator.memoPlaceholder', 'Add memo...')}
+                                className="h-8 max-w-md text-sm"
+                                autoFocus
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') handleSaveMemo();
+                                    if (e.key === 'Escape') handleCancelEditMemo();
+                                }}
+                            />
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
+                                onClick={handleSaveMemo}
+                                disabled={updateItemMutation.isPending}
+                            >
+                                <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground"
+                                onClick={handleCancelEditMemo}
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={handleStartEditMemo}
+                            className="group flex items-center gap-2 rounded-md border border-dashed border-border bg-muted/30 px-2.5 py-1 text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30 hover:text-foreground"
+                        >
+                            <span className="max-w-md truncate">
+                                {item.memo || t('navigator.addMemo', 'Add memo...')}
+                            </span>
+                            <Edit2 className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+                        </button>
+                    )}
+                </div>
+                <div className="hidden shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-card px-5 py-3 text-center sm:flex">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                        {t('navigator.progress', 'Progress')}
+                    </p>
+                    <p className="text-3xl font-bold tabular-nums text-primary">{progress}%</p>
                 </div>
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -217,6 +291,14 @@ export const ItemDetailPage = () => {
                 </div>
             )}
             {activeTab === 'notes' && <ItemNotesList stages={item.stages} />}
+
+            <StageDetailPanel
+                item={item}
+                stageId={selectedStageId}
+                actors={actors}
+                onClose={handleStageClose}
+                onSelectStage={handleStageSelect}
+            />
         </div>
     );
 };

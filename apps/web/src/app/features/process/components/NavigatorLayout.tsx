@@ -3,7 +3,6 @@ import { Outlet } from 'react-router-dom';
 
 import { Sheet, SheetContent } from '@flows/ui-kit';
 
-import { ModeRail } from './ModeRail';
 import { NavigatorHeader } from './NavigatorHeader';
 import { NavigatorSidebar } from './NavigatorSidebar';
 
@@ -12,19 +11,15 @@ export const NavigatorLayout = () => {
 
     return (
         <div className="flex h-screen overflow-hidden bg-background">
-            {/* Desktop: mode rail + sidebar */}
+            {/* Desktop sidebar */}
             <aside className="hidden sm:flex">
-                <ModeRail />
                 <NavigatorSidebar />
             </aside>
 
             {/* Mobile sidebar sheet */}
             <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
                 <SheetContent side="left" className="w-64 p-0">
-                    <div className="flex h-full">
-                        <ModeRail />
-                        <NavigatorSidebar className="flex-1 border-r-0" />
-                    </div>
+                    <NavigatorSidebar className="h-full border-r-0" />
                 </SheetContent>
             </Sheet>
 

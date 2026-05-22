@@ -36,7 +36,7 @@ export const ToolAction = ({ toolId, context, onEmbed, onFlowExecute, flowState,
     const isFlowRunning = isFlow && (flowState?.status === 'loading' || flowState?.status === 'running');
     const isFlowDone = isFlow && flowState?.status === 'completed';
     const isFlowError = isFlow && flowState?.status === 'error';
-    const flowId = tool.flowRef?.flowId;
+    const flowId = isFlow ? tool.urlTemplate : undefined;
 
     const handleClick = () => {
         if (tool.stereo === 'link' && url) {

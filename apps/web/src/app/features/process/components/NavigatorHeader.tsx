@@ -12,13 +12,11 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
     Button,
-    ThemeToggle,
 } from '@flows/ui-kit';
 
-import { NAV_ITEMS } from '../consts';
-import { CurrentActorDropdown } from './CurrentActorDropdown';
 import { LivenessIndicator } from './LivenessIndicator';
 import { UnresolvedNotesBadge } from './UnresolvedNotesBadge';
+import { NAV_ITEMS } from '../consts';
 
 interface NavigatorHeaderProps {
     onMenuClick?: () => void;
@@ -26,13 +24,12 @@ interface NavigatorHeaderProps {
 
 const HeaderBreadcrumb = () => {
     const { t } = useTranslation();
-    const { id, stageId } = useParams<{ id: string; stageId: string }>();
+    const { id } = useParams<{ id: string }>();
     const location = useLocation();
     const isItemRoute = location.pathname.startsWith('/items/');
     const { data: itemData } = useItem(isItemRoute ? (id ?? null) : null);
 
     const item = itemData?.data;
-    const stage = stageId ? item?.stages.find(s => s.id === stageId) : undefined;
 
     if (id && item) {
         return (
@@ -44,25 +41,9 @@ const HeaderBreadcrumb = () => {
                         </BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
-                    {stage ? (
-                        <>
-                            <BreadcrumbItem>
-                                <BreadcrumbLink asChild>
-                                    <Link to={`/items/${id}`} className="max-w-[120px] truncate">
-                                        {item.name}
-                                    </Link>
-                                </BreadcrumbLink>
-                            </BreadcrumbItem>
-                            <BreadcrumbSeparator />
-                            <BreadcrumbItem>
-                                <BreadcrumbPage className="max-w-[120px] truncate">{stage.name}</BreadcrumbPage>
-                            </BreadcrumbItem>
-                        </>
-                    ) : (
-                        <BreadcrumbItem>
-                            <BreadcrumbPage className="max-w-[200px] truncate">{item.name}</BreadcrumbPage>
-                        </BreadcrumbItem>
-                    )}
+                    <BreadcrumbItem>
+                        <BreadcrumbPage className="max-w-[200px] truncate">{item.name}</BreadcrumbPage>
+                    </BreadcrumbItem>
                 </BreadcrumbList>
             </Breadcrumb>
         );
@@ -77,8 +58,6 @@ const HeaderBreadcrumb = () => {
 };
 
 export const NavigatorHeader = ({ onMenuClick }: NavigatorHeaderProps) => {
-    const { t } = useTranslation();
-
     return (
         <header className="flex h-14 items-center justify-between border-b border-border bg-background px-4">
             <div className="flex items-center gap-3">
@@ -91,8 +70,6 @@ export const NavigatorHeader = ({ onMenuClick }: NavigatorHeaderProps) => {
             <div className="flex items-center gap-2">
                 <LivenessIndicator />
                 <UnresolvedNotesBadge />
-                <CurrentActorDropdown />
-                <ThemeToggle />
             </div>
         </header>
     );

@@ -13,10 +13,11 @@ export interface Tool {
     id: string;
     name: string;
     stereo: 'link' | 'embed' | 'flow';
+    // For 'link'/'embed': URL with {itemId}/{stageId}/etc placeholders.
+    // For 'flow': flowId of the connected workflow (server has no flowRef field).
     urlTemplate?: string;
     actionLabel: string;
     taskTemplates?: TaskTemplate[];
-    flowRef?: { flowId: string };
     memo?: string;
     isActive: boolean;
     createdAt: Timestamp;
