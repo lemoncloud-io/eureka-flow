@@ -94,7 +94,7 @@ export const ItemBoardPage = () => {
     const [search, setSearch] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
-    const items = itemsData?.data ?? [];
+    const items = useMemo(() => itemsData?.data ?? [], [itemsData?.data]);
 
     // Next action hero — prioritize current actor's items
     const heroEntry = useMemo(() => {
@@ -198,7 +198,7 @@ export const ItemBoardPage = () => {
                 <HeroAction
                     item={heroEntry.item}
                     action={heroEntry.action}
-                    onAction={() => navigate(`/items/${heroEntry.item.id}/stages/${heroEntry.action.stage.id}`)}
+                    onAction={() => navigate(`/items/${heroEntry.item.id}?stage=${heroEntry.action.stage.id}`)}
                 />
             ) : (
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-5 py-4">

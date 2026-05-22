@@ -1,6 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 
 import { SITE_URL } from '@flows/shared';
 import { isOAuthEnabled } from '@flows/web-core';
@@ -12,16 +12,25 @@ import { PolicyPage } from './features/landing';
 import { FlowEditorRouter } from './features/mobile-editor';
 import {
     ActorManagerPage,
+    DashboardPage,
     ItemBoardPage,
     ItemDetailPage,
     NavigatorLayout,
-    ProcessApplyPage,
     ProcessEditorPage,
     ProcessListPage,
-    StageFocusPage,
     ToolManagerPage,
 } from './features/process';
 import { TutorialRouter } from './features/tutorial';
+
+const LegacyStageRedirect = () => {
+    const { id, stageId } = useParams<{ id: string; stageId: string }>();
+    return <Navigate to={`/items/${id}?stage=${stageId}`} replace />;
+};
+
+const LegacyApplyRedirect = () => {
+    const { id } = useParams<{ id: string }>();
+    return <Navigate to={`/processes/${id}`} replace />;
+};
 
 export const App = () => {
     const { i18n } = useTranslation();
@@ -42,17 +51,17 @@ export const App = () => {
 
                 {/* Navigator routes */}
                 <Route element={<NavigatorLayout />}>
+                    <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/items" element={<ItemBoardPage />} />
                     <Route path="/items/:id" element={<ItemDetailPage />} />
-                    <Route path="/items/:id/stages/:stageId" element={<StageFocusPage />} />
                     <Route path="/processes" element={<ProcessListPage />} />
                     <Route path="/processes/:id" element={<ProcessEditorPage />} />
-                    <Route path="/processes/:id/apply" element={<ProcessApplyPage />} />
                     <Route path="/actors" element={<ActorManagerPage />} />
                     <Route path="/tools" element={<ToolManagerPage />} />
                 </Route>
-                {/* Legacy redirect */}
-                <Route path="/dashboard" element={<Navigate to="/items" replace />} />
+                {/* Legacy redirects */}
+                <Route path="/items/:id/stages/:stageId" element={<LegacyStageRedirect />} />
+                <Route path="/processes/:id/apply" element={<LegacyApplyRedirect />} />
 
                 {/* Builder routes */}
                 <Route path="/flows" element={<PublicFlowsPage />} />

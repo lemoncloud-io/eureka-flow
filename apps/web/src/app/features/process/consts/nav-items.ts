@@ -1,8 +1,10 @@
-import { GitBranch, Package, Users, Wrench } from 'lucide-react';
+import { GitBranch, LayoutDashboard, Package, Users, Wrench } from 'lucide-react';
+
+import type { ElementType } from 'react';
 
 export interface NavItem {
     to: string;
-    icon: React.ElementType;
+    icon: ElementType;
     labelKey: string;
     fallback: string;
 }
@@ -18,7 +20,10 @@ export const NAV_GROUPS: NavGroup[] = [
     {
         labelKey: 'navigator.work',
         fallback: 'Work',
-        items: [{ to: '/items', icon: Package, labelKey: 'navigator.items', fallback: 'Items' }],
+        items: [
+            { to: '/dashboard', icon: LayoutDashboard, labelKey: 'navigator.dashboard', fallback: 'Dashboard' },
+            { to: '/items', icon: Package, labelKey: 'navigator.items', fallback: 'Items' },
+        ],
     },
     {
         labelKey: 'navigator.setup',

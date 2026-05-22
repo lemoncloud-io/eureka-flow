@@ -1,8 +1,7 @@
+export { DashboardPage } from './DashboardPage';
 export { ItemBoardPage } from './ItemBoardPage';
 export { ItemDetailPage } from './ItemDetailPage';
 export { ProcessListPage } from './ProcessListPage';
-export { ProcessApplyPage } from './ProcessApplyPage';
 export { ProcessEditorPage } from './ProcessEditorPage';
-export { StageFocusPage } from './StageFocusPage';
 export { ActorManagerPage } from './ActorManagerPage';
 export { ToolManagerPage } from './ToolManagerPage';

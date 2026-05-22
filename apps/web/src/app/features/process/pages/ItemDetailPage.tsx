@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { CheckCircle2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -34,6 +34,7 @@ import { ItemNotesList } from '../components/ItemNotesList';
 import { NextActionCTA } from '../components/NextActionCTA';
 import { ProgressBar } from '../components/ProgressBar';
 import { StageCard } from '../components/StageCard';
+import { StageDetailPanel } from '../components/StageDetailPanel';
 import { STATUS_CONFIG } from '../components/StatusBadge';
 
 import type { Status } from '@flows/flows';
@@ -42,11 +43,14 @@ export const ItemDetailPage = () => {
     const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { data: itemData, isLoading } = useItem(id ?? null);
     const { data: actorsData } = useActors();
     const changeStatusMutation = useChangeStageStatusMutation();
     const deleteItemMutation = useDeleteItemMutation();
     const [activeTab, setActiveTab] = useState<'stages' | 'notes'>('stages');
+
+    const selectedStageId = searchParams.get('stage');
 
     const handleDelete = () => {
         if (!id) return;
@@ -60,7 +64,7 @@ export const ItemDetailPage = () => {
 
     const item = itemData?.data;
     useHydrateItemStages(item);
-    const actors = actorsData?.data ?? [];
+    const actors = useMemo(() => actorsData?.data ?? [], [actorsData?.data]);
     const actorMap = useMemo(() => new Map(actors.map(a => [a.id, a.name])), [actors]);
 
     const handleStatusChange = (stageId: string, status: Status) => {
@@ -76,9 +80,20 @@ export const ItemDetailPage = () => {
         );
     };
 
-    const handleStageSelect = (stageId: string) => {
-        navigate(`/items/${id}/stages/${stageId}`);
-    };
+    const handleStageSelect = useCallback(
+        (stageId: string) => {
+            const params = new URLSearchParams(searchParams);
+            params.set('stage', stageId);
+            setSearchParams(params, { replace: false });
+        },
+        [searchParams, setSearchParams]
+    );
+
+    const handleStageClose = useCallback(() => {
+        const params = new URLSearchParams(searchParams);
+        params.delete('stage');
+        setSearchParams(params, { replace: true });
+    }, [searchParams, setSearchParams]);
 
     if (isLoading || !item) {
         return (
@@ -217,6 +232,14 @@ export const ItemDetailPage = () => {
                 </div>
             )}
             {activeTab === 'notes' && <ItemNotesList stages={item.stages} />}
+
+            <StageDetailPanel
+                item={item}
+                stageId={selectedStageId}
+                actors={actors}
+                onClose={handleStageClose}
+                onSelectStage={handleStageSelect}
+            />
         </div>
     );
 };
