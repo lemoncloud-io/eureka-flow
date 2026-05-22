@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 
 import { ArrowRight, Globe, KeyRound, Lock, Search, ShieldX, X } from 'lucide-react';
 
-import { useBlockRegistry, useCanvasStore, useFlows } from '@flows/flows';
+import { useBlockRegistry, useCanvasStore, useFlows, useProductProgressStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { ApiKeyDialog } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
@@ -15,6 +15,7 @@ import { AiKeyDialog } from '../../flows/components/AiKeyDialog';
 import { ContentPreviewModal } from '../../flows/components/ContentPreviewModal';
 import { DevSocketPanel } from '../../flows/components/DevSocketPanel';
 import { FlowListDialog } from '../../flows/components/FlowListDialog';
+import { useProductProgressToasts } from '../../flows/hooks/useProductProgressToasts';
 import { useSocketRecorder } from '../../flows/hooks/useSocketRecorder';
 import {
     MobileBlockLibrarySheet,
@@ -105,6 +106,13 @@ export const MobileFlowEditorPage = () => {
         canEdit: role === 'owner',
         onMessage: socketRecorder.record,
     });
+
+    useProductProgressToasts();
+
+    const clearProductProgress = useProductProgressStore(state => state.clearAll);
+    useEffect(() => {
+        return () => clearProductProgress();
+    }, [currentFlowId, clearProductProgress]);
 
     const resetAllNodesToIdle = useCallback(() => {
         const { nodes, updateNodeData } = useCanvasStore.getState();

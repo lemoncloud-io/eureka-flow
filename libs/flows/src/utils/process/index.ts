@@ -5,3 +5,5 @@ export { generateToolUrl } from './generateToolUrl';
 export type { ToolContext } from './generateToolUrl';
 export { getStageUnresolvedNotesCount, getUnresolvedCount } from './getUnresolvedCount';
 export { matchesActor } from './matchesActor';
+export { averageProgress, computeEta, formatEta, isErrorProductState, isTerminalProductState } from './computeEta';
+export { getNodeProductId } from './getNodeProductId';
