@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-05-22] - root@0.51.0, @flows/web@0.51.0, @flows/admin@0.28.0
+
+### Features
+
+- (socket) stream product progress to banner, mobile toast, and node chip
+- (navigator) restore MVP polish — memo edit, progress card, mark-as-done
+
+### Bug Fixes
+
+- (tools) persist flow connection in urlTemplate
+
+### Refactor
+
+- (navigator) deduplicate actor filter and memoize stage panel
+- (navigator) revert UX to flow-navigator-mvp spec
+
 ## [2026-05-19] - root@0.50.0, @flows/web@0.50.0
 
 ### Features
