@@ -45,6 +45,14 @@ export interface CreateItemInput {
     name: string;
     thumbnailUrl: string;
     processId: string;
+    meta?: Record<string, string | null>;
+}
+
+export interface UpdateItemInput {
+    name?: string;
+    thumbnailUrl?: string;
+    memo?: string;
+    meta?: Record<string, string | null>;
 }
 
 export interface ChangeStatusInput {
@@ -54,14 +62,14 @@ export interface ChangeStatusInput {
 
 export interface CreateNoteInput {
     content: string;
-    authorId?: string;
+    actorId?: string;
     stereo?: 'comment' | 'issue' | 'request';
     targetActorId?: string;
 }
 
 export interface CreateTaskInput {
     title: string;
-    authorId?: string;
+    actorId?: string;
     stereo?: 'normal' | 'review' | 'revision';
 }
 

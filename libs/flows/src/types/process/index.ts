@@ -19,6 +19,7 @@ export type {
     CreateStageInput,
     UpdateStageInput,
     CreateItemInput,
+    UpdateItemInput,
     ChangeStatusInput,
     CreateNoteInput,
     CreateTaskInput,
