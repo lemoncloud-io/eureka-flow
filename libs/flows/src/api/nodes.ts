@@ -14,7 +14,6 @@ import type {
 } from '../types';
 import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
-
 const _log = console.log.bind(console, '[nodes-api]');
 
 /**
@@ -209,6 +208,8 @@ export interface RunNodeOptions {
     propagate?: boolean;
     /** WebSocket connection ID for streaming execution results back to the caller */
     connection?: string;
+    /** If true, loads workspace settings (BYO API keys). Required in local for stored keys to take effect. */
+    setting?: boolean;
 }
 
 /**
@@ -231,12 +232,15 @@ export interface RunNodeOptions {
 export const runNode = async (nodeId: string, body?: RunNodeBody, options?: RunNodeOptions): Promise<NodeView> => {
     _log(`> runNode(${nodeId})`, { body, options });
     try {
-        // Build query params
+        // Build query params (send explicit 0/1 so server-side env default doesn't override)
         const queryParams: string[] = [];
-        if (options?.async) queryParams.push('async');
-        if (options?.force) queryParams.push('force');
+        if (options?.async === true) queryParams.push('async=1');
+        else if (options?.async === false) queryParams.push('async=0');
+        if (options?.force) queryParams.push('force=1');
         if (options?.propagate === true) queryParams.push('propagate=1');
         else if (options?.propagate === false) queryParams.push('propagate=0');
+        if (options?.setting === true) queryParams.push('setting=1');
+        else if (options?.setting === false) queryParams.push('setting=0');
         if (options?.connection) queryParams.push(`connection=${encodeURIComponent(options.connection)}`);
 
         const params = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';

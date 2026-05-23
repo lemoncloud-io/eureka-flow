@@ -93,8 +93,12 @@ apiClient.interceptors.response.use(
 
         const status = error.response?.status;
 
+        // HTTP 401: expired/revoked key — clear credentials
+        if (status === 401) {
+            handleAuthError();
+        }
         // HTTP 403: distinguish permission denied (valid key) vs auth expired
-        if (status === 403) {
+        else if (status === 403) {
             if (isPermissionDeniedResponse(error.response?.data)) {
                 handlePermissionDenied();
             } else {
