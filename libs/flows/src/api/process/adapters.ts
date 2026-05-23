@@ -3,24 +3,26 @@
  *
  * Server uses `flowId` everywhere. Frontend renamed to `processId`.
  * These helpers transform at the API boundary so the rest of the app only sees `processId`.
+ *
+ * Recursion is intentionally limited to the keys whose values are arrays of
+ * sub-entities (stages, tasks, notes). This keeps the walk shallow so large
+ * opaque payloads (node I/O blobs, $meta, port data) pass through by reference
+ * and aren't deep-cloned or key-renamed.
  */
 
-/** Keys whose object values are opaque user data and must NOT have their inner keys renamed. */
-const OPAQUE_KEYS = new Set(['$meta', 'meta']);
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-    value !== null && typeof value === 'object' && !Array.isArray(value);
+const RECURSE_KEYS = new Set(['stages', 'tasks', 'notes']);
 
 /** Deep rename: flowId → processId in server response data */
 export const fromServer = <T>(data: T): T => {
     if (data === null || data === undefined) return data;
     if (Array.isArray(data)) return data.map(fromServer) as T;
-    if (!isPlainObject(data)) return data;
+    if (typeof data !== 'object') return data;
 
+    const obj = data as Record<string, unknown>;
     const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(data)) {
+    for (const [key, value] of Object.entries(obj)) {
         const newKey = key === 'flowId' ? 'processId' : key;
-        result[newKey] = OPAQUE_KEYS.has(key) ? value : fromServer(value);
+        result[newKey] = RECURSE_KEYS.has(key) && Array.isArray(value) ? value.map(fromServer) : value;
     }
     return result as T;
 };
@@ -29,12 +31,13 @@ export const fromServer = <T>(data: T): T => {
 export const toServer = <T>(data: T): T => {
     if (data === null || data === undefined) return data;
     if (Array.isArray(data)) return data.map(toServer) as T;
-    if (!isPlainObject(data)) return data;
+    if (typeof data !== 'object') return data;
 
+    const obj = data as Record<string, unknown>;
     const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(data)) {
+    for (const [key, value] of Object.entries(obj)) {
         const newKey = key === 'processId' ? 'flowId' : key;
-        result[newKey] = OPAQUE_KEYS.has(key) ? value : toServer(value);
+        result[newKey] = RECURSE_KEYS.has(key) && Array.isArray(value) ? value.map(toServer) : value;
     }
     return result as T;
 };
