@@ -8,7 +8,7 @@ import { useBlockRegistry, useCanvasStore, useFlows, useProductProgressStore } f
 import { cn } from '@flows/lib/utils';
 import { ApiKeyDialog } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
-import { redirectToLogin, useWebCoreStore } from '@flows/web-core';
+import { isOAuthEnabled, redirectToLogin, useWebCoreStore } from '@flows/web-core';
 
 import { useDebugMode } from '../../../hooks/useDebugMode';
 import { AiKeyDialog } from '../../flows/components/AiKeyDialog';
