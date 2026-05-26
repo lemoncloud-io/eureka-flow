@@ -33,6 +33,11 @@
         "minutesAgo": "{{count}}분 전",
         "hoursAgo": "{{count}}시간 전"
     },
+    "pagination": {
+        "itemsPerPage": "페이지당",
+        "all": "전체",
+        "items": "개"
+    },
     "theme": {
         "light": "라이트",
         "dark": "다크",
