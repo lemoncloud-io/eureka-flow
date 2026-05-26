@@ -40,19 +40,19 @@
     },
     "how_it_works": {
         "badge": "How It Works",
-        "title": "Two layers, one platform",
-        "subtitle": "Human workflows above. Machine pipelines below. Connected when you need them.",
-        "navigate": {
-            "title": "Navigate",
-            "description": "Define your process once, apply it to every item. Each stage shows who does what — and what's next."
+        "title": "Three steps to get started",
+        "subtitle": "Add blocks, connect them, and run. Inspect results and iterate as you go.",
+        "add_blocks": {
+            "title": "Add Blocks",
+            "description": "Drag AI blocks from the sidebar onto the canvas. Mix inputs, processors, and outputs however you need."
         },
-        "build": {
-            "title": "Build",
-            "description": "Create AI pipelines with drag-and-drop blocks. Connect inputs and outputs visually. Run and debug in real time."
+        "connect_flow": {
+            "title": "Connect Flow",
+            "description": "Link node input and output ports to define how data moves. A visual pipeline takes shape as you wire things up."
         },
-        "connect": {
-            "title": "Connect",
-            "description": "Link a stage to an AI flow. When your team reaches that step, the machine runs automatically. Results flow back as notes."
+        "run_iterate": {
+            "title": "Run & Iterate",
+            "description": "Execute the flow with one click, review the results, and refine the configuration as you go."
         }
     },
     "features": {
