@@ -18,6 +18,7 @@ import type {
     Stage,
     Task,
     Tool,
+    UpdateItemInput,
     UpdateProcessInput,
     UpdateStageInput,
 } from '../../types/process';
@@ -170,6 +171,7 @@ export const mockApi: ProcessApi = {
             if (!input.name.trim()) throw new Error('name is required');
 
             const newItem = instantiateItem(process, id, input.name, input.thumbnailUrl);
+            if (input.meta) newItem.$meta = input.meta;
             dbItems = [newItem, ...dbItems];
             return success(newItem);
         },
@@ -192,14 +194,18 @@ export const mockApi: ProcessApi = {
             if (!input.name.trim()) throw new Error('name is required');
 
             const newItem = instantiateItem(process, input.processId, input.name, input.thumbnailUrl);
+            if (input.meta) newItem.$meta = input.meta;
             dbItems = [newItem, ...dbItems];
             return success(newItem);
         },
-        async update(id: string, input: Partial<Item>): Promise<ProcessApiResponse<Item>> {
+        async update(id: string, input: UpdateItemInput): Promise<ProcessApiResponse<Item>> {
             await delay(300);
             const idx = dbItems.findIndex(i => i.id === id);
             if (idx === -1) throw new Error('Item not found');
-            dbItems[idx] = { ...dbItems[idx], ...input, updatedAt: Date.now() };
+            const { meta, ...rest } = input;
+            const next: Item = { ...dbItems[idx], ...rest, updatedAt: Date.now() };
+            if (meta) next.$meta = meta;
+            dbItems[idx] = next;
             return success(dbItems[idx]);
         },
         async remove(id: string): Promise<ProcessApiResponse<{ id: string }>> {
@@ -261,7 +267,7 @@ export const mockApi: ProcessApi = {
                 stageId: id,
                 content: input.content,
                 stereo: input.stereo || 'comment',
-                actorId: input.authorId,
+                actorId: input.actorId,
                 targetActorId: input.targetActorId,
                 isResolved: false,
                 createdAt: Date.now(),
@@ -285,7 +291,7 @@ export const mockApi: ProcessApi = {
                 title: input.title,
                 stereo: input.stereo || 'normal',
                 status: 'todo',
-                actorId: input.authorId,
+                actorId: input.actorId,
                 notes: [],
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
@@ -324,7 +330,7 @@ export const mockApi: ProcessApi = {
                 taskId: id,
                 content: input.content,
                 stereo: input.stereo || 'comment',
-                actorId: input.authorId,
+                actorId: input.actorId,
                 targetActorId: input.targetActorId,
                 isResolved: false,
                 createdAt: Date.now(),

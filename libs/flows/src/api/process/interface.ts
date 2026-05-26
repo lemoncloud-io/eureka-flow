@@ -15,6 +15,7 @@ import type {
     Stage,
     Task,
     Tool,
+    UpdateItemInput,
     UpdateProcessInput,
     UpdateStageInput,
 } from '../../types/process';
@@ -32,7 +33,7 @@ export interface ProcessApi {
         list(): Promise<ProcessApiListResponse<Item>>;
         get(id: string): Promise<ProcessApiResponse<Item>>;
         create(input: CreateItemInput): Promise<ProcessApiResponse<Item>>;
-        update(id: string, input: Partial<Item>): Promise<ProcessApiResponse<Item>>;
+        update(id: string, input: UpdateItemInput): Promise<ProcessApiResponse<Item>>;
         remove(id: string): Promise<ProcessApiResponse<{ id: string }>>;
     };
     stages: {

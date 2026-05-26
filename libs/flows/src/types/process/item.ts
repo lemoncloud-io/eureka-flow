@@ -8,6 +8,7 @@ export interface Item {
     thumbnailUrl: string;
     stages: Stage[];
     memo?: string;
+    $meta?: Record<string, string | null>;
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }

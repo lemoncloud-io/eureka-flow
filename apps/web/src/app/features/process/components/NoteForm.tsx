@@ -21,7 +21,7 @@ export const NoteForm = ({ stageId }: NoteFormProps) => {
     const handleSubmit = () => {
         if (!content.trim()) return;
         addNoteMutation.mutate(
-            { stageId, input: { content: content.trim(), authorId: currentActorId ?? undefined } },
+            { stageId, input: { content: content.trim(), actorId: currentActorId ?? undefined } },
             { onSuccess: () => setContent('') }
         );
     };

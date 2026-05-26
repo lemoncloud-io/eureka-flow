@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
@@ -126,6 +126,7 @@ export const ItemDetailPage = () => {
     const currentStage = item.stages.find(s => s.status === 'doing');
     const totalNoteCount = item.stages.reduce((sum, s) => sum + s.notes.length, 0);
     const stageNameMap = new Map(item.stages.map(s => [s.id, s.name]));
+    const metaEntries = item.$meta ? Object.entries(item.$meta) : [];
 
     return (
         <div className="space-y-5">
@@ -189,6 +190,16 @@ export const ItemDetailPage = () => {
                             </span>
                             <Edit2 className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
                         </button>
+                    )}
+                    {metaEntries.length > 0 && (
+                        <dl className="grid max-w-md grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
+                            {metaEntries.map(([key, val]) => (
+                                <Fragment key={key}>
+                                    <dt className="font-medium text-muted-foreground">{key}</dt>
+                                    <dd className="truncate text-foreground">{val ?? '—'}</dd>
+                                </Fragment>
+                            ))}
+                        </dl>
                     )}
                 </div>
                 <div className="hidden shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-card px-5 py-3 text-center sm:flex">

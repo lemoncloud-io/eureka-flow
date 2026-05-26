@@ -5,7 +5,14 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { itemKeys, stageKeys } from './keys';
 import { processApi } from '../../api/process';
 
-import type { CreateItemInput, Item, ProcessApiListResponse, ProcessApiResponse, Stage } from '../../types/process';
+import type {
+    CreateItemInput,
+    Item,
+    ProcessApiListResponse,
+    ProcessApiResponse,
+    Stage,
+    UpdateItemInput,
+} from '../../types/process';
 
 export const useItems = () => {
     return useQuery({
@@ -135,7 +142,7 @@ export const useCreateItemMutation = () => {
 export const useUpdateItemMutation = () => {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, input }: { id: string; input: Partial<Item> }) => processApi.items.update(id, input),
+        mutationFn: ({ id, input }: { id: string; input: UpdateItemInput }) => processApi.items.update(id, input),
         onMutate: async ({ id, input }) => {
             await Promise.all([
                 qc.cancelQueries({ queryKey: itemKeys.detail(id) }),
@@ -143,13 +150,17 @@ export const useUpdateItemMutation = () => {
             ]);
             const prevDetail = qc.getQueryData<ProcessApiResponse<Item>>(itemKeys.detail(id));
             const prevList = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
+            const optimistic = (item: Item): Item => {
+                const { meta, ...rest } = input;
+                return { ...item, ...rest, ...(meta ? { $meta: meta } : {}) };
+            };
             qc.setQueryData<ProcessApiResponse<Item>>(itemKeys.detail(id), old => {
                 if (!old) return old;
-                return { ...old, data: { ...old.data, ...input } };
+                return { ...old, data: optimistic(old.data) };
             });
             qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
                 if (!old) return old;
-                return { ...old, data: old.data.map(i => (i.id === id ? { ...i, ...input } : i)) };
+                return { ...old, data: old.data.map(i => (i.id === id ? optimistic(i) : i)) };
             });
             return { prevDetail, prevList };
         },

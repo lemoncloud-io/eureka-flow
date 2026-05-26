@@ -26,7 +26,7 @@ export const TaskList = ({ tasks, stageId, canAdd }: TaskListProps) => {
     const handleAdd = () => {
         if (!title.trim()) return;
         addTaskMutation.mutate(
-            { stageId, input: { title: title.trim(), authorId: currentActorId ?? undefined } },
+            { stageId, input: { title: title.trim(), actorId: currentActorId ?? undefined } },
             {
                 onSuccess: () => {
                     setTitle('');
