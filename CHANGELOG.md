@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-05-26] - root@0.52.2, @flows/web@0.52.2, @flows/admin@0.29.1
+
+### Chores
+
+- (deps) drop unused docx and lodash
+
 ## [2026-05-26] - root@0.52.1, @flows/web@0.52.1
 
 ### Bug Fixes
