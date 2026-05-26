@@ -33,6 +33,11 @@
         "minutesAgo": "{{count}}m ago",
         "hoursAgo": "{{count}}h ago"
     },
+    "pagination": {
+        "itemsPerPage": "Per page",
+        "all": "All",
+        "items": " items"
+    },
     "theme": {
         "light": "Light",
         "dark": "Dark",
