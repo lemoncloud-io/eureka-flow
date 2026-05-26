@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-05-26] - root@0.52.0, @flows/web@0.52.0, @flows/admin@0.29.0
+
+### Features
+
+- (process) align write-side field names with server schema
+
+### Bug Fixes
+
+- (api) handle 401 and expose runNode setting param
+
+### Refactor
+
+- (api) simplify adapter recursion and runNode query params
+
 ## [2026-05-22] - root@0.51.0, @flows/web@0.51.0, @flows/admin@0.28.0
 
 ### Features
