@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-05-26] - root@0.52.1, @flows/web@0.52.1
+
+### Bug Fixes
+
+- (mobile) import isOAuthEnabled used in public-mode sign-in CTA
+
 ## [2026-05-26] - root@0.52.0, @flows/web@0.52.0, @flows/admin@0.29.0
 
 ### Features
