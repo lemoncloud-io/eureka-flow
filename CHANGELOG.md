@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-05-27] - root@0.53.2, @flows/web@0.53.2, @flows/admin@0.29.2
+
+### Bug Fixes
+
+- (flows) preserve node config in saveCurrentFlow body
+
 ## [2026-05-27] - root@0.53.1, @flows/web@0.53.1
 
 ### Bug Fixes
