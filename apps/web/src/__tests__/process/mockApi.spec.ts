@@ -51,25 +51,62 @@ describe('Process Navigator mockApi', () => {
             ).rejects.toThrow('name is required');
         });
 
-        it('should apply process to create item with remapped IDs', async () => {
+        it('should apply process to create item with high-fidelity remapped IDs and resets', async () => {
+            const testMeta = { targetMall: 'naver', autoRegister: true };
             const result = await mockApi.processes.apply('f1', {
                 name: '테스트 상품',
-                thumbnailUrl: '',
+                thumbnailUrl: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea',
                 processId: 'f1',
+                meta: testMeta,
             });
             const item = result.data;
+
+            // 1. Verify Item Core Properties
             expect(item.name).toBe('테스트 상품');
             expect(item.processId).toBe('f1');
+            expect(item.thumbnailUrl).toBe('https://images.unsplash.com/photo-1591047139829-d91aecb6caea');
+            expect(item.$meta).toEqual(testMeta);
             expect(item.stages.length).toBe(7);
 
-            // IDs should be remapped (not the template IDs)
+            // 2. Verify Stage-Level ID Remapping and itemId bindings
             const stageIds = item.stages.map(s => s.id);
+            // Remapped stage IDs should NOT use template prefixes like 'ts-'
             expect(stageIds.every(id => !id.startsWith('ts'))).toBe(true);
+            // Remapped stage IDs should follow the s{order}-{random} format
+            item.stages.forEach(s => {
+                expect(s.id).toMatch(/^s\d+-/);
+                expect(s.itemId).toBe(item.id);
+                expect(s.processId).toBe('f1');
+                expect(s.status).toBe('todo'); // Status reset to todo
+            });
 
-            // Dependencies should be remapped
-            const stage2 = item.stages.find(s => s.order === 2);
-            expect(stage2?.dependencyStageIds.length).toBe(1);
-            expect(stageIds).toContain(stage2?.dependencyStageIds[0]);
+            // 3. Verify DAG Dependency Integrity Remapping
+            // Let's get the original process template to compare dependencies
+            const templateRes = await mockApi.processes.get('f1');
+            const template = templateRes.data;
+
+            // For each stage in the instantiated item, verify its dependency links map correctly to the new stage IDs
+            item.stages.forEach(instStage => {
+                const tmplStage = template.stages.find(s => s.order === instStage.order);
+                expect(tmplStage).toBeDefined();
+
+                // Number of dependencies should be identical
+                expect(instStage.dependencyStageIds.length).toBe(tmplStage!.dependencyStageIds.length);
+
+                // For each dependency ID in the template, the instantiated stage should have the corresponding new stage ID
+                tmplStage!.dependencyStageIds.forEach(tmplDepId => {
+                    // Find the dependent stage's order in the template
+                    const depTmplStage = template.stages.find(s => s.id === tmplDepId);
+                    expect(depTmplStage).toBeDefined();
+
+                    // Find the newly instantiated stage with that same order
+                    const depInstStage = item.stages.find(s => s.order === depTmplStage!.order);
+                    expect(depInstStage).toBeDefined();
+
+                    // The instantiated stage's dependency list must contain this new instantiated stage's ID
+                    expect(instStage.dependencyStageIds).toContain(depInstStage!.id);
+                });
+            });
         });
     });
 
