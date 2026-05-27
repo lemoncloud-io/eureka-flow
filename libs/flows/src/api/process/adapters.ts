@@ -39,3 +39,15 @@ export const toServer = <T>(data: T): T => {
     }
     return result as T;
 };
+
+/**
+ * extract only the defined attribute.
+ * ex) `{ a:1, b: undefined }` -> `{ a:1 }`
+ */
+export const onlyDefined = <T>(N: T) =>
+    N && typeof N === 'object'
+        ? Object.entries(N).reduce<T>((N, [k, v]) => {
+              if (v !== undefined) N[k as keyof T] = v;
+              return N;
+          }, {} as T)
+        : (null as T);
