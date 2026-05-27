@@ -20,11 +20,14 @@ import type {
     Stage,
     Task,
     Tool,
+    UpdateActorInput,
     UpdateItemInput,
     UpdateProcessInput,
     UpdateStageInput,
+    UpdateToolInput,
 } from '../../types/process';
 
+// Shared internal state for the mock API
 let dbItems: Item[] = [...INITIAL_ITEMS];
 let dbProcesses: Record<string, Process> = { ...PROCESSES };
 let dbActors: Record<string, Actor> = { ...ACTORS };
@@ -120,8 +123,8 @@ export const mockApi: ProcessApi = {
         async create(input: CreateProcessInput): Promise<ProcessApiResponse<Process>> {
             await delay(300);
             if (!input.name.trim()) throw new Error('name is required');
-            const id = `flow-${Date.now()}`;
-            const stages: Stage[] = input.stages.map((s, i) => ({
+            const id = `process-${Date.now()}`;
+            const stages: Stage[] = input.stages.map<Stage>((s, i) => ({
                 id: `ts-${Date.now()}-${i}`,
                 itemId: '',
                 processId: id,
@@ -422,6 +425,12 @@ export const mockApi: ProcessApi = {
         },
     },
     actors: {
+        async get(id: string): Promise<ProcessApiResponse<Actor>> {
+            await delay(100);
+            const actor = dbActors[id];
+            if (!actor) throw new Error('Actor not found');
+            return success(actor);
+        },
         async list(): Promise<ProcessApiListResponse<Actor>> {
             await delay(100);
             return listSuccess(Object.values(dbActors));
@@ -446,7 +455,7 @@ export const mockApi: ProcessApi = {
             dbActors[id] = newActor;
             return success(newActor, warnings);
         },
-        async update(id: string, input: Partial<Actor>): Promise<ProcessApiResponse<Actor>> {
+        async update(id: string, input: UpdateActorInput): Promise<ProcessApiResponse<Actor>> {
             await delay(200);
             const actor = dbActors[id];
             if (!actor) throw new Error('Actor not found');
@@ -470,6 +479,16 @@ export const mockApi: ProcessApi = {
         },
     },
     tools: {
+        async hello(id?: string, param?: any, body?: any): Promise<ProcessApiResponse<string>> {
+            await delay(100);
+            return success(`Hello tool: ${id || 'anonymous'}`);
+        },
+        async get(id: string): Promise<ProcessApiResponse<Tool>> {
+            await delay(100);
+            const tool = dbTools[id];
+            if (!tool) throw new Error('Tool not found');
+            return success(tool);
+        },
         async list(): Promise<ProcessApiListResponse<Tool>> {
             await delay(100);
             return listSuccess(Object.values(dbTools));
@@ -507,7 +526,7 @@ export const mockApi: ProcessApi = {
             dbTools[id] = newTool;
             return success(newTool, warnings);
         },
-        async update(id: string, input: Partial<Tool>): Promise<ProcessApiResponse<Tool>> {
+        async update(id: string, input: UpdateToolInput): Promise<ProcessApiResponse<Tool>> {
             await delay(200);
             const tool = dbTools[id];
             if (!tool) throw new Error('Tool not found');

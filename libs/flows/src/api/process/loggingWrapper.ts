@@ -1,6 +1,5 @@
 import type { ProcessApi } from './interface';
 import type {
-    Actor,
     ChangeStatusInput,
     CreateActorInput,
     CreateItemInput,
@@ -9,10 +8,11 @@ import type {
     CreateTaskInput,
     CreateToolInput,
     ItemListParams,
-    Tool,
+    UpdateActorInput,
     UpdateItemInput,
     UpdateProcessInput,
     UpdateStageInput,
+    UpdateToolInput,
 } from '../../types/process';
 
 /**
@@ -121,20 +121,24 @@ export class LoggingProcessApiWrapper implements ProcessApi {
     };
 
     public readonly actors = {
+        get: (id: string) => this.logCall('actors', 'get', [id], () => this.api.actors.get(id)),
         list: () => this.logCall('actors', 'list', [], () => this.api.actors.list()),
         create: (input: CreateActorInput) =>
             this.logCall('actors', 'create', [input], () => this.api.actors.create(input)),
-        update: (id: string, input: Partial<Actor>) =>
+        update: (id: string, input: UpdateActorInput) =>
             this.logCall('actors', 'update', [id, input], () => this.api.actors.update(id, input)),
         deactivate: (id: string) => this.logCall('actors', 'deactivate', [id], () => this.api.actors.deactivate(id)),
         activate: (id: string) => this.logCall('actors', 'activate', [id], () => this.api.actors.activate(id)),
     };
 
     public readonly tools = {
+        hello: (id?: string, param?: any, body?: any) =>
+            this.logCall('tools', 'hello', [id, param, body], () => this.api.tools.hello(id, param, body)),
+        get: (id: string) => this.logCall('tools', 'get', [id], () => this.api.tools.get(id)),
         list: () => this.logCall('tools', 'list', [], () => this.api.tools.list()),
         create: (input: CreateToolInput) =>
             this.logCall('tools', 'create', [input], () => this.api.tools.create(input)),
-        update: (id: string, input: Partial<Tool>) =>
+        update: (id: string, input: UpdateToolInput) =>
             this.logCall('tools', 'update', [id, input], () => this.api.tools.update(id, input)),
         deactivate: (id: string) => this.logCall('tools', 'deactivate', [id], () => this.api.tools.deactivate(id)),
         activate: (id: string) => this.logCall('tools', 'activate', [id], () => this.api.tools.activate(id)),

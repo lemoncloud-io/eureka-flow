@@ -4,6 +4,10 @@ import { proxyCall } from './proxyClient';
 import type { ProcessApi } from './interface';
 import type {
     Actor,
+    CreateActorInput,
+    CreateItemInput,
+    CreateProcessInput,
+    CreateToolInput,
     Item,
     ItemListParams,
     Note,
@@ -13,6 +17,9 @@ import type {
     Stage,
     Task,
     Tool,
+    UpdateActorInput,
+    UpdateProcessInput,
+    UpdateToolInput,
 } from '../../types/process';
 
 /**
@@ -44,26 +51,26 @@ const notYetAvailable = (method: string) => async () => {
 
 export const realApi: ProcessApi = {
     processes: {
-        list: async () => {
+        list: async (): Promise<ProcessApiListResponse<Process>> => {
             const res = await proxyCall<ProcessApiListResponse<Process>>('flows', 'list');
             return adaptListResponse(res);
         },
-        get: async id => {
+        get: async (id: string): Promise<ProcessApiResponse<Process>> => {
             const res = await proxyCall<ProcessApiResponse<Process>>('flows', 'get', id);
             return adaptResponse(res);
         },
-        create: async input => {
+        create: async (input: CreateProcessInput): Promise<ProcessApiResponse<Process>> => {
             const res = await proxyCall<ProcessApiResponse<Process>>('flows', 'create', '0', toServer(input));
             return adaptResponse(res);
         },
-        update: async (id, input) => {
+        update: async (id: string, input: UpdateProcessInput): Promise<ProcessApiResponse<Process>> => {
             const res = await proxyCall<ProcessApiResponse<Process>>('flows', 'update', id, toServer(input));
             return adaptResponse(res);
         },
-        remove: async id => {
+        remove: async (id: string): Promise<ProcessApiResponse<{ id: string }>> => {
             return proxyCall<ProcessApiResponse<{ id: string }>>('flows', 'remove', id);
         },
-        apply: async (id, input) => {
+        apply: async (id: string, input: CreateItemInput): Promise<ProcessApiResponse<Item>> => {
             const res = await proxyCall<ProcessApiResponse<Item>>('flows', 'apply', id, toServer(input));
             return adaptResponse(res);
         },
@@ -126,37 +133,46 @@ export const realApi: ProcessApi = {
     },
 
     actors: {
-        list: async () => {
+        get: async (id: string): Promise<ProcessApiResponse<Actor>> => {
+            return proxyCall<ProcessApiResponse<Actor>>('actors', 'get', id);
+        },
+        list: async (): Promise<ProcessApiListResponse<Actor>> => {
             return proxyCall<ProcessApiListResponse<Actor>>('actors', 'list');
         },
-        create: async input => {
+        create: async (input: CreateActorInput): Promise<ProcessApiResponse<Actor>> => {
             return proxyCall<ProcessApiResponse<Actor>>('actors', 'create', '0', input);
         },
-        update: async (id, input) => {
+        update: async (id: string, input: UpdateActorInput): Promise<ProcessApiResponse<Actor>> => {
             return proxyCall<ProcessApiResponse<Actor>>('actors', 'update', id, input);
         },
-        deactivate: async id => {
+        deactivate: async (id: string): Promise<ProcessApiResponse<Actor>> => {
             return proxyCall<ProcessApiResponse<Actor>>('actors', 'deactivate', id);
         },
-        activate: async id => {
+        activate: async (id: string): Promise<ProcessApiResponse<Actor>> => {
             return proxyCall<ProcessApiResponse<Actor>>('actors', 'activate', id);
         },
     },
 
     tools: {
-        list: async () => {
+        hello: async (_id?: string, _param?: any, _body?: any): Promise<ProcessApiResponse<string>> => {
+            return proxyCall<ProcessApiResponse<string>>('tools', 'hello', _id || '0', { param: _param, body: _body });
+        },
+        get: async (id: string): Promise<ProcessApiResponse<Tool>> => {
+            return proxyCall<ProcessApiResponse<Tool>>('tools', 'get', id);
+        },
+        list: async (): Promise<ProcessApiListResponse<Tool>> => {
             return proxyCall<ProcessApiListResponse<Tool>>('tools', 'list');
         },
-        create: async input => {
+        create: async (input: CreateToolInput): Promise<ProcessApiResponse<Tool>> => {
             return proxyCall<ProcessApiResponse<Tool>>('tools', 'create', '0', input);
         },
-        update: async (id, input) => {
+        update: async (id: string, input: UpdateToolInput): Promise<ProcessApiResponse<Tool>> => {
             return proxyCall<ProcessApiResponse<Tool>>('tools', 'update', id, input);
         },
-        deactivate: async id => {
+        deactivate: async (id: string): Promise<ProcessApiResponse<Tool>> => {
             return proxyCall<ProcessApiResponse<Tool>>('tools', 'deactivate', id);
         },
-        activate: async id => {
+        activate: async (id: string): Promise<ProcessApiResponse<Tool>> => {
             return proxyCall<ProcessApiResponse<Tool>>('tools', 'activate', id);
         },
     },

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { actorKeys } from './keys';
 import { processApi } from '../../api/process';
 
-import type { Actor, CreateActorInput, ProcessApiListResponse } from '../../types/process';
+import type { Actor, CreateActorInput, ProcessApiListResponse, UpdateActorInput } from '../../types/process';
 
 export const useActors = (options?: { staleTime?: number }) => {
     return useQuery({
@@ -29,7 +29,7 @@ export const useCreateActorMutation = () => {
 export const useUpdateActorMutation = () => {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, input }: { id: string; input: Partial<Actor> }) => processApi.actors.update(id, input),
+        mutationFn: ({ id, input }: { id: string; input: UpdateActorInput }) => processApi.actors.update(id, input),
         onMutate: async ({ id, input }) => {
             await qc.cancelQueries({ queryKey: actorKeys.lists() });
             const prev = qc.getQueryData<ProcessApiListResponse<Actor>>(actorKeys.lists());

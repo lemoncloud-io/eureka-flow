@@ -73,6 +73,7 @@ export const ToolFormDialog = ({ open, onOpenChange, tool }: ToolFormDialogProps
                     id: tool.id,
                     input: {
                         name: name.trim(),
+                        stereo: tool.stereo,
                         actionLabel: actionLabel.trim(),
                         urlTemplate: resolvedUrlTemplate,
                         memo: memo || undefined,

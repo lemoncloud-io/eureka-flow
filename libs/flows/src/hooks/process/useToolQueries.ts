@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toolKeys } from './keys';
 import { processApi } from '../../api/process';
 
-import type { CreateToolInput, ProcessApiListResponse, Tool } from '../../types/process';
+import type { CreateToolInput, ProcessApiListResponse, Tool, UpdateToolInput } from '../../types/process';
 
 export const useTools = (options?: { staleTime?: number }) => {
     return useQuery({
@@ -29,7 +29,7 @@ export const useCreateToolMutation = () => {
 export const useUpdateToolMutation = () => {
     const qc = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, input }: { id: string; input: Partial<Tool> }) => processApi.tools.update(id, input),
+        mutationFn: ({ id, input }: { id: string; input: UpdateToolInput }) => processApi.tools.update(id, input),
         onMutate: async ({ id, input }) => {
             await qc.cancelQueries({ queryKey: toolKeys.lists() });
             const prev = qc.getQueryData<ProcessApiListResponse<Tool>>(toolKeys.lists());

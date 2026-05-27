@@ -80,6 +80,14 @@ export interface CreateActorInput {
     memo?: string;
 }
 
+export interface UpdateActorInput {
+    name?: string;
+    color?: string;
+    stereo: 'person' | 'team' | 'vendor';
+    isActive?: boolean;
+    memo?: string;
+}
+
 export interface CreateToolInput {
     name: string;
     stereo: 'link' | 'embed' | 'flow';
@@ -95,6 +103,15 @@ export interface CreateToolInput {
         order: number;
     }[];
     memo?: string;
+}
+
+export interface UpdateToolInput {
+    name?: string;
+    stereo: 'link' | 'embed' | 'flow';
+    urlTemplate?: string;
+    actionLabel?: string;
+    memo?: string;
+    isActive?: boolean;
 }
 
 export interface ItemListParams {

@@ -57,7 +57,7 @@ export const ActorFormDialog = ({ open, onOpenChange, actor }: ActorFormDialogPr
 
         if (isEdit) {
             updateMutation.mutate(
-                { id: actor.id, input: { name: name.trim(), color, memo: memo || undefined } },
+                { id: actor.id, input: { name: name.trim(), color, memo: memo || undefined, stereo: actor.stereo } },
                 {
                     onSuccess: result => {
                         result.warnings?.forEach(w => toast.warning(w));
