@@ -6,10 +6,6 @@ const recentIds = new Set<string>();
 const pendingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 const listeners = new Set<() => void>();
 
-const notify = () => {
-    listeners.forEach(listener => listener());
-};
-
 const subscribe = (onChange: () => void) => {
     listeners.add(onChange);
     return () => {
@@ -25,12 +21,12 @@ export const markConnectionNew = (connectionId: string): void => {
     if (existing) clearTimeout(existing);
 
     recentIds.add(connectionId);
-    notify();
+    listeners.forEach(l => l());
 
     const timeoutId = setTimeout(() => {
         recentIds.delete(connectionId);
         pendingTimeouts.delete(connectionId);
-        notify();
+        listeners.forEach(l => l());
     }, NEW_BADGE_TTL_MS);
     pendingTimeouts.set(connectionId, timeoutId);
 };

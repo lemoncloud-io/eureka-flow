@@ -239,6 +239,7 @@ export const useConnectionMode = (
 
                 if (createdEdge?.id && createdEdge.id !== tempId) {
                     updateConnection(tempId, { id: createdEdge.id });
+                    // Re-mark with the server id so the badge survives the id swap.
                     markConnectionNew(createdEdge.id);
                 }
 
@@ -255,7 +256,6 @@ export const useConnectionMode = (
         setSource(null);
     }, []);
 
-    /** Direct connect between any two ports — does not require source state */
     /** Direct connect between any two ports — does not require source state */
     const connectPorts = useCallback(
         async (sourceNodeId: string, sourcePortId: string, targetNodeId: string, targetPortId: string) => {
@@ -324,6 +324,7 @@ export const useConnectionMode = (
                 );
                 if (createdEdge?.id && createdEdge.id !== tempId) {
                     updateConnection(tempId, { id: createdEdge.id });
+                    // Re-mark with the server id so the badge survives the id swap.
                     markConnectionNew(createdEdge.id);
                 }
                 toast.success(t('mobile.connection.connected', 'Connected'));
