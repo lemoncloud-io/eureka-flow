@@ -3,7 +3,7 @@ import { realApi } from './realApi';
 
 import type { ProcessApi } from './interface';
 
-const useReal = import.meta.env.VITE_PROCESS_API === 'real';
+const useReal = import.meta.env.VITE_PROCESS_API === 'real' && !import.meta.env.VITEST;
 
 export const processApi: ProcessApi = useReal ? realApi : mockApi;
 
