@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-05-27] - root@0.53.1, @flows/web@0.53.1
+
+### Bug Fixes
+
+- (mobile) node add persistence, delete UX, dropdown bubbling, i18n
+
 ## [2026-05-27] - root@0.53.0, @flows/web@0.53.0
 
 ### Features
