@@ -52,7 +52,7 @@ describe('Process Navigator mockApi', () => {
         });
 
         it('should apply process to create item with high-fidelity remapped IDs and resets', async () => {
-            const testMeta = { targetMall: 'naver', autoRegister: true };
+            const testMeta = { targetMall: 'naver', autoRegister: 'true' };
             const result = await mockApi.processes.apply('f1', {
                 name: '테스트 상품',
                 thumbnailUrl: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea',
