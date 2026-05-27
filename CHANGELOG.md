@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-05-27] - root@0.53.0, @flows/web@0.53.0
+
+### Features
+
+- (mobile) polish node detail with new-badge wiring, multi-conn add row, i18n
+- (mobile) apply mobile UX fixes from 2026-05-21 spec
+
+### Bug Fixes
+
+- (mobile) clear prior new-badge timeout when marking the same connection again
+- (mobile) keep dropdown open during 2-stage node delete confirm
+
+### Refactor
+
+- (mobile) extract renderPortGroup and tighten connection-mode comments
+
 ## [2026-05-26] - root@0.52.2, @flows/web@0.52.2, @flows/admin@0.29.1
 
 ### Chores
