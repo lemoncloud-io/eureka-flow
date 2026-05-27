@@ -1,5 +1,188 @@
 # Changelog
 
+## [2026-05-27] - root@0.53.1, @flows/web@0.53.1
+
+### Bug Fixes
+
+- (mobile) node add persistence, delete UX, dropdown bubbling, i18n
+
+## [2026-05-27] - root@0.53.0, @flows/web@0.53.0
+
+### Features
+
+- (mobile) polish node detail with new-badge wiring, multi-conn add row, i18n
+- (mobile) apply mobile UX fixes from 2026-05-21 spec
+
+### Bug Fixes
+
+- (mobile) clear prior new-badge timeout when marking the same connection again
+- (mobile) keep dropdown open during 2-stage node delete confirm
+
+### Refactor
+
+- (mobile) extract renderPortGroup and tighten connection-mode comments
+
+## [2026-05-26] - root@0.52.2, @flows/web@0.52.2, @flows/admin@0.29.1
+
+### Chores
+
+- (deps) drop unused docx and lodash
+
+## [2026-05-26] - root@0.52.1, @flows/web@0.52.1
+
+### Bug Fixes
+
+- (mobile) import isOAuthEnabled used in public-mode sign-in CTA
+
+## [2026-05-26] - root@0.52.0, @flows/web@0.52.0, @flows/admin@0.29.0
+
+### Features
+
+- (process) align write-side field names with server schema
+
+### Bug Fixes
+
+- (api) handle 401 and expose runNode setting param
+
+### Refactor
+
+- (api) simplify adapter recursion and runNode query params
+
+## [2026-05-22] - root@0.51.0, @flows/web@0.51.0, @flows/admin@0.28.0
+
+### Features
+
+- (socket) stream product progress to banner, mobile toast, and node chip
+- (navigator) restore MVP polish — memo edit, progress card, mark-as-done
+
+### Bug Fixes
+
+- (tools) persist flow connection in urlTemplate
+
+### Refactor
+
+- (navigator) deduplicate actor filter and memoize stage panel
+- (navigator) revert UX to flow-navigator-mvp spec
+
+## [2026-05-19] - root@0.50.0, @flows/web@0.50.0
+
+### Features
+
+- enable real process API in CI deployments
+
+## [2026-05-19] - root@0.49.0, @flows/web@0.49.0, @flows/admin@0.27.0
+
+### Features
+
+- (process) add loading indicators and success messages
+- show actor/tool assignment indicators on stage template items
+- improve actor card with stereo icons and current ring
+- polish tools page, process cards, and item row indicators
+- replace prev/next nav with horizontal stage stepper
+- replace tool type dropdown with icon radio cards
+- note author display and tool opened feedback
+- process apply with item name prompt and list shortcut
+- polish stage completion info and actor color dots
+- add reopen, skip, and completion state UX improvements
+- show navigator button on dev server (VITE_ENV=DEV)
+- support zip file upload in image input block
+- improve tool action UX and embed browser
+- stage detail and actor page UX improvements
+- ux batch — hydration, delete item, notes fix, cleanup
+- items page UX improvements and stage hydration
+- optimistic UI for all process navigator mutations
+- implement realApi proxy client and remove Dashboard
+- navigator UX improvements — actor filtering, item filters, stage warnings
+- (flows) add navigator feature
+- enhance navigator with type-aware UI improvements
+- improve dashboard
+- improve ui
+- implement phase8
+- implement phase7
+- implement phase6
+- implement phase5
+- implement phase4
+- implement phase3
+- implement phase2
+- implement phase1
+
+### Bug Fixes
+
+- increase stage card vertical padding
+- prevent crash from empty SelectItem value in tool form
+- auto-fetch all flow pages in tool form dropdown
+- pass flowRef on tool creation, not just update
+- expand sidebar setup section by default
+- route task/note mutations through stages.update for real API
+- share actor selection across components via Zustand store
+- cache update correctness in optimistic mutations
+- use sentinel value for empty SelectItem in stage editor
+- only call useItem on /items/* routes in header breadcrumb
+- use entity-specific proxy path (/:type/:id/proxy) instead of /flows/
+- default to mockApi, switch to realApi only with VITE_PROCESS_API=real
+- improve navigator UX with contextual header and stage navigation
+- improve navigator accessibility and dashboard UX
+
+### Refactor
+
+- (process) remove unused hydration
+- remove server-unsupported UI features
+- simplify review — fix hydration, memo, dedup
+- replace invalidateQueries with direct cache updates
+- improve navigator UI with design review fixes
+- use ui-kit Breadcrumb components and extract helpers
+- (process) simplify incomplete task tracking
+
+### Chores
+
+- resolve merge conflicts with origin/develop
+- add type dependency
+
+### Other
+
+- revert: restore landing page to original state
+
+## [2026-05-18] - root@0.48.0, @flows/web@0.48.0
+
+### Features
+
+- (mobile) add "new" connection badge and output result preview
+- (mobile) replace window.confirm with 2-stage inline confirm buttons
+- (mobile) add flow settings menu items and error state to connection cards
+- (mobile) add image upload to new flow sheet and content preview to connection targets
+- (mobile) convert connection sheet to fullscreen slide-in page
+- (mobile) expand icon opens ContentPreviewModal overlay
+- (mobile) add image thumbnails, error banners, waiting state to cards
+- (mobile) rewrite MobileStepCard to match Figma vertical card layout
+- (mobile) upgrade connection sheet and new flow sheet
+- (mobile) fix Figma gaps — rich cards, breadcrumbs, Korean labels
+- (mobile) redesign mobile editor UI to match Figma TO-BE
+
+### Bug Fixes
+
+- (mobile) revert stereo left border and restore group container
+- (mobile) match empty state card layout and add stereo left border
+- (mobile) align UI with Figma design spec
+- (mobile) support desktop=1 query param to force PC view
+- (mobile) add missing i18n keys for flow settings, pc version, confirm messages
+- (mobile) remove chevron from available cards, add toggle expand to connected cards
+- (mobile) fix available card layout — separate row content from chevron
+- (mobile) add checkmark to connected cards and chevron to available cards
+- (mobile) fix run button icon size (w-4.5 invalid) and darken background
+- (mobile) reduce oversized text and buttons for mobile viewport
+- (mobile) match header to Figma — no back arrow, larger name, round play
+- (mobile) enlarge expand button touch target to 44px minimum
+- (mobile) revert quick-add cards to row layout matching Figma
+- (mobile) change IMG badge color to purple to match Figma
+- (mobile) enlarge card image preview and add resolution/IMG badge
+- (mobile) show content preview for all block types in step cards
+- (mobile) show config.text in step card content preview
+- (mobile) align with Figma TO-BE and add i18n keys
+
+### Refactor
+
+- (mobile) remove AI slop patterns from mobile editor UI
+
 ## [2026-05-14] - root@0.47.0, @flows/web@0.47.0, @flows/admin@0.26.0
 
 ### Features

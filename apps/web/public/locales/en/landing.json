@@ -8,14 +8,31 @@
     "hero": {
         "badge": "Open Beta",
         "title": {
-            "line1": "Build AI Workflows",
-            "accent": "Visually",
-            "line2": "No Code Required"
+            "line1": "Workflows That Move",
+            "accent": "Forward",
+            "line2": "For People and Machines"
         },
-        "subtitle": "Drag, connect, and run AI pipelines on a visual canvas. No installation needed — start building in your browser.",
-        "cta_primary": "Start Building Free",
-        "cta_secondary": "View Demo",
+        "subtitle": "One platform where team workflows and AI pipelines run side by side. Navigate progress. Automate the rest.",
+        "cta_primary": "Get Started",
         "cta_explore": "Explore Public Flows"
+    },
+    "mode_picker": {
+        "navigator": {
+            "title": "Navigate",
+            "subtitle": "Team Workflows",
+            "description": "Track progress across stages, assign team members, and always know what to do next. Built for product launches, content pipelines, and operational workflows.",
+            "cta": "Start Navigating",
+            "continue": "Continue",
+            "goToDashboard": "Go to Dashboard",
+            "features": ["Stage-by-stage progress", "Team assignment", "Next action at a glance"]
+        },
+        "builder": {
+            "title": "Build",
+            "subtitle": "AI Pipelines",
+            "description": "Drag, connect, and run AI blocks on a visual canvas. Text generation, image synthesis, schema extraction — no code required.",
+            "cta": "Build a Flow",
+            "features": ["Visual drag-and-drop", "AI-native blocks", "Real-time execution"]
+        }
     },
     "screenshot": {
         "alt": "Eureka Flow canvas screenshot",
@@ -23,44 +40,44 @@
     },
     "how_it_works": {
         "badge": "How It Works",
-        "title": "Three steps to your first AI workflow",
-        "subtitle": "No setup, no installation. Start building in your browser right now.",
+        "title": "Three steps to get started",
+        "subtitle": "Add blocks, connect them, and run. Inspect results and iterate as you go.",
         "add_blocks": {
             "title": "Add Blocks",
-            "description": "Pick AI blocks from the library — text generation, image synthesis, schema extraction."
+            "description": "Drag AI blocks from the sidebar onto the canvas. Mix inputs, processors, and outputs however you need."
         },
         "connect_flow": {
-            "title": "Connect the Flow",
-            "description": "Drag connections between blocks to define your data pipeline. Type-safe ports prevent mistakes."
+            "title": "Connect Flow",
+            "description": "Link node input and output ports to define how data moves. A visual pipeline takes shape as you wire things up."
         },
         "run_iterate": {
             "title": "Run & Iterate",
-            "description": "Execute node-by-node or run the entire flow. See results in real time, debug instantly."
+            "description": "Execute the flow with one click, review the results, and refine the configuration as you go."
         }
     },
     "features": {
         "badge": "Features",
-        "title": "Core features for AI workflows",
-        "subtitle": "A visual editor designed from the ground up for AI workflows.",
+        "title": "Everything you need to keep moving",
+        "subtitle": "From team coordination to AI automation, in one place.",
         "visual_canvas": {
             "title": "Visual Canvas",
-            "description": "Drag and connect nodes to build complete AI pipelines. Auto-layout keeps your workflow organized. Zoom, pan, and navigate with a minimap — see the entire workflow at a glance."
+            "description": "Drag and connect nodes to build complete AI pipelines. Auto-layout keeps your workflow organized. Zoom, pan, and navigate with a minimap."
         },
         "ai_nodes": {
             "title": "AI-Native Nodes",
-            "description": "Text generation, image synthesis, schema extraction — purpose-built nodes for AI tasks. Each node handles its own I/O types, so you focus on logic, not plumbing."
+            "description": "Text generation, image synthesis, schema extraction — purpose-built nodes for AI tasks. Each node handles its own I/O types."
         },
         "instant_run": {
-            "title": "Instant Execution",
-            "description": "Run and debug node-by-node directly on the canvas. Check results instantly without leaving the editor."
+            "title": "Next Action Dashboard",
+            "description": "Always know what to do next. The dashboard surfaces pending actions, unresolved notes, and team workload at a glance."
         }
     },
     "cta": {
-        "title": "Start building today",
+        "title": "Start moving forward",
         "subtitle": "Free during open beta. No installation needed — runs entirely in your browser.",
         "note": "Free to start",
-        "button": "Start Building Free",
-        "explore": "Explore Public Flows"
+        "button": "Start Navigating",
+        "explore": "Build a Flow"
     },
     "social_proof": {
         "open_source": "100% Open Source",

@@ -10,6 +10,7 @@ import type {
     FlowUpdateMessage,
     NodeState,
     PortUpdateMessage,
+    ProductProgressMessage,
     SocketNodeEvent,
     SocketTraceEvent,
     TraceStage,
@@ -128,6 +129,22 @@ const parsePortId = (
 };
 
 /**
+ * Type guard for ProductProgressMessage.
+ * Matches: { type: 'product-progress', productId, progress$, state }.
+ */
+export const isProductProgressMessage = (data: unknown): data is ProductProgressMessage => {
+    if (typeof data !== 'object' || data === null) return false;
+    const msg = data as Record<string, unknown>;
+    return (
+        msg['type'] === 'product-progress' &&
+        typeof msg['productId'] === 'string' &&
+        typeof msg['progress$'] === 'object' &&
+        msg['progress$'] !== null &&
+        typeof msg['state'] === 'string'
+    );
+};
+
+/**
  * Type guard for SocketTraceEvent
  * `seq` (required number) is the discriminant — unique to trace events
  */
@@ -217,6 +234,21 @@ export interface PortUpdateInfo {
     runId?: string;
 }
 
+/**
+ * Product deployment progress info parsed from WebSocket message.
+ * Emitted for `action: 'progress'` payloads from codes-goods-api.
+ */
+export interface ProductProgressInfo {
+    /** Product ID from codes-goods-api */
+    productId: string;
+    /** Phase → percent map (e.g., { upload: 100, refactor: 60, build: 20, deploy: 0 }) */
+    progress$: Record<string, number>;
+    /** Current phase state (e.g., 'uploading', 'building', 'done', 'error') */
+    state: string;
+    /** Last few ms-epoch timestamps for ETA computation */
+    timestamps: number[];
+}
+
 export interface UseInitFlowSocketOptions {
     /** Channel ID to subscribe to (from flow load response) */
     channelId?: string | null;
@@ -232,6 +264,8 @@ export interface UseInitFlowSocketOptions {
     onPortUpdate?: (info: PortUpdateInfo) => void;
     /** Callback when trace message is received - for agent block execution logs */
     onTraceUpdate?: (info: TraceUpdateInfo) => void;
+    /** Callback when product progress message is received - for deployment progress UI */
+    onProductProgress?: (info: ProductProgressInfo) => void;
     /** Observer for all parsed messages (dev tools, replay recording) */
     onMessage?: (message: WebSocketMessage) => void;
 }
@@ -268,6 +302,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         onNodeReload,
         onPortUpdate,
         onTraceUpdate,
+        onProductProgress,
         onMessage,
     } = options;
 
@@ -314,6 +349,18 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
     const dispatchMessage = useCallback(
         (message: WebSocketMessage) => {
             const data = message.data;
+
+            // Handle product progress streaming (codes-goods-api → eureka-sockets-api).
+            // Emitted with action='progress' wrapping a product-progress payload.
+            if (message.action === 'progress' && isProductProgressMessage(data)) {
+                onProductProgress?.({
+                    productId: data.productId,
+                    progress$: data.progress$,
+                    state: data.state,
+                    timestamps: data.timestamps ?? [],
+                });
+                return;
+            }
 
             // Handle trace message FIRST (before node/flow handlers)
             // Merged trace payload contains type: "node" from nested data,
@@ -442,7 +489,15 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                 }
             }
         },
-        [currentFlowId, getLastLocalUpdateTimestamp, onFlowUpdate, onNodeReload, onPortUpdate, onTraceUpdate]
+        [
+            currentFlowId,
+            getLastLocalUpdateTimestamp,
+            onFlowUpdate,
+            onNodeReload,
+            onPortUpdate,
+            onTraceUpdate,
+            onProductProgress,
+        ]
     );
 
     // Broadcast messages to all subscribers and handle updates

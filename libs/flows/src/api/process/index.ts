@@ -1,0 +1,12 @@
+import { mockApi } from './mockApi';
+import { realApi } from './realApi';
+
+import type { ProcessApi } from './interface';
+
+const useReal = import.meta.env.VITE_PROCESS_API === 'real';
+
+export const processApi: ProcessApi = useReal ? realApi : mockApi;
+
+export type { ProcessApi } from './interface';
+export { mockApi, resetMockDb } from './mockApi';
+export { realApi } from './realApi';

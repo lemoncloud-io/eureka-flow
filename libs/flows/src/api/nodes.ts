@@ -14,7 +14,6 @@ import type {
 } from '../types';
 import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
-
 const _log = console.log.bind(console, '[nodes-api]');
 
 /**
@@ -209,6 +208,8 @@ export interface RunNodeOptions {
     propagate?: boolean;
     /** WebSocket connection ID for streaming execution results back to the caller */
     connection?: string;
+    /** If true, loads workspace settings (BYO API keys). Required in local for stored keys to take effect. */
+    setting?: boolean;
 }
 
 /**
@@ -231,16 +232,15 @@ export interface RunNodeOptions {
 export const runNode = async (nodeId: string, body?: RunNodeBody, options?: RunNodeOptions): Promise<NodeView> => {
     _log(`> runNode(${nodeId})`, { body, options });
     try {
-        // Build query params
-        const queryParams: string[] = [];
-        if (options?.async) queryParams.push('async');
-        if (options?.force) queryParams.push('force');
-        if (options?.propagate === true) queryParams.push('propagate=1');
-        else if (options?.propagate === false) queryParams.push('propagate=0');
-        if (options?.connection) queryParams.push(`connection=${encodeURIComponent(options.connection)}`);
+        // Send explicit 0/1 so server-side env default doesn't override caller intent.
+        const params: Record<string, number | string> = {};
+        if (options?.async !== undefined) params.async = options.async ? 1 : 0;
+        if (options?.force) params.force = 1;
+        if (options?.propagate !== undefined) params.propagate = options.propagate ? 1 : 0;
+        if (options?.setting !== undefined) params.setting = options.setting ? 1 : 0;
+        if (options?.connection) params.connection = options.connection;
 
-        const params = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-        const response = await api.post<NodeView>(`/nodes/${encodePathSegment(nodeId)}/run${params}`, body || {});
+        const response = await api.post<NodeView>(`/nodes/${encodePathSegment(nodeId)}/run`, body || {}, { params });
         return response.data;
     } catch (err) {
         _log('> runNode error:', err);

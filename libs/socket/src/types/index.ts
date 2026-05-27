@@ -91,9 +91,35 @@ export interface PortUpdateMessage extends SocketEvent {
 }
 
 /**
+ * Product progress notification streamed from codes-goods-api via eureka-sockets-api.
+ * Wrapped on the wire as { action: 'progress', id, data: ProductProgressMessage }.
+ *
+ * @example
+ * {
+ *   "type": "product-progress",
+ *   "productId": "p-1234",
+ *   "progress$": { "upload": 100, "refactor": 60, "build": 20, "deploy": 0 },
+ *   "state": "building",
+ *   "timestamps": [1771810800000, 1771810820000, 1771810838212]
+ * }
+ */
+export interface ProductProgressMessage {
+    type: 'product-progress';
+    productId: string;
+    progress$: Record<string, number>;
+    state: string;
+    timestamps?: number[];
+}
+
+/**
  * Union type for socket data messages
  */
-export type SocketDataMessage = FlowUpdateMessage | SocketNodeEvent | PortUpdateMessage | SocketTraceEvent;
+export type SocketDataMessage =
+    | FlowUpdateMessage
+    | SocketNodeEvent
+    | PortUpdateMessage
+    | SocketTraceEvent
+    | ProductProgressMessage;
 
 /**
  * Raw WebSocket message wrapper from server

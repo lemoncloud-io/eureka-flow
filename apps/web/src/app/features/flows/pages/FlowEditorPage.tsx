@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { FLOW_FORBIDDEN, getPermissions, getProfile, useBlocks, useFlows } from '@flows/flows';
+import { FLOW_FORBIDDEN, getPermissions, getProfile, useBlocks, useFlows, useProductProgressStore } from '@flows/flows';
 import { ApiKeyDialog } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
@@ -14,11 +14,13 @@ import { redirectToLogin, useWebCoreStore, validateApiKey } from '@flows/web-cor
 import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
 import { AiKeyDialog } from '../components/AiKeyDialog';
+import { DesktopMobileSwitchCta } from '../components/DesktopMobileSwitchCta';
 import { DevSocketPanel } from '../components/DevSocketPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
 import { FlowListDialog } from '../components/FlowListDialog';
 import { Header } from '../components/Header';
 import { HelpDialog } from '../components/HelpDialog';
+import { ProductProgressBanner } from '../components/ProductProgressBanner';
 import { PublishDialog } from '../components/PublishDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
@@ -29,6 +31,7 @@ import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { FlowRole } from '@flows/flows';
+import type { ProductProgressInfo } from '@flows/socket';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -53,7 +56,7 @@ const DevRoleToggle: React.FC<{
     onClose?: () => void;
 }> = ({ role, computedRole, onOverride, onClose }) => {
     const dragRef = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState({ x: 16, y: 56 }); // bottom-right offset (above minimap)
+    const [pos, setPos] = useState({ x: 16, y: 88 }); // bottom-right offset (above mobile-switch CTA + gap)
     const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
     const didDrag = useRef(false);
 
@@ -183,6 +186,16 @@ export const FlowEditorPage = () => {
 
     const socketRecorder = useSocketRecorder();
 
+    const setProductProgress = useProductProgressStore(state => state.setProgress);
+    const clearProductProgress = useProductProgressStore(state => state.clearAll);
+    const handleProductProgress = useCallback(
+        (info: ProductProgressInfo) => setProductProgress(info),
+        [setProductProgress]
+    );
+    useEffect(() => {
+        return () => clearProductProgress();
+    }, [currentFlowId, clearProductProgress]);
+
     const resetAllNodesToIdle = useCallback(() => {
         canvasRef.current?.getWorkflow()?.nodes?.forEach(n => {
             canvasRef.current?.updateNodeFromServer(n.id, { state: 'IDLE', status: 'IDLE' }, { force: true });
@@ -206,6 +219,7 @@ export const FlowEditorPage = () => {
         onNodeReload: handleNodeUpdate,
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
+        onProductProgress: handleProductProgress,
         onMessage: socketRecorder.record,
     });
 
@@ -754,6 +768,8 @@ export const FlowEditorPage = () => {
                 />
             </div>
 
+            <ProductProgressBanner />
+
             {/* Floating Header */}
             <Header
                 flowInfo={{
@@ -821,6 +837,8 @@ export const FlowEditorPage = () => {
 
             {/* Floating Sidebar */}
             <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} role={role} />
+
+            <DesktopMobileSwitchCta />
 
             {/* API Key Dialog */}
             <ApiKeyDialog

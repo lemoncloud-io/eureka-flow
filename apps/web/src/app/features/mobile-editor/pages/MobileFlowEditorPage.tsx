@@ -4,23 +4,27 @@ import { Link } from 'react-router-dom';
 
 import { ArrowRight, Globe, KeyRound, Lock, Search, ShieldX, X } from 'lucide-react';
 
-import { useBlockRegistry, useCanvasStore, useFlows } from '@flows/flows';
+import { useBlockRegistry, useCanvasStore, useFlows, useProductProgressStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { ApiKeyDialog } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
-import { redirectToLogin, useWebCoreStore } from '@flows/web-core';
+import { isOAuthEnabled, redirectToLogin, useWebCoreStore } from '@flows/web-core';
 
 import { useDebugMode } from '../../../hooks/useDebugMode';
 import { AiKeyDialog } from '../../flows/components/AiKeyDialog';
+import { ContentPreviewModal } from '../../flows/components/ContentPreviewModal';
 import { DevSocketPanel } from '../../flows/components/DevSocketPanel';
 import { FlowListDialog } from '../../flows/components/FlowListDialog';
+import { useProductProgressToasts } from '../../flows/hooks/useProductProgressToasts';
 import { useSocketRecorder } from '../../flows/hooks/useSocketRecorder';
 import {
     MobileBlockLibrarySheet,
     MobileBottomBar,
     MobileConnectionSheet,
     MobileFlowMap,
+    MobileFlowSettingsSheet,
     MobileHeader,
+    MobileNewFlowSheet,
     MobileStepDetail,
     MobileStepList,
 } from '../components';
@@ -41,6 +45,11 @@ import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? [] });
+
+const isPortTypeCompatible = (sourceType: string, targetType: string | undefined): boolean => {
+    const target = targetType ?? 'any';
+    return sourceType === 'any' || target === 'any' || sourceType.toLowerCase() === target.toLowerCase();
+};
 
 export const MobileFlowEditorPage = () => {
     const { t } = useTranslation(['flows']);
@@ -67,7 +76,10 @@ export const MobileFlowEditorPage = () => {
     const [isFlowMapOpen, setIsFlowMapOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isNewFlowSheetOpen, setIsNewFlowSheetOpen] = useState(false);
+    const [isFlowSettingsOpen, setIsFlowSettingsOpen] = useState(false);
     const [isAiKeyDialogOpen, setIsAiKeyDialogOpen] = useState(false);
+    const [previewContent, setPreviewContent] = useState<{ value: unknown; type?: string } | null>(null);
 
     // Step navigation (replaces configNodeId)
     const stepNav = useStepNavigation();
@@ -102,6 +114,13 @@ export const MobileFlowEditorPage = () => {
         onMessage: socketRecorder.record,
     });
 
+    useProductProgressToasts();
+
+    const clearProductProgress = useProductProgressStore(state => state.clearAll);
+    useEffect(() => {
+        return () => clearProductProgress();
+    }, [currentFlowId, clearProductProgress]);
+
     const resetAllNodesToIdle = useCallback(() => {
         const { nodes, updateNodeData } = useCanvasStore.getState();
         nodes.forEach(n => updateNodeData(n.id, { state: 'IDLE' } as Partial<NodeData>));
@@ -109,14 +128,12 @@ export const MobileFlowEditorPage = () => {
 
     const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ socketConnectionId });
 
-    const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleNew, handleClear } = useMobileFlowActions(
-        {
-            updateUrl,
-            serializeWorkflowState,
-            lastSavedStateRef,
-            lastLocalUpdateTimestampRef,
-        }
-    );
+    const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleCreateNewFlow } = useMobileFlowActions({
+        updateUrl,
+        serializeWorkflowState,
+        lastSavedStateRef,
+        lastLocalUpdateTimestampRef,
+    });
 
     const connectionMode = useConnectionMode(blockRegistry, currentFlowId);
     const { recentIds, addRecent } = useRecentBlocks();
@@ -160,19 +177,16 @@ export const MobileFlowEditorPage = () => {
         async (type: string) => {
             addRecent(type);
             const newNodeId = await handleAddBlock(type);
+            if (!newNodeId) return;
 
             // Auto-connect if there's a pending connection source
-            if (newNodeId && pendingConnectSource) {
+            if (pendingConnectSource) {
                 const newNodeDef = blockRegistry[type];
                 const srcType = pendingConnectSource.portDataType;
-                const isCompatible = (portType: string | undefined) => {
-                    const t = portType ?? 'any';
-                    return srcType === 'any' || t === 'any' || srcType.toLowerCase() === t.toLowerCase();
-                };
 
                 if (pendingConnectSource.direction === 'output') {
                     // Original node's output → new block's input
-                    const compatibleInput = newNodeDef?.inputs?.find(p => isCompatible(p.type));
+                    const compatibleInput = newNodeDef?.inputs?.find(p => isPortTypeCompatible(srcType, p.type));
                     if (compatibleInput) {
                         await connectionMode.connectPorts(
                             pendingConnectSource.nodeId,
@@ -183,7 +197,7 @@ export const MobileFlowEditorPage = () => {
                     }
                 } else {
                     // New block's output → original node's input
-                    const compatibleOutput = newNodeDef?.outputs?.find(p => isCompatible(p.type));
+                    const compatibleOutput = newNodeDef?.outputs?.find(p => isPortTypeCompatible(srcType, p.type));
                     if (compatibleOutput) {
                         await connectionMode.connectPorts(
                             newNodeId,
@@ -194,9 +208,13 @@ export const MobileFlowEditorPage = () => {
                     }
                 }
                 setPendingConnectSource(null);
+                return;
             }
+
+            // Plain add (no auto-connect) — open new node's detail
+            stepNav.openStep(newNodeId);
         },
-        [addRecent, handleAddBlock, pendingConnectSource, blockRegistry, connectionMode]
+        [addRecent, handleAddBlock, pendingConnectSource, blockRegistry, connectionMode, stepNav]
     );
 
     // ============================================================
@@ -285,6 +303,7 @@ export const MobileFlowEditorPage = () => {
                 onSave={handleSave}
                 onOpenFlowList={() => setIsFlowListOpen(true)}
                 onOpenFlowMap={() => setIsFlowMapOpen(true)}
+                onOpenFlowSettings={() => setIsFlowSettingsOpen(true)}
                 onRunAll={handleRunAll}
                 isRunning={isRunning}
                 runProgress={runProgress}
@@ -296,8 +315,7 @@ export const MobileFlowEditorPage = () => {
                     });
                 }}
                 onExport={handleExport}
-                onNew={role === 'owner' ? handleNew : undefined}
-                onClear={role === 'owner' ? handleClear : undefined}
+                onNew={role === 'owner' ? () => setIsNewFlowSheetOpen(true) : undefined}
                 onApiKeySettings={() => {
                     if (!useWebCoreStore.getState().apiKey && redirectToLogin()) return;
                     setIsApiKeyDialogOpen(true);
@@ -349,6 +367,7 @@ export const MobileFlowEditorPage = () => {
                 <div className="pt-2">
                     <MobileStepList
                         onTapCard={handleTapCard}
+                        onExpandContent={setPreviewContent}
                         onAddStep={() => setIsBlockLibraryOpen(true)}
                         onAddBlockDirect={handleAddBlockWithRecent}
                         onRunNode={handleRunNode}
@@ -419,8 +438,20 @@ export const MobileFlowEditorPage = () => {
                 onOpenChange={setIsFlowListOpen}
                 currentFlowId={currentFlowId}
                 onSelectFlow={handleSelectFlow}
-                onNewFlow={handleNew}
+                onNewFlow={() => {
+                    setIsFlowListOpen(false);
+                    setIsNewFlowSheetOpen(true);
+                }}
             />
+
+            <MobileNewFlowSheet
+                open={isNewFlowSheetOpen}
+                onOpenChange={setIsNewFlowSheetOpen}
+                onCreate={handleCreateNewFlow}
+                onNameChange={updateFlowName}
+            />
+
+            <MobileFlowSettingsSheet open={isFlowSettingsOpen} onOpenChange={setIsFlowSettingsOpen} role={role} />
 
             <ApiKeyDialog
                 open={isApiKeyDialogOpen}
@@ -431,6 +462,13 @@ export const MobileFlowEditorPage = () => {
             />
 
             {showDevTools && <AiKeyDialog open={isAiKeyDialogOpen} onOpenChange={setIsAiKeyDialogOpen} />}
+
+            {/* Content Preview Modal — expand from card */}
+            <ContentPreviewModal
+                open={!!previewContent}
+                onOpenChange={open => !open && setPreviewContent(null)}
+                content={previewContent}
+            />
 
             {/* Dev Role Toggle (hidden in production unless debug mode) */}
             {showDevTools && (

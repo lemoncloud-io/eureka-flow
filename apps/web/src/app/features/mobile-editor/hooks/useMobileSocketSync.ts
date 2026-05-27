@@ -2,14 +2,27 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import { toast } from 'sonner';
 
-import { EXECUTE_FUNCTIONS, getPortData, useCanvasStore, useFlows, useFlowsStore } from '@flows/flows';
+import {
+    EXECUTE_FUNCTIONS,
+    getPortData,
+    useCanvasStore,
+    useFlows,
+    useFlowsStore,
+    useProductProgressStore,
+} from '@flows/flows';
 import { useInitFlowSocket } from '@flows/socket';
 
 import { executeNodeWithToast } from '../utils';
 
 import type { SerializeWorkflowFn } from './types';
 import type { NodeState } from '@flows/flows';
-import type { NodeUpdateInfo, PortUpdateInfo, TraceUpdateInfo, WebSocketMessage } from '@flows/socket';
+import type {
+    NodeUpdateInfo,
+    PortUpdateInfo,
+    ProductProgressInfo,
+    TraceUpdateInfo,
+    WebSocketMessage,
+} from '@flows/socket';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 interface UseMobileSocketSyncParams {
@@ -218,6 +231,12 @@ export const useMobileSocketSync = ({
         [appendTraceLog, appendRunTrace]
     );
 
+    const setProductProgress = useProductProgressStore(state => state.setProgress);
+    const handleProductProgress = useCallback(
+        (info: ProductProgressInfo) => setProductProgress(info),
+        [setProductProgress]
+    );
+
     const getLastLocalUpdateTimestamp = useCallback(
         () => lastLocalUpdateTimestampRef.current,
         [lastLocalUpdateTimestampRef]
@@ -231,6 +250,7 @@ export const useMobileSocketSync = ({
         onNodeReload: handleNodeUpdate,
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
+        onProductProgress: handleProductProgress,
         onMessage,
     });
     connectionIdRef.current = connectionId ?? undefined;

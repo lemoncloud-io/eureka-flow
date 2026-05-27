@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Expand, Loader2, Play, ScrollText, X } from 'lucide-react';
+import { Archive, Expand, Loader2, Play, ScrollText, X } from 'lucide-react';
 
 import { compressImageIfNeeded } from '@flows/flows';
 
@@ -19,6 +19,7 @@ export const InputImageVisualizationEditable: React.FC<EditableVisualizationProp
     const img = node.config?.imageData as string | undefined;
     const fileData = node.config?.fileData as string | undefined;
     const fileName = node.config?.fileName as string | undefined;
+    const isZipData = !!img && !fileData && /\.zip$/i.test(fileName || '');
     const fileInputId = `inline-image-${node.id}`;
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,6 +64,28 @@ export const InputImageVisualizationEditable: React.FC<EditableVisualizationProp
                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
                         <Loader2 className="w-4 h-4 text-primary animate-spin" />
                     </div>
+                </div>
+            ) : isZipData ? (
+                <div className="relative group rounded-lg border border-border overflow-hidden bg-black/20">
+                    <label
+                        htmlFor={fileInputId}
+                        className="w-full flex items-center gap-2 p-3 cursor-pointer hover:bg-black/30 transition-colors"
+                    >
+                        <Archive className="w-4 h-4 text-orange-400 shrink-0" />
+                        <span className="text-[11px] text-foreground/80 truncate flex-1">{fileName}</span>
+                    </label>
+                    <button
+                        onClick={e => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onConfigChange('imageData', '');
+                            onConfigChange('fileName', '');
+                        }}
+                        className="absolute top-1.5 right-1.5 p-1 bg-black/60 hover:bg-black/80 text-white rounded-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title={t('visualization.removeImage')}
+                    >
+                        <X className="w-3 h-3" />
+                    </button>
                 </div>
             ) : img && !fileData ? (
                 <div className="relative group rounded-lg border border-border overflow-hidden bg-black/20 min-h-[96px]">

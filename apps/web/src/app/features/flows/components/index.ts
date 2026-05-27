@@ -3,6 +3,7 @@ export * from './ComponentViewerModal';
 export * from './ConnectionLine';
 export * from './ContentPreviewModal';
 export * from './DataTooltip';
+export * from './DesktopMobileSwitchCta';
 export * from './DetailPanel';
 export * from './EmptyStateGuide';
 export * from './FilePreviewDialog';

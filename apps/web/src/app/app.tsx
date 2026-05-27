@@ -1,15 +1,36 @@
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 
 import { SITE_URL } from '@flows/shared';
 import { isOAuthEnabled } from '@flows/web-core';
 
 import { KeyCreationPage, KeySuccessPage, LoginPage, OAuthResponsePage } from './features/auth';
 import { PublicFlowsPage } from './features/flows';
-import { LandingPage, PolicyPage } from './features/landing';
+import { HomePage } from './features/home';
+import { PolicyPage } from './features/landing';
 import { FlowEditorRouter } from './features/mobile-editor';
+import {
+    ActorManagerPage,
+    DashboardPage,
+    ItemBoardPage,
+    ItemDetailPage,
+    NavigatorLayout,
+    ProcessEditorPage,
+    ProcessListPage,
+    ToolManagerPage,
+} from './features/process';
 import { TutorialRouter } from './features/tutorial';
+
+const LegacyStageRedirect = () => {
+    const { id, stageId } = useParams<{ id: string; stageId: string }>();
+    return <Navigate to={`/items/${id}?stage=${stageId}`} replace />;
+};
+
+const LegacyApplyRedirect = () => {
+    const { id } = useParams<{ id: string }>();
+    return <Navigate to={`/processes/${id}`} replace />;
+};
 
 export const App = () => {
     const { i18n } = useTranslation();
@@ -26,11 +47,29 @@ export const App = () => {
                 <link rel="alternate" hreflang="x-default" href={`${SITE_URL}/`} />
             </Helmet>
             <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/tutorial" element={<TutorialRouter />} />
+                <Route path="/" element={<HomePage />} />
+
+                {/* Navigator routes */}
+                <Route element={<NavigatorLayout />}>
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/items" element={<ItemBoardPage />} />
+                    <Route path="/items/:id" element={<ItemDetailPage />} />
+                    <Route path="/processes" element={<ProcessListPage />} />
+                    <Route path="/processes/:id" element={<ProcessEditorPage />} />
+                    <Route path="/actors" element={<ActorManagerPage />} />
+                    <Route path="/tools" element={<ToolManagerPage />} />
+                </Route>
+                {/* Legacy redirects */}
+                <Route path="/items/:id/stages/:stageId" element={<LegacyStageRedirect />} />
+                <Route path="/processes/:id/apply" element={<LegacyApplyRedirect />} />
+
+                {/* Builder routes */}
                 <Route path="/flows" element={<PublicFlowsPage />} />
                 <Route path="/editor" element={<FlowEditorRouter />} />
                 <Route path="/flows/:id" element={<FlowEditorRouter />} />
+
+                {/* Other routes */}
+                <Route path="/tutorial" element={<TutorialRouter />} />
                 <Route path="/policy/:type" element={<PolicyPage />} />
                 {isOAuthEnabled && (
                     <>
