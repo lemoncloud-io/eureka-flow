@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { upsertFlow, useCanvasConnections, useCanvasNodes, useCanvasStore } from '@flows/flows';
 
+import { markConnectionNew } from './useRecentConnections';
 import { arePortTypesCompatible, generateTempId, wouldCreateCycle } from '../../flows/utils';
 
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
@@ -201,6 +202,7 @@ export const useConnectionMode = (
             };
 
             addConnection(newConnection);
+            markConnectionNew(tempId);
 
             // Copy source output data to target input data (same as desktop WorkflowCanvas)
             const srcNode = useCanvasStore.getState().nodes.find(n => n.id === srcNodeId);
@@ -237,6 +239,7 @@ export const useConnectionMode = (
 
                 if (createdEdge?.id && createdEdge.id !== tempId) {
                     updateConnection(tempId, { id: createdEdge.id });
+                    markConnectionNew(createdEdge.id);
                 }
 
                 toast.success(t('mobile.connection.connected', 'Connected'));
@@ -293,6 +296,7 @@ export const useConnectionMode = (
             };
 
             useCanvasStore.getState().addConnection(newConnection);
+            markConnectionNew(tempId);
 
             // Copy source output data to target input data (same as desktop WorkflowCanvas)
             const srcNode = useCanvasStore.getState().nodes.find(n => n.id === sourceNodeId);
@@ -320,6 +324,7 @@ export const useConnectionMode = (
                 );
                 if (createdEdge?.id && createdEdge.id !== tempId) {
                     updateConnection(tempId, { id: createdEdge.id });
+                    markConnectionNew(createdEdge.id);
                 }
                 toast.success(t('mobile.connection.connected', 'Connected'));
             } catch {

@@ -271,7 +271,7 @@ export const MobileHeader = ({
                     </DropdownMenuLabel>
                     <DropdownMenuItem onClick={onOpenFlowSettings} className="gap-2">
                         <Settings2 className="w-4 h-4" />
-                        {t('mobile.flowSettings', '플로우 설정')}
+                        {t('mobile.flowSettings.menuLabel', '플로우 설정')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={enableDesktopOverride} className="gap-2">
                         <Monitor className="w-4 h-4" />

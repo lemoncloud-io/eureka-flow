@@ -8,5 +8,6 @@ export { useMobileNodeOrder } from './useMobileNodeOrder';
 export { useMobileRunAll } from './useMobileRunAll';
 export { useMobileSocketSync } from './useMobileSocketSync';
 export { useNodeConfig } from './useNodeConfig';
+export { markConnectionNew, useIsConnectionNew } from './useRecentConnections';
 export { useRecentBlocks } from './useRecentBlocks';
 export { useStepNavigation } from './useStepNavigation';

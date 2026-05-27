@@ -1,3 +1,4 @@
+export { AddConnectionRow } from './AddConnectionRow';
 export { ConfigFieldList } from './ConfigFieldList';
 export { DataPreview } from './DataPreview';
 export { MobileBlockLibrarySheet } from './MobileBlockLibrarySheet';
