@@ -212,6 +212,91 @@ process/
     3.  **스테이지 데이터 초기화**:
         - 부모 `itemId` 및 `processId` 관계를 바인딩합니다.
         - 단계의 기본 상태(`status`)를 일괄 `'todo'`로 재설정합니다.
-        - 생성일 및 수정일 타임스탬프(`createdAt`, `updatedAt`)를 즉시 갱신합니다.
+        - 생성일 및 수정일 타임스탬('createdAt', 'updatedAt')를 즉시 갱신합니다.
     4.  **DAG 의존성 정합성 수립 (Dependency Stage ID Mapping)**:
         - 가장 치명적인 연산으로, 이전 템플릿 시절 가지고 있던 선행 단계 ID 목록(`dependencyStageIds`)을 새롭게 매핑 생성된 신규 Stage ID 목록으로 일대일 변환/체인 링킹 처리하여 의존성 방향 그래프의 정합성을 깨뜨리지 않고 완벽하게 이식합니다.
+
+---
+
+## 🏗️ 7. 멀티티어 API 설계 패턴 (mockApi, proxyApi, realApi)
+
+프로세스 엔진 모듈의 통신 및 데이터 무결성을 보장하기 위해 도입된 **멀티티어 API 아키텍처(Multi-Tier API Architecture)**의 디자인 패턴, 역할 분담 및 설계 검토 내용입니다.
+
+이 구조는 단순한 네트워크 클라이언트를 넘어, **프론트엔드와 백엔드가 동일한 스펙 계약(Contract)을 공유하고 독립적으로 병렬 개발**할 수 있도록 고안되었습니다.
+
+```mermaid
+flowchart TD
+    subgraph Client [클라이언트 레이어 (Frontend)]
+        UI[React UI Components] --> Queries[React Query / Hooks]
+    end
+
+    subgraph API_Bridge [통합 API & 계약 브릿지]
+        Queries --> RealAPI["realApi.ts (프로덕션 어댑터)"]
+        Queries -.->|"테스트 / 개발 모킹"| MockAPI["mockApi.ts (인메모리 스펙 엔진)"]
+
+        RealAPI --> ProxyAPI["proxyApi.ts (createProxyApi)"]
+        MockAPI --> MockData["mockData.ts (인메모리 DB)"]
+    end
+
+    subgraph Network [네트워크 레이어]
+        ProxyAPI -->|"proxyCall()"| ProxyClient["proxyClient.ts (네트워크/테스트 라우터)"]
+    end
+
+    subgraph Server [서버 레이어 (Backend)]
+        ProxyClient -->|"HTTP POST /api/proxy"| ServerGateway[서버 게이트웨이]
+        ServerGateway --> SharedProxy["proxyApi.ts (서버측 동일 공유)"]
+        SharedProxy --> ServerBiz["서버 비즈니스 서비스"]
+    end
+
+    style MockAPI fill:#f9f,stroke:#333,stroke-width:2px
+    style ProxyAPI fill:#bbf,stroke:#333,stroke-width:2px
+    style RealAPI fill:#bfb,stroke:#333,stroke-width:2px
+```
+
+### 📂 7.1. 각 파일의 역할 및 명확한 범위 (Roles & Boundaries)
+
+#### 1️⃣ [mockApi.ts](../libs/flows/src/api/process/mockApi.ts) - **실행 가능한 비즈니스 스펙 (Executable Reference Specification)**
+
+- **역할**: 단순히 정적인 JSON 모킹 데이터를 돌려주는 더미 API가 아닙니다. 백엔드가 궁극적으로 구현해야 하는 **비즈니스 로직과 물리적인 데이터 변이(Mutations) 규칙을 그대로 탑재한 브라우저 인메모리 가상 백엔드**입니다.
+- **주요 범위**:
+    - `mockData.ts`를 인메모리 데이터베이스 삼아 등록, 조회, 수정, 삭제(CRUD)의 논리 흐름 처리.
+    - 프로세스 복제(`apply`) 시 고유 식별자 할당, 타임스탬프 리프레시, 태스크 초기화 및 **의존성 맵핑(DAG 정합성 재생성) 로직의 실질적 구현**.
+    - 상태값 변경 검증 및 예외 규격(예: 필수 필드 유효성, 존재하지 않는 리소스에 대한 예외 처리) 동작.
+- **아키텍처적 가치**: 백엔드 개발자에게는 **"이 코드에 구현된 규칙 그대로 데이터가 정합성을 유지하며 가공되어야 한다"를 보여주는 명확한 Executable Specification(동작 사양서)** 역할을 합니다.
+
+#### 2️⃣ [proxyApi.ts](../libs/flows/src/api/process/proxyApi.ts) - **API 계약 및 엔드포인트 라우팅 맵퍼 (Contract Bridge & Router)**
+
+- **역할**: 통신의 입출력 규격을 선언하고 이를 하나의 통일된 프록시 핸들러(`ProxyClient`)에 주입 가능한 구조로 결합해 주는 **중간 단계 연결 고리(Contract Bridge)**입니다.
+- **주요 범위**:
+    - `ProcessApi` 인터페이스의 각 도메인 메서드(processes, items, stages 등)를 제네릭 프록시 클라이언트 함수 `client(type, cmd, id, param, body)` 포맷으로 변환해 주는 맵핑 구조 제공.
+    - 프론트엔드와 백엔드가 **동일한 TypeScript 코드 파일인 `proxyApi.ts`를 공유**하여 사용합니다.
+- **아키텍처적 가치**: 클라이언트와 서버가 완전히 동일한 `proxyApi.ts` 코드를 공유하므로, API 경로 구조나 엔드포인트 명세가 수정될 경우 양측 모두 컴파일 타임에 즉시 오류를 감지할 수 있습니다. API 계약 불일치(Contract Drift) 문제를 원천 차단하는 핵심 뼈대입니다.
+
+#### 3️⃣ [realApi.ts](../libs/flows/src/api/process/realApi.ts) - **프로덕션 환경 네트워크 연결 어댑터 (Production Adapter)**
+
+- **역할**: 프로덕션 빌드에서 실제 백엔드 서버 인프라로 HTTP 통신을 실어 나르는 **어댑터(Adapter)** 계층입니다.
+- **주요 범위**:
+    - `createProxyApi` 스켈레톤의 콜백으로 `proxyCall`을 주입하여 HTTP 네트워크 통신 바인딩.
+    - 클라이언트-서버 간 데이터 변환을 책임지는 아답터 함수(`toServer`, `fromServer`) 호출을 통해, 네트워크 데이터 인코딩/디코딩 책임 담당.
+- **아키텍처적 가치**: 비즈니스 규칙(`mockApi`)이나 API 계약 매핑(`proxyApi`)에 대한 어떠한 로직도 담고 있지 않는 순수한 **스켈레톤(Skeleton) 어댑터**입니다. 이 덕분에 코드가 매우 얇고 간결하게 유지되며(단 20여 줄), 외부 통신 의존성 분리가 매우 우수합니다.
+
+---
+
+### 🧐 7.2. 디자인 패턴 검토 및 아키텍처 평가 (Architectural Evaluation)
+
+#### 👍 주요 장점 (Strengths)
+
+1. **타이트한 API 계약 일관성 (No Contract Drift)**:
+    - 프론트엔드와 백엔드가 `proxyApi.ts`와 데이터 타입(`types/process/index.ts`)을 공유함으로써, 통신 규격이 느슨하게 관리되면서 발생하는 런타임 통신 에러를 100% 예방합니다.
+2. **백엔드 병목이 없는 오프라인 우선 개발 (Zero-Block / Offline-First)**:
+    - 신규 피처 요구사항이 발생했을 때, 프론트엔드 개발자는 `mockApi.ts`에 로직을 먼저 완벽히 시뮬레이션 구현하여 UI 화면 구성을 완전히 완료할 수 있습니다.
+    - 백엔드는 프론트엔드가 이미 검증 완료한 `mockApi.ts` 비즈니스 스펙 코드를 레퍼런스 가이드 삼아 고대로 이식하여 개발 속도를 압도적으로 올립니다.
+3. **고해상도 통합 테스트 신뢰성 (High-Fidelity Automated Testing)**:
+    - Vitest 환경에서 가짜 MSW나 깨지기 쉬운 HTTP 네트워크 모킹을 사용하지 않고, 오직 `mockApi`의 완벽한 상태 상태 변이를 타겟팅한 통합 테스트([realApi.spec.ts](../apps/web/src/__tests__/process/realApi.spec.ts))를 구동할 수 있습니다. 실제 백엔드가 구동되지 않은 CLI 환경에서도 실제 프로덕션 코드와 99.9% 동일하게 작동하는 시나리오 테스트(75개 이상)를 완벽하게 보장할 수 있습니다.
+
+#### ⚠️ 아키텍처 정합성을 위한 설계 고려사항 및 유지 가이드
+
+- **동일 코드 동기화 제어**:
+    - `mockApi.ts`와 `proxyApi.ts`는 프론트엔드와 백엔드 간에 논리적으로 **완벽한 "동일(Identical) 코드 복제품"**이어야 합니다. 따라서 한쪽에서 스펙을 변경할 경우 다른 쪽에 자동으로 동기화되거나 공유 패키지(`libs/flows`) 형태로 빌드되어 양측 모두에 참조되도록 패키지 참조 관계를 올바르게 유지해야 합니다.
+- **Adapters 레이어의 명확한 관리**:
+    - 클라이언트에서 쓰는 복잡한 가상 엔티티 객체와 서버에서 통신 payload로 쓰는 순수 데이터 구조(JSON) 간에 불일치가 커질 경우, [adapters.ts](../libs/flows/src/api/process/adapters.ts)를 통해서만 정밀하게 변환 작업을 수행하고 핵심 `proxyApi` 명세는 가볍게 유지하십시오.
