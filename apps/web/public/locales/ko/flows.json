@@ -112,6 +112,7 @@
         "noOutputs": "출력 없음",
         "nodeLabel": "노드 라벨",
         "customLabel": "사용자 정의 라벨 (메모)",
+        "deleteNode": "노드 삭제",
         "namePlaceholder": "블록 이름을 입력하세요...",
         "connection": "연결",
         "deleteConnection": "연결 삭제",
@@ -166,7 +167,10 @@
         "saveFile": "저장",
         "cancelEdit": "취소",
         "removeFile": "파일 제거",
-        "fileAttached": "파일 첨부됨"
+        "fileAttached": "파일 첨부됨",
+        "takePhoto": "카메라",
+        "textFile": "텍스트 파일",
+        "uploading": "업로드 중..."
     },
     "imageEditor": {
         "title": "이미지 편집",
@@ -243,6 +247,7 @@
         "privateFlowTitle": "비공개 플로우",
         "privateFlowDescription": "이 플로우는 공개되지 않았습니다. API 키로 로그인하면 접근할 수 있습니다.",
         "loadErrorTitle": "로드 실패",
+        "flowForbidden": "이 플로우에 접근할 권한이 없습니다.",
         "signInWithApiKey": "API 키로 로그인",
         "browsePublicFlows": "공개 플로우 둘러보기",
         "signInToEdit": "로그인하여 편집하기",
@@ -506,6 +511,8 @@
         "nodeFailed": "노드 {{current}}/{{total}} 실패",
         "allNodesCompleted": "모든 {{count}}개 노드 완료",
         "failedToCreateNode": "노드 생성 실패",
+        "runAllFailed": "플로우 실행 실패",
+        "waitingForData": "데이터 대기 중...",
         "emptyState": {
             "title": "입력 노드 선택",
             "description": "블록을 추가하여 AI 워크플로우를 만들고, 연결하여 데이터를 전달하세요."

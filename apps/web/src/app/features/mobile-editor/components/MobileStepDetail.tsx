@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, ArrowLeft, ArrowRight, FileText, Loader2, Play, Plus, Trash2 } from 'lucide-react';
@@ -85,6 +85,12 @@ export const MobileStepDetail = ({
 
     const isOpen = nodeId !== null;
     const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+    // Auto-close when the underlying node disappears (e.g. deleted via card menu or socket sync).
+    // Without this, activeNodeId stays set → step list stays hidden → blank screen until refresh.
+    useEffect(() => {
+        if (nodeId && !node) onClose();
+    }, [nodeId, node, onClose]);
 
     if (!node || !blockDef) return null;
 

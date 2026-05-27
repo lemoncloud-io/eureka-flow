@@ -56,7 +56,7 @@ const DevRoleToggle: React.FC<{
     onClose?: () => void;
 }> = ({ role, computedRole, onOverride, onClose }) => {
     const dragRef = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState({ x: 16, y: 56 }); // bottom-right offset (above minimap)
+    const [pos, setPos] = useState({ x: 16, y: 88 }); // bottom-right offset (above mobile-switch CTA + gap)
     const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
     const didDrag = useRef(false);
 
