@@ -24,10 +24,8 @@ interface UseMobileFlowActionsReturn {
     /** Returns the final node ID (server-assigned or temp) */
     handleAddBlock: (type: string) => Promise<string | null>;
     handleExport: () => void;
-    handleNew: () => Promise<void>;
     /** Creates new flow without confirm — for MobileNewFlowSheet */
     handleCreateNewFlow: () => Promise<string | null>;
-    handleClear: () => void;
 }
 
 export const useMobileFlowActions = ({
@@ -159,22 +157,11 @@ export const useMobileFlowActions = ({
         return newId;
     }, [createNewFlow, updateUrl, t, serializeWorkflowState, lastSavedStateRef]);
 
-    const handleNew = useCallback(async () => {
-        await handleCreateNewFlow();
-    }, [handleCreateNewFlow]);
-
-    const handleClear = useCallback(() => {
-        useCanvasStore.getState().clearWorkflow();
-        toast.success(t('flowEditor.canvasCleared', 'Canvas cleared'));
-    }, [t]);
-
     return {
         handleSave,
         handleSelectFlow,
         handleAddBlock,
         handleExport,
-        handleNew,
         handleCreateNewFlow,
-        handleClear,
     };
 };

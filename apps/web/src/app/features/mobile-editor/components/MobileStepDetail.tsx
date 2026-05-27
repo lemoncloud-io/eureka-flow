@@ -1,10 +1,10 @@
-import { useCallback, useState } from 'react';
+import { Fragment, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, ArrowLeft, ArrowRight, FileText, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-import { isAiBlock, isMissingAiKey, useBlockRegistry, useCanvasConnections } from '@flows/flows';
+import { isAiBlock, isMissingAiKey, useCanvasConnections } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Input, Label, Switch } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -14,6 +14,7 @@ import { BlockIcon } from '../../flows/components/BlockIcon';
 import { getPortStyleKey } from '../../flows/utils';
 import { useNodeConfig } from '../hooks/useNodeConfig';
 import { deleteNodeWithSync, executeNodeWithToast } from '../utils';
+import { AddConnectionRow } from './AddConnectionRow';
 import { ConfigFieldList } from './ConfigFieldList';
 import { STEREO_FALLBACK_LABEL, STEREO_I18N_KEY, STEREO_ICON_BG, TYPE_DOT } from './consts';
 import { MobileConnectionCard } from './MobileConnectionCard';
@@ -79,7 +80,6 @@ export const MobileStepDetail = ({
     const isRunning = (node?.state as string) === 'RUNNING';
 
     const allConnections = useCanvasConnections();
-    const blockRegistry = useBlockRegistry();
     const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
     const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
 
@@ -211,7 +211,6 @@ export const MobileStepDetail = ({
                                 node={node}
                                 blockDef={blockDef}
                                 allConnections={allConnections}
-                                blockRegistry={blockRegistry}
                                 canEdit={canEdit}
                                 onOpenOutputConnection={onOpenOutputConnection}
                                 onOpenInputConnection={onOpenInputConnection}
@@ -377,13 +376,87 @@ const PortButton = ({
     );
 };
 
+type PortConnectionFn = (
+    nodeId: string,
+    portId: string,
+    portDataType: string,
+    nodeName: string,
+    portName: string
+) => void;
+
+type Port = { id: string; label?: string; type?: string };
+type Conn = {
+    id: string;
+    sourceNodeId: string;
+    sourcePortId: string;
+    targetNodeId: string;
+    targetPortId: string;
+};
+
+interface PortGroupParams {
+    nodeId: string;
+    ports: Port[];
+    conns: Conn[];
+    direction: 'input' | 'output';
+    canEdit: boolean;
+    displayName: string;
+    onOpen?: PortConnectionFn;
+    t: (key: string, defaultValue?: string) => string;
+}
+
+const renderPortGroup = ({ nodeId, ports, conns, direction, canEdit, displayName, onOpen, t }: PortGroupParams) => {
+    const isInput = direction === 'input';
+    const prefix = isInput ? 'in' : 'out';
+
+    return ports.map(port => {
+        const portConns = conns.filter(c => (isInput ? c.targetPortId : c.sourcePortId) === port.id);
+        const open = () => onOpen?.(nodeId, port.id, port.type ?? 'any', displayName, port.label || port.id);
+
+        if (portConns.length === 0) {
+            return (
+                <PortButton
+                    key={`${prefix}-${port.id}`}
+                    portKey={`${prefix}-${port.id}`}
+                    port={port}
+                    direction={direction}
+                    connectedNames={null}
+                    canEdit={canEdit}
+                    onConnect={open}
+                    t={t}
+                />
+            );
+        }
+
+        return (
+            <Fragment key={`${prefix}-${port.id}`}>
+                {portConns.map(conn => (
+                    <MobileConnectionCard
+                        key={`${prefix}-${port.id}-${isInput ? conn.sourceNodeId : conn.targetNodeId}`}
+                        nodeId={isInput ? conn.sourceNodeId : conn.targetNodeId}
+                        connectionId={conn.id}
+                        canEdit={canEdit}
+                        onDisconnect={open}
+                        onTap={open}
+                    />
+                ))}
+                {canEdit && (
+                    <AddConnectionRow
+                        onClick={open}
+                        label={t('mobile.connection.addConnection', '추가 연결')}
+                        hint={t('mobile.connection.tapToConnect', '탭하여 연결')}
+                    />
+                )}
+            </Fragment>
+        );
+    });
+};
+
 /** Connections section — extracted for readability */
 const ConnectionsSection = ({
     nodeId,
     node,
     blockDef,
     allConnections,
-    blockRegistry,
     canEdit,
     onOpenOutputConnection,
     onOpenInputConnection,
@@ -391,47 +464,21 @@ const ConnectionsSection = ({
 }: {
     nodeId: string | null;
     node: { customLabel?: string; type: string };
-    blockDef: {
-        inputs?: Array<{ id: string; label?: string; type?: string }>;
-        outputs?: Array<{ id: string; label?: string; type?: string }>;
-        label?: string;
-    };
-    allConnections: Array<{
-        id: string;
-        sourceNodeId: string;
-        sourcePortId: string;
-        targetNodeId: string;
-        targetPortId: string;
-    }>;
-    blockRegistry: Record<string, { label?: string; icon?: string }>;
+    blockDef: { inputs?: Port[]; outputs?: Port[]; label?: string };
+    allConnections: Conn[];
     canEdit: boolean;
-    onOpenOutputConnection?: (
-        nodeId: string,
-        portId: string,
-        portDataType: string,
-        nodeName: string,
-        portName: string
-    ) => void;
-    onOpenInputConnection?: (
-        nodeId: string,
-        portId: string,
-        portDataType: string,
-        nodeName: string,
-        portName: string
-    ) => void;
+    onOpenOutputConnection?: PortConnectionFn;
+    onOpenInputConnection?: PortConnectionFn;
     t: (key: string, defaultValue?: string) => string;
 }) => {
     if (!blockDef || !nodeId) return null;
 
     const inputPorts = blockDef.inputs ?? [];
     const outputPorts = blockDef.outputs ?? [];
-
     if (inputPorts.length === 0 && outputPorts.length === 0) return null;
 
-    // Pre-split connections by direction
     const inConns = allConnections.filter(c => c.targetNodeId === nodeId);
     const outConns = allConnections.filter(c => c.sourceNodeId === nodeId);
-
     const displayName = node.customLabel || blockDef.label || node.type;
 
     return (
@@ -440,118 +487,36 @@ const ConnectionsSection = ({
                 {t('mobile.connectedBlocks', '연결된 블록')}
             </div>
 
-            {/* Input ports */}
             {inputPorts.length > 0 && (
                 <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider pt-1">
                     {t('mobile.input', '입력')}
                 </div>
             )}
-            {inputPorts.map(port => {
-                const conn = inConns.find(c => c.targetPortId === port.id);
-                if (conn) {
-                    return (
-                        <MobileConnectionCard
-                            key={`in-${port.id}`}
-                            nodeId={conn.sourceNodeId}
-                            canEdit={canEdit}
-                            onDisconnect={() =>
-                                onOpenInputConnection?.(
-                                    nodeId,
-                                    port.id,
-                                    port.type ?? 'any',
-                                    displayName,
-                                    port.label || port.id
-                                )
-                            }
-                            onTap={() =>
-                                onOpenInputConnection?.(
-                                    nodeId,
-                                    port.id,
-                                    port.type ?? 'any',
-                                    displayName,
-                                    port.label || port.id
-                                )
-                            }
-                        />
-                    );
-                }
-                return (
-                    <PortButton
-                        key={`in-${port.id}`}
-                        portKey={`in-${port.id}`}
-                        port={port}
-                        direction="input"
-                        connectedNames={null}
-                        canEdit={canEdit}
-                        onConnect={() =>
-                            onOpenInputConnection?.(
-                                nodeId,
-                                port.id,
-                                port.type ?? 'any',
-                                displayName,
-                                port.label || port.id
-                            )
-                        }
-                        t={t}
-                    />
-                );
+            {renderPortGroup({
+                nodeId,
+                ports: inputPorts,
+                conns: inConns,
+                direction: 'input',
+                canEdit,
+                displayName,
+                onOpen: onOpenInputConnection,
+                t,
             })}
 
-            {/* Output ports */}
             {outputPorts.length > 0 && (
                 <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider pt-2">
                     {t('mobile.output', '출력')}
                 </div>
             )}
-            {outputPorts.map(port => {
-                const conns = outConns.filter(c => c.sourcePortId === port.id);
-                if (conns.length > 0) {
-                    return conns.map(conn => (
-                        <MobileConnectionCard
-                            key={`out-${port.id}-${conn.targetNodeId}`}
-                            nodeId={conn.targetNodeId}
-                            canEdit={canEdit}
-                            onDisconnect={() =>
-                                onOpenOutputConnection?.(
-                                    nodeId,
-                                    port.id,
-                                    port.type ?? 'any',
-                                    displayName,
-                                    port.label || port.id
-                                )
-                            }
-                            onTap={() =>
-                                onOpenOutputConnection?.(
-                                    nodeId,
-                                    port.id,
-                                    port.type ?? 'any',
-                                    displayName,
-                                    port.label || port.id
-                                )
-                            }
-                        />
-                    ));
-                }
-                return (
-                    <PortButton
-                        key={`out-${port.id}`}
-                        portKey={`out-${port.id}`}
-                        port={port}
-                        direction="output"
-                        connectedNames={null}
-                        canEdit={canEdit}
-                        onConnect={() =>
-                            onOpenOutputConnection?.(
-                                nodeId,
-                                port.id,
-                                port.type ?? 'any',
-                                displayName,
-                                port.label || port.id
-                            )
-                        }
-                        t={t}
-                    />
-                );
+            {renderPortGroup({
+                nodeId,
+                ports: outputPorts,
+                conns: outConns,
+                direction: 'output',
+                canEdit,
+                displayName,
+                onOpen: onOpenOutputConnection,
+                t,
             })}
         </div>
     );

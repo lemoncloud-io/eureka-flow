@@ -104,10 +104,11 @@ export const MobileStepCard = React.memo(
         );
 
         const [confirmingDelete, setConfirmingDelete] = useState(false);
-        const handleDelete = useCallback(
-            (e: React.MouseEvent) => {
-                e.stopPropagation();
+        const handleDeleteSelect = useCallback(
+            (e: Event) => {
                 if (!confirmingDelete) {
+                    // Keep the dropdown open so the user can tap once more to confirm.
+                    e.preventDefault();
                     setConfirmingDelete(true);
                     setTimeout(() => setConfirmingDelete(false), 3000);
                     return;
@@ -225,7 +226,7 @@ export const MobileStepCard = React.memo(
                             )}
                             {canEdit && onDelete && (
                                 <DropdownMenuItem
-                                    onClick={handleDelete}
+                                    onSelect={handleDeleteSelect}
                                     className={cn(
                                         'gap-2',
                                         confirmingDelete

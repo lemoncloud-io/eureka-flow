@@ -1,3 +1,4 @@
+export { AddConnectionRow } from './AddConnectionRow';
 export { ConfigFieldList } from './ConfigFieldList';
 export { DataPreview } from './DataPreview';
 export { MobileBlockLibrarySheet } from './MobileBlockLibrarySheet';
@@ -6,6 +7,7 @@ export { MobileConnectionCard } from './MobileConnectionCard';
 export { MobileConnectionSheet } from './MobileConnectionSheet';
 export { MobileFileField } from './MobileFileField';
 export { MobileFlowMap } from './MobileFlowMap';
+export { MobileFlowSettingsSheet } from './MobileFlowSettingsSheet';
 export { MobileHeader } from './MobileHeader';
 export { MobileImageUpload } from './MobileImageUpload';
 export { MobileNewFlowSheet } from './MobileNewFlowSheet';

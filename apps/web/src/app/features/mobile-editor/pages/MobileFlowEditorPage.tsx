@@ -22,6 +22,7 @@ import {
     MobileBottomBar,
     MobileConnectionSheet,
     MobileFlowMap,
+    MobileFlowSettingsSheet,
     MobileHeader,
     MobileNewFlowSheet,
     MobileStepDetail,
@@ -44,6 +45,11 @@ import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? [] });
+
+const isPortTypeCompatible = (sourceType: string, targetType: string | undefined): boolean => {
+    const target = targetType ?? 'any';
+    return sourceType === 'any' || target === 'any' || sourceType.toLowerCase() === target.toLowerCase();
+};
 
 export const MobileFlowEditorPage = () => {
     const { t } = useTranslation(['flows']);
@@ -71,6 +77,7 @@ export const MobileFlowEditorPage = () => {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isNewFlowSheetOpen, setIsNewFlowSheetOpen] = useState(false);
+    const [isFlowSettingsOpen, setIsFlowSettingsOpen] = useState(false);
     const [isAiKeyDialogOpen, setIsAiKeyDialogOpen] = useState(false);
     const [previewContent, setPreviewContent] = useState<{ value: unknown; type?: string } | null>(null);
 
@@ -121,13 +128,12 @@ export const MobileFlowEditorPage = () => {
 
     const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ socketConnectionId });
 
-    const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleNew, handleCreateNewFlow, handleClear } =
-        useMobileFlowActions({
-            updateUrl,
-            serializeWorkflowState,
-            lastSavedStateRef,
-            lastLocalUpdateTimestampRef,
-        });
+    const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleCreateNewFlow } = useMobileFlowActions({
+        updateUrl,
+        serializeWorkflowState,
+        lastSavedStateRef,
+        lastLocalUpdateTimestampRef,
+    });
 
     const connectionMode = useConnectionMode(blockRegistry, currentFlowId);
     const { recentIds, addRecent } = useRecentBlocks();
@@ -171,19 +177,16 @@ export const MobileFlowEditorPage = () => {
         async (type: string) => {
             addRecent(type);
             const newNodeId = await handleAddBlock(type);
+            if (!newNodeId) return;
 
             // Auto-connect if there's a pending connection source
-            if (newNodeId && pendingConnectSource) {
+            if (pendingConnectSource) {
                 const newNodeDef = blockRegistry[type];
                 const srcType = pendingConnectSource.portDataType;
-                const isCompatible = (portType: string | undefined) => {
-                    const t = portType ?? 'any';
-                    return srcType === 'any' || t === 'any' || srcType.toLowerCase() === t.toLowerCase();
-                };
 
                 if (pendingConnectSource.direction === 'output') {
                     // Original node's output → new block's input
-                    const compatibleInput = newNodeDef?.inputs?.find(p => isCompatible(p.type));
+                    const compatibleInput = newNodeDef?.inputs?.find(p => isPortTypeCompatible(srcType, p.type));
                     if (compatibleInput) {
                         await connectionMode.connectPorts(
                             pendingConnectSource.nodeId,
@@ -194,7 +197,7 @@ export const MobileFlowEditorPage = () => {
                     }
                 } else {
                     // New block's output → original node's input
-                    const compatibleOutput = newNodeDef?.outputs?.find(p => isCompatible(p.type));
+                    const compatibleOutput = newNodeDef?.outputs?.find(p => isPortTypeCompatible(srcType, p.type));
                     if (compatibleOutput) {
                         await connectionMode.connectPorts(
                             newNodeId,
@@ -205,9 +208,13 @@ export const MobileFlowEditorPage = () => {
                     }
                 }
                 setPendingConnectSource(null);
+                return;
             }
+
+            // Plain add (no auto-connect) — open new node's detail
+            stepNav.openStep(newNodeId);
         },
-        [addRecent, handleAddBlock, pendingConnectSource, blockRegistry, connectionMode]
+        [addRecent, handleAddBlock, pendingConnectSource, blockRegistry, connectionMode, stepNav]
     );
 
     // ============================================================
@@ -296,6 +303,7 @@ export const MobileFlowEditorPage = () => {
                 onSave={handleSave}
                 onOpenFlowList={() => setIsFlowListOpen(true)}
                 onOpenFlowMap={() => setIsFlowMapOpen(true)}
+                onOpenFlowSettings={() => setIsFlowSettingsOpen(true)}
                 onRunAll={handleRunAll}
                 isRunning={isRunning}
                 runProgress={runProgress}
@@ -307,8 +315,7 @@ export const MobileFlowEditorPage = () => {
                     });
                 }}
                 onExport={handleExport}
-                onNew={role === 'owner' ? handleNew : undefined}
-                onClear={role === 'owner' ? handleClear : undefined}
+                onNew={role === 'owner' ? () => setIsNewFlowSheetOpen(true) : undefined}
                 onApiKeySettings={() => {
                     if (!useWebCoreStore.getState().apiKey && redirectToLogin()) return;
                     setIsApiKeyDialogOpen(true);
@@ -443,6 +450,8 @@ export const MobileFlowEditorPage = () => {
                 onCreate={handleCreateNewFlow}
                 onNameChange={updateFlowName}
             />
+
+            <MobileFlowSettingsSheet open={isFlowSettingsOpen} onOpenChange={setIsFlowSettingsOpen} role={role} />
 
             <ApiKeyDialog
                 open={isApiKeyDialogOpen}

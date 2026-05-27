@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 
+import { hasDesktopOverride } from './desktopOverride';
+
 const MOBILE_BREAKPOINT = 767;
 const MEDIA_QUERY = `(max-width: ${MOBILE_BREAKPOINT}px)`;
-
-const hasDesktopOverride = () => new URLSearchParams(window.location.search).get('desktop') === '1';
 
 export const useIsMobile = (): boolean => {
     const [isMobile, setIsMobile] = useState(() => !hasDesktopOverride() && window.matchMedia(MEDIA_QUERY).matches);
@@ -17,4 +17,18 @@ export const useIsMobile = (): boolean => {
     }, []);
 
     return isMobile;
+};
+
+/** Raw device-size check — ignores `?desktop=1` override. Use to detect mobile devices forced into desktop view. */
+export const useIsMobileDevice = (): boolean => {
+    const [isMobileDevice, setIsMobileDevice] = useState(() => window.matchMedia(MEDIA_QUERY).matches);
+
+    useEffect(() => {
+        const mql = window.matchMedia(MEDIA_QUERY);
+        const handler = (e: MediaQueryListEvent) => setIsMobileDevice(e.matches);
+        mql.addEventListener('change', handler);
+        return () => mql.removeEventListener('change', handler);
+    }, []);
+
+    return isMobileDevice;
 };

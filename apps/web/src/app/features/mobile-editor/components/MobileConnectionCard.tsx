@@ -8,20 +8,28 @@ import { cn } from '@flows/lib/utils';
 
 import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
+import { useIsConnectionNew } from '../hooks';
 
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 interface MobileConnectionCardProps {
     nodeId: string;
+    connectionId: string;
     canEdit: boolean;
-    isNew?: boolean;
     onDisconnect?: () => void;
     onTap?: () => void;
 }
 
-export const MobileConnectionCard = ({ nodeId, canEdit, isNew, onDisconnect, onTap }: MobileConnectionCardProps) => {
+export const MobileConnectionCard = ({
+    nodeId,
+    connectionId,
+    canEdit,
+    onDisconnect,
+    onTap,
+}: MobileConnectionCardProps) => {
+    const isNew = useIsConnectionNew(connectionId);
     const { t } = useTranslation(['flows']);
-    const [expanded, setExpanded] = useState(false);
+    const [expanded, setExpanded] = useState(true);
     const blockRegistry = useBlockRegistry();
 
     const node = useCanvasStore(state => state.nodes.find(n => n.id === nodeId));
