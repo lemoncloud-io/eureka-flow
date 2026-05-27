@@ -14,6 +14,7 @@ import { redirectToLogin, useWebCoreStore, validateApiKey } from '@flows/web-cor
 import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
 import { AiKeyDialog } from '../components/AiKeyDialog';
+import { DesktopMobileSwitchCta } from '../components/DesktopMobileSwitchCta';
 import { DevSocketPanel } from '../components/DevSocketPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
 import { FlowListDialog } from '../components/FlowListDialog';
@@ -836,6 +837,8 @@ export const FlowEditorPage = () => {
 
             {/* Floating Sidebar */}
             <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} role={role} />
+
+            <DesktopMobileSwitchCta />
 
             {/* API Key Dialog */}
             <ApiKeyDialog

@@ -16,7 +16,6 @@ import {
     Save,
     Search,
     Settings2,
-    Trash2,
     WifiOff,
 } from 'lucide-react';
 
@@ -34,6 +33,7 @@ import {
 } from '@flows/ui-kit';
 
 import { DebugModeToggle } from '../../../components/DebugModeToggle';
+import { enableDesktopOverride } from '../hooks';
 
 import type { FlowRole, SaveStatus } from '@flows/flows';
 
@@ -51,6 +51,7 @@ interface MobileHeaderProps {
     onSave: () => void;
     onOpenFlowList: () => void;
     onOpenFlowMap: () => void;
+    onOpenFlowSettings: () => void;
     onRunAll: () => void;
     isRunning: boolean;
     runProgress: RunProgress | null;
@@ -58,7 +59,6 @@ interface MobileHeaderProps {
     onToggleSearch?: () => void;
     onExport?: () => void;
     onNew?: () => void;
-    onClear?: () => void;
     onApiKeySettings?: () => void;
     role?: FlowRole;
     onVersionClick?: () => void;
@@ -75,6 +75,7 @@ export const MobileHeader = ({
     onSave,
     onOpenFlowList,
     onOpenFlowMap,
+    onOpenFlowSettings,
     onRunAll,
     isRunning,
     runProgress,
@@ -82,7 +83,6 @@ export const MobileHeader = ({
     onToggleSearch,
     onExport,
     onNew,
-    onClear,
     onApiKeySettings,
     role = 'owner',
     onVersionClick,
@@ -91,7 +91,6 @@ export const MobileHeader = ({
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
     const { canEdit, canRun } = getPermissions(role);
-    const [confirmingClear, setConfirmingClear] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(flowName);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -270,17 +269,11 @@ export const MobileHeader = ({
                     <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                         {t('header.menuGroup.canvas', 'Canvas')}
                     </DropdownMenuLabel>
-                    <DropdownMenuItem onClick={onOpenFlowMap} className="gap-2">
+                    <DropdownMenuItem onClick={onOpenFlowSettings} className="gap-2">
                         <Settings2 className="w-4 h-4" />
                         {t('mobile.flowSettings', '플로우 설정')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                        onClick={() => {
-                            const url = window.location.href;
-                            window.location.href = url + (url.includes('?') ? '&' : '?') + 'desktop=1';
-                        }}
-                        className="gap-2"
-                    >
+                    <DropdownMenuItem onClick={enableDesktopOverride} className="gap-2">
                         <Monitor className="w-4 h-4" />
                         {t('mobile.pcVersion', 'PC 버전 보기')}
                     </DropdownMenuItem>
@@ -288,28 +281,6 @@ export const MobileHeader = ({
                         <MapIcon className="w-4 h-4" />
                         {t('mobile.flowOverview', '플로우 전체보기')}
                     </DropdownMenuItem>
-                    {onClear && (
-                        <DropdownMenuItem
-                            onClick={() => {
-                                if (!confirmingClear) {
-                                    setConfirmingClear(true);
-                                    setTimeout(() => setConfirmingClear(false), 3000);
-                                    return;
-                                }
-                                onClear();
-                                setConfirmingClear(false);
-                            }}
-                            className={cn(
-                                'gap-2',
-                                confirmingClear ? 'bg-destructive text-destructive-foreground' : 'text-destructive'
-                            )}
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            {confirmingClear
-                                ? t('mobile.confirmClear', '정말 모두 삭제하시겠습니까?')
-                                : t('header.clearCanvas', 'Clear Canvas')}
-                        </DropdownMenuItem>
-                    )}
 
                     <DropdownMenuSeparator />
 

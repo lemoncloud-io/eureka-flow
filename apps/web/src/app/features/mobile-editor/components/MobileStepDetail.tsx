@@ -447,11 +447,11 @@ const ConnectionsSection = ({
                 </div>
             )}
             {inputPorts.map(port => {
-                const conn = inConns.find(c => c.targetPortId === port.id);
-                if (conn) {
-                    return (
+                const conns = inConns.filter(c => c.targetPortId === port.id);
+                if (conns.length > 0) {
+                    return conns.map(conn => (
                         <MobileConnectionCard
-                            key={`in-${port.id}`}
+                            key={`in-${port.id}-${conn.sourceNodeId}`}
                             nodeId={conn.sourceNodeId}
                             canEdit={canEdit}
                             onDisconnect={() =>
@@ -473,7 +473,7 @@ const ConnectionsSection = ({
                                 )
                             }
                         />
-                    );
+                    ));
                 }
                 return (
                     <PortButton

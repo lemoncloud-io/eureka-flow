@@ -21,7 +21,7 @@ interface MobileConnectionCardProps {
 
 export const MobileConnectionCard = ({ nodeId, canEdit, isNew, onDisconnect, onTap }: MobileConnectionCardProps) => {
     const { t } = useTranslation(['flows']);
-    const [expanded, setExpanded] = useState(false);
+    const [expanded, setExpanded] = useState(true);
     const blockRegistry = useBlockRegistry();
 
     const node = useCanvasStore(state => state.nodes.find(n => n.id === nodeId));

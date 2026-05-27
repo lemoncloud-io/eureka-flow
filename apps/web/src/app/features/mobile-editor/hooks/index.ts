@@ -1,5 +1,6 @@
 export { useConnectionMode } from './useConnectionMode';
-export { useIsMobile } from './useIsMobile';
+export { disableDesktopOverride, enableDesktopOverride, hasDesktopOverride } from './desktopOverride';
+export { useIsMobile, useIsMobileDevice } from './useIsMobile';
 export { useMobileAutoSave } from './useMobileAutoSave';
 export { useMobileEditorBoot } from './useMobileEditorBoot';
 export { useMobileFlowActions } from './useMobileFlowActions';
