@@ -25,7 +25,7 @@ import type {
 /**
  * Real API implementation using server proxy pattern.
  *
- * All calls go through: POST /flows/:id/proxy?type=X&cmd=Y
+ * All calls go through: POST /processes/:id/proxy?type=X&cmd=Y
  */
 
 // --- Helper: adapt response data ---
@@ -40,37 +40,31 @@ const adaptListResponse = <T>(res: ProcessApiListResponse<T>): ProcessApiListRes
     data: res.data.map(fromServer),
 });
 
-// --- Stub for server commands not yet available ---
-
-const notYetAvailable = (method: string) => async () => {
-    throw new Error(`Server command not yet available: ${method}. Use mock API for now.`);
-};
-
 // --- Implementation ---
 
 export const realApi: ProcessApi = {
     processes: {
         list: async (): Promise<ProcessApiListResponse<Process>> => {
-            const res = await proxyCall<ProcessApiListResponse<Process>>('flows', 'list');
+            const res = await proxyCall<ProcessApiListResponse<Process>>('processes', 'list');
             return adaptListResponse(res);
         },
         get: async (id: string): Promise<ProcessApiResponse<Process>> => {
-            const res = await proxyCall<ProcessApiResponse<Process>>('flows', 'get', id);
+            const res = await proxyCall<ProcessApiResponse<Process>>('processes', 'get', id);
             return adaptResponse(res);
         },
         create: async (input: CreateProcessInput): Promise<ProcessApiResponse<Process>> => {
-            const res = await proxyCall<ProcessApiResponse<Process>>('flows', 'create', '0', toServer(input));
+            const res = await proxyCall<ProcessApiResponse<Process>>('processes', 'create', '0', toServer(input));
             return adaptResponse(res);
         },
         update: async (id: string, input: UpdateProcessInput): Promise<ProcessApiResponse<Process>> => {
-            const res = await proxyCall<ProcessApiResponse<Process>>('flows', 'update', id, toServer(input));
+            const res = await proxyCall<ProcessApiResponse<Process>>('processes', 'update', id, toServer(input));
             return adaptResponse(res);
         },
         remove: async (id: string): Promise<ProcessApiResponse<{ id: string }>> => {
-            return proxyCall<ProcessApiResponse<{ id: string }>>('flows', 'remove', id);
+            return proxyCall<ProcessApiResponse<{ id: string }>>('processes', 'remove', id);
         },
         apply: async (id: string, input: CreateItemInput): Promise<ProcessApiResponse<Item>> => {
-            const res = await proxyCall<ProcessApiResponse<Item>>('flows', 'apply', id, toServer(input));
+            const res = await proxyCall<ProcessApiResponse<Item>>('processes', 'apply', id, toServer(input));
             return adaptResponse(res);
         },
     },
@@ -120,15 +114,26 @@ export const realApi: ProcessApi = {
         },
     },
 
-    // Server may not support these yet — stub with clear error
     tasks: {
-        changeStatus: notYetAvailable('tasks.changeStatus') as ProcessApi['tasks']['changeStatus'],
-        addNote: notYetAvailable('tasks.addNote') as ProcessApi['tasks']['addNote'],
+        changeStatus: async (id, input) => {
+            const res = await proxyCall<ProcessApiResponse<Task>>('tasks', 'changeStatus', id, input);
+            return adaptResponse(res);
+        },
+        addNote: async (id, input) => {
+            const res = await proxyCall<ProcessApiResponse<Note>>('tasks', 'addNote', id, input);
+            return adaptResponse(res);
+        },
     },
 
     notes: {
-        resolve: notYetAvailable('notes.resolve') as ProcessApi['notes']['resolve'],
-        reopen: notYetAvailable('notes.reopen') as ProcessApi['notes']['reopen'],
+        resolve: async (id, input) => {
+            const res = await proxyCall<ProcessApiResponse<Note>>('notes', 'resolve', id, input);
+            return adaptResponse(res);
+        },
+        reopen: async id => {
+            const res = await proxyCall<ProcessApiResponse<Note>>('notes', 'reopen', id);
+            return adaptResponse(res);
+        },
     },
 
     actors: {
