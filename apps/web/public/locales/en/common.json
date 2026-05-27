@@ -265,7 +265,7 @@
         "sortRecent": "Recently Updated",
         "sortLeastRecent": "Least Recently Updated",
         "noItemsForActor": "No items for this actor.",
-        "paginationInfo": "Pagination Info",
+        "paginationInfo": "Page {{current}} of {{total}} ({{count}} total items)",
         "itemDeleted": "Item deleted",
         "memoPlaceholder": "Add memo...",
         "addMemo": "Add memo...",
