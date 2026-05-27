@@ -1,16 +1,9 @@
 import { useSyncExternalStore } from 'react';
 
-/**
- * Tracks recently-created connection IDs so the connected-node cards can show
- * a "new" badge for a few seconds after the connection is made. The store is
- * intentionally module-level (not Zustand) — a single transient UI signal does
- * not need a global store, and `useSyncExternalStore` keeps subscribers in sync
- * across mounts/unmounts while the card list re-renders.
- */
-
 const NEW_BADGE_TTL_MS = 5000;
 
 const recentIds = new Set<string>();
+const pendingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 const listeners = new Set<() => void>();
 
 const notify = () => {
@@ -26,12 +19,20 @@ const subscribe = (onChange: () => void) => {
 
 export const markConnectionNew = (connectionId: string): void => {
     if (!connectionId) return;
+    // Reset the TTL when the same id is marked again so the first timeout does
+    // not prematurely clear an id that was just re-marked.
+    const existing = pendingTimeouts.get(connectionId);
+    if (existing) clearTimeout(existing);
+
     recentIds.add(connectionId);
     notify();
-    setTimeout(() => {
+
+    const timeoutId = setTimeout(() => {
         recentIds.delete(connectionId);
+        pendingTimeouts.delete(connectionId);
         notify();
     }, NEW_BADGE_TTL_MS);
+    pendingTimeouts.set(connectionId, timeoutId);
 };
 
 export const useIsConnectionNew = (connectionId: string): boolean =>
