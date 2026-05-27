@@ -53,7 +53,7 @@ describe('Setup Screens CRUD & Validation Scenarios', () => {
 
     it('DEBUG: check processApi and environment', async () => {
         console.log('--- DEBUG INFO ---');
-        console.log('import.meta.env:', JSON.stringify(import.meta.env));
+        console.log('import.meta.env:', JSON.stringify((import.meta as any).env));
         try {
             const toolsRes = await processApi.tools.list();
             console.log('processApi.tools.list() returned data length:', toolsRes?.data?.length);

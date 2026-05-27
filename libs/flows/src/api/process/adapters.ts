@@ -21,8 +21,7 @@ export const fromServer = <T>(data: T): T => {
     const obj = data as Record<string, unknown>;
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
-        const newKey = key === 'flowId' ? 'processId' : key;
-        result[newKey] = RECURSE_KEYS.has(key) && Array.isArray(value) ? value.map(fromServer) : value;
+        result[key] = RECURSE_KEYS.has(key) && Array.isArray(value) ? value.map(fromServer) : value;
     }
     return result as T;
 };
@@ -36,8 +35,7 @@ export const toServer = <T>(data: T): T => {
     const obj = data as Record<string, unknown>;
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
-        const newKey = key === 'processId' ? 'flowId' : key;
-        result[newKey] = RECURSE_KEYS.has(key) && Array.isArray(value) ? value.map(toServer) : value;
+        result[key] = RECURSE_KEYS.has(key) && Array.isArray(value) ? value.map(toServer) : value;
     }
     return result as T;
 };

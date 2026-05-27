@@ -143,6 +143,9 @@
         "keyCreatedSuccess": "API 키 생성이 완료되었습니다."
     },
     "navigator": {
+        "work": "작업",
+        "dashboard": "대시보드",
+        "setup": "설정",
         "actorSaved": "담당자가 저장되었습니다.",
         "actorCreated": "담당자가 생성되었습니다.",
         "editActor": "담당자 수정",
@@ -280,6 +283,41 @@
         "processes": "프로세스 템플릿 목록",
         "noProcessesYet": "등록된 프로세스 템플릿이 없습니다.",
         "tools": "도구 목록",
-        "noToolsYet": "등록된 도구가 없습니다."
+        "noToolsYet": "등록된 도구가 없습니다.",
+        "copyImage": "이미지 복사",
+        "deleteImage": "이미지 삭제",
+        "doubleClickToEdit": "더블 클릭하여 편집",
+        "editName": "이름 수정",
+        "nextAction": "다음 작업",
+        "thumbnail": "대표 이미지 (1:1 비율, 최대 512px)",
+        "clickOrDrag": "이미지를 드래그하거나, 붙여넣기(Ctrl+V) 또는 클릭하세요",
+        "imageSpec": "1:1 비율, 최대 512px (자동 리사이징)"
+    },
+    "common": {
+        "cancel": "취소",
+        "delete": "삭제",
+        "all": "전체"
+    },
+    "dashboard": {
+        "donePct": "완료",
+        "requests": "요청",
+        "next": "다음",
+        "total": "전체 항목",
+        "doing": "진행 중",
+        "doneItems": "완료",
+        "activeActions": "조치 필요 작업",
+        "pending": "대기 중",
+        "teamWorkload": "팀 업무량",
+        "tasks": "개 작업",
+        "allCaughtUp": "모든 작업을 완료했습니다!",
+        "noMandatory": "대기 중인 필수 작업이 없습니다.",
+        "off": "비활성"
+    },
+    "actor": {
+        "stereo": {
+            "person": "개인",
+            "team": "팀",
+            "vendor": "협력사"
+        }
     }
 }

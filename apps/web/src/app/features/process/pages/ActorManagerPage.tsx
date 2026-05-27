@@ -114,7 +114,7 @@ export const ActorManagerPage = () => {
                                         </div>
                                         <div className="mt-0.5 flex items-center gap-2">
                                             <Badge variant="secondary" className="text-[10px]">
-                                                {actor.stereo}
+                                                {t(`actor.stereo.${actor.stereo}`, actor.stereo)}
                                             </Badge>
                                             {currentActor?.id === actor.id && (
                                                 <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">

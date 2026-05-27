@@ -143,6 +143,9 @@
         "keyCreatedSuccess": "API key creation complete."
     },
     "navigator": {
+        "work": "Work",
+        "dashboard": "Dashboard",
+        "setup": "Setup",
         "actorSaved": "Actor saved",
         "actorCreated": "Actor created",
         "editActor": "Edit Actor",
@@ -280,6 +283,41 @@
         "processes": "Processes",
         "noProcessesYet": "No process templates yet. Create your first workflow.",
         "tools": "Tools",
-        "noToolsYet": "No tools yet. Create your first external tool connection."
+        "noToolsYet": "No tools yet. Create your first external tool connection.",
+        "copyImage": "Copy Image",
+        "deleteImage": "Remove",
+        "doubleClickToEdit": "Double click to edit",
+        "editName": "Edit Name",
+        "nextAction": "Next action",
+        "thumbnail": "Thumbnail Image (1:1 Ratio, Max 512px)",
+        "clickOrDrag": "Drag image, Paste (Ctrl+V) or Click",
+        "imageSpec": "1:1 ratio, max 512px (Auto-resized)"
+    },
+    "common": {
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "all": "All"
+    },
+    "dashboard": {
+        "donePct": "DONE",
+        "requests": "Requests",
+        "next": "NEXT",
+        "total": "Total Items",
+        "doing": "Doing",
+        "doneItems": "Done",
+        "activeActions": "Active Action Needed",
+        "pending": "PENDING",
+        "teamWorkload": "Team Workload",
+        "tasks": "tasks",
+        "allCaughtUp": "You're all caught up!",
+        "noMandatory": "No mandatory next actions.",
+        "off": "Off"
+    },
+    "actor": {
+        "stereo": {
+            "person": "Person",
+            "team": "Team",
+            "vendor": "Vendor"
+        }
     }
 }

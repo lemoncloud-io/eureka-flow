@@ -19,7 +19,7 @@ export const useItems = (params?: ItemListParams) => {
     return useQuery({
         queryKey: itemKeys.lists(params as Record<string, unknown>),
         queryFn: () => processApi.items.list(params),
-        staleTime: 30_000,
+        staleTime: 0,
     });
 };
 

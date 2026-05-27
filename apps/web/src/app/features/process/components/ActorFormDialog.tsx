@@ -103,9 +103,9 @@ export const ActorFormDialog = ({ open, onOpenChange, actor }: ActorFormDialogPr
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="person">Person</SelectItem>
-                                    <SelectItem value="team">Team</SelectItem>
-                                    <SelectItem value="vendor">Vendor</SelectItem>
+                                    <SelectItem value="person">{t('actor.stereo.person', 'Person')}</SelectItem>
+                                    <SelectItem value="team">{t('actor.stereo.team', 'Team')}</SelectItem>
+                                    <SelectItem value="vendor">{t('actor.stereo.vendor', 'Vendor')}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

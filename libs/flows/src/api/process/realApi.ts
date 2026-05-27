@@ -26,7 +26,6 @@ import type {
  * Real API implementation using server proxy pattern.
  *
  * All calls go through: POST /flows/:id/proxy?type=X&cmd=Y
- * Server field `flowId` is mapped to frontend `processId` at this boundary.
  */
 
 // --- Helper: adapt response data ---

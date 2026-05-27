@@ -120,7 +120,7 @@ describe('Process Navigator mockApi', () => {
 
             const result = await mockApi.stages.addNote(stage.id, {
                 content: 'Test note',
-                authorId: 'md',
+                actorId: 'md',
                 stereo: 'issue',
                 targetActorId: 'photo',
             });

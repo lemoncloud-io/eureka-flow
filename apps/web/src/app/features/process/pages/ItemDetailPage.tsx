@@ -1,8 +1,8 @@
-import { Fragment, useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { Check, CheckCircle2, Edit2, Trash2, X } from 'lucide-react';
+import { Check, CheckCircle2, Copy, Edit2, ImagePlus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -38,6 +38,7 @@ import { ProgressBar } from '../components/ProgressBar';
 import { StageCard } from '../components/StageCard';
 import { StageDetailPanel } from '../components/StageDetailPanel';
 import { STATUS_CONFIG } from '../components/StatusBadge';
+import { copyImageToClipboard, handleImagePaste, processAndResizeImage } from '../utils/image';
 
 import type { Status } from '@flows/flows';
 
@@ -54,6 +55,11 @@ export const ItemDetailPage = () => {
     const [activeTab, setActiveTab] = useState<'stages' | 'notes'>('stages');
     const [memoDraft, setMemoDraft] = useState<string | null>(null);
     const isEditingMemo = memoDraft !== null;
+
+    const [nameDraft, setNameDraft] = useState<string | null>(null);
+    const isEditingName = nameDraft !== null;
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const selectedStageId = searchParams.get('stage');
 
@@ -107,6 +113,77 @@ export const ItemDetailPage = () => {
         updateItemMutation.mutate({ id, input: { memo: memoDraft } }, { onSuccess: () => setMemoDraft(null) });
     };
 
+    const handleStartEditName = () => setNameDraft(item?.name ?? '');
+    const handleCancelEditName = () => setNameDraft(null);
+    const handleSaveName = () => {
+        if (!id || nameDraft === null || !nameDraft.trim()) return;
+        updateItemMutation.mutate({ id, input: { name: nameDraft.trim() } }, { onSuccess: () => setNameDraft(null) });
+    };
+
+    const handleThumbnailUpload = async (fileOrBlob: File | Blob) => {
+        try {
+            const resized = await processAndResizeImage(fileOrBlob);
+            updateItemMutation.mutate(
+                { id: id!, input: { thumbnailUrl: resized } },
+                {
+                    onSuccess: () => {
+                        toast.success(t('navigator.imageUploaded', 'Image processed successfully!'));
+                    },
+                }
+            );
+        } catch {
+            toast.error(t('navigator.imageError', 'Failed to process image.'));
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = () => {
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file && file.type.startsWith('image/')) {
+            await handleThumbnailUpload(file);
+        }
+    };
+
+    const handlePaste = async (e: React.ClipboardEvent) => {
+        const file = handleImagePaste(e);
+        if (file) {
+            await handleThumbnailUpload(file);
+        }
+    };
+
+    const handleCopyThumbnail = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!item?.thumbnailUrl) return;
+        const success = await copyImageToClipboard(item.thumbnailUrl);
+        if (success) {
+            toast.success(t('navigator.imageCopied', 'Image copied to clipboard!'));
+        } else {
+            toast.error(t('navigator.copyFailed', 'Failed to copy image.'));
+        }
+    };
+
+    const handleDeleteThumbnail = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        updateItemMutation.mutate(
+            { id: id!, input: { thumbnailUrl: '' } },
+            {
+                onSuccess: () => {
+                    toast.success(t('navigator.imageDeleted', 'Image removed.'));
+                },
+            }
+        );
+    };
+
     if (isLoading || !item) {
         return (
             <div className="space-y-6">
@@ -131,19 +208,124 @@ export const ItemDetailPage = () => {
     return (
         <div className="space-y-5">
             <div className="flex items-start gap-4">
-                {item.thumbnailUrl ? (
-                    <img
-                        src={item.thumbnailUrl}
-                        alt={item.name}
-                        className="h-20 w-20 shrink-0 rounded-xl object-cover"
+                <div
+                    tabIndex={0}
+                    className={cn(
+                        'group relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted outline-none transition-all cursor-pointer select-none',
+                        isDragging
+                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                            : 'hover:border-primary/50 hover:bg-muted/10'
+                    )}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onPaste={handlePaste}
+                    onClick={() => fileInputRef.current?.click()}
+                >
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={async e => {
+                            const file = e.target.files?.[0];
+                            if (file) await handleThumbnailUpload(file);
+                        }}
                     />
-                ) : (
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary text-2xl font-bold">
-                        {item.name.charAt(0).toUpperCase()}
-                    </div>
-                )}
+                    {item.thumbnailUrl ? (
+                        <>
+                            <img
+                                src={item.thumbnailUrl}
+                                alt={item.name}
+                                className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+                                <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 text-white hover:bg-white/20"
+                                    onClick={handleCopyThumbnail}
+                                    title={t('navigator.copyImage', 'Copy Image')}
+                                >
+                                    <Copy className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 text-destructive hover:bg-destructive/20 hover:text-destructive"
+                                    onClick={handleDeleteThumbnail}
+                                    title={t('navigator.deleteImage', 'Remove')}
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex h-full w-full items-center justify-center bg-primary/10 text-primary text-2xl font-bold transition-transform group-hover:scale-105">
+                                {item.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100 text-white text-[10px]">
+                                <ImagePlus className="h-4 w-4 mb-0.5" />
+                                <span>{t('navigator.upload', 'Upload')}</span>
+                            </div>
+                        </>
+                    )}
+                </div>
                 <div className="min-w-0 flex-1 space-y-2">
-                    <h1 className="text-2xl font-bold truncate">{item.name}</h1>
+                    {isEditingName ? (
+                        <div className="flex items-center gap-1.5">
+                            <Input
+                                value={nameDraft ?? ''}
+                                onChange={e => setNameDraft(e.target.value)}
+                                placeholder={t('navigator.itemNamePlaceholder', 'Item name')}
+                                className="h-9 max-w-md text-lg font-semibold"
+                                autoFocus
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') handleSaveName();
+                                    if (e.key === 'Escape') handleCancelEditName();
+                                }}
+                            />
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
+                                onClick={handleSaveName}
+                                disabled={updateItemMutation.isPending}
+                            >
+                                <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-muted-foreground"
+                                onClick={handleCancelEditName}
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 group/title">
+                            <h1
+                                className="text-2xl font-bold truncate cursor-pointer hover:text-primary transition-colors"
+                                onDoubleClick={handleStartEditName}
+                                title={t('navigator.doubleClickToEdit', 'Double click to edit')}
+                            >
+                                {item.name}
+                            </h1>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 opacity-0 group-hover/title:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                                onClick={handleStartEditName}
+                                title={t('navigator.editName', 'Edit Name')}
+                            >
+                                <Edit2 className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    )}
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                         {currentStage && <span>{currentStage.name}</span>}
                         {currentStage && <span>·</span>}
