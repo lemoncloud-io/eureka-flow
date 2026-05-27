@@ -147,12 +147,13 @@ Radix UI 원형에 맞춤형 스타일 및 애니메이션을 입힌 총 33종�
 
 Eureka Flow는 Zustand 프레임워크를 기반으로 아래와 같이 도메인 관심사별로 상태(Store)를 분할하고 필요시 교차 통신을 하도록 설계되었습니다.
 
-| 스토어명 (Zustand Store) | 정의 위치                                                                                     | 담당 역할                                                                                       |
-| :----------------------- | :-------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------- |
-| **`useCanvasStore`**     | [libs/flows/src/stores/useCanvasStore.ts](../libs/flows/src/stores/useCanvasStore.ts)         | 화면 내 노드 좌표, Bezier 커브선, 뷰포트 확대/축소 비율, 다중선택, 드래그 상태 관리             |
-| **`useFlowsStore`**      | [libs/flows/src/stores/useFlowsStore.ts](../libs/flows/src/stores/useFlowsStore.ts)           | 현재 에디터가 작업 중인 플로우 이름, 로딩된 컴포넌트 블록 레지스트리 목록, 자동저장 활성화 유무 |
-| **`useWebSocketStore`**  | [libs/socket/src/stores/useWebSocketStore.ts](../libs/socket/src/stores/useWebSocketStore.ts) | 서버 소켓 연결 상태(CONNECTED, DISCONNECTED), 실시간 업데이트 이벤트 구독자 분배                |
-| **`useWebCoreStore`**    | [libs/web-core/src/stores/useWebCoreStore.ts](../libs/web-core/src/stores/useWebCoreStore.ts) | 개발자 API 키 발급 및 브라우저 세션 보존, API 엔드포인트 바인딩 정보 관리                       |
+| 스토어명 (Zustand Store)   | 정의 위치                                                                                            | 담당 역할                                                                                       |
+| :------------------------- | :--------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------- |
+| **`useCanvasStore`**       | [libs/flows/src/stores/useCanvasStore.ts](../libs/flows/src/stores/useCanvasStore.ts)                | 화면 내 노드 좌표, Bezier 커브선, 뷰포트 확대/축소 비율, 다중선택, 드래그 상태 관리             |
+| **`useFlowsStore`**        | [libs/flows/src/stores/useFlowsStore.ts](../libs/flows/src/stores/useFlowsStore.ts)                  | 현재 에디터가 작업 중인 플로우 이름, 로딩된 컴포넌트 블록 레지스트리 목록, 자동저장 활성화 유무 |
+| **`useWebSocketStore`**    | [libs/socket/src/stores/useWebSocketStore.ts](../libs/socket/src/stores/useWebSocketStore.ts)        | 서버 소켓 연결 상태(CONNECTED, DISCONNECTED), 실시간 업데이트 이벤트 구독자 분배                |
+| **`useWebCoreStore`**      | [libs/web-core/src/stores/useWebCoreStore.ts](../libs/web-core/src/stores/useWebCoreStore.ts)        | 개발자 API 키 발급 및 브라우저 세션 보존, API 엔드포인트 바인딩 정보 관리                       |
+| **`useCurrentActorStore`** | [apps/web/src/.../useCurrentActor.ts](../apps/web/src/app/features/process/hooks/useCurrentActor.ts) | 현재 선택된 액터 정보("Set as me") 저장 및 브라우저 `localStorage` 영속화 연동                  |
 
 ---
 

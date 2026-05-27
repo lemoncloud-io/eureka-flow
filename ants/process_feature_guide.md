@@ -148,12 +148,70 @@ process/
 `process` 피처 개발에 착수하실 때, 아래 순서로 영역을 점진적으로 다루는 것을 강력하게 권장합니다:
 
 1.  **로컬 서버 실행**:
+
     ```bash
     yarn web:start
     ```
 
     - 브라우저에서 `http://localhost:3000/dashboard` 및 `http://localhost:3000/items`로 접근하여 현 레이아웃을 둘러보세요.
+
 2.  **새로운 체크리스트/태스크 필드 기능 개발**:
     - 단계를 구성하는 태스크 구조에 추가적인 특성(예: 마감기한, 중요도 등)을 더하려면 `libs/flows/src/types/process/task.ts`에 타입을 추가한 후, [TaskList.tsx](./components/TaskList.tsx) 및 [StageDetailPanel.tsx](./components/StageDetailPanel.tsx)를 수정하세요.
 3.  **단계 간 오토 레이아웃 및 자동 진행 흐름 개선**:
     - 선행 단계 완료 시 다음 단계를 자동으로 `"doing"` 상태로 전이시키는 제어는 [useStageQueries.ts](../libs/flows/src/hooks/process/useStageQueries.ts) 내부의 비즈니스 로직에 포함되어 있습니다. 이 전이 방식을 튜닝하여 비즈니스 효율을 극대화해 보세요.
+
+---
+
+## 🌟 6. 프로세스 네비게이터 고급 기능 명세 (Premium Features)
+
+프로세스 네비게이터 모듈에 고도화되어 적용된 핵심 고급 기능 및 구현 디테일 가이드입니다.
+
+### 🖼️ 6.1. 고성능 1:1 이미지 업로드 및 최대 512px 리사이징 엔진 (`image.ts`)
+
+- **구현 파일**: [image.ts](file:///Users/dujung/Documents/Projects/M2/eureka-flow/apps/web/src/app/features/process/utils/image.ts)
+- **동작 방식**:
+    1.  **정사각형(1:1) 센터 크롭**: 사용자가 첨부, 드래그 앤 드롭 또는 클립보드로 붙여 넣은 이미지 파일의 가로/세로 중 작은 길이를 기준으로 중앙을 잘라내어 정사각형 형태로 자동 보정합니다.
+    2.  **최대 512px 축소/확장**: 고화질 원본 이미지의 크기를 가로/세로 최대 `512px` 크기로 다운사이징 또는 스케일 업하여 리소스를 가볍게 유지합니다.
+    3.  **고품질 압축 및 Base64 반환**: HTML5 Canvas의 2D 렌더링 컨텍스트(`imageSmoothingQuality = 'high'`)를 이용해 고품질 크롭 후 `image/jpeg` 포맷(품질 90%)의 Data URL로 저장해 데이터 크기를 획기적으로 줄입니다.
+- **클립보드 및 드래그 앤 드롭 연동**:
+    - **복사(Copy)**: "썸네일 복사" 클릭 시 브라우저 버전에 따라 바이너리 `ClipboardItem`을 직접 클립보드에 쓰거나(Figma, Slack 등 디자인 협업 도구에 즉시 붙여넣기 가능) 텍스트 Data URL로 Fallback 처리해 범용적인 복사 편의성을 제공합니다.
+    - **붙여넣기(Paste)**: 상세 아바타 및 신규 생성 카드 드롭존 영역 어디서나 `Ctrl+V` (또는 `Cmd+V`) 및 이미지 드래그 드롭을 감지해 프로세스 엔진에 즉시 파이프라인하여 리사이징 처리합니다.
+
+### 📊 6.2. 고성능 Ellipsis 페이지네이션 및 캐시 스캐닝 동기화
+
+- **구현 컴포넌트**: [ItemBoardPage.tsx](file:///Users/dujung/Documents/Projects/M2/eureka-flow/apps/web/src/app/features/process/pages/ItemBoardPage.tsx)
+- **페이지네이션 UI**:
+    - 중간 범위 페이지(`page - 1`, `page`, `page + 1`)와 경계값(`1` 및 `totalPages`)을 유기적으로 배치하고, 생략 영역을 `...` (Ellipsis) 블록으로 수려하게 렌더링하는 명품 인터랙티브 페이지네이션 바를 제공합니다.
+- **낙관적 캐시 스캐닝 (Optimistic Scan)**:
+    - 새 아이템의 등록, 삭제, 또는 이름 변경 시 단순히 활성 페이지의 쿼리만 무효화하는 것이 아닙니다. `qc.getQueryCache().findAll()` 스캐너를 통해 활성화된 모든 필터링/정렬 기준의 아이템 목록 쿼리 세트를 실시간으로 스캔하고 즉각 캐시를 동기화하여 화면 전환 시의 딜레이가 전혀 존재하지 않도록 보장합니다.
+
+### 👤 6.3. 전역 'Set as me' (나로 지정) 상태 및 다국어 콘솔 에러 클리어
+
+- **구현 훅**: [useCurrentActor.ts](file:///Users/dujung/Documents/Projects/M2/eureka-flow/apps/web/src/app/features/process/hooks/useCurrentActor.ts)
+- **동작 명세**:
+    - 사용자가 담당자 목록에서 특정 담당 카드의 "나로 지정(Set as me)"을 활성화하면 Zustand 전역 스토어인 `useCurrentActorStore`에 배정되어 `localStorage`에 영속 보존됩니다.
+    - 나로 지정된 담당자 카드는 시각적으로 `Current` 배지와 부드러운 하이라이트 효과가 부여되며, 상단 공통 네비게이션 헤더의 드롭다운 영역과 항상 실시간 싱크됩니다.
+    - 노트 작성 및 태스크 추가 시 나로 지정된 사용자의 ID가 기본 작성자(`actorId`) 속성에 자동으로 연동 탑재됩니다.
+- **다국어(i18n) 안전성 보장**:
+    - 콘솔창을 어지럽히던 각종 i18n 경고(네비게이션, 대시보드, 스테레오 타입 누락 등)에 대한 번역 키 매핑을 `en/common.json`, `ko/common.json` 리소스 사전에 완벽히 전수 보강했으며, 모든 배지 및 리스트 요소에 `t` 헬퍼 함수를 둘러 콘솔 오염을 원천 차단했습니다.
+
+### 🪵 6.4. 무중단 개발 편의용 로깅 프록시 (`LoggingProcessApiWrapper`)
+
+- **구현 파일**: [loggingWrapper.ts](file:///Users/dujung/Documents/Projects/M2/eureka-flow/libs/flows/src/api/process/loggingWrapper.ts)
+- **동작**:
+    - 개발 및 단위 테스트 단계에서 발생하는 모든 `ProcessApi` 데이터 입출력 및 LATENCY(ms) 단위를 모니터링하기 위해 API 인터셉터 래퍼를 구성했습니다.
+    - 원래의 비즈니스 파일(`mockApi.ts`)의 코드에는 한 줄의 디버그용 출력 코드도 침범하지 않는 무중단(Zero-touch) 패턴으로 개발되어 있으며, 브라우저 콘솔에서는 가독성 높은 색상 뱃지 그룹 형태로, Vitest 터미널 환경에서는 깔끔한 텍스트 줄바꿈 형태로 유동적으로 감지해 가독성 높은 디버깅 로그를 출력합니다.
+
+### 📋 6.5. 템플릿 복제 및 ID 리맵핑 엔진 명세 (ProcessApi.apply)
+
+- **정의 및 계약**: [interface.ts](file:///Users/dujung/Documents/Projects/M2/eureka-flow/libs/flows/src/api/process/interface.ts) 및 [mockApi.spec.ts](file:///Users/dujung/Documents/Projects/M2/eureka-flow/apps/web/src/__tests__/process/mockApi.spec.ts)
+- **핵심 비즈니스 흐름**:
+  템플릿(Process)을 기반으로 실행 단위인 항목(Item)을 인스턴스화할 때, DAG(Directed Acyclic Graph)의 정합성을 보장하기 위해 다음과 같은 딥 카피 및 식별자 재생성 파이프라인이 구동됩니다.
+    1.  **Item 고유 식별자 할당**: 새 아이템 생성을 위해 `item-${timestamp}` 포맷의 식별자를 생성합니다.
+    2.  **독립된 Stage ID 생성**: 정적 템플릿의 단계 ID(예: `stage-1`)를 실시간 활성 아이템 단위의 전역 고유 ID인 `s{order}-${randomString}` (예: `s1-a8d2f1`) 형식으로 자동 매핑하여 충돌을 회방합니다.
+    3.  **스테이지 데이터 초기화**:
+        - 부모 `itemId` 및 `processId` 관계를 바인딩합니다.
+        - 단계의 기본 상태(`status`)를 일괄 `'todo'`로 재설정합니다.
+        - 생성일 및 수정일 타임스탬프(`createdAt`, `updatedAt`)를 즉시 갱신합니다.
+    4.  **DAG 의존성 정합성 수립 (Dependency Stage ID Mapping)**:
+        - 가장 치명적인 연산으로, 이전 템플릿 시절 가지고 있던 선행 단계 ID 목록(`dependencyStageIds`)을 새롭게 매핑 생성된 신규 Stage ID 목록으로 일대일 변환/체인 링킹 처리하여 의존성 방향 그래프의 정합성을 깨뜨리지 않고 완벽하게 이식합니다.
