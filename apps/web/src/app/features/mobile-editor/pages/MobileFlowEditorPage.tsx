@@ -53,7 +53,8 @@ const isPortTypeCompatible = (sourceType: string, targetType: string | undefined
 
 export const MobileFlowEditorPage = () => {
     const { t } = useTranslation(['flows']);
-    const { currentFlowId, flowName, isLoading, isSaving, saveStatus, updateFlowName, isEditable } = useFlows();
+    const { currentFlowId, flowName, isLoading, isSaving, saveStatus, updateFlowName, isEditable, saveCurrentFlow } =
+        useFlows();
     const { apiKey } = useWebCoreStore();
     const blockRegistry = useBlockRegistry();
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
@@ -161,6 +162,20 @@ export const MobileFlowEditorPage = () => {
         },
         [stepNav]
     );
+
+    // Flush pending config edits before closing detail so refresh within the
+    // 500ms node-sync debounce (see useNodeConfig.syncNodeToServer) does not
+    // drop edits made in MobileStepDetail.
+    const handleCloseStep = useCallback(async () => {
+        const { nodes, connections } = useCanvasStore.getState();
+        const currentState = serializeWorkflowState({ nodes, connections });
+        if (currentState !== lastSavedStateRef.current) {
+            lastLocalUpdateTimestampRef.current = Date.now();
+            const result = await saveCurrentFlow({ nodes, connections });
+            if (result.success) lastSavedStateRef.current = currentState;
+        }
+        stepNav.closeStep();
+    }, [stepNav, saveCurrentFlow]);
 
     const handleRunNode = useCallback(
         (nodeId: string) => {
@@ -384,7 +399,7 @@ export const MobileFlowEditorPage = () => {
                 flowId={currentFlowId}
                 socketConnectionId={socketConnectionId}
                 role={role}
-                onClose={stepNav.closeStep}
+                onClose={handleCloseStep}
                 onOpenOutputConnection={connectionMode.openForPort}
                 onOpenInputConnection={connectionMode.openForInputPort}
                 onOpenAiKeyDialog={showDevTools ? () => setIsAiKeyDialogOpen(true) : undefined}

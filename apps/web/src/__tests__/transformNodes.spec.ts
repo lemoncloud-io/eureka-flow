@@ -121,6 +121,22 @@ describe('transformNodeForSave', () => {
         expect(result.description).toBe('Does stuff');
     });
 
+    it('should include config when non-empty', () => {
+        const node = makeNode({ config: { text: 'hello' } as Record<string, string> });
+
+        const result = transformNodeForSave(node, makeRegistry());
+
+        expect(result.config).toEqual({ text: 'hello' });
+    });
+
+    it('should exclude config when empty', () => {
+        const node = makeNode({ config: {} as Record<string, string> });
+
+        const result = transformNodeForSave(node, makeRegistry());
+
+        expect(result).not.toHaveProperty('config');
+    });
+
     it('should use node.blockId when available', () => {
         const node = makeNode({ blockId: '0008' });
 
