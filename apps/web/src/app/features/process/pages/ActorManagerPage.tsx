@@ -21,7 +21,7 @@ const STEREO_ICON: Record<Actor['stereo'], React.ElementType> = {
 
 export const ActorManagerPage = () => {
     const { t } = useTranslation();
-    const { data: actorsData, isLoading } = useActors();
+    const { data: actorsData, isLoading } = useActors({ staleTime: 0 });
     const { currentActor, setCurrentActor } = useCurrentActor();
     const deactivateMutation = useDeactivateActorMutation();
     const activateMutation = useActivateActorMutation();

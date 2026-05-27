@@ -13,7 +13,7 @@ import { ProcessCard } from '../components/ProcessCard';
 export const ProcessListPage = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const { data: processesData, isLoading } = useProcesses();
+    const { data: processesData, isLoading } = useProcesses({ staleTime: 0 });
     const deleteMutation = useDeleteProcessMutation();
     const applyMutation = useApplyProcessMutation();
     const [applyTarget, setApplyTarget] = useState<string | null>(null);

@@ -5,11 +5,11 @@ import { processApi } from '../../api/process';
 
 import type { Actor, CreateActorInput, ProcessApiListResponse } from '../../types/process';
 
-export const useActors = () => {
+export const useActors = (options?: { staleTime?: number }) => {
     return useQuery({
         queryKey: actorKeys.lists(),
         queryFn: () => processApi.actors.list(),
-        staleTime: 60_000,
+        staleTime: options?.staleTime !== undefined ? options.staleTime : 60_000,
     });
 };
 

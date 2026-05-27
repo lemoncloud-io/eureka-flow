@@ -13,11 +13,11 @@ import type {
     UpdateProcessInput,
 } from '../../types/process';
 
-export const useProcesses = () => {
+export const useProcesses = (options?: { staleTime?: number }) => {
     return useQuery({
         queryKey: processKeys.lists(),
         queryFn: () => processApi.processes.list(),
-        staleTime: 60_000,
+        staleTime: options?.staleTime !== undefined ? options.staleTime : 60_000,
     });
 };
 

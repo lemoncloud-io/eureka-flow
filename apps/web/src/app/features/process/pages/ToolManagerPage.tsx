@@ -19,7 +19,7 @@ const STEREO_CONFIG: Record<Tool['stereo'], { label: string; icon: React.Element
 
 export const ToolManagerPage = () => {
     const { t } = useTranslation();
-    const { data: toolsData, isLoading } = useTools();
+    const { data: toolsData, isLoading } = useTools({ staleTime: 0 });
     const deactivateMutation = useDeactivateToolMutation();
     const activateMutation = useActivateToolMutation();
     const [dialogOpen, setDialogOpen] = useState(false);

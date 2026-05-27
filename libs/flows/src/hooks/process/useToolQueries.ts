@@ -5,11 +5,11 @@ import { processApi } from '../../api/process';
 
 import type { CreateToolInput, ProcessApiListResponse, Tool } from '../../types/process';
 
-export const useTools = () => {
+export const useTools = (options?: { staleTime?: number }) => {
     return useQuery({
         queryKey: toolKeys.lists(),
         queryFn: () => processApi.tools.list(),
-        staleTime: 60_000,
+        staleTime: options?.staleTime !== undefined ? options.staleTime : 60_000,
     });
 };
 
