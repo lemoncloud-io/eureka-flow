@@ -1,4 +1,5 @@
 import { ACTORS, INITIAL_ITEMS, PROCESSES, TOOLS } from './mockData';
+import { matchesActor } from '../../utils/process';
 
 import type { ProcessApi } from './interface';
 import type {
@@ -11,6 +12,7 @@ import type {
     CreateTaskInput,
     CreateToolInput,
     Item,
+    ItemListParams,
     Note,
     Process,
     ProcessApiListResponse,
@@ -177,9 +179,77 @@ export const mockApi: ProcessApi = {
         },
     },
     items: {
-        async list(): Promise<ProcessApiListResponse<Item>> {
+        async list(params?: ItemListParams): Promise<ProcessApiListResponse<Item>> {
             await delay(300);
-            return listSuccess(dbItems);
+
+            let filtered = [...dbItems];
+
+            // 1. Filter by actorId
+            if (params?.actorId) {
+                filtered = filtered.filter(item => matchesActor(item, params.actorId!));
+            }
+
+            // 2. Sort by field (createdAt / updatedAt)
+            const sortParam = params?.sort || 'createdAt:desc';
+            const [sortField, sortOrder] = sortParam.split(':') as ['createdAt' | 'updatedAt', 'asc' | 'desc'];
+
+            filtered.sort((a, b) => {
+                const valA = a[sortField] || 0;
+                const valB = b[sortField] || 0;
+                if (valA !== valB) {
+                    return sortOrder === 'desc' ? valB - valA : valA - valB;
+                }
+                // Stable sorting fallback: use ID
+                return sortOrder === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id);
+            });
+
+            const total = filtered.length;
+
+            // 3. Paginate
+            let pageData = filtered;
+            let page = 0;
+            let limit = 10;
+
+            const hasPaginationParams =
+                params && (params.page !== undefined || params.limit !== undefined || params.last !== undefined);
+
+            if (hasPaginationParams) {
+                page = params.page ?? 0;
+                limit = params.limit ?? 10;
+
+                if (params.last && params.last.length === 2) {
+                    // Cursor-based paging
+                    const lastId = params.last[1];
+                    const index = filtered.findIndex(item => item.id === lastId);
+                    if (index !== -1) {
+                        pageData = filtered.slice(index + 1).slice(0, limit);
+                    } else {
+                        pageData = filtered.slice(0, limit);
+                    }
+                } else {
+                    // Offset-based paging
+                    const start = page * limit;
+                    pageData = filtered.slice(start, start + limit);
+                }
+            } else {
+                // Backward compatibility: if no pagination parameters are specified, return everything
+                page = 0;
+                limit = filtered.length || 10;
+                pageData = filtered;
+            }
+
+            const lastItem = pageData.length > 0 ? pageData[pageData.length - 1] : null;
+            const last = lastItem ? [String(lastItem[sortField]), lastItem.id] : undefined;
+
+            return {
+                data: pageData,
+                meta: {
+                    page,
+                    pageSize: limit,
+                    total,
+                    ...(last ? { last } : {}),
+                },
+            };
         },
         async get(id: string): Promise<ProcessApiResponse<Item>> {
             await delay(200);

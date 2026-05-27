@@ -1,10 +1,10 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 
-import { getNextAction, getUnresolvedCount, isItemComplete, matchesActor, useActors, useItems } from '@flows/flows';
+import { getNextAction, isItemComplete, useActors, useItems } from '@flows/flows';
 import { Button } from '@flows/ui-kit';
 
 import { ActorFilterPills } from '../components/ActorFilterPills';
@@ -73,41 +73,69 @@ const HeroAction = ({ item, action, onAction }: HeroActionProps) => {
 export const ItemBoardPage = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const { data: itemsData, isLoading } = useItems();
+    const { currentActor, setCurrentActor } = useCurrentActor();
+
+    const [page, setPage] = useState(0);
+    const [limit] = useState(10);
+    const [sort, setSort] = useState('createdAt:desc');
+    const [cursorHistory, setCursorHistory] = useState<Record<number, string[]>>({});
+
+    const activeLastCursor = page > 0 ? cursorHistory[page - 1] : undefined;
+
+    const { data: itemsData, isLoading } = useItems({
+        page,
+        limit,
+        sort,
+        actorId: currentActor?.id,
+        last: activeLastCursor,
+    });
+
     const { data: actorsData } = useActors();
     const { handleTrySample, isPending: trySamplePending } = useTrySample();
-    const { currentActor, setCurrentActor } = useCurrentActor();
 
     const items = useMemo(() => itemsData?.data ?? [], [itemsData?.data]);
     const activeActors = useMemo(() => (actorsData?.data ?? []).filter(a => a.isActive), [actorsData?.data]);
 
-    const filteredByActor = useMemo(() => {
-        if (!currentActor) return items;
-        return items.filter(item => matchesActor(item, currentActor.id));
-    }, [items, currentActor]);
+    const totalCount = itemsData?.meta?.total ?? 0;
+    const totalPages = Math.ceil(totalCount / limit);
+
+    const currentLastCursor = itemsData?.meta?.last;
+
+    useEffect(() => {
+        if (currentLastCursor && page >= 0) {
+            setCursorHistory(prev => {
+                if (JSON.stringify(prev[page]) === JSON.stringify(currentLastCursor)) {
+                    return prev;
+                }
+                return { ...prev, [page]: currentLastCursor };
+            });
+        }
+    }, [currentLastCursor, page]);
+
+    const handleActorSelect = useCallback(
+        (actorId: string | null) => {
+            setCurrentActor(actorId);
+            setPage(0);
+            setCursorHistory({});
+        },
+        [setCurrentActor]
+    );
+
+    const handleSortChange = useCallback((newSort: string) => {
+        setSort(newSort);
+        setPage(0);
+        setCursorHistory({});
+    }, []);
 
     const heroEntry = useMemo(() => {
-        const withActions = filteredByActor
+        const withActions = items
             .filter(item => !isItemComplete(item))
             .map(item => ({ item, action: getNextAction(item) }))
             .filter((e): e is { item: Item; action: NextAction } => !!e.action);
         if (!currentActor) return withActions[0] ?? null;
         const mine = withActions.find(e => e.action.stage.actorId === currentActor.id);
         return mine ?? withActions[0] ?? null;
-    }, [filteredByActor, currentActor]);
-
-    const sortedItems = useMemo(() => {
-        const score = (item: Item) => {
-            const hasDoing = item.stages.some(s => s.status === 'doing');
-            const isComplete = isItemComplete(item);
-            const unresolved = getUnresolvedCount(item);
-            if (unresolved > 0) return 0;
-            if (hasDoing) return 1;
-            if (isComplete) return 3;
-            return 2;
-        };
-        return [...filteredByActor].sort((a, b) => score(a) - score(b));
-    }, [filteredByActor]);
+    }, [items, currentActor]);
 
     const handleItemClick = useCallback((id: string) => navigate(`/items/${id}`), [navigate]);
 
@@ -130,7 +158,7 @@ export const ItemBoardPage = () => {
         );
     }
 
-    if (items.length === 0) {
+    if (items.length === 0 && !currentActor && page === 0) {
         return <EmptyState onTrySample={handleTrySample} isLoading={trySamplePending} />;
     }
 
@@ -139,7 +167,7 @@ export const ItemBoardPage = () => {
             <ActorFilterPills
                 actors={activeActors}
                 selectedActorId={currentActor?.id ?? null}
-                onSelect={setCurrentActor}
+                onSelect={handleActorSelect}
             />
 
             {/* Next Action Hero */}
@@ -161,26 +189,104 @@ export const ItemBoardPage = () => {
                 </div>
             )}
 
-            {/* Header + New */}
-            <div className="flex items-center justify-between gap-4">
+            {/* Header + Filters + New */}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/50 pb-2 pt-2">
                 <div className="flex items-baseline gap-2">
                     <h2 className="text-lg font-semibold">{t('navigator.items', 'Items')}</h2>
-                    <span className="text-sm text-muted-foreground">({sortedItems.length})</span>
+                    <span className="text-sm text-muted-foreground">
+                        ({totalCount} {t('navigator.total', 'total')})
+                    </span>
                 </div>
-                <NewItemDialog />
+                <div className="flex items-center gap-3">
+                    {/* Sort Selector */}
+                    <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground">
+                        <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                        <select
+                            value={sort}
+                            onChange={e => handleSortChange(e.target.value)}
+                            className="bg-transparent border-none outline-none pr-1 font-medium cursor-pointer"
+                        >
+                            <option value="createdAt:desc">{t('navigator.sortNewest', 'Newest First')}</option>
+                            <option value="createdAt:asc">{t('navigator.sortOldest', 'Oldest First')}</option>
+                            <option value="updatedAt:desc">{t('navigator.sortRecent', 'Recently Updated')}</option>
+                            <option value="updatedAt:asc">
+                                {t('navigator.sortLeastRecent', 'Least Recently Updated')}
+                            </option>
+                        </select>
+                    </div>
+                    <NewItemDialog />
+                </div>
             </div>
 
             {/* Item list */}
             <div className="rounded-lg border border-border/50">
-                {sortedItems.map(item => (
+                {items.map(item => (
                     <ItemRow key={item.id} item={item} onClick={handleItemClick} />
                 ))}
-                {sortedItems.length === 0 && (
+                {items.length === 0 && (
                     <p className="py-8 text-center text-sm text-muted-foreground">
                         {t('navigator.noItemsForActor', 'No items for this actor.')}
                     </p>
                 )}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-border/50 bg-card/50 p-4 backdrop-blur-sm">
+                    <div className="text-xs text-muted-foreground">
+                        {t('navigator.paginationInfo', {
+                            current: page + 1,
+                            total: totalPages,
+                            count: totalCount,
+                            defaultValue: 'Page {{current}} of {{total}} ({{count}} items)',
+                        })}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage(p => Math.max(0, p - 1))}
+                            disabled={page === 0}
+                            className="h-8 w-8 p-0 rounded-lg"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        {Array.from({ length: totalPages }).map((_, idx) => {
+                            if (idx === 0 || idx === totalPages - 1 || (idx >= page - 1 && idx <= page + 1)) {
+                                return (
+                                    <Button
+                                        key={idx}
+                                        variant={page === idx ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => setPage(idx)}
+                                        className={`h-8 w-8 p-0 rounded-lg text-xs font-semibold ${
+                                            page === idx ? 'shadow-sm shadow-primary/20' : ''
+                                        }`}
+                                    >
+                                        {idx + 1}
+                                    </Button>
+                                );
+                            } else if (idx === page - 2 || idx === page + 2) {
+                                return (
+                                    <span key={idx} className="px-1 text-xs text-muted-foreground select-none">
+                                        ...
+                                    </span>
+                                );
+                            }
+                            return null;
+                        })}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                            disabled={page === totalPages - 1}
+                            className="h-8 w-8 p-0 rounded-lg"
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

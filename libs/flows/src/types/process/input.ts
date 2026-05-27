@@ -96,3 +96,11 @@ export interface CreateToolInput {
     }[];
     memo?: string;
 }
+
+export interface ItemListParams {
+    page?: number;
+    limit?: number;
+    actorId?: string;
+    sort?: string;
+    last?: string[];
+}

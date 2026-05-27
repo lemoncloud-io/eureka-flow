@@ -8,16 +8,17 @@ import { processApi } from '../../api/process';
 import type {
     CreateItemInput,
     Item,
+    ItemListParams,
     ProcessApiListResponse,
     ProcessApiResponse,
     Stage,
     UpdateItemInput,
 } from '../../types/process';
 
-export const useItems = () => {
+export const useItems = (params?: ItemListParams) => {
     return useQuery({
-        queryKey: itemKeys.lists(),
-        queryFn: () => processApi.items.list(),
+        queryKey: itemKeys.lists(params as Record<string, unknown>),
+        queryFn: () => processApi.items.list(params),
         staleTime: 30_000,
     });
 };
@@ -73,9 +74,13 @@ export const useHydrateItemStages = (item: Item | undefined) => {
             if (!old) return old;
             return { ...old, data: patchItem(old.data) };
         });
-        qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
-            if (!old) return old;
-            return { ...old, data: old.data.map(i => (i.id === itemId ? patchItem(i) : i)) };
+
+        const queries = qc.getQueryCache().findAll({ queryKey: itemKeys.lists() });
+        queries.forEach(query => {
+            qc.setQueryData<ProcessApiListResponse<Item>>(query.queryKey, old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(i => (i.id === itemId ? patchItem(i) : i)) };
+            });
         });
     }, [itemId, allDone, qc, stageIdsKey]);
 };
@@ -118,9 +123,12 @@ export const useHydrateAllItemStages = (items: Item[] | undefined) => {
             stages: item.stages.map(s => stageMap.get(s.id) ?? s),
         });
 
-        qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
-            if (!old) return old;
-            return { ...old, data: old.data.map(patchItem) };
+        const queries = qc.getQueryCache().findAll({ queryKey: itemKeys.lists() });
+        queries.forEach(query => {
+            qc.setQueryData<ProcessApiListResponse<Item>>(query.queryKey, old => {
+                if (!old) return old;
+                return { ...old, data: old.data.map(patchItem) };
+            });
         });
     }, [stageIdsKey, allDone, qc, allStageIds]);
 };
@@ -130,10 +138,7 @@ export const useCreateItemMutation = () => {
     return useMutation({
         mutationFn: (input: CreateItemInput) => processApi.items.create(input),
         onSuccess: result => {
-            qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
-                if (!old) return old;
-                return { ...old, data: [...old.data, result.data] };
-            });
+            qc.invalidateQueries({ queryKey: itemKeys.lists() });
             qc.setQueryData(itemKeys.detail(result.data.id), result);
         },
     });
@@ -149,7 +154,10 @@ export const useUpdateItemMutation = () => {
                 qc.cancelQueries({ queryKey: itemKeys.lists() }),
             ]);
             const prevDetail = qc.getQueryData<ProcessApiResponse<Item>>(itemKeys.detail(id));
-            const prevList = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
+
+            const queries = qc.getQueryCache().findAll({ queryKey: itemKeys.lists() });
+            const prevLists = queries.map(q => ({ queryKey: q.queryKey, data: q.state.data }));
+
             const optimistic = (item: Item): Item => {
                 const { meta, ...rest } = input;
                 return { ...item, ...rest, ...(meta ? { $meta: meta } : {}) };
@@ -158,22 +166,27 @@ export const useUpdateItemMutation = () => {
                 if (!old) return old;
                 return { ...old, data: optimistic(old.data) };
             });
-            qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
-                if (!old) return old;
-                return { ...old, data: old.data.map(i => (i.id === id ? optimistic(i) : i)) };
+
+            queries.forEach(query => {
+                qc.setQueryData<ProcessApiListResponse<Item>>(query.queryKey, old => {
+                    if (!old) return old;
+                    return { ...old, data: old.data.map(i => (i.id === id ? optimistic(i) : i)) };
+                });
             });
-            return { prevDetail, prevList };
+
+            return { prevDetail, prevLists };
         },
         onError: (_, { id }, ctx) => {
             if (ctx?.prevDetail) qc.setQueryData(itemKeys.detail(id), ctx.prevDetail);
-            if (ctx?.prevList) qc.setQueryData(itemKeys.lists(), ctx.prevList);
+            if (ctx?.prevLists) {
+                ctx.prevLists.forEach(({ queryKey, data }) => {
+                    qc.setQueryData(queryKey, data);
+                });
+            }
         },
         onSuccess: (result, { id }) => {
             qc.setQueryData(itemKeys.detail(id), result);
-            qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
-                if (!old) return old;
-                return { ...old, data: old.data.map(i => (i.id === id ? result.data : i)) };
-            });
+            qc.invalidateQueries({ queryKey: itemKeys.lists() });
         },
     });
 };
@@ -184,16 +197,28 @@ export const useDeleteItemMutation = () => {
         mutationFn: (id: string) => processApi.items.remove(id),
         onMutate: async id => {
             await qc.cancelQueries({ queryKey: itemKeys.lists() });
-            const prev = qc.getQueryData<ProcessApiListResponse<Item>>(itemKeys.lists());
-            qc.setQueryData<ProcessApiListResponse<Item>>(itemKeys.lists(), old => {
-                if (!old) return old;
-                return { ...old, data: old.data.filter(i => i.id !== id) };
+
+            const queries = qc.getQueryCache().findAll({ queryKey: itemKeys.lists() });
+            const prevLists = queries.map(q => ({ queryKey: q.queryKey, data: q.state.data }));
+
+            queries.forEach(query => {
+                qc.setQueryData<ProcessApiListResponse<Item>>(query.queryKey, old => {
+                    if (!old) return old;
+                    return { ...old, data: old.data.filter(i => i.id !== id) };
+                });
             });
             qc.removeQueries({ queryKey: itemKeys.detail(id) });
-            return { prev };
+            return { prevLists };
         },
         onError: (_, __, ctx) => {
-            if (ctx?.prev) qc.setQueryData(itemKeys.lists(), ctx.prev);
+            if (ctx?.prevLists) {
+                ctx.prevLists.forEach(({ queryKey, data }) => {
+                    qc.setQueryData(queryKey, data);
+                });
+            }
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: itemKeys.lists() });
         },
     });
 };

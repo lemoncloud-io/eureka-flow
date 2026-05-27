@@ -8,6 +8,7 @@ import type {
     CreateTaskInput,
     CreateToolInput,
     Item,
+    ItemListParams,
     Note,
     Process,
     ProcessApiListResponse,
@@ -30,7 +31,7 @@ export interface ProcessApi {
         apply(id: string, input: CreateItemInput): Promise<ProcessApiResponse<Item>>;
     };
     items: {
-        list(): Promise<ProcessApiListResponse<Item>>;
+        list(params?: ItemListParams): Promise<ProcessApiListResponse<Item>>;
         get(id: string): Promise<ProcessApiResponse<Item>>;
         create(input: CreateItemInput): Promise<ProcessApiResponse<Item>>;
         update(id: string, input: UpdateItemInput): Promise<ProcessApiResponse<Item>>;

@@ -25,4 +25,5 @@ export type {
     CreateTaskInput,
     CreateActorInput,
     CreateToolInput,
+    ItemListParams,
 } from './input';

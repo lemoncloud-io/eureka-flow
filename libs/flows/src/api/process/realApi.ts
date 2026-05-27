@@ -5,6 +5,7 @@ import type { ProcessApi } from './interface';
 import type {
     Actor,
     Item,
+    ItemListParams,
     Note,
     Process,
     ProcessApiListResponse,
@@ -69,8 +70,8 @@ export const realApi: ProcessApi = {
     },
 
     items: {
-        list: async () => {
-            const res = await proxyCall<ProcessApiListResponse<Item>>('items', 'list');
+        list: async (params?: ItemListParams) => {
+            const res = await proxyCall<ProcessApiListResponse<Item>>('items', 'list', '0', params);
             return adaptListResponse(res);
         },
         get: async id => {

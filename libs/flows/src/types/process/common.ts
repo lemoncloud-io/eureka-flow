@@ -36,6 +36,7 @@ export interface ProcessApiListResponse<T> {
         page: number;
         pageSize: number;
         total: number;
+        last?: string[];
     };
 }
 

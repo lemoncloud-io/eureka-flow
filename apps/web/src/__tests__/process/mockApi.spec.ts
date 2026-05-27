@@ -194,4 +194,55 @@ describe('Process Navigator mockApi', () => {
             expect(result.data.urlTemplate).toBeUndefined();
         });
     });
+
+    describe('items pagination, filtering, and sorting', () => {
+        it('should list items with default pagination when parameters are supplied', async () => {
+            const result = await mockApi.items.list({ page: 0, limit: 2 });
+            expect(result.data.length).toBeLessThanOrEqual(2);
+            expect(result.meta).toBeDefined();
+            expect(result.meta?.page).toBe(0);
+            expect(result.meta?.pageSize).toBe(2);
+            expect(result.meta?.total).toBeGreaterThan(0);
+        });
+
+        it('should filter items by actorId', async () => {
+            // photo is actor ID for '촬영팀'
+            const result = await mockApi.items.list({ actorId: 'photo' });
+            expect(result.data.length).toBeGreaterThan(0);
+            for (const item of result.data) {
+                const hasPhoto = item.stages.some(
+                    s =>
+                        s.actorId === 'photo' ||
+                        s.tasks.some(t => t.actorId === 'photo') ||
+                        s.notes.some(n => n.targetActorId === 'photo' && !n.isResolved)
+                );
+                expect(hasPhoto).toBe(true);
+            }
+        });
+
+        it('should sort items by createdAt descending by default', async () => {
+            const result = await mockApi.items.list({ page: 0, limit: 5 });
+            const timestamps = result.data.map(i => i.createdAt);
+            const sortedTimestamps = [...timestamps].sort((a, b) => b - a);
+            expect(timestamps).toEqual(sortedTimestamps);
+        });
+
+        it('should sort items by createdAt ascending', async () => {
+            const result = await mockApi.items.list({ page: 0, limit: 5, sort: 'createdAt:asc' });
+            const timestamps = result.data.map(i => i.createdAt);
+            const sortedTimestamps = [...timestamps].sort((a, b) => a - b);
+            expect(timestamps).toEqual(sortedTimestamps);
+        });
+
+        it('should handle cursor-based pagination using last', async () => {
+            const page1 = await mockApi.items.list({ page: 0, limit: 1 });
+            expect(page1.data.length).toBe(1);
+            expect(page1.meta?.last).toBeDefined();
+
+            const lastCursor = page1.meta?.last;
+            const page2 = await mockApi.items.list({ limit: 1, last: lastCursor });
+            expect(page2.data.length).toBe(1);
+            expect(page2.data[0].id).not.toBe(page1.data[0].id);
+        });
+    });
 });
