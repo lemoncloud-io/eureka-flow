@@ -82,10 +82,11 @@ export const useMobileFlowActions = ({
             const def = blockRegistry[type];
             if (!def) return null;
 
+            // Place new node at the top: y less than current min so it sorts first.
             const tempNodeId = generateTempId('node');
-            const lastNode = nodes[nodes.length - 1];
-            const posX = lastNode ? lastNode.position.x : 100;
-            const posY = lastNode ? lastNode.position.y + 200 : 100;
+            const minY = nodes.reduce((m, n) => Math.min(m, n.position?.y ?? Infinity), Infinity);
+            const posX = nodes[0]?.position?.x ?? 100;
+            const posY = nodes.length === 0 ? 100 : minY - 200;
 
             const newNode: NodeData = {
                 id: tempNodeId,
@@ -108,6 +109,8 @@ export const useMobileFlowActions = ({
                     config: newNode.config,
                 });
                 const serverId = result?.nodes?.[0]?.id;
+                const finalId = serverId && serverId !== tempNodeId ? serverId : tempNodeId;
+
                 if (serverId && serverId !== tempNodeId) {
                     useCanvasStore
                         .getState()
@@ -119,15 +122,37 @@ export const useMobileFlowActions = ({
                             targetNodeId: c.targetNodeId === tempNodeId ? serverId : c.targetNodeId,
                         }))
                     );
-                    return serverId;
                 }
-                return tempNodeId;
+
+                // Persist immediately so refresh within autosave debounce keeps the node.
+                const { nodes: latestNodes, connections: latestConnections } = useCanvasStore.getState();
+                lastLocalUpdateTimestampRef.current = Date.now();
+                const saveResult = await saveCurrentFlow({ nodes: latestNodes, connections: latestConnections });
+                if (saveResult.success) {
+                    lastSavedStateRef.current = serializeWorkflowState({
+                        nodes: latestNodes,
+                        connections: latestConnections,
+                    });
+                    if (saveResult.id && saveResult.id !== currentFlowId) updateUrl(saveResult.id);
+                }
+
+                return finalId;
             } catch {
+                useCanvasStore.getState().setNodes(prev => prev.filter(n => n.id !== tempNodeId));
                 toast.error(t('mobile.failedToCreateNode', 'Failed to create node'));
                 return null;
             }
         },
-        [blockRegistry, currentFlowId, t]
+        [
+            blockRegistry,
+            currentFlowId,
+            saveCurrentFlow,
+            updateUrl,
+            serializeWorkflowState,
+            lastSavedStateRef,
+            lastLocalUpdateTimestampRef,
+            t,
+        ]
     );
 
     const handleExport = useCallback(() => {

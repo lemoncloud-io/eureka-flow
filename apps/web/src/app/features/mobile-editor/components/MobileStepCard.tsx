@@ -217,7 +217,7 @@ export const MobileStepCard = React.memo(
                                 <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
                             </div>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuContent align="end" className="w-40" onClick={e => e.stopPropagation()}>
                             {canRun && blockDef?.isRunnable !== false && onRun && (
                                 <DropdownMenuItem onClick={handleRun} disabled={isRunning} className="gap-2">
                                     <Play className="w-3.5 h-3.5" />
