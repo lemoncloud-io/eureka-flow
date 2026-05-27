@@ -238,6 +238,8 @@ export const ItemBoardPage = () => {
                             current: page + 1,
                             total: totalPages,
                             count: totalCount,
+                            start: page + 1,
+                            end: totalPages,
                             defaultValue: 'Page {{current}} of {{total}} ({{count}} items)',
                         })}
                     </div>
