@@ -9,6 +9,9 @@ interface AiKeyWarningBannerProps {
 export const AiKeyWarningBanner: React.FC<AiKeyWarningBannerProps> = ({ onRegisterKey }) => {
     const { t } = useTranslation(['flows']);
 
+
+
+    
     return (
         <div className="mt-2 bg-destructive/10 border border-destructive/20 rounded-lg p-2.5 text-[10px]">
             <p className="font-semibold text-destructive">{t('aiKey.missing')}</p>
