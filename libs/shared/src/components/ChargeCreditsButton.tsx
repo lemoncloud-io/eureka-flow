@@ -12,7 +12,7 @@ import { useBillingCharge } from '../hooks';
  * See docs/adr/0001-flow-billing-deeplink.md.
  */
 export const ChargeCreditsButton = () => {
-    const { t } = useTranslation();
+    const { t } = useTranslation('common');
     const { isEnabled, charge } = useBillingCharge();
 
     if (!isEnabled) return null;
