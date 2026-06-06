@@ -1,4 +1,7 @@
 {
+    "credits": {
+        "charge": "Buy credits"
+    },
     "actions": {
         "save": "Save",
         "cancel": "Cancel",

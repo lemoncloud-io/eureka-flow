@@ -1,4 +1,7 @@
 {
+    "credits": {
+        "charge": "크레딧 충전"
+    },
     "actions": {
         "save": "저장",
         "cancel": "취소",

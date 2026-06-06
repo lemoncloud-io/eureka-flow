@@ -6,6 +6,7 @@ declare global {
     interface Window {
         ENV?: string;
         VITE_API_URL?: string;
+        VITE_BILLING_URL?: string;
     }
 }
 
@@ -22,6 +23,9 @@ export const OAUTH_ENDPOINT = import.meta.env?.VITE_OAUTH_ENDPOINT?.toLowerCase(
 export const SOCIAL_OAUTH_ENDPOINT = import.meta.env?.VITE_SOCIAL_OAUTH_ENDPOINT?.toLowerCase() || '';
 export const OPENAPI_ENDPOINT = import.meta.env?.VITE_OPENAPI_ENDPOINT?.toLowerCase() || '';
 export const HOST = import.meta.env?.VITE_HOST?.toLowerCase() || window.location.origin;
+
+// Billing app URL for the credit-charge deep-link. Empty when unset → charge button hidden (OSS).
+export const BILLING_URL = window.VITE_BILLING_URL || import.meta.env?.VITE_BILLING_URL || '';
 
 /** Whether OAuth login is enabled (all required env vars present) */
 export const isOAuthEnabled = !!OAUTH_ENDPOINT && !!SOCIAL_OAUTH_ENDPOINT;

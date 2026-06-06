@@ -21,6 +21,7 @@ import {
 
 import { getPermissions, useSystemInfoQuery } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+import { ChargeCreditsButton } from '@flows/shared';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -172,6 +173,7 @@ export const MobileHeader = ({
 
             {/* Action buttons group */}
             <div className="flex items-center gap-1 shrink-0">
+                <ChargeCreditsButton />
                 {/* Search */}
                 {onToggleSearch && nodeCount > 0 && (
                     <button
