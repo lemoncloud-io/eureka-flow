@@ -6,7 +6,7 @@ import { ArrowRight, Globe, KeyRound, Lock, Search, ShieldX, X } from 'lucide-re
 
 import { useBlockRegistry, useCanvasStore, useFlows, useProductProgressStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import { ApiKeyDialog } from '@flows/shared';
+import { ApiKeyDialog, useCreditsRefresh } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
 import { isOAuthEnabled, redirectToLogin, useWebCoreStore } from '@flows/web-core';
 
@@ -106,13 +106,19 @@ export const MobileFlowEditorPage = () => {
     });
 
     const socketRecorder = useSocketRecorder();
+    const refreshCredits = useCreditsRefresh();
 
     const { isSocketConnected, socketConnectionId, replayMessage } = useMobileSocketSync({
         serializeWorkflowState,
         lastSavedStateRef,
         lastLocalUpdateTimestampRef,
         canEdit: role === 'owner',
-        onMessage: socketRecorder.record,
+        onMessage: message => {
+            socketRecorder.record(message);
+            if (message.action === 'trace' || message.action === 'message' || message.action === 'progress') {
+                refreshCredits();
+            }
+        },
     });
 
     useProductProgressToasts();

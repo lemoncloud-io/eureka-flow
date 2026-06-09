@@ -6,7 +6,7 @@ import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { FLOW_FORBIDDEN, getPermissions, getProfile, useBlocks, useFlows, useProductProgressStore } from '@flows/flows';
-import { ApiKeyDialog } from '@flows/shared';
+import { ApiKeyDialog, useCreditsRefresh } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
 import { redirectToLogin, useWebCoreStore, validateApiKey } from '@flows/web-core';
@@ -185,6 +185,7 @@ export const FlowEditorPage = () => {
     });
 
     const socketRecorder = useSocketRecorder();
+    const refreshCredits = useCreditsRefresh();
 
     const setProductProgress = useProductProgressStore(state => state.setProgress);
     const clearProductProgress = useProductProgressStore(state => state.clearAll);
@@ -220,7 +221,14 @@ export const FlowEditorPage = () => {
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
         onProductProgress: handleProductProgress,
-        onMessage: socketRecorder.record,
+        onMessage: message => {
+            socketRecorder.record(message);
+            // Run execution streams trace/message/progress events as nodes consume
+            // credits — refresh the balance (debounced) once the run settles.
+            if (message.action === 'trace' || message.action === 'message' || message.action === 'progress') {
+                refreshCredits();
+            }
+        },
     });
 
     const { startTourIfFirstVisit, startTour } = useTour();
