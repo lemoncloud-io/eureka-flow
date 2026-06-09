@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useCreditBalance } from '@flows/shared';
@@ -32,6 +32,7 @@ describe('useCreditBalance', () => {
 
     afterEach(() => {
         vi.clearAllMocks();
+        vi.useRealTimers();
     });
 
     it('should not call the query function when apiKey is null', async () => {
@@ -52,5 +53,27 @@ describe('useCreditBalance', () => {
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
         expect(getMock).toHaveBeenCalledWith('/wallets/0/balance');
         expect(result.current.data).toEqual({ total: 4200 });
+    });
+
+    it('retries 3 times then stops on a persistent error (no request storm)', async () => {
+        vi.useFakeTimers();
+        storeApiKey = 'key-503';
+        getMock.mockRejectedValue(new Error('503 $sess.gid is required'));
+
+        const { result } = renderHook(() => useCreditBalance(), { wrapper: createWrapper() });
+
+        // initial attempt + 3 backoff retries (1s + 2s + 4s) settle within 8s
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(8000);
+        });
+
+        expect(result.current.isError).toBe(true);
+        expect(getMock).toHaveBeenCalledTimes(4); // 1 initial + 3 retries
+
+        // and then it STOPS — no further requests as time passes
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(60_000);
+        });
+        expect(getMock).toHaveBeenCalledTimes(4);
     });
 });
