@@ -173,7 +173,7 @@ export const MobileHeader = ({
 
             {/* Action buttons group */}
             <div className="flex items-center gap-1 shrink-0">
-                <CreditBalanceChip />
+                <CreditBalanceChip variant="bare" />
                 {/* Search */}
                 {onToggleSearch && nodeCount > 0 && (
                     <button
