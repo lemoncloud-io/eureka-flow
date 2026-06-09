@@ -382,63 +382,70 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
             )}
             <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3">
-                {/* Left: Brand + Flow Info */}
-                <div data-tour="header-left" className="pointer-events-auto">
-                    <div
-                        className={cn(
-                            'flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-2 sm:px-3 rounded-2xl',
-                            'bg-glass-bg backdrop-blur-2xl border border-border/40',
-                            'shadow-floating'
-                        )}
-                    >
-                        <RouterLink
-                            to="/"
-                            className="flex items-center gap-1.5 sm:gap-2 hover:opacity-70 transition-opacity"
+                {/* Left: Brand + Flow Info + Credits */}
+                <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
+                    <div data-tour="header-left">
+                        <div
+                            className={cn(
+                                'flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-2 sm:px-3 rounded-2xl',
+                                'bg-glass-bg backdrop-blur-2xl border border-border/40',
+                                'shadow-floating'
+                            )}
                         >
-                            <img src="/logo/purple-symbol.png" alt="Eureka Flow" className="h-5 w-5 sm:h-6 sm:w-6" />
-                            <span className="text-xs sm:text-sm font-semibold text-foreground hidden sm:inline">
-                                Flow
-                            </span>
-                            <Badge variant="orange" size="sm" className="hidden sm:inline-flex font-semibold">
-                                {t('header.beta')}
-                            </Badge>
-                        </RouterLink>
-                        <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
-                        {!canEdit ? (
-                            <span className="text-xs sm:text-sm text-foreground truncate max-w-[120px] sm:max-w-[200px]">
-                                {flowInfo.flowName}
-                            </span>
-                        ) : (
-                            <FlowNameInput {...flowInfo} />
-                        )}
-                        {canEdit && (
-                            <span className="hidden md:inline">
-                                <SaveStatusBadge
-                                    saveStatus={saveState.saveStatus}
-                                    lastSavedAt={saveState.lastSavedAt}
-                                />
-                            </span>
-                        )}
-                        {canRun && onRunAll && (
-                            <button
-                                onClick={onRunAll}
-                                className="hidden sm:inline-flex items-center gap-1 px-1.5 text-xs font-semibold text-foreground hover:opacity-70 transition-opacity"
+                            <RouterLink
+                                to="/"
+                                className="flex items-center gap-1.5 sm:gap-2 hover:opacity-70 transition-opacity"
                             >
-                                <img src="/icons/play_all.svg" alt="" className="w-4 h-4" />
-                                {t('header.runAll')}
-                            </button>
-                        )}
-                        {isPublicMode && (
-                            <Badge variant="secondary" size="sm" className="text-[10px]">
-                                {t('header.viewOnly', 'View Only')}
-                            </Badge>
-                        )}
-                        {role === 'guest' && !isPublicMode && (
-                            <Badge variant="secondary" size="sm" className="text-[10px]">
-                                {t('header.guestMode', 'Guest')}
-                            </Badge>
-                        )}
+                                <img
+                                    src="/logo/purple-symbol.png"
+                                    alt="Eureka Flow"
+                                    className="h-5 w-5 sm:h-6 sm:w-6"
+                                />
+                                <span className="text-xs sm:text-sm font-semibold text-foreground hidden sm:inline">
+                                    Flow
+                                </span>
+                                <Badge variant="orange" size="sm" className="hidden sm:inline-flex font-semibold">
+                                    {t('header.beta')}
+                                </Badge>
+                            </RouterLink>
+                            <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
+                            {!canEdit ? (
+                                <span className="text-xs sm:text-sm text-foreground truncate max-w-[120px] sm:max-w-[200px]">
+                                    {flowInfo.flowName}
+                                </span>
+                            ) : (
+                                <FlowNameInput {...flowInfo} />
+                            )}
+                            {canEdit && (
+                                <span className="hidden md:inline">
+                                    <SaveStatusBadge
+                                        saveStatus={saveState.saveStatus}
+                                        lastSavedAt={saveState.lastSavedAt}
+                                    />
+                                </span>
+                            )}
+                            {canRun && onRunAll && (
+                                <button
+                                    onClick={onRunAll}
+                                    className="hidden sm:inline-flex items-center gap-1 px-1.5 text-xs font-semibold text-foreground hover:opacity-70 transition-opacity"
+                                >
+                                    <img src="/icons/play_all.svg" alt="" className="w-4 h-4" />
+                                    {t('header.runAll')}
+                                </button>
+                            )}
+                            {isPublicMode && (
+                                <Badge variant="secondary" size="sm" className="text-[10px]">
+                                    {t('header.viewOnly', 'View Only')}
+                                </Badge>
+                            )}
+                            {role === 'guest' && !isPublicMode && (
+                                <Badge variant="secondary" size="sm" className="text-[10px]">
+                                    {t('header.guestMode', 'Guest')}
+                                </Badge>
+                            )}
+                        </div>
                     </div>
+                    <CreditBalanceChip />
                 </div>
 
                 {/* Right: Toolbar */}
@@ -486,7 +493,6 @@ export const Header: React.FC<HeaderProps> = ({
                             </>
                         )}
                         {socketState && <SocketDot {...socketState} />}
-                        <CreditBalanceChip />
                     </div>
 
                     {/* Menu */}

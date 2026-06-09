@@ -22,13 +22,20 @@ const isValidUrl = (value: string): boolean => {
 export const useBillingCharge = () => {
     const isEnabled = isValidUrl(BILLING_URL);
 
-    const charge = useCallback(() => {
-        if (!isEnabled) return;
-        const url = new URL(BILLING_URL);
-        url.searchParams.set('from', 'flow');
-        url.searchParams.set('return_to', window.location.href);
-        window.open(url.toString(), '_blank', 'noopener,noreferrer');
-    }, [isEnabled]);
+    const open = useCallback(
+        (path: string) => {
+            if (!isEnabled) return;
+            const url = new URL(BILLING_URL);
+            if (path) url.pathname = path;
+            url.searchParams.set('from', 'flow');
+            url.searchParams.set('return_to', window.location.href);
+            window.open(url.toString(), '_blank', 'noopener,noreferrer');
+        },
+        [isEnabled]
+    );
 
-    return { isEnabled, charge };
+    const charge = useCallback(() => open(''), [open]);
+    const openPayments = useCallback(() => open('/payments'), [open]);
+
+    return { isEnabled, charge, openPayments };
 };

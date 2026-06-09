@@ -1,6 +1,6 @@
 export * from './ApiKeyDialog';
 export * from './CreditBalanceChip';
-export * from './CreditCoin';
+export * from './CreditDetails';
 export * from './CreditFilterTabs';
 export * from './CreditUsageSheet';
 export * from './ErrorFallback';

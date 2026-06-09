@@ -2,6 +2,11 @@
     "credits": {
         "charge": "크레딧 충전",
         "balance": "잔액",
+        "detailTitle": "크레딧 상세 정보",
+        "totalHeld": "총 보유 크레딧",
+        "buy": "크레딧 구매",
+        "usageHistory": "크레딧 사용 내역",
+        "paymentHistory": "크레딧 결제 내역",
         "usageTitle": "크레딧 사용내역",
         "available": "사용가능",
         "held": "사용중",

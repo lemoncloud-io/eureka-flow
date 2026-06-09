@@ -2,6 +2,11 @@
     "credits": {
         "charge": "Buy credits",
         "balance": "Balance",
+        "detailTitle": "Credit details",
+        "totalHeld": "Total credits",
+        "buy": "Buy credits",
+        "usageHistory": "Usage history",
+        "paymentHistory": "Payment history",
         "usageTitle": "Credit usage",
         "available": "Available",
         "held": "On hold",
