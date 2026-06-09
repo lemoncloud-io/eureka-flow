@@ -1,5 +1,7 @@
 export * from './ApiKeyDialog';
 export * from './ChargeCreditsButton';
+export * from './CreditBalanceChip';
+export * from './CreditUsageSheet';
 export * from './ErrorFallback';
 export * from './GlobalLoader';
 export * from './LoadingFallback';

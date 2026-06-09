@@ -1,6 +1,19 @@
 {
     "credits": {
-        "charge": "Buy credits"
+        "charge": "Buy credits",
+        "balance": "Balance",
+        "usageTitle": "Credit usage",
+        "available": "Available",
+        "held": "On hold",
+        "expireWithin": "Within {{days}} days",
+        "empty": "No usage yet",
+        "loadError": "Couldn't load credits",
+        "stereo": {
+            "use": "Used",
+            "purchase": "Purchase",
+            "gain": "Earned",
+            "cancel": "Canceled"
+        }
     },
     "actions": {
         "save": "Save",

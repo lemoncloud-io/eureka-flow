@@ -1,6 +1,19 @@
 {
     "credits": {
-        "charge": "크레딧 충전"
+        "charge": "크레딧 충전",
+        "balance": "잔액",
+        "usageTitle": "크레딧 사용내역",
+        "available": "사용가능",
+        "held": "사용중",
+        "expireWithin": "{{days}}일 이내",
+        "empty": "사용내역 없음",
+        "loadError": "크레딧을 불러오지 못했어요",
+        "stereo": {
+            "use": "사용",
+            "purchase": "구매",
+            "gain": "획득",
+            "cancel": "취소"
+        }
     },
     "actions": {
         "save": "저장",

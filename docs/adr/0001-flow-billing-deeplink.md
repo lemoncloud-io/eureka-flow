@@ -30,6 +30,18 @@ flow links _out_ to the billing app; it never embeds payment.
   screen billing shows a manual "back to flow" link; it never auto-redirects.
 - **The button is env-gated.** It renders only when `VITE_BILLING_URL` is set, so
   open-source self-hosters (who have no billing app) never see a dead button.
+- **Workspace context exception (amended 2026-06-09).** Credits are
+  **workspace-scoped** (backend deploys a per-workspace wallet — see billing
+  decisions ADR-9). Identity hierarchy is **Site(`sid`) ⊃ Workspace(`workspaceId`)
+  ⊃ Wallet**; `sid` and `workspaceId` are _different_ identifiers. The deep-link
+  MAY carry a workspace _hint_ so billing pre-selects the right wallet — but the
+  hint must be a **workspace identifier**, not the key's `sid` (which is the
+  parent site). ⚠️ **Open:** the apiKey claim exposes only `sid`+`uid`, no
+  `workspaceId`; flow needs a way to learn its key's workspaceId (e.g. backend
+  adds it to `flows/0/profile`) before this hint can be precise. Whatever is
+  passed is **not** an auth token — billing still OAuth-logs-in and re-validates
+  membership server-side, so a spoofed hint grants nothing. The "no identity"
+  rule still bans tokens/apiKeys in the URL.
 
 ## Consequences
 
@@ -37,9 +49,10 @@ flow links _out_ to the billing app; it never embeds payment.
 - No token-handoff complexity; the cost is the user logs into billing separately
   (acceptable — billing is an occasional destination, not a hot path).
 - New tab preserves the user's editor work (no same-tab navigation loss).
-- **Deferred (future, "A1"):** showing the live credit balance inside flow. This
-  requires the billing backend (`crd-d1`) to accept an **API-key-signed** balance
-  read (today it validates OAuth only). Until that backend capability exists, flow
-  shows the button but not the balance. Revisit when backend confirms support.
+- **A1 ACTIVATED (2026-06-09):** in-app credit balance + usage history inside flow.
+  The backend now exposes api-key-signed reads (`flw-v1/_api_/wallets/0/balance`,
+  `.../transactions/0/list`), so the deferral reason is gone. flow shows balance +
+  usage read-only next to the charge button; payment (charge execution) still
+  delegates to billing via deep-link (flow stays payment-free).
 - Cross-app URL contract (`from`, `return_to`) and the allowlist now span two
   repos; changing it requires coordinated edits in flow and billing.
