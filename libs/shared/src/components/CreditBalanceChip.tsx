@@ -30,7 +30,7 @@ const TRIGGER_STYLE = {
 export const CreditBalanceChip = ({ variant = 'pill' }: CreditBalanceChipProps) => {
     const { t } = useTranslation('common');
     const apiKey = useWebCoreStore(s => s.apiKey);
-    const { data, isLoading, isError } = useCreditBalance();
+    const { data, isLoading, isError, refetch } = useCreditBalance();
     const [popoverOpen, setPopoverOpen] = useState(false);
     const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -43,9 +43,16 @@ export const CreditBalanceChip = ({ variant = 'pill' }: CreditBalanceChipProps) 
         setSheetOpen(true);
     };
 
+    // Refresh balance when opening the popover (replaces window-focus refetch),
+    // e.g. after returning from a billing charge.
+    const handleOpenChange = (open: boolean) => {
+        setPopoverOpen(open);
+        if (open) refetch();
+    };
+
     return (
         <>
-            <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+            <Popover open={popoverOpen} onOpenChange={handleOpenChange}>
                 <PopoverTrigger asChild>
                     <Button
                         variant="ghost"
