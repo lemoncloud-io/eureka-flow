@@ -8,6 +8,19 @@
         "expireWithin": "{{days}}일 이내",
         "empty": "사용내역 없음",
         "loadError": "크레딧을 불러오지 못했어요",
+        "loadMore": "더 보기",
+        "filter": {
+            "all": "전체",
+            "use": "사용",
+            "purchase": "구매",
+            "gain": "획득",
+            "cancel": "취소"
+        },
+        "reason": {
+            "flow_run": "플로우 실행",
+            "admin_grant": "관리자 지급",
+            "signup_bonus": "가입 보너스"
+        },
         "stereo": {
             "use": "사용",
             "purchase": "구매",

@@ -1,24 +1,41 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { useWebCoreStore } from '@flows/web-core';
 
 import { creditsKeys } from './creditsKeys';
 import { getCreditTransactions } from '../../api';
 
-import type { CreditTransactionsParams } from '../../types';
+import type { CreditFilter, ListTransactionsResponse } from '../../types';
 
-const DEFAULT_PARAMS: CreditTransactionsParams = { limit: 24, page: 0 };
+const PAGE_SIZE = 24;
+
+const getNextPageParam = (lastPage: ListTransactionsResponse) => {
+    const limit = lastPage.limit ?? PAGE_SIZE;
+    const page = lastPage.page ?? 0;
+    const total = lastPage.total ?? 0;
+    const fetched = (page + 1) * limit;
+    return fetched < total ? page + 1 : undefined;
+};
 
 /**
- * Fetches credit transaction history (first page by default). Gated on the
- * active apiKey. v1 has no filter UI — callers may pass params for future use.
+ * Fetches credit transaction history with cursor-style pagination (infinite
+ * query). Gated on the active apiKey. `filter` maps to the backend `stereo`
+ * param ('all' → no filter) and is the only cache dimension; pages accumulate
+ * inside `data.pages`.
  */
-export const useCreditTransactions = (params: CreditTransactionsParams = DEFAULT_PARAMS) => {
+export const useCreditTransactions = (filter: CreditFilter = 'all') => {
     const apiKey = useWebCoreStore(s => s.apiKey);
 
-    return useQuery({
-        queryKey: creditsKeys.transactions(apiKey, params),
-        queryFn: () => getCreditTransactions(params),
+    return useInfiniteQuery({
+        queryKey: creditsKeys.transactions(apiKey, filter),
+        queryFn: ({ pageParam }) =>
+            getCreditTransactions({
+                stereo: filter === 'all' ? undefined : filter,
+                limit: PAGE_SIZE,
+                page: pageParam,
+            }),
+        initialPageParam: 0,
+        getNextPageParam,
         enabled: !!apiKey,
     });
 };

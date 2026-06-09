@@ -12,22 +12,17 @@ describe('creditsKeys', () => {
         expect(creditsKeys.balance('key-a')).not.toEqual(creditsKeys.balance('key-b'));
     });
 
-    it('should build the transactions key with apiKey + empty params by default', () => {
-        expect(creditsKeys.transactions('key-a')).toEqual(['credits', 'transactions', 'key-a', {}]);
+    it('should build the transactions key with apiKey + "all" filter by default', () => {
+        expect(creditsKeys.transactions('key-a')).toEqual(['credits', 'transactions', 'key-a', 'all']);
     });
 
-    it('should produce different keys for different params', () => {
-        const pageOne = creditsKeys.transactions('key-a', { page: 0, limit: 24 });
-        const pageTwo = creditsKeys.transactions('key-a', { page: 1, limit: 24 });
-        expect(pageOne).not.toEqual(pageTwo);
+    it('should produce different keys for different filters', () => {
+        const all = creditsKeys.transactions('key-a', 'all');
+        const use = creditsKeys.transactions('key-a', 'use');
+        expect(all).not.toEqual(use);
     });
 
-    it('should fold params into the key', () => {
-        expect(creditsKeys.transactions('key-a', { stereo: 'use' })).toEqual([
-            'credits',
-            'transactions',
-            'key-a',
-            { stereo: 'use' },
-        ]);
+    it('should fold the filter into the key', () => {
+        expect(creditsKeys.transactions('key-a', 'use')).toEqual(['credits', 'transactions', 'key-a', 'use']);
     });
 });

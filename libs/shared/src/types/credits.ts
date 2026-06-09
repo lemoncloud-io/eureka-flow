@@ -5,6 +5,9 @@
 
 export type CreditStereo = 'use' | 'purchase' | 'gain' | 'cancel';
 
+/** Transaction-list filter: a single stereo, or 'all' (no stereo filter). */
+export type CreditFilter = CreditStereo | 'all';
+
 export type TransactionState = 'pending' | 'held' | 'succeeded' | 'released' | 'failed' | 'reversed' | '';
 
 export interface WalletBalanceResponse {
@@ -24,6 +27,16 @@ export interface WalletBalanceResponse {
     };
 }
 
+/** Per-line detail of a transaction (e.g. one model call inside a flow run). */
+export interface TransactionLine {
+    nodeId?: string;
+    nodeName?: string;
+    model?: string;
+    reason?: string;
+    amount?: number;
+    relatedUsageId?: string;
+}
+
 export interface TransactionView {
     id: string;
     createdAt?: number;
@@ -37,6 +50,8 @@ export interface TransactionView {
     creditChange?: number;
     availableAfter?: number;
     heldAfter?: number;
+    relatedRunId?: string;
+    lines$?: TransactionLine[];
 }
 
 export interface ListTransactionsResponse {

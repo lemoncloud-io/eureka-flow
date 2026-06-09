@@ -1,22 +1,24 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Badge, ScrollArea, Sheet, SheetContent, SheetHeader, SheetTitle, Skeleton, cn } from '@flows/ui-kit';
+import { Badge, Button, ScrollArea, Sheet, SheetContent, SheetHeader, SheetTitle, Skeleton, cn } from '@flows/ui-kit';
 
+import { CreditFilterTabs } from './CreditFilterTabs';
 import { useCreditBalance, useCreditTransactions } from '../hooks';
-import { formatCredits } from '../utils';
+import { formatCreditDateTime, formatCredits } from '../utils';
 
-import type { CreditStereo, TransactionView, WalletBalanceResponse } from '../types';
+import type { CreditFilter, CreditStereo, TransactionView, WalletBalanceResponse } from '../types';
 
 interface CreditUsageSheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
 
-// Reuse ui-kit Badge variants (identical class sets) instead of a parallel map.
-const STEREO_BADGE: Record<CreditStereo, 'default' | 'blue' | 'green' | 'destructive'> = {
-    use: 'default',
+// Badge palette aligned with billing-front meta.ts (KIND_BADGE).
+const STEREO_BADGE: Record<CreditStereo, 'secondary' | 'blue' | 'orange' | 'destructive'> = {
+    use: 'secondary',
     purchase: 'blue',
-    gain: 'green',
+    gain: 'orange',
     cancel: 'destructive',
 };
 
@@ -44,22 +46,32 @@ const BalanceSummary = ({ data }: { data: WalletBalanceResponse }) => {
 };
 
 const TransactionRow = ({ tx }: { tx: TransactionView }) => {
-    const { t } = useTranslation('common');
+    const { t, i18n } = useTranslation('common');
     const change = tx.creditChange ?? 0;
     const changeColor = change > 0 ? 'text-success' : change < 0 ? 'text-destructive' : 'text-muted-foreground';
     const sign = change > 0 ? '+' : '';
-    const dateLabel = tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : '';
+
+    // Known backend reasons resolve via i18n; unknown reasons fall back to the raw string.
+    const reasonKey = tx.reason ? `credits.reason.${tx.reason}` : '';
+    const friendlyReason = reasonKey && i18n.exists(reasonKey) ? t(reasonKey) : tx.reason;
+    const title = tx.name || friendlyReason || '-';
+
+    const dateLabel = formatCreditDateTime(tx.createdAt ?? 0);
+    const model = tx.lines$?.[0]?.model;
+    const meta = [dateLabel, model].filter(Boolean).join(' · ');
 
     return (
-        <div className="flex items-center gap-3 py-2.5">
-            <Badge variant={STEREO_BADGE[tx.stereo]} className="shrink-0">
-                {t(`credits.stereo.${tx.stereo}`)}
-            </Badge>
+        <div className="flex items-start justify-between gap-3 py-3">
             <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-foreground">{tx.name || tx.reason || '-'}</p>
-                {dateLabel && <p className="text-xs text-muted-foreground">{dateLabel}</p>}
+                <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-semibold text-foreground">{title}</span>
+                    <Badge variant={STEREO_BADGE[tx.stereo]} className="shrink-0">
+                        {t(`credits.stereo.${tx.stereo}`)}
+                    </Badge>
+                </div>
+                {meta && <p className="mt-1 text-xs text-muted-foreground">{meta}</p>}
             </div>
-            <span className={cn('shrink-0 text-sm font-medium tabular-nums', changeColor)}>
+            <span className={cn('shrink-0 text-sm font-bold tabular-nums', changeColor)}>
                 {sign}
                 {formatCredits(change)}
             </span>
@@ -67,15 +79,15 @@ const TransactionRow = ({ tx }: { tx: TransactionView }) => {
     );
 };
 
-const TransactionList = () => {
+const TransactionList = ({ filter }: { filter: CreditFilter }) => {
     const { t } = useTranslation('common');
-    const { data, isLoading, isError } = useCreditTransactions();
+    const { data, isLoading, isError, hasNextPage, fetchNextPage, isFetchingNextPage } = useCreditTransactions(filter);
 
     if (isLoading) {
         return (
             <div className="space-y-3">
                 {Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full rounded-md" />
+                    <Skeleton key={i} className="h-12 w-full rounded-md" />
                 ))}
             </div>
         );
@@ -85,26 +97,45 @@ const TransactionList = () => {
         return <p className="py-8 text-center text-sm text-muted-foreground">{t('credits.loadError')}</p>;
     }
 
-    if (!data || data.list.length === 0) {
+    const rows = data?.pages.flatMap(p => p.list) ?? [];
+
+    if (rows.length === 0) {
         return <p className="py-8 text-center text-sm text-muted-foreground">{t('credits.empty')}</p>;
     }
 
     return (
-        <div className="divide-y divide-border">
-            {data.list.map(tx => (
-                <TransactionRow key={tx.id} tx={tx} />
-            ))}
+        <div>
+            <div className="divide-y divide-border">
+                {rows.map(tx => (
+                    <TransactionRow key={tx.id} tx={tx} />
+                ))}
+            </div>
+            {hasNextPage && (
+                <div className="pt-3">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full"
+                        disabled={isFetchingNextPage}
+                        onClick={() => fetchNextPage()}
+                    >
+                        {t('credits.loadMore')}
+                    </Button>
+                </div>
+            )}
         </div>
     );
 };
 
 /**
- * Read-only credit usage Sheet: balance summary + transaction history. Opened
- * from CreditBalanceChip. No filter UI in v1 (first page only). No payment code.
+ * Read-only credit usage Sheet: balance summary + filterable, paginated
+ * transaction history. Opened from CreditBalanceChip. No payment code lives here.
  */
 export const CreditUsageSheet = ({ open, onOpenChange }: CreditUsageSheetProps) => {
     const { t } = useTranslation('common');
     const { data: balance } = useCreditBalance();
+    const [filter, setFilter] = useState<CreditFilter>('all');
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
@@ -114,8 +145,9 @@ export const CreditUsageSheet = ({ open, onOpenChange }: CreditUsageSheetProps) 
                 </SheetHeader>
                 <div className="flex flex-1 flex-col gap-4 overflow-hidden p-6">
                     {balance && <BalanceSummary data={balance} />}
+                    <CreditFilterTabs value={filter} onChange={setFilter} />
                     <ScrollArea className="flex-1">
-                        <TransactionList />
+                        <TransactionList filter={filter} />
                     </ScrollArea>
                 </div>
             </SheetContent>
