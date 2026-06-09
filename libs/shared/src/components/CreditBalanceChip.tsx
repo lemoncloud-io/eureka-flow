@@ -1,19 +1,19 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Coins } from 'lucide-react';
-
 import { Button, Skeleton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
+import { CreditCoin } from './CreditCoin';
 import { CreditUsageSheet } from './CreditUsageSheet';
 import { useCreditBalance } from '../hooks';
 import { formatCredits } from '../utils';
 
 /**
- * Read-only credit balance chip for the editor toolbar. Sits beside
- * ChargeCreditsButton. Hidden when unauthenticated (no apiKey) or on error
- * (silent fallback). Clicking opens the usage Sheet. flow never charges here.
+ * Single credit control in the editor toolbar. Shows the balance; clicking opens
+ * the usage Sheet, where charging lives (one cohesive credit entry point instead
+ * of a separate charge button). Hidden when unauthenticated (no apiKey) or on
+ * error (silent fallback). flow never charges here — charge deep-links to billing.
  */
 export const CreditBalanceChip = () => {
     const { t } = useTranslation('common');
@@ -37,8 +37,8 @@ export const CreditBalanceChip = () => {
                             onClick={() => setOpen(true)}
                             aria-label={t('credits.balance')}
                         >
-                            <Coins className="h-4 w-4" />
-                            <span className="text-sm font-medium tabular-nums">{formatCredits(data.total)}</span>
+                            <CreditCoin className="h-4 w-4" />
+                            <span className="text-sm font-semibold tracking-tight">{formatCredits(data.total)}</span>
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>{t('credits.balance')}</TooltipContent>

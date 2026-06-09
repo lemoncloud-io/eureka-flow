@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 
 import { Badge, Button, ScrollArea, Sheet, SheetContent, SheetHeader, SheetTitle, Skeleton, cn } from '@flows/ui-kit';
 
+import { CreditCoin } from './CreditCoin';
 import { CreditFilterTabs } from './CreditFilterTabs';
-import { useCreditBalance, useCreditTransactions } from '../hooks';
+import { useBillingCharge, useCreditBalance, useCreditTransactions } from '../hooks';
 import { formatCreditDateTime, formatCredits } from '../utils';
 
 import type { CreditFilter, CreditStereo, TransactionView, WalletBalanceResponse } from '../types';
@@ -29,18 +30,42 @@ const SummaryRow = ({ label, value }: { label: string; value: number }) => (
     </div>
 );
 
-const BalanceSummary = ({ data }: { data: WalletBalanceResponse }) => {
+interface BalanceSummaryProps {
+    data: WalletBalanceResponse;
+    canCharge: boolean;
+    onCharge: () => void;
+}
+
+const BalanceSummary = ({ data, canCharge, onCharge }: BalanceSummaryProps) => {
     const { t } = useTranslation('common');
     const within7 = data.expiring?.within7Days ?? 0;
     const within30 = data.expiring?.within30Days ?? 0;
+    const hasDetail = data.available != null || (data.held != null && data.held > 0) || within7 > 0 || within30 > 0;
 
     return (
-        <div className="space-y-2 rounded-xl border border-border bg-card p-4">
-            <SummaryRow label={t('credits.balance')} value={data.total} />
-            {data.available != null && <SummaryRow label={t('credits.available')} value={data.available} />}
-            {data.held != null && data.held > 0 && <SummaryRow label={t('credits.held')} value={data.held} />}
-            {within7 > 0 && <SummaryRow label={t('credits.expireWithin', { days: 7 })} value={within7} />}
-            {within30 > 0 && <SummaryRow label={t('credits.expireWithin', { days: 30 })} value={within30} />}
+        <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <p className="text-sm text-muted-foreground">{t('credits.balance')}</p>
+                    <p className="mt-1 flex items-center gap-1.5 text-2xl font-bold tracking-tight text-foreground">
+                        <CreditCoin className="h-6 w-6" />
+                        {formatCredits(data.total)}
+                    </p>
+                </div>
+                {canCharge && (
+                    <Button size="sm" onClick={onCharge}>
+                        {t('credits.charge')}
+                    </Button>
+                )}
+            </div>
+            {hasDetail && (
+                <div className="mt-3 space-y-2 border-t border-border pt-3">
+                    {data.available != null && <SummaryRow label={t('credits.available')} value={data.available} />}
+                    {data.held != null && data.held > 0 && <SummaryRow label={t('credits.held')} value={data.held} />}
+                    {within7 > 0 && <SummaryRow label={t('credits.expireWithin', { days: 7 })} value={within7} />}
+                    {within30 > 0 && <SummaryRow label={t('credits.expireWithin', { days: 30 })} value={within30} />}
+                </div>
+            )}
         </div>
     );
 };
@@ -135,6 +160,7 @@ const TransactionList = ({ filter }: { filter: CreditFilter }) => {
 export const CreditUsageSheet = ({ open, onOpenChange }: CreditUsageSheetProps) => {
     const { t } = useTranslation('common');
     const { data: balance } = useCreditBalance();
+    const { isEnabled: canCharge, charge } = useBillingCharge();
     const [filter, setFilter] = useState<CreditFilter>('all');
 
     return (
@@ -144,7 +170,7 @@ export const CreditUsageSheet = ({ open, onOpenChange }: CreditUsageSheetProps) 
                     <SheetTitle>{t('credits.usageTitle')}</SheetTitle>
                 </SheetHeader>
                 <div className="flex flex-1 flex-col gap-4 overflow-hidden p-6">
-                    {balance && <BalanceSummary data={balance} />}
+                    {balance && <BalanceSummary data={balance} canCharge={canCharge} onCharge={charge} />}
                     <CreditFilterTabs value={filter} onChange={setFilter} />
                     <ScrollArea className="flex-1">
                         <TransactionList filter={filter} />

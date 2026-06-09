@@ -26,7 +26,7 @@ import {
 
 import { getPermissions, useSystemInfoQuery } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import { ChargeCreditsButton, CreditBalanceChip } from '@flows/shared';
+import { CreditBalanceChip } from '@flows/shared';
 import {
     Badge,
     DropdownMenu,
@@ -487,7 +487,6 @@ export const Header: React.FC<HeaderProps> = ({
                         )}
                         {socketState && <SocketDot {...socketState} />}
                         <CreditBalanceChip />
-                        <ChargeCreditsButton />
                     </div>
 
                     {/* Menu */}
