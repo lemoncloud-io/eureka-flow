@@ -14,5 +14,5 @@ Glossary of domain terms. No implementation details. Update as terms are resolve
 
 ## Cross-app
 
-- **Billing app** — The separate `billing.eureka.codes` application (OAuth-authenticated) that owns all payment, charge, refund, and ledger-mutation logic. flow links _out_ to it.
+- **Billing app** — The separate `billing.example.com` application (OAuth-authenticated) that owns all payment, charge, refund, and ledger-mutation logic. flow links _out_ to it.
 - **Charge deep-link** — An outbound, new-tab navigation from flow to the billing app carrying only `from` (source tag) and `return_to` (where to come back to). Carries no identity — billing authenticates the user itself.

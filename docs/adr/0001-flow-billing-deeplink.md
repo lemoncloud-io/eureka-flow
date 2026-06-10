@@ -7,7 +7,7 @@ Status: Accepted
 
 Users consume account-scoped **credits** when AI blocks run in flow. They need a
 way to buy more. The payment system lives in a separate app
-(`billing.eureka.codes`, OAuth-authenticated), which owns all charge/refund/ledger
+(`billing.example.com`, OAuth-authenticated), which owns all charge/refund/ledger
 logic. Three constraints shape how flow can connect to it:
 
 1. **flow is Apache-2.0 open source** — it cannot contain payment/Stripe logic.
