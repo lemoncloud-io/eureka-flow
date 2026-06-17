@@ -1,5 +1,6 @@
 export * from './flows';
 export * from './blocks';
+export * from './models';
 export * from './edges';
 export * from './graphs';
 export * from './nodes';
