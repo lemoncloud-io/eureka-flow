@@ -1,5 +1,40 @@
 # Changelog
 
+## [2026-06-17] - root@0.54.0, @flows/web@0.54.0, @flows/admin@0.30.0
+
+### Features
+
+- (permissions) model 4 flow roles, fix owner-only 403 for editors
+- (models) add LLM model selector with expected credit cost
+- (credits) refresh balance after a flow run
+- (credits) credit chip variants for mobile + navigator headers
+- (credits) figma popover redesign + left-header placement
+- (credits) unify credit control + brand coin glyph
+- (credits) filter tabs, pagination, richer usage rows
+- (credits) in-app credit balance + usage history (A1)
+- (billing) add credit-charge deep-link button to editor
+
+### Bug Fixes
+
+- (credits) cap balance/transactions retries, stop request storm
+
+### Documentation
+
+- (i18n) clarify VITE_I18N_BUCKET_URL must end with stage prefix
+- (billing) use placeholder billing URL for open-source
+
+### Refactor
+
+- (billing) harden useBillingCharge per review
+
+### Chores
+
+- remove stray figma-login-check.png from repo root
+
+### Other
+
+- test: (credits) prove retry cap; stop refetch on reconnect
+
 ## [2026-05-27] - root@0.53.2, @flows/web@0.53.2, @flows/admin@0.29.2
 
 ### Bug Fixes
