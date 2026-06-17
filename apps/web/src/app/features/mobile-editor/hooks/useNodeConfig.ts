@@ -14,13 +14,15 @@ export const useNodeConfig = (nodeId: string | null, flowId: string | null, role
 
     const blockDef = node ? blockRegistry[node.type] : undefined;
     const syncTimerRef = useRef<number | null>(null);
-    const { canEdit, canRun } = useMemo(() => getPermissions(role), [role]);
+    const { canEditConfig, canEditStructure, canRun } = useMemo(() => getPermissions(role), [role]);
 
     const configFields: NodeConfigItem[] = blockDef?.config$$ ?? node?.config$$ ?? [];
 
     const syncNodeToServer = useCallback(
         (updates: Record<string, unknown>) => {
-            if (!canEdit || !nodeId || !flowId || isTempId(nodeId)) return;
+            // Owner + Editor may sync config; for an Editor the server routes /nodes/:id/upsert
+            // into their session overlay (CASE B). Viewer/Anonymous: blocked.
+            if (!canEditConfig || !nodeId || !flowId || isTempId(nodeId)) return;
             if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
             syncTimerRef.current = window.setTimeout(() => {
                 upsertNode(nodeId, flowId, updates).catch(err => {
@@ -28,7 +30,7 @@ export const useNodeConfig = (nodeId: string | null, flowId: string | null, role
                 });
             }, 500);
         },
-        [canEdit, nodeId, flowId]
+        [canEditConfig, nodeId, flowId]
     );
 
     useEffect(
@@ -44,51 +46,51 @@ export const useNodeConfig = (nodeId: string | null, flowId: string | null, role
 
     const handleConfigChange = useCallback(
         (key: string, value: unknown) => {
-            if (role === 'anonymous' || !nodeId) return;
+            // Owner + Editor edit any node config (Editor's change persists via session overlay)
+            if (!canEditConfig || !nodeId) return;
             const currentNode = useCanvasStore.getState().nodes.find(n => n.id === nodeId);
             if (!currentNode) return;
-            if (role === 'guest' && !currentNode.type?.startsWith('input-')) return;
 
             const newConfig = { ...currentNode.config, [key]: value };
             useCanvasStore.getState().updateNodeData(nodeId, { config: newConfig } as Partial<NodeData>);
             syncNodeToServer({ config: newConfig });
         },
-        [role, nodeId, syncNodeToServer]
+        [canEditConfig, nodeId, syncNodeToServer]
     );
 
     const handleCustomLabelChange = useCallback(
         (value: string) => {
-            if (!canEdit) return;
+            if (!canEditStructure) return;
             setCustomLabel(value);
             if (!nodeId) return;
             useCanvasStore.getState().updateNodeData(nodeId, { customLabel: value } as Partial<NodeData>);
             syncNodeToServer({ customLabel: value || undefined });
         },
-        [canEdit, nodeId, syncNodeToServer]
+        [canEditStructure, nodeId, syncNodeToServer]
     );
 
     const handleDescriptionChange = useCallback(
         (value: string) => {
-            if (!canEdit || !nodeId) return;
+            if (!canEditStructure || !nodeId) return;
             useCanvasStore.getState().updateNodeData(nodeId, { description: value } as Partial<NodeData>);
             syncNodeToServer({ description: value || undefined });
         },
-        [canEdit, nodeId, syncNodeToServer]
+        [canEditStructure, nodeId, syncNodeToServer]
     );
 
     const handleToggleAuto = useCallback(
         (auto: boolean) => {
-            if (!canEdit || !nodeId) return;
+            if (!canEditStructure || !nodeId) return;
             useCanvasStore.getState().updateNodeData(nodeId, { auto } as Partial<NodeData>);
             syncNodeToServer({ auto });
         },
-        [canEdit, nodeId, syncNodeToServer]
+        [canEditStructure, nodeId, syncNodeToServer]
     );
 
     return {
         node,
         blockDef,
-        canEdit,
+        canEditStructure,
         canRun,
         customLabel,
         configFields,

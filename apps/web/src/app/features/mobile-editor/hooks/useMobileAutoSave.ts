@@ -8,7 +8,7 @@ const AUTO_SAVE_DELAY = 2000;
 
 interface UseMobileAutoSaveParams {
     isAppReady: boolean;
-    /** Whether the current user can save (false for guest/anonymous) */
+    /** Whether the current user can save (Owner + Editor; false for viewer/anonymous) */
     canSave: boolean;
     serializeWorkflowState: SerializeWorkflowFn;
     lastSavedStateRef: React.MutableRefObject<string | null>;

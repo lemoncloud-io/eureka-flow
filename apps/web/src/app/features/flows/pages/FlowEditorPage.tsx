@@ -5,8 +5,16 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { FLOW_FORBIDDEN, getPermissions, getProfile, useBlocks, useFlows, useProductProgressStore } from '@flows/flows';
-import { ApiKeyDialog } from '@flows/shared';
+import {
+    FLOW_FORBIDDEN,
+    deriveRole,
+    getPermissions,
+    getProfile,
+    useBlocks,
+    useFlows,
+    useProductProgressStore,
+} from '@flows/flows';
+import { ApiKeyDialog, useCreditsRefresh } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
 import { redirectToLogin, useWebCoreStore, validateApiKey } from '@flows/web-core';
@@ -47,7 +55,7 @@ const isInputElement = (target: EventTarget | null): boolean => {
     return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
 };
 
-const DEV_ROLES: FlowRole[] = ['owner', 'guest', 'anonymous'];
+const DEV_ROLES: FlowRole[] = ['owner', 'editor', 'viewer', 'anonymous'];
 
 const DevRoleToggle: React.FC<{
     role: FlowRole;
@@ -160,6 +168,7 @@ export const FlowEditorPage = () => {
         updateFlowName,
         isPublic,
         isEditable,
+        isOwner,
         flowThumbnail,
         togglePublic,
         publishFlow,
@@ -185,6 +194,7 @@ export const FlowEditorPage = () => {
     });
 
     const socketRecorder = useSocketRecorder();
+    const refreshCredits = useCreditsRefresh();
 
     const setProductProgress = useProductProgressStore(state => state.setProgress);
     const clearProductProgress = useProductProgressStore(state => state.clearAll);
@@ -220,7 +230,14 @@ export const FlowEditorPage = () => {
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
         onProductProgress: handleProductProgress,
-        onMessage: socketRecorder.record,
+        onMessage: message => {
+            socketRecorder.record(message);
+            // Run execution streams trace/message/progress events as nodes consume
+            // credits — refresh the balance (debounced) once the run settles.
+            if (message.action === 'trace' || message.action === 'message' || message.action === 'progress') {
+                refreshCredits();
+            }
+        },
     });
 
     const { startTourIfFirstVisit, startTour } = useTour();
@@ -244,8 +261,8 @@ export const FlowEditorPage = () => {
     // Public mode: read-only viewing when no API key and viewing an existing flow
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
 
-    // Role derivation: owner (isEditable) / guest (has apiKey but !isEditable) / anonymous (no apiKey)
-    const computedRole: FlowRole = isPublicMode ? 'anonymous' : isEditable ? 'owner' : 'guest';
+    // Role derivation: anonymous (no apiKey) / owner (isOwner) / editor (isEditable, not owner) / viewer (signed-in, not editable)
+    const computedRole: FlowRole = deriveRole({ isPublicMode, isOwner, isEditable });
 
     // Dev-only role override for testing
     const [devRoleOverride, setDevRoleOverride] = useState<FlowRole | null>(null);

@@ -23,6 +23,11 @@ export const blocksKeys = {
     detail: (id: string) => [...blocksKeys.details(), id] as const,
 };
 
+export const modelsKeys = {
+    all: ['llm-models'] as const,
+    list: (image: boolean, provider?: string) => [...modelsKeys.all, { image, provider }] as const,
+};
+
 export const nodesKeys = {
     all: ['nodes'] as const,
     lists: () => [...nodesKeys.all, 'list'] as const,

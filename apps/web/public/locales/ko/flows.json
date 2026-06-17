@@ -37,7 +37,8 @@
         "editPublishInfo": "게시 정보 수정",
         "unpublish": "게시 취소",
         "viewOnly": "읽기 전용",
-        "guestMode": "게스트",
+        "editorMode": "편집자",
+        "editorModeHint": "설정 편집과 실행은 가능하지만, 구조 변경은 소유자만 할 수 있어요",
         "apiKeySettings": "API 키 설정",
         "guidedTour": "가이드 투어",
         "replayTutorial": "튜토리얼 다시보기",
@@ -500,6 +501,12 @@
         "fitToView": "화면에 맞추기",
         "goToNode": "노드로 이동"
     },
+    "permissions": {
+        "ownerOnlyRename": "플로우 이름은 소유자만 변경할 수 있어요",
+        "ownerOnly": "소유자만 가능",
+        "signInToEdit": "편집하려면 로그인하세요",
+        "deniedToast": "이 작업은 소유자만 할 수 있어요"
+    },
     "mobile": {
         "addNode": "노드 추가",
         "addFirstStep": "첫 번째 스텝을 추가하세요",
@@ -554,6 +561,8 @@
         "noSearchResults": "일치하는 노드 없음",
         "imageOutput": "이미지",
         "viewOnly": "보기 전용",
+        "editorMode": "편집자",
+        "editorModeHint": "설정 편집과 실행은 가능하지만, 구조 변경은 소유자만 할 수 있어요",
         "flowSettings": {
             "menuLabel": "플로우 설정",
             "title": "플로우 설정",

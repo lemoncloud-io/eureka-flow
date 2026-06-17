@@ -1,54 +1,87 @@
 /**
  * Flow Role & Permission System
  *
- * Three-tier user roles for flow editor access control:
- * - Owner: Full CRUD (create, edit, save, run)
- * - Guest: Has API key, can view & run nodes, can move nodes locally, cannot save/upsert
- * - Anonymous: No API key, view-only
+ * Four user roles, derived from the server's two booleans (`isOwner`, `isEditable`)
+ * plus apiKey presence (public mode):
+ * - Owner: created the flow (sid+uid match). Structural edits, config, metadata, run.
+ * - Editor: same workspace (sid), not owner. Config edit (saved to a per-user session
+ *   overlay) + run. No structural edits, no rename/publish.
+ * - Viewer: signed-in, no edit permission. Run a public flow only.
+ * - Anonymous: no session. View a public flow only.
+ *
+ * See CONTEXT.md "Access model" and docs/adr/0002-flow-permission-model.md.
  */
 
-export type FlowRole = 'owner' | 'guest' | 'anonymous';
+export type FlowRole = 'owner' | 'editor' | 'viewer' | 'anonymous';
 
 export interface FlowPermissions {
-    /** Add/delete nodes, change config, add connections */
-    canEdit: boolean;
+    /** Edit any node's config values (Owner direct, Editor via session overlay) */
+    canEditConfig: boolean;
+    /** Structural change: add/delete nodes & edges, move, connect, and flow metadata (rename/publish). Owner only. */
+    canEditStructure: boolean;
     /** Execute nodes */
     canRun: boolean;
-    /** Move nodes on canvas (local only for guest) */
-    canDragNodes: boolean;
-    /** Save flow */
+    /** Persist edits (Owner = direct, Editor = session overlay) */
     canSave: boolean;
-    /** Sync node data to server (upsert) */
-    canUpsert: boolean;
-    /** Create new flow, open flow list (authenticated users) */
+    /** Move nodes on canvas (local for non-owners) */
+    canDragNodes: boolean;
+    /** Create new flow, open flow list (any authenticated user) */
     canCreate: boolean;
 }
 
 export const ROLE_PERMISSIONS: Record<FlowRole, FlowPermissions> = {
     owner: {
-        canEdit: true,
+        canEditConfig: true,
+        canEditStructure: true,
         canRun: true,
-        canDragNodes: true,
         canSave: true,
-        canUpsert: true,
+        canDragNodes: true,
         canCreate: true,
     },
-    guest: {
-        canEdit: false,
+    editor: {
+        canEditConfig: true,
+        canEditStructure: false,
         canRun: true,
+        canSave: true,
         canDragNodes: true,
+        canCreate: true,
+    },
+    viewer: {
+        canEditConfig: false,
+        canEditStructure: false,
+        canRun: true,
         canSave: false,
-        canUpsert: false,
+        canDragNodes: false,
         canCreate: true,
     },
     anonymous: {
-        canEdit: false,
+        canEditConfig: false,
+        canEditStructure: false,
         canRun: false,
-        canDragNodes: false,
         canSave: false,
-        canUpsert: false,
+        canDragNodes: false,
         canCreate: false,
     },
 };
 
 export const getPermissions = (role: FlowRole): FlowPermissions => ROLE_PERMISSIONS[role];
+
+/**
+ * Derive the flow role from access facts.
+ * - Public mode (no apiKey, viewing a flow) ⇒ anonymous, regardless of server flags.
+ * - Otherwise: owner (isOwner) → editor (isEditable) → viewer.
+ */
+export const deriveRole = ({
+    isPublicMode,
+    isOwner,
+    isEditable,
+}: {
+    isPublicMode: boolean;
+    isOwner: boolean;
+    isEditable: boolean;
+}): FlowRole => {
+    if (isPublicMode) return 'anonymous';
+    if (isOwner) return 'owner';
+    if (isEditable) return 'editor';
+    return 'viewer';
+};

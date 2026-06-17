@@ -14,6 +14,7 @@ export * from './HelpDialog';
 export * from './ImageEditorDialog';
 export * from './Minimap';
 export * from './MobileControls';
+export * from './ModelSelect';
 export * from './NodeBlock';
 export * from './PublishDialog';
 export * from './RunHistoryPanel';

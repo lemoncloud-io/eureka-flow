@@ -4,9 +4,16 @@ import { Link } from 'react-router-dom';
 
 import { ArrowRight, Globe, KeyRound, Lock, Search, ShieldX, X } from 'lucide-react';
 
-import { useBlockRegistry, useCanvasStore, useFlows, useProductProgressStore } from '@flows/flows';
+import {
+    deriveRole,
+    getPermissions,
+    useBlockRegistry,
+    useCanvasStore,
+    useFlows,
+    useProductProgressStore,
+} from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import { ApiKeyDialog } from '@flows/shared';
+import { ApiKeyDialog, useCreditsRefresh } from '@flows/shared';
 import { Button } from '@flows/ui-kit';
 import { isOAuthEnabled, redirectToLogin, useWebCoreStore } from '@flows/web-core';
 
@@ -53,8 +60,17 @@ const isPortTypeCompatible = (sourceType: string, targetType: string | undefined
 
 export const MobileFlowEditorPage = () => {
     const { t } = useTranslation(['flows']);
-    const { currentFlowId, flowName, isLoading, isSaving, saveStatus, updateFlowName, isEditable, saveCurrentFlow } =
-        useFlows();
+    const {
+        currentFlowId,
+        flowName,
+        isLoading,
+        isSaving,
+        saveStatus,
+        updateFlowName,
+        isEditable,
+        isOwner,
+        saveCurrentFlow,
+    } = useFlows();
     const { apiKey } = useWebCoreStore();
     const blockRegistry = useBlockRegistry();
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
@@ -62,10 +78,11 @@ export const MobileFlowEditorPage = () => {
     const { isDebugMode, handleVersionClick, disableDebugMode } = useDebugMode();
     const showDevTools = isDebugMode;
 
-    // Role derivation
-    const computedRole: FlowRole = isPublicMode ? 'anonymous' : isEditable ? 'owner' : 'guest';
+    // Role derivation: anonymous (no apiKey) / owner (isOwner) / editor (isEditable, not owner) / viewer
+    const computedRole: FlowRole = deriveRole({ isPublicMode, isOwner, isEditable });
     const [devRoleOverride, setDevRoleOverride] = useState<FlowRole | null>(null);
     const role: FlowRole = devRoleOverride ?? computedRole;
+    const permissions = getPermissions(role);
 
     // Shared refs for cross-hook communication
     const lastSavedStateRef = useRef<string | null>(null);
@@ -99,20 +116,26 @@ export const MobileFlowEditorPage = () => {
 
     useMobileAutoSave({
         isAppReady,
-        canSave: role === 'owner',
+        canSave: permissions.canSave,
         serializeWorkflowState,
         lastSavedStateRef,
         lastLocalUpdateTimestampRef,
     });
 
     const socketRecorder = useSocketRecorder();
+    const refreshCredits = useCreditsRefresh();
 
     const { isSocketConnected, socketConnectionId, replayMessage } = useMobileSocketSync({
         serializeWorkflowState,
         lastSavedStateRef,
         lastLocalUpdateTimestampRef,
-        canEdit: role === 'owner',
-        onMessage: socketRecorder.record,
+        canEdit: permissions.canEditStructure,
+        onMessage: message => {
+            socketRecorder.record(message);
+            if (message.action === 'trace' || message.action === 'message' || message.action === 'progress') {
+                refreshCredits();
+            }
+        },
     });
 
     useProductProgressToasts();
@@ -182,10 +205,10 @@ export const MobileFlowEditorPage = () => {
             executeNodeWithToast(nodeId, {
                 flowId: currentFlowId,
                 socketConnectionId,
-                canEdit: role === 'owner',
+                canEdit: permissions.canEditStructure,
             });
         },
-        [currentFlowId, socketConnectionId, role]
+        [currentFlowId, socketConnectionId, permissions.canEditStructure]
     );
 
     const handleAddBlockWithRecent = useCallback(
@@ -330,7 +353,7 @@ export const MobileFlowEditorPage = () => {
                     });
                 }}
                 onExport={handleExport}
-                onNew={role === 'owner' ? () => setIsNewFlowSheetOpen(true) : undefined}
+                onNew={permissions.canCreate ? () => setIsNewFlowSheetOpen(true) : undefined}
                 onApiKeySettings={() => {
                     if (!useWebCoreStore.getState().apiKey && redirectToLogin()) return;
                     setIsApiKeyDialogOpen(true);
@@ -488,7 +511,7 @@ export const MobileFlowEditorPage = () => {
             {/* Dev Role Toggle (hidden in production unless debug mode) */}
             {showDevTools && (
                 <div className="fixed top-16 right-2 z-50 flex gap-0.5 bg-background/90 backdrop-blur border border-border rounded-lg p-0.5 text-[10px] font-mono">
-                    {(['owner', 'guest', 'anonymous'] as FlowRole[]).map(r => (
+                    {(['owner', 'editor', 'viewer', 'anonymous'] as FlowRole[]).map(r => (
                         <button
                             key={r}
                             onClick={() => setDevRoleOverride(r === computedRole ? null : r)}

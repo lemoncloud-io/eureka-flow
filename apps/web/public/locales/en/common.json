@@ -1,4 +1,38 @@
 {
+    "credits": {
+        "charge": "Buy credits",
+        "balance": "Balance",
+        "detailTitle": "Credit details",
+        "totalHeld": "Total credits",
+        "buy": "Buy credits",
+        "usageHistory": "Usage history",
+        "paymentHistory": "Payment history",
+        "usageTitle": "Credit usage",
+        "available": "Available",
+        "held": "On hold",
+        "expireWithin": "Within {{days}} days",
+        "empty": "No usage yet",
+        "loadError": "Couldn't load credits",
+        "loadMore": "Load more",
+        "filter": {
+            "all": "All",
+            "use": "Use",
+            "purchase": "Purchase",
+            "gain": "Earn",
+            "cancel": "Cancelled"
+        },
+        "reason": {
+            "flow_run": "Flow run",
+            "admin_grant": "Admin grant",
+            "signup_bonus": "Signup bonus"
+        },
+        "stereo": {
+            "use": "Used",
+            "purchase": "Purchase",
+            "gain": "Earned",
+            "cancel": "Canceled"
+        }
+    },
     "actions": {
         "save": "Save",
         "cancel": "Cancel",
