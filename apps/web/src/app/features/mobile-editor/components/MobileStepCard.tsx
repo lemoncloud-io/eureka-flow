@@ -78,7 +78,7 @@ export const MobileStepCard = React.memo(
     ({ node, displayName, onTapCard, onExpandContent, onRun, onDelete, role = 'owner' }: MobileStepCardProps) => {
         const { t } = useTranslation(['flows']);
         const blockRegistry = useBlockRegistry();
-        const { canEdit, canRun } = useMemo(() => getPermissions(role), [role]);
+        const { canEditStructure, canRun } = useMemo(() => getPermissions(role), [role]);
         const blockDef = blockRegistry[node.type];
         const state = (node.state ?? 'IDLE') as NodeState;
         const stereo = blockDef?.stereo ?? 'process';
@@ -224,7 +224,7 @@ export const MobileStepCard = React.memo(
                                     {t('mobile.run', 'Run')}
                                 </DropdownMenuItem>
                             )}
-                            {canEdit && onDelete && (
+                            {canEditStructure && onDelete && (
                                 <DropdownMenuItem
                                     onSelect={handleDeleteSelect}
                                     className={cn(

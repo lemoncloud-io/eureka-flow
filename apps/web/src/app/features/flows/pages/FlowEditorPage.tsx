@@ -5,7 +5,15 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { FLOW_FORBIDDEN, getPermissions, getProfile, useBlocks, useFlows, useProductProgressStore } from '@flows/flows';
+import {
+    FLOW_FORBIDDEN,
+    deriveRole,
+    getPermissions,
+    getProfile,
+    useBlocks,
+    useFlows,
+    useProductProgressStore,
+} from '@flows/flows';
 import { ApiKeyDialog, useCreditsRefresh } from '@flows/shared';
 import { useInitFlowSocket } from '@flows/socket';
 import { Button } from '@flows/ui-kit';
@@ -47,7 +55,7 @@ const isInputElement = (target: EventTarget | null): boolean => {
     return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
 };
 
-const DEV_ROLES: FlowRole[] = ['owner', 'guest', 'anonymous'];
+const DEV_ROLES: FlowRole[] = ['owner', 'editor', 'viewer', 'anonymous'];
 
 const DevRoleToggle: React.FC<{
     role: FlowRole;
@@ -160,6 +168,7 @@ export const FlowEditorPage = () => {
         updateFlowName,
         isPublic,
         isEditable,
+        isOwner,
         flowThumbnail,
         togglePublic,
         publishFlow,
@@ -252,8 +261,8 @@ export const FlowEditorPage = () => {
     // Public mode: read-only viewing when no API key and viewing an existing flow
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
 
-    // Role derivation: owner (isEditable) / guest (has apiKey but !isEditable) / anonymous (no apiKey)
-    const computedRole: FlowRole = isPublicMode ? 'anonymous' : isEditable ? 'owner' : 'guest';
+    // Role derivation: anonymous (no apiKey) / owner (isOwner) / editor (isEditable, not owner) / viewer (signed-in, not editable)
+    const computedRole: FlowRole = deriveRole({ isPublicMode, isOwner, isEditable });
 
     // Dev-only role override for testing
     const [devRoleOverride, setDevRoleOverride] = useState<FlowRole | null>(null);

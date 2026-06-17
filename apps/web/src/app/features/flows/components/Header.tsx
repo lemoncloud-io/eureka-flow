@@ -356,7 +356,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
-    const { canEdit, canRun, canCreate } = getPermissions(role);
+    const { canEditStructure, canSave, canRun, canCreate } = getPermissions(role);
 
     const getSaveButtonVariant = (): 'default' | 'success' | 'warning' | 'error' => {
         if (saveState.saveStatus === 'saving') return 'warning';
@@ -409,14 +409,21 @@ export const Header: React.FC<HeaderProps> = ({
                                 </Badge>
                             </RouterLink>
                             <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
-                            {!canEdit ? (
-                                <span className="text-xs sm:text-sm text-foreground truncate max-w-[120px] sm:max-w-[200px]">
+                            {!canEditStructure ? (
+                                <span
+                                    className="text-xs sm:text-sm text-foreground truncate max-w-[120px] sm:max-w-[200px]"
+                                    title={
+                                        !isPublicMode
+                                            ? t('header.ownerOnlyRename', 'Only the owner can rename this flow')
+                                            : undefined
+                                    }
+                                >
                                     {flowInfo.flowName}
                                 </span>
                             ) : (
                                 <FlowNameInput {...flowInfo} />
                             )}
-                            {canEdit && (
+                            {canSave && (
                                 <span className="hidden md:inline">
                                     <SaveStatusBadge
                                         saveStatus={saveState.saveStatus}
@@ -433,14 +440,22 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.runAll')}
                                 </button>
                             )}
-                            {isPublicMode && (
+                            {(role === 'viewer' || role === 'anonymous') && (
                                 <Badge variant="secondary" size="sm" className="text-[10px]">
                                     {t('header.viewOnly', 'View Only')}
                                 </Badge>
                             )}
-                            {role === 'guest' && !isPublicMode && (
-                                <Badge variant="secondary" size="sm" className="text-[10px]">
-                                    {t('header.guestMode', 'Guest')}
+                            {role === 'editor' && (
+                                <Badge
+                                    variant="secondary"
+                                    size="sm"
+                                    className="text-[10px]"
+                                    title={t(
+                                        'header.editorModeHint',
+                                        'You can edit settings and run; only the owner can change structure'
+                                    )}
+                                >
+                                    {t('header.editorMode', 'Editor')}
                                 </Badge>
                             )}
                         </div>
@@ -467,7 +482,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 shortcut="⌘O"
                             />
                         )}
-                        {canEdit && (
+                        {canSave && (
                             <ToolbarButton
                                 onClick={editActions.onSave}
                                 icon={<Save className="w-4 h-4" />}
@@ -476,7 +491,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 variant={getSaveButtonVariant()}
                             />
                         )}
-                        {canEdit && (
+                        {canEditStructure && (
                             <>
                                 <ToolbarButton
                                     onClick={editActions.onUndo}
@@ -522,7 +537,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
                                 </DropdownMenuItem>
                             )}
-                            {canEdit && (
+                            {canSave && (
                                 <DropdownMenuItem onClick={fileActions.onSave}>
                                     <Save className="w-4 h-4 mr-2" />
                                     {t('header.saveFlow')}
@@ -548,7 +563,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuSeparator />
 
                             {/* Edit actions - visible on mobile, owner only */}
-                            {canEdit && (
+                            {canEditStructure && (
                                 <div className="sm:hidden">
                                     <DropdownMenuItem onClick={editActions.onUndo}>
                                         <Undo2 className="w-4 h-4 mr-2" />
@@ -568,7 +583,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.canvas')}
                             </DropdownMenuLabel>
-                            {canEdit && (
+                            {canEditStructure && (
                                 <DropdownMenuItem onClick={editActions.onAutoLayout}>
                                     <LayoutGrid className="w-4 h-4 mr-2" />
                                     {t('header.autoLayout')}
@@ -587,7 +602,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.expandAll')}
                                 </DropdownMenuItem>
                             )}
-                            {canEdit && (
+                            {canEditStructure && (
                                 <DropdownMenuItem onClick={editActions.onClear} className="text-destructive">
                                     <Trash2 className="w-4 h-4 mr-2" />
                                     {t('header.clearCanvas')}
@@ -597,7 +612,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuSeparator />
 
                             {/* Share Group */}
-                            {canEdit && (onTogglePublic || onPublish) && (
+                            {canEditStructure && (onTogglePublic || onPublish) && (
                                 <>
                                     <DropdownMenuLabel className="flex items-center justify-between text-xs text-muted-foreground font-normal">
                                         {t('header.menuGroup.share')}
@@ -633,7 +648,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.settings')}
                             </DropdownMenuLabel>
-                            {canEdit && (
+                            {canSave && (
                                 <div className="flex items-center justify-between px-2 py-1.5">
                                     <span className="text-sm">{t('header.autoSave')}</span>
                                     <button

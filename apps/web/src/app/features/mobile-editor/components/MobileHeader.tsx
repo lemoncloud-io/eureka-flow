@@ -91,7 +91,7 @@ export const MobileHeader = ({
     onDisableDebugMode,
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
-    const { canEdit, canRun } = getPermissions(role);
+    const { canEditStructure, canSave, canRun } = getPermissions(role);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(flowName);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -138,7 +138,7 @@ export const MobileHeader = ({
                     />
                 ) : (
                     <div className="flex items-center gap-1 min-w-0">
-                        {canEdit ? (
+                        {canEditStructure ? (
                             <button
                                 onClick={handleStartEditing}
                                 className="truncate text-base font-bold text-foreground leading-tight"
@@ -161,8 +161,19 @@ export const MobileHeader = ({
                     </div>
                 )}
 
-                {/* View-only badge for non-owner roles */}
-                {!canEdit && (
+                {/* Role badge: Editor (config + run) vs View only (viewer/anonymous) */}
+                {role === 'editor' && (
+                    <span
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0"
+                        title={t(
+                            'mobile.editorModeHint',
+                            'You can edit settings and run; only the owner can change structure'
+                        )}
+                    >
+                        {t('mobile.editorMode', 'Editor')}
+                    </span>
+                )}
+                {(role === 'viewer' || role === 'anonymous') && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
                         {t('mobile.viewOnly', 'View only')}
                     </span>
@@ -185,7 +196,7 @@ export const MobileHeader = ({
                     </button>
                 )}
                 {/* Save */}
-                {canEdit && (
+                {canSave && (
                     <button
                         onClick={onSave}
                         disabled={isSaving}
@@ -252,7 +263,7 @@ export const MobileHeader = ({
                         <FolderOpen className="w-4 h-4" />
                         {t('header.openFlow', 'Open Flow')}
                     </DropdownMenuItem>
-                    {canEdit && (
+                    {canSave && (
                         <DropdownMenuItem onClick={onSave} className="gap-2">
                             <Save className="w-4 h-4" />
                             {t('header.saveFlow', 'Save Flow')}

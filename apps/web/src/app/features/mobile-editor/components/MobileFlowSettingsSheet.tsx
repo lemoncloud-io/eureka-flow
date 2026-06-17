@@ -39,7 +39,7 @@ export const MobileFlowSettingsSheet = ({ open, onOpenChange, role }: MobileFlow
     const updateFlowMutation = useUpdateFlowMutation();
     const deleteFlowMutation = useDeleteFlowMutation();
 
-    const { canEdit } = getPermissions(role);
+    const { canEditStructure } = getPermissions(role);
     const [name, setName] = useState(flowName);
     const [description, setDescription] = useState(flowDescription ?? '');
     const [thumbnail, setThumbnail] = useState<string | null>(flowThumbnail ?? null);
@@ -135,7 +135,7 @@ export const MobileFlowSettingsSheet = ({ open, onOpenChange, role }: MobileFlow
                                     onChange={e => setName(e.target.value)}
                                     placeholder="Untitled Flow"
                                     className="h-10 text-sm"
-                                    disabled={!canEdit}
+                                    disabled={!canEditStructure}
                                 />
                                 <p className="text-[11px] text-muted-foreground/50 mt-1.5">
                                     {t(
@@ -158,7 +158,7 @@ export const MobileFlowSettingsSheet = ({ open, onOpenChange, role }: MobileFlow
                                     )}
                                     rows={3}
                                     className="text-sm resize-none"
-                                    disabled={!canEdit}
+                                    disabled={!canEditStructure}
                                 />
                             </div>
 
@@ -172,12 +172,12 @@ export const MobileFlowSettingsSheet = ({ open, onOpenChange, role }: MobileFlow
                                     className="hidden"
                                     id="flow-settings-image"
                                     onChange={handleImageSelect}
-                                    disabled={!canEdit}
+                                    disabled={!canEditStructure}
                                 />
                                 {thumbnail ? (
                                     <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-border/60">
                                         <img src={thumbnail} alt="" className="w-full h-full object-cover" />
-                                        {canEdit && (
+                                        {canEditStructure && (
                                             <button
                                                 type="button"
                                                 onClick={() => setThumbnail(null)}
@@ -194,7 +194,7 @@ export const MobileFlowSettingsSheet = ({ open, onOpenChange, role }: MobileFlow
                                             'w-20 h-20 rounded-xl border border-dashed border-border/60',
                                             'flex flex-col items-center justify-center gap-1',
                                             'text-muted-foreground/40 transition-colors',
-                                            canEdit
+                                            canEditStructure
                                                 ? 'cursor-pointer hover:border-primary/30 hover:text-primary/40'
                                                 : 'opacity-50'
                                         )}
@@ -204,7 +204,7 @@ export const MobileFlowSettingsSheet = ({ open, onOpenChange, role }: MobileFlow
                                 )}
                             </div>
 
-                            {canEdit && (
+                            {canEditStructure && (
                                 <button
                                     type="button"
                                     onClick={() => setShowDeleteConfirm(true)}
@@ -218,7 +218,7 @@ export const MobileFlowSettingsSheet = ({ open, onOpenChange, role }: MobileFlow
                                 </button>
                             )}
 
-                            {canEdit && (
+                            {canEditStructure && (
                                 <button
                                     onClick={handleSave}
                                     disabled={isSaving}

@@ -53,6 +53,8 @@ export const useFlows = () => {
         setIsPublic,
         isEditable,
         setIsEditable,
+        isOwner,
+        setIsOwner,
         flowThumbnail,
         setFlowThumbnail,
     } = useFlowsStore();
@@ -106,7 +108,8 @@ export const useFlows = () => {
                     setChannelId(flowData.channelId);
                 }
                 setIsPublic(!!flowData.isPublic);
-                setIsEditable(flowData.isEditable ?? true);
+                setIsEditable(flowData.isEditable ?? false);
+                setIsOwner(flowData.isOwner ?? false);
                 setFlowThumbnail(flowData.thumbnail ?? '');
                 return { flowId: savedFlowId, flowData, isNew: false };
             } catch (err) {
@@ -130,6 +133,7 @@ export const useFlows = () => {
         setFlowDescription('');
         setIsPublic(false);
         setIsEditable(true);
+        setIsOwner(true);
         setFlowThumbnail('');
         return { flowId: newFlowId, flowData: null, isNew: true };
     }, [
@@ -140,6 +144,7 @@ export const useFlows = () => {
         setChannelId,
         setIsPublic,
         setIsEditable,
+        setIsOwner,
         setFlowThumbnail,
     ]);
 
@@ -181,7 +186,8 @@ export const useFlows = () => {
                     setChannelId(flowData.channelId);
                 }
                 setIsPublic(!!flowData.isPublic);
-                setIsEditable(flowData.isEditable ?? true);
+                setIsEditable(flowData.isEditable ?? false);
+                setIsOwner(flowData.isOwner ?? false);
                 setFlowThumbnail(flowData.thumbnail ?? '');
                 return flowData;
             } catch (err) {
@@ -318,6 +324,7 @@ export const useFlows = () => {
                 setChannelId(null);
                 setIsPublic(false);
                 setIsEditable(true);
+                setIsOwner(true);
                 setFlowThumbnail('');
                 return newFlowId;
             }
@@ -335,6 +342,7 @@ export const useFlows = () => {
         setChannelId,
         setIsPublic,
         setIsEditable,
+        setIsOwner,
         setFlowThumbnail,
     ]);
 
@@ -474,6 +482,7 @@ export const useFlows = () => {
         // Actions - Publish
         isPublic,
         isEditable,
+        isOwner,
         flowThumbnail,
         togglePublic,
         publishFlow,

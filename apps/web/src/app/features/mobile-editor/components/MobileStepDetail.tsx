@@ -61,7 +61,7 @@ export const MobileStepDetail = ({
     const {
         node,
         blockDef,
-        canEdit,
+        canEditStructure,
         canRun,
         customLabel,
         configFields,
@@ -73,9 +73,14 @@ export const MobileStepDetail = ({
     const handleRun = useCallback(
         async (options?: { propagate?: boolean }) => {
             if (!canRun || !nodeId) return;
-            await executeNodeWithToast(nodeId, { flowId, socketConnectionId, canEdit, propagate: options?.propagate });
+            await executeNodeWithToast(nodeId, {
+                flowId,
+                socketConnectionId,
+                canEdit: canEditStructure,
+                propagate: options?.propagate,
+            });
         },
-        [canRun, canEdit, nodeId, flowId, socketConnectionId]
+        [canRun, canEditStructure, nodeId, flowId, socketConnectionId]
     );
     const isRunning = (node?.state as string) === 'RUNNING';
 
@@ -102,7 +107,7 @@ export const MobileStepDetail = ({
 
     const stereoLabel = t(STEREO_I18N_KEY[stereo] ?? '', STEREO_FALLBACK_LABEL[stereo] ?? stereo);
     const handleDelete = () => {
-        if (!canEdit || !nodeId) return;
+        if (!canEditStructure || !nodeId) return;
         if (!confirmingDelete) {
             setConfirmingDelete(true);
             return;
@@ -165,7 +170,7 @@ export const MobileStepDetail = ({
                                         onChange={e => handleCustomLabelChange(e.target.value)}
                                         placeholder={blockDef.label}
                                         className="h-9 text-sm"
-                                        disabled={!canEdit}
+                                        disabled={!canEditStructure}
                                     />
                                 </div>
                             </div>
@@ -182,7 +187,11 @@ export const MobileStepDetail = ({
                             <div className="flex items-center justify-between">
                                 <Label className="text-sm font-medium">{t('mobile.autoExecution', '자동 실행')}</Label>
                                 <div className="flex items-center gap-1.5">
-                                    <Switch checked={isAuto} onCheckedChange={handleToggleAuto} disabled={!canEdit} />
+                                    <Switch
+                                        checked={isAuto}
+                                        onCheckedChange={handleToggleAuto}
+                                        disabled={!canEditStructure}
+                                    />
                                 </div>
                             </div>
 
@@ -217,14 +226,14 @@ export const MobileStepDetail = ({
                                 node={node}
                                 blockDef={blockDef}
                                 allConnections={allConnections}
-                                canEdit={canEdit}
+                                canEdit={canEditStructure}
                                 onOpenOutputConnection={onOpenOutputConnection}
                                 onOpenInputConnection={onOpenInputConnection}
                                 t={t}
                             />
 
                             {/* Delete — 2-stage confirm */}
-                            {canEdit && (
+                            {canEditStructure && (
                                 <div className="pt-4 border-t border-border">
                                     <button
                                         onClick={handleDelete}

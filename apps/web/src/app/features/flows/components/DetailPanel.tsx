@@ -27,6 +27,7 @@ import {
     downloadImage,
     getEffectiveState,
     getNodeHeight,
+    getPermissions,
     isAiBlock,
     isMissingAiKey,
     processImageWithConfig,
@@ -516,9 +517,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     const blockRegistry = useBlockRegistry();
     const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
     const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
-    const canEdit = role === 'owner';
-    const canRun = role !== 'anonymous';
-    const isInputNode = selectedNode?.type?.startsWith('input-') ?? false;
+    const { canEditConfig, canEditStructure, canRun } = getPermissions(role);
     const [isTouchDialogOpen, setIsTouchDialogOpen] = useState(false);
     const [touchPortId, setTouchPortId] = useState<string | null>(null);
     const [previewContent, setPreviewContent] = useState<{ value: unknown; type?: string } | null>(null);
@@ -631,8 +630,8 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
     const renderConfigInput = (node: NodeData, field: ConfigField, definition: BlockDefinition) => {
         const value = node.config?.[field.key] ?? definition.defaultConfig[field.key];
-        // Guest can edit input node values locally (not persisted)
-        const isDisabled = !canEdit && !(role === 'guest' && isInputNode);
+        // Owner + Editor edit node config (Editor's change persists via session overlay)
+        const isDisabled = !canEditConfig;
 
         const handleChange = (val: unknown) => {
             if (isDisabled) return;
@@ -815,7 +814,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 type="text"
                                 value={selectedNode.customLabel || def.label}
                                 onChange={e => onLabelChange(selectedNode.id, e.target.value)}
-                                disabled={!canEdit}
+                                disabled={!canEditStructure}
                                 className="bg-transparent font-semibold text-sm text-foreground focus:bg-muted/30 outline-none rounded px-1.5 py-0.5 -ml-1 flex-1 min-w-0 border border-transparent focus:border-primary/40 transition-colors disabled:opacity-60 disabled:cursor-default"
                                 placeholder={t('flows:detailPanel.nodeLabel')}
                             />
@@ -903,7 +902,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             className="w-full bg-background/60 border border-border/50 rounded-md p-2 text-xs text-foreground focus:border-primary/50 outline-none resize-none h-14 transition-colors mt-2 disabled:opacity-60 disabled:cursor-default"
                             value={selectedNode.description || ''}
                             onChange={e => onDescriptionChange(selectedNode.id, e.target.value)}
-                            disabled={!canEdit}
+                            disabled={!canEditStructure}
                             placeholder={t('flows:detailPanel.descriptionPlaceholder')}
                         />
                     </CollapsibleSection>
@@ -920,7 +919,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             </span>
                             <button
                                 onClick={() => onToggleAuto(selectedNode.id)}
-                                disabled={!canEdit}
+                                disabled={!canEditStructure}
                                 className="flex items-center gap-2 disabled:opacity-60 disabled:cursor-default"
                                 title={
                                     isAuto
@@ -1162,7 +1161,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 <Wrench className="w-3.5 h-3.5" />
                             </button>
                         )}
-                        {canEdit && (
+                        {canEditStructure && (
                             <button
                                 onClick={() => onDeleteNode(selectedNode.id)}
                                 className={cn(
@@ -1311,7 +1310,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             <Wrench className="w-3.5 h-3.5" />
                         </button>
                     )}
-                    {canEdit && (
+                    {canEditStructure && (
                         <button
                             onClick={() => onDeleteConnection(selectedConnection.id)}
                             className="flex-1 bg-destructive/10 border border-destructive/30 hover:bg-destructive/20 text-destructive text-xs py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"

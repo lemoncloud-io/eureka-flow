@@ -37,7 +37,8 @@
         "editPublishInfo": "Edit publish info",
         "unpublish": "Unpublish",
         "viewOnly": "View Only",
-        "guestMode": "Guest",
+        "editorMode": "Editor",
+        "editorModeHint": "You can edit settings and run; only the owner can change structure",
         "apiKeySettings": "API Key Settings",
         "guidedTour": "Guided Tour",
         "replayTutorial": "Replay Tutorial",
@@ -500,6 +501,12 @@
         "fitToView": "Fit to View",
         "goToNode": "Go to node"
     },
+    "permissions": {
+        "ownerOnlyRename": "Only the owner can rename this flow",
+        "ownerOnly": "Owner only",
+        "signInToEdit": "Sign in to edit",
+        "deniedToast": "This action is allowed for the owner only"
+    },
     "mobile": {
         "addNode": "Add Node",
         "addFirstStep": "Add your first step",
@@ -554,6 +561,8 @@
         "noSearchResults": "No matching nodes",
         "imageOutput": "Image",
         "viewOnly": "View only",
+        "editorMode": "Editor",
+        "editorModeHint": "You can edit settings and run; only the owner can change structure",
         "flowSettings": {
             "menuLabel": "Flow Settings",
             "title": "Flow Settings",
