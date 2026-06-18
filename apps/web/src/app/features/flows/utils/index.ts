@@ -1,3 +1,5 @@
+import { TEMP_ID_PREFIXES, generateTempId, isTempId } from '@flows/flows';
+
 import type { Connection, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
 import type { Dispatch, SetStateAction } from 'react';
 
@@ -141,16 +143,9 @@ export const deduplicateEdges = (edges: Connection[]): Connection[] => {
  */
 export const generateId = (): string => Math.random().toString(36).slice(2, 11);
 
-export const TEMP_ID_PREFIXES = ['temp_', 'edge_', 'node_'] as const;
-export const TEMP_ID_PREFIX = 'temp_';
-
-export const generateTempId = (prefix: 'temp' | 'edge' | 'node' = 'temp'): string =>
-    `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-
-export const isTempId = (id: string | undefined): boolean => {
-    if (!id) return false;
-    return TEMP_ID_PREFIXES.some(prefix => id.startsWith(prefix));
-};
+// Temp-ID utilities now live in @flows/flows (single source of truth shared with the
+// lib sync hooks). Re-exported here so existing imports from this barrel keep working.
+export { generateTempId, isTempId, TEMP_ID_PREFIXES };
 
 /**
  * Calculate bezier curve path for connection lines

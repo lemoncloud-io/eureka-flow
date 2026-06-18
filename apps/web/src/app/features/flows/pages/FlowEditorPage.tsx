@@ -168,7 +168,7 @@ export const FlowEditorPage = () => {
         updateFlowName,
         isPublic,
         isEditable,
-        isOwner,
+        hasOwned,
         flowThumbnail,
         togglePublic,
         publishFlow,
@@ -261,8 +261,8 @@ export const FlowEditorPage = () => {
     // Public mode: read-only viewing when no API key and viewing an existing flow
     const isPublicMode = !apiKey && window.location.pathname.startsWith('/flows/');
 
-    // Role derivation: anonymous (no apiKey) / owner (isOwner) / editor (isEditable, not owner) / viewer (signed-in, not editable)
-    const computedRole: FlowRole = deriveRole({ isPublicMode, isOwner, isEditable });
+    // Role derivation: anonymous (no apiKey) / owner (hasOwned) / editor (isEditable, not owner) / viewer (signed-in, not editable)
+    const computedRole: FlowRole = deriveRole({ isPublicMode, hasOwned, isEditable });
 
     // Dev-only role override for testing
     const [devRoleOverride, setDevRoleOverride] = useState<FlowRole | null>(null);
