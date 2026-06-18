@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-06-18] - root@0.54.1, @flows/web@0.54.1, @flows/admin@0.30.1
+
+### Bug Fixes
+
+- (permissions) rename isOwner -> hasOwned to match server /load contract
+- (flows) detect node_/edge_ temp IDs to prevent 404 on node save
+
 ## [2026-06-17] - root@0.54.0, @flows/web@0.54.0, @flows/admin@0.30.0
 
 ### Features
