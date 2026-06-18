@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 
+import { isTempId } from '../utils';
 import { useCreateNodeMutation, useUpsertNodeMutation } from './queries/useNodesQuery';
 
 import type { NodeView } from '../types';
@@ -7,10 +8,6 @@ import type { NodeView } from '../types';
 const DEBOUNCE_MS = 500;
 const FLUSH_MAX_WAIT_MS = 5000;
 const FLUSH_POLL_INTERVAL_MS = 50;
-const TEMP_ID_PREFIX = 'temp_';
-
-/** Check if an ID is a temporary ID (not yet assigned by server) */
-const isTempId = (id: string): boolean => id.startsWith(TEMP_ID_PREFIX);
 
 /** Callback invoked when server assigns a real ID to replace temp ID */
 export type OnNodeIdAssigned = (tempId: string, serverId: string) => void;
