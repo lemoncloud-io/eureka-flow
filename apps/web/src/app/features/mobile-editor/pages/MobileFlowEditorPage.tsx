@@ -68,7 +68,7 @@ export const MobileFlowEditorPage = () => {
         saveStatus,
         updateFlowName,
         isEditable,
-        isOwner,
+        hasOwned,
         saveCurrentFlow,
     } = useFlows();
     const { apiKey } = useWebCoreStore();
@@ -78,8 +78,8 @@ export const MobileFlowEditorPage = () => {
     const { isDebugMode, handleVersionClick, disableDebugMode } = useDebugMode();
     const showDevTools = isDebugMode;
 
-    // Role derivation: anonymous (no apiKey) / owner (isOwner) / editor (isEditable, not owner) / viewer
-    const computedRole: FlowRole = deriveRole({ isPublicMode, isOwner, isEditable });
+    // Role derivation: anonymous (no apiKey) / owner (hasOwned) / editor (isEditable, not owner) / viewer
+    const computedRole: FlowRole = deriveRole({ isPublicMode, hasOwned, isEditable });
     const [devRoleOverride, setDevRoleOverride] = useState<FlowRole | null>(null);
     const role: FlowRole = devRoleOverride ?? computedRole;
     const permissions = getPermissions(role);

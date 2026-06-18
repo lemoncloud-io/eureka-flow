@@ -19,7 +19,7 @@ Glossary of domain terms. No implementation details. Update as terms are resolve
 
 ## Access model
 
-Server (`eureka-flows-api`) is the source of truth; the client mirrors it via two booleans on `/load` (`isOwner`, `isEditable`).
+Server (`eureka-flows-api`) is the source of truth; the client mirrors it via two booleans on `/load` (`hasOwned`, `isEditable`).
 
 - **Owner** — The user who created a flow; server-checked as identity match on both **Workspace** and user (`sid` + `uid`). Only role allowed to make a **Structural edit** or change flow metadata (rename/publish). _Avoid_: creator, author.
 - **Editor** — A user who shares the flow's **Workspace** but is not the Owner. Has _edit permission_ (**Config edit** of any node) but **not** ownership; cannot make Structural edits. _Avoid_: collaborator, member.

@@ -1,7 +1,7 @@
 /**
  * Flow Role & Permission System
  *
- * Four user roles, derived from the server's two booleans (`isOwner`, `isEditable`)
+ * Four user roles, derived from the server's two booleans (`hasOwned`, `isEditable`)
  * plus apiKey presence (public mode):
  * - Owner: created the flow (sid+uid match). Structural edits, config, metadata, run.
  * - Editor: same workspace (sid), not owner. Config edit (saved to a per-user session
@@ -69,19 +69,19 @@ export const getPermissions = (role: FlowRole): FlowPermissions => ROLE_PERMISSI
 /**
  * Derive the flow role from access facts.
  * - Public mode (no apiKey, viewing a flow) ⇒ anonymous, regardless of server flags.
- * - Otherwise: owner (isOwner) → editor (isEditable) → viewer.
+ * - Otherwise: owner (hasOwned) → editor (isEditable) → viewer.
  */
 export const deriveRole = ({
     isPublicMode,
-    isOwner,
+    hasOwned,
     isEditable,
 }: {
     isPublicMode: boolean;
-    isOwner: boolean;
+    hasOwned: boolean;
     isEditable: boolean;
 }): FlowRole => {
     if (isPublicMode) return 'anonymous';
-    if (isOwner) return 'owner';
+    if (hasOwned) return 'owner';
     if (isEditable) return 'editor';
     return 'viewer';
 };

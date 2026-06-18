@@ -6,20 +6,20 @@ import type { FlowRole } from './permissions';
 
 describe('deriveRole', () => {
     it('is anonymous in public mode regardless of server flags', () => {
-        expect(deriveRole({ isPublicMode: true, isOwner: true, isEditable: true })).toBe('anonymous');
-        expect(deriveRole({ isPublicMode: true, isOwner: false, isEditable: false })).toBe('anonymous');
+        expect(deriveRole({ isPublicMode: true, hasOwned: true, isEditable: true })).toBe('anonymous');
+        expect(deriveRole({ isPublicMode: true, hasOwned: false, isEditable: false })).toBe('anonymous');
     });
 
-    it('is owner when isOwner', () => {
-        expect(deriveRole({ isPublicMode: false, isOwner: true, isEditable: true })).toBe('owner');
+    it('is owner when hasOwned', () => {
+        expect(deriveRole({ isPublicMode: false, hasOwned: true, isEditable: true })).toBe('owner');
     });
 
     it('is editor when editable but not owner', () => {
-        expect(deriveRole({ isPublicMode: false, isOwner: false, isEditable: true })).toBe('editor');
+        expect(deriveRole({ isPublicMode: false, hasOwned: false, isEditable: true })).toBe('editor');
     });
 
     it('is viewer when signed-in but not editable', () => {
-        expect(deriveRole({ isPublicMode: false, isOwner: false, isEditable: false })).toBe('viewer');
+        expect(deriveRole({ isPublicMode: false, hasOwned: false, isEditable: false })).toBe('viewer');
     });
 });
 
