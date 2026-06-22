@@ -10,6 +10,7 @@ import {
     deriveRole,
     getPermissions,
     getProfile,
+    toAiKeyStatus,
     useBlocks,
     useFlows,
     useProductProgressStore,
@@ -342,10 +343,7 @@ export const FlowEditorPage = () => {
                 getProfile()
                     .then(data => {
                         const store = useWebCoreStore.getState();
-                        store.setAiKeyStatus({
-                            hasGeminiKey: !!data.geminiApiKey,
-                            hasOpenaiKey: !!data.openaiApiKey,
-                        });
+                        store.setAiKeyStatus(toAiKeyStatus(data));
                         store.addApiKey(currentApiKey);
                         store.updateKeyProfile(currentApiKey, { sid: data.sid, uid: data.uid });
                     })

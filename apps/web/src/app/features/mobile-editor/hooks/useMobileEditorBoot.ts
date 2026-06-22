@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FLOW_FORBIDDEN, getProfile, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { FLOW_FORBIDDEN, getProfile, toAiKeyStatus, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 
 import type { SerializeWorkflowFn } from './types';
@@ -69,10 +69,7 @@ export const useMobileEditorBoot = ({
                 getProfile()
                     .then(data => {
                         const store = useWebCoreStore.getState();
-                        store.setAiKeyStatus({
-                            hasGeminiKey: !!data.geminiApiKey,
-                            hasOpenaiKey: !!data.openaiApiKey,
-                        });
+                        store.setAiKeyStatus(toAiKeyStatus(data));
                         store.addApiKey(currentApiKey);
                         store.updateKeyProfile(currentApiKey, { sid: data.sid, uid: data.uid });
                     })

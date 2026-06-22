@@ -34,6 +34,8 @@ export interface WebCoreState {
     apiKeys: StoredApiKey[];
     hasGeminiKey: boolean;
     hasOpenaiKey: boolean;
+    /** Workspace has ≥1 AI API key configured (server-authoritative). Source: GET /flows/0/profile. */
+    useApiKey: boolean;
 }
 
 export interface WebCoreStore extends WebCoreState {
@@ -43,7 +45,7 @@ export interface WebCoreStore extends WebCoreState {
     setProfile: (profile: UserProfile) => void;
     updateProfile: (user: UserView) => void;
     registerLogoutCallback: (callback: () => void) => () => void;
-    setAiKeyStatus: (status: { hasGeminiKey: boolean; hasOpenaiKey: boolean }) => void;
+    setAiKeyStatus: (status: { hasGeminiKey: boolean; hasOpenaiKey: boolean; useApiKey: boolean }) => void;
     setApiKey: (key: string) => void;
     clearApiKey: () => void;
     addApiKey: (key: string, options?: { label?: string; profile?: ApiKeyProfile }) => void;
@@ -64,6 +66,7 @@ const initialState: WebCoreState = {
     apiKeys: getStoredApiKeys(),
     hasGeminiKey: false,
     hasOpenaiKey: false,
+    useApiKey: false,
 };
 
 export const useWebCoreStore = create<WebCoreStore>()(set => {
@@ -110,6 +113,7 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
                 apiKey: null,
                 hasGeminiKey: false,
                 hasOpenaiKey: false,
+                useApiKey: false,
             });
 
             if (isOAuthEnabled) {
@@ -144,9 +148,11 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
             };
         },
 
-        setAiKeyStatus: (status: { hasGeminiKey: boolean; hasOpenaiKey: boolean }) =>
+        setAiKeyStatus: (status: { hasGeminiKey: boolean; hasOpenaiKey: boolean; useApiKey: boolean }) =>
             set(state =>
-                state.hasGeminiKey === status.hasGeminiKey && state.hasOpenaiKey === status.hasOpenaiKey
+                state.hasGeminiKey === status.hasGeminiKey &&
+                state.hasOpenaiKey === status.hasOpenaiKey &&
+                state.useApiKey === status.useApiKey
                     ? state
                     : status
             ),
@@ -194,7 +200,7 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
 
         switchApiKey: (key: string) => {
             setStoredApiKey(key);
-            set({ apiKey: key, profile: null, hasGeminiKey: false, hasOpenaiKey: false });
+            set({ apiKey: key, profile: null, hasGeminiKey: false, hasOpenaiKey: false, useApiKey: false });
         },
 
         updateKeyProfile: (key: string, profile: ApiKeyProfile) => {
