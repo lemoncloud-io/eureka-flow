@@ -34,6 +34,7 @@ import {
 } from '@flows/ui-kit';
 
 import { DebugModeToggle } from '../../../components/DebugModeToggle';
+import { RunModeIndicator } from '../../flows/components/RunModeIndicator';
 import { enableDesktopOverride } from '../hooks';
 
 import type { FlowRole, SaveStatus } from '@flows/flows';
@@ -184,6 +185,7 @@ export const MobileHeader = ({
 
             {/* Action buttons group */}
             <div className="flex items-center gap-1 shrink-0">
+                {canRun && <RunModeIndicator compact />}
                 <CreditBalanceChip variant="bare" />
                 {/* Search */}
                 {onToggleSearch && nodeCount > 0 && (

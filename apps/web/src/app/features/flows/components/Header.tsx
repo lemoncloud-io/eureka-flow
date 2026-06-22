@@ -44,6 +44,7 @@ import {
     TooltipTrigger,
 } from '@flows/ui-kit';
 
+import { RunModeIndicator } from './RunModeIndicator';
 import { DebugModeToggle } from '../../../components/DebugModeToggle';
 
 import type { FlowRole, SaveStatus } from '@flows/flows';
@@ -440,6 +441,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.runAll')}
                                 </button>
                             )}
+                            {canRun && <RunModeIndicator />}
                             {(role === 'viewer' || role === 'anonymous') && (
                                 <Badge variant="secondary" size="sm" className="text-[10px]">
                                     {t('header.viewOnly', 'View Only')}

@@ -18,6 +18,7 @@ export * from './ModelSelect';
 export * from './NodeBlock';
 export * from './PublishDialog';
 export * from './RunHistoryPanel';
+export * from './RunModeIndicator';
 export * from './S3Image';
 export * from './Sidebar';
 export * from './ThumbnailPicker';
