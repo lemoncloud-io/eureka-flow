@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, ExternalLink, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { saveAiKey } from '@flows/flows';
+import { saveAiKey, toAiKeyStatus } from '@flows/flows';
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
@@ -60,10 +60,7 @@ export const AiKeyDialog = ({ open, onOpenChange }: AiKeyDialogProps) => {
         setIsSaving(true);
         try {
             const data = await saveAiKey(expandedProvider, keyInput.trim());
-            useWebCoreStore.getState().setAiKeyStatus({
-                hasGeminiKey: !!data.geminiApiKey,
-                hasOpenaiKey: !!data.openaiApiKey,
-            });
+            useWebCoreStore.getState().setAiKeyStatus(toAiKeyStatus(data));
             toast.success(t('aiKey.saveSuccess'));
             resetState();
         } catch {
