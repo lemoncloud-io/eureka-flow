@@ -560,9 +560,6 @@
         "searchNodes": "노드 검색...",
         "noSearchResults": "일치하는 노드 없음",
         "imageOutput": "이미지",
-        "viewOnly": "보기 전용",
-        "editorMode": "편집자",
-        "editorModeHint": "설정 편집과 실행은 가능하지만, 구조 변경은 소유자만 할 수 있어요",
         "flowSettings": {
             "menuLabel": "플로우 설정",
             "title": "플로우 설정",

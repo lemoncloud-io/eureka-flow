@@ -560,9 +560,6 @@
         "searchNodes": "Search nodes...",
         "noSearchResults": "No matching nodes",
         "imageOutput": "Image",
-        "viewOnly": "View only",
-        "editorMode": "Editor",
-        "editorModeHint": "You can edit settings and run; only the owner can change structure",
         "flowSettings": {
             "menuLabel": "Flow Settings",
             "title": "Flow Settings",

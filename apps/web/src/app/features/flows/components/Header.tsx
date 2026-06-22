@@ -26,7 +26,7 @@ import {
 
 import { getPermissions, useSystemInfoQuery } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import { CreditBalanceChip } from '@flows/shared';
+import { BillingChip } from '@flows/shared';
 import {
     Badge,
     DropdownMenu,
@@ -44,7 +44,7 @@ import {
     TooltipTrigger,
 } from '@flows/ui-kit';
 
-import { RunModeIndicator } from './RunModeIndicator';
+import { RoleIndicator } from './RoleIndicator';
 import { DebugModeToggle } from '../../../components/DebugModeToggle';
 
 import type { FlowRole, SaveStatus } from '@flows/flows';
@@ -441,28 +441,10 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.runAll')}
                                 </button>
                             )}
-                            {canRun && <RunModeIndicator />}
-                            {(role === 'viewer' || role === 'anonymous') && (
-                                <Badge variant="secondary" size="sm" className="text-[10px]">
-                                    {t('header.viewOnly', 'View Only')}
-                                </Badge>
-                            )}
-                            {role === 'editor' && (
-                                <Badge
-                                    variant="secondary"
-                                    size="sm"
-                                    className="text-[10px]"
-                                    title={t(
-                                        'header.editorModeHint',
-                                        'You can edit settings and run; only the owner can change structure'
-                                    )}
-                                >
-                                    {t('header.editorMode', 'Editor')}
-                                </Badge>
-                            )}
+                            <RoleIndicator role={role} />
                         </div>
                     </div>
-                    <CreditBalanceChip />
+                    <BillingChip />
                 </div>
 
                 {/* Right: Toolbar */}

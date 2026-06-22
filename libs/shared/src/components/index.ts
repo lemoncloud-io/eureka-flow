@@ -1,5 +1,5 @@
 export * from './ApiKeyDialog';
-export * from './CreditBalanceChip';
+export * from './BillingChip';
 export * from './CreditDetails';
 export * from './CreditFilterTabs';
 export * from './CreditUsageSheet';

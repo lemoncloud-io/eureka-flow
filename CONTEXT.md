@@ -11,6 +11,8 @@ Glossary of domain terms. No implementation details. Update as terms are resolve
 - **Credit** — The account-scoped virtual currency consumed when AI blocks run in flow. Owned at the **account** level (not workspace, not project).
 - **Credit balance** — Total spendable credits for an accountId. Read-only from flow's perspective.
 - **Credit charge (충전)** — The act of buying credits. **Always happens in the billing app, never inside flow.** From flow, "charge" means leaving for billing.
+- **AI key** — A workspace's own LLM provider key (Gemini/OpenAI), configured server-side and surfaced read-only to the client as `useApiKey` (server-authoritative, else "any provider key present"). It is **not** the **flow API key** (the localStorage credential that authenticates the client to flow) — the two are unrelated keys. _Avoid_: "API key" unqualified (collides with the flow auth key), provider token.
+- **Run mode** — Which billing path an AI run takes, decided **server-side**, not a client toggle. **Own AI key** — workspace has an **AI key**, runs use it and **no Credits are charged**; **Credits** — no AI key, runs draw down the **Credit balance**. The client only _surfaces_ the active mode (from `useApiKey`); it never selects it. _Avoid_: BYOK (dev jargon — not user-facing), "key mode".
 
 ## Cross-app
 

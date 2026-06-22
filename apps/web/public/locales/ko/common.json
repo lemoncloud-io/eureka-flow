@@ -33,6 +33,11 @@
             "cancel": "취소"
         }
     },
+    "runMode": {
+        "ownKey": "내 AI 키",
+        "ownKeyHint": "실행에 워크스페이스 AI 키를 사용해요 — 크레딧이 차감되지 않아요",
+        "notCharged": "실행에 내 AI 키를 사용해요 — 크레딧이 차감되지 않아요."
+    },
     "actions": {
         "save": "저장",
         "cancel": "취소",

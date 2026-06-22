@@ -33,6 +33,11 @@
             "cancel": "Canceled"
         }
     },
+    "runMode": {
+        "ownKey": "Own AI key",
+        "ownKeyHint": "Runs use your workspace AI key — no credits charged",
+        "notCharged": "Runs use your AI key — credits not charged."
+    },
     "actions": {
         "save": "Save",
         "cancel": "Cancel",
