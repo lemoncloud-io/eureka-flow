@@ -41,6 +41,9 @@ export const useSocketHandlers = ({
     const portNoRef = useRef<Map<string, number>>(new Map());
     const portRunIdRef = useRef<Map<string, string>>(new Map());
     const highlightTimeoutsRef = useRef<Map<string, number>>(new Map());
+    // Nodes with an in-flight auto-execution. Guards against the propagate echo
+    // re-triggering executeNode for a node already running (React #185 loop).
+    const executingNodesRef = useRef<Set<string>>(new Set());
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
 
     const appendTraceLog = useCanvasStore(state => state.appendTraceLog);
@@ -81,6 +84,7 @@ export const useSocketHandlers = ({
                 const prevRunId = nodeRunIdRef.current.get(nodeId);
                 if (prevRunId && prevRunId !== runId) {
                     nodeNoRef.current.delete(nodeId);
+                    executingNodesRef.current.delete(nodeId);
                     canvasRef.current?.updateNodeFromServer(nodeId, { state: 'IDLE', status: 'IDLE' }, { force: true });
                 }
                 nodeRunIdRef.current.set(nodeId, runId);
@@ -93,6 +97,11 @@ export const useSocketHandlers = ({
             }
 
             if (!canvasRef.current) return;
+
+            // Auto-execution finished: release the re-entrancy guard
+            if (state === 'COMPLETED' || state === 'ERROR') {
+                executingNodesRef.current.delete(nodeId);
+            }
 
             // New execution starting: clear trace logs
             if (state === 'RUNNING' && no !== undefined && no <= 1) {
@@ -173,6 +182,11 @@ export const useSocketHandlers = ({
             const hasAllInputs = (nodeDef.inputs ?? []).every(input => node.inputData?.[input.id]?.value !== undefined);
             if (!hasAllInputs) return;
 
+            // Skip if this node already has an auto-execution in flight. The propagate
+            // echo re-marks the node READY with a fresh runId every cycle; without this
+            // guard executeNode re-fires synchronously and React hits update-depth limit.
+            if (executingNodesRef.current.has(nodeId)) return;
+            executingNodesRef.current.add(nodeId);
             setTimeout(() => canvasRef.current?.executeNode(nodeId), 0);
         },
         [blockRegistry, currentFlowId, clearTraceLogs, beginRun, finalizeRun, canvasRef]
@@ -180,7 +194,7 @@ export const useSocketHandlers = ({
 
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
-            const { portId, nodeId, flowId, portName, no, runId, ts } = info;
+            const { portId, nodeId, flowId, portName, no, runId } = info;
 
             if (flowId && flowId !== currentFlowId) return;
 
@@ -204,8 +218,10 @@ export const useSocketHandlers = ({
 
             if (no !== undefined) {
                 const prevNo = portNoRef.current.get(portId);
-                // ts = server signals fresh data, skip dedup
-                if (!ts && prevNo !== undefined && prevNo >= no) return;
+                // Dedup within a run. portNoRef is cleared on runId change above, so a
+                // genuinely new run still passes. (Previously `ts` bypassed this dedup,
+                // which let propagate echoes re-render unbounded — the React #185 hole.)
+                if (prevNo !== undefined && prevNo >= no) return;
                 portNoRef.current.set(portId, no);
             }
 
@@ -285,6 +301,7 @@ export const useSocketHandlers = ({
         nodeRunIdRef.current.clear();
         portNoRef.current.clear();
         portRunIdRef.current.clear();
+        executingNodesRef.current.clear();
         highlightTimeoutsRef.current.forEach(id => window.clearTimeout(id));
         highlightTimeoutsRef.current.clear();
     }, [currentFlowId]);
@@ -299,6 +316,7 @@ export const useSocketHandlers = ({
         nodeRunIdRef.current.clear();
         portNoRef.current.clear();
         portRunIdRef.current.clear();
+        executingNodesRef.current.clear();
     }, []);
 
     return {
