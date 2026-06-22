@@ -61,6 +61,9 @@ export const useMobileSocketSync = ({
     const portNoRef = useRef<Map<string, number>>(new Map());
     const connectionIdRef = useRef<string | undefined>();
     const pendingAutoExecRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Nodes with an in-flight auto-execution. Guards the propagate echo from
+    // re-triggering executeNode for a node already running (React #185 loop).
+    const executingNodesRef = useRef<Set<string>>(new Set());
 
     const handleFlowUpdate = useCallback(
         async (flowId: string) => {
@@ -88,6 +91,7 @@ export const useMobileSocketSync = ({
                 const prevRunId = nodeRunIdRef.current.get(nodeId);
                 if (prevRunId && prevRunId !== runId) {
                     nodeNoRef.current.delete(nodeId);
+                    executingNodesRef.current.delete(nodeId);
                 }
                 nodeRunIdRef.current.set(nodeId, runId);
             }
@@ -115,6 +119,11 @@ export const useMobileSocketSync = ({
 
             const storeState = useCanvasStore.getState();
             const { updateNodeData, nodes } = storeState;
+
+            // Auto-execution finished: release the re-entrancy guard
+            if (state === 'COMPLETED' || state === 'ERROR') {
+                executingNodesRef.current.delete(nodeId);
+            }
 
             if (state === 'ERROR') {
                 updateNodeData(nodeId, {
@@ -147,6 +156,10 @@ export const useMobileSocketSync = ({
                 );
                 if (!hasAllInputs) return;
 
+                // Skip if this node already has an auto-execution in flight — the
+                // propagate echo re-marks it READY with a fresh runId every cycle.
+                if (executingNodesRef.current.has(nodeId)) return;
+                executingNodesRef.current.add(nodeId);
                 pendingAutoExecRef.current = setTimeout(() => {
                     pendingAutoExecRef.current = null;
                     executeNodeWithToast(nodeId, {
@@ -242,7 +255,12 @@ export const useMobileSocketSync = ({
         [lastLocalUpdateTimestampRef]
     );
 
-    const { isConnected, connectionId, replayMessage } = useInitFlowSocket({
+    // hex connection id — sockets-api routes runNode(?connection=) on this, not raw connectionId
+    const {
+        isConnected,
+        id: connectionId,
+        replayMessage,
+    } = useInitFlowSocket({
         channelId,
         currentFlowId,
         getLastLocalUpdateTimestamp,
@@ -260,6 +278,7 @@ export const useMobileSocketSync = ({
         nodeNoRef.current.clear();
         nodeRunIdRef.current.clear();
         portNoRef.current.clear();
+        executingNodesRef.current.clear();
         if (pendingAutoExecRef.current) {
             clearTimeout(pendingAutoExecRef.current);
             pendingAutoExecRef.current = null;

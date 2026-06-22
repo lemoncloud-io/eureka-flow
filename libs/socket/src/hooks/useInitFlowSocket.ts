@@ -529,6 +529,8 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
     }, [channelId, apiKey]);
 
     return {
+        // hex connection id (sockets-api routing key); raw connectionId fails to parse
+        id,
         connectionId,
         connect,
         disconnect,
