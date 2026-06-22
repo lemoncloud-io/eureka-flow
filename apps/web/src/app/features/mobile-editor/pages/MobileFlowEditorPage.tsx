@@ -48,6 +48,7 @@ import { useStepNavigation } from '../hooks/useStepNavigation';
 import { executeNodeWithToast } from '../utils';
 
 import type { FlowRole } from '@flows/flows';
+import type { WebSocketMessage } from '@flows/socket';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[] }): string =>
@@ -123,19 +124,27 @@ export const MobileFlowEditorPage = () => {
     });
 
     const socketRecorder = useSocketRecorder();
+    const { record: recordSocketMessage } = socketRecorder;
     const refreshCredits = useCreditsRefresh();
+
+    // Stable identity required — useInitFlowSocket's dispatch effect deps on onMessage;
+    // an inline arrow re-runs that effect every render, re-processing lastMessage in a loop.
+    const handleSocketMessage = useCallback(
+        (message: WebSocketMessage) => {
+            recordSocketMessage(message);
+            if (message.action === 'trace' || message.action === 'message' || message.action === 'progress') {
+                refreshCredits();
+            }
+        },
+        [recordSocketMessage, refreshCredits]
+    );
 
     const { isSocketConnected, socketConnectionId, replayMessage } = useMobileSocketSync({
         serializeWorkflowState,
         lastSavedStateRef,
         lastLocalUpdateTimestampRef,
         canEdit: permissions.canEditStructure,
-        onMessage: message => {
-            socketRecorder.record(message);
-            if (message.action === 'trace' || message.action === 'message' || message.action === 'progress') {
-                refreshCredits();
-            }
-        },
+        onMessage: handleSocketMessage,
     });
 
     useProductProgressToasts();

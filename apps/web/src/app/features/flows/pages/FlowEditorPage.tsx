@@ -40,7 +40,7 @@ import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { FlowRole } from '@flows/flows';
-import type { ProductProgressInfo } from '@flows/socket';
+import type { ProductProgressInfo, WebSocketMessage } from '@flows/socket';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -195,7 +195,23 @@ export const FlowEditorPage = () => {
     });
 
     const socketRecorder = useSocketRecorder();
+    const { record: recordSocketMessage } = socketRecorder;
     const refreshCredits = useCreditsRefresh();
+
+    // Stable identity is required: useInitFlowSocket's dispatch effect lists onMessage
+    // in its deps, so an inline arrow would re-run that effect every render and
+    // re-process the same lastMessage — an infinite re-render loop (and #185 under load).
+    const handleSocketMessage = useCallback(
+        (message: WebSocketMessage) => {
+            recordSocketMessage(message);
+            // Run execution streams trace/message/progress events as nodes consume
+            // credits — refresh the balance (debounced) once the run settles.
+            if (message.action === 'trace' || message.action === 'message' || message.action === 'progress') {
+                refreshCredits();
+            }
+        },
+        [recordSocketMessage, refreshCredits]
+    );
 
     const setProductProgress = useProductProgressStore(state => state.setProgress);
     const clearProductProgress = useProductProgressStore(state => state.clearAll);
@@ -232,14 +248,7 @@ export const FlowEditorPage = () => {
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
         onProductProgress: handleProductProgress,
-        onMessage: message => {
-            socketRecorder.record(message);
-            // Run execution streams trace/message/progress events as nodes consume
-            // credits — refresh the balance (debounced) once the run settles.
-            if (message.action === 'trace' || message.action === 'message' || message.action === 'progress') {
-                refreshCredits();
-            }
-        },
+        onMessage: handleSocketMessage,
     });
 
     const { startTourIfFirstVisit, startTour } = useTour();
