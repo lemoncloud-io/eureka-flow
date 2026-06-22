@@ -236,8 +236,7 @@ export const FlowEditorPage = () => {
         reconnect: socketReconnect,
         reconnectAttempts,
         maxReconnectReached,
-        // hex connection id — sockets-api routes runNode(?connection=) on this, not raw connectionId
-        id: socketConnectionId,
+        connectionId: socketConnectionId,
         replayMessage,
     } = useInitFlowSocket({
         channelId,
