@@ -1,5 +1,39 @@
 # Changelog
 
+## [2026-06-23] - root@0.55.0, @flows/web@0.55.0, @flows/admin@0.31.0
+
+### Features
+
+- (dev) replace floating DevRoleToggle with inline header DevRoleChip
+- (permissions) allow editor role to modify canvas (add/delete/connect blocks)
+- (flows) show AI key warning banner on LOCAL only
+- (flows) add read-only RunModeIndicator (own key vs credits)
+- (permissions) consume server v0.26.618 hasOwned/isEditable + useApiKey
+
+### Bug Fixes
+
+- (dev) use ● / ✗ for permission indicators in DevRoleChip tooltip
+- (dev) use circle symbols for permission indicators in DevRoleChip tooltip
+- (i18n) clarify DevRoleChip permission tooltip labels in ko/en
+- (i18n) add missing translations for DevRoleChip and header keys
+- (permissions) replace owner-only guards with canModifyCanvas in mobile + DetailPanel
+- (a11y) role=img on RoleIndicator + BillingChip popover skeleton + credit aria-label
+- (flows) stop infinite re-render loop on flow run (React #185)
+- (socket) route WS run echo via hex connection id + guard propagate loop
+
+### Documentation
+
+- update permission model — split canvas edit from flow metadata, add matrix + ADR amendment
+
+### Refactor
+
+- (dev) make DevRoleChip draggable floating widget
+- (flows) consolidate header billing + role into BillingChip and RoleIndicator
+
+### Other
+
+- revert: (socket) drop frontend hex connection id + misdiagnosed #185 guards
+
 ## [2026-06-18] - root@0.54.1, @flows/web@0.54.1, @flows/admin@0.30.1
 
 ### Bug Fixes
