@@ -441,10 +441,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         useEffect(() => {
             if (initialData) {
-                // Normalize nodes to ensure config is never undefined
+                // Normalize nodes so config and position are never undefined
+                // (position is optional on the node type; a position-less node
+                // crashes desktop render at node.position.x — see NodeBlock/Minimap).
                 const loadedNodes = (initialData.nodes ?? []).map(n => ({
                     ...n,
                     config: n.config ?? {},
+                    position: n.position ?? { x: 0, y: 0 },
                 }));
                 setNodes(loadedNodes);
                 setConnections(deduplicateEdges(initialData.connections ?? []));
@@ -730,10 +733,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     edges: connections.filter(c => !pendingEdgeIds.has(c.id)),
                 }),
                 loadWorkflow: async (state: WorkflowStateWithPorts) => {
-                    // Normalize nodes to ensure config is never undefined
+                    // Normalize nodes so config and position are never undefined
+                    // (position is optional on the node type; a position-less node
+                    // crashes desktop render at node.position.x — see NodeBlock/Minimap).
                     const loadedNodes = (state.nodes ?? []).map(n => ({
                         ...n,
                         config: n.config ?? {},
+                        position: n.position ?? { x: 0, y: 0 },
                     }));
 
                     const rawConnections = state.edges ?? state.connections ?? [];
