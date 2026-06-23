@@ -69,7 +69,8 @@
         "frontend": "프론트엔드",
         "portsInfo": "입력 {{inputs}}개 → 출력 {{outputs}}개",
         "recent": "최근",
-        "readOnlyHint": "블록을 추가하려면 로그인하세요"
+        "readOnlyHint": "블록을 추가하려면 로그인하세요",
+        "viewerHint": "뷰어는 블록을 추가할 수 없습니다"
     },
     "canvas": {
         "executionLogs": "실행 로그",

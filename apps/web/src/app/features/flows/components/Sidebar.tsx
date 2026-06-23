@@ -99,7 +99,7 @@ const BlockCard: React.FC<BlockCardProps> = ({
 type CategoryKey = keyof typeof BLOCK_CATEGORY_CONFIG;
 
 export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoading, role = 'owner' }, ref) => {
-    const isReadOnly = role !== 'owner';
+    const isReadOnly = role === 'viewer' || role === 'anonymous';
     const { t } = useTranslation(['flows']);
     const [isOpen, setIsOpen] = useState(false);
     const [expandedCategories, setExpandedCategories] = useState<Set<CategoryKey>>(new Set(BLOCK_CATEGORIES));
@@ -301,7 +301,11 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
 
                         {/* Footer */}
                         <div className="mt-3 border-t border-border/30 pt-2.5 text-center text-[11px] text-muted-foreground/70">
-                            {isReadOnly ? t('sidebar.readOnlyHint', 'Sign in to add blocks') : t('sidebar.clickToAdd')}
+                            {isReadOnly
+                                ? role === 'anonymous'
+                                    ? t('sidebar.readOnlyHint', 'Sign in to add blocks')
+                                    : t('sidebar.viewerHint', 'Viewers cannot add blocks')
+                                : t('sidebar.clickToAdd')}
                         </div>
                     </div>
                 </>

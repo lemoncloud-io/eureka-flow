@@ -69,7 +69,8 @@
         "frontend": "Frontend",
         "portsInfo": "{{inputs}} inputs → {{outputs}} outputs",
         "recent": "Recent",
-        "readOnlyHint": "Sign in to add blocks"
+        "readOnlyHint": "Sign in to add blocks",
+        "viewerHint": "Viewers cannot add blocks"
     },
     "canvas": {
         "executionLogs": "Execution Logs",

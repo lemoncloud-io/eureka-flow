@@ -357,7 +357,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
-    const { canEditStructure, canSave, canRun, canCreate } = getPermissions(role);
+    const { canEditStructure, canModifyCanvas, canSave, canRun, canCreate } = getPermissions(role);
 
     const getSaveButtonVariant = (): 'default' | 'success' | 'warning' | 'error' => {
         if (saveState.saveStatus === 'saving') return 'warning';
@@ -475,7 +475,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 variant={getSaveButtonVariant()}
                             />
                         )}
-                        {canEditStructure && (
+                        {canModifyCanvas && (
                             <>
                                 <ToolbarButton
                                     onClick={editActions.onUndo}
@@ -546,8 +546,8 @@ export const Header: React.FC<HeaderProps> = ({
 
                             <DropdownMenuSeparator />
 
-                            {/* Edit actions - visible on mobile, owner only */}
-                            {canEditStructure && (
+                            {/* Edit actions - visible on mobile */}
+                            {canModifyCanvas && (
                                 <div className="sm:hidden">
                                     <DropdownMenuItem onClick={editActions.onUndo}>
                                         <Undo2 className="w-4 h-4 mr-2" />
@@ -567,7 +567,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.canvas')}
                             </DropdownMenuLabel>
-                            {canEditStructure && (
+                            {canModifyCanvas && (
                                 <DropdownMenuItem onClick={editActions.onAutoLayout}>
                                     <LayoutGrid className="w-4 h-4 mr-2" />
                                     {t('header.autoLayout')}
@@ -586,7 +586,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.expandAll')}
                                 </DropdownMenuItem>
                             )}
-                            {canEditStructure && (
+                            {canModifyCanvas && (
                                 <DropdownMenuItem onClick={editActions.onClear} className="text-destructive">
                                     <Trash2 className="w-4 h-4 mr-2" />
                                     {t('header.clearCanvas')}
