@@ -864,7 +864,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     handleSelectionChange(null);
                 },
                 newWorkflow: () => {
-                    if (!permissions.canModifyCanvas) return;
+                    if (!permissions.canCreate) return;
                     setNodes([]);
                     setConnections([]);
                     pastRef.current = [];
