@@ -23,14 +23,28 @@ Glossary of domain terms. No implementation details. Update as terms are resolve
 
 Server (`eureka-flows-api`) is the source of truth; the client mirrors it via two booleans on `/load` (`hasOwned`, `isEditable`).
 
-- **Owner** — The user who created a flow; server-checked as identity match on both **Workspace** and user (`sid` + `uid`). Only role allowed to make a **Structural edit** or change flow metadata (rename/publish). _Avoid_: creator, author.
-- **Editor** — A user who shares the flow's **Workspace** but is not the Owner. Has _edit permission_ (**Config edit** of any node) but **not** ownership; cannot make Structural edits. _Avoid_: collaborator, member.
+- **Owner** — The user who created a flow; server-checked as identity match on both **Workspace** and user (`sid` + `uid`). Only role that may change **Flow metadata** (rename/publish). _Avoid_: creator, author.
+- **Editor** — A user who shares the flow's **Workspace** but is not the Owner. May perform **Canvas edits** and **Config edits**; cannot change **Flow metadata** (rename/publish). _Avoid_: collaborator, member.
 - **Viewer** — A signed-in user with neither edit permission nor ownership. May open a **Public** flow and run it; changes nothing persistent. _Avoid_: guest (legacy client name — it conflated Editor and Viewer).
 - **Anonymous** — A visitor with no session. May view a **Public** flow only; may not run or edit.
 - **Workspace** — The tenant grouping (`sid`) a flow and a user belong to. Same-Workspace membership is what grants an Editor their edit permission. _Avoid_: organization, team, account.
-- **Structural edit** — Changing a flow's shape: add/delete nodes or edges, move nodes, change connections, plus metadata such as the name. Owner-only. _Avoid_: upsert (endpoint, not concept).
+- **Canvas edit** — Changing a flow's shape: add/delete nodes or edges, connect ports, resize nodes, undo/redo canvas history, auto-layout. Available to **Owner** and **Editor**. _Avoid_: structural edit (overloaded — use "canvas edit" for canvas ops, "flow metadata" for rename/publish).
+- **Flow metadata edit** — Changing a flow's identity: rename and publish/unpublish. **Owner only.** _Avoid_: structural edit (see Canvas edit).
 - **Config edit** — Changing any node's configuration values without altering flow shape. Available to Owners (written directly) and Editors (written to their **Session overlay**). _Avoid_: save (endpoint, not concept).
 - **Session overlay** — A per-user, per-flow layer (server `SessionModel`) holding an Editor's Config edits. The original flow's nodes/edges are never mutated; on load the overlay is merged back for that user only, so each Editor sees their own config. _Avoid_: draft, fork, copy.
 - **Editable** (`isEditable`) — Server shorthand for "has edit permission" — true for **both** Owner and Editor. Does **not** imply ownership; the client's historical bug was treating Editable as Owner.
 - **Open-to-Edit** (`openToEdit`) — Per-flow flag promoting every signed-in user to **Editor** regardless of Workspace. Folded into `isEditable` server-side and settable only on localhost, so it is **not** modeled on the client. _Avoid_: shared, collaborative.
 - **Public** (`isPublic`) — Per-flow visibility flag letting Viewers and Anonymous visitors open and run a flow. Orthogonal to edit permission — a Public flow is still read-only to non-Editors. _Avoid_: published, open.
+
+### Permission matrix
+
+| Capability                             | Owner | Editor | Viewer | Anonymous |
+| -------------------------------------- | :---: | :----: | :----: | :-------: |
+| Canvas edit (add/delete/connect nodes) |   ✓   |   ✓    |   —    |     —     |
+| Config edit (node values)              |   ✓   |   ✓    |   —    |     —     |
+| Run nodes                              |   ✓   |   ✓    |   ✓    |     —     |
+| Save (auto-save + manual)              |   ✓   |   ✓    |   —    |     —     |
+| Flow metadata (rename/publish)         |   ✓   |   —    |   —    |     —     |
+| View                                   |   ✓   |   ✓    |   ✓    |     ✓     |
+
+Client permission flags: `canModifyCanvas` (canvas edit), `canEditConfig`, `canRun`, `canSave`, `canEditStructure` (flow metadata), `canCreate`, `canDragNodes`.
