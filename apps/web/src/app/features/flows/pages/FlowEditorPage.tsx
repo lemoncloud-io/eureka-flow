@@ -24,6 +24,7 @@ import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
 import { AiKeyDialog } from '../components/AiKeyDialog';
 import { DesktopMobileSwitchCta } from '../components/DesktopMobileSwitchCta';
+import { DevRoleChip } from '../components/DevRoleChip';
 import { DevSocketPanel } from '../components/DevSocketPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
 import { FlowListDialog } from '../components/FlowListDialog';
@@ -770,9 +771,6 @@ export const FlowEditorPage = () => {
                 onVersionClick={handleVersionClick}
                 isDebugMode={isDebugMode}
                 onDisableDebugMode={isDebugMode ? disableDebugMode : undefined}
-                devRole={showDevTools ? devRoleOverride : undefined}
-                computedRole={showDevTools ? computedRole : undefined}
-                onDevRoleOverride={showDevTools ? setDevRoleOverride : undefined}
             />
 
             {/* Floating Sidebar */}
@@ -841,6 +839,14 @@ export const FlowEditorPage = () => {
             )}
 
             {/* Dev Tools (hidden in production unless debug mode activated) */}
+            {showDevTools && (
+                <DevRoleChip
+                    role={role}
+                    computedRole={computedRole}
+                    onOverride={setDevRoleOverride}
+                    onClose={isDebugMode ? disableDebugMode : undefined}
+                />
+            )}
             {showDevTools && (
                 <DevSocketPanel
                     messages={socketRecorder.messages}
