@@ -34,6 +34,7 @@ export const RoleIndicator = ({ role, compact = false }: RoleIndicatorProps) => 
 
     return (
         <span
+            role="img"
             className={cn(
                 'flex shrink-0 items-center justify-center text-muted-foreground',
                 compact ? 'h-6 w-6' : 'h-7 w-7'

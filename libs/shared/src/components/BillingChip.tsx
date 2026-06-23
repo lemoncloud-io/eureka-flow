@@ -66,7 +66,13 @@ export const BillingChip = ({ variant = 'pill' }: BillingChipProps) => {
                     <Button
                         variant="ghost"
                         className={cn('gap-1.5', TRIGGER_STYLE[variant])}
-                        aria-label={ownAiKey ? ownKeyLabel : t('credits.balance')}
+                        aria-label={
+                            ownAiKey
+                                ? ownKeyLabel
+                                : data
+                                  ? `${t('credits.balance')}: ${formatCredits(data.total)}`
+                                  : t('credits.balance')
+                        }
                         title={ownAiKey ? t('runMode.ownKeyHint') : undefined}
                     >
                         {ownAiKey ? (
@@ -93,7 +99,9 @@ export const BillingChip = ({ variant = 'pill' }: BillingChipProps) => {
                     sideOffset={8}
                     className="w-72 rounded-xl p-4"
                 >
-                    {data ? (
+                    {isLoading && !data ? (
+                        <Skeleton className="h-20 w-full rounded-lg" />
+                    ) : data ? (
                         <CreditDetails balance={data} onUsage={openUsage} showOwnKeyNote={ownAiKey} />
                     ) : (
                         <p className="text-sm text-muted-foreground">{t('runMode.notCharged')}</p>
