@@ -55,10 +55,10 @@
     },
     "devRoleChip": {
         "label": "DEV",
-        "canvas": "Canvas",
-        "config": "Config",
+        "canvas": "Block edit",
+        "config": "Node config",
         "run": "Run",
-        "metadata": "Metadata"
+        "metadata": "Rename/Publish"
     },
     "sidebar": {
         "library": "Library",

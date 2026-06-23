@@ -55,10 +55,10 @@
     },
     "devRoleChip": {
         "label": "개발",
-        "canvas": "캔버스",
-        "config": "설정",
+        "canvas": "블록 추가·삭제",
+        "config": "노드 설정값",
         "run": "실행",
-        "metadata": "메타데이터"
+        "metadata": "이름변경·게시"
     },
     "sidebar": {
         "library": "라이브러리",
