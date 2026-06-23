@@ -44,12 +44,21 @@
         "replayTutorial": "Replay Tutorial",
         "beta": "Beta",
         "graphView": "Graph View",
+        "navigator": "Navigator",
+        "ownerOnlyRename": "Only the owner can rename this flow",
         "menuGroup": {
             "file": "File",
             "canvas": "Canvas",
             "share": "Share",
             "settings": "Settings"
         }
+    },
+    "devRoleChip": {
+        "label": "DEV",
+        "canvas": "Canvas",
+        "config": "Config",
+        "run": "Run",
+        "metadata": "Metadata"
     },
     "sidebar": {
         "library": "Library",

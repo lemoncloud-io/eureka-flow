@@ -44,12 +44,21 @@
         "replayTutorial": "튜토리얼 다시보기",
         "beta": "베타",
         "graphView": "그래프 뷰",
+        "navigator": "네비게이터",
+        "ownerOnlyRename": "워크플로우 이름은 소유자만 변경할 수 있습니다",
         "menuGroup": {
             "file": "파일",
             "canvas": "캔버스",
             "share": "공유",
             "settings": "설정"
         }
+    },
+    "devRoleChip": {
+        "label": "개발",
+        "canvas": "캔버스",
+        "config": "설정",
+        "run": "실행",
+        "metadata": "메타데이터"
     },
     "sidebar": {
         "library": "라이브러리",
