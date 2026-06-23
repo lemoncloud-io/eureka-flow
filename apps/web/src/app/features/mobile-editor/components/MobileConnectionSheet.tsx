@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Check, ChevronDown, ChevronUp, Link2, Link2Off, Plus, Unlink } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
+import { getPermissions, useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
@@ -45,7 +45,8 @@ export const MobileConnectionSheet = ({
     role = 'owner',
 }: MobileConnectionSheetProps) => {
     const { t } = useTranslation(['flows']);
-    const readOnly = role !== 'owner';
+    const { canModifyCanvas } = getPermissions(role);
+    const readOnly = !canModifyCanvas;
     const connections = useCanvasConnections();
     const nodes = useCanvasNodes();
     const blockRegistry = useBlockRegistry();

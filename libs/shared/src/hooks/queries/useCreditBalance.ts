@@ -10,7 +10,7 @@ import { getCreditBalance } from '../../api';
  * never fires for unauthenticated users. Retries up to 3 times with backoff, then
  * stops — a failing endpoint (e.g. 503) must not be hammered. Window-focus refetch
  * is disabled for the same reason; the balance is refreshed when the credit
- * popover is opened instead (see CreditBalanceChip).
+ * popover is opened instead (see BillingChip).
  */
 export const useCreditBalance = () => {
     const apiKey = useWebCoreStore(s => s.apiKey);

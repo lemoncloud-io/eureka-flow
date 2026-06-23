@@ -44,12 +44,21 @@
         "replayTutorial": "튜토리얼 다시보기",
         "beta": "베타",
         "graphView": "그래프 뷰",
+        "navigator": "네비게이터",
+        "ownerOnlyRename": "워크플로우 이름은 소유자만 변경할 수 있습니다",
         "menuGroup": {
             "file": "파일",
             "canvas": "캔버스",
             "share": "공유",
             "settings": "설정"
         }
+    },
+    "devRoleChip": {
+        "label": "개발",
+        "canvas": "블록 추가·삭제",
+        "config": "노드 설정값",
+        "run": "실행",
+        "metadata": "이름변경·게시"
     },
     "sidebar": {
         "library": "라이브러리",
@@ -69,7 +78,8 @@
         "frontend": "프론트엔드",
         "portsInfo": "입력 {{inputs}}개 → 출력 {{outputs}}개",
         "recent": "최근",
-        "readOnlyHint": "블록을 추가하려면 로그인하세요"
+        "readOnlyHint": "블록을 추가하려면 로그인하세요",
+        "viewerHint": "뷰어는 블록을 추가할 수 없습니다"
     },
     "canvas": {
         "executionLogs": "실행 로그",
@@ -560,9 +570,6 @@
         "searchNodes": "노드 검색...",
         "noSearchResults": "일치하는 노드 없음",
         "imageOutput": "이미지",
-        "viewOnly": "보기 전용",
-        "editorMode": "편집자",
-        "editorModeHint": "설정 편집과 실행은 가능하지만, 구조 변경은 소유자만 할 수 있어요",
         "flowSettings": {
             "menuLabel": "플로우 설정",
             "title": "플로우 설정",

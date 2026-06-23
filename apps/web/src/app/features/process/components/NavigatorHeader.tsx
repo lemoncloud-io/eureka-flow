@@ -4,7 +4,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 
 import { useItem } from '@flows/flows';
-import { CreditBalanceChip } from '@flows/shared';
+import { BillingChip } from '@flows/shared';
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -69,7 +69,7 @@ export const NavigatorHeader = ({ onMenuClick }: NavigatorHeaderProps) => {
             </div>
 
             <div className="flex items-center gap-2">
-                <CreditBalanceChip variant="bare" />
+                <BillingChip variant="bare" />
                 <LivenessIndicator />
                 <UnresolvedNotesBadge />
             </div>

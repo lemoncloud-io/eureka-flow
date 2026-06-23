@@ -10,6 +10,7 @@ import {
     deriveRole,
     getPermissions,
     getProfile,
+    toAiKeyStatus,
     useBlocks,
     useFlows,
     useProductProgressStore,
@@ -23,6 +24,7 @@ import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
 import { AiKeyDialog } from '../components/AiKeyDialog';
 import { DesktopMobileSwitchCta } from '../components/DesktopMobileSwitchCta';
+import { DevRoleChip } from '../components/DevRoleChip';
 import { DevSocketPanel } from '../components/DevSocketPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
 import { FlowListDialog } from '../components/FlowListDialog';
@@ -39,7 +41,7 @@ import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { FlowRole } from '@flows/flows';
-import type { ProductProgressInfo } from '@flows/socket';
+import type { ProductProgressInfo, WebSocketMessage } from '@flows/socket';
 
 const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
     JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
@@ -53,93 +55,6 @@ const staggerStyle = (index: number): React.CSSProperties => ({
 const isInputElement = (target: EventTarget | null): boolean => {
     if (!target || !(target instanceof HTMLElement)) return false;
     return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
-};
-
-const DEV_ROLES: FlowRole[] = ['owner', 'editor', 'viewer', 'anonymous'];
-
-const DevRoleToggle: React.FC<{
-    role: FlowRole;
-    computedRole: FlowRole;
-    onOverride: (role: FlowRole | null) => void;
-    onClose?: () => void;
-}> = ({ role, computedRole, onOverride, onClose }) => {
-    const dragRef = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState({ x: 16, y: 88 }); // bottom-right offset (above mobile-switch CTA + gap)
-    const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
-    const didDrag = useRef(false);
-
-    const handlePointerDown = useCallback(
-        (e: React.PointerEvent) => {
-            if ((e.target as HTMLElement).closest('button')) return;
-            e.preventDefault();
-            dragState.current = { startX: e.clientX, startY: e.clientY, originX: pos.x, originY: pos.y };
-            didDrag.current = false;
-            dragRef.current?.setPointerCapture(e.pointerId);
-        },
-        [pos]
-    );
-
-    const handlePointerMove = useCallback((e: React.PointerEvent) => {
-        if (!dragState.current) return;
-        const dx = dragState.current.startX - e.clientX;
-        const dy = dragState.current.startY - e.clientY;
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true;
-        setPos({
-            x: Math.max(0, dragState.current.originX + dx),
-            y: Math.max(0, dragState.current.originY + dy),
-        });
-    }, []);
-
-    const handlePointerUp = useCallback(() => {
-        dragState.current = null;
-        // Reset after a tick so the click event (which fires after pointerup) can still check didDrag
-        requestAnimationFrame(() => {
-            didDrag.current = false;
-        });
-    }, []);
-
-    return (
-        <div
-            ref={dragRef}
-            className="fixed z-50 touch-none"
-            style={{ right: pos.x, bottom: pos.y }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-        >
-            <div className="flex gap-1 bg-glass-bg backdrop-blur-2xl border border-border/40 shadow-floating rounded-2xl p-1 text-xs font-mono cursor-grab active:cursor-grabbing">
-                <span className="px-1.5 py-1 text-muted-foreground/50 select-none">DEV</span>
-                {DEV_ROLES.map(r => (
-                    <button
-                        key={r}
-                        onClick={() => {
-                            if (didDrag.current) return;
-                            onOverride(r === computedRole ? null : r);
-                        }}
-                        className={`px-2 py-1 rounded-lg transition-colors ${
-                            role === r
-                                ? 'bg-primary text-primary-foreground'
-                                : 'text-muted-foreground hover:bg-accent/60'
-                        }`}
-                    >
-                        {r}
-                    </button>
-                ))}
-                {onClose && (
-                    <button
-                        onClick={() => {
-                            if (didDrag.current) return;
-                            onClose();
-                        }}
-                        className="px-1.5 py-1 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                        title="Exit debug mode"
-                    >
-                        <X className="w-3 h-3" />
-                    </button>
-                )}
-            </div>
-        </div>
-    );
 };
 
 export const FlowEditorPage = () => {
@@ -194,7 +109,23 @@ export const FlowEditorPage = () => {
     });
 
     const socketRecorder = useSocketRecorder();
+    const { record: recordSocketMessage } = socketRecorder;
     const refreshCredits = useCreditsRefresh();
+
+    // Stable identity is required: useInitFlowSocket's dispatch effect lists onMessage
+    // in its deps, so an inline arrow would re-run that effect every render and
+    // re-process the same lastMessage — an infinite re-render loop (and #185 under load).
+    const handleSocketMessage = useCallback(
+        (message: WebSocketMessage) => {
+            recordSocketMessage(message);
+            // Run execution streams trace/message/progress events as nodes consume
+            // credits — refresh the balance (debounced) once the run settles.
+            if (message.action === 'trace' || message.action === 'message' || message.action === 'progress') {
+                refreshCredits();
+            }
+        },
+        [recordSocketMessage, refreshCredits]
+    );
 
     const setProductProgress = useProductProgressStore(state => state.setProgress);
     const clearProductProgress = useProductProgressStore(state => state.clearAll);
@@ -230,14 +161,7 @@ export const FlowEditorPage = () => {
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
         onProductProgress: handleProductProgress,
-        onMessage: message => {
-            socketRecorder.record(message);
-            // Run execution streams trace/message/progress events as nodes consume
-            // credits — refresh the balance (debounced) once the run settles.
-            if (message.action === 'trace' || message.action === 'message' || message.action === 'progress') {
-                refreshCredits();
-            }
-        },
+        onMessage: handleSocketMessage,
     });
 
     const { startTourIfFirstVisit, startTour } = useTour();
@@ -342,10 +266,7 @@ export const FlowEditorPage = () => {
                 getProfile()
                     .then(data => {
                         const store = useWebCoreStore.getState();
-                        store.setAiKeyStatus({
-                            hasGeminiKey: !!data.geminiApiKey,
-                            hasOpenaiKey: !!data.openaiApiKey,
-                        });
+                        store.setAiKeyStatus(toAiKeyStatus(data));
                         store.addApiKey(currentApiKey);
                         store.updateKeyProfile(currentApiKey, { sid: data.sid, uid: data.uid });
                     })
@@ -919,45 +840,45 @@ export const FlowEditorPage = () => {
 
             {/* Dev Tools (hidden in production unless debug mode activated) */}
             {showDevTools && (
-                <>
-                    <DevRoleToggle
-                        role={role}
-                        computedRole={computedRole}
-                        onOverride={setDevRoleOverride}
-                        onClose={isDebugMode ? disableDebugMode : undefined}
-                    />
-                    <DevSocketPanel
-                        messages={socketRecorder.messages}
-                        isRecording={socketRecorder.isRecording}
-                        replayState={socketRecorder.replayState}
-                        onToggleRecording={socketRecorder.toggleRecording}
-                        onClear={socketRecorder.clear}
-                        onReplay={msg => {
-                            resetSequenceTracking();
-                            const nodeId = msg.id.split(':')[0];
-                            canvasRef.current?.updateNodeFromServer(
-                                nodeId,
-                                { state: 'IDLE', status: 'IDLE' },
-                                { force: true }
-                            );
-                            replayMessage(msg);
-                        }}
-                        onReplayFromIndex={fromIndex => {
-                            resetSequenceTracking();
-                            resetAllNodesToIdle();
-                            socketRecorder.startReplayFromIndex(fromIndex, replayMessage);
-                        }}
-                        onStopReplay={() => {
-                            socketRecorder.stopReplaySequence();
-                            resetAllNodesToIdle();
-                        }}
-                        onResetNodes={() => {
-                            resetSequenceTracking();
-                            resetAllNodesToIdle();
-                        }}
-                        onMarkReplayed={socketRecorder.markReplayed}
-                    />
-                </>
+                <DevRoleChip
+                    role={role}
+                    computedRole={computedRole}
+                    onOverride={setDevRoleOverride}
+                    onClose={isDebugMode ? disableDebugMode : undefined}
+                />
+            )}
+            {showDevTools && (
+                <DevSocketPanel
+                    messages={socketRecorder.messages}
+                    isRecording={socketRecorder.isRecording}
+                    replayState={socketRecorder.replayState}
+                    onToggleRecording={socketRecorder.toggleRecording}
+                    onClear={socketRecorder.clear}
+                    onReplay={msg => {
+                        resetSequenceTracking();
+                        const nodeId = msg.id.split(':')[0];
+                        canvasRef.current?.updateNodeFromServer(
+                            nodeId,
+                            { state: 'IDLE', status: 'IDLE' },
+                            { force: true }
+                        );
+                        replayMessage(msg);
+                    }}
+                    onReplayFromIndex={fromIndex => {
+                        resetSequenceTracking();
+                        resetAllNodesToIdle();
+                        socketRecorder.startReplayFromIndex(fromIndex, replayMessage);
+                    }}
+                    onStopReplay={() => {
+                        socketRecorder.stopReplaySequence();
+                        resetAllNodesToIdle();
+                    }}
+                    onResetNodes={() => {
+                        resetSequenceTracking();
+                        resetAllNodesToIdle();
+                    }}
+                    onMarkReplayed={socketRecorder.markReplayed}
+                />
             )}
 
             {/* Loading Overlay */}

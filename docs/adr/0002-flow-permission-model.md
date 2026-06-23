@@ -34,9 +34,27 @@ removes the owner-only `/upsert` an Editor used to trigger; no extra client writ
 - `setIsEditable`/`setHasOwned` default to `false` (never `true`) so a missing field can never
   escalate to edit access.
 - `openToEdit` is **not** modeled on the client. It is already folded into the server's
-  `isEditable`, and is settable only on localhost — so the client treats Structural edit as
+  `isEditable`, and is settable only on localhost — so the client treats Flow metadata as
   Owner-only. The only effect is that on a (rare, localhost) Open-to-Edit flow an Editor sees no
-  structural affordance even though the server would permit it — strictly more restrictive than
+  metadata affordance even though the server would permit it — strictly more restrictive than
   the server, never less, so it can never cause a 403.
 - A residual `permission_denied` (race / stale role) is handled as a toast plus a flow refetch to
   resync the role, rather than a silent failure.
+
+## Amendment — Editor canvas edit (2026-06-23)
+
+The original decision kept **Structural edit** (add/delete nodes, connect edges) Owner-only. In
+practice, editors can't create or delete nodes, only change config — this turned out to be too
+restrictive: an Editor working in a shared workspace saw a sidebar blocked by "sign in to add
+blocks" even though they were authenticated and had `isEditable: true`.
+
+**Resolution:** We further split the original "Structural edit" into two independent capabilities:
+
+- **Canvas edit** (`canModifyCanvas`) — add/delete/resize nodes, connect/disconnect edges, undo/redo,
+  auto-layout. Granted to **Owner + Editor**.
+- **Flow metadata edit** (`canEditStructure`) — rename and publish/unpublish. **Owner only.**
+
+The server already permits Editors to write nodes via the Session overlay on `upsertNode`, so
+unlocking canvas edits on the client does not add new API surface — it removes an over-restrictive
+client guard. The Session overlay ensures the original flow is never mutated by an Editor's canvas
+changes.

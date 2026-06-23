@@ -3,9 +3,8 @@
  *
  * Four user roles, derived from the server's two booleans (`hasOwned`, `isEditable`)
  * plus apiKey presence (public mode):
- * - Owner: created the flow (sid+uid match). Structural edits, config, metadata, run.
- * - Editor: same workspace (sid), not owner. Config edit (saved to a per-user session
- *   overlay) + run. No structural edits, no rename/publish.
+ * - Owner: created the flow (sid+uid match). Canvas edits, config, metadata (rename/publish), run.
+ * - Editor: same workspace (sid), not owner. Canvas edits + config + run. No rename/publish.
  * - Viewer: signed-in, no edit permission. Run a public flow only.
  * - Anonymous: no session. View a public flow only.
  *
@@ -17,7 +16,9 @@ export type FlowRole = 'owner' | 'editor' | 'viewer' | 'anonymous';
 export interface FlowPermissions {
     /** Edit any node's config values (Owner direct, Editor via session overlay) */
     canEditConfig: boolean;
-    /** Structural change: add/delete nodes & edges, move, connect, and flow metadata (rename/publish). Owner only. */
+    /** Canvas structure: add/delete/resize nodes, connect edges, undo/redo, layout. Owner + Editor. */
+    canModifyCanvas: boolean;
+    /** Flow metadata: rename, publish/unpublish. Owner only. */
     canEditStructure: boolean;
     /** Execute nodes */
     canRun: boolean;
@@ -32,6 +33,7 @@ export interface FlowPermissions {
 export const ROLE_PERMISSIONS: Record<FlowRole, FlowPermissions> = {
     owner: {
         canEditConfig: true,
+        canModifyCanvas: true,
         canEditStructure: true,
         canRun: true,
         canSave: true,
@@ -40,6 +42,7 @@ export const ROLE_PERMISSIONS: Record<FlowRole, FlowPermissions> = {
     },
     editor: {
         canEditConfig: true,
+        canModifyCanvas: true,
         canEditStructure: false,
         canRun: true,
         canSave: true,
@@ -48,6 +51,7 @@ export const ROLE_PERMISSIONS: Record<FlowRole, FlowPermissions> = {
     },
     viewer: {
         canEditConfig: false,
+        canModifyCanvas: false,
         canEditStructure: false,
         canRun: true,
         canSave: false,
@@ -56,6 +60,7 @@ export const ROLE_PERMISSIONS: Record<FlowRole, FlowPermissions> = {
     },
     anonymous: {
         canEditConfig: false,
+        canModifyCanvas: false,
         canEditStructure: false,
         canRun: false,
         canSave: false,

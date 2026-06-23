@@ -2,12 +2,21 @@ import { useTranslation } from 'react-i18next';
 
 import { KeyRound } from 'lucide-react';
 
+import { useDebugMode } from '../../../hooks/useDebugMode';
+
 interface AiKeyWarningBannerProps {
     onRegisterKey?: () => void;
 }
 
 export const AiKeyWarningBanner: React.FC<AiKeyWarningBannerProps> = ({ onRegisterKey }) => {
     const { t } = useTranslation(['flows']);
+    const { isDebugMode } = useDebugMode();
+
+    // AI key alerts are local-only: hidden on deployed DEV/PROD unless debug mode is toggled on.
+    const showAiKeyAlerts = import.meta.env.VITE_ENV === 'LOCAL' || isDebugMode;
+    if (!showAiKeyAlerts) {
+        return null;
+    }
 
     return (
         <div className="mt-2 bg-destructive/10 border border-destructive/20 rounded-lg p-2.5 text-[10px]">

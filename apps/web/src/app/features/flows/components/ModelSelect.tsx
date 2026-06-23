@@ -21,7 +21,7 @@ interface ModelSelectProps {
     fallbackOptions?: ConfigOption[];
 }
 
-/** Expected credit cost — uses the app's credit glyph (Sparkles), same as CreditBalanceChip. */
+/** Expected credit cost — uses the app's credit glyph (Sparkles), same as BillingChip. */
 const CreditTag = ({ price, unit }: { price: number; unit?: string }) => (
     <span className="flex shrink-0 items-baseline gap-1 text-xs font-medium text-foreground/80">
         <Sparkles className="h-3 w-3 self-center fill-amber-400 text-amber-400" />
@@ -134,12 +134,19 @@ export const ModelSelect = ({ blockType, value, onChange, disabled, dense, fallb
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
-                <button type="button" disabled={disabled} className={cn(fieldBase, 'flex items-center justify-between gap-2')}>
+                <button
+                    type="button"
+                    disabled={disabled}
+                    className={cn(fieldBase, 'flex items-center justify-between gap-2')}
+                >
                     <span className="truncate">{selected?.label ?? t('model.placeholder', '모델 선택')}</span>
                     <span className="flex shrink-0 items-center gap-1.5">
                         {selected && <CreditTag price={selected.expectedPrice} unit={unit} />}
                         <ChevronDown
-                            className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', open && 'rotate-180')}
+                            className={cn(
+                                'w-3.5 h-3.5 text-muted-foreground transition-transform',
+                                open && 'rotate-180'
+                            )}
                         />
                     </span>
                 </button>

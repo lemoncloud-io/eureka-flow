@@ -44,12 +44,21 @@
         "replayTutorial": "Replay Tutorial",
         "beta": "Beta",
         "graphView": "Graph View",
+        "navigator": "Navigator",
+        "ownerOnlyRename": "Only the owner can rename this flow",
         "menuGroup": {
             "file": "File",
             "canvas": "Canvas",
             "share": "Share",
             "settings": "Settings"
         }
+    },
+    "devRoleChip": {
+        "label": "DEV",
+        "canvas": "Block edit",
+        "config": "Node config",
+        "run": "Run",
+        "metadata": "Rename/Publish"
     },
     "sidebar": {
         "library": "Library",
@@ -69,7 +78,8 @@
         "frontend": "Frontend",
         "portsInfo": "{{inputs}} inputs → {{outputs}} outputs",
         "recent": "Recent",
-        "readOnlyHint": "Sign in to add blocks"
+        "readOnlyHint": "Sign in to add blocks",
+        "viewerHint": "Viewers cannot add blocks"
     },
     "canvas": {
         "executionLogs": "Execution Logs",
@@ -560,9 +570,6 @@
         "searchNodes": "Search nodes...",
         "noSearchResults": "No matching nodes",
         "imageOutput": "Image",
-        "viewOnly": "View only",
-        "editorMode": "Editor",
-        "editorModeHint": "You can edit settings and run; only the owner can change structure",
         "flowSettings": {
             "menuLabel": "Flow Settings",
             "title": "Flow Settings",
