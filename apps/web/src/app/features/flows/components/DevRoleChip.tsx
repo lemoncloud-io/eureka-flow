@@ -78,10 +78,10 @@ export const DevRoleChip = ({ role, computedRole, onOverride, onClose }: DevRole
                     {DEV_ROLES.map(r => {
                         const p = getPermissions(r);
                         const tooltip = [
-                            `${t('devRoleChip.canvas')}: ${p.canModifyCanvas ? '●' : '○'}`,
-                            `${t('devRoleChip.config')}: ${p.canEditConfig ? '●' : '○'}`,
-                            `${t('devRoleChip.run')}: ${p.canRun ? '●' : '○'}`,
-                            `${t('devRoleChip.metadata')}: ${p.canEditStructure ? '●' : '○'}`,
+                            `${t('devRoleChip.canvas')}: ${p.canModifyCanvas ? '●' : '✗'}`,
+                            `${t('devRoleChip.config')}: ${p.canEditConfig ? '●' : '✗'}`,
+                            `${t('devRoleChip.run')}: ${p.canRun ? '●' : '✗'}`,
+                            `${t('devRoleChip.metadata')}: ${p.canEditStructure ? '●' : '✗'}`,
                         ].join(' · ');
                         return (
                             <Tooltip key={r}>
