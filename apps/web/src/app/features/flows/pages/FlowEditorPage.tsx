@@ -56,93 +56,6 @@ const isInputElement = (target: EventTarget | null): boolean => {
     return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
 };
 
-const DEV_ROLES: FlowRole[] = ['owner', 'editor', 'viewer', 'anonymous'];
-
-const DevRoleToggle: React.FC<{
-    role: FlowRole;
-    computedRole: FlowRole;
-    onOverride: (role: FlowRole | null) => void;
-    onClose?: () => void;
-}> = ({ role, computedRole, onOverride, onClose }) => {
-    const dragRef = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState({ x: 16, y: 88 }); // bottom-right offset (above mobile-switch CTA + gap)
-    const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
-    const didDrag = useRef(false);
-
-    const handlePointerDown = useCallback(
-        (e: React.PointerEvent) => {
-            if ((e.target as HTMLElement).closest('button')) return;
-            e.preventDefault();
-            dragState.current = { startX: e.clientX, startY: e.clientY, originX: pos.x, originY: pos.y };
-            didDrag.current = false;
-            dragRef.current?.setPointerCapture(e.pointerId);
-        },
-        [pos]
-    );
-
-    const handlePointerMove = useCallback((e: React.PointerEvent) => {
-        if (!dragState.current) return;
-        const dx = dragState.current.startX - e.clientX;
-        const dy = dragState.current.startY - e.clientY;
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true;
-        setPos({
-            x: Math.max(0, dragState.current.originX + dx),
-            y: Math.max(0, dragState.current.originY + dy),
-        });
-    }, []);
-
-    const handlePointerUp = useCallback(() => {
-        dragState.current = null;
-        // Reset after a tick so the click event (which fires after pointerup) can still check didDrag
-        requestAnimationFrame(() => {
-            didDrag.current = false;
-        });
-    }, []);
-
-    return (
-        <div
-            ref={dragRef}
-            className="fixed z-50 touch-none"
-            style={{ right: pos.x, bottom: pos.y }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-        >
-            <div className="flex gap-1 bg-glass-bg backdrop-blur-2xl border border-border/40 shadow-floating rounded-2xl p-1 text-xs font-mono cursor-grab active:cursor-grabbing">
-                <span className="px-1.5 py-1 text-muted-foreground/50 select-none">DEV</span>
-                {DEV_ROLES.map(r => (
-                    <button
-                        key={r}
-                        onClick={() => {
-                            if (didDrag.current) return;
-                            onOverride(r === computedRole ? null : r);
-                        }}
-                        className={`px-2 py-1 rounded-lg transition-colors ${
-                            role === r
-                                ? 'bg-primary text-primary-foreground'
-                                : 'text-muted-foreground hover:bg-accent/60'
-                        }`}
-                    >
-                        {r}
-                    </button>
-                ))}
-                {onClose && (
-                    <button
-                        onClick={() => {
-                            if (didDrag.current) return;
-                            onClose();
-                        }}
-                        className="px-1.5 py-1 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                        title="Exit debug mode"
-                    >
-                        <X className="w-3 h-3" />
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-};
-
 export const FlowEditorPage = () => {
     const { t } = useTranslation(['flows']);
     const canvasRef = useRef<WorkflowCanvasRef>(null);
@@ -857,6 +770,9 @@ export const FlowEditorPage = () => {
                 onVersionClick={handleVersionClick}
                 isDebugMode={isDebugMode}
                 onDisableDebugMode={isDebugMode ? disableDebugMode : undefined}
+                devRole={showDevTools ? devRoleOverride : undefined}
+                computedRole={showDevTools ? computedRole : undefined}
+                onDevRoleOverride={showDevTools ? setDevRoleOverride : undefined}
             />
 
             {/* Floating Sidebar */}
@@ -926,45 +842,37 @@ export const FlowEditorPage = () => {
 
             {/* Dev Tools (hidden in production unless debug mode activated) */}
             {showDevTools && (
-                <>
-                    <DevRoleToggle
-                        role={role}
-                        computedRole={computedRole}
-                        onOverride={setDevRoleOverride}
-                        onClose={isDebugMode ? disableDebugMode : undefined}
-                    />
-                    <DevSocketPanel
-                        messages={socketRecorder.messages}
-                        isRecording={socketRecorder.isRecording}
-                        replayState={socketRecorder.replayState}
-                        onToggleRecording={socketRecorder.toggleRecording}
-                        onClear={socketRecorder.clear}
-                        onReplay={msg => {
-                            resetSequenceTracking();
-                            const nodeId = msg.id.split(':')[0];
-                            canvasRef.current?.updateNodeFromServer(
-                                nodeId,
-                                { state: 'IDLE', status: 'IDLE' },
-                                { force: true }
-                            );
-                            replayMessage(msg);
-                        }}
-                        onReplayFromIndex={fromIndex => {
-                            resetSequenceTracking();
-                            resetAllNodesToIdle();
-                            socketRecorder.startReplayFromIndex(fromIndex, replayMessage);
-                        }}
-                        onStopReplay={() => {
-                            socketRecorder.stopReplaySequence();
-                            resetAllNodesToIdle();
-                        }}
-                        onResetNodes={() => {
-                            resetSequenceTracking();
-                            resetAllNodesToIdle();
-                        }}
-                        onMarkReplayed={socketRecorder.markReplayed}
-                    />
-                </>
+                <DevSocketPanel
+                    messages={socketRecorder.messages}
+                    isRecording={socketRecorder.isRecording}
+                    replayState={socketRecorder.replayState}
+                    onToggleRecording={socketRecorder.toggleRecording}
+                    onClear={socketRecorder.clear}
+                    onReplay={msg => {
+                        resetSequenceTracking();
+                        const nodeId = msg.id.split(':')[0];
+                        canvasRef.current?.updateNodeFromServer(
+                            nodeId,
+                            { state: 'IDLE', status: 'IDLE' },
+                            { force: true }
+                        );
+                        replayMessage(msg);
+                    }}
+                    onReplayFromIndex={fromIndex => {
+                        resetSequenceTracking();
+                        resetAllNodesToIdle();
+                        socketRecorder.startReplayFromIndex(fromIndex, replayMessage);
+                    }}
+                    onStopReplay={() => {
+                        socketRecorder.stopReplaySequence();
+                        resetAllNodesToIdle();
+                    }}
+                    onResetNodes={() => {
+                        resetSequenceTracking();
+                        resetAllNodesToIdle();
+                    }}
+                    onMarkReplayed={socketRecorder.markReplayed}
+                />
             )}
 
             {/* Loading Overlay */}

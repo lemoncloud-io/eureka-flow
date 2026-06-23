@@ -44,6 +44,7 @@ import {
     TooltipTrigger,
 } from '@flows/ui-kit';
 
+import { DevRoleChip } from './DevRoleChip';
 import { RoleIndicator } from './RoleIndicator';
 import { DebugModeToggle } from '../../../components/DebugModeToggle';
 
@@ -110,6 +111,9 @@ interface HeaderProps {
     onVersionClick?: () => void;
     isDebugMode?: boolean;
     onDisableDebugMode?: () => void;
+    devRole?: FlowRole | null;
+    computedRole?: FlowRole;
+    onDevRoleOverride?: (role: FlowRole | null) => void;
 }
 
 const FlowNameInput: React.FC<FlowInfoProps> = ({ flowName, onNameChange }) => {
@@ -354,6 +358,9 @@ export const Header: React.FC<HeaderProps> = ({
     onVersionClick,
     isDebugMode,
     onDisableDebugMode,
+    devRole,
+    computedRole,
+    onDevRoleOverride,
 }) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
@@ -493,6 +500,15 @@ export const Header: React.FC<HeaderProps> = ({
                         )}
                         {socketState && <SocketDot {...socketState} />}
                     </div>
+
+                    {/* Dev role switcher */}
+                    {devRole !== undefined && computedRole && onDevRoleOverride && (
+                        <DevRoleChip
+                            role={devRole ?? computedRole}
+                            computedRole={computedRole}
+                            onOverride={onDevRoleOverride}
+                        />
+                    )}
 
                     {/* Menu */}
                     <DropdownMenu>
