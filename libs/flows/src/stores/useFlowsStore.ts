@@ -28,8 +28,10 @@ interface FlowsState {
     channelId: string | null;
     /** Whether this flow is publicly accessible */
     isPublic: boolean;
-    /** Whether the current user can edit this flow (from server response) */
+    /** Whether the current user has edit permission (Owner OR same-workspace Editor) */
     isEditable: boolean;
+    /** Whether the current user owns this flow (Owner only — gates structural/metadata edits) */
+    hasOwned: boolean;
     /** Thumbnail URL (http or s3) */
     flowThumbnail: string;
 
@@ -47,6 +49,7 @@ interface FlowsState {
     setChannelId: (channelId: string | null) => void;
     setIsPublic: (isPublic: boolean) => void;
     setIsEditable: (isEditable: boolean) => void;
+    setHasOwned: (hasOwned: boolean) => void;
     setFlowThumbnail: (thumbnail: string) => void;
 }
 
@@ -63,7 +66,8 @@ export const useFlowsStore = create<FlowsState>(set => ({
     saveError: null,
     channelId: '0000',
     isPublic: false,
-    isEditable: true,
+    isEditable: false,
+    hasOwned: false,
     flowThumbnail: '',
 
     setBlockRegistry: blocks => {
@@ -114,6 +118,8 @@ export const useFlowsStore = create<FlowsState>(set => ({
 
     setIsEditable: isEditable => set({ isEditable }),
 
+    setHasOwned: hasOwned => set({ hasOwned }),
+
     setFlowThumbnail: thumbnail => set({ flowThumbnail: thumbnail }),
 }));
 
@@ -129,4 +135,6 @@ export const useSaveError = () => useFlowsStore(state => state.saveError);
 export const useChannelId = () => useFlowsStore(state => state.channelId);
 export const useFlowDescription = () => useFlowsStore(state => state.flowDescription);
 export const useIsPublic = () => useFlowsStore(state => state.isPublic);
+export const useIsEditable = () => useFlowsStore(state => state.isEditable);
+export const useHasOwned = () => useFlowsStore(state => state.hasOwned);
 export const useFlowThumbnail = () => useFlowsStore(state => state.flowThumbnail);

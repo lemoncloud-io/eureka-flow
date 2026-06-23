@@ -1,6 +1,6 @@
 {
   "name": "@flows/source",
-  "version": "0.53.2",
+  "version": "0.55.0",
   "license": "Apache-2.0",
   "private": true,
   "scripts": {
@@ -94,7 +94,7 @@
     "@commitlint/cli": "^19.6.0",
     "@commitlint/config-conventional": "^19.6.0",
     "@eslint/js": "^9.8.0",
-    "@lemoncloud/eureka-flows-api": "^0.26.516",
+    "@lemoncloud/eureka-flows-api": "^0.26.609",
     "@lemoncloud/eureka-sockets-api": "^0.26.412",
     "@nx/eslint": "22.3.3",
     "@nx/eslint-plugin": "22.3.3",

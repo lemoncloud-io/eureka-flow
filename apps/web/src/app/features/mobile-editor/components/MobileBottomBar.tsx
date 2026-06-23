@@ -2,7 +2,9 @@ import { useTranslation } from 'react-i18next';
 
 import { Plus } from 'lucide-react';
 
+import { getPermissions } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+
 
 import type { FlowRole } from '@flows/flows';
 
@@ -13,8 +15,9 @@ interface MobileBottomBarProps {
 
 export const MobileBottomBar = ({ onAddNode, role = 'owner' }: MobileBottomBarProps) => {
     const { t } = useTranslation(['flows']);
+    const { canModifyCanvas } = getPermissions(role);
 
-    if (role !== 'owner') return null;
+    if (!canModifyCanvas) return null;
 
     return (
         <div

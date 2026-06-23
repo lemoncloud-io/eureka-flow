@@ -26,6 +26,7 @@ import {
 
 import { getPermissions, useSystemInfoQuery } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+import { BillingChip } from '@flows/shared';
 import {
     Badge,
     DropdownMenu,
@@ -43,6 +44,7 @@ import {
     TooltipTrigger,
 } from '@flows/ui-kit';
 
+import { RoleIndicator } from './RoleIndicator';
 import { DebugModeToggle } from '../../../components/DebugModeToggle';
 
 import type { FlowRole, SaveStatus } from '@flows/flows';
@@ -355,7 +357,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
     const { t } = useTranslation(['flows']);
     const navigate = useNavigate();
-    const { canEdit, canRun, canCreate } = getPermissions(role);
+    const { canEditStructure, canModifyCanvas, canSave, canRun, canCreate } = getPermissions(role);
 
     const getSaveButtonVariant = (): 'default' | 'success' | 'warning' | 'error' => {
         if (saveState.saveStatus === 'saving') return 'warning';
@@ -381,63 +383,68 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
             )}
             <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3">
-                {/* Left: Brand + Flow Info */}
-                <div data-tour="header-left" className="pointer-events-auto">
-                    <div
-                        className={cn(
-                            'flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-2 sm:px-3 rounded-2xl',
-                            'bg-glass-bg backdrop-blur-2xl border border-border/40',
-                            'shadow-floating'
-                        )}
-                    >
-                        <RouterLink
-                            to="/"
-                            className="flex items-center gap-1.5 sm:gap-2 hover:opacity-70 transition-opacity"
+                {/* Left: Brand + Flow Info + Credits */}
+                <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
+                    <div data-tour="header-left">
+                        <div
+                            className={cn(
+                                'flex items-center gap-1.5 sm:gap-2 h-9 sm:h-10 px-2 sm:px-3 rounded-2xl',
+                                'bg-glass-bg backdrop-blur-2xl border border-border/40',
+                                'shadow-floating'
+                            )}
                         >
-                            <img src="/logo/purple-symbol.png" alt="Eureka Flow" className="h-5 w-5 sm:h-6 sm:w-6" />
-                            <span className="text-xs sm:text-sm font-semibold text-foreground hidden sm:inline">
-                                Flow
-                            </span>
-                            <Badge variant="orange" size="sm" className="hidden sm:inline-flex font-semibold">
-                                {t('header.beta')}
-                            </Badge>
-                        </RouterLink>
-                        <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
-                        {!canEdit ? (
-                            <span className="text-xs sm:text-sm text-foreground truncate max-w-[120px] sm:max-w-[200px]">
-                                {flowInfo.flowName}
-                            </span>
-                        ) : (
-                            <FlowNameInput {...flowInfo} />
-                        )}
-                        {canEdit && (
-                            <span className="hidden md:inline">
-                                <SaveStatusBadge
-                                    saveStatus={saveState.saveStatus}
-                                    lastSavedAt={saveState.lastSavedAt}
-                                />
-                            </span>
-                        )}
-                        {canRun && onRunAll && (
-                            <button
-                                onClick={onRunAll}
-                                className="hidden sm:inline-flex items-center gap-1 px-1.5 text-xs font-semibold text-foreground hover:opacity-70 transition-opacity"
+                            <RouterLink
+                                to="/"
+                                className="flex items-center gap-1.5 sm:gap-2 hover:opacity-70 transition-opacity"
                             >
-                                <img src="/icons/play_all.svg" alt="" className="w-4 h-4" />
-                                {t('header.runAll')}
-                            </button>
-                        )}
-                        {isPublicMode && (
-                            <Badge variant="secondary" size="sm" className="text-[10px]">
-                                {t('header.viewOnly', 'View Only')}
-                            </Badge>
-                        )}
-                        {role === 'guest' && !isPublicMode && (
-                            <Badge variant="secondary" size="sm" className="text-[10px]">
-                                {t('header.guestMode', 'Guest')}
-                            </Badge>
-                        )}
+                                <img
+                                    src="/logo/purple-symbol.png"
+                                    alt="Eureka Flow"
+                                    className="h-5 w-5 sm:h-6 sm:w-6"
+                                />
+                                <span className="text-xs sm:text-sm font-semibold text-foreground hidden sm:inline">
+                                    Flow
+                                </span>
+                                <Badge variant="orange" size="sm" className="hidden sm:inline-flex font-semibold">
+                                    {t('header.beta')}
+                                </Badge>
+                            </RouterLink>
+                            <div className="w-px h-3 sm:h-4 bg-border/60 hidden sm:block" />
+                            {!canEditStructure ? (
+                                <span
+                                    className="text-xs sm:text-sm text-foreground truncate max-w-[120px] sm:max-w-[200px]"
+                                    title={
+                                        !isPublicMode
+                                            ? t('header.ownerOnlyRename', 'Only the owner can rename this flow')
+                                            : undefined
+                                    }
+                                >
+                                    {flowInfo.flowName}
+                                </span>
+                            ) : (
+                                <FlowNameInput {...flowInfo} />
+                            )}
+                            {canSave && (
+                                <span className="hidden md:inline">
+                                    <SaveStatusBadge
+                                        saveStatus={saveState.saveStatus}
+                                        lastSavedAt={saveState.lastSavedAt}
+                                    />
+                                </span>
+                            )}
+                            {canRun && onRunAll && (
+                                <button
+                                    onClick={onRunAll}
+                                    className="hidden sm:inline-flex items-center gap-1 px-1.5 text-xs font-semibold text-foreground hover:opacity-70 transition-opacity"
+                                >
+                                    <img src="/icons/play_all.svg" alt="" className="w-4 h-4" />
+                                    {t('header.runAll')}
+                                </button>
+                            )}
+                            <RoleIndicator role={role} />
+                        </div>
                     </div>
+                    <BillingChip />
                 </div>
 
                 {/* Right: Toolbar */}
@@ -459,7 +466,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 shortcut="⌘O"
                             />
                         )}
-                        {canEdit && (
+                        {canSave && (
                             <ToolbarButton
                                 onClick={editActions.onSave}
                                 icon={<Save className="w-4 h-4" />}
@@ -468,7 +475,7 @@ export const Header: React.FC<HeaderProps> = ({
                                 variant={getSaveButtonVariant()}
                             />
                         )}
-                        {canEdit && (
+                        {canModifyCanvas && (
                             <>
                                 <ToolbarButton
                                     onClick={editActions.onUndo}
@@ -514,7 +521,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     <DropdownMenuShortcut>⌘N</DropdownMenuShortcut>
                                 </DropdownMenuItem>
                             )}
-                            {canEdit && (
+                            {canSave && (
                                 <DropdownMenuItem onClick={fileActions.onSave}>
                                     <Save className="w-4 h-4 mr-2" />
                                     {t('header.saveFlow')}
@@ -539,8 +546,8 @@ export const Header: React.FC<HeaderProps> = ({
 
                             <DropdownMenuSeparator />
 
-                            {/* Edit actions - visible on mobile, owner only */}
-                            {canEdit && (
+                            {/* Edit actions - visible on mobile */}
+                            {canModifyCanvas && (
                                 <div className="sm:hidden">
                                     <DropdownMenuItem onClick={editActions.onUndo}>
                                         <Undo2 className="w-4 h-4 mr-2" />
@@ -560,7 +567,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.canvas')}
                             </DropdownMenuLabel>
-                            {canEdit && (
+                            {canModifyCanvas && (
                                 <DropdownMenuItem onClick={editActions.onAutoLayout}>
                                     <LayoutGrid className="w-4 h-4 mr-2" />
                                     {t('header.autoLayout')}
@@ -579,7 +586,7 @@ export const Header: React.FC<HeaderProps> = ({
                                     {t('header.expandAll')}
                                 </DropdownMenuItem>
                             )}
-                            {canEdit && (
+                            {canModifyCanvas && (
                                 <DropdownMenuItem onClick={editActions.onClear} className="text-destructive">
                                     <Trash2 className="w-4 h-4 mr-2" />
                                     {t('header.clearCanvas')}
@@ -589,7 +596,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuSeparator />
 
                             {/* Share Group */}
-                            {canEdit && (onTogglePublic || onPublish) && (
+                            {canEditStructure && (onTogglePublic || onPublish) && (
                                 <>
                                     <DropdownMenuLabel className="flex items-center justify-between text-xs text-muted-foreground font-normal">
                                         {t('header.menuGroup.share')}
@@ -625,7 +632,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
                                 {t('header.menuGroup.settings')}
                             </DropdownMenuLabel>
-                            {canEdit && (
+                            {canSave && (
                                 <div className="flex items-center justify-between px-2 py-1.5">
                                     <span className="text-sm">{t('header.autoSave')}</span>
                                     <button

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown } from 'lucide-react';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 
-import { useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
+import { getPermissions, useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { BlockIcon } from '../../flows/components/BlockIcon';
@@ -36,6 +36,7 @@ export const MobileStepList = ({
     role = 'owner',
 }: MobileStepListProps) => {
     const { t } = useTranslation(['flows']);
+    const { canModifyCanvas } = getPermissions(role);
     const nodes = useCanvasNodes();
     const connections = useCanvasConnections();
     const blockRegistry = useBlockRegistry();
@@ -80,7 +81,7 @@ export const MobileStepList = ({
             .filter(group => group.nodeIds.length > 0);
     }, [groups, searchQuery, displayNames, nodeMap]);
 
-    const handleDelete = role === 'owner' ? (nodeId: string) => deleteNodeWithSync(nodeId, flowId) : undefined;
+    const handleDelete = canModifyCanvas ? (nodeId: string) => deleteNodeWithSync(nodeId, flowId) : undefined;
 
     /** Check if nodeB follows nodeA via a direct connection (in topological order) */
     const isDirectlyConnected = (prevId: string, currId: string) =>
@@ -101,7 +102,7 @@ export const MobileStepList = ({
                         )}
                     </p>
 
-                    {role === 'owner' &&
+                    {canModifyCanvas &&
                         onAddBlockDirect &&
                         (() => {
                             const quickBlocks = Object.values(blockRegistry)

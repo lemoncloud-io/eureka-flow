@@ -1,5 +1,81 @@
 # Changelog
 
+## [2026-06-23] - root@0.55.0, @flows/web@0.55.0, @flows/admin@0.31.0
+
+### Features
+
+- (dev) replace floating DevRoleToggle with inline header DevRoleChip
+- (permissions) allow editor role to modify canvas (add/delete/connect blocks)
+- (flows) show AI key warning banner on LOCAL only
+- (flows) add read-only RunModeIndicator (own key vs credits)
+- (permissions) consume server v0.26.618 hasOwned/isEditable + useApiKey
+
+### Bug Fixes
+
+- (dev) use ● / ✗ for permission indicators in DevRoleChip tooltip
+- (dev) use circle symbols for permission indicators in DevRoleChip tooltip
+- (i18n) clarify DevRoleChip permission tooltip labels in ko/en
+- (i18n) add missing translations for DevRoleChip and header keys
+- (permissions) replace owner-only guards with canModifyCanvas in mobile + DetailPanel
+- (a11y) role=img on RoleIndicator + BillingChip popover skeleton + credit aria-label
+- (flows) stop infinite re-render loop on flow run (React #185)
+- (socket) route WS run echo via hex connection id + guard propagate loop
+
+### Documentation
+
+- update permission model — split canvas edit from flow metadata, add matrix + ADR amendment
+
+### Refactor
+
+- (dev) make DevRoleChip draggable floating widget
+- (flows) consolidate header billing + role into BillingChip and RoleIndicator
+
+### Other
+
+- revert: (socket) drop frontend hex connection id + misdiagnosed #185 guards
+
+## [2026-06-18] - root@0.54.1, @flows/web@0.54.1, @flows/admin@0.30.1
+
+### Bug Fixes
+
+- (permissions) rename isOwner -> hasOwned to match server /load contract
+- (flows) detect node_/edge_ temp IDs to prevent 404 on node save
+
+## [2026-06-17] - root@0.54.0, @flows/web@0.54.0, @flows/admin@0.30.0
+
+### Features
+
+- (permissions) model 4 flow roles, fix owner-only 403 for editors
+- (models) add LLM model selector with expected credit cost
+- (credits) refresh balance after a flow run
+- (credits) credit chip variants for mobile + navigator headers
+- (credits) figma popover redesign + left-header placement
+- (credits) unify credit control + brand coin glyph
+- (credits) filter tabs, pagination, richer usage rows
+- (credits) in-app credit balance + usage history (A1)
+- (billing) add credit-charge deep-link button to editor
+
+### Bug Fixes
+
+- (credits) cap balance/transactions retries, stop request storm
+
+### Documentation
+
+- (i18n) clarify VITE_I18N_BUCKET_URL must end with stage prefix
+- (billing) use placeholder billing URL for open-source
+
+### Refactor
+
+- (billing) harden useBillingCharge per review
+
+### Chores
+
+- remove stray figma-login-check.png from repo root
+
+### Other
+
+- test: (credits) prove retry cap; stop refetch on reconnect
+
 ## [2026-05-27] - root@0.53.2, @flows/web@0.53.2, @flows/admin@0.29.2
 
 ### Bug Fixes

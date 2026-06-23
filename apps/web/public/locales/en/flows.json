@@ -37,18 +37,28 @@
         "editPublishInfo": "Edit publish info",
         "unpublish": "Unpublish",
         "viewOnly": "View Only",
-        "guestMode": "Guest",
+        "editorMode": "Editor",
+        "editorModeHint": "You can edit settings and run; only the owner can change structure",
         "apiKeySettings": "API Key Settings",
         "guidedTour": "Guided Tour",
         "replayTutorial": "Replay Tutorial",
         "beta": "Beta",
         "graphView": "Graph View",
+        "navigator": "Navigator",
+        "ownerOnlyRename": "Only the owner can rename this flow",
         "menuGroup": {
             "file": "File",
             "canvas": "Canvas",
             "share": "Share",
             "settings": "Settings"
         }
+    },
+    "devRoleChip": {
+        "label": "DEV",
+        "canvas": "Block edit",
+        "config": "Node config",
+        "run": "Run",
+        "metadata": "Rename/Publish"
     },
     "sidebar": {
         "library": "Library",
@@ -68,7 +78,8 @@
         "frontend": "Frontend",
         "portsInfo": "{{inputs}} inputs → {{outputs}} outputs",
         "recent": "Recent",
-        "readOnlyHint": "Sign in to add blocks"
+        "readOnlyHint": "Sign in to add blocks",
+        "viewerHint": "Viewers cannot add blocks"
     },
     "canvas": {
         "executionLogs": "Execution Logs",
@@ -500,6 +511,12 @@
         "fitToView": "Fit to View",
         "goToNode": "Go to node"
     },
+    "permissions": {
+        "ownerOnlyRename": "Only the owner can rename this flow",
+        "ownerOnly": "Owner only",
+        "signInToEdit": "Sign in to edit",
+        "deniedToast": "This action is allowed for the owner only"
+    },
     "mobile": {
         "addNode": "Add Node",
         "addFirstStep": "Add your first step",
@@ -553,7 +570,6 @@
         "searchNodes": "Search nodes...",
         "noSearchResults": "No matching nodes",
         "imageOutput": "Image",
-        "viewOnly": "View only",
         "flowSettings": {
             "menuLabel": "Flow Settings",
             "title": "Flow Settings",

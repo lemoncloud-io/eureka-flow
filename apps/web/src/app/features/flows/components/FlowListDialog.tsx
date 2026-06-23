@@ -55,6 +55,10 @@ const FlowCard: React.FC<{
     const [isEditingDesc, setIsEditingDesc] = useState(false);
     const [descDraft, setDescDraft] = useState(flow.description ?? '');
 
+    // Owner-only: thumbnail, description and delete all hit owner-only metadata
+    // mutations (POST/DELETE /flows/:id). Non-owners would only get a 403.
+    const canManage = flow.hasOwned ?? false;
+
     // Sync draft with prop when flow data changes (e.g. after refetch)
     useEffect(() => {
         if (!isEditingDesc) {
@@ -81,27 +85,39 @@ const FlowCard: React.FC<{
             {/* Thumbnail */}
             <button
                 type="button"
+                disabled={!canManage}
                 className={cn(
                     'group/thumb shrink-0 w-20 h-14 rounded-md overflow-hidden relative',
                     'bg-muted/50 border border-border/50',
-                    !flow.thumbnail && 'flex items-center justify-center'
+                    !flow.thumbnail && 'flex items-center justify-center',
+                    !canManage && 'cursor-default'
                 )}
-                onClick={e => {
-                    e.stopPropagation();
-                    onRequestThumbnailUpload();
-                }}
+                onClick={
+                    canManage
+                        ? e => {
+                              e.stopPropagation();
+                              onRequestThumbnailUpload();
+                          }
+                        : undefined
+                }
             >
                 {flow.thumbnail ? (
                     <>
                         <img src={flow.thumbnail} alt="" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/thumb:bg-black/40 transition-colors">
-                            <Camera className="w-4 h-4 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
-                        </div>
+                        {canManage && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/thumb:bg-black/40 transition-colors">
+                                <Camera className="w-4 h-4 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity" />
+                            </div>
+                        )}
                     </>
                 ) : (
                     <>
-                        <FolderOpen className="w-6 h-6 text-muted-foreground/40 group-hover/thumb:hidden" />
-                        <ImagePlus className="w-5 h-5 text-muted-foreground/50 hidden group-hover/thumb:block" />
+                        <FolderOpen
+                            className={cn('w-6 h-6 text-muted-foreground/40', canManage && 'group-hover/thumb:hidden')}
+                        />
+                        {canManage && (
+                            <ImagePlus className="w-5 h-5 text-muted-foreground/50 hidden group-hover/thumb:block" />
+                        )}
                     </>
                 )}
             </button>
@@ -149,13 +165,22 @@ const FlowCard: React.FC<{
                     />
                 ) : (
                     <p
-                        className="mt-0.5 text-xs text-muted-foreground truncate cursor-text hover:text-foreground/70"
-                        onClick={e => {
-                            e.stopPropagation();
-                            setDescDraft(flow.description ?? '');
-                            setIsEditingDesc(true);
-                        }}
-                        title={flow.description || t('flowList.clickToAddDescription')}
+                        className={cn(
+                            'mt-0.5 text-xs text-muted-foreground truncate',
+                            canManage && 'cursor-text hover:text-foreground/70'
+                        )}
+                        onClick={
+                            canManage
+                                ? e => {
+                                      e.stopPropagation();
+                                      setDescDraft(flow.description ?? '');
+                                      setIsEditingDesc(true);
+                                  }
+                                : undefined
+                        }
+                        title={
+                            canManage ? flow.description || t('flowList.clickToAddDescription') : flow.description || ''
+                        }
                     >
                         {flow.description || (
                             <span className="italic text-muted-foreground/50">{t('flowList.noDescription')}</span>
@@ -175,46 +200,48 @@ const FlowCard: React.FC<{
                 </div>
             </div>
 
-            {/* Actions */}
-            <div
-                className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={e => e.stopPropagation()}
-            >
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-accent">
-                            <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem
-                            onClick={e => {
-                                e.stopPropagation();
-                                onRequestThumbnailUpload();
-                            }}
-                        >
-                            {t('flowList.changeThumbnail')}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onClick={e => {
-                                e.stopPropagation();
-                                setDescDraft(flow.description ?? '');
-                                setIsEditingDesc(true);
-                            }}
-                        >
-                            {t('flowList.editDescription')}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onClick={onDelete}
-                            className="text-destructive focus:text-destructive"
-                            disabled={isCurrent}
-                        >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            {t('flowList.delete')}
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
+            {/* Actions — owner-only (change thumbnail / edit description / delete) */}
+            {canManage && (
+                <div
+                    className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-accent">
+                                <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    onRequestThumbnailUpload();
+                                }}
+                            >
+                                {t('flowList.changeThumbnail')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    setDescDraft(flow.description ?? '');
+                                    setIsEditingDesc(true);
+                                }}
+                            >
+                                {t('flowList.editDescription')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={onDelete}
+                                className="text-destructive focus:text-destructive"
+                                disabled={isCurrent}
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                {t('flowList.delete')}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            )}
         </div>
     );
 };

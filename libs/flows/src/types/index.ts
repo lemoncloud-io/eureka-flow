@@ -291,8 +291,15 @@ export interface FlowModel {
 
 /**
  * FlowView - view representation of flow model
+ *
+ * @see eureka-flows-api v0.26.618 — list/load responses include per-flow permission flags.
  */
-export interface FlowView extends Partial<FlowModel> {}
+export interface FlowView extends Partial<FlowModel> {
+    /** Whether the current user owns this flow (sid+uid match). Only Owners may change structure/metadata. */
+    hasOwned?: boolean;
+    /** Whether the current user has edit permission (true for Owner AND same-workspace Editor). */
+    isEditable?: boolean;
+}
 
 /**
  * FlowBody - body for flow creation/update
@@ -625,8 +632,10 @@ export interface LoadFlowResult extends FlowModel {
     ports?: LoadFlowPortData[];
     /** WebSocket channel ID for real-time node status updates */
     channelId?: string;
-    /** Whether the current user can edit this flow (owner = true, guest = false) */
+    /** Whether the current user has edit permission (true for Owner AND same-workspace Editor) */
     isEditable?: boolean;
+    /** Whether the current user owns this flow (sid+uid match). Only Owners may change structure/metadata. */
+    hasOwned?: boolean;
 }
 
 /**
@@ -828,4 +837,9 @@ export interface ProfileResponse {
     uid: string;
     geminiApiKey?: string;
     openaiApiKey?: string;
+    /**
+     * Whether the workspace has ≥1 AI API key configured (server-authoritative).
+     * Enables the "use own API key vs use credits" run-mode choice. Server v0.26.618.
+     */
+    useApiKey?: boolean;
 }

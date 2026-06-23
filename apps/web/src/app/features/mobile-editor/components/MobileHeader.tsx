@@ -21,6 +21,7 @@ import {
 
 import { getPermissions, useSystemInfoQuery } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+import { BillingChip } from '@flows/shared';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -33,6 +34,7 @@ import {
 } from '@flows/ui-kit';
 
 import { DebugModeToggle } from '../../../components/DebugModeToggle';
+import { RoleIndicator } from '../../flows/components/RoleIndicator';
 import { enableDesktopOverride } from '../hooks';
 
 import type { FlowRole, SaveStatus } from '@flows/flows';
@@ -90,7 +92,7 @@ export const MobileHeader = ({
     onDisableDebugMode,
 }: MobileHeaderProps) => {
     const { t } = useTranslation(['flows']);
-    const { canEdit, canRun } = getPermissions(role);
+    const { canEditStructure, canSave, canRun } = getPermissions(role);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(flowName);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -137,7 +139,7 @@ export const MobileHeader = ({
                     />
                 ) : (
                     <div className="flex items-center gap-1 min-w-0">
-                        {canEdit ? (
+                        {canEditStructure ? (
                             <button
                                 onClick={handleStartEditing}
                                 className="truncate text-base font-bold text-foreground leading-tight"
@@ -160,18 +162,15 @@ export const MobileHeader = ({
                     </div>
                 )}
 
-                {/* View-only badge for non-owner roles */}
-                {!canEdit && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
-                        {t('mobile.viewOnly', 'View only')}
-                    </span>
-                )}
+                {/* Role hint: Editor (config + run) vs View only (viewer/anonymous) */}
+                <RoleIndicator role={role} compact />
                 {/* Disconnected warning */}
                 {isDisconnected && <WifiOff className="w-3.5 h-3.5 text-destructive/60 shrink-0" />}
             </div>
 
             {/* Action buttons group */}
             <div className="flex items-center gap-1 shrink-0">
+                <BillingChip variant="bare" />
                 {/* Search */}
                 {onToggleSearch && nodeCount > 0 && (
                     <button
@@ -183,7 +182,7 @@ export const MobileHeader = ({
                     </button>
                 )}
                 {/* Save */}
-                {canEdit && (
+                {canSave && (
                     <button
                         onClick={onSave}
                         disabled={isSaving}
@@ -250,7 +249,7 @@ export const MobileHeader = ({
                         <FolderOpen className="w-4 h-4" />
                         {t('header.openFlow', 'Open Flow')}
                     </DropdownMenuItem>
-                    {canEdit && (
+                    {canSave && (
                         <DropdownMenuItem onClick={onSave} className="gap-2">
                             <Save className="w-4 h-4" />
                             {t('header.saveFlow', 'Save Flow')}

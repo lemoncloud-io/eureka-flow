@@ -1,6 +1,8 @@
+import { isAiBlock } from '@flows/flows';
 import { Input, Label, Switch, Textarea } from '@flows/ui-kit';
 
 import { MobileFileField } from './MobileFileField';
+import { ModelSelect } from '../../flows/components/ModelSelect';
 
 import type { NodeConfigItem } from '@lemoncloud/eureka-flows-api';
 
@@ -47,6 +49,13 @@ export const ConfigFieldList = ({ fields, config, onConfigChange, blockType }: C
 
                             {field.type === 'boolean' || field.type === 'checkbox' ? (
                                 <Switch checked={!!value} onCheckedChange={v => onConfigChange(field.key, v)} />
+                            ) : field.key === 'model' && blockType && isAiBlock(blockType) ? (
+                                <ModelSelect
+                                    blockType={blockType}
+                                    value={String(value ?? '')}
+                                    onChange={v => onConfigChange(field.key, v)}
+                                    fallbackOptions={field.options}
+                                />
                             ) : field.type === 'select' && field.options ? (
                                 <select
                                     value={String(value)}
