@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-25] - root@0.55.3, @flows/web@0.55.3, @flows/admin@0.31.2
+
+### Bug Fixes
+
+- (ui) correct credit change color
+
 ## [2026-06-25] - root@0.55.2, @flows/web@0.55.2, @flows/admin@0.31.1
 
 ### Bug Fixes
