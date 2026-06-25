@@ -25,7 +25,8 @@ const STEREO_BADGE: Record<CreditStereo, 'secondary' | 'blue' | 'orange' | 'dest
 const TransactionRow = ({ tx }: { tx: TransactionView }) => {
     const { t, i18n } = useTranslation('common');
     const change = tx.creditChange ?? 0;
-    const changeColor = change > 0 ? 'text-success' : change < 0 ? 'text-destructive' : 'text-muted-foreground';
+    const changeColor =
+        change > 0 ? 'text-destructive' : change < 0 ? 'text-blue-500 dark:text-blue-400' : 'text-muted-foreground';
     const sign = change > 0 ? '+' : '';
 
     // Known backend reasons resolve via i18n; unknown reasons fall back to the raw string.
