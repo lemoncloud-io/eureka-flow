@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-25] - root@0.55.2, @flows/web@0.55.2, @flows/admin@0.31.1
+
+### Bug Fixes
+
+- (web-core) stop false API-key clear on large flow payloads
+
 ## [2026-06-24] - root@0.55.1, @flows/web@0.55.1
 
 ### Bug Fixes
