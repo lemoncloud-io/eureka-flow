@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-06-25] - root@0.55.2, @flows/web@0.55.2, @flows/admin@0.31.1
+
+### Bug Fixes
+
+- (web-core) stop false API-key clear on large flow payloads
+
+## [2026-06-24] - root@0.55.1, @flows/web@0.55.1
+
+### Bug Fixes
+
+- (canvas) default node position on load to stop undefined '.x' crash
+- (flows) clear canvas on New for viewer role
+
 ## [2026-06-23] - root@0.55.0, @flows/web@0.55.0, @flows/admin@0.31.0
 
 ### Features

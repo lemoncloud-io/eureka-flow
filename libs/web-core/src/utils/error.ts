@@ -28,23 +28,27 @@ interface ErrorLike {
 const PERMISSION_DENIED_MARKER = 'NOT ALLOWED';
 const AUTH_ERROR_MARKER = 'FORBIDDEN';
 
-/** Normalize response data to uppercase string for marker detection */
-const toUpperBody = (data: unknown): string => {
-    if (!data) return '';
-    const str = typeof data === 'string' ? data : JSON.stringify(data);
-    return str.toUpperCase();
-};
+/**
+ * Extract a 200-wrapped error envelope as an uppercase string.
+ *
+ * API Gateway wraps 403 errors as a short string body that starts with the
+ * status code (e.g. "403 NOT ALLOWED - ..."). A successful load returns a JSON
+ * object, never an envelope — so objects yield '' to avoid scanning legitimate
+ * payload content (a flow node prompt containing "forbidden"/"403" must not be
+ * mistaken for an auth error).
+ */
+const toErrorEnvelope = (data: unknown): string => (typeof data === 'string' ? data.toUpperCase() : '');
 
 /** Check if response body indicates a permission-denied error (valid key, no edit rights) */
 export const isPermissionDeniedResponse = (data: unknown): boolean =>
-    toUpperBody(data).includes(PERMISSION_DENIED_MARKER);
+    toErrorEnvelope(data).includes(PERMISSION_DENIED_MARKER);
 
 /** Single-pass classification of 200-wrapped 403 errors from API Gateway */
 export const classify403Body = (data: unknown): 'permission_denied' | 'auth_error' | null => {
-    const upper = toUpperBody(data);
-    if (!upper.includes('403')) return null;
-    if (upper.includes(PERMISSION_DENIED_MARKER)) return 'permission_denied';
-    if (upper.includes(AUTH_ERROR_MARKER)) return 'auth_error';
+    const body = toErrorEnvelope(data);
+    if (!/^\s*403\b/.test(body)) return null;
+    if (body.includes(PERMISSION_DENIED_MARKER)) return 'permission_denied';
+    if (body.includes(AUTH_ERROR_MARKER)) return 'auth_error';
     return null;
 };
 
