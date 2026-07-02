@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { getPermissions, upsertNode, useBlockRegistry, useCanvasStore } from '@flows/flows';
 
-import { isTempId } from '../../flows/utils';
+import { isUnresolvedTempId, resolveTempId } from '../../flows/utils';
 
 import type { FlowRole } from '@flows/flows';
 import type { NodeConfigItem, NodeData } from '@lemoncloud/eureka-flows-api';
@@ -22,10 +22,12 @@ export const useNodeConfig = (nodeId: string | null, flowId: string | null, role
         (updates: Record<string, unknown>) => {
             // Owner + Editor may sync config; for an Editor the server routes /nodes/:id/upsert
             // into their session overlay (CASE B). Viewer/Anonymous: blocked.
-            if (!canEditConfig || !nodeId || !flowId || isTempId(nodeId)) return;
+            if (!canEditConfig || !nodeId || !flowId || isUnresolvedTempId(nodeId)) return;
             if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
             syncTimerRef.current = window.setTimeout(() => {
-                upsertNode(nodeId, flowId, updates).catch(err => {
+                // resolveTempId: the server may have assigned the real ID while the UI
+                // state still holds the temp ID — upserting the temp ID would re-create it
+                upsertNode(resolveTempId(nodeId), flowId, updates).catch(err => {
                     console.error('[useNodeConfig] Failed to sync node:', err);
                 });
             }, 500);

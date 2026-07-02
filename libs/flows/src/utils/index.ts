@@ -9,6 +9,7 @@ export * from './nodeSize';
 export * from './s3Utils';
 export * from './urlUtils';
 export * from './aiBlockUtils';
+export * from './saveFilter';
 export * from './transformNodes';
 export * from './tempId';
 export * from './process';

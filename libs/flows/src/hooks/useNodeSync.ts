@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { isTempId } from '../utils';
+import { isUnresolvedTempId, markTempIdResolved, resolveTempId } from '../utils';
 import { useCreateNodeMutation, useUpsertNodeMutation } from './queries/useNodesQuery';
 
 import type { NodeView } from '../types';
@@ -118,9 +118,6 @@ export const useNodeSync = ({ flowId, disabled }: UseNodeSyncOptions): UseNodeSy
         Map<string, { resolve: (serverId: string) => void; reject: (error: Error) => void }>
     >(new Map());
 
-    // Map of tempId -> serverId (for already resolved IDs)
-    const resolvedIdsRef = useRef<Map<string, string>>(new Map());
-
     // Track last successfully synced config per node (for skip-if-unchanged optimization)
     const syncedConfigRef = useRef<Map<string, Record<string, string>>>(new Map());
 
@@ -132,7 +129,6 @@ export const useNodeSync = ({ flowId, disabled }: UseNodeSyncOptions): UseNodeSy
             pendingUpdates.current.clear();
             pendingNodeIdsRef.current.clear();
             pendingResolvers.current.clear();
-            resolvedIdsRef.current.clear();
             syncedConfigRef.current.clear();
         };
     }, []);
@@ -155,48 +151,53 @@ export const useNodeSync = ({ flowId, disabled }: UseNodeSyncOptions): UseNodeSy
                 return;
             }
 
-            // Skip if this is a temp ID that hasn't been resolved yet
+            // Skip only IDs created this session whose server create is still in flight.
+            // Temp-format IDs loaded from the server are canonical and must sync.
             // Updates will be synced after ID is assigned
-            if (isTempId(nodeId)) {
-                console.debug('[useNodeSync] Skipping sync for temp ID:', nodeId);
+            if (isUnresolvedTempId(nodeId)) {
+                console.debug('[useNodeSync] Skipping sync for unresolved temp ID:', nodeId);
                 return;
             }
 
+            // UI state may still hold the temp ID briefly after the server assigns the
+            // real one; upserting the temp ID would re-create it as a ghost node.
+            const targetId = resolveTempId(nodeId);
+
             // Merge with any pending updates for this node
-            const existing = pendingUpdates.current.get(nodeId) || {};
+            const existing = pendingUpdates.current.get(targetId) || {};
             const merged = { ...existing, ...updates };
-            pendingUpdates.current.set(nodeId, merged);
+            pendingUpdates.current.set(targetId, merged);
 
             // Clear existing timer for this node
-            const existingTimer = debounceTimers.current.get(nodeId);
+            const existingTimer = debounceTimers.current.get(targetId);
             if (existingTimer) {
                 clearTimeout(existingTimer);
             }
 
             // Set new debounce timer
             const timer = setTimeout(() => {
-                const finalUpdates = pendingUpdates.current.get(nodeId);
+                const finalUpdates = pendingUpdates.current.get(targetId);
                 if (finalUpdates && Object.keys(finalUpdates).length > 0) {
                     // Cast: NodeView lacks `config` but API uses Record<string, string> (see NodeData.config)
                     const configSnapshot = finalUpdates.config
                         ? (finalUpdates.config as Record<string, string>)
                         : undefined;
                     upsertMutation.mutate(
-                        { id: nodeId, flowId, body: finalUpdates },
+                        { id: targetId, flowId, body: finalUpdates },
                         {
                             onSuccess: () => {
                                 if (configSnapshot) {
-                                    syncedConfigRef.current.set(nodeId, configSnapshot);
+                                    syncedConfigRef.current.set(targetId, configSnapshot);
                                 }
                             },
                         }
                     );
-                    pendingUpdates.current.delete(nodeId);
+                    pendingUpdates.current.delete(targetId);
                 }
-                debounceTimers.current.delete(nodeId);
+                debounceTimers.current.delete(targetId);
             }, DEBOUNCE_MS);
 
-            debounceTimers.current.set(nodeId, timer);
+            debounceTimers.current.set(targetId, timer);
         },
         [disabled, upsertMutation, flowId]
     );
@@ -265,8 +266,8 @@ export const useNodeSync = ({ flowId, disabled }: UseNodeSyncOptions): UseNodeSy
                             const serverId = createdNode.id;
                             console.log('[useNodeSync] Node created with server ID:', { tempId, serverId });
 
-                            // Store mapping for future lookups
-                            resolvedIdsRef.current.set(tempId, serverId);
+                            // Store mapping for future lookups (session temp-ID registry)
+                            markTempIdResolved(tempId, serverId);
 
                             // Store synced config for the new server ID
                             if (node.config && Object.keys(node.config).length > 0) {
@@ -343,9 +344,9 @@ export const useNodeSync = ({ flowId, disabled }: UseNodeSyncOptions): UseNodeSy
      * Returns a promise that resolves with the server ID, or rejects on error
      */
     const waitForNodeId = useCallback((tempId: string): Promise<string> => {
-        // Check if already resolved (ID mapping exists)
-        const resolvedId = resolvedIdsRef.current.get(tempId);
-        if (resolvedId) {
+        // Check if already resolved (ID mapping exists in the session registry)
+        const resolvedId = resolveTempId(tempId);
+        if (resolvedId !== tempId) {
             console.debug('[useNodeSync] waitForNodeId: already resolved', { tempId, resolvedId });
             return Promise.resolve(resolvedId);
         }
@@ -377,8 +378,8 @@ export const useNodeSync = ({ flowId, disabled }: UseNodeSyncOptions): UseNodeSy
         debounceTimers.current.forEach(timer => clearTimeout(timer));
         debounceTimers.current.clear();
 
-        // Collect all pending updates (only for non-temp IDs)
-        const updates = Array.from(pendingUpdates.current.entries()).filter(([nodeId]) => !isTempId(nodeId));
+        // Collect all pending updates (only for IDs already persisted on the server)
+        const updates = Array.from(pendingUpdates.current.entries()).filter(([nodeId]) => !isUnresolvedTempId(nodeId));
         pendingUpdates.current.clear();
 
         // Execute pending updates

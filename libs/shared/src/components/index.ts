@@ -6,4 +6,5 @@ export * from './CreditUsageSheet';
 export * from './ErrorFallback';
 export * from './GlobalLoader';
 export * from './LoadingFallback';
+export * from './NotFoundPage';
 export * from './VersionUpdateBanner';

@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-07-02] - root@0.56.0, @flows/web@0.56.0, @flows/admin@0.31.3
+
+### Features
+
+- (web) show 404 page on unmatched routes
+
+### Bug Fixes
+
+- (flows) stop temp node IDs leaking into flow save
+- (flows) allow node selection for viewer role
+
+## [2026-06-25] - root@0.55.3, @flows/web@0.55.3, @flows/admin@0.31.2
+
+### Bug Fixes
+
+- (ui) correct credit change color
+
 ## [2026-06-25] - root@0.55.2, @flows/web@0.55.2, @flows/admin@0.31.1
 
 ### Bug Fixes

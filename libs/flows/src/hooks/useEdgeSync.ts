@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
 import { upsertFlow } from '../api';
+import { markTempIdResolved, resolveTempId } from '../utils';
 
 import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
@@ -85,15 +86,11 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
         Map<string, { resolve: (serverId: string) => void; reject: (error: Error) => void }>
     >(new Map());
 
-    // Map of tempId -> serverId (for already resolved IDs)
-    const resolvedIdsRef = useRef<Map<string, string>>(new Map());
-
     // Cleanup on unmount
     useEffect(() => {
         return () => {
             pendingEdgeIdsRef.current.clear();
             pendingResolvers.current.clear();
-            resolvedIdsRef.current.clear();
         };
     }, []);
 
@@ -144,8 +141,8 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
                             const serverId = createdEdge.id;
                             console.log('[useEdgeSync] Edge created with server ID:', { tempId, serverId });
 
-                            // Store mapping for future lookups
-                            resolvedIdsRef.current.set(tempId, serverId);
+                            // Store mapping for future lookups (session temp-ID registry)
+                            markTempIdResolved(tempId, serverId);
 
                             // Remove from pending
                             pendingEdgeIdsRef.current.delete(tempId);
@@ -193,9 +190,9 @@ export const useEdgeSync = ({ flowId }: UseEdgeSyncOptions): UseEdgeSyncReturn =
      * Returns a promise that resolves with the server ID, or rejects on error
      */
     const waitForEdgeId = useCallback((tempId: string): Promise<string> => {
-        // Check if already resolved (ID mapping exists)
-        const resolvedId = resolvedIdsRef.current.get(tempId);
-        if (resolvedId) {
+        // Check if already resolved (ID mapping exists in the session registry)
+        const resolvedId = resolveTempId(tempId);
+        if (resolvedId !== tempId) {
             console.debug('[useEdgeSync] waitForEdgeId: already resolved', { tempId, resolvedId });
             return Promise.resolve(resolvedId);
         }
