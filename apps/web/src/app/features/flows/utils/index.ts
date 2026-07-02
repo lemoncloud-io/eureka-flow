@@ -1,4 +1,4 @@
-import { TEMP_ID_PREFIXES, generateTempId, isTempId } from '@flows/flows';
+import { TEMP_ID_PREFIXES, generateTempId, isTempId, isUnresolvedTempId, resolveTempId } from '@flows/flows';
 
 import type { Connection, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
 import type { Dispatch, SetStateAction } from 'react';
@@ -145,7 +145,7 @@ export const generateId = (): string => Math.random().toString(36).slice(2, 11);
 
 // Temp-ID utilities now live in @flows/flows (single source of truth shared with the
 // lib sync hooks). Re-exported here so existing imports from this barrel keep working.
-export { generateTempId, isTempId, TEMP_ID_PREFIXES };
+export { generateTempId, isTempId, isUnresolvedTempId, resolveTempId, TEMP_ID_PREFIXES };
 
 /**
  * Calculate bezier curve path for connection lines

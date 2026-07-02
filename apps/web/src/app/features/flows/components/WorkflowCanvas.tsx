@@ -49,9 +49,10 @@ import {
     exportCanvasAsPng,
     generateTempId,
     getVisiblePorts,
-    isTempId,
+    isUnresolvedTempId,
     isValidConnection,
     replaceNodeIdInState,
+    resolveTempId,
     wouldCreateCycle,
 } from '../utils';
 
@@ -1194,6 +1195,23 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             ) => {
                 if (!permissions.canRun) return;
 
+                // A node whose server create is still in flight has no server-known ID —
+                // running it would hit the API with an ID the server never assigned.
+                if (isUnresolvedTempId(nodeId)) {
+                    try {
+                        nodeId = await waitForNodeId(nodeId);
+                    } catch (error) {
+                        console.error('[WorkflowCanvas] Node creation failed, cannot execute:', nodeId, error);
+                        return;
+                    }
+                    // waitForNodeId returns the ID as-is when no create is pending (failed earlier)
+                    if (isUnresolvedTempId(nodeId)) {
+                        console.error('[WorkflowCanvas] Node was never persisted, cannot execute:', nodeId);
+                        return;
+                    }
+                }
+                nodeId = resolveTempId(nodeId);
+
                 const startTime = Date.now();
 
                 setNodes(prev =>
@@ -1212,7 +1230,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                 await Promise.all([flushPendingUpdates(), flushPendingEdges()]);
 
-                const currentNode = nodesRef.current.find(n => n.id === nodeId);
+                // Match through resolveTempId: refs refresh on render, so right after an
+                // ID resolves they may still hold the temp ID while nodeId is the server ID
+                const currentNode = nodesRef.current.find(n => n.id && resolveTempId(n.id) === nodeId);
                 if (!currentNode) return;
 
                 const inputs = manualOverrideInputs || currentNode.inputData;
@@ -1234,7 +1254,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     return;
                 }
 
-                const incomingConnections = connectionsRef.current.filter(c => c.targetNodeId === nodeId);
+                const incomingConnections = connectionsRef.current
+                    .filter(c => resolveTempId(c.targetNodeId) === nodeId)
+                    // Normalize: hydrateInputsFromUpstream re-filters by exact targetNodeId
+                    .map(c => (c.targetNodeId === nodeId ? c : { ...c, targetNodeId: nodeId }));
                 const hydratedInputs = hydrateInputsFromUpstream(nodeId, incomingConnections, nodesRef.current, inputs);
 
                 const missingInputs = nodeDef.inputs.filter(inputPort => {
@@ -1486,6 +1509,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 getSyncedConfig,
                 flushPendingUpdates,
                 flushPendingEdges,
+                waitForNodeId,
             ]
         );
 
@@ -1582,10 +1606,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 setConnections(prev => prev.filter(c => c.sourceNodeId !== id && c.targetNodeId !== id));
                 handleSelectionChange(null);
 
-                if (flowId && !isTempId(id)) {
-                    const serverEdges = connectedEdges.filter(e => e.id && !isTempId(e.id));
-                    const nodesToDelete = [{ id: `#${id}` }] as unknown as NodeData[];
-                    const edgesToDelete = serverEdges.map(e => ({ id: `#${e.id}` })) as unknown as Connection[];
+                if (flowId && !isUnresolvedTempId(id)) {
+                    const serverEdges = connectedEdges.filter(e => e.id && !isUnresolvedTempId(e.id));
+                    const nodesToDelete = [{ id: `#${resolveTempId(id)}` }] as unknown as NodeData[];
+                    const edgesToDelete = serverEdges.map(e => ({
+                        id: `#${resolveTempId(e.id)}`,
+                    })) as unknown as Connection[];
 
                     upsertFlow(flowId, { nodes: nodesToDelete, edges: edgesToDelete }).catch(err => {
                         console.error('[WorkflowCanvas] Failed to delete node:', err);
@@ -1603,8 +1629,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 setConnections(prev => prev.filter(c => c.id !== id));
                 setSelectedConnectionId(null);
 
-                if (flowId && !isTempId(id)) {
-                    const edgesToDelete = [{ id: `#${id}` }] as unknown as Connection[];
+                if (flowId && !isUnresolvedTempId(id)) {
+                    const edgesToDelete = [{ id: `#${resolveTempId(id)}` }] as unknown as Connection[];
 
                     upsertFlow(flowId, { nodes: [], edges: edgesToDelete }).catch(err => {
                         console.error('[WorkflowCanvas] Failed to delete edge:', err);
@@ -1951,9 +1977,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     // Batch update moved nodes' positions via /flows/:id/upsert (owner only)
                     if (flowId && permissions.canModifyCanvas) {
                         const nodesToUpdate = movedNodes
-                            .filter(n => n.id && !isTempId(n.id))
+                            .filter(n => n.id && !isUnresolvedTempId(n.id))
                             .map(n => ({
-                                id: n.id,
+                                id: resolveTempId(n.id),
                                 position: n.position,
                             }));
 
@@ -2034,9 +2060,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     // Batch update moved nodes' positions via /flows/:id/upsert (owner only)
                     if (flowId && permissions.canModifyCanvas) {
                         const nodesToUpdate = movedNodes
-                            .filter(n => n.id && !isTempId(n.id))
+                            .filter(n => n.id && !isUnresolvedTempId(n.id))
                             .map(n => ({
-                                id: n.id,
+                                id: resolveTempId(n.id),
                                 position: n.position,
                             }));
 
@@ -2230,9 +2256,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         );
                     }
 
-                    // Check if either node has a temp ID - if so, wait for real IDs
-                    const sourceIsTempId = isTempId(connectionDraft.sourceNodeId);
-                    const targetIsTempId = isTempId(targetNodeId);
+                    // Check if either node's server create is still in flight - if so, wait for real IDs
+                    const sourceIsTempId = isUnresolvedTempId(connectionDraft.sourceNodeId);
+                    const targetIsTempId = isUnresolvedTempId(targetNodeId);
 
                     // Create edge callback to replace temp ID with server ID
                     const onEdgeIdAssigned = (oldTempId: string, newServerId: string) => {
@@ -2244,9 +2270,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         createEdgeAsync(
                             tempEdgeId,
                             {
-                                sourceNodeId: connectionDraft.sourceNodeId,
+                                sourceNodeId: resolveTempId(connectionDraft.sourceNodeId),
                                 sourcePortId: connectionDraft.sourcePortId,
-                                targetNodeId,
+                                targetNodeId: resolveTempId(targetNodeId),
                                 targetPortId,
                             },
                             onEdgeIdAssigned
@@ -2256,8 +2282,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         const createEdgeAfterNodeIds = async () => {
                             const resolvedSourceId = sourceIsTempId
                                 ? await waitForNodeId(connectionDraft.sourceNodeId)
-                                : connectionDraft.sourceNodeId;
-                            const resolvedTargetId = targetIsTempId ? await waitForNodeId(targetNodeId) : targetNodeId;
+                                : resolveTempId(connectionDraft.sourceNodeId);
+                            const resolvedTargetId = targetIsTempId
+                                ? await waitForNodeId(targetNodeId)
+                                : resolveTempId(targetNodeId);
 
                             createEdgeAsync(
                                 tempEdgeId,
@@ -2409,15 +2437,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         handleSelectionChange(null);
 
                         if (flowId) {
-                            const serverNodeIds = Array.from(selectedNodeIds).filter(id => !isTempId(id));
-                            const serverEdges = connectedEdges.filter(e => e.id && !isTempId(e.id));
+                            const serverNodeIds = Array.from(selectedNodeIds).filter(id => !isUnresolvedTempId(id));
+                            const serverEdges = connectedEdges.filter(e => e.id && !isUnresolvedTempId(e.id));
 
                             if (serverNodeIds.length > 0 || serverEdges.length > 0) {
                                 const nodesToDelete = serverNodeIds.map(id => ({
-                                    id: `#${id}`,
+                                    id: `#${resolveTempId(id)}`,
                                 })) as unknown as NodeData[];
                                 const edgesToDelete = serverEdges.map(e => ({
-                                    id: `#${e.id}`,
+                                    id: `#${resolveTempId(e.id)}`,
                                 })) as unknown as Connection[];
 
                                 upsertFlow(flowId, { nodes: nodesToDelete, edges: edgesToDelete }).catch(err => {
@@ -2433,8 +2461,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         setHoveredConnectionId(null);
                         setTooltip(null);
 
-                        if (flowId && targetId && !isTempId(targetId)) {
-                            const edgesToDelete = [{ id: `#${targetId}` }] as unknown as Connection[];
+                        if (flowId && targetId && !isUnresolvedTempId(targetId)) {
+                            const edgesToDelete = [{ id: `#${resolveTempId(targetId)}` }] as unknown as Connection[];
 
                             upsertFlow(flowId, { nodes: [], edges: edgesToDelete }).catch(err => {
                                 console.error('[WorkflowCanvas] Failed to delete edge:', err);
