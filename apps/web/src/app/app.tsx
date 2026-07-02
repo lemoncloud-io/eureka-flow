@@ -2,7 +2,7 @@ import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 
-import { SITE_URL } from '@flows/shared';
+import { NotFoundPage, SITE_URL } from '@flows/shared';
 import { isOAuthEnabled } from '@flows/web-core';
 
 import { KeyCreationPage, KeySuccessPage, LoginPage, OAuthResponsePage } from './features/auth';
@@ -79,6 +79,9 @@ export const App = () => {
                         <Route path="/auth/key-created" element={<KeySuccessPage />} />
                     </>
                 )}
+
+                {/* Catch-all: unmatched paths (e.g. /apps/*) */}
+                <Route path="*" element={<NotFoundPage />} />
             </Routes>
         </BrowserRouter>
     );
