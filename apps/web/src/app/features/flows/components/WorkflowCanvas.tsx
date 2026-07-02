@@ -1766,7 +1766,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         };
 
         const handleNodeMouseDown = (e: React.MouseEvent, nodeId: string) => {
-            if (!permissions.canDragNodes) return;
             e.stopPropagation();
             setContextMenu(null);
 
@@ -1803,6 +1802,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             }
             // If already selected without modifier, keep current selection for group drag
 
+            // Selection is allowed for all roles above; dragging requires permission
+            if (!permissions.canDragNodes) return;
+
             dragStartSnapshotRef.current = {
                 nodes: JSON.parse(JSON.stringify(nodes)),
                 connections: [...connections],
@@ -1831,8 +1833,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         // Touch version of node drag start
         // Note: Selection happens on touch END (tap), not start, to distinguish tap vs drag
+        // Runs for all roles so tap-to-select works without drag permission;
+        // actual movement is gated by canDragNodes in handleNodeTouchMove
         const handleNodeTouchStart = (e: React.TouchEvent, nodeId: string) => {
-            if (!permissions.canDragNodes) return;
             e.stopPropagation();
 
             // Don't start drag during port connection
