@@ -4,7 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown } from 'lucide-react';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 
-import { getPermissions, useBlockRegistry, useCanvasConnections, useCanvasNodes, useCanvasStore } from '@flows/flows';
+import {
+    getPermissions,
+    translateServerKey,
+    useBlockRegistry,
+    useCanvasConnections,
+    useCanvasNodes,
+    useCanvasStore,
+} from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { BlockIcon } from '../../flows/components/BlockIcon';
@@ -33,14 +40,14 @@ export const MobileStepList = ({
     searchQuery,
     role = 'owner',
 }: MobileStepListProps) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const { canModifyCanvas } = getPermissions(role);
     const nodes = useCanvasNodes();
     const connections = useCanvasConnections();
     const blockRegistry = useBlockRegistry();
 
     const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
-    const displayNames = useMemo(() => buildNodeDisplayNames(nodes, blockRegistry), [nodes, blockRegistry]);
+    const displayNames = useMemo(() => buildNodeDisplayNames(nodes, blockRegistry, t), [nodes, blockRegistry, t]);
 
     /** Connected components — each is an independent subflow */
     const groups = useMemo(() => findConnectedComponents(nodes, connections), [nodes, connections]);
@@ -128,7 +135,7 @@ export const MobileStepList = ({
                                             >
                                                 <BlockIcon icon={block.icon} size={16} />
                                             </div>
-                                            {block.label}
+                                            {translateServerKey(t, block.label)}
                                         </button>
                                     ))}
                                 </div>

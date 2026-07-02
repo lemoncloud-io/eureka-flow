@@ -4,7 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Check, ChevronDown, ChevronUp, Link2, Link2Off, Plus, Unlink } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-import { getPermissions, useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
+import {
+    getPermissions,
+    resolveNodeName,
+    translateServerKey,
+    useBlockRegistry,
+    useCanvasConnections,
+    useCanvasNodes,
+} from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
@@ -44,7 +51,7 @@ export const MobileConnectionSheet = ({
     direction = 'output',
     role = 'owner',
 }: MobileConnectionSheetProps) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const { canModifyCanvas } = getPermissions(role);
     const readOnly = !canModifyCanvas;
     const connections = useCanvasConnections();
@@ -95,13 +102,13 @@ export const MobileConnectionSheet = ({
             return {
                 connectionId: conn.id,
                 targetNodeId: otherNodeId,
-                targetNodeName: otherNode?.customLabel || otherDef?.label || otherNodeId,
+                targetNodeName: resolveNodeName(otherNode, otherDef, t, otherNodeId),
                 targetIcon: otherDef?.icon,
-                breadcrumb: `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${otherDef?.label ?? otherNodeId}`,
+                breadcrumb: `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${translateServerKey(t, otherDef?.label) || otherNodeId}`,
                 stereo,
             };
         });
-    }, [connections, sourceNodeId, sourcePortId, nodes, blockRegistry, isOutput]);
+    }, [connections, sourceNodeId, sourcePortId, nodes, blockRegistry, isOutput, t]);
 
     const availableTargets = compatibleTargets.filter(t => !t.alreadyConnected);
     const hasConnections = existingWithNames.length > 0;
@@ -271,7 +278,7 @@ export const MobileConnectionSheet = ({
                                         const targetNode = nodes.find(n => n.id === target.nodeId);
                                         const targetDef = targetNode ? blockRegistry[targetNode.type] : undefined;
                                         const stereo = targetDef?.stereo ?? 'process';
-                                        const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${targetDef?.label ?? target.nodeId}`;
+                                        const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${translateServerKey(t, targetDef?.label) || target.nodeId}`;
 
                                         return (
                                             <button

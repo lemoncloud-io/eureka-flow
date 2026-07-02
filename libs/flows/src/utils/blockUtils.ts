@@ -1,5 +1,37 @@
+import { translateServerKey } from './i18nServerKey';
+
 import type { BlockDefinitionWithFrontend } from '../types';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { TFunction } from 'i18next';
+
+/**
+ * Resolve a node's display name with the standard precedence:
+ * user `customLabel` (never translated) → translated block label → fallback (defaults to node type).
+ * Centralizes the "customLabel wins, label is a server key" invariant used across editor surfaces.
+ */
+export const resolveNodeName = (
+    node: Pick<NodeData, 'customLabel' | 'type'> | undefined,
+    def: BlockDefinitionWithFrontend | undefined,
+    t: TFunction,
+    fallback: string | undefined = node?.type
+): string => node?.customLabel || translateServerKey(t, def?.label) || fallback || '';
+
+/**
+ * Match a block against a search query, testing both the translated text and the raw key/type,
+ * so search works in any language and against un-migrated raw text.
+ */
+export const blockMatchesQuery = (
+    t: TFunction,
+    block: Pick<BlockDefinitionWithFrontend, 'label' | 'description' | 'type'>,
+    query: string
+): boolean =>
+    [
+        translateServerKey(t, block.label),
+        translateServerKey(t, block.description),
+        block.label,
+        block.description,
+        block.type,
+    ].some(value => value.toLowerCase().includes(query));
 
 /**
  * Find block definition by config keys when node.type doesn't match registry

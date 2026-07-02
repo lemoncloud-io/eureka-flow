@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChevronUp, LayoutGrid, Search, X } from 'lucide-react';
 
-import { BLOCK_CATEGORIES, BLOCK_CATEGORY_CONFIG, useBlockGroups } from '@flows/flows';
+import { BLOCK_CATEGORIES, BLOCK_CATEGORY_CONFIG, translateServerKey, useBlockGroups } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Collapsible,
@@ -100,7 +100,7 @@ type CategoryKey = keyof typeof BLOCK_CATEGORY_CONFIG;
 
 export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoading, role = 'owner' }, ref) => {
     const isReadOnly = role === 'viewer' || role === 'anonymous';
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const [isOpen, setIsOpen] = useState(false);
     const [expandedCategories, setExpandedCategories] = useState<Set<CategoryKey>>(new Set(BLOCK_CATEGORIES));
     const [searchQuery, setSearchQuery] = useState('');
@@ -280,8 +280,11 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                                 <BlockCard
                                                                     key={block.id}
                                                                     type={block.id}
-                                                                    label={block.label}
-                                                                    description={block.description}
+                                                                    label={translateServerKey(t, block.label)}
+                                                                    description={translateServerKey(
+                                                                        t,
+                                                                        block.description
+                                                                    )}
                                                                     icon={block.icon}
                                                                     onAdd={() => handleAddNode(block.id)}
                                                                     disabled={isLoading || isReadOnly}

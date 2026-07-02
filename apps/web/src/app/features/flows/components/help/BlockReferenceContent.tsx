@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChevronRight, Cpu, Search } from 'lucide-react';
 
-import { useBlocks } from '@flows/flows';
+import { blockMatchesQuery, translateServerKey, useBlocks } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { MarkdownViewer } from '@flows/ui-kit';
 
@@ -20,7 +20,7 @@ interface BlockItemProps {
 }
 
 const BlockItem = ({ block, isSelected, onClick }: BlockItemProps) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
 
     return (
         <button
@@ -32,7 +32,7 @@ const BlockItem = ({ block, isSelected, onClick }: BlockItemProps) => {
         >
             <div className="flex items-center gap-2">
                 <BlockIcon icon={block.icon} size={20} fallback={<span className="text-lg">📦</span>} />
-                <span className="font-medium text-sm">{block.label}</span>
+                <span className="font-medium text-sm">{translateServerKey(t, block.label)}</span>
                 {block.isFrontend && (
                     <span className="ml-auto flex items-center gap-1 text-xs text-primary">
                         <Cpu className="w-3 h-3" />
@@ -40,7 +40,9 @@ const BlockItem = ({ block, isSelected, onClick }: BlockItemProps) => {
                     </span>
                 )}
             </div>
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{block.description}</p>
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                {translateServerKey(t, block.description)}
+            </p>
         </button>
     );
 };
@@ -50,21 +52,21 @@ interface BlockDetailProps {
 }
 
 const BlockDetail = ({ block }: BlockDetailProps) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
 
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-3">
                 <BlockIcon icon={block.icon} size={28} fallback={<span className="text-2xl">📦</span>} />
                 <div>
-                    <h3 className="font-semibold">{block.label}</h3>
+                    <h3 className="font-semibold">{translateServerKey(t, block.label)}</h3>
                     <p className="text-xs text-muted-foreground">{block.type}</p>
                 </div>
             </div>
 
             <div className="text-sm text-muted-foreground">
                 <MarkdownViewer
-                    content={block.description || ''}
+                    content={translateServerKey(t, block.description)}
                     className="[&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_p]:text-sm [&_code]:text-xs"
                 />
             </div>
@@ -87,7 +89,7 @@ const BlockDetail = ({ block }: BlockDetailProps) => {
                             <div key={input.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full bg-primary" />
-                                    <span className="text-sm">{input.label || input.id}</span>
+                                    <span className="text-sm">{translateServerKey(t, input.label) || input.id}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs text-muted-foreground">{input.type || 'any'}</span>
@@ -111,7 +113,7 @@ const BlockDetail = ({ block }: BlockDetailProps) => {
                             <div key={output.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full bg-green-500" />
-                                    <span className="text-sm">{output.label || output.id}</span>
+                                    <span className="text-sm">{translateServerKey(t, output.label) || output.id}</span>
                                 </div>
                                 <span className="text-xs text-muted-foreground">{output.type || 'any'}</span>
                             </div>
@@ -155,7 +157,7 @@ const BlockDetail = ({ block }: BlockDetailProps) => {
 };
 
 export const BlockReferenceContent = () => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const { blockRegistry } = useBlocks();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -173,17 +175,14 @@ export const BlockReferenceContent = () => {
     }, [blockRegistry]);
 
     const filteredBlocks = useMemo(() => {
+        const query = searchQuery.toLowerCase();
         return blocks.filter(block => {
-            const matchesSearch =
-                !searchQuery ||
-                block.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                block.description?.toLowerCase().includes(searchQuery.toLowerCase());
-
+            const matchesSearch = !searchQuery || blockMatchesQuery(t, block, query);
             const matchesCategory = !selectedCategory || block.stereo === selectedCategory;
 
             return matchesSearch && matchesCategory;
         });
-    }, [blocks, searchQuery, selectedCategory]);
+    }, [blocks, searchQuery, selectedCategory, t]);
 
     const selectedBlock = selectedBlockType ? blockRegistry[selectedBlockType] : null;
 

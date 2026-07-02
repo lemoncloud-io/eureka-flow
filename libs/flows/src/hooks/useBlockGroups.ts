@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { isOutputBlock } from '../consts';
 import { useBlockRegistry } from '../stores/useFlowsStore';
-
-import type { BlockDefinitionWithFrontend } from '../types';
+import { blockMatchesQuery } from '../utils';
 
 export const useBlockGroups = (searchQuery: string) => {
     const blockRegistry = useBlockRegistry();
+    const { t } = useTranslation('blocks');
 
     return useMemo(() => {
         const blocks = Object.entries(blockRegistry)
@@ -14,14 +15,7 @@ export const useBlockGroups = (searchQuery: string) => {
             .map(([, block]) => block);
 
         const query = searchQuery.toLowerCase().trim();
-        const filtered = query
-            ? blocks.filter(
-                  (b: BlockDefinitionWithFrontend) =>
-                      b.label.toLowerCase().includes(query) ||
-                      b.description.toLowerCase().includes(query) ||
-                      b.type.toLowerCase().includes(query)
-              )
-            : blocks;
+        const filtered = query ? blocks.filter(b => blockMatchesQuery(t, b, query)) : blocks;
 
         return {
             inputs: filtered.filter(b => b.stereo === 'input' || (!b.stereo && b.type.startsWith('input-'))),
@@ -30,5 +24,5 @@ export const useBlockGroups = (searchQuery: string) => {
             ),
             outputs: filtered.filter(b => b.stereo === 'output' || (!b.stereo && isOutputBlock(b.type))),
         };
-    }, [blockRegistry, searchQuery]);
+    }, [blockRegistry, searchQuery, t]);
 };

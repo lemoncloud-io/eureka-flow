@@ -9,7 +9,7 @@ import resourcesToBackend from 'i18next-resources-to-backend';
 
 const I18N_VERSION = process.env.I18N_VERSION || 'fallback';
 const isDevelopment = import.meta.env.DEV;
-const namespaces = ['common', 'flows', 'nodes', 'landing', 'tutorial'];
+const namespaces = ['common', 'flows', 'nodes', 'landing', 'tutorial', 'blocks'];
 const S3_BUCKET_URL = import.meta.env.VITE_I18N_BUCKET_URL;
 
 // Clean up old i18n caches (production only)

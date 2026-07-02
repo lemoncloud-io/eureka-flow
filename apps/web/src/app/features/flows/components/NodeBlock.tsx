@@ -16,6 +16,7 @@ import {
     getNodeWidth,
     isAiBlock,
     isMissingAiKey,
+    translateServerKey,
     useBlockRegistry,
     useCanvasStore,
     useNodeTraceLogs,
@@ -202,7 +203,7 @@ export const NodeBlock = memo<NodeBlockProps>(
         isCollapsed = false,
         onToggleCollapsed,
     }) => {
-        const { t } = useTranslation(['nodes', 'flows']);
+        const { t } = useTranslation(['nodes', 'flows', 'blocks']);
         const blockRegistry = useBlockRegistry();
         const tutorialHint = useCanvasStore(s => s.tutorialHint);
         const productId = getNodeProductId(node);
@@ -510,12 +511,12 @@ export const NodeBlock = memo<NodeBlockProps>(
                             <div className="flex flex-col overflow-hidden min-w-0">
                                 <div className="flex items-center gap-1.5">
                                     <span className="font-semibold text-[13px] text-foreground truncate leading-tight">
-                                        {node.customLabel || definition.label}
+                                        {node.customLabel || translateServerKey(t, definition.label)}
                                     </span>
                                 </div>
                                 {node.customLabel && (
                                     <span className="text-[9px] text-muted-foreground/70 truncate font-mono leading-tight">
-                                        {definition.label}
+                                        {translateServerKey(t, definition.label)}
                                     </span>
                                 )}
                             </div>

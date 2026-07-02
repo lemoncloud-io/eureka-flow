@@ -1,7 +1,9 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Braces, Hash, Image, Sparkles, Type } from 'lucide-react';
 
+import { translateServerKey } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { isMarkdownContent } from '@flows/ui-kit';
 
@@ -123,6 +125,7 @@ export const PortItem: React.FC<PortItemProps> = ({
     onTouchStart,
     onDoubleClick,
 }) => {
+    const { t } = useTranslation(['flows', 'blocks']);
     // Determine if this input port is a valid drop target for the current connection draft
     const isDraggingConnection = !!connectionDraft;
     const isInputPort = type === 'input';
@@ -236,7 +239,7 @@ export const PortItem: React.FC<PortItemProps> = ({
             >
                 <div className="flex items-center gap-1">
                     {PortIcon && <PortIcon className="w-2.5 h-2.5 shrink-0" />}
-                    <span className="font-semibold uppercase tracking-wider">{port.label}</span>
+                    <span className="font-semibold uppercase tracking-wider">{translateServerKey(t, port.label)}</span>
                 </div>
                 {portData && (
                     <div className="mt-1 pt-1 border-t border-border/50">

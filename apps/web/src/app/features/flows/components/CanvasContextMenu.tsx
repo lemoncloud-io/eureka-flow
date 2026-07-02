@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChevronRight, Search, X } from 'lucide-react';
 
-import { BLOCK_CATEGORIES, BLOCK_CATEGORY_CONFIG, useBlockGroups } from '@flows/flows';
+import { BLOCK_CATEGORIES, BLOCK_CATEGORY_CONFIG, translateServerKey, useBlockGroups } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { BlockIcon } from './BlockIcon';
@@ -20,7 +20,7 @@ const MENU_MAX_HEIGHT = 360;
 const VIEWPORT_PADDING = 8;
 
 export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ screenX, screenY, onSelect, onClose }) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const [searchQuery, setSearchQuery] = useState('');
     const menuRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -135,7 +135,7 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ screenX, s
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-1">
                                             <span className="text-xs font-medium text-foreground truncate">
-                                                {block.label}
+                                                {translateServerKey(t, block.label)}
                                             </span>
                                         </div>
                                     </div>

@@ -1,5 +1,5 @@
 /** Default namespaces/languages — used as fallback when presign API is unavailable */
-export const DEFAULT_NAMESPACES = ['common', 'flows', 'nodes', 'landing', 'tutorial'];
+export const DEFAULT_NAMESPACES = ['common', 'flows', 'nodes', 'landing', 'tutorial', 'blocks'];
 export const DEFAULT_LANGUAGES = ['en', 'ko'];
 
 export const PRESIGN_API_URL = import.meta.env.VITE_I18N_PRESIGN_URL as string | undefined;

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, Check, ChevronDown, ChevronUp, Unlink } from 'lucide-react';
 
-import { useBlockRegistry, useCanvasStore } from '@flows/flows';
+import { resolveNodeName, translateServerKey, useBlockRegistry, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
@@ -28,7 +28,7 @@ export const MobileConnectionCard = ({
     onTap,
 }: MobileConnectionCardProps) => {
     const isNew = useIsConnectionNew(connectionId);
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const [expanded, setExpanded] = useState(true);
     const blockRegistry = useBlockRegistry();
 
@@ -49,8 +49,8 @@ export const MobileConnectionCard = ({
     if (!node || !blockDef) return null;
 
     const stereo = blockDef.stereo ?? 'process';
-    const displayName = node.customLabel || blockDef.label || node.type;
-    const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${blockDef.label ?? node.type}`;
+    const displayName = resolveNodeName(node, blockDef, t);
+    const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${translateServerKey(t, blockDef.label) || node.type}`;
     const nodeState = (node.state ?? 'IDLE') as string;
     const isError = nodeState === 'ERROR';
     const errorMessage =

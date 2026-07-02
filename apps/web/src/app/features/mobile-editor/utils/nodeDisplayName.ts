@@ -1,5 +1,8 @@
+import { translateServerKey } from '@flows/flows';
+
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { TFunction } from 'i18next';
 
 /**
  * Build a map of nodeId → disambiguated display name.
@@ -8,7 +11,8 @@ import type { NodeData } from '@lemoncloud/eureka-flows-api';
  */
 export const buildNodeDisplayNames = (
     nodes: NodeData[],
-    blockRegistry: Record<string, BlockDefinitionWithFrontend>
+    blockRegistry: Record<string, BlockDefinitionWithFrontend>,
+    t: TFunction
 ): Map<string, string> => {
     const result = new Map<string, string>();
 
@@ -22,7 +26,7 @@ export const buildNodeDisplayNames = (
         }
 
         const def = blockRegistry[node.type];
-        const baseLabel = def?.label || node.type;
+        const baseLabel = translateServerKey(t, def?.label) || node.type;
         const group = labelGroups.get(baseLabel) ?? [];
         group.push(node.id);
         labelGroups.set(baseLabel, group);
