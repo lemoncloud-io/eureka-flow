@@ -10,6 +10,8 @@ import resourcesToBackend from 'i18next-resources-to-backend';
 const I18N_VERSION = process.env.I18N_VERSION || 'fallback';
 const isDevelopment = import.meta.env.DEV;
 const namespaces = ['common', 'flows', 'nodes', 'landing', 'tutorial', 'blocks'];
+// Single source of truth for languages — add a language here (and its resource files) to enable it.
+const SUPPORTED_LANGUAGES = ['en', 'ko'] as const;
 const S3_BUCKET_URL = import.meta.env.VITE_I18N_BUCKET_URL;
 
 // Clean up old i18n caches (production only)
@@ -43,7 +45,7 @@ i18n.use(ChainedBackend)
     .use(initReactI18next)
     .init({
         fallbackLng: 'en',
-        supportedLngs: ['en', 'ko'],
+        supportedLngs: [...SUPPORTED_LANGUAGES],
         defaultNS: 'common',
         ns: namespaces,
         debug: isDevelopment,
@@ -55,7 +57,7 @@ i18n.use(ChainedBackend)
                 {
                     prefix: `i18next_res_${I18N_VERSION}_`,
                     expirationTime: isDevelopment ? 5 * 60 * 1000 : 60 * 60 * 1000,
-                    versions: { en: I18N_VERSION, ko: I18N_VERSION },
+                    versions: Object.fromEntries(SUPPORTED_LANGUAGES.map(lng => [lng, I18N_VERSION])),
                 },
                 {
                     loadPath: httpLoadPath,
