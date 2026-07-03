@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Wand2 } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { Button } from '@flows/ui-kit';
 
 import { BlockTable } from '../components/BlockTable';
+import { MigrationDialog } from '../components/MigrationDialog';
 import { useBlocksQuery } from '../hooks';
 
 import type { BlockStereo } from '../types';
@@ -23,6 +24,7 @@ export const BlockListPage = () => {
     const { data: blocks = [], isLoading, error } = useBlocksQuery();
 
     const [activeTab, setActiveTab] = useState<BlockStereo | 'all'>('all');
+    const [migrationOpen, setMigrationOpen] = useState(false);
 
     const filteredBlocks = useMemo(() => {
         const sorted = [...blocks].sort((a, b) => a.order - b.order);
@@ -34,9 +36,16 @@ export const BlockListPage = () => {
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-foreground">블록 관리</h1>
-                <Button size="sm" onClick={() => navigate('/blocks/new')}>
-                    <Plus className="mr-1.5 h-4 w-4" />새 블록 추가
-                </Button>
+                <div className="flex gap-2">
+                    {import.meta.env.DEV && (
+                        <Button variant="outline" size="sm" onClick={() => setMigrationOpen(true)} disabled={isLoading}>
+                            <Wand2 className="mr-1.5 h-4 w-4" />키 마이그레이션
+                        </Button>
+                    )}
+                    <Button size="sm" onClick={() => navigate('/blocks/new')}>
+                        <Plus className="mr-1.5 h-4 w-4" />새 블록 추가
+                    </Button>
+                </div>
             </div>
 
             <div className="flex gap-1 border-b">
@@ -68,6 +77,8 @@ export const BlockListPage = () => {
             ) : (
                 <BlockTable blocks={filteredBlocks} />
             )}
+
+            <MigrationDialog open={migrationOpen} onOpenChange={setMigrationOpen} blocks={blocks} />
         </div>
     );
 };
