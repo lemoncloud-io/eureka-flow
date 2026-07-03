@@ -4,11 +4,11 @@ import { ArrowRight, Cpu, Download, Upload } from 'lucide-react';
 
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@flows/ui-kit';
 
-import { useBlockStore } from '../../blocks';
+import { useBlocksQuery } from '../../blocks';
 
 export const DashboardPage = () => {
     const navigate = useNavigate();
-    const blocks = useBlockStore(s => s.blocks);
+    const { data: blocks = [] } = useBlocksQuery();
 
     const inputCount = blocks.filter(b => b.stereo === 'input').length;
     const processCount = blocks.filter(b => b.stereo === 'process').length;

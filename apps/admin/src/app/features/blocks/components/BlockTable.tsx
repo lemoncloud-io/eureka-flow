@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 
-import { Pencil, Trash2 } from 'lucide-react';
+import { Eye } from 'lucide-react';
 
 import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@flows/ui-kit';
 
@@ -16,10 +16,9 @@ const STEREO_VARIANT: Record<BlockStereo, 'default' | 'secondary' | 'outline'> =
 
 interface BlockTableProps {
     blocks: Block[];
-    onDelete: (id: string) => void;
 }
 
-export const BlockTable = ({ blocks, onDelete }: BlockTableProps) => {
+export const BlockTable = ({ blocks }: BlockTableProps) => {
     const navigate = useNavigate();
 
     return (
@@ -74,18 +73,7 @@ export const BlockTable = ({ blocks, onDelete }: BlockTableProps) => {
                                             navigate(`/blocks/${block.id}`);
                                         }}
                                     >
-                                        <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-destructive hover:text-destructive"
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            onDelete(block.id);
-                                        }}
-                                    >
-                                        <Trash2 className="h-4 w-4" />
+                                        <Eye className="h-4 w-4" />
                                     </Button>
                                 </div>
                             </TableCell>

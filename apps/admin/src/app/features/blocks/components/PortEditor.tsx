@@ -10,9 +10,10 @@ interface PortEditorProps {
     label: string;
     ports: Port[];
     onChange: (ports: Port[]) => void;
+    disabled?: boolean;
 }
 
-export const PortEditor = ({ label, ports, onChange }: PortEditorProps) => {
+export const PortEditor = ({ label, ports, onChange, disabled = false }: PortEditorProps) => {
     const addPort = () => {
         onChange([...ports, { id: '', label: '', type: 'text' }]);
     };
@@ -30,10 +31,12 @@ export const PortEditor = ({ label, ports, onChange }: PortEditorProps) => {
         <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">{label}</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addPort}>
-                    <Plus className="mr-1 h-3.5 w-3.5" />
-                    추가
-                </Button>
+                {!disabled && (
+                    <Button type="button" variant="outline" size="sm" onClick={addPort}>
+                        <Plus className="mr-1 h-3.5 w-3.5" />
+                        추가
+                    </Button>
+                )}
             </div>
             {ports.length === 0 && <p className="text-sm text-muted-foreground">포트가 없습니다.</p>}
             {ports.map((port, index) => (
@@ -43,14 +46,16 @@ export const PortEditor = ({ label, ports, onChange }: PortEditorProps) => {
                         value={port.id}
                         onChange={e => updatePort(index, 'id', e.target.value)}
                         className="w-28"
+                        disabled={disabled}
                     />
                     <Input
                         placeholder="Label"
                         value={port.label}
                         onChange={e => updatePort(index, 'label', e.target.value)}
                         className="flex-1"
+                        disabled={disabled}
                     />
-                    <Select value={port.type} onValueChange={v => updatePort(index, 'type', v)}>
+                    <Select value={port.type} onValueChange={v => updatePort(index, 'type', v)} disabled={disabled}>
                         <SelectTrigger className="w-28">
                             <SelectValue />
                         </SelectTrigger>
@@ -62,15 +67,17 @@ export const PortEditor = ({ label, ports, onChange }: PortEditorProps) => {
                             ))}
                         </SelectContent>
                     </Select>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => removePort(index)}
-                    >
-                        <X className="h-4 w-4" />
-                    </Button>
+                    {!disabled && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => removePort(index)}
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    )}
                 </div>
             ))}
         </div>
