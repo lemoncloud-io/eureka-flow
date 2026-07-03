@@ -12,7 +12,6 @@ const isDevelopment = import.meta.env.DEV;
 const namespaces = ['common', 'flows', 'nodes', 'landing', 'tutorial', 'blocks'];
 // Single source of truth for languages — add a language here (and its resource files) to enable it.
 const SUPPORTED_LANGUAGES = ['en', 'ko'] as const;
-const S3_BUCKET_URL = import.meta.env.VITE_I18N_BUCKET_URL;
 
 // Clean up old i18n caches (production only)
 if (!isDevelopment) {
@@ -29,12 +28,10 @@ if (!isDevelopment) {
     });
 }
 
-// HTTP load path: S3 bucket URL if configured, otherwise local /locales/
-const httpLoadPath = S3_BUCKET_URL
-    ? `${S3_BUCKET_URL}/{{lng}}/{{ns}}.json${isDevelopment ? '' : `?v=${I18N_VERSION}`}`
-    : `/locales/{{lng}}/{{ns}}.json${isDevelopment ? '' : `?v=${I18N_VERSION}`}`;
+// Translations live in the repo (public/locales) and are served with the app
+const httpLoadPath = `/locales/{{lng}}/{{ns}}.json${isDevelopment ? '' : `?v=${I18N_VERSION}`}`;
 
-// Bundled fallback: dynamic import from public/locales (safety net when S3 is unreachable)
+// Bundled fallback: dynamic import from public/locales (safety net when HTTP load fails)
 const loadBundled = (lng: string, ns: string) => import(`../../public/locales/${lng}/${ns}.json`);
 const bundledFallback = resourcesToBackend(loadBundled);
 
@@ -51,7 +48,7 @@ i18n.use(ChainedBackend)
         debug: isDevelopment,
         interpolation: { escapeValue: false },
         backend: {
-            // [0] localStorage cache (fast) → [1] S3/HTTP (authoritative) → [2] bundled fallback (offline)
+            // [0] localStorage cache (fast) → [1] /locales HTTP (authoritative) → [2] bundled fallback (offline)
             backends: [LocalStorageBackend, HttpBackend, bundledFallback],
             backendOptions: [
                 {
@@ -61,11 +58,8 @@ i18n.use(ChainedBackend)
                 },
                 {
                     loadPath: httpLoadPath,
-                    requestOptions: S3_BUCKET_URL ? { mode: 'cors' as RequestMode } : undefined,
                 },
             ],
-            // When localStorage hits, also refresh from S3 in background
-            ...(S3_BUCKET_URL ? { cacheHitMode: 'refresh' } : {}),
         },
         detection: {
             order: ['localStorage', 'navigator'],
@@ -78,29 +72,6 @@ i18n.use(ChainedBackend)
             ...(isEmbeddedInIframe ? { bindI18nStore: 'added removed' } : {}),
         },
     });
-
-// Supplement S3-loaded translations with bundled resources for keys not yet deployed to S3.
-// Uses deep merge without overwrite so S3 keys take priority, but new code-level keys are available.
-const supplementWithBundled = async () => {
-    const lngs = [...new Set([i18n.language, i18n.options.fallbackLng].flat().filter(Boolean))] as string[];
-    for (const lng of lngs) {
-        for (const ns of namespaces) {
-            try {
-                const bundled = (await loadBundled(lng, ns)).default;
-                i18n.addResourceBundle(lng, ns, bundled, true, false);
-            } catch {
-                // bundled resource not available
-            }
-        }
-    }
-    i18n.emit('languageChanged', i18n.language);
-};
-
-if (i18n.isInitialized) {
-    supplementWithBundled();
-} else {
-    i18n.on('initialized', supplementWithBundled);
-}
 
 // Admin i18n editor integration via postMessage (only active when embedded in iframe)
 if (isEmbeddedInIframe) {

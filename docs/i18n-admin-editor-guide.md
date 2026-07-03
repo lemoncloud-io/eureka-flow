@@ -1,5 +1,11 @@
 # i18n Admin Editor - Development Guide
 
+> **⚠️ OUTDATED (2026-07):** S3/presign storage was removed. The editor now reads from the web
+> app's bundled `/locales/` files and writes via JSON file **Export/Import** — translations live
+> in the repo (`apps/web/public/locales/`). See [i18n-server-keys.md](./i18n-server-keys.md) §4.4.
+> The preview/BroadcastChannel/editor-UI sections below are still accurate; the S3/presign
+> sections are not.
+
 Browser-based translation editor that reads/writes JSON to S3, with live preview via iframe and cross-tab sync via BroadcastChannel.
 
 ## Architecture Overview

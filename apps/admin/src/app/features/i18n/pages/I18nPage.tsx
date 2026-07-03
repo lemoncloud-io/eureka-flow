@@ -2,21 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
     AlertTriangle,
+    Download,
     ExternalLink,
     Loader2,
     Monitor,
     PanelRightClose,
     PanelRightOpen,
     RotateCcw,
-    Save,
     Search,
+    Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button, Input } from '@flows/ui-kit';
 
 import { NamespaceSelector, TranslationEditor, WebPreview } from '../components';
-import { fetchTranslation, flattenJson, isUploadConfigured } from '../consts';
+import { fetchTranslation, flattenJson, parseTranslationFileName } from '../consts';
 import { usePreviewPublisher, usePreviewSubscriber } from '../hooks';
 import { useI18nStore } from '../stores';
 
@@ -24,22 +25,20 @@ import type { PreviewMessage } from '../hooks';
 import type { FlatTranslations } from '../types';
 
 type AllNsData = Record<string, Record<string, FlatTranslations>>;
-const canUpload = isUploadConfigured();
 
 export const I18nPage = () => {
     const namespace = useI18nStore(s => s.namespace);
     const namespaces = useI18nStore(s => s.namespaces);
     const languages = useI18nStore(s => s.languages);
     const setNamespace = useI18nStore(s => s.setNamespace);
-    const initLocales = useI18nStore(s => s.initLocales);
     const loadTranslations = useI18nStore(s => s.loadTranslations);
-    const saveTranslations = useI18nStore(s => s.saveTranslations);
+    const exportTranslations = useI18nStore(s => s.exportTranslations);
+    const importTranslations = useI18nStore(s => s.importTranslations);
     const resetChanges = useI18nStore(s => s.resetChanges);
     const updateValue = useI18nStore(s => s.updateValue);
     const addKey = useI18nStore(s => s.addKey);
     const deleteKey = useI18nStore(s => s.deleteKey);
     const isLoading = useI18nStore(s => s.isLoading);
-    const isSaving = useI18nStore(s => s.isSaving);
     const error = useI18nStore(s => s.error);
     const isDirty = useI18nStore(s => s.isDirty);
     const edited = useI18nStore(s => s.edited);
@@ -52,14 +51,7 @@ export const I18nPage = () => {
 
     const { broadcast } = usePreviewPublisher();
     const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Discover languages and namespaces from API on mount
-    const initRef = useRef(false);
-    useEffect(() => {
-        if (initRef.current) return;
-        initRef.current = true;
-        initLocales();
-    }, [initLocales]);
+    const importInputRef = useRef<HTMLInputElement | null>(null);
 
     useEffect(() => {
         if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
@@ -153,10 +145,35 @@ export const I18nPage = () => {
         [hasChanges, setNamespace]
     );
 
-    const handleSave = useCallback(async () => {
-        await saveTranslations();
-        toast.success('Saved');
-    }, [saveTranslations]);
+    const handleExport = useCallback(() => {
+        exportTranslations();
+        toast.success('Exported — copy files into apps/web/public/locales/{lng}/ and commit');
+    }, [exportTranslations]);
+
+    const handleImportFiles = useCallback(
+        async (files: FileList | null) => {
+            if (!files || files.length === 0) return;
+            for (const file of Array.from(files)) {
+                const parsed = parseTranslationFileName(file.name, languages);
+                if (!parsed) {
+                    toast.error(`${file.name}: expected {ns}.{lng}.json (lng: ${languages.join(', ')})`);
+                    continue;
+                }
+                if (parsed.ns && parsed.ns !== namespace) {
+                    toast.error(`${file.name}: namespace mismatch (current: ${namespace})`);
+                    continue;
+                }
+                try {
+                    const data = JSON.parse(await file.text());
+                    importTranslations(parsed.lng, data);
+                    toast.success(`${file.name} imported into ${parsed.lng}`);
+                } catch {
+                    toast.error(`${file.name}: invalid JSON`);
+                }
+            }
+        },
+        [languages, namespace, importTranslations]
+    );
 
     const handleReset = useCallback(() => {
         const confirmed = window.confirm('Discard all changes?');
@@ -229,27 +246,38 @@ export const I18nPage = () => {
                         <ExternalLink className="h-3.5 w-3.5" />
                     </Button>
                     <div className="w-px h-6 bg-border" />
-                    {!canUpload && (
-                        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                            Local mode (read-only)
-                        </span>
-                    )}
-                    <Button variant="outline" size="sm" onClick={handleReset} disabled={!hasChanges || isSaving}>
+                    <Button variant="outline" size="sm" onClick={handleReset} disabled={!hasChanges}>
                         <RotateCcw className="h-3.5 w-3.5 mr-1" />
                         Reset
                     </Button>
+                    <input
+                        ref={importInputRef}
+                        type="file"
+                        accept=".json,application/json"
+                        multiple
+                        className="hidden"
+                        onChange={e => {
+                            handleImportFiles(e.target.files);
+                            e.target.value = '';
+                        }}
+                    />
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => importInputRef.current?.click()}
+                        title="Import {ns}.{lng}.json files into the editor"
+                    >
+                        <Upload className="h-3.5 w-3.5 mr-1" />
+                        Import
+                    </Button>
                     <Button
                         size="sm"
-                        onClick={handleSave}
-                        disabled={!hasChanges || isSaving || !canUpload}
-                        title={!canUpload ? 'Set VITE_I18N_PRESIGN_URL to enable saving' : undefined}
+                        onClick={handleExport}
+                        disabled={isLoading}
+                        title="Download {ns}.{lng}.json per language — commit into apps/web/public/locales/"
                     >
-                        {isSaving ? (
-                            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                        ) : (
-                            <Save className="h-3.5 w-3.5 mr-1" />
-                        )}
-                        Save
+                        <Download className="h-3.5 w-3.5 mr-1" />
+                        Export
                     </Button>
                 </div>
             </div>
