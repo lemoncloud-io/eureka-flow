@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 
-import { Eye } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 
 import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@flows/ui-kit';
 
@@ -73,7 +73,7 @@ export const BlockTable = ({ blocks }: BlockTableProps) => {
                                             navigate(`/blocks/${block.id}`);
                                         }}
                                     >
-                                        <Eye className="h-4 w-4" />
+                                        <Pencil className="h-4 w-4" />
                                     </Button>
                                 </div>
                             </TableCell>
