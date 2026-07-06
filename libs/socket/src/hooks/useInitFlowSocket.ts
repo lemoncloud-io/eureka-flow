@@ -8,9 +8,11 @@ import { useWebSocketStore } from '../stores/useWebSocketStore';
 
 import type {
     FlowUpdateMessage,
+    LogEnvelopeMessage,
     NodeState,
     PortUpdateMessage,
     ProductProgressMessage,
+    ProgressEnvelopeMessage,
     SocketNodeEvent,
     SocketTraceEvent,
     TraceStage,
@@ -88,6 +90,18 @@ export const isPortUpdateMessage = (data: unknown): data is PortUpdateMessage =>
     if (typeof data !== 'object' || data === null) return false;
     const msg = data as Record<string, unknown>;
     return msg['type'] === 'node/port' && typeof msg['id'] === 'string';
+};
+
+export const isProgressEnvelopeMessage = (data: unknown): data is ProgressEnvelopeMessage => {
+    if (typeof data !== 'object' || data === null) return false;
+    const msg = data as Record<string, unknown>;
+    return typeof msg['type'] === 'string' && msg['type'].startsWith('progress:') && typeof msg['id'] === 'string';
+};
+
+export const isLogEnvelopeMessage = (data: unknown): data is LogEnvelopeMessage => {
+    if (typeof data !== 'object' || data === null) return false;
+    const msg = data as Record<string, unknown>;
+    return typeof msg['type'] === 'string' && msg['type'].startsWith('log:') && typeof msg['id'] === 'string';
 };
 
 /**

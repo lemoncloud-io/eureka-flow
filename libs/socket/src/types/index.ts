@@ -111,6 +111,24 @@ export interface ProductProgressMessage {
     timestamps?: number[];
 }
 
+export interface ProgressEnvelopeMessage extends SocketEvent {
+    type: `progress:${string}`;
+    data?: {
+        status?: string;
+        percent?: number;
+    };
+}
+
+export interface LogEnvelopeMessage extends SocketEvent {
+    type: `log:${string}`;
+    data?: {
+        entries?: {
+            level?: string;
+            message?: string;
+        }[];
+    };
+}
+
 /**
  * Union type for socket data messages
  */
