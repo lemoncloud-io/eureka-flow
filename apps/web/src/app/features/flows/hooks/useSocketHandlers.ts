@@ -6,7 +6,13 @@ import { EXECUTE_FUNCTIONS, getNode, getPortData, useCanvasStore } from '@flows/
 
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
-import type { NodeUpdateInfo, PortUpdateInfo, TraceUpdateInfo } from '@flows/socket';
+import type {
+    LogTraceEntryInfo,
+    NodeUpdateInfo,
+    PortUpdateInfo,
+    ProgressUpdateInfo,
+    TraceUpdateInfo,
+} from '@flows/socket';
 import type { RefObject } from 'react';
 
 interface UseSocketHandlersParams {
@@ -40,6 +46,7 @@ export const useSocketHandlers = ({
     const nodeRunIdRef = useRef<Map<string, string>>(new Map());
     const portNoRef = useRef<Map<string, number>>(new Map());
     const portRunIdRef = useRef<Map<string, string>>(new Map());
+    const progressSeqRef = useRef<Map<string, number>>(new Map());
     const highlightTimeoutsRef = useRef<Map<string, number>>(new Map());
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
 
@@ -81,6 +88,8 @@ export const useSocketHandlers = ({
                 const prevRunId = nodeRunIdRef.current.get(nodeId);
                 if (prevRunId && prevRunId !== runId) {
                     nodeNoRef.current.delete(nodeId);
+                    // progress seq is per-run: a new run's reporter restarts at low seq
+                    progressSeqRef.current.delete(nodeId);
                     canvasRef.current?.updateNodeFromServer(nodeId, { state: 'IDLE', status: 'IDLE' }, { force: true });
                 }
                 nodeRunIdRef.current.set(nodeId, runId);
@@ -259,6 +268,64 @@ export const useSocketHandlers = ({
         [setUpdatedPort, clearUpdatedPort, appendRunPortUpdate, blockRegistry, currentFlowId, canvasRef]
     );
 
+    const handleProgressUpdate = useCallback(
+        (info: ProgressUpdateInfo) => {
+            const { nodeId, status, percent, step, totalSteps, label, error, seq, ts, product$ } = info;
+
+            // Last-write-wins: drop stale snapshots (seq is epoch-based across server invocations)
+            const prevSeq = progressSeqRef.current.get(nodeId);
+            if (prevSeq !== undefined && seq <= prevSeq) return;
+            progressSeqRef.current.set(nodeId, seq);
+
+            if (!canvasRef.current) return;
+
+            const state = status === 'done' ? 'COMPLETED' : status === 'error' ? 'ERROR' : 'RUNNING';
+            const progress = percent ?? (step && totalSteps ? Math.round((step / totalSteps) * 100) : undefined);
+
+            // Merge streamed product view into the block's out data (live deploy state from codes-goods-api)
+            const node = canvasRef.current.getWorkflow()?.nodes?.find(n => n.id === nodeId);
+            const prevOut = node?.outputData?.['out']?.value;
+            const outValue =
+                product$ && typeof prevOut === 'object' && prevOut !== null
+                    ? { ...(prevOut as Record<string, unknown>), ...product$ }
+                    : product$;
+
+            canvasRef.current.updateNodeFromServer(nodeId, {
+                state,
+                status: state,
+                ...(error ? { error, errorMessage: error } : {}),
+                ...(progress !== undefined ? { executionStats: { progress } } : {}),
+                ...(outValue
+                    ? { outputData: { out: { value: outValue, type: 'json', timestamp: ts ?? Date.now() } } }
+                    : {}),
+            });
+
+            if (state === 'ERROR') {
+                const displayName = getNodeDisplayName(nodeId, canvasRef, blockRegistry);
+                toast.error(`${displayName} failed`, {
+                    description: error ? String(error).slice(0, 80) : label,
+                    duration: 8000,
+                });
+            }
+            // ponytail: no success toast here — node COMPLETED events already toast; avoids duplicates.
+        },
+        [blockRegistry, canvasRef]
+    );
+
+    const handleLogTrace = useCallback(
+        (info: LogTraceEntryInfo) => {
+            const { nodeId, level, message, ts, seq, json } = info;
+            appendTraceLog(nodeId, {
+                seq: seq ?? 0,
+                ts: ts ?? Date.now(),
+                stage: level,
+                message,
+                data: json,
+            });
+        },
+        [appendTraceLog]
+    );
+
     const handleTraceUpdate = useCallback(
         (info: TraceUpdateInfo) => {
             const { nodeId, seq, ts, stage, message, runId, data } = info;
@@ -285,6 +352,7 @@ export const useSocketHandlers = ({
         nodeRunIdRef.current.clear();
         portNoRef.current.clear();
         portRunIdRef.current.clear();
+        progressSeqRef.current.clear();
         highlightTimeoutsRef.current.forEach(id => window.clearTimeout(id));
         highlightTimeoutsRef.current.clear();
     }, [currentFlowId]);
@@ -299,6 +367,7 @@ export const useSocketHandlers = ({
         nodeRunIdRef.current.clear();
         portNoRef.current.clear();
         portRunIdRef.current.clear();
+        progressSeqRef.current.clear();
     }, []);
 
     return {
@@ -306,6 +375,8 @@ export const useSocketHandlers = ({
         handleNodeUpdate,
         handlePortUpdate,
         handleTraceUpdate,
+        handleProgressUpdate,
+        handleLogTrace,
         getLastLocalUpdateTimestamp,
         lastLocalUpdateTimestampRef,
         resetSequenceTracking,

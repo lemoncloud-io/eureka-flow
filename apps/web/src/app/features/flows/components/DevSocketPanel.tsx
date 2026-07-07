@@ -27,6 +27,8 @@ const TYPE_COLORS: Record<RecordedMessage['type'], string> = {
     port: 'text-amber-400',
     flow: 'text-green-400',
     trace: 'text-purple-400',
+    progress: 'text-cyan-400',
+    log: 'text-rose-400',
     unknown: 'text-muted-foreground',
 };
 

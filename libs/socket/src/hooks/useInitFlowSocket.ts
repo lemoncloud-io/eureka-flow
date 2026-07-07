@@ -8,9 +8,11 @@ import { useWebSocketStore } from '../stores/useWebSocketStore';
 
 import type {
     FlowUpdateMessage,
+    LogEnvelopeMessage,
     NodeState,
     PortUpdateMessage,
     ProductProgressMessage,
+    ProgressEnvelopeMessage,
     SocketNodeEvent,
     SocketTraceEvent,
     TraceStage,
@@ -88,6 +90,18 @@ export const isPortUpdateMessage = (data: unknown): data is PortUpdateMessage =>
     if (typeof data !== 'object' || data === null) return false;
     const msg = data as Record<string, unknown>;
     return msg['type'] === 'node/port' && typeof msg['id'] === 'string';
+};
+
+export const isProgressEnvelopeMessage = (data: unknown): data is ProgressEnvelopeMessage => {
+    if (typeof data !== 'object' || data === null) return false;
+    const msg = data as Record<string, unknown>;
+    return typeof msg['type'] === 'string' && msg['type'].startsWith('progress:') && typeof msg['id'] === 'string';
+};
+
+export const isLogEnvelopeMessage = (data: unknown): data is LogEnvelopeMessage => {
+    if (typeof data !== 'object' || data === null) return false;
+    const msg = data as Record<string, unknown>;
+    return typeof msg['type'] === 'string' && msg['type'].startsWith('log:') && typeof msg['id'] === 'string';
 };
 
 /**
@@ -235,6 +249,42 @@ export interface PortUpdateInfo {
 }
 
 /**
+ * Progress snapshot info parsed from a lemon-model `progress:*` envelope.
+ * Emitted by eureka-flows-api processors and codes-goods-api deploy steps.
+ */
+export interface ProgressUpdateInfo {
+    /** Task ID — the node ID of the block being traced */
+    nodeId: string;
+    /** 'pending' | 'running' | 'done' | 'error' */
+    status?: string;
+    percent?: number;
+    step?: number;
+    totalSteps?: number;
+    label?: string;
+    error?: string;
+    /** Reporter sequence — last-write-wins dedup key (epoch-based across server invocations) */
+    seq: number;
+    ts?: number;
+    /** Live product view from codes-goods-api (merge into block out data) */
+    product$?: Record<string, unknown>;
+}
+
+/**
+ * One log line parsed from a lemon-model `log:*` envelope batch.
+ */
+export interface LogTraceEntryInfo {
+    /** Node ID of the traced block */
+    nodeId: string;
+    level?: string;
+    message?: string;
+    ts?: number;
+    seq?: number;
+    json?: Record<string, unknown>;
+    /** Reporter identity (per server invocation) */
+    source?: string;
+}
+
+/**
  * Product deployment progress info parsed from WebSocket message.
  * Emitted for `action: 'progress'` payloads from codes-goods-api.
  */
@@ -264,6 +314,10 @@ export interface UseInitFlowSocketOptions {
     onPortUpdate?: (info: PortUpdateInfo) => void;
     /** Callback when trace message is received - for agent block execution logs */
     onTraceUpdate?: (info: TraceUpdateInfo) => void;
+    /** Callback when a lemon-model progress snapshot is received - live node state/data updates */
+    onProgressUpdate?: (info: ProgressUpdateInfo) => void;
+    /** Callback per log line from a lemon-model log batch - live server logs in trace panel */
+    onLogTrace?: (info: LogTraceEntryInfo) => void;
     /** Callback when product progress message is received - for deployment progress UI */
     onProductProgress?: (info: ProductProgressInfo) => void;
     /** Observer for all parsed messages (dev tools, replay recording) */
@@ -302,6 +356,8 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         onNodeReload,
         onPortUpdate,
         onTraceUpdate,
+        onProgressUpdate,
+        onLogTrace,
         onProductProgress,
         onMessage,
     } = options;
@@ -393,6 +449,44 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                         data: data.data,
                     });
                 }
+                return;
+            }
+
+            // Handle lemon-model progress snapshot (progress:*) — live node state/data updates.
+            // Emitted by flows-api processors (runWithProcessTrace) and codes-goods-api deploy steps.
+            if (isProgressEnvelopeMessage(data)) {
+                const state = data.data;
+                if (state) {
+                    onProgressUpdate?.({
+                        nodeId: message.id,
+                        status: state.status,
+                        percent: state.percent,
+                        step: state.step,
+                        totalSteps: state.totalSteps,
+                        label: state.label,
+                        error: state.error,
+                        seq: state.seq ?? 0,
+                        ts: state.ts,
+                        product$: state.meta?.product$,
+                    });
+                }
+                return;
+            }
+
+            // Handle lemon-model log batch (log:*) — unpack entries in batch order.
+            if (isLogEnvelopeMessage(data)) {
+                const batch = data.data;
+                (batch?.entries ?? []).forEach(entry =>
+                    onLogTrace?.({
+                        nodeId: message.id,
+                        level: entry.level,
+                        message: entry.message,
+                        ts: entry.ts,
+                        seq: entry.seq,
+                        json: entry.json,
+                        source: batch?.source,
+                    })
+                );
                 return;
             }
 
@@ -496,6 +590,8 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
             onNodeReload,
             onPortUpdate,
             onTraceUpdate,
+            onProgressUpdate,
+            onLogTrace,
             onProductProgress,
         ]
     );
