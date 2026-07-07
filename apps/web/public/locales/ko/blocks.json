@@ -51,6 +51,7 @@
     "product_info": "제품 정보",
     "project_id": "프로젝트 ID (projectId)",
     "prompt": "프롬프트",
+    "request": "요청사항",
     "result": "결과",
     "schema": "스키마",
     "schema_json_converter": "AI JSON 스키마 변환기",

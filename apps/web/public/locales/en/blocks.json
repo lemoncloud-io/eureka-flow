@@ -51,6 +51,7 @@
     "product_info": "Product Info",
     "project_id": "Project ID (projectId)",
     "prompt": "Prompt",
+    "request": "Request",
     "result": "Result",
     "schema": "Schema",
     "schema_json_converter": "AI JSON Schema Converter",

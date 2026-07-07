@@ -39,8 +39,10 @@ export const MigrationDialog = ({ open, onOpenChange, blocks }: MigrationDialogP
                 <DialogHeader>
                     <DialogTitle>블록 label을 키로 변환</DialogTitle>
                     <DialogDescription>
-                        각 블록의 label을 <code>{'{block_type}'}</code> 키로, 설명을 <code>{'{block_type}_desc'}</code>{' '}
-                        키로 교체합니다. 이미 키인 블록은 건너뜁니다. 서버에 즉시 반영되는 작업입니다.
+                        각 블록의 label을 <code>{'{block_type}'}</code>, 설명을 <code>{'{block_type}_desc'}</code>,
+                        포트·설정 label을 공용 키(<code>prompt</code>, <code>model</code> 등)로 교체합니다. 이미 키인
+                        항목은 건너뜁니다. <span className="text-amber-600">⚠ 매핑 없는 label은 원문 그대로 유지</span>{' '}
+                        됩니다. 서버에 즉시 반영되는 작업입니다.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -60,6 +62,20 @@ export const MigrationDialog = ({ open, onOpenChange, blocks }: MigrationDialogP
                                     <span className="truncate">{item.currentLabel}</span>
                                     <ArrowRight className="h-3.5 w-3.5 shrink-0" />
                                     <code className="text-foreground">{item.labelKey}</code>
+                                    {item.fieldCount > 0 && (
+                                        <Badge variant="secondary" className="ml-auto shrink-0">
+                                            +{item.fieldCount} 필드
+                                        </Badge>
+                                    )}
+                                    {item.unmapped.length > 0 && (
+                                        <Badge
+                                            variant="outline"
+                                            className="shrink-0 border-amber-500 text-amber-600"
+                                            title={`매핑 없음 (원문 유지): ${item.unmapped.join(', ')}`}
+                                        >
+                                            ⚠ {item.unmapped.length}
+                                        </Badge>
+                                    )}
                                 </div>
                             )}
                         </div>
