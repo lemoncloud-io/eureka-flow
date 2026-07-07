@@ -116,15 +116,28 @@ export interface ProgressEnvelopeMessage extends SocketEvent {
     data?: {
         status?: string;
         percent?: number;
+        step?: number;
+        totalSteps?: number;
+        label?: string;
+        error?: string;
+        seq?: number;
+        ts?: number;
+        /** service-defined extras — `product$` carries the live product view from codes-goods-api */
+        meta?: { product$?: Record<string, unknown> } & Record<string, unknown>;
     };
 }
 
 export interface LogEnvelopeMessage extends SocketEvent {
     type: `log:${string}`;
     data?: {
+        /** reporter identity (per-invocation on server side) */
+        source?: string;
         entries?: {
             level?: string;
             message?: string;
+            ts?: number;
+            seq?: number;
+            json?: Record<string, unknown>;
         }[];
     };
 }

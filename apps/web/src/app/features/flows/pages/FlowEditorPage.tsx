@@ -96,6 +96,8 @@ export const FlowEditorPage = () => {
         handleNodeUpdate,
         handlePortUpdate,
         handleTraceUpdate,
+        handleProgressUpdate,
+        handleLogTrace,
         getLastLocalUpdateTimestamp,
         lastLocalUpdateTimestampRef,
         resetSequenceTracking,
@@ -160,6 +162,8 @@ export const FlowEditorPage = () => {
         onNodeReload: handleNodeUpdate,
         onPortUpdate: handlePortUpdate,
         onTraceUpdate: handleTraceUpdate,
+        onProgressUpdate: handleProgressUpdate,
+        onLogTrace: handleLogTrace,
         onProductProgress: handleProductProgress,
         onMessage: handleSocketMessage,
     });
