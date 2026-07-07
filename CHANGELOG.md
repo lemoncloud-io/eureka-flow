@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-07-07] - root@0.57.0, @flows/web@0.57.0, @flows/admin@0.32.0
+
+### Features
+
+- (socket) apply lemon-model progress envelopes
+- (socket) consume lemon-model progress/logtrace over flow socket
+
+### Chores
+
+- (deps) add lemon-model
+
 ## [2026-07-02] - root@0.56.0, @flows/web@0.56.0, @flows/admin@0.31.3
 
 ### Features
