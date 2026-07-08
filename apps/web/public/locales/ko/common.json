@@ -145,6 +145,9 @@
         "addNewKey": "새 키 추가",
         "switch": "전환",
         "unverified": "?",
+        "context": "워크스페이스 · 프로젝트",
+        "workspace": "워크스페이스",
+        "project": "프로젝트",
         "errors": {
             "popupBlocked": "팝업이 차단되었습니다. 팝업 차단을 해제하고 다시 시도해주세요."
         }

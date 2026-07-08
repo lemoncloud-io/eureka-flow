@@ -831,6 +831,20 @@ export interface RunContext {
 // Profile API Types
 // ============================================================================
 
+/** A workspace (tenant) the session belongs to, from GET /flows/0/profile. */
+export interface Workspace {
+    id: string;
+    name: string;
+    stereo: string; // adv | dev | etc.
+}
+
+/** A project within the workspace, from GET /flows/0/profile. */
+export interface Project {
+    id: string;
+    name: string;
+    stereo: string; // adv | dev | etc.
+}
+
 /** Response from GET /flows/0/profile */
 export interface ProfileResponse {
     sid: string;
@@ -842,4 +856,8 @@ export interface ProfileResponse {
      * Enables the "use own API key vs use credits" run-mode choice. Server v0.26.618.
      */
     useApiKey?: boolean;
+    /** Workspace the session belongs to. Server-authoritative; optional for backward compat. */
+    workspace$?: Workspace;
+    /** Project within the workspace. Server-authoritative; optional for backward compat. */
+    project$?: Project;
 }

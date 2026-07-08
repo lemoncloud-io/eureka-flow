@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Check, ExternalLink, Eye, EyeOff, KeyRound, Trash2 } from 'lucide-react';
+import { Building2, Check, ExternalLink, Eye, EyeOff, KeyRound, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from '@flows/ui-kit';
@@ -44,6 +44,8 @@ export const ApiKeyDialog = ({
     const apiKeys = useWebCoreStore(s => s.apiKeys);
     const switchApiKey = useWebCoreStore(s => s.switchApiKey);
     const removeApiKey = useWebCoreStore(s => s.removeApiKey);
+    const workspace = useWebCoreStore(s => s.workspace);
+    const project = useWebCoreStore(s => s.project);
 
     // Only pre-fill initialValue when no saved keys exist (first-time use)
     useEffect(() => {
@@ -102,6 +104,43 @@ export const ApiKeyDialog = ({
                     <DialogTitle className="text-base">{t('apiKeyDialog.title')}</DialogTitle>
                     <DialogDescription className="text-xs">{t('apiKeyDialog.description')}</DialogDescription>
                 </DialogHeader>
+
+                {/* Workspace / project context (single-line breadcrumb; parent then current project) */}
+                {workspace && project && (
+                    <div className="flex flex-col gap-1.5">
+                        <p className="text-[11px] text-muted-foreground font-medium">
+                            {t('apiKeyDialog.context', 'Workspace & Project')}
+                        </p>
+                        <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-border/40 bg-muted/30 min-w-0">
+                            <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <span className="flex items-center gap-1.5 min-w-0 text-xs whitespace-nowrap overflow-hidden">
+                                <span
+                                    className="shrink-0 max-w-[48%] truncate font-medium text-foreground"
+                                    title={`${t('apiKeyDialog.workspace', 'Workspace')} · #${workspace.id}`}
+                                >
+                                    {workspace.name}
+                                </span>
+                                {workspace.stereo && (
+                                    <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-muted-foreground/70">
+                                        {workspace.stereo}
+                                    </span>
+                                )}
+                                <span className="shrink-0 text-muted-foreground/40">/</span>
+                                <span
+                                    className="flex-1 min-w-0 truncate font-medium text-foreground"
+                                    title={`${t('apiKeyDialog.project', 'Project')} · #${project.id}`}
+                                >
+                                    {project.name}
+                                </span>
+                                {project.stereo && (
+                                    <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-muted-foreground/70">
+                                        {project.stereo}
+                                    </span>
+                                )}
+                            </span>
+                        </div>
+                    </div>
+                )}
 
                 {/* Saved keys list */}
                 {hasSavedKeys && (

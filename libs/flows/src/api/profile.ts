@@ -1,22 +1,27 @@
 import { api } from '@flows/web-core';
 
-import type { ProfileResponse } from '../types';
+import type { ProfileResponse, Project, Workspace } from '../types';
 
-/** AI key availability derived from a profile response, as stored in useWebCoreStore. */
+/** AI key availability + workspace/project context derived from a profile response, stored in useWebCoreStore. */
 export interface AiKeyStatus {
     hasGeminiKey: boolean;
     hasOpenaiKey: boolean;
     useApiKey: boolean;
+    workspace: Workspace | null;
+    project: Project | null;
 }
 
 /**
  * Map a profile response to AI key status. `useApiKey` is server-authoritative;
- * when omitted, fall back to "has any provider key configured".
+ * when omitted, fall back to "has any provider key configured". `workspace$`/`project$`
+ * are optional (older servers omit them) and normalise to null.
  */
 export const toAiKeyStatus = (data: ProfileResponse): AiKeyStatus => ({
     hasGeminiKey: !!data.geminiApiKey,
     hasOpenaiKey: !!data.openaiApiKey,
     useApiKey: data.useApiKey ?? (!!data.geminiApiKey || !!data.openaiApiKey),
+    workspace: data.workspace$ ?? null,
+    project: data.project$ ?? null,
 });
 
 export const getProfile = async (): Promise<ProfileResponse> => {
