@@ -145,6 +145,9 @@
         "addNewKey": "Add new key",
         "switch": "Switch",
         "unverified": "?",
+        "context": "Workspace & Project",
+        "workspace": "Workspace",
+        "project": "Project",
         "errors": {
             "popupBlocked": "Popup was blocked. Please allow popups and try again."
         }

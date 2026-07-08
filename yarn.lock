@@ -9274,6 +9274,11 @@ lemon-model@^1.1.1:
   resolved "https://registry.npmjs.org/lemon-model/-/lemon-model-1.1.1.tgz"
   integrity sha512-idf2zPvYzUmz50F9wJik8f4vk+FeebgmzsHfpEtsv5nnWbdpaHM1sDMISmgqFPyv3X1cXvaRNyu4btdSIA03sQ==
 
+lemon-model@^1.2.3:
+  version "1.2.3"
+  resolved "https://registry.yarnpkg.com/lemon-model/-/lemon-model-1.2.3.tgz#793ded0f892967a8dfe206da70f0323ea47afcb9"
+  integrity sha512-OXqBDPnVIyKgxvyfo1qYalSqQ2v43czEuhPEWDbQ+EtlLBk54KsTG68IbeGgrqr52lL3luquEt8rafUSn2A/tw==
+
 leven@^3.1.0:
   version "3.1.0"
   resolved "https://registry.npmjs.org/leven/-/leven-3.1.0.tgz"

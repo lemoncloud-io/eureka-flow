@@ -1,13 +1,20 @@
 import { useCallback, useRef, useState } from 'react';
 
-import { isFlowUpdateMessage, isNodeUpdateMessage, isPortUpdateMessage, isTraceMessage } from '@flows/socket';
+import {
+    isFlowUpdateMessage,
+    isLogEnvelopeMessage,
+    isNodeUpdateMessage,
+    isPortUpdateMessage,
+    isProgressEnvelopeMessage,
+    isTraceMessage,
+} from '@flows/socket';
 
 import type { WebSocketMessage } from '@flows/socket';
 
 export interface RecordedMessage {
     seq: number;
     timestamp: number;
-    type: 'node' | 'port' | 'flow' | 'trace' | 'unknown';
+    type: 'node' | 'port' | 'flow' | 'trace' | 'progress' | 'log' | 'unknown';
     targetId: string;
     summary: string;
     raw: WebSocketMessage;
@@ -39,6 +46,20 @@ const summarize = (message: WebSocketMessage): Pick<RecordedMessage, 'type' | 't
     if (isPortUpdateMessage(data)) {
         const ts = data.ts ? ` ts=${data.ts}` : '';
         return { type: 'port', targetId: data.id, summary: `port${ts}`.trim() };
+    }
+
+    if (isProgressEnvelopeMessage(data)) {
+        const state = data.data;
+        const percent = state?.percent !== undefined ? ` ${state.percent}%` : '';
+        return { type: 'progress', targetId: message.id, summary: `${state?.status ?? 'progress'}${percent}` };
+    }
+
+    if (isLogEnvelopeMessage(data)) {
+        const batch = data.data;
+        const count = batch?.entries?.length ?? 0;
+        const first = batch?.entries?.[0];
+        const head = first ? ` · ${first.level} ${String(first.message ?? '').slice(0, 30)}` : '';
+        return { type: 'log', targetId: message.id, summary: `${count} entries${head}` };
     }
 
     return { type: 'unknown', targetId: message.id, summary: 'unknown' };
@@ -116,7 +137,6 @@ export const useSocketRecorder = () => {
             const remaining = messages.slice(fromIndex);
             if (remaining.length === 0) return;
 
-            const baseTs = remaining[0].timestamp;
             setReplayState({ isReplaying: true, currentSeq: null, totalCount: remaining.length });
 
             // Sequential scheduler: one timer at a time

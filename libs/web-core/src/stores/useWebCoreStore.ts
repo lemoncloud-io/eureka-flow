@@ -23,6 +23,13 @@ export interface UserProfile {
 
 export type UserView = Partial<UserProfile>;
 
+/** Workspace/project reference from the profile (GET /flows/0/profile); same shape for both. */
+export interface ProfileScope {
+    id: string;
+    name: string;
+    stereo: string;
+}
+
 export interface WebCoreState {
     initState?: AWSWebCoreState;
     isInitialized: boolean;
@@ -36,6 +43,9 @@ export interface WebCoreState {
     hasOpenaiKey: boolean;
     /** Workspace has ≥1 AI API key configured (server-authoritative). Source: GET /flows/0/profile. */
     useApiKey: boolean;
+    /** Active workspace/project context. Source: GET /flows/0/profile. Null until boot fetch. */
+    workspace: ProfileScope | null;
+    project: ProfileScope | null;
 }
 
 export interface WebCoreStore extends WebCoreState {
@@ -45,7 +55,13 @@ export interface WebCoreStore extends WebCoreState {
     setProfile: (profile: UserProfile) => void;
     updateProfile: (user: UserView) => void;
     registerLogoutCallback: (callback: () => void) => () => void;
-    setAiKeyStatus: (status: { hasGeminiKey: boolean; hasOpenaiKey: boolean; useApiKey: boolean }) => void;
+    setAiKeyStatus: (status: {
+        hasGeminiKey: boolean;
+        hasOpenaiKey: boolean;
+        useApiKey: boolean;
+        workspace?: ProfileScope | null;
+        project?: ProfileScope | null;
+    }) => void;
     setApiKey: (key: string) => void;
     clearApiKey: () => void;
     addApiKey: (key: string, options?: { label?: string; profile?: ApiKeyProfile }) => void;
@@ -67,6 +83,8 @@ const initialState: WebCoreState = {
     hasGeminiKey: false,
     hasOpenaiKey: false,
     useApiKey: false,
+    workspace: null,
+    project: null,
 };
 
 export const useWebCoreStore = create<WebCoreStore>()(set => {
@@ -114,6 +132,8 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
                 hasGeminiKey: false,
                 hasOpenaiKey: false,
                 useApiKey: false,
+                workspace: null,
+                project: null,
             });
 
             if (isOAuthEnabled) {
@@ -148,14 +168,27 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
             };
         },
 
-        setAiKeyStatus: (status: { hasGeminiKey: boolean; hasOpenaiKey: boolean; useApiKey: boolean }) =>
-            set(state =>
-                state.hasGeminiKey === status.hasGeminiKey &&
-                state.hasOpenaiKey === status.hasOpenaiKey &&
-                state.useApiKey === status.useApiKey
-                    ? state
-                    : status
-            ),
+        setAiKeyStatus: status =>
+            set(state => {
+                const workspace = status.workspace ?? null;
+                const project = status.project ?? null;
+                if (
+                    state.hasGeminiKey === status.hasGeminiKey &&
+                    state.hasOpenaiKey === status.hasOpenaiKey &&
+                    state.useApiKey === status.useApiKey &&
+                    state.workspace?.id === workspace?.id &&
+                    state.project?.id === project?.id
+                ) {
+                    return state;
+                }
+                return {
+                    hasGeminiKey: status.hasGeminiKey,
+                    hasOpenaiKey: status.hasOpenaiKey,
+                    useApiKey: status.useApiKey,
+                    workspace,
+                    project,
+                };
+            }),
 
         setApiKey: (key: string) => {
             setStoredApiKey(key);
@@ -200,7 +233,15 @@ export const useWebCoreStore = create<WebCoreStore>()(set => {
 
         switchApiKey: (key: string) => {
             setStoredApiKey(key);
-            set({ apiKey: key, profile: null, hasGeminiKey: false, hasOpenaiKey: false, useApiKey: false });
+            set({
+                apiKey: key,
+                profile: null,
+                hasGeminiKey: false,
+                hasOpenaiKey: false,
+                useApiKey: false,
+                workspace: null,
+                project: null,
+            });
         },
 
         updateKeyProfile: (key: string, profile: ApiKeyProfile) => {
