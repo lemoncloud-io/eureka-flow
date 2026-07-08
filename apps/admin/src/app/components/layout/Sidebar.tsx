@@ -30,8 +30,8 @@ export const Sidebar = () => {
             {/* Signal rail: a wire threads the nav, each route is a tap on it */}
             <nav className="relative flex flex-1 flex-col gap-0.5 px-3 py-3">
                 <span className="eyebrow mb-2 pl-9 text-muted-foreground">Console</span>
-                {/* the wire */}
-                <span className="pointer-events-none absolute bottom-3 left-[26px] top-10 w-px bg-border" aria-hidden />
+                {/* the wire — runs through the node markers' centers (nav px-3 + pl-2 + half of w-6 = 31px) */}
+                <span className="pointer-events-none absolute bottom-3 left-[31px] top-10 w-px bg-border" aria-hidden />
                 {NAV_ITEMS.map(item => (
                     <NavLink
                         key={item.to}
