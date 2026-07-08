@@ -25,6 +25,7 @@
         "experimentalDecorators": true,
         "baseUrl": ".",
         "paths": {
+            "@flows/agent": ["libs/agent/src/index.ts"],
             "@flows/flows": ["libs/flows/src/index.ts"],
             "@flows/lib/utils": ["libs/ui-kit/src/utils/index.ts"],
             "@flows/shared": ["libs/shared/src/index.ts"],
