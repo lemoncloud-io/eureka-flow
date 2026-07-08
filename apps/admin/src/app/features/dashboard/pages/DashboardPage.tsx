@@ -1,55 +1,121 @@
 import { useNavigate } from 'react-router-dom';
 
-import { ArrowRight, Cpu, Download, Upload } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, Cpu } from 'lucide-react';
 
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@flows/ui-kit';
+import { cn } from '@flows/lib/utils';
 
 import { useBlocksQuery } from '../../blocks';
+
+import type { LucideIcon } from 'lucide-react';
+
+interface Stage {
+    role: string;
+    label: string;
+    count: number;
+    icon: LucideIcon;
+    accent: string;
+    glow: string;
+}
+
+const Connector = () => (
+    <div className="relative hidden h-px flex-1 self-center overflow-hidden bg-border lg:block" aria-hidden>
+        <span className="absolute top-1/2 h-px w-8 -translate-y-1/2 bg-gradient-to-r from-transparent via-primary to-transparent animate-wire-flow motion-reduce:hidden" />
+    </div>
+);
+
+const StageNode = ({ stage }: { stage: Stage }) => {
+    const Icon = stage.icon;
+    return (
+        <div className="relative flex-1 overflow-hidden rounded-lg border bg-card p-5">
+            <span className={cn('absolute inset-x-0 top-0 h-0.5', stage.accent)} />
+            <div className="flex items-center justify-between">
+                <span className="eyebrow text-muted-foreground">{stage.role}</span>
+                <span className={cn('flex h-8 w-8 items-center justify-center rounded-md', stage.glow)}>
+                    <Icon className="h-4 w-4" />
+                </span>
+            </div>
+            <p className="mt-4 font-mono text-4xl font-semibold tabular-nums tracking-tight text-foreground">
+                {String(stage.count).padStart(2, '0')}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{stage.label}</p>
+        </div>
+    );
+};
 
 export const DashboardPage = () => {
     const navigate = useNavigate();
     const { data: blocks = [] } = useBlocksQuery();
 
-    const inputCount = blocks.filter(b => b.stereo === 'input').length;
-    const processCount = blocks.filter(b => b.stereo === 'process').length;
-    const outputCount = blocks.filter(b => b.stereo === 'output').length;
+    const stages: Stage[] = [
+        {
+            role: 'source',
+            label: 'Input blocks',
+            count: blocks.filter(b => b.stereo === 'input').length,
+            icon: ArrowDownToLine,
+            accent: 'bg-port-text',
+            glow: 'bg-port-text/10 text-port-text',
+        },
+        {
+            role: 'transform',
+            label: 'Process blocks',
+            count: blocks.filter(b => b.stereo === 'process').length,
+            icon: Cpu,
+            accent: 'bg-primary',
+            glow: 'bg-primary/10 text-primary',
+        },
+        {
+            role: 'sink',
+            label: 'Output blocks',
+            count: blocks.filter(b => b.stereo === 'output').length,
+            icon: ArrowUpFromLine,
+            accent: 'bg-wire',
+            glow: 'bg-wire/10 text-wire',
+        },
+    ];
+
+    const total = blocks.length;
+    const frontend = blocks.filter(b => b.isFrontend).length;
 
     return (
-        <div className="flex flex-col gap-6">
-            <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-            <div className="grid grid-cols-3 gap-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm text-muted-foreground">Input Blocks</CardTitle>
-                        <Download className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-3xl font-bold">{inputCount}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm text-muted-foreground">Process Blocks</CardTitle>
-                        <Cpu className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-3xl font-bold">{processCount}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm text-muted-foreground">Output Blocks</CardTitle>
-                        <Upload className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-3xl font-bold">{outputCount}</p>
-                    </CardContent>
-                </Card>
+        <div className="mx-auto flex max-w-5xl flex-col gap-8">
+            <div className="flex flex-col gap-1">
+                <span className="eyebrow text-primary">signal flow</span>
+                <h1 className="text-2xl font-bold tracking-tight text-foreground">Block Registry</h1>
+                <p className="text-sm text-muted-foreground">등록된 블록이 source → transform → sink 로 흐릅니다.</p>
             </div>
-            <Button className="w-fit" variant="outline" onClick={() => navigate('/blocks')}>
-                블록 관리로 이동
-                <ArrowRight className="ml-1.5 h-4 w-4" />
-            </Button>
+
+            {/* The flow: three stages wired in sequence — the shape of every workflow */}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-0">
+                <StageNode stage={stages[0]} />
+                <Connector />
+                <StageNode stage={stages[1]} />
+                <Connector />
+                <StageNode stage={stages[2]} />
+            </div>
+
+            {/* Registry readout */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <ReadoutCell label="total blocks" value={total} />
+                <ReadoutCell label="frontend" value={frontend} />
+                <ReadoutCell label="backend" value={total - frontend} />
+                <button
+                    onClick={() => navigate('/blocks')}
+                    className="group flex items-center justify-between rounded-lg border bg-card px-4 py-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/40"
+                >
+                    <span className="eyebrow text-muted-foreground">manage</span>
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                        블록 관리
+                        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                    </span>
+                </button>
+            </div>
         </div>
     );
 };
+
+const ReadoutCell = ({ label, value }: { label: string; value: number }) => (
+    <div className="rounded-lg border bg-card px-4 py-3">
+        <span className="eyebrow text-muted-foreground">{label}</span>
+        <p className="mt-1.5 font-mono text-2xl font-semibold tabular-nums text-foreground">{value}</p>
+    </div>
+);

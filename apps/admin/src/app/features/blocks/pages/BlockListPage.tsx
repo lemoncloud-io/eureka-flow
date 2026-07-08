@@ -13,10 +13,10 @@ import { useBlocksQuery } from '../hooks';
 import type { BlockStereo } from '../types';
 
 const TABS: { label: string; value: BlockStereo | 'all' }[] = [
-    { label: '전체', value: 'all' },
-    { label: 'Input', value: 'input' },
-    { label: 'Process', value: 'process' },
-    { label: 'Output', value: 'output' },
+    { label: 'all', value: 'all' },
+    { label: 'input', value: 'input' },
+    { label: 'process', value: 'process' },
+    { label: 'output', value: 'output' },
 ];
 
 export const BlockListPage = () => {
@@ -33,9 +33,12 @@ export const BlockListPage = () => {
     }, [blocks, activeTab]);
 
     return (
-        <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-foreground">블록 관리</h1>
+        <div className="mx-auto flex max-w-6xl flex-col gap-6">
+            <div className="flex items-end justify-between">
+                <div className="flex flex-col gap-1">
+                    <span className="eyebrow text-primary">registry</span>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">블록 관리</h1>
+                </div>
                 <div className="flex gap-2">
                     {import.meta.env.DEV && (
                         <Button variant="outline" size="sm" onClick={() => setMigrationOpen(true)} disabled={isLoading}>
@@ -48,21 +51,29 @@ export const BlockListPage = () => {
                 </div>
             </div>
 
-            <div className="flex gap-1 border-b">
-                {TABS.map(tab => (
-                    <button
-                        key={tab.value}
-                        onClick={() => setActiveTab(tab.value)}
-                        className={cn(
-                            'px-4 py-2 text-sm font-medium transition-colors',
-                            activeTab === tab.value
-                                ? 'border-b-2 border-primary text-primary'
-                                : 'text-muted-foreground hover:text-foreground'
-                        )}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
+            <div className="flex items-center gap-1.5 border-b pb-px">
+                {TABS.map(tab => {
+                    const active = activeTab === tab.value;
+                    return (
+                        <button
+                            key={tab.value}
+                            onClick={() => setActiveTab(tab.value)}
+                            className={cn(
+                                'rounded-md px-3 py-1.5 font-mono text-xs transition-colors',
+                                active
+                                    ? 'bg-accent text-primary'
+                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                            )}
+                        >
+                            {tab.label}
+                        </button>
+                    );
+                })}
+                {!isLoading && (
+                    <span className="ml-auto font-mono text-xs text-muted-foreground">
+                        {filteredBlocks.length} blocks
+                    </span>
+                )}
             </div>
 
             {isLoading ? (

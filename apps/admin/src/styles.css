@@ -4,73 +4,99 @@
 
 @layer base {
     :root {
-        --background: 0 0% 100%;
-        --foreground: 240 10% 10%;
-        --card: 0 0% 100%;
-        --card-foreground: 240 10% 10%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 240 10% 10%;
+        /* Type: mono is the machine-language voice (keys, types, paths, counts),
+           sans is the human-language voice (prose, Korean UI labels). */
+        --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, 'Menlo', 'Consolas', monospace;
+        --font-sans: system-ui, -apple-system, 'Pretendard', 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
 
-        /* Primary - Vivid Violet (#8F19F6) */
+        /* Surface: cool graphite paper, not pure white */
+        --background: 240 24% 98%;
+        --foreground: 240 18% 12%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 18% 12%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 240 18% 12%;
+
+        /* Signal violet (brand) — live / active / primary */
         --primary: 272 92% 53%;
         --primary-foreground: 0 0% 100%;
-        --secondary: 240 5% 96%;
-        --secondary-foreground: 240 5% 40%;
-        --accent: 272 50% 95%;
-        --accent-foreground: 272 80% 50%;
+        --secondary: 240 20% 95%;
+        --secondary-foreground: 240 10% 35%;
+        --accent: 272 60% 96%;
+        --accent-foreground: 272 80% 48%;
 
-        --muted: 240 5% 96%;
-        --muted-foreground: 240 5% 50%;
+        --muted: 240 20% 95.5%;
+        --muted-foreground: 240 8% 46%;
         --destructive: 0 72% 55%;
         --destructive-foreground: 0 0% 100%;
-        --border: 240 5% 90%;
-        --input: 240 5% 90%;
+        --border: 240 18% 90%;
+        --input: 240 18% 88%;
         --ring: 272 92% 53%;
         --radius: 0.5rem;
 
-        /* Point color */
         --point: 272 92% 53%;
 
-        /* Semantic Colors */
-        --success: 150 70% 40%;
+        /* Wire cyan — the second signal color (connections / secondary accent) */
+        --wire: 188 88% 40%;
+        --wire-foreground: 0 0% 100%;
+
+        /* Port type colors — mirror the flow editor's typed ports */
+        --port-text: 212 88% 55%;
+        --port-image: 272 88% 60%;
+        --port-any: 240 6% 55%;
+
+        /* Semantic */
+        --success: 150 65% 38%;
         --success-foreground: 0 0% 100%;
-        --warning: 40 95% 50%;
+        --warning: 38 92% 48%;
         --warning-foreground: 0 0% 0%;
         --info: 210 90% 55%;
         --info-foreground: 0 0% 100%;
+
+        /* Blueprint grid line (used on the app background) */
+        --grid-line: 240 20% 93%;
     }
 
     .dark {
-        --background: 240 10% 6%;
+        --background: 240 14% 7%;
         --foreground: 0 0% 96%;
-        --card: 240 8% 10%;
+        --card: 240 12% 10%;
         --card-foreground: 0 0% 96%;
-        --popover: 240 8% 10%;
+        --popover: 240 12% 10%;
         --popover-foreground: 0 0% 96%;
 
-        --primary: 272 85% 70%;
-        --primary-foreground: 0 0% 100%;
-        --secondary: 240 6% 15%;
-        --secondary-foreground: 0 0% 80%;
-        --accent: 272 30% 18%;
-        --accent-foreground: 272 80% 80%;
+        --primary: 272 90% 72%;
+        --primary-foreground: 240 20% 8%;
+        --secondary: 240 8% 16%;
+        --secondary-foreground: 0 0% 82%;
+        --accent: 272 40% 20%;
+        --accent-foreground: 272 85% 82%;
 
-        --muted: 240 6% 15%;
-        --muted-foreground: 0 0% 64%;
+        --muted: 240 8% 15%;
+        --muted-foreground: 240 6% 60%;
         --destructive: 0 70% 55%;
         --destructive-foreground: 0 0% 100%;
-        --border: 240 6% 18%;
-        --input: 240 6% 18%;
-        --ring: 272 85% 70%;
+        --border: 240 8% 18%;
+        --input: 240 8% 20%;
+        --ring: 272 90% 72%;
 
-        --point: 272 85% 72%;
+        --point: 272 90% 74%;
 
-        --success: 150 60% 50%;
+        --wire: 188 82% 52%;
+        --wire-foreground: 240 20% 8%;
+
+        --port-text: 212 85% 66%;
+        --port-image: 272 85% 72%;
+        --port-any: 240 6% 60%;
+
+        --success: 150 58% 52%;
         --success-foreground: 0 0% 100%;
-        --warning: 40 90% 55%;
+        --warning: 38 88% 56%;
         --warning-foreground: 0 0% 10%;
-        --info: 210 80% 60%;
+        --info: 210 80% 62%;
         --info-foreground: 0 0% 100%;
+
+        --grid-line: 240 10% 12%;
     }
 }
 
@@ -80,10 +106,33 @@
     }
     body {
         @apply bg-background text-foreground antialiased;
+        font-family: var(--font-sans);
+    }
+    /* App background: faint blueprint grid — the canvas the dataflow tool lives on */
+    .app-grid {
+        background-image:
+            linear-gradient(hsl(var(--grid-line)) 1px, transparent 1px),
+            linear-gradient(90deg, hsl(var(--grid-line)) 1px, transparent 1px);
+        background-size: 28px 28px;
+        background-position: -1px -1px;
     }
 }
 
-/* Smooth transitions for theme switching */
+@layer utilities {
+    .font-mono {
+        font-family: var(--font-mono);
+    }
+    /* Terminal eyebrow: the instrument-readout micro-label */
+    .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 0.6875rem;
+        line-height: 1;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+    }
+}
+
+/* Smooth theme transition */
 html {
     transition:
         background-color 0.3s ease,
