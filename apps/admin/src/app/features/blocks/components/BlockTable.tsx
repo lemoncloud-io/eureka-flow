@@ -49,7 +49,7 @@ export const BlockTable = ({ blocks }: BlockTableProps) => {
 
     return (
         <div className="overflow-hidden rounded-lg border bg-card">
-            <Table>
+            <Table className="[&_thead]:h-auto [&_td]:px-4 [&_td]:py-2.5 [&_th]:px-4 [&_th]:py-2.5 [&_th]:h-auto">
                 <TableHeader>
                     <TableRow className="hover:bg-transparent">
                         <TableHead className="w-12"></TableHead>

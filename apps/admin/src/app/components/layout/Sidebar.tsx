@@ -18,7 +18,7 @@ export const Sidebar = () => {
     return (
         <aside className="flex w-60 shrink-0 flex-col border-r bg-card">
             {/* Brand terminal */}
-            <div className="flex h-16 items-center gap-2.5 border-b px-5">
+            <div className="flex h-14 items-center gap-2.5 border-b px-5">
                 <span className="relative flex h-2.5 w-2.5 shrink-0">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
                     <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
@@ -28,10 +28,10 @@ export const Sidebar = () => {
             </div>
 
             {/* Signal rail: a wire threads the nav, each route is a tap on it */}
-            <nav className="relative flex flex-1 flex-col gap-0.5 px-3 py-4">
+            <nav className="relative flex flex-1 flex-col gap-0.5 px-3 py-3">
                 <span className="eyebrow mb-2 pl-9 text-muted-foreground">Console</span>
                 {/* the wire */}
-                <span className="pointer-events-none absolute bottom-4 left-[26px] top-12 w-px bg-border" aria-hidden />
+                <span className="pointer-events-none absolute bottom-3 left-[26px] top-10 w-px bg-border" aria-hidden />
                 {NAV_ITEMS.map(item => (
                     <NavLink
                         key={item.to}
@@ -88,7 +88,7 @@ export const Sidebar = () => {
             </nav>
 
             {/* Status readout */}
-            <div className="border-t px-5 py-3">
+            <div className="border-t px-5 py-2.5">
                 <div className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
                     <span className="h-1.5 w-1.5 rounded-full bg-success" />
                     <span>signal · online</span>

@@ -31,7 +31,7 @@ export const Header = () => {
     };
 
     return (
-        <header className="flex h-16 items-center justify-between gap-3 border-b bg-card px-6">
+        <header className="flex h-14 items-center justify-between gap-3 border-b bg-card px-5">
             {/* Instrument readout: where you are, in the machine's own path notation */}
             <div className="flex min-w-0 items-center gap-2">
                 <span className="text-sm font-semibold text-foreground">{section.title}</span>

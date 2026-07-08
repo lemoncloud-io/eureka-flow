@@ -108,14 +108,6 @@
         @apply bg-background text-foreground antialiased;
         font-family: var(--font-sans);
     }
-    /* App background: faint blueprint grid — the canvas the dataflow tool lives on */
-    .app-grid {
-        background-image:
-            linear-gradient(hsl(var(--grid-line)) 1px, transparent 1px),
-            linear-gradient(90deg, hsl(var(--grid-line)) 1px, transparent 1px);
-        background-size: 28px 28px;
-        background-position: -1px -1px;
-    }
 }
 
 @layer utilities {
