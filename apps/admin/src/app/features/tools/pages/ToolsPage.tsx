@@ -75,7 +75,7 @@ export const ToolsPage = () => {
     return (
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-foreground">Tools</h1>
+                <h1 className="text-xl font-bold tracking-tight text-foreground">Tools</h1>
                 <Button size="sm" onClick={handleAdd}>
                     <Plus className="mr-1 h-4 w-4" />새 Tool 추가
                 </Button>

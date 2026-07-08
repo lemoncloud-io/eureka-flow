@@ -93,7 +93,9 @@ export const BlockDetailPage = () => {
                         <ArrowLeft className="mr-1 h-4 w-4" />
                         목록
                     </Button>
-                    <h1 className="text-2xl font-bold text-foreground">{isNew ? '새 블록 생성' : formData.name}</h1>
+                    <h1 className="text-xl font-bold tracking-tight text-foreground">
+                        {isNew ? '새 블록 생성' : formData.name}
+                    </h1>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => navigate('/blocks')}>

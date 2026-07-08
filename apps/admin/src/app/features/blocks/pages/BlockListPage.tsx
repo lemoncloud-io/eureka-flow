@@ -37,7 +37,7 @@ export const BlockListPage = () => {
             <div className="flex items-end justify-between">
                 <div className="flex flex-col gap-1">
                     <span className="eyebrow text-primary">registry</span>
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground">블록 관리</h1>
+                    <h1 className="text-xl font-bold tracking-tight text-foreground">블록 관리</h1>
                 </div>
                 <div className="flex gap-2">
                     {import.meta.env.DEV && (

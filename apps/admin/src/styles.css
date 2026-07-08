@@ -108,6 +108,15 @@
         @apply bg-background text-foreground antialiased;
         font-family: var(--font-sans);
     }
+    /* Inner-page table density: shrink the shared ui-kit table type (15px) and
+       padding (py-5 px-6) uniformly across every admin table. */
+    .admin-content :is(td, th) {
+        font-size: 0.8125rem;
+        padding: 0.625rem 1rem;
+    }
+    .admin-content thead {
+        height: auto;
+    }
 }
 
 @layer utilities {
