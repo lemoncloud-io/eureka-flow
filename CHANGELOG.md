@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-07-08] - root@0.58.0, @flows/web@0.58.0, @flows/admin@0.33.0
+
+### Features
+
+- (shared) show workspace & project in ApiKeyDialog
+
 ## [2026-07-07] - root@0.57.0, @flows/web@0.57.0, @flows/admin@0.32.0
 
 ### Features
