@@ -1,5 +1,7 @@
 # Data flow & lifecycle
 
+> ⚠️ **Superseded on specifics — supporting material.** Predates the authoritative redesign; where they disagree, **[workflow-logic.md](workflow-logic.md)** (behavior) and **[component-interfaces.md](component-interfaces.md)** (shapes) win. Kept for context, not as an implementation source.
+
 > Part of the [Agent Chat spec](README.md) · Prev: [Data models & interfaces](04-data-models.md) · Next: [Testing strategies →](06-testing.md)
 
 ## Data flow

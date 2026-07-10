@@ -1,5 +1,7 @@
 # Concerns
 
+> ⚠️ **Superseded on specifics — supporting material.** Predates the authoritative redesign; where they disagree, **[workflow-logic.md](workflow-logic.md)** (behavior) and **[component-interfaces.md](component-interfaces.md)** (shapes) win. Kept for context, not as an implementation source.
+
 > Part of the [Agent Chat spec](README.md) · Prev: [Testing strategies](06-testing.md) · Next: [Open questions →](08-open-questions.md)
 
 - **Naming collision.** `agent-codex` is an existing **block**; this feature is a **meta-agent** that

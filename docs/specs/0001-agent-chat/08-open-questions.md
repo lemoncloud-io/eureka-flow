@@ -1,5 +1,7 @@
 # Open questions
 
+> ⚠️ **Superseded on specifics — supporting material.** Predates the authoritative redesign; where they disagree, **[workflow-logic.md](workflow-logic.md)** (behavior) and **[component-interfaces.md](component-interfaces.md)** (shapes) win. Kept for context, not as an implementation source.
+
 > Part of the [Agent Chat spec](README.md) · Prev: [Concerns](07-concerns.md)
 
 1. **Stage 1 provider drivers:** which providers/models does `BrowserLlmGateway` ship with (OpenAI +

@@ -26,79 +26,92 @@ Two worlds run through every diagram: **Draft** (where the agent edits safely) a
 
 ## 1. Overview — component architecture
 
-Who owns what, and who may call whom. The Orchestrator is the **sole writer**; it never imports Flow or React, reaching the canvas only through the **Tool Interface** and the **CanvasBinding** seam. Note the Executor has real paths into the **Live** world: live reads go through `CanvasBinding`, and runs go through `RunTracker` — both reach the Flow layer. _(§ Components, § Locked decision 8, § Read targeting)_
+The whole agent — reasoning loop, tools, orchestration — is React/TypeScript **in the browser**; no new backend. Four bands: the **agent core** (`libs/agent`, no React/Flow imports), the pluggable **`LlmGateway`** (one impl bound at runtime), the existing **flow layer** (`@flows`, React-owned), and **outside-the-browser** dependencies. The Orchestrator is the **sole writer**; it reaches the live canvas only through the **`CanvasBinding`** seam, and the LLM only through the gateway — so it never knows whether OpenAI, Gemini, or a simulation answered. _(§ Components, § Locked decision 8; mirrors [`03-architecture.md`](03-architecture.md))_
 
 ```mermaid
-flowchart TB
-    User(("User"))
-
-    subgraph UI["UI — pure view"]
-        Panel["Agent Panel"]
-    end
-
-    subgraph Core["Orchestration — sole writer"]
-        Orch["Orchestrator"]
+graph LR
+    subgraph CORE["Agent core · libs/agent (browser, no React/Flow imports)"]
+        UI["Agent Panel"]
+        ORCH["Orchestrator<br/>sole writer · provider-agnostic loop"]
         PB["Prompt Builder"]
-        Store["Storage"]
-    end
-
-    subgraph Ext["Outbound + catalog"]
-        GW["LLM Gateway"]
-        Skills["Skill Registry"]
-    end
-
-    subgraph TI["Tool Interface — the seam"]
-        Reg["Tool Registry"]
-        Exec["Tool Executor"]
-        Env["Environment"]
+        STORE["Storage · AgentSession<br/>messages · traces · gate"]
+        REG["Tool Registry"]
+        EXEC["Tool Executor<br/>validate · permission · route by kind"]
+        ENV["Environment<br/>baseline · fork · diff · promote"]
         RT["RunTracker"]
+        DRAFT[["Draft store<br/>headless · never persists"]]
+        UI --> ORCH
+        ORCH --> PB
+        ORCH -->|dispatch| EXEC
+        ORCH -->|env ops at turn boundaries| ENV
+        ORCH --> STORE
+        STORE -.->|reactive render| UI
+        EXEC --> REG
+        EXEC -->|mutate · read if forked| DRAFT
+        EXEC -->|run| RT
+        ENV -->|fork · diff · discard| DRAFT
     end
 
-    Draft[["Draft store<br/>headless<br/>never persists"]]
-
-    subgraph LiveWorld["React-owned — live world"]
-        CB["CanvasBinding"]
-        Flow["Flow layer<br/>Live canvas"]
+    subgraph GATEWAY["LlmGateway · one impl bound at runtime (browser)"]
+        GW["LlmGateway<br/>interface"]
+        S1["BrowserLlmGateway<br/>Stage 1 · key in localStorage"]
+        S2["ProxyLlmGateway<br/>Stage 2"]
+        SIM["SimulationGateway<br/>scripted · no LLM"]
+        OAI["OpenAiDriver"]
+        GEM["GeminiDriver"]
+        GW -.-> S1
+        GW -.-> S2
+        GW -.-> SIM
+        S1 --> OAI
+        S1 --> GEM
     end
 
-    User --> Panel
-    Panel -->|"send · resolvePending"| Orch
-    Orch -.->|"writes"| Store
-    Store -.->|"renders"| Panel
+    subgraph FLOWLAYER["Existing flow layer · @flows (browser, React-owned)"]
+        CB["CanvasBinding<br/>live read · persist · reload · connId"]
+        CANVAS["useCanvasStore / live canvas"]
+        FLOWS["useFlowsStore<br/>blockRegistry"]
+        FAPI["@flows/flows API<br/>upsertFlow · upsertNode · runNode"]
+        SOCK["useInitFlowSocket"]
+        CB --> CANVAS
+        CB --> FAPI
+    end
 
-    Orch --> PB
-    Orch -->|"chat request"| GW
-    GW -.->|"deltas · tool_calls"| Orch
-    PB -.->|"skill index"| Skills
+    subgraph OUTSIDE["Outside the browser · existing / third-party"]
+        OAIAPI["OpenAI API"]
+        GEMAPI["Gemini API"]
+        PRX["Stage 2 proxy"]
+        EUREKA["Eureka Flow API<br/>existing backend"]
+    end
 
-    Orch -->|"call LLM tools"| Exec
-    Orch -->|"env ops at turn boundaries"| Env
-
-    Exec --> Reg
-    Exec -->|"catalog · meta"| Skills
-    Exec -->|"mutate · read if forked"| Draft
-    Exec -->|"read live"| CB
-    Exec -->|"run"| RT
-
-    Env -->|"fork · diff · discard"| Draft
-    Env -->|"baseline · promote · reload · flush"| CB
-    RT -->|"connId · outputs"| CB
-    RT -->|"dispatch · run state"| Flow
-    CB --> Flow
+    ORCH <-->|request / reply| GW
+    EXEC -->|live read| CB
+    EXEC -->|catalog| FLOWS
+    ENV -->|baseline · promote · reload · flush| CB
+    RT -->|connId · outputs| CB
+    RT -->|dispatch · run state| FAPI
+    OAI --> OAIAPI
+    GEM --> GEMAPI
+    S2 --> PRX
+    FAPI --> EUREKA
+    EUREKA -->|WS events| SOCK
+    SOCK --> CANVAS
+    SOCK -.->|run events| RT
 
     classDef draft fill:#d5f5e3,stroke:#27ae60,color:#145a32;
     classDef live fill:#fadbd8,stroke:#c0392b,color:#641e16;
     classDef core fill:#d6eaf8,stroke:#2874a6,color:#1b4f72;
-    class Draft draft;
-    class CB,Flow live;
-    class Orch core;
+    class DRAFT draft;
+    class CB,CANVAS live;
+    class ORCH core;
 ```
+
+_Dotted edges into the gateway = alternatives: exactly **one** `LlmGateway` impl is bound at runtime (Stage 1 now, Stage 2 later, Simulation in tests). Provider drivers live only inside `BrowserLlmGateway`; in Stage 2 that normalization moves into the proxy._
 
 **Takeaways:**
 
-1. The triangle `Panel → Orchestrator → Storage → Panel` is the _only_ UI-sync path — streaming, gates, and status are all just store writes. _(§ UI-sync)_
-2. The Executor reaches **Live** two ways: `CanvasBinding` for live reads, `RunTracker` for runs. The Environment reaches Live only through `CanvasBinding` (baseline, promote, reload, flush).
-3. **Draft** and **Live** are different objects; only **promote** copies Draft changes into Live.
+1. **One outbound LLM seam.** The Orchestrator codes against `LlmGateway` only; provider drivers and key/transport staging sit behind it, so swapping Stage 1 → Stage 2 leaves the core untouched.
+2. **The Executor reaches Live two ways:** `CanvasBinding` for live structural reads, `RunTracker → @flows API` for runs. The Environment reaches Live only through `CanvasBinding` (baseline, promote, reload, flush).
+3. **Draft (green) and Live (red) are different objects;** only **promote** copies Draft changes into Live. Structural changes appear on the live canvas at promote — only _runs_ stream live (backend `WS events → socket → store / RunTracker`).
 
 ---
 

@@ -1,5 +1,7 @@
 # Data models & interfaces
 
+> ⚠️ **Superseded on specifics — supporting material.** Predates the authoritative redesign; where they disagree, **[workflow-logic.md](workflow-logic.md)** (behavior) and **[component-interfaces.md](component-interfaces.md)** (shapes) win. Kept for context, not as an implementation source.
+
 > Part of the [Agent Chat spec](README.md) · Prev: [Architecture & design](03-architecture.md) · Next: [Data flow & lifecycle →](05-data-flow.md)
 
 ## Data models / schemas

@@ -3,7 +3,7 @@
 > Status: **Draft** · Owner: TBD · Last updated: 2026-07-09
 > Related: [CONTEXT.md](../../../CONTEXT.md), [ADR-0002 permission model](../../adr/0002-flow-permission-model.md)
 
-This spec is anchored by two **authoritative** documents; the numbered files below are supporting
+This spec is anchored by three **authoritative** documents; the numbered files below are supporting
 material being reconciled against them.
 
 ## Contents
@@ -15,7 +15,8 @@ material being reconciled against them.
   control flow.
 - [component-interfaces.md](component-interfaces.md) — the typed shape of every seam (branded ids,
   the `ToolResult`/`FlowDiff`/`Plan` unions, and the `Environment`/`CanvasBinding`/`RunTracker`
-  contracts). Consistent with workflow-logic.md.
+  contracts): a top-down overview that indexes the per-component detail files in
+  [`interfaces/`](interfaces/). Consistent with workflow-logic.md.
 - [workflow-logic-diagrams.md](workflow-logic-diagrams.md) — sequence & containment diagrams for the above.
 
 **Supporting spec** — _being reconciled against the authoritative design above (may lag):_
