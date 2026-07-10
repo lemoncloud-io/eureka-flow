@@ -1,15 +1,19 @@
-# Agent Environment
+# Agent Environment Foundation — Review Brief
 
 ## 1. Summary
 
-Every future Browser Agent component will get its world through **one narrow interface**:
-the Agent Environment. It provides exactly five things — runtime identity, storage, tracing,
-time, and cancellation — and deliberately nothing else. The forbidden operations (eval, Function
-constructor, filesystem, arbitrary network, arbitrary script execution) are declared in the
-interface itself as immutable `false` flags, so the restriction is part of the contract, not a
-convention. It is a **restricted capability boundary** — not a full sandbox yet.
+The Agent Environment defines a narrow runtime capability boundary for future Browser Agent
+components. In this initial slice, it exposes the minimum runtime capabilities needed by
+higher-level agent layers — runtime identity, storage, tracing, time, and cancellation — and
+declares forbidden capabilities (eval, Function constructor, filesystem, arbitrary network,
+arbitrary script execution) as immutable `false` flags in the interface itself, so the
+restriction is part of the contract rather than a convention.
 
-## 2. Requirement
+These five capabilities are not a universal standard and not the complete Browser Agent
+interface map; they are the minimum runtime surface required for this Environment slice. The
+result is a **restricted capability boundary** — not a full sandbox.
+
+## 2. Meeting requirements addressed
 
 - Browser JavaScript runtime ✓
 - Virtual Node.js runtime for tests ✓
@@ -18,32 +22,37 @@ convention. It is a **restricted capability boundary** — not a full sandbox ye
     - eval ✓
     - Function constructor ✓
     - filesystem ✓
+    - arbitrary network ✓
     - arbitrary script execution ✓
 
 ## 3. Problem
 
 Agent code will be driven by untrusted LLM output. If it reaches directly for browser globals:
 
-- **No enforceable boundary** — "the agent can't do X" becomes a scattered convention.
-- **Not testable** — code that grabs `localStorage`/`window` can't run deterministically in Node.
+- **No enforceable boundary** — "the agent cannot do X" becomes a scattered convention.
+- **Not testable** — code that accesses `localStorage`/`window` directly cannot run
+  deterministically in Node.
 - **Unauditable coupling** — every component invents its own access to state, time, and logging.
 
-One narrow contract fixes all three.
+A single runtime contract addresses these issues by centralizing approved runtime access.
 
-## 4. Concept: restricted runtime boundary
+## 4. Concept: restricted runtime capability boundary
 
-**Inside** (all the agent gets):
+**Usable runtime capabilities** (what agent components receive through the environment):
 
-|                  |                                                       |
-| ---------------- | ----------------------------------------------------- |
-| Runtime identity | `'browser' \| 'node-virtual'`                         |
-| Storage          | JSON key-value, the only path to persistent state     |
-| Tracing          | leveled log sink, secrets redacted                    |
-| Time             | `now()`, injectable for deterministic tests           |
-| Cancellation     | `createAbortController()` for Stop at a safe boundary |
-| Capability flags | frozen, all-`false` declaration of what is forbidden  |
+|                  |                                                           |
+| ---------------- | --------------------------------------------------------- |
+| Runtime identity | `'browser' \| 'node-virtual'`                             |
+| Storage          | JSON key-value store, the only path to persistent state   |
+| Tracing          | leveled log sink with secret redaction                    |
+| Time             | `now()`, injectable for deterministic tests               |
+| Cancellation     | `createAbortController()` to stop work at a safe boundary |
 
-**Outside** (not in this slice, not reachable through the environment):
+**Capability declarations** (not an additional runtime power): the `capabilities` object is a
+frozen, all-`false` declaration of forbidden capabilities. It grants nothing at runtime; it
+records in the type system what the environment will not provide.
+
+**Out of scope for this slice** (not reachable through the environment):
 
 Agent Panel · LlmGateway · ToolExecutor · Orchestrator · canvas mutation ·
 flow creation/switching · arbitrary JS execution · filesystem
@@ -57,7 +66,7 @@ classDiagram
         +runtime: AgentRuntime
         +storage: AgentStorageSupportable
         +traceReporter?: AgentTraceReporterSupportable
-        +capabilities: all false, frozen
+        +capabilities: frozen, all false
         +now() number
         +createAbortController() AbortController
         +close()?
@@ -79,7 +88,7 @@ classDiagram
     }
     class BrowserAgentEnvironment {
         runtime = 'browser'
-        real clock, real abort
+        system clock, native cancellation
     }
     class VirtualAgentEnvironment {
         runtime = 'node-virtual'
@@ -91,7 +100,7 @@ classDiagram
     }
     class MemoryAgentStorage {
         in-memory Map
-        same semantics
+        same storage contract
     }
 
     AgentEnvironmentSupportable --> AgentStorageSupportable : storage
@@ -104,8 +113,9 @@ classDiagram
     VirtualAgentEnvironment --> MemoryAgentStorage : default
 ```
 
-Same interface, two runtimes — future agent code is written once and runs unchanged against the
-same contract in the editor and in CI.
+Both runtimes implement the same contract, so future agent components can run against the
+browser runtime in the editor and the virtual runtime in CI without changing their
+environment-facing code.
 
 ## 6. UML — virtual environment test sequence
 
@@ -127,6 +137,8 @@ sequenceDiagram
     Env-->>Test: allowEval=false, allowFileSystem=false, … (frozen)
 ```
 
+The virtual environment is demonstrated through the test path rather than a UI surface.
+
 ## 7. Security boundary
 
 ```mermaid
@@ -141,45 +153,56 @@ flowchart LR
     ENV -.->|no path| NO
 ```
 
-Honest framing: this constrains what agent code can do **through the environment**. It is a
-restricted capability boundary for future agent components — not a sandbox of all JS in the app.
+Scope clarification: this constrains what future agent code can access through the Environment
+interface. It does not sandbox all JavaScript running in the application.
 
-## 8. What is done
+## 8. Completed in this slice
 
-- [x] Environment interface (`AgentEnvironmentSupportable`, team `*Supportable` style)
-- [x] Browser environment
-- [x] Virtual Node.js environment (the 07.10 goal)
-- [x] localStorage wrapper, namespaced `flow_mosaic_agent_` (follows the app's `flow_mosaic_` convention)
-- [x] Memory storage with the same storage contract (proven by a shared contract spec)
-- [x] Trace reporter (noop + buffered) with secret redaction
+- [x] Environment interface (`AgentEnvironmentSupportable`, following the team `*Supportable` convention)
+- [x] Browser environment implementation
+- [x] Virtual Node.js environment aligned with the 07.10 goal
+- [x] localStorage adapter namespaced `flow_mosaic_agent_` (consistent with the app's `flow_mosaic_` convention)
+- [x] Memory storage satisfying the same storage contract (verified by a shared contract spec)
+- [x] Trace reporter (noop and buffered) with secret redaction
 - [x] Frozen, compile-time-`false` capability flags
-- [x] 42 tests passing + typecheck
+- [x] 42 tests passing and typecheck clean
 
-## 9. What is not done
+## 9. Intentionally out of scope for this slice
+
+The following are deferred by design, not missing:
 
 - [ ] Agent Panel
 - [ ] LlmGateway
 - [ ] ToolExecutor
 - [ ] Orchestrator
 - [ ] FlowAdapter / canvas integration
-- [ ] Full sandbox (this slice is the capability boundary, not a sandbox)
+- [ ] Full sandbox (this slice establishes the capability boundary only)
 
 ## 10. Acceptance criteria
 
-- [x] One Environment interface (`AgentEnvironmentSupportable`, team `*Supportable` style)
-- [x] Two runtimes behind it: browser and node-virtual
-- [x] No forbidden capability exposed — eval, Function constructor, filesystem, arbitrary
+- [x] A single Environment interface (`AgentEnvironmentSupportable`, team `*Supportable` style)
+- [x] Two runtimes implement it: browser and node-virtual
+- [x] No forbidden capability is exposed — eval, Function constructor, filesystem, arbitrary
       network, arbitrary script execution; flags are literal `false` and frozen (test-verified)
-- [x] Persistent state only through `AgentStorageSupportable` (no direct localStorage access)
-- [x] Browser keys namespaced `flow_mosaic_agent_`; `listKeys`/`clear` scoped to that namespace
+- [x] Persistent state flows only through `AgentStorageSupportable` (no direct localStorage access)
+- [x] Browser keys are namespaced `flow_mosaic_agent_`; `listKeys`/`clear` are scoped to that namespace
 - [x] Both storage implementations pass the same shared contract spec
-- [x] Trace entries redact secret-looking fields (API keys never land in logs)
-- [x] Typecheck and `npx nx test agent` green (42 tests)
+- [x] Trace entries redact secret-looking fields before reaching any log sink
+- [x] Typecheck and `npx nx test agent` pass (42 tests)
 
-## 11. Review questions
+## 11. Recommended next step
 
-1. Final interface naming — align with Lucas's docs (e.g. `allowEval` vs other capability names)?
-2. Package location — confirm `libs/agent/src/environment` (`@flows/agent`)?
-3. Storage prefix — confirm `flow_mosaic_agent_` as the final direction?
-4. Should clock/abort stay inside the Environment, or become separate interfaces later?
-5. Is key-name-based redaction enough for now, or add value-pattern scanning before gateway work?
+After alignment on naming, package location, and storage prefix, the next implementation slice
+should connect the Environment into the future Orchestrator/ToolExecutor execution context, so
+higher-level agent logic can use storage, tracing, time, and cancellation through the same
+runtime boundary.
+
+## 12. Review questions
+
+1. Confirm final interface and capability-flag naming against Lucas's documentation (e.g. `allowEval`).
+2. Confirm the package location: `libs/agent/src/environment` (`@flows/agent`).
+3. Confirm `flow_mosaic_agent_` as the final storage key prefix.
+4. Decide whether clock and cancellation remain part of the Environment interface or become
+   separate interfaces in a later slice.
+5. Decide whether key-name-based redaction is sufficient for now, or whether value-pattern
+   scanning is required before gateway work.
