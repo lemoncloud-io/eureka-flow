@@ -10,6 +10,7 @@ import {
     useBlockRegistry,
     useCanvasStore,
     useFlows,
+    useFlowsStore,
     useProductProgressStore,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -197,14 +198,17 @@ export const MobileFlowEditorPage = () => {
 
     // Flush pending config edits before closing detail so refresh within the
     // 500ms node-sync debounce (see useNodeConfig.syncNodeToServer) does not
-    // drop edits made in MobileStepDetail.
+    // drop edits made in MobileStepDetail. Skipped when Auto Save is off —
+    // the flow reaches the server only through the header's save button.
     const handleCloseStep = useCallback(async () => {
-        const { nodes, connections } = useCanvasStore.getState();
-        const currentState = serializeWorkflowState({ nodes, connections });
-        if (currentState !== lastSavedStateRef.current) {
-            lastLocalUpdateTimestampRef.current = Date.now();
-            const result = await saveCurrentFlow({ nodes, connections });
-            if (result.success) lastSavedStateRef.current = currentState;
+        if (useFlowsStore.getState().isAutoSaveEnabled) {
+            const { nodes, connections } = useCanvasStore.getState();
+            const currentState = serializeWorkflowState({ nodes, connections });
+            if (currentState !== lastSavedStateRef.current) {
+                lastLocalUpdateTimestampRef.current = Date.now();
+                const result = await saveCurrentFlow({ nodes, connections });
+                if (result.success) lastSavedStateRef.current = currentState;
+            }
         }
         stepNav.closeStep();
     }, [stepNav, saveCurrentFlow]);

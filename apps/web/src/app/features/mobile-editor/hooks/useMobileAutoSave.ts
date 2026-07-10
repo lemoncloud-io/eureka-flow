@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import { useCanvasStore, useFlows } from '@flows/flows';
+import { useCanvasStore, useFlows, useIsAutoSaveEnabled } from '@flows/flows';
 
 import type { SerializeWorkflowFn } from './types';
 
@@ -23,10 +23,11 @@ export const useMobileAutoSave = ({
     lastLocalUpdateTimestampRef,
 }: UseMobileAutoSaveParams): void => {
     const { saveCurrentFlow } = useFlows();
+    const isAutoSaveEnabled = useIsAutoSaveEnabled();
     const autoSaveTimerRef = useRef<number | null>(null);
 
     useEffect(() => {
-        if (!canSave || !isAppReady) return;
+        if (!canSave || !isAppReady || !isAutoSaveEnabled) return;
 
         const unsub = useCanvasStore.subscribe((state, prevState) => {
             if (state.nodes !== prevState.nodes || state.connections !== prevState.connections) {
@@ -49,5 +50,13 @@ export const useMobileAutoSave = ({
             unsub();
             if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
         };
-    }, [canSave, isAppReady, saveCurrentFlow, serializeWorkflowState, lastSavedStateRef, lastLocalUpdateTimestampRef]);
+    }, [
+        canSave,
+        isAppReady,
+        isAutoSaveEnabled,
+        saveCurrentFlow,
+        serializeWorkflowState,
+        lastSavedStateRef,
+        lastLocalUpdateTimestampRef,
+    ]);
 };

@@ -28,6 +28,7 @@ import {
     useCanvasStore,
     useCollapsedNodeIds,
     useEdgeSync,
+    useFlowsStore,
     useNodeSync,
     useUpdatedPortIds,
 } from '@flows/flows';
@@ -1561,7 +1562,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             if (!permissions.canModifyCanvas) return;
             saveCheckpoint();
             setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, customLabel: label || undefined } : n)));
-            syncNodeUpdate(nodeId, { customLabel: label || undefined });
+            // Auto Save off: keep the rename local; /flows/:id/save persists it on manual save
+            if (useFlowsStore.getState().isAutoSaveEnabled) {
+                syncNodeUpdate(nodeId, { customLabel: label || undefined });
+            }
         };
 
         const handleDescriptionChange = (nodeId: string, description: string) => {
@@ -1943,6 +1947,28 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [dragState, permissions.canDragNodes]
         );
 
+        // Batch update moved nodes' positions via /flows/:id/upsert (owner only).
+        // Auto Save off: keep positions local; /flows/:id/save persists them on manual save
+        const upsertMovedPositions = useCallback(
+            (movedNodes: NodeData[]) => {
+                if (!flowId || !permissions.canModifyCanvas) return;
+                if (!useFlowsStore.getState().isAutoSaveEnabled) return;
+
+                const nodesToUpdate = movedNodes
+                    .filter(n => n.id && !isUnresolvedTempId(n.id))
+                    .map(n => ({
+                        id: resolveTempId(n.id),
+                        position: n.position,
+                    }));
+                if (nodesToUpdate.length === 0) return;
+
+                upsertFlow(flowId, { nodes: nodesToUpdate as NodeData[], edges: [] }).catch(err => {
+                    console.error('[WorkflowCanvas] Failed to batch update node positions:', err);
+                });
+            },
+            [flowId, permissions.canModifyCanvas]
+        );
+
         // Touch end handler for node dragging
         const handleNodeTouchEnd = useCallback(() => {
             if (dragState && dragStartSnapshotRef.current) {
@@ -1974,28 +2000,14 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     pastRef.current.push(dragStartSnapshotRef.current);
                     futureRef.current = [];
 
-                    // Batch update moved nodes' positions via /flows/:id/upsert (owner only)
-                    if (flowId && permissions.canModifyCanvas) {
-                        const nodesToUpdate = movedNodes
-                            .filter(n => n.id && !isUnresolvedTempId(n.id))
-                            .map(n => ({
-                                id: resolveTempId(n.id),
-                                position: n.position,
-                            }));
-
-                        if (nodesToUpdate.length > 0) {
-                            upsertFlow(flowId, { nodes: nodesToUpdate as NodeData[], edges: [] }).catch(err => {
-                                console.error('[WorkflowCanvas] Failed to batch update node positions:', err);
-                            });
-                        }
-                    }
+                    upsertMovedPositions(movedNodes);
                 }
             }
 
             setDragState(null);
             dragStartSnapshotRef.current = null;
             lastTouchPosRef.current = null;
-        }, [dragState, nodes, flowId, permissions.canModifyCanvas, handleSelectionChange]);
+        }, [dragState, nodes, handleSelectionChange, upsertMovedPositions]);
 
         const handleMouseMove = (e: React.MouseEvent) => {
             if (isPanning) {
@@ -2057,21 +2069,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     pastRef.current.push(dragStartSnapshotRef.current);
                     futureRef.current = [];
 
-                    // Batch update moved nodes' positions via /flows/:id/upsert (owner only)
-                    if (flowId && permissions.canModifyCanvas) {
-                        const nodesToUpdate = movedNodes
-                            .filter(n => n.id && !isUnresolvedTempId(n.id))
-                            .map(n => ({
-                                id: resolveTempId(n.id),
-                                position: n.position,
-                            }));
-
-                        if (nodesToUpdate.length > 0) {
-                            upsertFlow(flowId, { nodes: nodesToUpdate as NodeData[], edges: [] }).catch(err => {
-                                console.error('[WorkflowCanvas] Failed to batch update node positions:', err);
-                            });
-                        }
-                    }
+                    upsertMovedPositions(movedNodes);
                 }
             }
 
