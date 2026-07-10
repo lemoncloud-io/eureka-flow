@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-07-10] - root@0.59.0, @flows/web@0.59.0
+
+### Features
+
+- (flows) skip node upserts for rename and position when Auto Save is off
+
 ## [2026-07-08] - root@0.58.0, @flows/web@0.58.0, @flows/admin@0.33.0
 
 ### Features
