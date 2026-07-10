@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { getPermissions, upsertNode, useBlockRegistry, useCanvasStore } from '@flows/flows';
+import { getPermissions, upsertNode, useBlockRegistry, useCanvasStore, useFlowsStore } from '@flows/flows';
 
 import { isUnresolvedTempId, resolveTempId } from '../../flows/utils';
 
@@ -66,7 +66,10 @@ export const useNodeConfig = (nodeId: string | null, flowId: string | null, role
             setCustomLabel(value);
             if (!nodeId) return;
             useCanvasStore.getState().updateNodeData(nodeId, { customLabel: value } as Partial<NodeData>);
-            syncNodeToServer({ customLabel: value || undefined });
+            // Auto Save off: keep the rename local; /flows/:id/save persists it on manual save
+            if (useFlowsStore.getState().isAutoSaveEnabled) {
+                syncNodeToServer({ customLabel: value || undefined });
+            }
         },
         [canEditStructure, nodeId, syncNodeToServer]
     );
