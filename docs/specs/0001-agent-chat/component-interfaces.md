@@ -671,6 +671,15 @@ interface StorageInterface {
 }
 ```
 
+> **Store vs. storage — one component, two layers.** `StorageInterface` is a **persistence port**, not
+> the reactive layer. The reactive session state is the Zustand `useAgentStore` (the §7.2 `AgentSession`
+> held in-memory); **the Panel subscribes to that store** via selector hooks and re-renders when the
+> Orchestrator writes to it (`set(...)`). `StorageInterface` is called only by the store/Orchestrator —
+> `save` on every change, `load`/`create` on flow-open — to mirror the session to localStorage. The
+> Panel never subscribes to `StorageInterface`: localStorage is **not** a reactive source (its DOM
+> `storage` event fires cross-tab only). Keeping it a port means tests can swap an in-memory
+> implementation without touching reactivity.
+
 ### 7.4 LLM Gateway (provider-neutral)
 
 The only outbound LLM dependency. Canonical shape mirrors OpenAI chat-completions; provider drivers translate to Gemini etc. behind it.
