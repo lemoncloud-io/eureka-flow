@@ -4,6 +4,7 @@ export * from './ConnectionLine';
 export * from './ContentPreviewModal';
 export * from './DataTooltip';
 export * from './DesktopMobileSwitchCta';
+export * from './DevCanvasBindingPanel';
 export * from './DevRoleChip';
 export * from './DetailPanel';
 export * from './EmptyStateGuide';

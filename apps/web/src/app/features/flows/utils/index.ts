@@ -240,6 +240,8 @@ export const replaceNodeIdInState = (
 
 export { wouldCreateCycle } from './graph';
 export { captureCanvasAsDataUrl, captureCanvasForThumbnail, exportCanvasAsPng } from './exportImage';
+export { makeDesktopCanvasBinding } from './makeDesktopCanvasBinding';
+export type { CanvasBinding, Graph, XY } from './makeDesktopCanvasBinding';
 
 // ============================================================
 // Input File Upload Utilities

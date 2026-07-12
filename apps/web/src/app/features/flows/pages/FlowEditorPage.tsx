@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -24,6 +24,7 @@ import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
 import { AiKeyDialog } from '../components/AiKeyDialog';
 import { DesktopMobileSwitchCta } from '../components/DesktopMobileSwitchCta';
+import { DevCanvasBindingPanel } from '../components/DevCanvasBindingPanel';
 import { DevRoleChip } from '../components/DevRoleChip';
 import { DevSocketPanel } from '../components/DevSocketPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
@@ -36,6 +37,7 @@ import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { useSocketHandlers } from '../hooks/useSocketHandlers';
 import { useSocketRecorder } from '../hooks/useSocketRecorder';
+import { makeDesktopCanvasBinding } from '../utils';
 
 import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
@@ -61,6 +63,9 @@ export const FlowEditorPage = () => {
     const { t } = useTranslation(['flows']);
     const canvasRef = useRef<WorkflowCanvasRef>(null);
     const sidebarRef = useRef<SidebarRef>(null);
+
+    // The one seam between agent code and the React-owned live canvas (SPEC §6.5).
+    const canvasBinding = useMemo(() => makeDesktopCanvasBinding(canvasRef), []);
 
     const { loadBlocks, blockRegistry } = useBlocks();
     const {
@@ -880,6 +885,7 @@ export const FlowEditorPage = () => {
                     onMarkReplayed={socketRecorder.markReplayed}
                 />
             )}
+            {showDevTools && <DevCanvasBindingPanel binding={canvasBinding} />}
 
             {/* Loading Overlay */}
             {isLoading && (
