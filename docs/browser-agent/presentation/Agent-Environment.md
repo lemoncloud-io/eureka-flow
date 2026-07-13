@@ -1,4 +1,4 @@
-# Agent Environment Foundation — Review Brief
+# Agent Environment Foundation
 
 ## 1. Summary
 
@@ -13,7 +13,7 @@ These five capabilities are not a universal standard and not the complete Browse
 interface map; they are the minimum runtime surface required for this Environment slice. The
 result is a **restricted capability boundary** — not a full sandbox.
 
-## 2. Meeting requirements addressed
+## 2. Requirements
 
 - Browser JavaScript runtime ✓
 - Virtual Node.js runtime for tests ✓
@@ -57,7 +57,7 @@ records in the type system what the environment will not provide.
 Agent Panel · LlmGateway · ToolExecutor · Orchestrator · canvas mutation ·
 flow creation/switching · arbitrary JS execution · filesystem
 
-## 5. UML — main interfaces
+## 5. Main interfaces
 
 ```mermaid
 classDiagram
@@ -117,7 +117,7 @@ Both runtimes implement the same contract, so future agent components can run ag
 browser runtime in the editor and the virtual runtime in CI without changing their
 environment-facing code.
 
-## 6. UML — virtual environment test sequence
+## 6. Virtual environment test sequence
 
 ```mermaid
 sequenceDiagram
@@ -160,25 +160,14 @@ interface. It does not sandbox all JavaScript running in the application.
 
 - [x] Environment interface (`AgentEnvironmentSupportable`, following the team `*Supportable` convention)
 - [x] Browser environment implementation
-- [x] Virtual Node.js environment aligned with the 07.10 goal
+- [x] Virtual Node.js environment
 - [x] localStorage adapter namespaced `flow_mosaic_agent_` (consistent with the app's `flow_mosaic_` convention)
 - [x] Memory storage satisfying the same storage contract (verified by a shared contract spec)
 - [x] Trace reporter (noop and buffered) with secret redaction
 - [x] Frozen, compile-time-`false` capability flags
 - [x] 42 tests passing and typecheck clean
 
-## 9. Intentionally out of scope for this slice
-
-The following are deferred by design, not missing:
-
-- [ ] Agent Panel
-- [ ] LlmGateway
-- [ ] ToolExecutor
-- [ ] Orchestrator
-- [ ] FlowAdapter / canvas integration
-- [ ] Full sandbox (this slice establishes the capability boundary only)
-
-## 10. Acceptance criteria
+## 9. Acceptance criteria
 
 - [x] A single Environment interface (`AgentEnvironmentSupportable`, team `*Supportable` style)
 - [x] Two runtimes implement it: browser and node-virtual
@@ -190,19 +179,22 @@ The following are deferred by design, not missing:
 - [x] Trace entries redact secret-looking fields before reaching any log sink
 - [x] Typecheck and `npx nx test agent` pass (42 tests)
 
-## 11. Recommended next step
+## 10. Next step
 
 After alignment on naming, package location, and storage prefix, the next implementation slice
 should connect the Environment into the future Orchestrator/ToolExecutor execution context, so
 higher-level agent logic can use storage, tracing, time, and cancellation through the same
 runtime boundary.
 
-## 12. Review questions
+## 11. Build and compatibility check
 
-1. Confirm final interface and capability-flag naming against Lucas's documentation (e.g. `allowEval`).
-2. Confirm the package location: `libs/agent/src/environment` (`@flows/agent`).
-3. Confirm `flow_mosaic_agent_` as the final storage key prefix.
-4. Decide whether clock and cancellation remain part of the Environment interface or become
-   separate interfaces in a later slice.
-5. Decide whether key-name-based redaction is sufficient for now, or whether value-pattern
-   scanning is required before gateway work.
+- TypeScript source is implemented under `libs/agent` (`@flows/agent`).
+- Typecheck passes: `npx tsc -p libs/agent/tsconfig.json --noEmit`.
+- Unit tests pass: `npx nx test agent` (42 tests).
+- Library build passes: `npx nx build agent` compiles the environment to JavaScript with type
+  declarations via `tsconfig.lib.json` (output under `libs/agent/dist`, not tracked in git).
+- Application build passes: `npx nx build web` bundles the workspace, confirming the package is
+  compatible with the app's JavaScript build pipeline.
+- The runtime source uses no Node-only APIs (`fs`, `path`, `child_process`, `process`) and no
+  `eval`/`Function` constructor, keeping the package browser-safe.
+- Any pre-existing Vite build warnings are unrelated to the Agent Environment slice.

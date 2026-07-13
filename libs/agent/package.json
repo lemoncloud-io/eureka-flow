@@ -13,5 +13,20 @@
         },
         "./package.json": "./package.json"
     },
-    "dependencies": {}
+    "dependencies": {},
+    "nx": {
+        "targets": {
+            "build": {
+                "command": "tsc -p libs/agent/tsconfig.lib.json",
+                "cache": true,
+                "inputs": [
+                    "production",
+                    "^production"
+                ],
+                "outputs": [
+                    "{projectRoot}/dist"
+                ]
+            }
+        }
+    }
 }
