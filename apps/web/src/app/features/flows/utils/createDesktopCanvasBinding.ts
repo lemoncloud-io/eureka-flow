@@ -39,7 +39,7 @@ export interface CanvasBinding {
  * Pass the same ref object that is wired to `<WorkflowCanvas ref={...} />`; the binding
  * reads `ref.current` lazily on every call, so it stays valid across canvas re-renders.
  */
-export const makeDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | null>): CanvasBinding => {
+export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | null>): CanvasBinding => {
     const canvas = (): WorkflowCanvasRef => {
         if (!ref.current) {
             throw new Error('CanvasBinding: canvas is not mounted');

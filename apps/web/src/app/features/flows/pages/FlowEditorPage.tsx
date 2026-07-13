@@ -37,7 +37,7 @@ import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { useSocketHandlers } from '../hooks/useSocketHandlers';
 import { useSocketRecorder } from '../hooks/useSocketRecorder';
-import { makeDesktopCanvasBinding } from '../utils';
+import { createDesktopCanvasBinding } from '../utils';
 
 import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
@@ -65,7 +65,7 @@ export const FlowEditorPage = () => {
     const sidebarRef = useRef<SidebarRef>(null);
 
     // The one seam between agent code and the React-owned live canvas (SPEC §6.5).
-    const canvasBinding = useMemo(() => makeDesktopCanvasBinding(canvasRef), []);
+    const canvasBinding = useMemo(() => createDesktopCanvasBinding(canvasRef), []);
 
     const { loadBlocks, blockRegistry } = useBlocks();
     const {

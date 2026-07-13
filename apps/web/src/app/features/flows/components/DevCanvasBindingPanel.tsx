@@ -4,7 +4,7 @@ import { RefreshCw } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 
-import type { CanvasBinding } from '../utils/makeDesktopCanvasBinding';
+import type { CanvasBinding } from '../utils/createDesktopCanvasBinding';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 interface DevCanvasBindingPanelProps {
