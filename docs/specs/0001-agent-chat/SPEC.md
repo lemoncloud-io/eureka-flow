@@ -2,7 +2,7 @@
 
 > **Scope:** the smallest coherent version of the in-browser flow agent — it **generates and edits**
 > flows by chat (add / remove / reconfigure / **rename / move** blocks). Running flows, multi-editor
-> safety, and durable backend persistence are **deferred** (§8). Earlier, fuller design iterations are
+> safety, and durable backend persistence are **deferred** (§9). Earlier, fuller design iterations are
 > kept for reference under [`archive/`](archive/).
 >
 > Friendly companion with diagrams: **[README.md](README.md)**. · Last updated: 2026-07-12.
@@ -50,139 +50,180 @@ To stay as simple as possible, the skeleton assumes a **frontend-swap apply mode
   the server rides on the normal flow-save path and is a later concern.
 
 These assumptions are exactly what make the commit a single, safe, synchronous step. When they change
-(real server persistence, multiple editors), the deferred hardening in §8 comes back.
+(real server persistence, multiple editors), the deferred hardening in §9 comes back.
 
 ## 4. Components
 
-| Component | Role |
-| --- | --- |
-| **Agent Panel** | Chat UI. Emits `send` / `resolvePlan`; renders purely from the session store. No logic. |
-| **Orchestrator** | Owns the turn and is the **only writer**. Runs the think/act loop and the approval gate. |
-| **LlmGateway** | The one outbound LLM dependency (a real browser impl + a fake for tests). |
-| **ToolExecutor** | Runs each tool call the model emits: validate → permission → do it → result. |
-| **Workspace** | Owns the **draft**. Snapshots the baseline, diffs, and swaps the draft in. The model never calls these. |
-| **CanvasBinding** | The single seam to the real, React-owned canvas: read it, edit a node, swap it. |
-| **Storage** | The persisted session (`SessionState`) the Panel renders from. |
+| Component         | Role                                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------------- |
+| **Agent Panel**   | Chat UI. Emits `send` / `resolvePlan`; renders purely from the session store. No logic.                 |
+| **Orchestrator**  | Owns the turn and is the **only writer**. Runs the think/act loop and the approval gate.                |
+| **LlmGateway**    | The one outbound LLM dependency (a real browser impl + a fake for tests).                               |
+| **ToolExecutor**  | Runs each tool call the model emits: validate → permission → do it → result.                            |
+| **Workspace**     | Owns the **draft**. Snapshots the baseline, diffs, and swaps the draft in. The model never calls these. |
+| **CanvasBinding** | The single seam to the real, React-owned canvas: read it, edit a node, swap it.                         |
+| **Storage**       | The persisted session (`SessionState`) the Panel renders from.                                          |
 
 ## 5. Interface definitions
 
 Everything, in one place. Ids are **plain strings**; a draft-only node carries a `"temp:"`-prefixed
-id that stays as-is after the swap (until a later real save). Branded ids are deferred (§8).
+id that stays as-is after the swap (until a later real save). Branded ids are deferred (§9).
 
 ```ts
 // ── 1 · Orchestrator ───────────────────────────────────────────────────────
 interface Orchestrator {
-  send(text: string): Promise<void>;                 // append user msg → run the whole turn
-  resolvePlan(decision: 'accept' | 'reject'): void;  // Panel → resume at the plan gate
-  abort(): void;                                      // cancel the in-flight stream, discard the draft
+    send(text: string): Promise<void>; // append user msg → run the whole turn
+    resolvePlan(decision: 'accept' | 'reject'): void; // Panel → resume at the plan gate
+    abort(): void; // cancel the in-flight stream, discard the draft
 }
 
 // ── 2 · LlmGateway ─────────────────────────────────────────────────────────
 interface LlmGateway {
-  chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk>;
+    chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk>;
 }
-interface ChatRequest { messages: ChatMessage[]; tools: ToolDef[]; stream?: boolean; }
+interface ChatRequest {
+    messages: ChatMessage[];
+    tools: ToolDef[];
+    stream?: boolean;
+}
 interface ChatMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | null;
-  toolCalls?: { id: string; name: string; args: string }[];
-  toolCallId?: string;
+    role: 'system' | 'user' | 'assistant' | 'tool';
+    content: string | null;
+    toolCalls?: { id: string; name: string; args: string }[];
+    toolCallId?: string;
 }
-interface ToolDef { name: string; description: string; parameters: JsonSchema; }
-interface Chunk { text?: string; toolCall?: { id: string; name: string; argsDelta: string }; done?: boolean; }
+interface ToolDef {
+    name: string;
+    description: string;
+    parameters: JsonSchema;
+}
+interface Chunk {
+    text?: string;
+    toolCall?: { id: string; name: string; argsDelta: string };
+    done?: boolean;
+}
 
 // ── 3 · ToolExecutor ───────────────────────────────────────────────────────
 // Tool identity is an open string so tools can be discovered at runtime (dynamic /
 // external / MCP). The built-ins are a known subset, not the whole universe.
 type BuiltinToolName =
-  | 'list_blocks' | 'get_flow'                                             // read   → catalog / live-or-draft
-  | 'add_node' | 'update_node' | 'delete_node' | 'connect' | 'disconnect'; // mutate → draft only
-interface ToolCall { id: string; name: string; args: unknown; }
-type ToolResult =
-  | { toolCallId: string; ok: true;  data?: unknown }
-  | { toolCallId: string; ok: false; error: string };
+    | 'list_blocks'
+    | 'get_flow' // read   → catalog / live-or-draft
+    | 'add_node'
+    | 'update_node'
+    | 'delete_node'
+    | 'connect'
+    | 'disconnect'; // mutate → draft only
+interface ToolCall {
+    id: string;
+    name: string;
+    args: unknown;
+}
+type ToolResult = { toolCallId: string; ok: true; data?: unknown } | { toolCallId: string; ok: false; error: string };
 
 // A ToolProvider owns a set of tools and can list + run them — the seam that
 // dynamic / MCP tools plug into. One BuiltinToolProvider (the flow tools) today.
 interface ToolProvider {
-  listTools(): Promise<ToolDef[]> | ToolDef[];       // discovery (MCP: tools/list)
-  owns(name: string): boolean;
-  dispatch(call: ToolCall): Promise<ToolResult>;     // run one   (MCP: tools/call)
+    listTools(): Promise<ToolDef[]> | ToolDef[]; // discovery (MCP: tools/list)
+    owns(name: string): boolean;
+    dispatch(call: ToolCall): Promise<ToolResult>; // run one   (MCP: tools/call)
 }
 interface ToolExecutor {
-  listTools(): Promise<ToolDef[]>;                   // union across providers → the LLM's tool defs
-  dispatch(call: ToolCall): Promise<ToolResult>;     // validate → permission → route to the owning provider
+    listTools(): Promise<ToolDef[]>; // union across providers → the LLM's tool defs
+    dispatch(call: ToolCall): Promise<ToolResult>; // validate → permission → route to the owning provider
 }
 
 // ── 4 · Workspace (draft + swap; never LLM-callable) ────────────────────────
 interface Workspace {
-  snapshotBaseline(): void;   // read the live flow → keep as baseline + seed for the draft (no fork)
-  getFlow(): FlowSnapshot;    // structural read: the draft if it exists this turn, else live
-  mutate: MutateOps;          // the draft-only editing surface
-  diff(): FlowDiff;           // draft vs baseline = the review summary
-  promote(): void;            // swap the whole draft into the live canvas (synchronous; no server writes)
-  discard(): void;            // drop the draft (Reject / turn end)
+    snapshotBaseline(): void; // read the live flow → keep as baseline + seed for the draft (no fork)
+    getFlow(): FlowSnapshot; // structural read: the draft if it exists this turn, else live
+    mutate: MutateOps; // the draft-only editing surface
+    diff(): FlowDiff; // draft vs baseline = the review summary
+    promote(): void; // swap the whole draft into the live canvas (synchronous; no server writes)
+    discard(): void; // drop the draft (Reject / turn end)
 }
 interface MutateOps {
-  addNode(input: { type: string; position?: XY; config?: Record<string, string>; label?: string }): { tempId: string };
-  updateNode(id: string, patch: { config?: Record<string, string>; label?: string; position?: XY }): void;
-  deleteNode(id: string): void;
-  connect(edge: Edge): { edgeId: string };
-  disconnect(edgeId: string): void;
+    addNode(input: { type: string; position?: XY; config?: Record<string, string>; label?: string }): {
+        tempId: string;
+    };
+    updateNode(id: string, patch: { config?: Record<string, string>; label?: string; position?: XY }): void;
+    deleteNode(id: string): void;
+    connect(edge: Edge): { edgeId: string };
+    disconnect(edgeId: string): void;
 }
 
 // ── 5 · CanvasBinding (the one door to the real canvas) ─────────────────────
 // Graph = the live canvas shape from the store: { nodes: NodeData[]; connections: Connection[] }
 // (NodeData / Connection are existing codebase types — see §7).
 interface CanvasBinding {
-  readGraph(): Graph;                                                      // live structural read
-  updateNode(id: string, patch: { label?: string; position?: XY }): void; // one node, immediate, frontend-only
-  swapFlow(graph: Graph): void;                                            // replace the whole flow at once (apply a draft)
+    readGraph(): Graph; // live structural read
+    updateNode(id: string, patch: { label?: string; position?: XY }): void; // one node, immediate, frontend-only
+    swapFlow(graph: Graph): void; // replace the whole flow at once (apply a draft)
 }
 
 // ── 6 · Session (what the Panel renders from) ───────────────────────────────
 interface SessionState {
-  flowId: string;
-  messages: Message[];
-  phase: 'idle' | 'thinking' | 'awaiting_plan' | 'done' | 'error';
-  plan?: Plan;                     // present while phase === 'awaiting_plan'
+    flowId: string;
+    messages: Message[];
+    phase: 'idle' | 'thinking' | 'awaiting_plan' | 'done' | 'error';
+    plan?: Plan; // present while phase === 'awaiting_plan'
 }
 interface Storage {
-  load(flowId: string): SessionState | null;
-  create(flowId: string): SessionState;
-  save(state: SessionState): void; // localStorage; called on every change
+    load(flowId: string): SessionState | null;
+    create(flowId: string): SessionState;
+    save(state: SessionState): void; // localStorage; called on every change
 }
 
 // ── Data shapes ─────────────────────────────────────────────────────────────
-type Graph = { nodes: NodeData[]; connections: Connection[] };  // existing codebase types (§7)
+type Graph = { nodes: NodeData[]; connections: Connection[] }; // existing codebase types (§7)
 
-interface FlowSnapshot { flowId: string; nodes: NodeView[]; edges: Edge[]; }
-interface NodeView {
-  id: string; type: string; label?: string; position: XY;
-  config?: Record<string, string>;
-  inputs:  { portId: string; type?: string }[];
-  outputs: { portId: string; type?: string }[];
+interface FlowSnapshot {
+    flowId: string;
+    nodes: NodeView[];
+    edges: Edge[];
 }
-interface Edge { id?: string; sourceNodeId: string; sourcePortId: string; targetNodeId: string; targetPortId: string; }
-interface XY { x: number; y: number; }
+interface NodeView {
+    id: string;
+    type: string;
+    label?: string;
+    position: XY;
+    config?: Record<string, string>;
+    inputs: { portId: string; type?: string }[];
+    outputs: { portId: string; type?: string }[];
+}
+interface Edge {
+    id?: string;
+    sourceNodeId: string;
+    sourcePortId: string;
+    targetNodeId: string;
+    targetPortId: string;
+}
+interface XY {
+    x: number;
+    y: number;
+}
 
 interface FlowDiff {
-  addedNodes:    { tempId: string; type: string; position: XY; config?: Record<string, string>; label?: string }[];
-  removedNodes:  string[];
-  modifiedNodes: { id: string; config?: Record<string, string>; label?: string; position?: XY }[];
-  addedEdges:    Edge[];
-  removedEdges:  string[];
-  isEmpty: boolean;
+    addedNodes: { tempId: string; type: string; position: XY; config?: Record<string, string>; label?: string }[];
+    removedNodes: string[];
+    modifiedNodes: { id: string; config?: Record<string, string>; label?: string; position?: XY }[];
+    addedEdges: Edge[];
+    removedEdges: string[];
+    isEmpty: boolean;
 }
-interface Plan { id: string; explanation: string; diff: FlowDiff; }
+interface Plan {
+    id: string;
+    explanation: string;
+    diff: FlowDiff;
+}
 
 interface Message {
-  id: string;
-  role: 'user' | 'assistant' | 'tool' | 'system';
-  content?: string;
-  toolCalls?: { id: string; name: string; args: unknown; status: 'proposed' | 'running' | 'ok' | 'error' }[];
-  plan?: Plan;                     // assistant plan message → rehydrates the gate on reload
-  ts: number;
+    id: string;
+    role: 'user' | 'assistant' | 'tool' | 'system';
+    content?: string;
+    toolCalls?: { id: string; name: string; args: unknown; status: 'proposed' | 'running' | 'ok' | 'error' }[];
+    plan?: Plan; // assistant plan message → rehydrates the gate on reload
+    ts: number;
 }
 ```
 
@@ -190,23 +231,23 @@ interface Message {
 
 ### 6.1 Orchestrator
 
-The spine. `send(text)` runs the entire turn; the loop and the gate live *inside* it.
+The spine. `send(text)` runs the entire turn; the loop and the gate live _inside_ it.
 
 `send(text)`:
 
 1. Append the user message; set `phase = 'thinking'`; `workspace.snapshotBaseline()`.
 2. **Reasoning loop** (bounded by a per-turn iteration cap):
-   - Build the request: system prompt + history + tool defs, plus the **structural snapshot on the
-     first iteration only** (`workspace.getFlow()`).
-   - `gateway.chat(req)`; stream text deltas into the store (the Panel shows text appear — streaming
-     is store writes, not a socket).
-   - If the model emits **tool calls** → `executor.dispatch()` each, append results, continue.
-   - If it returns **final text only** → exit the loop.
+    - Build the request: system prompt + history + tool defs, plus the **structural snapshot on the
+      first iteration only** (`workspace.getFlow()`).
+    - `gateway.chat(req)`; stream text deltas into the store (the Panel shows text appear — streaming
+      is store writes, not a socket).
+    - If the model emits **tool calls** → `executor.dispatch()` each, append results, continue.
+    - If it returns **final text only** → exit the loop.
 3. **Finalize:** `diff = workspace.diff()`.
-   - `diff.isEmpty` (pure Q&A / read-only turn) → emit the final answer; `phase = 'done'`.
-   - Otherwise ask the model, in one dedicated completion, for a natural-language **`explanation`**
-     of the diff (fallback: a mechanical summary). Build the `Plan`, set `phase = 'awaiting_plan'`,
-     store it → the Panel renders the approval card.
+    - `diff.isEmpty` (pure Q&A / read-only turn) → emit the final answer; `phase = 'done'`.
+    - Otherwise ask the model, in one dedicated completion, for a natural-language **`explanation`**
+      of the diff (fallback: a mechanical summary). Build the `Plan`, set `phase = 'awaiting_plan'`,
+      store it → the Panel renders the approval card.
 4. `resolvePlan('accept')` → `workspace.promote()` (the swap) → `phase = 'done'`.
    `resolvePlan('reject')` → `workspace.discard()` → `phase = 'done'`.
 
@@ -222,7 +263,7 @@ The only outbound LLM dependency, behind one interface so it can be swapped:
 - **`FakeGateway`** — deterministic scripted responses for tests.
 
 `chat(req)` returns an async stream of `Chunk`s (text and/or tool-call deltas). The provider-neutral
-request shape mirrors chat-completions; a proxy gateway and multi-provider drivers are deferred (§8).
+request shape mirrors chat-completions; a proxy gateway and multi-provider drivers are deferred (§9).
 
 ### 6.3 ToolExecutor & tools
 
@@ -236,23 +277,23 @@ Tools live behind **providers** (`ToolProvider`): `listTools()` advertises them 
 `BuiltinToolProvider` (the flow tools below); a dynamic / MCP provider can be added later with no
 change to the Executor (§9).
 
-| Tool | Kind | Target | Notes |
-| --- | --- | --- | --- |
-| `list_blocks` | read | block catalog | the palette the agent composes from |
-| `get_flow` | read | **draft if forked this turn, else live** | so the agent sees its own in-progress edits |
-| `add_node` | mutate | **draft** | `{ type, position?, config?, label? }`; position optional (a default is assigned) |
-| `update_node` | mutate | **draft** | `{ config?, label?, position? }` — reconfigure, **rename**, and/or **move**; config patch merges |
-| `delete_node` | mutate | **draft** | |
-| `connect` | mutate | **draft** | 4-tuple endpoints |
-| `disconnect` | mutate | **draft** | by edge id |
+| Tool          | Kind   | Target                                   | Notes                                                                                            |
+| ------------- | ------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `list_blocks` | read   | block catalog                            | the palette the agent composes from                                                              |
+| `get_flow`    | read   | **draft if forked this turn, else live** | so the agent sees its own in-progress edits                                                      |
+| `add_node`    | mutate | **draft**                                | `{ type, position?, config?, label? }`; position optional (a default is assigned)                |
+| `update_node` | mutate | **draft**                                | `{ config?, label?, position? }` — reconfigure, **rename**, and/or **move**; config patch merges |
+| `delete_node` | mutate | **draft**                                |                                                                                                  |
+| `connect`     | mutate | **draft**                                | 4-tuple endpoints                                                                                |
+| `disconnect`  | mutate | **draft**                                | by edge id                                                                                       |
 
 - **Label & position are first-class mutations now** (§3): `update_node` can rename (`label`) and move
   (`position`) an existing node, and `add_node` can place a new one. They ride along in the swap — no
   backend write.
 - **Permissions:** mutate tools require the relevant `FlowPermissions` flag (`canModifyCanvas` /
   `canEditStructure` / `canEditConfig`); a denied call returns `{ ok:false, error }` and changes nothing.
-- **Lazy fork:** the *first* mutate call triggers the draft fork; before that, `get_flow` reads live.
-- **No `run_*`, no runtime reads, no skill/layout/metadata tools** in the skeleton — see §8.
+- **Lazy fork:** the _first_ mutate call triggers the draft fork; before that, `get_flow` reads live.
+- **No `run_*`, no runtime reads, no skill/layout/metadata tools** in the skeleton — see §9.
 
 ### 6.4 Workspace (draft, diff, swap)
 
@@ -274,7 +315,7 @@ Owns the draft and the `CanvasBinding` as private fields; exposes only the turn-
   synchronous step. No server writes, no ordering, no id remapping; autosave stays off. Because we
   install the exact draft you reviewed, "presented ≡ applied" holds by construction. Assumes the live
   flow was not edited during the turn (single editor); otherwise the swap would overwrite that edit —
-  deferred (§8).
+  deferred (§9).
 - **`discard()`** — drop the draft; the live flow was never touched.
 
 ### 6.5 CanvasBinding
@@ -313,24 +354,24 @@ See the block in §5. Notes:
 Every seam wraps a primitive already in the repo — this is what makes the skeleton implementable
 without new backend work.
 
-| Seam | Wraps | Where |
-| --- | --- | --- |
-| draft store | `createCanvasStore()` = `createStore(canvasStateCreator)` (`zustand/vanilla`, v5.0.10) — an additive factory beside the live `create()` singleton | `libs/flows/src/stores/useCanvasStore.ts` |
-| `MutateOps.*` | store pure actions `setNodes` / `updateNodeData` / `deleteNode` / `addConnection` / `deleteConnection` (no `addNode` action — create via `setNodes`) | `libs/flows/src/stores/useCanvasStore.ts` |
-| `list_blocks` | `blockRegistry` / `listBlocks()` | `libs/flows/src/stores/useFlowsStore.ts`, `libs/flows/src/api/blocks.ts` |
-| `readGraph` (live) | store `nodes`/`connections` (mobile); `WorkflowCanvasRef.getWorkflow()` (desktop) | `libs/flows/src/stores/useCanvasStore.ts`, `apps/web/src/app/features/flows/components/WorkflowCanvas.tsx` |
-| `updateNode` | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — local `setNodes`, immediate, no server call | `apps/web/src/app/features/flows/components/WorkflowCanvas.tsx` |
-| `swapFlow` | `loadWorkflow(graph)` on the live store / `canvasRef.loadWorkflow` (same primitive the socket `FlowUpdateMessage` handler uses) — with autosave suppressed | `libs/flows/src/stores/useCanvasStore.ts`, `apps/web/src/app/features/flows/hooks/useSocketHandlers.ts` |
-| permissions | `FlowPermissions` (`canModifyCanvas`, `canEditConfig`, `canEditStructure`, `canRun`, …) | `libs/flows/src/types/permissions.ts` |
+| Seam               | Wraps                                                                                                                                                      | Where                                                                                                      |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| draft store        | `createCanvasStore()` = `createStore(canvasStateCreator)` (`zustand/vanilla`, v5.0.10) — an additive factory beside the live `create()` singleton          | `libs/flows/src/stores/useCanvasStore.ts`                                                                  |
+| `MutateOps.*`      | store pure actions `setNodes` / `updateNodeData` / `deleteNode` / `addConnection` / `deleteConnection` (no `addNode` action — create via `setNodes`)       | `libs/flows/src/stores/useCanvasStore.ts`                                                                  |
+| `list_blocks`      | `blockRegistry` / `listBlocks()`                                                                                                                           | `libs/flows/src/stores/useFlowsStore.ts`, `libs/flows/src/api/blocks.ts`                                   |
+| `readGraph` (live) | store `nodes`/`connections` (mobile); `WorkflowCanvasRef.getWorkflow()` (desktop)                                                                          | `libs/flows/src/stores/useCanvasStore.ts`, `apps/web/src/app/features/flows/components/WorkflowCanvas.tsx` |
+| `updateNode`       | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — local `setNodes`, immediate, no server call                                                        | `apps/web/src/app/features/flows/components/WorkflowCanvas.tsx`                                            |
+| `swapFlow`         | `loadWorkflow(graph)` on the live store / `canvasRef.loadWorkflow` (same primitive the socket `FlowUpdateMessage` handler uses) — with autosave suppressed | `libs/flows/src/stores/useCanvasStore.ts`, `apps/web/src/app/features/flows/hooks/useSocketHandlers.ts`    |
+| permissions        | `FlowPermissions` (`canModifyCanvas`, `canEditConfig`, `canEditStructure`, `canRun`, …)                                                                    | `libs/flows/src/types/permissions.ts`                                                                      |
 
 Reused codebase types (not redefined): `NodeData` (note **`config`**, not `data`; holds `position`),
 `Connection`/`EdgeData` (the store collection is `connections`), `BlockDefinitionWithFrontend`,
 `WorkflowState = { nodes, edges }`. New agent code is proposed for `libs/agent/src`, mirroring how
 `flows`/`socket` are structured.
 
-> **What is deliberately *not* grounded here:** the old server-write primitives (`createNodeAsync` /
+> **What is deliberately _not_ grounded here:** the old server-write primitives (`createNodeAsync` /
 > `waitForNodeId`, `upsertNode`, `upsertFlow`) are unused in this version — the swap replaces them.
-> They return when durable backend persistence does (§8).
+> They return when durable backend persistence does (§9).
 
 ## 8. The draft model (why it's safe)
 
@@ -340,9 +381,11 @@ store. The skeleton needs one **additive** refactor: expose the state-creator th
 second, headless instance can be built.
 
 ```ts
-const canvasStateCreator = (set, get) => ({ /* all state + actions, unchanged */ });
-export const useCanvasStore   = create(canvasStateCreator);              // live singleton — consumers untouched
-export const createCanvasStore = () => createStore(canvasStateCreator);  // zustand/vanilla — the headless draft
+const canvasStateCreator = (set, get) => ({
+    /* all state + actions, unchanged */
+});
+export const useCanvasStore = create(canvasStateCreator); // live singleton — consumers untouched
+export const createCanvasStore = () => createStore(canvasStateCreator); // zustand/vanilla — the headless draft
 ```
 
 A headless instance runs the real reducers (real validation) but has **none** of the persistence
@@ -366,7 +409,7 @@ Each is a clean addition to the skeleton, not a rewrite:
 - **Branded ids** — `ServerNodeId` / `TempNodeId` / … for compile-time guarantees once ids hit the
   server again.
 - **Kind-scoped tool surfaces** — split the one executor into read/mutate surfaces so a read tool
-  *cannot* call a mutating primitive.
+  _cannot_ call a mutating primitive.
 - **Dynamic & MCP external tools** — add a `ToolProvider` beside the built-in one (`listTools()` ↔ MCP
   `tools/list`, `dispatch()` ↔ `tools/call`). External tools don't edit the flow, so they stay out of
   the draft/plan loop and get their own approval. The open `string` name + `ToolProvider` already

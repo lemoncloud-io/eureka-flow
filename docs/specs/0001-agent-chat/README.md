@@ -8,14 +8,14 @@ the new version in.
 
 > This is the friendly tour. For interfaces and precise behavior, see **[SPEC.md](SPEC.md)**.
 > Scope of this first version: **generate + edit** flows on the frontend. Running flows and saving
-> durably to the server come later (see *What's not here yet*).
+> durably to the server come later (see _What's not here yet_).
 
 ---
 
 ## What it can do
 
 - **Generate** — "build a flow that fetches an article and summarizes it."
-- **Edit** — "add an email step after the summary," "rename this node to *Summarize*," "line these
+- **Edit** — "add an email step after the summary," "rename this node to _Summarize_," "line these
   three nodes up," "remove the translate block."
 
 ## What's not here yet
@@ -69,12 +69,14 @@ classDiagram
     }
     class ToolExecutor {
         <<the model acts>>
+        +listTools() ToolDef[]
         +dispatch(call) ToolResult
     }
     class Workspace {
         <<draft + swap>>
         +snapshotBaseline()
         +getFlow() FlowSnapshot
+        +mutate MutateOps
         +diff() FlowDiff
         +promote()
         +discard()
@@ -82,6 +84,7 @@ classDiagram
     class CanvasBinding {
         <<door to the live canvas>>
         +readGraph() Graph
+        +updateNode(id, patch)
         +swapFlow(graph)
     }
     Orchestrator --> LlmGateway
@@ -152,7 +155,7 @@ stateDiagram-v2
 ## Draft → plan → swap (the safety story)
 
 This is the heart of the design. Edits go to a **hidden draft copy** of your flow. At the end, the
-difference between the draft and your original flow *is* the plan you review. Accept **swaps the draft
+difference between the draft and your original flow _is_ the plan you review. Accept **swaps the draft
 in** as your live flow; Reject throws the draft away.
 
 ```mermaid
@@ -182,13 +185,13 @@ Accept applies the **exact** draft you reviewed, so what you saw is what you get
 
 You're looking at a flow that fetches an article. You type:
 
-> **"Summarize the article, rename the fetch node to *Get article*, and email the summary to me."**
+> **"Summarize the article, rename the fetch node to _Get article_, and email the summary to me."**
 
 1. The agent reads your flow and the block catalog (`get_flow`, `list_blocks`).
 2. On a draft it renames the fetch node (`update_node` → label), adds a **Summarize** block wired
    after it, then an **Email** block after that (`add_node`, `connect`) — your canvas hasn't changed.
-3. It shows a plan: *"Renamed 1 node, +2 nodes, +2 connections — summarizes the article text and
-   emails the result to you,"* with the diff.
+3. It shows a plan: _"Renamed 1 node, +2 nodes, +2 connections — summarizes the article text and
+   emails the result to you,"_ with the diff.
 4. You click **Accept**. The draft is swapped into your canvas, and your flow now shows the renamed
    node and the two new blocks in place.
 
