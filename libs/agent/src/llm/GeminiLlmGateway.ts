@@ -19,6 +19,10 @@ const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
 const ERROR_BODY_SNIPPET_LENGTH = 200;
 
+/** A provider/proxy could echo request data back; scrub the key before it reaches an error. */
+const redactText = (value: string, secret: string): string =>
+    secret.length > 0 ? value.split(secret).join('[redacted]') : value;
+
 interface GeminiContent {
     role: 'user' | 'model';
     parts: Array<{ text: string }>;
@@ -82,10 +86,11 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): LlmGat
 
             if (!response.ok) {
                 const body = await response.text().catch(() => '');
+                const safeBody = redactText(body, apiKey);
 
                 trace?.error('llm.gemini.error', { model, status: response.status });
                 throw new Error(
-                    `Gemini request failed with status ${response.status}: ${body.slice(0, ERROR_BODY_SNIPPET_LENGTH)}`
+                    `Gemini request failed with status ${response.status}: ${safeBody.slice(0, ERROR_BODY_SNIPPET_LENGTH)}`
                 );
             }
 

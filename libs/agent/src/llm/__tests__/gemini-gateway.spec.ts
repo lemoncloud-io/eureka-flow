@@ -96,6 +96,15 @@ describe('createGeminiLlmGateway', () => {
         expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
     });
 
+    it('redacts the API key when an error body echoes it', async () => {
+        const http = new ScriptedHttpRequest([{ status: 400, text: `bad key ${API_KEY}` }]);
+
+        const attempt = createGateway(http).complete({ messages: [{ role: 'user', content: 'q' }] });
+
+        await expect(attempt).rejects.toThrow(/status 400.*bad key \[redacted\]/);
+        await attempt.catch((error: Error) => expect(error.message).not.toContain(API_KEY));
+    });
+
     it('throws when the response has no candidates', async () => {
         const http = new ScriptedHttpRequest([{ json: { candidates: [] } }]);
 
