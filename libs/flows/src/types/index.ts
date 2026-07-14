@@ -2,6 +2,7 @@ export * from './apps';
 export * from './graph';
 export * from './permissions';
 export * from './process';
+export * from './uploadHtml';
 
 export type {
     BlockDefinition,

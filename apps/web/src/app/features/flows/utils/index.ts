@@ -7,7 +7,8 @@ import {
     resolveTempId,
 } from '@flows/flows';
 
-import type { Connection, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
+import type { UploadHtmlProductView } from '@flows/flows';
+import type { Connection, DataPacket, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
 import type { Dispatch, SetStateAction } from 'react';
 
 // ============================================================
@@ -379,6 +380,27 @@ export const tryParseJson = (value: unknown): object | null => {
     } catch {
         return null;
     }
+};
+
+// ============================================================
+// upload-html Product Utilities
+// ============================================================
+
+/**
+ * Recognize an `upload-html` product packet, so it can be shown as a link card instead of raw JSON.
+ *
+ * Keyed on `website` alone: a mock run emits `{ website }` with no id, name or progress$, and the
+ * spec requires it to render the same way. A JSON string is parsed first — a node can carry the
+ * product as text.
+ */
+export const getUploadHtmlProduct = (packet: DataPacket<unknown> | null | undefined): UploadHtmlProductView | null => {
+    if (!packet) return null;
+
+    const value = typeof packet.value === 'string' ? tryParseJson(packet.value) : packet.value;
+    if (!value || typeof value !== 'object') return null;
+
+    const product = value as UploadHtmlProductView;
+    return typeof product.website === 'string' && product.website ? product : null;
 };
 
 // ============================================================

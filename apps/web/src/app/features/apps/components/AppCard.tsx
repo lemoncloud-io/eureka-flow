@@ -3,36 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { ArrowRight } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
+import { gradientOf, initialsOf } from '@flows/shared';
 import { Badge } from '@flows/ui-kit';
 
 import type { AppView } from '@flows/flows';
-
-/**
- * Apps have no per-App preview image, so the tile is a deterministic gradient
- * derived from the App's code — stable across renders, distinct per App.
- */
-const GRADIENTS = [
-    'from-violet-500/25 to-fuchsia-500/10',
-    'from-sky-500/25 to-cyan-500/10',
-    'from-amber-500/25 to-orange-500/10',
-    'from-emerald-500/25 to-teal-500/10',
-    'from-rose-500/25 to-pink-500/10',
-    'from-indigo-500/25 to-blue-500/10',
-];
-
-const gradientOf = (code: string): string => {
-    let hash = 0;
-    for (let i = 0; i < code.length; i++) hash = (hash * 31 + code.charCodeAt(i)) >>> 0;
-    return GRADIENTS[hash % GRADIENTS.length];
-};
-
-const initialsOf = (label: string): string =>
-    label
-        .split(/[\s-_]+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map(part => part.charAt(0).toUpperCase())
-        .join('');
 
 export const AppCard = ({ app }: { app: AppView }) => {
     const { t, i18n } = useTranslation();

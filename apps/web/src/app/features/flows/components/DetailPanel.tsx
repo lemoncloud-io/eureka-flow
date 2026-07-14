@@ -45,6 +45,7 @@ import { FilePreviewDialog } from './FilePreviewDialog';
 import { FrontendBadge } from './FrontendBadge';
 import { ImageEditorDialog } from './ImageEditorDialog';
 import { ModelSelect } from './ModelSelect';
+import { ProductLinkCard } from './ProductLinkCard';
 import { RunHistoryPanel } from './RunHistoryPanel';
 import { S3Image } from './S3Image';
 import { TouchDialog } from './TouchDialog';
@@ -52,6 +53,7 @@ import {
     INPUT_FILE_ACCEPT,
     clearFileConfig,
     getUploadErrorMessage,
+    getUploadHtmlProduct,
     processUploadedFile,
     readImageFile,
     tryParseJson,
@@ -561,6 +563,16 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     >
                         <Expand className="w-3 h-3" />
                     </button>
+                </div>
+            );
+        }
+
+        // upload-html product → link card instead of raw JSON
+        const product = getUploadHtmlProduct(packet);
+        if (product) {
+            return (
+                <div className="mt-1.5">
+                    <ProductLinkCard product={product} />
                 </div>
             );
         }

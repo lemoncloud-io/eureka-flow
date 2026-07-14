@@ -5,8 +5,9 @@ import { Expand } from 'lucide-react';
 
 import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
-import { tryParseJson } from '../../utils';
+import { getUploadHtmlProduct, tryParseJson } from '../../utils';
 import { ContentPreviewModal } from '../ContentPreviewModal';
+import { ProductLinkCard } from '../ProductLinkCard';
 import { S3Image } from '../S3Image';
 import { getFirstInputData } from './helpers';
 
@@ -29,6 +30,12 @@ export const PreviewVisualization: React.FC<VisualizationProps> = ({ node, defin
                 {t('visualization.waitingForData')}
             </div>
         );
+    }
+
+    // upload-html product → its own link card, not wrapped in the click-to-expand preview box
+    const product = getUploadHtmlProduct(lastInput);
+    if (product) {
+        return <ProductLinkCard product={product} />;
     }
 
     const handleClick = (e: React.MouseEvent) => {
