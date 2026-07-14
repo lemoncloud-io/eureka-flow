@@ -1,4 +1,11 @@
-import { TEMP_ID_PREFIXES, generateTempId, isTempId, isUnresolvedTempId, resolveTempId } from '@flows/flows';
+import {
+    TEMP_ID_PREFIXES,
+    compressImageIfNeeded,
+    generateTempId,
+    isTempId,
+    isUnresolvedTempId,
+    resolveTempId,
+} from '@flows/flows';
 
 import type { Connection, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
 import type { Dispatch, SetStateAction } from 'react';
@@ -245,6 +252,33 @@ export { captureCanvasAsDataUrl, captureCanvasForThumbnail, exportCanvasAsPng } 
 // Input File Upload Utilities
 // ============================================================
 
+/** Maximum upload file size, in MB. Single source of truth — i18n copy interpolates this. */
+export const MAX_UPLOAD_SIZE_MB = 58;
+
+export const MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+
+/** Thrown when a picked file is at or over MAX_UPLOAD_SIZE, so callers can tell it apart from read failures */
+export class FileTooLargeError extends Error {
+    constructor() {
+        super(`File exceeds ${MAX_UPLOAD_SIZE_MB} MB`);
+        this.name = 'FileTooLargeError';
+    }
+}
+
+/** Reject an oversized file before it is read into memory */
+export const assertUploadSize = (file: File): void => {
+    if (file.size >= MAX_UPLOAD_SIZE) throw new FileTooLargeError();
+};
+
+/** Resolve an upload failure to user-facing copy — size rejections read differently from read failures */
+export const getUploadErrorMessage = (
+    error: unknown,
+    t: (key: string, options?: Record<string, unknown>) => string
+): string =>
+    error instanceof FileTooLargeError
+        ? t('flows:detailPanel.fileTooLarge', { size: MAX_UPLOAD_SIZE_MB })
+        : t('flows:detailPanel.uploadFailed');
+
 /** Accepted file types for the input-image block (images + text/json + zip files) */
 export const INPUT_FILE_ACCEPT =
     'image/*,.txt,.text,.html,.json,.zip,text/plain,text/html,application/json,application/zip,application/x-zip-compressed';
@@ -266,6 +300,26 @@ export const extractBase64 = (dataUrl: string): string => {
     return idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
 };
 
+/** Read a file as a data URL */
+const readAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = evt => resolve(evt.target?.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+    });
+
+/**
+ * Read an image file and return it as a compressed data URL.
+ * Throws FileTooLargeError if the file is at or over MAX_UPLOAD_SIZE.
+ */
+export const readImageFile = async (file: File): Promise<string> => {
+    assertUploadSize(file);
+
+    const { dataUrl: compressed } = await compressImageIfNeeded(await readAsDataUrl(file));
+    return compressed;
+};
+
 /** Clear all file-related config keys */
 export const clearFileConfig = (onConfigChange: (key: string, value: unknown) => void): void => {
     onConfigChange('fileData', '');
@@ -276,42 +330,36 @@ export const clearFileConfig = (onConfigChange: (key: string, value: unknown) =>
 /**
  * Read uploaded file and update config via onConfigChange.
  * Text files (txt/html/json) → fileData (base64), image files → processImage callback.
+ * Throws FileTooLargeError if the file is at or over MAX_UPLOAD_SIZE.
  */
 export const processUploadedFile = async (
     file: File,
     onConfigChange: (key: string, value: unknown) => void,
     processImage: (dataUrl: string) => Promise<string>
 ): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = async evt => {
-            const dataUrl = evt.target?.result as string;
-            if (!dataUrl) {
-                resolve();
-                return;
-            }
+    assertUploadSize(file);
 
-            if (isZipFile(file)) {
-                const raw = extractBase64(dataUrl);
-                onConfigChange('imageData', raw);
-                onConfigChange('fileData', '');
-                onConfigChange('fileName', file.name);
-                onConfigChange('fileType', '');
-            } else if (isTextFile(file)) {
-                onConfigChange('fileData', dataUrl);
-                onConfigChange('fileName', file.name);
-                onConfigChange('fileType', file.type || 'text/plain');
-                onConfigChange('imageData', '');
-            } else {
-                const processed = await processImage(dataUrl);
-                onConfigChange('imageData', processed);
-                clearFileConfig(onConfigChange);
-            }
-            resolve();
-        };
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-    });
+    const dataUrl = await readAsDataUrl(file);
+    if (!dataUrl) return;
+
+    if (isZipFile(file)) {
+        onConfigChange('imageData', extractBase64(dataUrl));
+        onConfigChange('fileData', '');
+        onConfigChange('fileName', file.name);
+        onConfigChange('fileType', '');
+        return;
+    }
+
+    if (isTextFile(file)) {
+        onConfigChange('fileData', dataUrl);
+        onConfigChange('fileName', file.name);
+        onConfigChange('fileType', file.type || 'text/plain');
+        onConfigChange('imageData', '');
+        return;
+    }
+
+    onConfigChange('imageData', await processImage(dataUrl));
+    clearFileConfig(onConfigChange);
 };
 
 // ============================================================

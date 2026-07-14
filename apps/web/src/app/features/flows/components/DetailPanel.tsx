@@ -20,6 +20,7 @@ import {
     X,
     Zap,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import {
     DEFAULT_TEXTAREA_HEIGHT,
@@ -47,7 +48,14 @@ import { ModelSelect } from './ModelSelect';
 import { RunHistoryPanel } from './RunHistoryPanel';
 import { S3Image } from './S3Image';
 import { TouchDialog } from './TouchDialog';
-import { INPUT_FILE_ACCEPT, clearFileConfig, processUploadedFile, tryParseJson } from '../utils';
+import {
+    INPUT_FILE_ACCEPT,
+    clearFileConfig,
+    getUploadErrorMessage,
+    processUploadedFile,
+    readImageFile,
+    tryParseJson,
+} from '../utils';
 
 import type { BlockDefinition, ConfigField, Connection, DataPacket, FlowRole, NodeData } from '@flows/flows';
 
@@ -180,10 +188,15 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
         const file = e.target.files?.[0];
         if (!file) return;
 
-        await processUploadedFile(file, onConfigChange, dataUrl =>
-            processImageWithConfig(dataUrl, { aspectRatio, maxWidth, bypass })
-        );
-        e.target.value = '';
+        try {
+            await processUploadedFile(file, onConfigChange, dataUrl =>
+                processImageWithConfig(dataUrl, { aspectRatio, maxWidth, bypass })
+            );
+        } catch (error) {
+            toast.error(getUploadErrorMessage(error, t));
+        } finally {
+            e.target.value = '';
+        }
     };
 
     const handleDownload = (e: React.MouseEvent) => {
@@ -638,6 +651,19 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             onConfigChange(node.id, field.key, val);
         };
 
+        const handleFileFieldUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+
+            try {
+                handleChange(await readImageFile(file));
+            } catch (error) {
+                toast.error(getUploadErrorMessage(error, t));
+            } finally {
+                e.target.value = '';
+            }
+        };
+
         switch (field.type) {
             case 'text':
                 return field.short ? (
@@ -728,26 +754,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         {value && <FileImagePreview src={value} onRemove={() => handleChange('')} t={t} />}
                         <label className="cursor-pointer bg-muted/50 hover:bg-muted border border-border/60 text-foreground/80 text-xs py-2 px-3 rounded-md text-center transition-colors">
                             <span>{value ? t('flows:detailPanel.changeFile') : t('flows:detailPanel.uploadFile')}</span>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={async e => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                        const reader = new FileReader();
-                                        reader.onload = async evt => {
-                                            if (evt.target?.result) {
-                                                const { dataUrl } = await compressImageIfNeeded(
-                                                    evt.target.result as string
-                                                );
-                                                handleChange(dataUrl);
-                                            }
-                                        };
-                                        reader.readAsDataURL(file);
-                                    }
-                                }}
-                            />
+                            <input type="file" accept="image/*" className="hidden" onChange={handleFileFieldUpload} />
                         </label>
                     </div>
                 );

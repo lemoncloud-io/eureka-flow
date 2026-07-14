@@ -2,13 +2,14 @@ import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Archive, Camera, FileText, Image, Loader2, Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { processImageWithConfig } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Label } from '@flows/ui-kit';
 
 import { S3Image } from '../../flows/components/S3Image';
-import { INPUT_FILE_ACCEPT, clearFileConfig, processUploadedFile } from '../../flows/utils';
+import { INPUT_FILE_ACCEPT, clearFileConfig, getUploadErrorMessage, processUploadedFile } from '../../flows/utils';
 
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
@@ -40,6 +41,8 @@ export const MobileImageUpload = ({ node, onConfigChange }: MobileImageUploadPro
             await processUploadedFile(file, onConfigChange, dataUrl =>
                 processImageWithConfig(dataUrl, { aspectRatio, maxWidth, bypass })
             );
+        } catch (error) {
+            toast.error(getUploadErrorMessage(error, t));
         } finally {
             setIsUploading(false);
             e.target.value = '';

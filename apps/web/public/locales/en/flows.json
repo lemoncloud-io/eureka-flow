@@ -181,7 +181,9 @@
         "fileAttached": "File attached",
         "takePhoto": "Camera",
         "textFile": "Text file",
-        "uploading": "Uploading..."
+        "uploading": "Uploading...",
+        "fileTooLarge": "File is too large. Maximum size is {{size}} MB.",
+        "uploadFailed": "Upload failed. Please try again."
     },
     "imageEditor": {
         "title": "Edit Image",
