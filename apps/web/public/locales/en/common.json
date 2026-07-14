@@ -183,5 +183,16 @@
         "complete": "Done",
         "regenerateKey": "Create EurekaAPI key again",
         "keyCreatedSuccess": "API key creation complete."
+    },
+    "apps": {
+        "title": "My Apps",
+        "description": "AI Studio apps deployed to run on Eureka Flow.",
+        "empty": "No apps yet",
+        "emptyDescription": "Apps deployed from AI Studio will appear here.",
+        "status": {
+            "deployed": "Deployed",
+            "deploying": "Deploying",
+            "failed": "Failed"
+        }
     }
 }

@@ -7,7 +7,7 @@ import { GitFork, Github, Layers, Loader2, Search } from 'lucide-react';
 
 import { usePublicFlowsInfiniteQuery, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
-import { ApiKeyDialog, SITE_URL } from '@flows/shared';
+import { ApiKeyDialog, GITHUB_URL, SITE_URL } from '@flows/shared';
 import { Badge, Button, Input, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 import { redirectToLogin, useWebCoreStore } from '@flows/web-core';
 
@@ -15,7 +15,6 @@ import { formatRelativeTime } from '../utils';
 
 import type { FlowView } from '@flows/flows';
 
-const GITHUB_URL = 'https://github.com/lemoncloud-io/eureka-flow';
 const STAGGER_DELAY_MS = 40;
 const SKELETON_HEIGHTS = [200, 260, 180, 240, 220, 280, 190, 250];
 

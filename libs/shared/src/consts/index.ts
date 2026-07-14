@@ -1,6 +1,9 @@
 /** Canonical site URL for SEO meta tags, canonical links, and OG images */
 export const SITE_URL = 'https://flow.eureka.codes';
 
+/** Public source repository, linked from the landing nav */
+export const GITHUB_URL = 'https://github.com/lemoncloud-io/eureka-flow';
+
 /**
  * Error type-specific translation keys
  * Used by ErrorFallback component

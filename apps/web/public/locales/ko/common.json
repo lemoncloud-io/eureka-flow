@@ -183,5 +183,16 @@
         "complete": "완료",
         "regenerateKey": "EurekaAPI 키 다시 생성",
         "keyCreatedSuccess": "API 키 생성이 완료되었습니다."
+    },
+    "apps": {
+        "title": "내 앱",
+        "description": "Eureka Flow에서 실행되도록 배포된 AI Studio 앱입니다.",
+        "empty": "아직 앱이 없습니다",
+        "emptyDescription": "AI Studio에서 배포한 앱이 여기에 표시됩니다.",
+        "status": {
+            "deployed": "배포됨",
+            "deploying": "배포 중",
+            "failed": "실패"
+        }
     }
 }
