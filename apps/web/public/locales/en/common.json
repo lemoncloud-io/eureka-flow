@@ -186,7 +186,7 @@
     },
     "apps": {
         "title": "My Apps",
-        "description": "Apps deployed to your workspace. Opening one runs it in a new tab.",
+        "description": "Apps deployed to your workspace. Click one to open it.",
         "empty": "No apps deployed yet",
         "emptyDescription": "Deployed apps will appear here.",
         "loadFailed": "Couldn't load your apps",

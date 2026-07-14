@@ -1,9 +1,8 @@
 import { useTranslation } from 'react-i18next';
 
-import { ExternalLink } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
-import { SITE_URL } from '@flows/shared';
 import { Badge } from '@flows/ui-kit';
 
 import type { AppView } from '@flows/flows';
@@ -44,19 +43,18 @@ export const AppCard = ({ app }: { app: AppView }) => {
     return (
         <a
             /**
-             * `/apps/:id` is served by CloudFront (→ eureka-flows-api → the App's own S3 bundle),
-             * not by this SPA. The absolute SITE_URL is deliberate: a relative href would hit the
-             * SPA catch-all on localhost, where CloudFront does not exist.
+             * A plain <a>, not a react-router <Link>: `/apps/:id` is served by CloudFront
+             * (→ eureka-flows-api → the App's own S3 bundle), not by this SPA, so the click must
+             * be a real navigation that leaves the SPA.
              *
-             * SITE_URL is PROD. That is correct only while the ids come from the PROD-id mock —
-             * once the real list endpoint ships and returns DEV ids on DEV, switch to a relative
-             * href (works on any CloudFront-backed deploy) or an env-aware base.
+             * The href is relative so it resolves against whatever origin serves the page — the
+             * DEV deploy serves DEV Apps, PROD serves PROD ones. Caveat: on `localhost` there is
+             * no CloudFront, so this lands on the SPA catch-all (404). That is expected; verify
+             * App links on a deployed environment.
              *
              * @see docs/adr/0003-apps-route-ownership.md
              */
-            href={`${SITE_URL}/apps/${app.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={`/apps/${app.id}`}
             className={cn(
                 'group flex flex-col overflow-hidden rounded-2xl border border-border/40 bg-card',
                 'transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5'
@@ -71,7 +69,7 @@ export const AppCard = ({ app }: { app: AppView }) => {
             <div className="flex flex-1 flex-col gap-1.5 p-4">
                 <div className="flex items-start justify-between gap-2">
                     <h3 className="line-clamp-1 text-sm font-medium">{title}</h3>
-                    <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/30 transition-colors group-hover:text-primary" />
+                    <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/30 transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
                 </div>
                 <p className="line-clamp-1 font-mono text-[11px] text-muted-foreground/60">{app.code}</p>
                 <div className="mt-1 flex items-center gap-2">

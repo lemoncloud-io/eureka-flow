@@ -102,7 +102,7 @@ export const AppsPage = () => {
             <section className="mx-auto max-w-[1200px] px-6 pb-6 pt-28">
                 <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{t('apps.title', 'My Apps')}</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    {t('apps.description', 'Apps deployed to your workspace. Opening one runs it in a new tab.')}
+                    {t('apps.description', 'Apps deployed to your workspace. Click one to open it.')}
                 </p>
             </section>
 
