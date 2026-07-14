@@ -8,14 +8,21 @@ the new version in.
 
 > This is the friendly tour. For interfaces and precise behavior, see **[SPEC.md](SPEC.md)**.
 > Scope of this first version: **generate + edit** flows on the frontend. Running flows and saving
-> durably to the server come later (see *What's not here yet*).
+> durably to the server come later (see _What's not here yet_).
+
+Under the hood there's **one agent — the flow-edit agent — and it owns the turn** end to end: you send
+it a message, it works, it shows you a plan. Here, "agent" means _a single capability_ (a persona +
+its tools + its permissions) — not a manager of other agents. There's deliberately **no orchestrator
+layer yet**: with one agent, a router would just be a pass-through, so the Panel talks straight to the
+agent. When a second capability arrives (a Q&A helper, a "run it" agent), we add a small router above
+the agents to pick one per turn — see _What's not here yet_.
 
 ---
 
 ## What it can do
 
 - **Generate** — "build a flow that fetches an article and summarizes it."
-- **Edit** — "add an email step after the summary," "rename this node to *Summarize*," "line these
+- **Edit** — "add an email step after the summary," "rename this node to _Summarize_," "line these
   three nodes up," "remove the translate block."
 
 ## What's not here yet
@@ -26,55 +33,66 @@ the new version in.
 - **Multi-user co-editing** — v1 assumes you're the only editor of your flow.
 - **Undo/redo of an agent change** — you Accept or Reject a whole plan (a back-and-forth toggle is
   easy to add later, since we keep a copy of your original flow).
+- **More than one agent** — per-agent permissions are in place, but only the flow-edit agent ships
+  now. A second agent (a Q&A helper, a "run it" agent) is what brings in the router/orchestrator layer.
 
 ---
 
 ## The big picture
 
-You talk to the **Panel**. The **Orchestrator** runs the turn and is the only thing that writes state.
-It leans on three helpers — the **LlmGateway** to think, the **ToolExecutor** to let the model act,
-and the **Workspace** to hold the draft and swap it in. The Workspace reaches the real canvas through
-one door: the **CanvasBinding**.
+You talk to the **Panel**. The **Agent** owns the turn and is the only thing that writes state. It's
+configured with three things — how it should think (its prompt), what it can call (its tools), and
+what it's allowed to do (its permissions) — and leans on three helpers to do the work: the
+**LlmGateway** to think, the **ToolExecutor** to act (checking those permissions), and the
+**Workspace** to hold the draft and swap it in. The Workspace reaches the real canvas through one
+door: the **CanvasBinding**.
 
 ```mermaid
 flowchart TD
     User([You]) -->|message| Panel[Agent Panel]
-    Panel -->|send / resolvePlan| Orch[Orchestrator]
-    Orch -->|writes state| Store[(Session store)]
+    Panel -->|send / resolvePlan| Agent[Agent · flow-edit]
+    Agent -->|writes state| Store[(Session store)]
     Store -->|renders| Panel
-    Orch -->|think| LLM[LlmGateway]
-    Orch -->|act| Tools[ToolExecutor]
-    Orch -->|draft + swap| WS[Workspace]
+    Agent -->|think| LLM[LlmGateway]
+    Agent -->|act, within its permissions| Tools[ToolExecutor]
+    Agent -->|draft + swap| WS[Workspace]
     Tools -->|read / mutate| WS
     WS -->|read / swap| Bind[CanvasBinding]
     Bind -->|the real flow| Live[(Live canvas)]
 ```
 
-Notice the little loop on the left: **Panel → Orchestrator → store → Panel**. Data flows one way. The
-Panel only sends commands and renders what's in the store; it never touches the flow itself.
+Notice the little loop on the left: **Panel → Agent → store → Panel**. Data flows one way. The Panel
+only sends commands and renders what's in the store; it never touches the flow itself. (When there's
+more than one agent, a thin router slots in between the Panel and the agents — but that's later.)
 
 ## The pieces (UML)
 
 ```mermaid
 classDiagram
-    class Orchestrator {
-        <<the turn, sole writer>>
+    class Agent {
+        <<owns the turn, sole writer>>
         +send(text) Promise
         +resolvePlan(decision)
         +abort()
+        %% configured with:
+        +systemPrompt
+        +tools ToolProvider[]
+        +grant FlowPermissions
     }
     class LlmGateway {
         <<thinking>>
         +chat(req) AsyncIterable
     }
     class ToolExecutor {
-        <<the model acts>>
-        +dispatch(call) ToolResult
+        <<one engine; acting agent passed in>>
+        +listTools(agent) ToolDef[]
+        +dispatch(agent, call) ToolResult
     }
     class Workspace {
         <<draft + swap>>
         +snapshotBaseline()
         +getFlow() FlowSnapshot
+        +mutate MutateOps
         +diff() FlowDiff
         +promote()
         +discard()
@@ -82,14 +100,29 @@ classDiagram
     class CanvasBinding {
         <<door to the live canvas>>
         +readGraph() Graph
+        +updateNode(id, patch)
         +swapFlow(graph)
     }
-    Orchestrator --> LlmGateway
-    Orchestrator --> ToolExecutor
-    Orchestrator --> Workspace
+    Agent --> LlmGateway
+    Agent --> ToolExecutor
+    Agent --> Workspace : draft + swap
     ToolExecutor --> Workspace
     Workspace --> CanvasBinding
 ```
+
+## Agents & permissions
+
+An **agent** is just a small bundle: a **prompt** (how it thinks), a set of **tools** (what it can
+call), and a **permission grant** (what it's allowed to do). Today there's exactly one — the
+**flow-edit agent** — and it owns the turn directly. The bundle is what varies when more agents come;
+the wiring around it stays put.
+
+Permissions live **on the agent**, not globally. Every tool says which capability it needs (adding a
+block needs "modify canvas," rename needs "edit config," and so on). Before running a tool, the
+ToolExecutor checks it against the agent's grant — and against what **you** are allowed to do in this
+flow (owner / editor / viewer). An agent can never do more than you could by hand. That's why this
+scales cleanly: a future read-only "Q&A" agent simply carries an empty grant and can't touch your
+flow, while the flow-edit agent is granted the canvas edits it needs.
 
 ## How a turn works
 
@@ -101,32 +134,33 @@ on Accept, the draft is swapped in.
 sequenceDiagram
     actor User
     participant Panel as Agent Panel
-    participant Orch as Orchestrator
+    participant Agent as Agent (flow-edit)
     participant LLM as LlmGateway
     participant Tools as ToolExecutor
     participant WS as Workspace
     participant Canvas as CanvasBinding
 
     User->>Panel: "add a summarizer after the fetch"
-    Panel->>Orch: send(text)
-    Orch->>WS: snapshotBaseline()
+    Panel->>Agent: send(text)
+    Agent->>WS: snapshotBaseline()
+    Note over Agent,Tools: one shared ToolExecutor; the agent is passed in each call so its grant is checked
     loop think and act
-        Orch->>LLM: chat(history + tool defs)
-        LLM-->>Orch: tool call (add_node, update_node, connect, ...)
-        Orch->>Tools: dispatch(call)
+        Agent->>LLM: chat(agent prompt + history + tool defs)
+        LLM-->>Agent: tool call (add_node, update_node, connect, ...)
+        Agent->>Tools: dispatch(agent, call)
         Tools->>WS: mutate (forks the draft on the first edit)
         WS-->>Tools: result (e.g. tempId)
-        Tools-->>Orch: ok
+        Tools-->>Agent: ok
     end
-    LLM-->>Orch: final text
-    Orch->>WS: diff()
-    WS-->>Orch: FlowDiff
-    Orch-->>Panel: show plan (awaiting your decision)
+    LLM-->>Agent: final text
+    Agent->>WS: diff()
+    WS-->>Agent: FlowDiff
+    Agent-->>Panel: show plan (awaiting your decision)
     User->>Panel: Accept
-    Panel->>Orch: resolvePlan("accept")
-    Orch->>WS: promote()
+    Panel->>Agent: resolvePlan("accept")
+    Agent->>WS: promote()
     WS->>Canvas: swapFlow(draft)
-    Orch-->>Panel: done
+    Agent-->>Panel: done
 ```
 
 ## The turn's lifecycle
@@ -152,7 +186,7 @@ stateDiagram-v2
 ## Draft → plan → swap (the safety story)
 
 This is the heart of the design. Edits go to a **hidden draft copy** of your flow. At the end, the
-difference between the draft and your original flow *is* the plan you review. Accept **swaps the draft
+difference between the draft and your original flow _is_ the plan you review. Accept **swaps the draft
 in** as your live flow; Reject throws the draft away.
 
 ```mermaid
@@ -182,13 +216,13 @@ Accept applies the **exact** draft you reviewed, so what you saw is what you get
 
 You're looking at a flow that fetches an article. You type:
 
-> **"Summarize the article, rename the fetch node to *Get article*, and email the summary to me."**
+> **"Summarize the article, rename the fetch node to _Get article_, and email the summary to me."**
 
 1. The agent reads your flow and the block catalog (`get_flow`, `list_blocks`).
 2. On a draft it renames the fetch node (`update_node` → label), adds a **Summarize** block wired
    after it, then an **Email** block after that (`add_node`, `connect`) — your canvas hasn't changed.
-3. It shows a plan: *"Renamed 1 node, +2 nodes, +2 connections — summarizes the article text and
-   emails the result to you,"* with the diff.
+3. It shows a plan: _"Renamed 1 node, +2 nodes, +2 connections — summarizes the article text and
+   emails the result to you,"_ with the diff.
 4. You click **Accept**. The draft is swapped into your canvas, and your flow now shows the renamed
    node and the two new blocks in place.
 
