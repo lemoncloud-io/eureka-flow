@@ -186,9 +186,11 @@
     },
     "apps": {
         "title": "내 앱",
-        "description": "Eureka Flow에서 실행되도록 배포된 AI Studio 앱입니다.",
-        "empty": "아직 앱이 없습니다",
-        "emptyDescription": "AI Studio에서 배포한 앱이 여기에 표시됩니다.",
+        "description": "워크스페이스에 배포된 앱입니다. 열면 새 탭에서 실행됩니다.",
+        "empty": "아직 배포된 앱이 없습니다",
+        "emptyDescription": "앱을 배포하면 여기에 표시됩니다.",
+        "loadFailed": "앱 목록을 불러오지 못했습니다",
+        "loadFailedDescription": "목록을 가져오는 중 문제가 발생했습니다.",
         "status": {
             "deployed": "배포됨",
             "deploying": "배포 중",

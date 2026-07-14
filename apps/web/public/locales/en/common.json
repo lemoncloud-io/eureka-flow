@@ -186,9 +186,11 @@
     },
     "apps": {
         "title": "My Apps",
-        "description": "AI Studio apps deployed to run on Eureka Flow.",
-        "empty": "No apps yet",
-        "emptyDescription": "Apps deployed from AI Studio will appear here.",
+        "description": "Apps deployed to your workspace. Opening one runs it in a new tab.",
+        "empty": "No apps deployed yet",
+        "emptyDescription": "Deployed apps will appear here.",
+        "loadFailed": "Couldn't load your apps",
+        "loadFailedDescription": "Something went wrong while fetching the list.",
         "status": {
             "deployed": "Deployed",
             "deploying": "Deploying",

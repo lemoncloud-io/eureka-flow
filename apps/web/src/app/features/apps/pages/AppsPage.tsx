@@ -8,7 +8,7 @@ import { useAppsListQuery } from '@flows/flows';
 import { GITHUB_URL } from '@flows/shared';
 import { Badge, Button, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 
-import { AppCard } from '../components';
+import { AppCard, AppsEmptyState, AppsErrorState } from '../components';
 
 const SKELETON_COUNT = 4;
 
@@ -62,7 +62,7 @@ const AppsHeader = () => {
  */
 export const AppsPage = () => {
     const { t } = useTranslation();
-    const { data, isLoading } = useAppsListQuery();
+    const { data, isLoading, isError, refetch } = useAppsListQuery();
     const apps = data?.list ?? [];
 
     const renderBody = () => {
@@ -76,16 +76,9 @@ export const AppsPage = () => {
             );
         }
 
-        if (apps.length === 0) {
-            return (
-                <div className="flex flex-col items-center justify-center py-32 text-muted-foreground">
-                    <p className="mb-1 text-sm font-medium">{t('apps.empty', 'No apps yet')}</p>
-                    <p className="text-xs text-muted-foreground/60">
-                        {t('apps.emptyDescription', 'Apps deployed from AI Studio will appear here.')}
-                    </p>
-                </div>
-            );
-        }
+        if (isError) return <AppsErrorState onRetry={() => refetch()} />;
+
+        if (apps.length === 0) return <AppsEmptyState />;
 
         return (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -109,7 +102,7 @@ export const AppsPage = () => {
             <section className="mx-auto max-w-[1200px] px-6 pb-6 pt-28">
                 <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{t('apps.title', 'My Apps')}</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    {t('apps.description', 'AI Studio apps deployed to run on Eureka Flow.')}
+                    {t('apps.description', 'Apps deployed to your workspace. Opening one runs it in a new tab.')}
                 </p>
             </section>
 
