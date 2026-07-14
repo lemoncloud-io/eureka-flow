@@ -1,4 +1,4 @@
-# LlmGateway Foundation (W04)
+# LlmGateway Foundation
 
 ## 1. Summary
 
@@ -6,13 +6,13 @@ This slice adds the minimal LLM access layer on top of the Agent Environment: a 
 `LlmGatewaySupportable` completion contract, a Gemini 2.5 Flash provider as the first
 implementation, and an `HttpRequestSupportable` port so gateways never call the global
 `fetch` directly. It also adds a runtime self-check for the Environment's base services
-(storage and trace), runnable in the real browser.
+(storage and trace), callable in the browser runtime.
 
 Gateways depend only on the Agent Environment (tracing, time, cancellation) and the HTTP
 port. GPT, Claude, and OpenRouter follow later as further implementations of the same
 contract; this slice deliberately ships one provider.
 
-## 2. W04 requirements addressed (Leon scope)
+## 2. Requirements
 
 - Simple LlmGateway built on the Environment ✓
 - First provider: Gemini 2.5 Flash ✓
@@ -29,8 +29,10 @@ building it now would be premature.
 
 The HTTP port absorbs this. `LlmGatewaySupportable` talks to `HttpRequestSupportable`;
 when the proxy exists, it becomes either a different base URL or another implementation of
-the same port — gateway code does not change. Gemini currently permits direct browser
-calls, which is why it is the first provider.
+the same port — gateway code does not change. Gemini is the first provider target for
+this slice. Direct browser calls can be attempted through `FetchHttpRequest` when provider
+CORS and key-handling constraints allow it, but the production direction still favors a
+backend proxy.
 
 ## 4. Main interfaces
 
@@ -114,8 +116,9 @@ const result = await runAgentEnvironmentSelfCheck(createBrowserAgentEnvironment(
 - [x] Gemini 2.5 Flash gateway: header auth, system-instruction mapping, usage mapping,
       status-carrying errors, request/response tracing
 - [x] `baseUrl`/implementation override as the future proxy path
-- [x] Environment self-check for storage and trace, browser-runnable
-- [x] 59 tests passing (17 new) and typecheck clean
+- [x] Environment self-check for storage and trace, callable in the browser; real
+      editor/E2E execution remains a follow-up validation step
+- [x] 60 tests passing (18 new) and typecheck clean
 
 ## 8. Intentionally out of scope for this slice
 
@@ -134,7 +137,7 @@ The following are deferred by design, not missing:
 - [x] The API key travels in the `x-goog-api-key` header — never in the URL, errors, or traces (test-verified)
 - [x] A proxy can be introduced via `baseUrl` or a new port implementation with zero gateway changes (test-verified)
 - [x] Self-check passes on the virtual environment and is callable against the browser environment
-- [x] Typecheck, `npx nx test agent` (59 tests), `npx nx build agent`, and `npx nx build web` pass
+- [x] Typecheck, `npx nx test agent` (60 tests), `npx nx build agent`, and `npx nx build web` pass
 
 ## 10. Next step
 
