@@ -1,11 +1,13 @@
 # Agent Chat — Specification (skeleton v0)
 
 > **Scope:** the smallest coherent version of the in-browser flow agent — it **generates and edits**
-> flows by chat (add / remove / reconfigure / **rename / move** blocks). Running flows, multi-editor
-> safety, and durable backend persistence are **deferred** (§9). Earlier, fuller design iterations are
-> kept for reference under [`archive/`](archive/).
+> flows by chat (add / remove / reconfigure / **rename / move** blocks). It ships as **one agent** —
+> the flow-edit agent — that **owns the turn** end to end; a router/orchestrator for picking among
+> **multiple** agents is deferred (§9), so the Panel talks straight to the agent today. Running flows,
+> multi-editor safety, and durable backend persistence are also **deferred** (§9). Earlier, fuller
+> design iterations are kept for reference under [`archive/`](archive/).
 >
-> Friendly companion with diagrams: **[README.md](README.md)**. · Last updated: 2026-07-12.
+> Friendly companion with diagrams: **[README.md](README.md)**. · Last updated: 2026-07-14.
 
 ---
 
@@ -54,15 +56,21 @@ These assumptions are exactly what make the commit a single, safe, synchronous s
 
 ## 4. Components
 
-| Component         | Role                                                                                                    |
-| ----------------- | ------------------------------------------------------------------------------------------------------- |
-| **Agent Panel**   | Chat UI. Emits `send` / `resolvePlan`; renders purely from the session store. No logic.                 |
-| **Orchestrator**  | Owns the turn and is the **only writer**. Runs the think/act loop and the approval gate.                |
-| **LlmGateway**    | The one outbound LLM dependency (a real browser impl + a fake for tests).                               |
-| **ToolExecutor**  | Runs each tool call the model emits: validate → permission → do it → result.                            |
-| **Workspace**     | Owns the **draft**. Snapshots the baseline, diffs, and swaps the draft in. The model never calls these. |
-| **CanvasBinding** | The single seam to the real, React-owned canvas: read it, edit a node, swap it.                         |
-| **Storage**       | The persisted session (`SessionState`) the Panel renders from.                                          |
+| Component         | Role                                                                                                                                                                 |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agent Panel**   | Chat UI. Emits `send` / `resolvePlan`; renders purely from the session store. No logic.                                                                              |
+| **Agent**         | **Owns the turn** and is the only writer: runs the think/act loop and the approval gate. Configured with a persona (system prompt) + its tools + a permission grant. |
+| **LlmGateway**    | The one outbound LLM dependency (a real browser impl + a fake for tests).                                                                                            |
+| **ToolExecutor**  | Runs the agent's tool calls: validate → check the agent's permission grant → do it → result.                                                                         |
+| **Workspace**     | Owns the **draft**. Snapshots the baseline, diffs, and swaps the draft in. The model never calls these.                                                              |
+| **CanvasBinding** | The single seam to the real, React-owned canvas: read it, edit a node, swap it.                                                                                      |
+| **Storage**       | The persisted session (`SessionState`) the Panel renders from.                                                                                                       |
+
+The **flow-edit agent** is the only agent in the skeleton — the Panel drives it directly. It owns the
+flow tools (§6.3) and the draft/plan loop. "Agent" here is one bounded capability (persona + tools +
+permissions), **not** a coordinator of sub-agents. When a second agent appears, a thin router is added
+_above_ the agents to pick one per turn (deferred, §9); with one agent that layer is a pass-through, so
+we skip it and keep `send` on the agent itself.
 
 ## 5. Interface definitions
 
@@ -70,11 +78,23 @@ Everything, in one place. Ids are **plain strings**; a draft-only node carries a
 id that stays as-is after the swap (until a later real save). Branded ids are deferred (§9).
 
 ```ts
-// ── 1 · Orchestrator ───────────────────────────────────────────────────────
-interface Orchestrator {
+// ── 1 · Agent (owns the turn) ────────────────────────────────────────────────
+// The agent runs the whole turn — the think/act loop and the approval gate — and
+// is the only writer. It is the surface the Panel drives. NOT a coordinator of
+// sub-agents. Today there is exactly one: the flow-edit agent.
+interface Agent {
     send(text: string): Promise<void>; // append user msg → run the whole turn
     resolvePlan(decision: 'accept' | 'reject'): void; // Panel → resume at the plan gate
     abort(): void; // cancel the in-flight stream, discard the draft
+}
+// What makes an agent the agent it is — the parts that vary between capabilities.
+// The flow-edit agent is built with the flow tools + a canvas-edit grant.
+interface AgentConfig {
+    id: string;
+    description: string; // what it handles — used by the future router (§9)
+    systemPrompt: string; // persona / instructions
+    tools: ToolProvider[]; // its tool sources — one or more (ToolProvider, §5 · 3); the executor unions + routes across them
+    grant: FlowPermissions; // capabilities it is allowed; effective = grant ∩ session ceiling
 }
 
 // ── 2 · LlmGateway ─────────────────────────────────────────────────────────
@@ -96,6 +116,7 @@ interface ToolDef {
     name: string;
     description: string;
     parameters: JsonSchema;
+    requires?: keyof FlowPermissions; // the capability this tool needs (mutate tools set this); reads omit it
 }
 interface Chunk {
     text?: string;
@@ -103,7 +124,7 @@ interface Chunk {
     done?: boolean;
 }
 
-// ── 3 · ToolExecutor ───────────────────────────────────────────────────────
+// ── 3 · ToolExecutor & tools ─────────────────────────────────────────────────
 // Tool identity is an open string so tools can be discovered at runtime (dynamic /
 // external / MCP). The built-ins are a known subset, not the whole universe.
 type BuiltinToolName =
@@ -121,16 +142,20 @@ interface ToolCall {
 }
 type ToolResult = { toolCallId: string; ok: true; data?: unknown } | { toolCallId: string; ok: false; error: string };
 
-// A ToolProvider owns a set of tools and can list + run them — the seam that
-// dynamic / MCP tools plug into. One BuiltinToolProvider (the flow tools) today.
+// A ToolProvider is one source of tools — it lists them and runs them. The seam
+// dynamic / MCP tools plug into; maps 1:1 to MCP (listTools ↔ tools/list,
+// dispatch ↔ tools/call). One BuiltinToolProvider (the flow tools) today.
 interface ToolProvider {
     listTools(): Promise<ToolDef[]> | ToolDef[]; // discovery (MCP: tools/list)
-    owns(name: string): boolean;
     dispatch(call: ToolCall): Promise<ToolResult>; // run one   (MCP: tools/call)
 }
+// ONE executor for the session — a single engine, NOT reimplemented per agent.
+// The acting agent (its tools + grant) is passed in; the executor holds the
+// session permission ceiling. Per-agent behavior is data this one code reads.
+// Routing, permission, and validation all live here — the single choke-point.
 interface ToolExecutor {
-    listTools(): Promise<ToolDef[]>; // union across providers → the LLM's tool defs
-    dispatch(call: ToolCall): Promise<ToolResult>; // validate → permission → route to the owning provider
+    listTools(agent: AgentConfig): Promise<ToolDef[]>; // the agent's providers' tools, unioned → the LLM's defs
+    dispatch(agent: AgentConfig, call: ToolCall): Promise<ToolResult>; // validate → check grant ∩ ceiling → route by name → provider
 }
 
 // ── 4 · Workspace (draft + swap; never LLM-callable) ────────────────────────
@@ -229,19 +254,24 @@ interface Message {
 
 ## 6. Detailed specifications
 
-### 6.1 Orchestrator
+### 6.1 Agent (the turn)
 
-The spine. `send(text)` runs the entire turn; the loop and the gate live _inside_ it.
+The spine. The flow-edit agent owns the whole turn — `send(text)` runs the think/act loop and the
+approval gate _inside_ it — and it is the only writer. It carries the three things that would vary
+between capabilities: a **`systemPrompt`** (persona), its **`tools`** (what it can call), and a
+**`grant`** (the permissions it may use); it hands these to the shared `ToolExecutor` (§6.3) on each
+tool call rather than owning one. It is _not_ a coordinator of other agents; picking among multiple
+agents is a later, additive layer (§9).
 
 `send(text)`:
 
 1. Append the user message; set `phase = 'thinking'`; `workspace.snapshotBaseline()`.
 2. **Reasoning loop** (bounded by a per-turn iteration cap):
-    - Build the request: system prompt + history + tool defs, plus the **structural snapshot on the
-      first iteration only** (`workspace.getFlow()`).
+    - Build the request: the agent's `systemPrompt` + history + `executor.listTools(agent)`, plus the
+      **structural snapshot on the first iteration only** (`workspace.getFlow()`).
     - `gateway.chat(req)`; stream text deltas into the store (the Panel shows text appear — streaming
       is store writes, not a socket).
-    - If the model emits **tool calls** → `executor.dispatch()` each, append results, continue.
+    - If the model emits **tool calls** → `executor.dispatch(agent, call)` each, append results, continue.
     - If it returns **final text only** → exit the loop.
 3. **Finalize:** `diff = workspace.diff()`.
     - `diff.isEmpty` (pure Q&A / read-only turn) → emit the final answer; `phase = 'done'`.
@@ -255,6 +285,11 @@ Because the swap is synchronous there is no separate "promoting" phase. `abort()
 in-flight gateway stream (via `AbortSignal`) and discards any draft. There is exactly **one** gate at
 a time, so a single `plan?` slot on `SessionState` suffices.
 
+The flow-edit agent's config: persona "edit the user's flow"; `tools` = the built-in flow provider
+(§6.3); `grant` = `{ canModifyCanvas, canEditConfig, canEditStructure }`. A future **read-only Q&A**
+agent (empty `grant`, always empty-diff) or **run** agent (`grant` adds `canRun`) is just another
+`AgentConfig` plus the router that picks between them (§9) — the turn machinery above is unchanged.
+
 ### 6.2 LlmGateway
 
 The only outbound LLM dependency, behind one interface so it can be swapped:
@@ -267,15 +302,31 @@ request shape mirrors chat-completions; a proxy gateway and multi-provider drive
 
 ### 6.3 ToolExecutor & tools
 
-`dispatch(call)` is the single choke-point per tool call: **validate** `args` against the tool's JSON
-Schema → **check permission** (the tool's `requires` flag against `FlowPermissions`) → **route by
-name** → return a `ToolResult`. `data` is the compact value fed back to the model (e.g. a new node's
-`tempId`, or a `FlowSnapshot`).
+There is **one `ToolExecutor` for the session** — a single engine, **not** reimplemented or subclassed
+per agent. The **acting agent is passed in** (`dispatch(agent, call)`); the executor reads that agent's
+`tools` (to route) and `grant` (to gate), against the session's permission ceiling. Per-agent behavior
+is therefore _data the same code reads_, not new code — adding an agent adds a config value, never an
+executor. An agent still can't reach another's tools or exceed its grant, because the executor only
+ever acts on the `tools`/`grant` handed to it for that call. (Providers are shared too — a
+`ToolProvider` holds no agent-specific state — so e.g. one MCP connection can back several agents.)
 
-Tools live behind **providers** (`ToolProvider`): `listTools()` advertises them to the LLM and
-`dispatch()` routes a call to whichever provider owns that name. Today there's one
-`BuiltinToolProvider` (the flow tools below); a dynamic / MCP provider can be added later with no
-change to the Executor (§9).
+`dispatch(agent, call)` is the single choke-point per tool call: **validate** `args` against the tool's
+JSON Schema → **check permission** → **route by name** → return a `ToolResult`. `data` is the compact
+value fed back to the model (e.g. a new node's `tempId`, or a `FlowSnapshot`).
+
+**Permission (per agent, concrete).** Each tool declares the capability it needs via `ToolDef.requires`
+(reads omit it). A call is allowed only if that capability is in the **effective set** =
+`agent.grant ∩ session FlowPermissions` (the user's role-derived ceiling — §7). So the same tool can
+be callable for one agent and denied for another, and no agent can exceed what the user could do by
+hand. A denied call returns `{ ok:false, error }` and changes nothing. With one agent the grant is
+fixed for the whole turn; the mechanism is what carries over when more agents arrive.
+
+Tools come from **providers** (`ToolProvider`), and an agent can compose **several** — its `tools` is
+a list. Each provider just lists and runs its own tools; the executor unions their `listTools()` for
+the LLM and builds a `name → provider` index so `dispatch` routes each call to the right one (tool
+names are assumed unique across an agent's providers; a collision policy is a later concern). The
+flow-edit agent has a single `BuiltinToolProvider` (the flow tools below) today; adding a dynamic /
+MCP provider is just another entry in the list, with no change to the executor (§9).
 
 | Tool          | Kind   | Target                                   | Notes                                                                                            |
 | ------------- | ------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -290,8 +341,9 @@ change to the Executor (§9).
 - **Label & position are first-class mutations now** (§3): `update_node` can rename (`label`) and move
   (`position`) an existing node, and `add_node` can place a new one. They ride along in the swap — no
   backend write.
-- **Permissions:** mutate tools require the relevant `FlowPermissions` flag (`canModifyCanvas` /
-  `canEditStructure` / `canEditConfig`); a denied call returns `{ ok:false, error }` and changes nothing.
+- **Permissions:** each mutate tool sets `requires` (`canModifyCanvas` / `canEditStructure` /
+  `canEditConfig`); the executor checks it against the **agent's effective set** (§6.3). The
+  flow-edit agent is granted all three; a denied call returns `{ ok:false, error }` and changes nothing.
 - **Lazy fork:** the _first_ mutate call triggers the draft fork; before that, `get_flow` reads live.
 - **No `run_*`, no runtime reads, no skill/layout/metadata tools** in the skeleton — see §9.
 
@@ -336,7 +388,7 @@ Implementation detail (desktop impl, dev panel, grounding): **[canvas-binding.md
 
 `SessionState` is the whole persisted turn state; the Panel is a pure function of it. `Storage`
 loads/creates a session keyed by `flowId` and `save`s on every change (streaming deltas, phase
-transitions, the plan). The **render loop** is one-way: Panel emits commands → Orchestrator writes
+transitions, the plan). The **render loop** is one-way: Panel emits commands → the Agent writes
 `SessionState` → store → Panel re-renders. Persisting the `plan` on the assistant message means an
 `awaiting_plan` gate survives a page reload.
 
@@ -397,6 +449,12 @@ nodes by id; regenerating ids would make everything read as removed + re-added).
 
 Each is a clean addition to the skeleton, not a rewrite:
 
+- **Multiple agents + a router (the orchestrator)** — once there's a second capability (read-only
+  Q&A, a **run** agent with `canRun`, domain helpers), add a thin **Orchestrator** _above_ the agents:
+  it takes `send(text)`, picks one agent per turn via a classifier over each agent's `description`,
+  and delegates. The Panel then talks to the Orchestrator instead of the agent, and each agent keeps
+  its own `tools` + `grant`. Everything inside a turn is unchanged; this is purely an additive layer
+  (the reason `send`/`resolvePlan`/`abort` already look the same on either).
 - **Durable backend persistence** — replace (or follow) the frontend swap with real server writes so
   changes survive reload; this is where label/position start touching the backend again and the old
   awaited-write commit path returns.
@@ -410,10 +468,10 @@ Each is a clean addition to the skeleton, not a rewrite:
   server again.
 - **Kind-scoped tool surfaces** — split the one executor into read/mutate surfaces so a read tool
   _cannot_ call a mutating primitive.
-- **Dynamic & MCP external tools** — add a `ToolProvider` beside the built-in one (`listTools()` ↔ MCP
-  `tools/list`, `dispatch()` ↔ `tools/call`). External tools don't edit the flow, so they stay out of
-  the draft/plan loop and get their own approval. The open `string` name + `ToolProvider` already
-  allow for this.
+- **Dynamic & MCP external tools** — add another `ToolProvider` to an agent's `tools` list
+  (`listTools()` ↔ MCP `tools/list`, `dispatch()` ↔ `tools/call`). External tools don't edit the flow,
+  so they stay out of the draft/plan loop and get their own approval. The open `string` name + the
+  `ToolProvider[]` list already allow for this.
 - **Prompt Builder / Skill Registry / provider drivers**, and a headless **auto-layout** tool.
 
 ---
