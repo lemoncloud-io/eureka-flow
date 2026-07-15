@@ -228,5 +228,4 @@ You're looking at a flow that fetches an article. You type:
 
 ---
 
-**Next:** the interfaces and exact behavior live in **[SPEC.md](SPEC.md)**. Earlier, more detailed
-design iterations are archived under [`archive/`](archive/) for reference.
+**Next:** the interfaces and exact behavior live in **[SPEC.md](SPEC.md)**.

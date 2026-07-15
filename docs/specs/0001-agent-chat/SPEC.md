@@ -4,8 +4,7 @@
 > flows by chat (add / remove / reconfigure / **rename / move** blocks). It ships as **one agent** —
 > the flow-edit agent — that **owns the turn** end to end; a router/orchestrator for picking among
 > **multiple** agents is deferred (§9), so the Panel talks straight to the agent today. Running flows,
-> multi-editor safety, and durable backend persistence are also **deferred** (§9). Earlier, fuller
-> design iterations are kept for reference under [`archive/`](archive/).
+> multi-editor safety, and durable backend persistence are also **deferred** (§9).
 >
 > Friendly companion with diagrams: **[README.md](README.md)**. · Last updated: 2026-07-14.
 
@@ -56,15 +55,15 @@ These assumptions are exactly what make the commit a single, safe, synchronous s
 
 ## 4. Components
 
-| Component         | Role                                                                                                                                                                 |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Agent Panel**   | Chat UI. Emits `send` / `resolvePlan`; renders purely from the session store. No logic.                                                                              |
-| **Agent**         | **Owns the turn** and is the only writer: runs the think/act loop and the approval gate. Configured with a persona (system prompt) + its tools + a permission grant. |
-| **LlmGateway**    | The one outbound LLM dependency (a real browser impl + a fake for tests).                                                                                            |
-| **ToolExecutor**  | Runs the agent's tool calls: validate → check the agent's permission grant → do it → result.                                                                         |
-| **Workspace**     | Owns the **draft**. Snapshots the baseline, diffs, and swaps the draft in. The model never calls these.                                                              |
-| **CanvasBinding** | The single seam to the real, React-owned canvas: read it, edit a node, swap it.                                                                                      |
-| **Storage**       | The persisted session (`SessionState`) the Panel renders from.                                                                                                       |
+| Component         | Role                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Agent Panel**   | Chat UI. Emits `send` / `resolvePlan`; renders purely from the session store. No logic.                                                                                        |
+| **Agent**         | **Owns the turn** and is the only writer: runs the think/act loop and the approval gate. Configured with a persona (system prompt) + its tools + a permission grant.           |
+| **LlmGateway**    | The one outbound LLM dependency (concrete Stage-1 impl chosen per agent-spec — 0002 uses an offline dev gateway; a fake for tests; real backend-proxied gateway deferred, §9). |
+| **ToolExecutor**  | Runs the agent's tool calls: validate → check the agent's permission grant → do it → result.                                                                                   |
+| **Workspace**     | Owns the **draft**. Snapshots the baseline, diffs, and swaps the draft in. The model never calls these.                                                                        |
+| **CanvasBinding** | The single seam to the real, React-owned canvas: read it, edit a node, swap it.                                                                                                |
+| **Storage**       | The persisted session (`SessionState`) the Panel renders from.                                                                                                                 |
 
 The **flow-edit agent** is the only agent in the skeleton — the Panel drives it directly. It owns the
 flow tools (§6.3) and the draft/plan loop. "Agent" here is one bounded capability (persona + tools +
@@ -294,7 +293,9 @@ agent (empty `grant`, always empty-diff) or **run** agent (`grant` adds `canRun`
 
 The only outbound LLM dependency, behind one interface so it can be swapped:
 
-- **`BrowserLlmGateway`** — Stage 1, bring-your-own-key, talks to the provider directly.
+- **Concrete Stage-1 gateway** — chosen per agent-spec. 0002 ships an offline command/dev gateway
+  (no network, no key) as the driver; a real backend-proxied gateway (no client key) is deferred (§9).
+  (A browser bring-your-own-key impl was prototyped and removed.)
 - **`FakeGateway`** — deterministic scripted responses for tests.
 
 `chat(req)` returns an async stream of `Chunk`s (text and/or tool-call deltas). The provider-neutral
@@ -476,4 +477,4 @@ Each is a clean addition to the skeleton, not a rewrite:
 
 ---
 
-Diagrams & narrative: **[README.md](README.md)** · Prior iterations: **[`archive/`](archive/)**
+Diagrams & narrative: **[README.md](README.md)**
