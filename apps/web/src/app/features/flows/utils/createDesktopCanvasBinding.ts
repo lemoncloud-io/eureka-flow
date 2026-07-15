@@ -1,35 +1,10 @@
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
-import type { Connection, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type { CanvasBinding } from '@flows/agent';
+import type { NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 import type { RefObject } from 'react';
 
-/** A point on the canvas. */
-export interface XY {
-    x: number;
-    y: number;
-}
-
-/**
- * The live canvas graph, normalized to the agent's shape.
- * Note the collection is `connections` here, while the canvas exposes it as `edges`
- * (WorkflowState) — this binding is the single place that translates between them.
- */
-export type Graph = {
-    nodes: NodeData[];
-    connections: Connection[];
-};
-
-/**
- * The single seam between (non-React) agent code and the React-owned live canvas.
- * See docs/specs/0001-agent-chat/SPEC.md §6.5 and canvas-binding.md.
- */
-export interface CanvasBinding {
-    /** Live structural read of the current canvas graph. */
-    readGraph(): Graph;
-    /** Edit one node's label / position, applied immediately (frontend-only). */
-    updateNode(id: string, patch: { label?: string; position?: XY }): void;
-    /** Replace the whole flow at once (apply a draft). */
-    swapFlow(graph: Graph): void;
-}
+// The CanvasBinding contract (CanvasBinding / Graph / XY) is owned by @flows/agent; app code
+// imports those types from @flows/agent directly. See docs/specs/0002-locator-agent SPEC §6.5.
 
 /**
  * Desktop binding: wraps the imperative `WorkflowCanvas` ref, because on desktop the
@@ -50,7 +25,7 @@ export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | nu
     return {
         readGraph: () => {
             const wf: WorkflowState = canvas().getWorkflow(); // WorkflowState is { nodes, edges }
-            return { nodes: wf.nodes ?? [], connections: wf.edges ?? [] };
+            return { nodes: wf.nodes ?? [], edges: wf.edges ?? [] };
         },
 
         updateNode: (id, patch) => {
@@ -69,7 +44,7 @@ export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | nu
 
         swapFlow: graph => {
             // `loadWorkflow` reads `state.edges ?? state.connections`; emit `edges`.
-            void canvas().loadWorkflow({ nodes: graph.nodes, edges: graph.connections });
+            void canvas().loadWorkflow({ nodes: graph.nodes, edges: graph.edges });
         },
     };
 };

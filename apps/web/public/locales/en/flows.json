@@ -1,4 +1,12 @@
 {
+    "agentPanel": {
+        "title": "Assistant",
+        "subtitle": "Move nodes with commands like move(Fetch, up, 10).",
+        "empty": "Type a command to move a node:\nmove(Fetch, up, 10)\nmove(Email, to, 100, 200)\nlist",
+        "thinking": "Thinking…",
+        "placeholder": "Move a node…",
+        "send": "Send"
+    },
     "header": {
         "title": "EurekaFlow",
         "autoSave": "Auto Save",

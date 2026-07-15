@@ -1,4 +1,12 @@
 {
+    "agentPanel": {
+        "title": "어시스턴트",
+        "subtitle": "move(Fetch, up, 10) 같은 명령으로 노드를 이동하세요.",
+        "empty": "노드를 이동하는 명령을 입력하세요:\nmove(Fetch, up, 10)\nmove(Email, to, 100, 200)\nlist",
+        "thinking": "생각 중…",
+        "placeholder": "노드 이동…",
+        "send": "보내기"
+    },
     "header": {
         "title": "EurekaFlow",
         "autoSave": "자동 저장",

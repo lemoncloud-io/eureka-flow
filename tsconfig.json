@@ -6,6 +6,9 @@
     "files": [],
     "references": [
         {
+            "path": "./libs/agent"
+        },
+        {
             "path": "./apps/web"
         },
         {
