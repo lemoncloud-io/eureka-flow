@@ -52,6 +52,9 @@
         "doubleClickRename": "Double-click to rename"
     },
     "visualization": {
+        "product": {
+            "untitled": "Untitled app"
+        },
         "waitingForData": "Waiting for data...",
         "noImage": "No Image",
         "noImageSelected": "No Image Selected",

@@ -183,5 +183,18 @@
         "complete": "Done",
         "regenerateKey": "Create EurekaAPI key again",
         "keyCreatedSuccess": "API key creation complete."
+    },
+    "apps": {
+        "title": "My Apps",
+        "description": "Apps deployed to your workspace. Click one to open it.",
+        "empty": "No apps deployed yet",
+        "emptyDescription": "Deployed apps will appear here.",
+        "loadFailed": "Couldn't load your apps",
+        "loadFailedDescription": "Something went wrong while fetching the list.",
+        "status": {
+            "deployed": "Deployed",
+            "deploying": "Deploying",
+            "failed": "Failed"
+        }
     }
 }

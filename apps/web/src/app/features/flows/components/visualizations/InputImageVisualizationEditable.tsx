@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Archive, Expand, Loader2, Play, ScrollText, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { compressImageIfNeeded } from '@flows/flows';
 
-import { INPUT_FILE_ACCEPT, clearFileConfig, processUploadedFile } from '../../utils';
+import { INPUT_FILE_ACCEPT, clearFileConfig, getUploadErrorMessage, processUploadedFile } from '../../utils';
 import { FilePreviewDialog } from '../FilePreviewDialog';
 import { S3Image } from '../S3Image';
 
@@ -32,10 +33,12 @@ export const InputImageVisualizationEditable: React.FC<EditableVisualizationProp
                 const { dataUrl: compressed } = await compressImageIfNeeded(dataUrl);
                 return compressed;
             });
+        } catch (error) {
+            toast.error(getUploadErrorMessage(error, t));
         } finally {
             setIsUploading(false);
+            e.target.value = '';
         }
-        e.target.value = '';
     };
 
     const handleFileDelete = () => {

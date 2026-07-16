@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-07-16] - root@0.60.0, @flows/web@0.60.0, @flows/admin@0.34.0
+
+### Features
+
+- (apps) enable apps list route only in dev mode
+- (flows) render upload-html product output as a link card
+- (flows) block file uploads over 58 MB
+- (apps) open an App in the same tab via a relative /apps/:id href
+- (apps) add empty and error states to the apps list
+- (apps) add /apps route listing the workspace's deployed AI Studio apps
+
 ## [2026-07-10] - root@0.59.0, @flows/web@0.59.0
 
 ### Features
