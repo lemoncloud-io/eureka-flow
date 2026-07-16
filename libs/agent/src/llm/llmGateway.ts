@@ -45,15 +45,33 @@ export interface Chunk {
     text?: string;
     toolCall?: { id: string; name: string; argsDelta: string };
     done?: boolean;
+    /** Optional token accounting, emitted with the final (`done`) chunk when the provider reports it. */
+    usage?: { inputTokens?: number; outputTokens?: number };
+}
+
+/**
+ * What a gateway/model supports. Callers that need tool calling should check this before
+ * sending tool definitions; a text-only gateway rejects requests that carry them.
+ */
+export interface LlmGatewayCapabilities {
+    /** Whether the gateway/model can emit tool calls. */
+    readonly toolCalls: boolean;
 }
 
 /**
  * The one outbound LLM dependency, behind a single interface so it can be swapped.
- * This lib ships only {@link ../llm/fakeGateway.createFakeGateway} (it backs the tests);
- * concrete gateways live in the app — today an offline dev command gateway (no network, no
- * key) that parses a command and emits real tool calls, with a backend-proxied production
- * gateway deferred until an endpoint exists (see docs/specs/0002-locator-agent/SPEC.md §9).
+ * This lib ships {@link ../llm/fakeGateway.createFakeGateway} (it backs the tests) and
+ * {@link ../llm/GeminiLlmGateway.createGeminiLlmGateway} (the first HTTP provider,
+ * text-only, over the HttpRequest port); the app adds an offline dev command gateway (no
+ * network, no key) that parses a command and emits real tool calls, with a backend-proxied
+ * production gateway deferred until an endpoint exists (see
+ * docs/specs/0002-locator-agent/SPEC.md §9).
  */
 export interface LlmGateway {
+    /**
+     * Capability metadata; optional for backward compatibility — absent means unspecified
+     * (callers should not assume tool support).
+     */
+    readonly capabilities?: LlmGatewayCapabilities;
     chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk>;
 }

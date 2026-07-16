@@ -1,4 +1,4 @@
-import type { ChatRequest, Chunk, LlmGateway } from './llmGateway';
+import type { ChatRequest, Chunk, LlmGateway, LlmGatewayCapabilities } from './llmGateway';
 
 /** A scripted assistant turn: optional text and/or a batch of tool calls. */
 export interface FakeResponse {
@@ -22,6 +22,8 @@ export type FakeScriptStep = FakeResponse | ((req: ChatRequest) => FakeResponse)
  * `calls` records every request received, for assertions.
  */
 export interface FakeGateway extends LlmGateway {
+    /** The fake can script tool calls, so it declares tool support. */
+    readonly capabilities: LlmGatewayCapabilities;
     readonly calls: ChatRequest[];
     /** True once every scripted step has been consumed. */
     isExhausted(): boolean;
@@ -55,6 +57,7 @@ export const createFakeGateway = (script: FakeScriptStep[]): FakeGateway => {
     }
 
     return {
+        capabilities: { toolCalls: true },
         chat,
         calls,
         isExhausted: () => cursor >= script.length,
