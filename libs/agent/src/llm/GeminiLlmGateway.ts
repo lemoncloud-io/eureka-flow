@@ -9,7 +9,7 @@ export interface GeminiLlmGatewayOptions {
     http: HttpRequestSupportable;
     /** Gemini API key. Sent as the x-goog-api-key header — never in the URL, never traced. */
     apiKey: string;
-    /** Defaults to gemini-2.5-flash, the W04 first provider. */
+    /** Defaults to gemini-2.5-flash, the first provider. */
     model?: string;
     /** Override to route through a backend proxy without changing the gateway. */
     baseUrl?: string;
