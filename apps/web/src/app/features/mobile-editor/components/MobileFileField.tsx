@@ -2,9 +2,11 @@ import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Loader2, Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { compressImageIfNeeded } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
+
+import { getUploadErrorMessage, readImageFile } from '../../flows/utils';
 
 interface MobileFileFieldProps {
     value: string;
@@ -16,25 +18,19 @@ export const MobileFileField = ({ value, onChange }: MobileFileFieldProps) => {
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         setIsUploading(true);
-        const reader = new FileReader();
-        reader.onload = async evt => {
-            try {
-                if (evt.target?.result) {
-                    const { dataUrl } = await compressImageIfNeeded(evt.target.result as string);
-                    onChange(dataUrl);
-                }
-            } finally {
-                setIsUploading(false);
-            }
-        };
-        reader.onerror = () => setIsUploading(false);
-        reader.readAsDataURL(file);
-        e.target.value = '';
+        try {
+            onChange(await readImageFile(file));
+        } catch (error) {
+            toast.error(getUploadErrorMessage(error, t));
+        } finally {
+            setIsUploading(false);
+            e.target.value = '';
+        }
     };
 
     const hasValue = !!value && value.startsWith('data:');

@@ -17,6 +17,7 @@ export * from './Minimap';
 export * from './MobileControls';
 export * from './ModelSelect';
 export * from './NodeBlock';
+export * from './ProductLinkCard';
 export * from './PublishDialog';
 export * from './RoleIndicator';
 export * from './RunHistoryPanel';

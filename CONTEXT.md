@@ -14,9 +14,14 @@ Glossary of domain terms. No implementation details. Update as terms are resolve
 - **AI key** — A workspace's own LLM provider key (Gemini/OpenAI), configured server-side and surfaced read-only to the client as `useApiKey` (server-authoritative, else "any provider key present"). It is **not** the **flow API key** (the localStorage credential that authenticates the client to flow) — the two are unrelated keys. _Avoid_: "API key" unqualified (collides with the flow auth key), provider token.
 - **Run mode** — Which billing path an AI run takes, decided **server-side**, not a client toggle. **Own AI key** — workspace has an **AI key**, runs use it and **no Credits are charged**; **Credits** — no AI key, runs draw down the **Credit balance**. The client only _surfaces_ the active mode (from `useApiKey`); it never selects it. _Avoid_: BYOK (dev jargon — not user-facing), "key mode".
 
+## Apps
+
+- **App** — An AI Studio web app whose GenAI calls were rewritten to run through the flow backend, then deployed. Its identity lives in **codes**, not flow: an App _is_ a codes Product with `stereo: 'front'`. flow neither creates nor deletes Apps — it only lists the ones a **Workspace** owns and links out to them. _Avoid_: applet (the `eureka-inject` spec's word for the same thing — an alias, not the canonical term), product (collides with both the codes Product and the **Credit pack**), and bare "app" where a suite product is meant (see **Billing app**).
+- **Injection** — The one-way conversion that makes an App: a deterministic codemod swaps the AI Studio export's GenAI constructor for a flow-backed one, so every model call is billed and routed through flow. It happens outside flow (server-side pipeline); flow never performs it. _Avoid_: transform, convert (too generic — they describe the codemod, not the domain act).
+
 ## Cross-app
 
-- **Billing app** — The separate `billing.example.com` application (OAuth-authenticated) that owns all payment, charge, refund, and ledger-mutation logic. flow links _out_ to it.
+- **Billing app** — The separate `billing.example.com` application (OAuth-authenticated) that owns all payment, charge, refund, and ledger-mutation logic. flow links _out_ to it. Note: "app" here means a **suite product**, which is _not_ an **App** (a deployed AI Studio web app) — the two senses are distinct and the qualifier is never dropped.
 - **Charge deep-link** — An outbound, new-tab navigation from flow to the billing app carrying only `from` (source tag) and `return_to` (where to come back to). Carries no identity — billing authenticates the user itself.
 
 ## Access model
