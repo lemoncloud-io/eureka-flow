@@ -30,9 +30,6 @@
             "path": "./libs/socket"
         },
         {
-            "path": "./libs/agent"
-        },
-        {
             "path": "./libs/policy"
         },
         {
