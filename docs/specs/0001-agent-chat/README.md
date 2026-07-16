@@ -84,7 +84,7 @@ classDiagram
         +chat(req) AsyncIterable
     }
     class ToolExecutor {
-        <<one engine; acting agent passed in>>
+        <<one engine — acting agent passed in>>
         +listTools(agent) ToolDef[]
         +dispatch(agent, call) ToolResult
     }
@@ -143,7 +143,7 @@ sequenceDiagram
     User->>Panel: "add a summarizer after the fetch"
     Panel->>Agent: send(text)
     Agent->>WS: snapshotBaseline()
-    Note over Agent,Tools: one shared ToolExecutor; the agent is passed in each call so its grant is checked
+    Note over Agent,Tools: one shared ToolExecutor — the agent is passed in each call so its grant is checked
     loop think and act
         Agent->>LLM: chat(agent prompt + history + tool defs)
         LLM-->>Agent: tool call (add_node, update_node, connect, ...)
