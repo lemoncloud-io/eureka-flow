@@ -37,13 +37,13 @@ flowchart TD
 
     subgraph app["apps/web — flow-editor wiring (DOM)"]
         Panel["AgentPanel<br/>renders SessionState"]
-        Hook["useLocatorAgent<br/>session store + lifecycle"]
+        Hook["useLocatorAgent → useAgentSession<br/>session store + lifecycle"]
         Gateway["createCommandLlmGateway<br/>(offline, DEV)"]
         DBinding["createDesktopCanvasBinding"]
     end
 
     subgraph lib["@flows/agent — DOM-free core"]
-        Agent["LocatorAgent<br/>think / act loop"]
+        Agent["LocatorAgent · extends BaseAgent<br/>think / act loop"]
         Executor["ToolExecutor<br/>validate → permission → route"]
         Tools["Canvas tools<br/>list_nodes · move_node"]
     end
@@ -86,7 +86,8 @@ libs/agent/src/                          @flows/agent — DOM-free agent core (v
 │  ├─ validateArgs.ts                    Minimal JSON-Schema structural validator
 │  └─ toolExecutor.ts                    The ONE shared executor: validate → permission → route → provider
 ├─ agents/
-│  └─ locatorAgent.ts                    The think/act turn loop — composes the canvas tool provider + persona; the heart
+│  ├─ baseAgent.ts                       BaseAgent — the generic think/act turn loop, shared by every agent (interface → class)
+│  └─ locatorAgent.ts                    LocatorAgent extends BaseAgent — adds the canvas tools + persona + node-list seeding
 │                                        (the home for concrete agents; more join here)
 ├─ session/session.ts                    SessionState (the Panel renders from it) + in-memory Storage
 └─ index.ts                              Public barrel
@@ -94,7 +95,8 @@ libs/agent/src/                          @flows/agent — DOM-free agent core (v
 apps/web/src/app/features/flows/         Flow-editor wiring (vitest env: jsdom)
 ├─ utils/createDesktopCanvasBinding.ts   Real CanvasBinding over the editor's node state
 ├─ utils/createCommandLlmGateway.ts      Offline command gateway (DEV — no network, no key): parses a command, resolves the node by exact match, emits real move_node/list_nodes tool calls
-├─ hooks/useLocatorAgent.ts              React glue: per-flow localStorage-backed session store (survives reload) + lifecycle (arm/dispose; StrictMode-safe; abort on flow switch / unmount)
+├─ hooks/useAgentSession.ts              Generic React glue for ANY agent: per-flow localStorage-backed session store (survives reload) + lifecycle (arm/dispose; StrictMode-safe; abort on flow switch / unmount)
+├─ hooks/useLocatorAgent.ts              Thin wrapper: supplies the locator factory to useAgentSession
 ├─ components/AgentPanel.tsx             The docked chat panel — renders purely from SessionState
 └─ pages/FlowEditorPage.tsx             Mounts the panel; flex layout that shrinks the canvas
 ```
@@ -105,15 +107,18 @@ apps/web/src/app/features/flows/         Flow-editor wiring (vitest env: jsdom)
 2. **Contracts** (`libs/agent`, read as interfaces first): `permissions.ts` → `canvas/canvasBinding.ts`
    → `llm/llmGateway.ts` → `tools/toolTypes.ts` → `session/session.ts` → `agent.ts`.
 3. **Pure logic** (verifiable in isolation): `canvas/moveSemantics.ts` → `tools/validateArgs.ts`.
-4. **Orchestration**: `tools/toolExecutor.ts` → `canvas/canvasTools.ts` → `agents/locatorAgent.ts`
-   (the turn loop — read last; it pulls in everything above) → `index.ts`.
+4. **Orchestration**: `tools/toolExecutor.ts` → `canvas/canvasTools.ts` → `agents/baseAgent.ts`
+   (the generic turn loop) → `agents/locatorAgent.ts` (the concrete agent — read last; it pulls in
+   everything above) → `index.ts`.
 5. **App wiring** (binding → gateway → hook → UI → mount): `createDesktopCanvasBinding.ts` →
-   `createCommandLlmGateway.ts` → `useLocatorAgent.ts` → `AgentPanel.tsx` → `FlowEditorPage.tsx`.
+   `createCommandLlmGateway.ts` → `useAgentSession.ts` (generic session store + lifecycle) →
+   `useLocatorAgent.ts` (supplies the locator factory) → `AgentPanel.tsx` → `FlowEditorPage.tsx`.
 6. **Tests**: each `*.spec.ts(x)` next to its subject; `locatorAgent.spec.ts` and
    `useLocatorAgent.spec.tsx` carry the most behavior.
 
 **Shortest high-signal path** (most risk / design weight): `canvasBinding.ts` (the sole-editor seam)
-→ `locatorAgent.ts` (the turn loop) → `useLocatorAgent.ts` (the lifecycle + persistence) →
+→ `baseAgent.ts` (the generic turn loop) → `locatorAgent.ts` (what the concrete agent adds) →
+`useAgentSession.ts` (the lifecycle + persistence) → `useLocatorAgent.ts` (thin locator factory) →
 `createCommandLlmGateway.ts` (command parse → exact-match node resolution).
 
 ---

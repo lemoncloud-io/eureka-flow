@@ -25,6 +25,8 @@ export { validateArgs } from './tools/validateArgs';
 export type { AgentPhase, Message, SessionState, Storage } from './session/session';
 export { createInMemoryStorage } from './session/session';
 
-// Locator agent
-export { createLocatorAgent, LOCATOR_SYSTEM_PROMPT } from './agents/locatorAgent';
+// Agents — generic base + concrete agents
+export { BaseAgent, DEFAULT_MAX_ITERATIONS } from './agents/baseAgent';
+export type { BaseAgentDeps } from './agents/baseAgent';
+export { createLocatorAgent, LocatorAgent, LOCATOR_SYSTEM_PROMPT } from './agents/locatorAgent';
 export type { LocatorAgentDeps } from './agents/locatorAgent';
