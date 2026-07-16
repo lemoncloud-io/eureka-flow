@@ -65,7 +65,7 @@ export interface LlmGatewayCapabilities {
  * text-only, over the HttpRequest port); the app adds an offline dev command gateway (no
  * network, no key) that parses a command and emits real tool calls, with a backend-proxied
  * production gateway deferred until an endpoint exists (see
- * docs/specs/0002-locator-agent/SPEC.md §9).
+ * docs/browser-agent/agents/locator/SPEC.md §9).
  */
 export interface LlmGateway {
     /**

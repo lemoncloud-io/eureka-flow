@@ -18,7 +18,7 @@ export interface Graph {
 
 /**
  * The single seam between (non-React) agent code and the React-owned live canvas.
- * See docs/specs/0002-locator-agent/SPEC.md §6.5 and the desktop implementation in
+ * See docs/browser-agent/agents/locator/SPEC.md §6.5 and the desktop implementation in
  * apps/web (`createDesktopCanvasBinding`).
  *
  * The locator agent uses only `readGraph` (to find a node) and `updateNode` (to move
