@@ -1,16 +1,16 @@
-// Shared chat contract (provider-neutral messages, tool defs, streamed chunks)
-export type { ChatMessage, ChatRequest, Chunk, JsonSchema, LlmGateway, ToolDef } from './llmGateway';
+// Shared chat contract (provider-neutral messages, tool defs, streamed chunks, capabilities)
+export type {
+    ChatMessage,
+    ChatRequest,
+    Chunk,
+    JsonSchema,
+    LlmGateway,
+    LlmGatewayCapabilities,
+    ToolDef,
+} from './llmGateway';
 export { createFakeGateway } from './fakeGateway';
 export type { FakeGateway, FakeResponse, FakeScriptStep } from './fakeGateway';
 
-// W04 completion contract + Gemini provider (contract reconciliation in progress)
-export type {
-    LlmCompletionInput,
-    LlmCompletionResult,
-    LlmGatewaySupportable,
-    LlmMessage,
-    LlmRole,
-    LlmUsage,
-} from './types';
+// Gemini provider (first HTTP provider over the HttpRequest port; text-only for now)
 export { createGeminiLlmGateway } from './GeminiLlmGateway';
-export type { GeminiLlmGatewayOptions } from './GeminiLlmGateway';
+export type { GeminiLlmGateway, GeminiLlmGatewayOptions } from './GeminiLlmGateway';
