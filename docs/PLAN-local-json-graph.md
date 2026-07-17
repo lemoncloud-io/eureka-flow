@@ -219,7 +219,23 @@ S6 구현 시 주의: `loadWorkflow`가 undo 히스토리를 지우므로(`Workf
 
     ⚠️ **테스트 기대값 2개 수정** — `saveCurrentFlow` 반환에 `structureDropped` 추가로 `toEqual`이 낡음. 실패를 숨긴 게 아니라 **계약 변경이 맞다**(loop-engineering 금지 조항 해당 없음)
 
+    **실행 표면 완전성 검증** (어드바이저가 내 정찰 구멍을 잡음: `grep "runAll\b"`는 **`handleRunAll`/`onRunAll`을 못 잡는다** — 대문자 R이라 `runAll` 부분문자열이 없음. "5곳 전부"는 *주장*이었지 *입증*이 아니었다). 대소문자 무시 재검색으로 확정:
+    | 경로 | 게이트 |
+    | --- | --- |
+    | `Header.tsx:437 onClick={onRunAll}` ← `FlowEditorPage:793 onRunAll={handleRunAll}` | ✅ |
+    | `MobileHeader.tsx:212 onClick={onRunAll}` ← `MobileFlowEditorPage:352` ← `useMobileRunAll` | ✅ |
+    | `WorkflowCanvas:1417 triggerNode` (노드 실행 버튼 2곳) | ✅ |
+    | `MobileStepDetail:81`, `MobileFlowEditorPage:210 handleRunNode` | ✅ |
+    | `useSocketHandlers:184`, `useMobileSocketSync:151` (소켓 연쇄) | **의도적 비게이트** ✅ |
+    | `process/useFlowExecution.ts:57 runFlow` | **게이트 불필요** — `loadFlow` 응답에서 노드 ID를 뽑아 실행. 캔버스/작업본을 안 건드림 = 미저장 개념 자체가 없음 |
+
+    **(발견) `ShortcutGrid.tsx:9`가 `⌘⇧R Run All`을 광고하는데 핸들러가 없다.** `FlowEditorPage`의 키보드 핸들러는 `?`/`z`/`y`/`shift+z`뿐. **기존 문서 버그, 범위 밖** — 게이트 우회는 아님(존재하지 않는 경로)
+
     ❗ **미검증**: 실제 404 회피 = 인증 필요 → DEV 스모크. R5-b는 C11로 **로컬 재현 불가**(localhost 예외) → DEV 필수
+
+    ⚠️ **알려진 부분 구현 / 의식적 선택**:
+    - **R5-b는 auto-save 경로에 침묵.** editor가 auto-save 켜고 노드 추가 → 저장됨(구조 유실) → **토스트 없음**. 경고는 _명시적_ save와 실행 차단 시에만. 좁은 창(auto-save 기본 off + C11로 localhost는 구조까지 저장) + 매 틱 토스트는 스팸이라 명시적 save 전용으로 확정. "R5-b 완료"가 auto-save까지 덮는다고 읽지 말 것
+    - **`useRunGate`가 `useFlows()` 인스턴스를 늘린다** (`MobileStepDetail`/`useMobileRunAll`/양 페이지). 기존 패턴이고 TanStack이 쿼리를 dedupe하므로 정합성 문제 아님 — 의식적 선택으로 기록
 
 - [ ] **S7 — R6: 로컬 지속성 + 오프라인** (P1)
     - working + baseline + flowId → localStorage (IndexedDB 폴백)
@@ -368,3 +384,4 @@ S5 배선은 **구성 + 단위로만 검증됨**(로드 4곳이 `captureBaseline
 - 로컬 draft 다중 탭 충돌
 - **(추가)** `handleSave`(`FlowEditorPage.tsx:403`)/`retrySave`에 `canSave` 게이트 없음 — 기존 구멍, 범위 밖
 - **(추가)** `#` 툼스톤(C7)이 기존 flow의 `nodeIds$$`에 이미 쌓여 있을 수 있음 — 서버측 정리 필요 여부 미확인
+- **(추가, S6)** `ShortcutGrid.tsx:9`가 `⌘⇧R Run All`을 광고하나 **핸들러 부재** — 기존 버그. 구현할지 광고를 뗄지 미정
