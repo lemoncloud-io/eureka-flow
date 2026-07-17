@@ -36,6 +36,7 @@ import { ProductProgressBanner } from '../components/ProductProgressBanner';
 import { PublishDialog } from '../components/PublishDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
+import { useRunGate } from '../hooks/useRunGate';
 import { useSocketHandlers } from '../hooks/useSocketHandlers';
 import { useSocketRecorder } from '../hooks/useSocketRecorder';
 
@@ -105,6 +106,7 @@ export const FlowEditorPage = () => {
         loadFlowById,
     });
 
+    const runGate = useRunGate();
     const socketRecorder = useSocketRecorder();
     const { record: recordSocketMessage } = socketRecorder;
     const refreshCredits = useCreditsRefresh();
@@ -407,7 +409,21 @@ export const FlowEditorPage = () => {
         lastLocalUpdateTimestampRef.current = Date.now(); // Mark save time to ignore self-echo from socket
         const result = await saveCurrentFlow(data);
         if (result.success) {
-            showNotification(t('flowEditor.savedAs', { flowName }), 'success');
+            // A 200 does not mean the whole graph landed — an editor's added and deleted
+            // steps are dropped server-side without complaint, and this is the only place
+            // the user would ever hear about it. Say that instead of "saved", which here
+            // would be the more misleading of the two.
+            if (result.structureDropped) {
+                showNotification(
+                    t(
+                        'flowEditor.savedWithoutStructure',
+                        'Saved the step settings only. Added and deleted steps need owner access.'
+                    ),
+                    'error'
+                );
+            } else {
+                showNotification(t('flowEditor.savedAs', { flowName }), 'success');
+            }
             if (result.id !== currentFlowId) {
                 updateUrl(result.id, window.location.hash.replace('#', ''));
             }
@@ -458,13 +474,19 @@ export const FlowEditorPage = () => {
         canvasRef.current?.addNode(type);
     }, []);
 
+    const handleBeforeRun = useCallback(async (): Promise<boolean> => {
+        const data = canvasRef.current?.getWorkflow();
+        return data ? runGate(data) : false;
+    }, [runGate]);
+
     const handleRunAll = useCallback(async () => {
+        if (!(await handleBeforeRun())) return;
         try {
             await canvasRef.current?.runAll();
         } catch {
             showNotification(t('flowEditor.failedToRunFlow', 'Failed to run flow'), 'error');
         }
-    }, [t]);
+    }, [handleBeforeRun, t]);
 
     const handleSelectionChange = (nodeId: string | null) => {
         updateUrl(currentFlowId, nodeId);
@@ -700,6 +722,7 @@ export const FlowEditorPage = () => {
                     connectionId={socketConnectionId ?? undefined}
                     onNodeSelect={handleSelectionChange}
                     onChange={handleCanvasChange}
+                    onBeforeRun={handleBeforeRun}
                     onOpenLibrary={handleOpenLibrary}
                     onConnectionError={handleConnectionError}
                     onShowNotification={showNotification}

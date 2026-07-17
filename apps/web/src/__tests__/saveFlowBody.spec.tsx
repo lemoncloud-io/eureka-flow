@@ -133,7 +133,7 @@ describe('save body', () => {
 
         await waitFor(() => expect(postMock).toHaveBeenCalled());
         expect(savedPath()).toBe('/flows/0/save');
-        expect(outcome).toEqual({ success: true, id: '1009999' });
+        expect(outcome).toEqual({ success: true, id: '1009999', structureDropped: false });
         expect(savedBody().nodes.map(n => n.id)).toEqual(['n01ab']);
     });
 });

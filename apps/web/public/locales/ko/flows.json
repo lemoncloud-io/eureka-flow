@@ -264,7 +264,10 @@
         "signInWithApiKey": "API 키로 로그인",
         "browsePublicFlows": "공개 플로우 둘러보기",
         "signInToEdit": "로그인하여 편집하기",
-        "failedToRunFlow": "플로우 실행 실패"
+        "failedToRunFlow": "플로우 실행 실패",
+        "confirmSaveBeforeRun": "변경사항을 저장하고 실행할까요?",
+        "runNeedsOwnerForStructure": "편집자 권한에서는 추가·삭제한 단계가 저장되지 않아 실행할 수 없습니다. 소유자에게 요청하세요.",
+        "savedWithoutStructure": "단계 설정만 저장했습니다. 추가·삭제한 단계는 소유자 권한이 필요합니다."
     },
     "publicFlows": {
         "title": "공개 플로우",

@@ -217,6 +217,6 @@ describe('lazy flow creation', () => {
 
         await waitFor(() => expect(postMock).toHaveBeenCalled());
         expect(postMock.mock.calls.at(-1)?.[0]).toBe('/flows/0/save');
-        expect(outcome).toEqual({ success: true, id: '1009999' });
+        expect(outcome).toEqual({ success: true, id: '1009999', structureDropped: false });
     });
 });

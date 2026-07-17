@@ -30,6 +30,7 @@ import {
     useCanvasNodes,
     useCanvasStore,
     useCollapsedNodeIds,
+    useFlowsStore,
     useUpdatedPortIds,
 } from '@flows/flows';
 
@@ -107,6 +108,12 @@ interface WorkflowCanvasProps {
     connectionId?: string;
     onNodeSelect?: (nodeId: string | null) => void;
     onChange?: () => void;
+    /**
+     * Clears a user-initiated run, saving first if the server has not seen the graph yet.
+     * Returning false stops the run. Runs continuing on a socket message skip this — the
+     * server sending them is proof it already knows the node.
+     */
+    onBeforeRun?: () => Promise<boolean>;
     /** Called when user clicks "Add Node" from empty state */
     onOpenLibrary?: () => void;
     /** Called when a connection is rejected due to validation error */
@@ -193,6 +200,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             connectionId,
             onNodeSelect,
             onChange,
+            onBeforeRun,
             onOpenLibrary,
             onConnectionError,
             onShowNotification,
@@ -1055,7 +1063,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     useCanvasStore.getState().setAllNodesCollapsed(false);
                 },
                 runAll: async () => {
-                    if (!permissions.canRun || !flowId) return;
+                    // Read the id now rather than trusting the one this handle closed
+                    // over: a flow with no id yet gets one from the save that runs
+                    // immediately before this, and that store write has not re-rendered
+                    // us by the time it returns. The stale id here is null, so the run
+                    // would silently do nothing on exactly the new-flow path.
+                    const runFlowId = useFlowsStore.getState().currentFlowId;
+                    if (!permissions.canRun || !runFlowId) return;
 
                     const inputNodeIdSet = new Set(
                         nodesRef.current
@@ -1081,7 +1095,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     setInputNodeStates('RUNNING' as NodeState);
 
                     try {
-                        await runFlow(flowId, [...inputNodeIdSet], { connection: connectionId });
+                        await runFlow(runFlowId, [...inputNodeIdSet], { connection: connectionId });
                     } catch (error) {
                         setInputNodeStates('IDLE' as NodeState);
                         throw error;
@@ -1394,6 +1408,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         );
 
         executeNodeRef.current = executeNode;
+
+        // The run button's entry point. `executeNode` itself stays ungated because the
+        // socket path shares it, and a run already under way must not stop to ask.
+        const triggerNode = useCallback(
+            async (nodeId: string, options?: { propagate?: boolean }) => {
+                if (onBeforeRun && !(await onBeforeRun())) return;
+                await executeNode(nodeId, undefined, options);
+            },
+            [executeNode, onBeforeRun]
+        );
 
         // ============================================================
         // Auto-execution removed - Backend handles all propagation
@@ -2435,7 +2459,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                             }}
                                             actions={{
                                                 onDelete: () => deleteNode(node.id),
-                                                onTrigger: opts => executeNode(node.id, undefined, opts),
+                                                onTrigger: opts => triggerNode(node.id, opts),
                                                 onDuplicate: () => duplicateNode(node.id),
                                                 onOpenAiKeyDialog: onAiKeyRequired,
 
@@ -2535,7 +2559,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             onToggleAuto={handleToggleAuto}
                             onDeleteNode={deleteNode}
                             onDeleteConnection={deleteConnection}
-                            onTriggerNode={(nodeId, opts) => executeNode(nodeId, undefined, opts)}
+                            onTriggerNode={(nodeId, opts) => triggerNode(nodeId, opts)}
                             onSelectNode={id => handleSelectionChange(id)}
                             onSelectConnection={id => {
                                 setSelectedConnectionId(id);

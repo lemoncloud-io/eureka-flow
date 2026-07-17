@@ -25,6 +25,7 @@ import { ContentPreviewModal } from '../../flows/components/ContentPreviewModal'
 import { DevSocketPanel } from '../../flows/components/DevSocketPanel';
 import { FlowListDialog } from '../../flows/components/FlowListDialog';
 import { useProductProgressToasts } from '../../flows/hooks/useProductProgressToasts';
+import { useRunGate } from '../../flows/hooks/useRunGate';
 import { useSocketRecorder } from '../../flows/hooks/useSocketRecorder';
 import {
     MobileBlockLibrarySheet,
@@ -153,6 +154,7 @@ export const MobileFlowEditorPage = () => {
         nodes.forEach(n => updateNodeData(n.id, { state: 'IDLE' } as Partial<NodeData>));
     }, []);
 
+    const runGate = useRunGate();
     const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ socketConnectionId });
 
     const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleCreateNewFlow } = useMobileFlowActions({
@@ -202,14 +204,18 @@ export const MobileFlowEditorPage = () => {
     }, [stepNav, saveCurrentFlow]);
 
     const handleRunNode = useCallback(
-        (nodeId: string) => {
-            executeNodeWithToast(nodeId, {
-                flowId: currentFlowId,
+        async (nodeId: string) => {
+            const { nodes, connections } = useCanvasStore.getState();
+            if (!(await runGate({ nodes, connections }))) return;
+            await executeNodeWithToast(nodeId, {
+                // A new flow claims its id in the save the gate just made, so read it now
+                // rather than trusting what this callback closed over.
+                flowId: useFlowsStore.getState().currentFlowId,
                 socketConnectionId,
                 canEdit: permissions.canEditStructure,
             });
         },
-        [currentFlowId, socketConnectionId, permissions.canEditStructure]
+        [runGate, socketConnectionId, permissions.canEditStructure]
     );
 
     const handleAddBlockWithRecent = useCallback(

@@ -245,7 +245,7 @@ export const useFlows = () => {
     const saveCurrentFlow = useCallback(
         async (
             body: Partial<SaveFlowBody> & { connections?: SaveFlowBody['edges'] }
-        ): Promise<{ success: boolean; id: string }> => {
+        ): Promise<{ success: boolean; id: string; structureDropped: boolean }> => {
             // Set saving status (subtle indicator, not blocking)
             updateSaveStatus('saving');
 
@@ -286,15 +286,15 @@ export const useFlows = () => {
                     await saveFlowMutation.mutateAsync({ id: flowId, body: saveBody });
                 }
 
-                rebaseline(saveBody);
+                const structureDropped = rebaseline(saveBody);
 
                 setLastSavedAt(new Date());
                 updateSaveStatus('success');
-                return { success: true, id: flowId || '' };
+                return { success: true, id: flowId || '', structureDropped };
             } catch (error) {
                 console.error('[useFlows] Failed to save flow:', error);
                 updateSaveStatus('error', error instanceof Error ? error : new Error('Failed to save flow'));
-                return { success: false, id: '' };
+                return { success: false, id: '', structureDropped: false };
             }
         },
         [currentFlowId, createFlowMutation, saveFlowMutation, setLastSavedAt, setCurrentFlowId, updateSaveStatus]
@@ -306,7 +306,7 @@ export const useFlows = () => {
     const retrySave = useCallback(async () => {
         if (!lastSaveBodyRef.current) {
             updateSaveStatus('idle');
-            return { success: false, id: '' };
+            return { success: false, id: '', structureDropped: false };
         }
         // Retry with stored save body
         return saveCurrentFlow(lastSaveBodyRef.current);

@@ -264,7 +264,10 @@
         "signInWithApiKey": "Sign in with API Key",
         "browsePublicFlows": "Browse public flows",
         "signInToEdit": "Sign in to edit this flow",
-        "failedToRunFlow": "Failed to run flow"
+        "failedToRunFlow": "Failed to run flow",
+        "confirmSaveBeforeRun": "Save your changes and run?",
+        "runNeedsOwnerForStructure": "Added and deleted steps are not saved with editor access, so this flow cannot run. Ask the owner to make the change.",
+        "savedWithoutStructure": "Saved the step settings only. Added and deleted steps need owner access."
     },
     "publicFlows": {
         "title": "Public Flows",

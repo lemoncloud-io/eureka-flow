@@ -22,6 +22,19 @@ export const captureBaseline = (graph: GraphLike): void => {
 };
 
 /**
+ * Whether saving this diff would store the config and silently discard the structure.
+ *
+ * True only for a non-owner editor: the server writes their edits as a session config
+ * overlay, which has nowhere to put an added node or edge. The save still answers 200, so
+ * this is the only warning the client gets — hence one predicate, read both by the save
+ * that must not trust its own success and by the run that must not be attempted.
+ */
+export const willDropStructure = (diff: FlowDiff): boolean => {
+    const { isEditable, hasOwned } = useFlowsStore.getState();
+    return isEditable && !hasOwned && hasStructuralChange(diff);
+};
+
+/**
  * Adopt a save body that has just come back successful as the new baseline.
  *
  * The snapshot to pass is the one that was *sent*, never the working copy as it stands
@@ -29,18 +42,19 @@ export const captureBaseline = (graph: GraphLike): void => {
  * are unsaved. Marking those as baseline would make them vanish from the next diff, and
  * the user would lose whatever they typed during the round trip.
  *
- * One case declines the new baseline: a non-owner editor's structural change. The server
- * stores such an editor's config overlay and silently drops their added and removed nodes
- * and edges, so a 200 does not mean the graph was stored. Adopting the snapshot would
+ * A save whose structure the server drops declines the new baseline: adopting it would
  * read clean while the work exists only in this tab. Leaving the baseline where it is
  * reads dirty instead — which overstates what is left to save, but never loses it.
+ *
+ * Returns whether the structure was dropped, which is the only signal that a 200 did not
+ * mean what it said. Ask here rather than afterwards: once the baseline moves, the
+ * difference it was measured against is gone.
  */
-export const rebaseline = (sent: FlowSnapshot): void => {
-    const { baseline, isEditable, hasOwned, setBaseline } = useFlowsStore.getState();
-    const isNonOwnerEditor = isEditable && !hasOwned;
-    const droppedByServer = isNonOwnerEditor && hasStructuralChange(diffSnapshots(sent, baseline ?? emptySnapshot()));
-    if (droppedByServer) return;
-    setBaseline(sent);
+export const rebaseline = (sent: FlowSnapshot): boolean => {
+    const { baseline, setBaseline } = useFlowsStore.getState();
+    const dropped = willDropStructure(diffSnapshots(sent, baseline ?? emptySnapshot()));
+    if (!dropped) setBaseline(sent);
+    return dropped;
 };
 
 /** Diff a graph against the baseline outside of render — for timers and event handlers. */

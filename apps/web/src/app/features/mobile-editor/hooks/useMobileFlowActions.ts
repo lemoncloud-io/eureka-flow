@@ -36,7 +36,19 @@ export const useMobileFlowActions = ({
         lastLocalUpdateTimestampRef.current = Date.now();
         const result = await saveCurrentFlow({ nodes, connections });
         if (result.success) {
-            toast.success(t('flowEditor.savedAs', { flowName }));
+            // A 200 does not mean the whole graph landed — an editor's added and deleted
+            // steps are dropped server-side without complaint. Saying "saved" here would
+            // be the more misleading of the two.
+            if (result.structureDropped) {
+                toast.error(
+                    t(
+                        'flowEditor.savedWithoutStructure',
+                        'Saved the step settings only. Added and deleted steps need owner access.'
+                    )
+                );
+            } else {
+                toast.success(t('flowEditor.savedAs', { flowName }));
+            }
             if (result.id !== currentFlowId) updateUrl(result.id);
         } else {
             toast.error(t('flowEditor.failedToSaveWorkflow'));

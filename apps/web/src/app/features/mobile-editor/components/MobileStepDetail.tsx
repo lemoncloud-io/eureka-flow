@@ -4,13 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle, ArrowLeft, ArrowRight, FileText, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-import { isAiBlock, isMissingAiKey, useCanvasConnections, useCanvasStore } from '@flows/flows';
+import { isAiBlock, isMissingAiKey, useCanvasConnections, useCanvasStore, useFlowsStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Input, Label, Switch } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
 import { AiKeyWarningBanner } from '../../flows/components/AiKeyWarningBanner';
 import { BlockIcon } from '../../flows/components/BlockIcon';
+import { useRunGate } from '../../flows/hooks/useRunGate';
 import { getPortStyleKey } from '../../flows/utils';
 import { useNodeConfig } from '../hooks/useNodeConfig';
 import { executeNodeWithToast } from '../utils';
@@ -70,17 +71,23 @@ export const MobileStepDetail = ({
         handleToggleAuto,
     } = useNodeConfig(nodeId, flowId, role);
 
+    const runGate = useRunGate();
+
     const handleRun = useCallback(
         async (options?: { propagate?: boolean }) => {
             if (!canRun || !nodeId) return;
+            const { nodes, connections } = useCanvasStore.getState();
+            if (!(await runGate({ nodes, connections }))) return;
             await executeNodeWithToast(nodeId, {
-                flowId,
+                // A new flow claims its id in the save the gate just made, so read it now
+                // rather than trusting the prop this render closed over.
+                flowId: useFlowsStore.getState().currentFlowId,
                 socketConnectionId,
                 canEdit: canEditStructure,
                 propagate: options?.propagate,
             });
         },
-        [canRun, canEditStructure, nodeId, flowId, socketConnectionId]
+        [canRun, canEditStructure, nodeId, runGate, socketConnectionId]
     );
     const isRunning = (node?.state as string) === 'RUNNING';
 
