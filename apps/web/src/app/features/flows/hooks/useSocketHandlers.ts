@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import { toast } from 'sonner';
 
-import { EXECUTE_FUNCTIONS, getNode, getPortData, useCanvasStore } from '@flows/flows';
+import { EXECUTE_FUNCTIONS, captureBaseline, getNode, getPortData, useCanvasStore } from '@flows/flows';
 
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
@@ -20,8 +20,6 @@ interface UseSocketHandlersParams {
     blockRegistry: Record<string, BlockDefinitionWithFrontend>;
     currentFlowId: string | null;
     loadFlowById: (flowId: string) => Promise<unknown>;
-    lastSavedStateRef: RefObject<string | null>;
-    serializeWorkflowState: (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }) => string;
 }
 
 const getNodeDisplayName = (
@@ -39,8 +37,6 @@ export const useSocketHandlers = ({
     blockRegistry,
     currentFlowId,
     loadFlowById,
-    lastSavedStateRef,
-    serializeWorkflowState,
 }: UseSocketHandlersParams) => {
     const nodeNoRef = useRef<Map<string, number>>(new Map());
     const nodeRunIdRef = useRef<Map<string, string>>(new Map());
@@ -65,13 +61,16 @@ export const useSocketHandlers = ({
                 const flowData = await loadFlowById(flowId);
                 if (canvasRef.current && flowData) {
                     await canvasRef.current.loadWorkflow(flowData as Parameters<WorkflowCanvasRef['loadWorkflow']>[0]);
-                    lastSavedStateRef.current = serializeWorkflowState(flowData as { nodes?: unknown[] });
+                    // Baseline off the canvas, not off flowData: loadWorkflow fills in the
+                    // fields the response leaves out, and a baseline that skipped that
+                    // normalization would read dirty against a flow nobody has touched.
+                    captureBaseline(canvasRef.current.getWorkflow());
                 }
             } catch (error) {
                 console.error('[FlowEditor] Failed to reload flow:', error);
             }
         },
-        [loadFlowById, canvasRef, lastSavedStateRef, serializeWorkflowState]
+        [loadFlowById, canvasRef]
     );
 
     const handleNodeUpdate = useCallback(

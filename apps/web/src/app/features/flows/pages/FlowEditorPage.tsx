@@ -7,7 +7,9 @@ import { toast } from 'sonner';
 
 import {
     FLOW_FORBIDDEN,
+    captureBaseline,
     deriveRole,
+    diffAgainstBaseline,
     getPermissions,
     getProfile,
     toAiKeyStatus,
@@ -42,9 +44,6 @@ import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { FlowRole } from '@flows/flows';
 import type { ProductProgressInfo, WebSocketMessage } from '@flows/socket';
-
-const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
-    JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
 
 const STAGGER_DELAY_MS = 80;
 const staggerStyle = (index: number): React.CSSProperties => ({
@@ -89,8 +88,6 @@ export const FlowEditorPage = () => {
         publishFlow,
     } = useFlows();
 
-    const lastSavedStateRef = useRef<string | null>(null);
-
     const {
         handleFlowUpdate,
         handleNodeUpdate,
@@ -106,8 +103,6 @@ export const FlowEditorPage = () => {
         blockRegistry,
         currentFlowId,
         loadFlowById,
-        lastSavedStateRef,
-        serializeWorkflowState,
     });
 
     const socketRecorder = useSocketRecorder();
@@ -238,7 +233,7 @@ export const FlowEditorPage = () => {
                 const flowData = await loadFlowById(flowId);
                 if (canvasRef.current && flowData) {
                     await canvasRef.current.loadWorkflow(flowData);
-                    lastSavedStateRef.current = serializeWorkflowState(flowData);
+                    captureBaseline(canvasRef.current.getWorkflow());
                 }
                 updateUrl(flowId, null);
             } catch (error) {
@@ -325,7 +320,12 @@ export const FlowEditorPage = () => {
                     if (initialFlow) {
                         try {
                             await canvasRef.current.loadWorkflow(initialFlow);
-                            lastSavedStateRef.current = serializeWorkflowState(initialFlow);
+                            // Baseline off the canvas rather than initialFlow, and only
+                            // here — after loadBlocks. The response omits fields the canvas
+                            // fills in and the registry resolves, so a baseline built from
+                            // it reads dirty against a flow nobody has touched, and every
+                            // load would trip auto-save.
+                            captureBaseline(canvasRef.current.getWorkflow());
                         } catch (error) {
                             console.error('[FlowEditor] Failed to load workflow:', error);
                         }
@@ -380,12 +380,13 @@ export const FlowEditorPage = () => {
         autoSaveTimerRef.current = window.setTimeout(() => {
             if (canvasRef.current) {
                 const data = canvasRef.current.getWorkflow();
-                const currentState = serializeWorkflowState(data);
 
-                if (currentState !== lastSavedStateRef.current) {
+                // Nothing to save if the graph matches the baseline. A run rewrites node
+                // status and port data, and the diff ignores all of it — otherwise
+                // running a flow would look like an edit and save itself in a circle.
+                if (!diffAgainstBaseline(data).isEmpty) {
                     lastLocalUpdateTimestampRef.current = Date.now(); // Mark save time to ignore self-echo
                     saveCurrentFlow(data);
-                    lastSavedStateRef.current = currentState;
                 }
             }
         }, 2000);
@@ -406,7 +407,6 @@ export const FlowEditorPage = () => {
         lastLocalUpdateTimestampRef.current = Date.now(); // Mark save time to ignore self-echo from socket
         const result = await saveCurrentFlow(data);
         if (result.success) {
-            lastSavedStateRef.current = serializeWorkflowState(data);
             showNotification(t('flowEditor.savedAs', { flowName }), 'success');
             if (result.id !== currentFlowId) {
                 updateUrl(result.id, window.location.hash.replace('#', ''));
@@ -416,18 +416,15 @@ export const FlowEditorPage = () => {
         }
     };
 
-    const handleNew = async () => {
+    const handleNew = () => {
         if (!canvasRef.current) return;
         if (window.confirm(t('flowEditor.confirmNewFlow'))) {
             canvasRef.current.newWorkflow();
-            lastSavedStateRef.current = serializeWorkflowState({ nodes: [], connections: [] });
-            const newId = await createNewFlow();
-            if (newId) {
-                updateUrl(newId, null);
-                showNotification(t('flowEditor.newFlowCreated'), 'success');
-            } else {
-                showNotification(t('flowEditor.failedToCreateFlow'), 'error');
-            }
+            // No server flow yet — the first save claims the ID, so the URL has nothing
+            // to point at until then.
+            createNewFlow();
+            updateUrl(null, null);
+            showNotification(t('flowEditor.newFlowCreated'), 'success');
         }
     };
 

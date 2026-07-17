@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FLOW_FORBIDDEN, getProfile, toAiKeyStatus, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import {
+    FLOW_FORBIDDEN,
+    captureBaseline,
+    getProfile,
+    toAiKeyStatus,
+    useBlocks,
+    useCanvasStore,
+    useFlows,
+} from '@flows/flows';
 import { useWebCoreStore, validateApiKey } from '@flows/web-core';
-
-import type { SerializeWorkflowFn } from './types';
-
-interface UseMobileEditorBootParams {
-    serializeWorkflowState: SerializeWorkflowFn;
-    lastSavedStateRef: React.MutableRefObject<string | null>;
-}
 
 interface UseMobileEditorBootReturn {
     isAppReady: boolean;
@@ -22,10 +23,7 @@ interface UseMobileEditorBootReturn {
     updateUrl: (flowId: string | null) => void;
 }
 
-export const useMobileEditorBoot = ({
-    serializeWorkflowState,
-    lastSavedStateRef,
-}: UseMobileEditorBootParams): UseMobileEditorBootReturn => {
+export const useMobileEditorBoot = (): UseMobileEditorBootReturn => {
     const { t } = useTranslation(['flows']);
     const { loadBlocks } = useBlocks();
     const { initializeFlow, loadFlowById } = useFlows();
@@ -110,7 +108,12 @@ export const useMobileEditorBoot = ({
 
             if (initialFlow) {
                 useCanvasStore.getState().loadWorkflow(initialFlow);
-                lastSavedStateRef.current = serializeWorkflowState(initialFlow);
+                // Baseline off the store, not off initialFlow, and only here — after
+                // loadBlocks. The registry resolves each node's type on the way into a
+                // snapshot, so a baseline taken any earlier reads dirty against a flow
+                // nobody has touched, and every load would trip auto-save.
+                const { nodes, connections } = useCanvasStore.getState();
+                captureBaseline({ nodes, connections });
             }
 
             if (loadedId) {

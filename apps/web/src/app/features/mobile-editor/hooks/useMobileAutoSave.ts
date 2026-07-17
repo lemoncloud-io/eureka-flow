@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import { useCanvasStore, useFlows, useIsAutoSaveEnabled } from '@flows/flows';
-
-import type { SerializeWorkflowFn } from './types';
+import { diffAgainstBaseline, useCanvasStore, useFlows, useIsAutoSaveEnabled } from '@flows/flows';
 
 const AUTO_SAVE_DELAY = 2000;
 
@@ -10,16 +8,12 @@ interface UseMobileAutoSaveParams {
     isAppReady: boolean;
     /** Whether the current user can save (Owner + Editor; false for viewer/anonymous) */
     canSave: boolean;
-    serializeWorkflowState: SerializeWorkflowFn;
-    lastSavedStateRef: React.MutableRefObject<string | null>;
     lastLocalUpdateTimestampRef: React.MutableRefObject<number | null>;
 }
 
 export const useMobileAutoSave = ({
     isAppReady,
     canSave,
-    serializeWorkflowState,
-    lastSavedStateRef,
     lastLocalUpdateTimestampRef,
 }: UseMobileAutoSaveParams): void => {
     const { saveCurrentFlow } = useFlows();
@@ -36,11 +30,14 @@ export const useMobileAutoSave = ({
                 }
                 autoSaveTimerRef.current = window.setTimeout(() => {
                     const { nodes, connections } = useCanvasStore.getState();
-                    const currentState = serializeWorkflowState({ nodes, connections });
-                    if (currentState !== lastSavedStateRef.current) {
+
+                    // Nothing to save if the graph matches the baseline. A run rewrites
+                    // node status and port data, and the diff ignores all of it —
+                    // otherwise running a flow would look like an edit and save itself
+                    // in a circle.
+                    if (!diffAgainstBaseline({ nodes, connections }).isEmpty) {
                         lastLocalUpdateTimestampRef.current = Date.now();
                         saveCurrentFlow({ nodes, connections });
-                        lastSavedStateRef.current = currentState;
                     }
                 }, AUTO_SAVE_DELAY);
             }
@@ -50,13 +47,5 @@ export const useMobileAutoSave = ({
             unsub();
             if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
         };
-    }, [
-        canSave,
-        isAppReady,
-        isAutoSaveEnabled,
-        saveCurrentFlow,
-        serializeWorkflowState,
-        lastSavedStateRef,
-        lastLocalUpdateTimestampRef,
-    ]);
+    }, [canSave, isAppReady, isAutoSaveEnabled, saveCurrentFlow, lastLocalUpdateTimestampRef]);
 };

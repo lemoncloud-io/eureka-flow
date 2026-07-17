@@ -6,6 +6,7 @@ import { ArrowRight, Globe, KeyRound, Lock, Search, ShieldX, X } from 'lucide-re
 
 import {
     deriveRole,
+    diffAgainstBaseline,
     getPermissions,
     useBlockRegistry,
     useCanvasStore,
@@ -52,9 +53,6 @@ import type { FlowRole } from '@flows/flows';
 import type { WebSocketMessage } from '@flows/socket';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
-const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[] }): string =>
-    JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? [] });
-
 const isPortTypeCompatible = (sourceType: string, targetType: string | undefined): boolean => {
     const target = targetType ?? 'any';
     return sourceType === 'any' || target === 'any' || sourceType.toLowerCase() === target.toLowerCase();
@@ -87,7 +85,6 @@ export const MobileFlowEditorPage = () => {
     const permissions = getPermissions(role);
 
     // Shared refs for cross-hook communication
-    const lastSavedStateRef = useRef<string | null>(null);
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
 
     // UI state
@@ -114,13 +111,11 @@ export const MobileFlowEditorPage = () => {
         handleApiKeySubmit,
         reBoot,
         updateUrl,
-    } = useMobileEditorBoot({ serializeWorkflowState, lastSavedStateRef });
+    } = useMobileEditorBoot();
 
     useMobileAutoSave({
         isAppReady,
         canSave: permissions.canSave,
-        serializeWorkflowState,
-        lastSavedStateRef,
         lastLocalUpdateTimestampRef,
     });
 
@@ -141,8 +136,6 @@ export const MobileFlowEditorPage = () => {
     );
 
     const { isSocketConnected, socketConnectionId, replayMessage } = useMobileSocketSync({
-        serializeWorkflowState,
-        lastSavedStateRef,
         lastLocalUpdateTimestampRef,
         canEdit: permissions.canEditStructure,
         onMessage: handleSocketMessage,
@@ -164,8 +157,6 @@ export const MobileFlowEditorPage = () => {
 
     const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleCreateNewFlow } = useMobileFlowActions({
         updateUrl,
-        serializeWorkflowState,
-        lastSavedStateRef,
         lastLocalUpdateTimestampRef,
     });
 
@@ -202,11 +193,9 @@ export const MobileFlowEditorPage = () => {
     const handleCloseStep = useCallback(async () => {
         if (useFlowsStore.getState().isAutoSaveEnabled) {
             const { nodes, connections } = useCanvasStore.getState();
-            const currentState = serializeWorkflowState({ nodes, connections });
-            if (currentState !== lastSavedStateRef.current) {
+            if (!diffAgainstBaseline({ nodes, connections }).isEmpty) {
                 lastLocalUpdateTimestampRef.current = Date.now();
-                const result = await saveCurrentFlow({ nodes, connections });
-                if (result.success) lastSavedStateRef.current = currentState;
+                await saveCurrentFlow({ nodes, connections });
             }
         }
         stepNav.closeStep();

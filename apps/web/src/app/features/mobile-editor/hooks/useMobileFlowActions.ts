@@ -3,16 +3,13 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { newNodeId, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { captureBaseline, newNodeId, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 
-import type { SerializeWorkflowFn } from './types';
 import type { NodeState } from '@flows/flows';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 interface UseMobileFlowActionsParams {
     updateUrl: (flowId: string | null) => void;
-    serializeWorkflowState: SerializeWorkflowFn;
-    lastSavedStateRef: React.MutableRefObject<string | null>;
     lastLocalUpdateTimestampRef: React.MutableRefObject<number | null>;
 }
 
@@ -23,13 +20,11 @@ interface UseMobileFlowActionsReturn {
     handleAddBlock: (type: string) => Promise<string | null>;
     handleExport: () => void;
     /** Creates new flow without confirm — for MobileNewFlowSheet */
-    handleCreateNewFlow: () => Promise<string | null>;
+    handleCreateNewFlow: () => void;
 }
 
 export const useMobileFlowActions = ({
     updateUrl,
-    serializeWorkflowState,
-    lastSavedStateRef,
     lastLocalUpdateTimestampRef,
 }: UseMobileFlowActionsParams): UseMobileFlowActionsReturn => {
     const { t } = useTranslation(['flows']);
@@ -41,37 +36,29 @@ export const useMobileFlowActions = ({
         lastLocalUpdateTimestampRef.current = Date.now();
         const result = await saveCurrentFlow({ nodes, connections });
         if (result.success) {
-            lastSavedStateRef.current = serializeWorkflowState({ nodes, connections });
             toast.success(t('flowEditor.savedAs', { flowName }));
             if (result.id !== currentFlowId) updateUrl(result.id);
         } else {
             toast.error(t('flowEditor.failedToSaveWorkflow'));
         }
-    }, [
-        saveCurrentFlow,
-        flowName,
-        currentFlowId,
-        updateUrl,
-        t,
-        serializeWorkflowState,
-        lastSavedStateRef,
-        lastLocalUpdateTimestampRef,
-    ]);
+    }, [saveCurrentFlow, flowName, currentFlowId, updateUrl, t, lastLocalUpdateTimestampRef]);
 
     const handleSelectFlow = useCallback(
         async (flowId: string) => {
             try {
                 const flowData = await loadFlowById(flowId);
                 if (flowData) {
-                    useCanvasStore.getState().loadWorkflow(flowData);
-                    lastSavedStateRef.current = serializeWorkflowState(flowData);
+                    const { loadWorkflow } = useCanvasStore.getState();
+                    loadWorkflow(flowData);
+                    const { nodes, connections } = useCanvasStore.getState();
+                    captureBaseline({ nodes, connections });
                 }
                 updateUrl(flowId);
             } catch {
                 toast.error(t('flowEditor.failedToLoadFlow'));
             }
         },
-        [loadFlowById, updateUrl, t, serializeWorkflowState, lastSavedStateRef]
+        [loadFlowById, updateUrl, t]
     );
 
     const handleAddBlock = useCallback(
@@ -105,12 +92,8 @@ export const useMobileFlowActions = ({
                 const { nodes: latestNodes, connections: latestConnections } = useCanvasStore.getState();
                 lastLocalUpdateTimestampRef.current = Date.now();
                 const saveResult = await saveCurrentFlow({ nodes: latestNodes, connections: latestConnections });
-                if (saveResult.success) {
-                    lastSavedStateRef.current = serializeWorkflowState({
-                        nodes: latestNodes,
-                        connections: latestConnections,
-                    });
-                    if (saveResult.id && saveResult.id !== currentFlowId) updateUrl(saveResult.id);
+                if (saveResult.success && saveResult.id && saveResult.id !== currentFlowId) {
+                    updateUrl(saveResult.id);
                 }
 
                 return nodeId;
@@ -120,16 +103,7 @@ export const useMobileFlowActions = ({
                 return null;
             }
         },
-        [
-            blockRegistry,
-            currentFlowId,
-            saveCurrentFlow,
-            updateUrl,
-            serializeWorkflowState,
-            lastSavedStateRef,
-            lastLocalUpdateTimestampRef,
-            t,
-        ]
+        [blockRegistry, currentFlowId, saveCurrentFlow, updateUrl, lastLocalUpdateTimestampRef, t]
     );
 
     const handleExport = useCallback(() => {
@@ -148,16 +122,14 @@ export const useMobileFlowActions = ({
     }, [flowName, currentFlowId, t]);
 
     /** Creates new flow without confirmation — for use by MobileNewFlowSheet */
-    const handleCreateNewFlow = useCallback(async (): Promise<string | null> => {
+    const handleCreateNewFlow = useCallback((): void => {
         useCanvasStore.getState().clearWorkflow();
-        lastSavedStateRef.current = serializeWorkflowState({ nodes: [], connections: [] });
-        const newId = await createNewFlow();
-        if (newId) {
-            updateUrl(newId);
-            toast.success(t('flowEditor.newFlowCreated'));
-        }
-        return newId;
-    }, [createNewFlow, updateUrl, t, serializeWorkflowState, lastSavedStateRef]);
+        // No server flow yet — the first save claims the ID, so the URL has nothing to
+        // point at until then.
+        createNewFlow();
+        updateUrl(null);
+        toast.success(t('flowEditor.newFlowCreated'));
+    }, [createNewFlow, updateUrl, t]);
 
     return {
         handleSave,
