@@ -183,14 +183,36 @@ S6 구현 시 주의: `loadWorkflow`가 undo 히스토리를 지우므로(`Workf
 
 **→ 체크포인트: AC 1(부분)/2/3/5/6 데모 가능**
 
-- [ ] **S6 — R5: 실행 게이트 + editor 경고** (P1) ← **다음. 🔴 실행 회귀를 닫는 슬라이스**
-    - R5-a: dirty면 저장 확인 → save 완료 후 run. 거부 시 중단. `diffAgainstBaseline`(S5) 사용
-    - R5-b: editor + `hasStructuralChange` → 유실 경고 (**로컬 재현 불가, DEV 검증** — C11)
-    - **owner/editor 분기 필수** (착수 조건 2): save-before-run은 owner만 고친다. editor의 구조 변경은 서버가 버리므로 save 200 → run 여전히 404 → *처리한 척*만 한다. `hasStructuralChange`로 차단/경고
-    - **D-C 잔여분**: editor 구조 save 후 `loadFlow` 재호출로 baseline만 서버 진실로 재설정 (**캔버스는 재로드하지 말 것** — 작업본 유실 + undo 히스토리 삭제 `WorkflowCanvas.tsx:813-814`). 단 재로드 스냅샷도 정규화 경로를 타야 함(착수 조건 1) — 원본 응답을 그대로 baseline으로 쓰면 영구 dirty
-    - C5 해소 확인: `buildRunBody`가 `{}` 반환해도 config가 서버에 있음
-    - 검증: **AC4**
+- [x] **S6 — R5: 실행 게이트 + editor 경고** (P1) ✅ 2026-07-17 — **🔴 실행 회귀 닫힘 (코드 상)**
+    - `libs/flows/src/workspace/runGate.ts`: 순수 `runRequirement(graph)` → `'ready' | 'needs-save' | 'editor-structure'`
+    - `apps/web/.../hooks/useRunGate.ts`: confirm + save + toast (i18n/토스트가 `libs/flows`에 **없어서** 결정은 libs, UI는 apps — 확인함)
+    - **게이트 위치 = 사용자 발동 지점만.** 소켓 READY 연쇄 실행(`useSocketHandlers.ts:184`, `useMobileSocketSync.ts:151`)은 **의도적으로 비게이트** — 실행 중 확인창은 말이 안 되고, 서버가 그 메시지를 보냈다는 것 자체가 노드를 안다는 증거. 그래서 공유 `executeNode`가 아니라 트리거에 게이트(`triggerNode` 래퍼 + `onBeforeRun` prop)
+    - 배선 5곳: 데스크톱 노드 실행(:2438/:2538 → `triggerNode`), 데스크톱 Run All, 모바일 Run All, 모바일 `handleRunNode`, `MobileStepDetail.handleRun`
+    - **R5-b**: `willDropStructure`를 `baseline.ts`로 추출 → `rebaseline`(경고 신호 반환)과 `runRequirement`가 **같은 술어 하나**를 공유. `saveCurrentFlow`가 `structureDropped` 반환 → 명시적 save에서 "설정만 저장됨" 경고 (성공 토스트를 **대체** — 둘 다 띄우면 모순)
+    - i18n 키 3개 추가 (ko/en `flowEditor.*`)
     - blocked-by: S5 ✅
+
+    **D-C 폐기 (정정 2회차).** S5에서 "S6로 이월"했으나, 이월분도 **불필요**로 결론. 판별식: 재로드가 정합성을 고치는가, auto-save 효율만 고치는가?
+    | | baseline | 작업본 | 결과 |
+    | --- | --- | --- | --- |
+    | S5 decline | `{옛 노드, 옛 config}` | `{+새 노드, 새 config}` | dirty |
+    | D-C 재로드 | `{옛 노드, 새 config}` | `{+새 노드, 새 config}` | **dirty** |
+    양쪽 다 dirty·양쪽 다 실행 차단. 재로드의 유일한 효과 = config가 clean으로 읽혀 다음 auto-save 틱에 재전송 안 함 = **이미 실행이 막힌 사용자를 위한 멱등 save 효율**. 정합성 아님. S5의 decline이 false-clean(진짜 유실 위험)을 이미 죽였다 = D-C의 존재 이유. 대가는 editor 구조 save마다 GET 1회 + 정규화 재구현(착수 조건 1 재발). **D-D 착수 시 구체적 필요가 생기면 재검토** — 단 그때도 editor는 정당하게 dirty라 재로드가 D-D를 구해주지도 않는다.
+
+    **🐛 어드바이저가 잡은 함정 (내 설계는 이걸 밟고 있었다)**: 신규 flow(`flowId=null`) → 노드 추가 → Run All → 게이트가 save → flow 생성 → `setCurrentFlowId`. 그런데 `runAll`은 `WorkflowCanvas:1057`의 **useMemo 클로저에 잡힌 `flowId`**를 읽는다 → zustand 쓰기가 아직 리렌더 안 됨 → **`flowId=null` → `if (!flowId) return` → 조용히 아무것도 안 함**. 정확히 신규 flow 경로에서만. `useMobileRunAll`도 동일. → **실행 시점에 `useFlowsStore.getState().currentFlowId`를 새로 읽도록** 수정(desktop + mobile + 모바일 단일 노드 2곳). 캔버스 자체 `flowId`는 `loadWorkflow`만 갱신하고 save는 그걸 안 부르므로 대안 안 됨. 단일 노드 실행은 `runNode(nodeId)`가 flowId 불필요 + 클라 ID가 save 전후 동일이라 **원래 무사**
+
+    **결과**: `yarn lint` 에러 0 / 9개 프로젝트, 빌드 green, **137 → 147 테스트 green** (`runGate.spec.tsx` 10개 신규)
+
+    **뮤테이션 테스트 3/3 사살**:
+    | 뮤테이션 | 결과 |
+    | --- | --- |
+    | `editor-structure` → `needs-save`로 붕괴 (= save-then-404) | 2개 실패 ✅ |
+    | confirm 거부를 무시 | 1개 실패 ✅ |
+    | save 실패해도 실행 강행 | 1개 실패 ✅ |
+
+    ⚠️ **테스트 기대값 2개 수정** — `saveCurrentFlow` 반환에 `structureDropped` 추가로 `toEqual`이 낡음. 실패를 숨긴 게 아니라 **계약 변경이 맞다**(loop-engineering 금지 조항 해당 없음)
+
+    ❗ **미검증**: 실제 404 회피 = 인증 필요 → DEV 스모크. R5-b는 C11로 **로컬 재현 불가**(localhost 예외) → DEV 필수
 
 - [ ] **S7 — R6: 로컬 지속성 + 오프라인** (P1)
     - working + baseline + flowId → localStorage (IndexedDB 폴백)
@@ -237,7 +259,10 @@ S6 구현 시 주의: `loadWorkflow`가 undo 히스토리를 지우므로(`Workf
 
 ## 5. 위험 등록부
 
-### 🔴 S3가 연 것 — 미저장 노드 실행이 깨져 있다 (S6까지 존속)
+### ✅ S3가 연 것 — S6에서 닫혔다 (코드 상. DEV 스모크로 확인 필요). 아래는 원 기록
+
+> **닫힘 (2026-07-17, S6 `483326a`)**: 사용자 발동 실행 5곳이 전부 `useRunGate`를 통과 — dirty면 save 후 실행, 거부/실패 시 중단. editor 구조 변경은 save로 못 고치므로 차단 + 경고.
+> **단 코드 상 닫힘일 뿐** — 실제 404 회피는 인증이 필요해 결정적 스위트가 못 본다. 아래 DEV 스모크 체크리스트가 최종 게이트.
 
 S3가 실행 전 `flushPendingUpdates`/`flushPendingEdges` 대기를 제거했다. **그 대기의 존재 이유가 "실행 전 서버가 새 노드를 알게 보장"이었다.**
 이제: 노드 추가 → 저장 없이 실행 → `POST /nodes/<클라ID>/run` → **서버에 없는 ID → 404**.
@@ -306,6 +331,14 @@ S5 배선은 **구성 + 단위로만 검증됨**(로드 4곳이 `captureBaseline
 - [ ] 저장 → 새로고침 → 노드 ID 동일 (**AC3**, S3부터 미검증)
 - [ ] editor(비소유자) 계정으로 노드 추가 → S6 경고/차단 동작 (**C11: 로컬 재현 불가**)
 - [ ] undo/redo (S2부터 미검증 — `/tutorial`에서 도달 불가)
+
+**S6이 추가한 항목** (🔴 회귀가 실제로 닫혔는지):
+
+- [ ] **노드 추가 → 저장 없이 실행** → 확인창 → 저장 후 실행 **성공** (404 아님). = 회귀 종료 확인. **auto-save OFF로 할 것** (기본값이자 깨진 경로였음)
+- [ ] 확인창 **거부** → 실행 안 됨, save 요청 0회
+- [ ] **신규 flow(`/editor`) → 노드 추가 → Run All** → 저장·flow 생성 후 **실제로 실행됨** (조용히 no-op 아님 ← 어드바이저가 잡은 stale flowId 함정). **모바일도 동일 확인**
+- [ ] 실행 중 소켓 READY 연쇄 → 확인창 **안 뜸** (비게이트가 유지되는지)
+- [ ] editor로 config만 편집 → 실행 → 확인창 → 저장 → 실행 성공 (`editor-structure`로 잘못 막지 않는지)
 
 ### 기타
 
