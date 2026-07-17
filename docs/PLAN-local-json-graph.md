@@ -104,12 +104,19 @@ S6 구현 시 주의: `loadWorkflow`가 undo 히스토리를 지우므로(`Workf
     - blocked-by: 없음
     - **결과**: `apps/web/src/__tests__/createCanvasStore.spec.ts` 5개 green (양방향 격리 + 드래프트 2개 독립 + 액션 표면 동일). 전체 91개 green, 빌드 green, eslint 0, tsc 신규 에러 0 (기존 2개는 줄만 4→5/366→368로 밀림). 소비자 코드 변경 0줄.
 
-- [ ] **S2 — R1b: WorkflowCanvas nodes/connections → store** (P0, 최대 위험)
-    - **범위 한정**: `nodes`(:259) + `connections`(:260)만. UI state는 로컬 유지 (근거 아래)
-    - `nodesRef`/`connectionsRef` 미러(:269-272) 제거 → `useCanvasStore.getState()`로 대체
-    - `WorkflowCanvasRef` 18개 메서드 시그니처 **불변** — 이관 전 계약 테스트로 못박기
-    - 검증: **AC6** — store 직접 변경 → 캔버스 리렌더. ref 계약 테스트 green
+- [x] **S2 — R1b: WorkflowCanvas nodes/connections → store** (P0, 최대 위험) ✅ 2026-07-17
+    - **범위 한정**: `nodes`(:259) + `connections`(:260)만. UI state는 로컬 유지 (근거 §4)
+    - **로컬 이름 유지 전략**: `nodes`/`connections`/`setNodes`/`setConnections` 이름을 그대로 두고 **출처만** 교체 → ~40개 호출처 무편집. 실제 변경 = 선언 4줄 + import 2줄
+    - **`nodesRef`/`connectionsRef` 미러는 존치** (초안에서 변경). 제거하면 읽기 시점이 render-snapshot → live로 바뀌는데 `executeNode`는 레이스 수정 이력 지점(obs 3948/4439). R1이 요구한 변경 아님 = S2 범위 밖. `nodesRef.current = nodes`는 `nodes` 출처만 바뀌면 의미 동일
+    - **마운트 리셋 미도입**: `FlowEditorRouter`가 `useIsMobile()`로 데스크톱/모바일을 런타임 스왑 → 스토어 공유가 오히려 이득(스왑 시 그래프 유지). 리셋은 투기적 코드
+    - `WorkflowCanvasRef` 18개 메서드 시그니처 **불변**
     - blocked-by: S1
+    - **결과**: 91개 green, 빌드 green, eslint 0
+    - ⚠️ **검증 한계**: 결정적 스위트가 이 슬라이스의 위험면을 **안 건드린다** (nodes/connections/history를 타는 테스트 0개 — 위 Verifier 박스 참조). 그래서 `/tutorial`(인증 불필요, `TutorialPage`가 `WorkflowCanvasRef` 보유)에서 실브라우저 확인:
+        - 로드 시 노드 2개 실렌더 + 줌/미니맵/flow명 정상
+        - 블록 추가 → 2→3 리렌더. `nodes`의 유일한 출처가 `useCanvasNodes()`이므로 **3개 렌더 = 스토어에 3개** (구성상 확정) → **AC6 충족**
+        - 콘솔 error 0 / 26 messages
+    - ❗ **미검증(인증 필요)**: 드래그, undo/redo, executeNode, runAll, 소켓 경로 — 전부 `FlowEditorPage` 구동이라 `/tutorial`에서 안 탄다. **DEV 수동 스모크 필요**
 
 - [ ] **S3 — R2: 클라 ID + 철거** (P0)
     - `libs/flows/src/utils/graphId.ts` 신설 (D-A)

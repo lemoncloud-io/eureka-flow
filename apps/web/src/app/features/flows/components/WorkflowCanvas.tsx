@@ -25,6 +25,8 @@ import {
     upsertFlow,
     upsertPortNode,
     useBlockRegistry,
+    useCanvasConnections,
+    useCanvasNodes,
     useCanvasStore,
     useCollapsedNodeIds,
     useEdgeSync,
@@ -256,8 +258,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             flowId: flowId ?? null,
         });
 
-        const [nodes, setNodes] = useState<NodeData[]>([]);
-        const [connections, setConnections] = useState<Connection[]>([]);
+        // The graph lives in the store so non-React code can read and drive the canvas;
+        // writing to it re-renders here. Everything below stays component-local.
+        const nodes = useCanvasNodes();
+        const connections = useCanvasConnections();
+        const setNodes = useCanvasStore(state => state.setNodes);
+        const setConnections = useCanvasStore(state => state.setConnections);
+
         const [clipboard, setClipboard] = useState<NodeData[]>([]);
         const [resizingNode, setResizingNode] = useState<{ nodeId: string; width: number } | null>(null);
 
