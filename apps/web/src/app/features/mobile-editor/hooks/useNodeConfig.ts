@@ -5,7 +5,7 @@ import { getPermissions, useBlockRegistry, useCanvasStore } from '@flows/flows';
 import type { FlowRole } from '@flows/flows';
 import type { NodeConfigItem, NodeData } from '@lemoncloud/eureka-flows-api';
 
-export const useNodeConfig = (nodeId: string | null, flowId: string | null, role: FlowRole) => {
+export const useNodeConfig = (nodeId: string | null, role: FlowRole) => {
     const node = useCanvasStore(state => (nodeId ? state.nodes.find(n => n.id === nodeId) : undefined));
     const blockRegistry = useBlockRegistry();
     const [customLabel, setCustomLabel] = useState('');

@@ -489,10 +489,7 @@ export const FlowEditorPage = () => {
         canvasRef.current?.addNode(type);
     }, []);
 
-    const handleBeforeRun = useCallback(async (): Promise<boolean> => {
-        const data = canvasRef.current?.getWorkflow();
-        return data ? runGate(data) : false;
-    }, [runGate]);
+    const handleBeforeRun = useCallback(async (): Promise<boolean> => Boolean(await runGate()), [runGate]);
 
     const handleRunAll = useCallback(async () => {
         if (!(await handleBeforeRun())) return;

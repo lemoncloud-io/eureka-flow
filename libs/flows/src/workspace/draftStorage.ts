@@ -28,30 +28,47 @@ const STORE_NAME = 'drafts';
  */
 const DRAFT_KEY = 'current';
 
-const openDb = (): Promise<IDBDatabase> =>
-    new Promise((resolve, reject) => {
+/** Held open across writes — they land on a debounce while someone types, and a fresh
+ *  handshake each time buys nothing. Dropped on failure so the next call can retry. */
+let dbPromise: Promise<IDBDatabase> | null = null;
+
+const openDb = (): Promise<IDBDatabase> => {
+    dbPromise ??= new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, 1);
         request.onupgradeneeded = () => request.result.createObjectStore(STORE_NAME);
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
+    }).catch(error => {
+        dbPromise = null;
+        throw error;
     });
+    return dbPromise;
+};
 
 const withStore = async <T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> => {
     const db = await openDb();
-    try {
-        return await new Promise<T>((resolve, reject) => {
-            const request = run(db.transaction(STORE_NAME, mode).objectStore(STORE_NAME));
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-    } finally {
-        db.close();
-    }
+    return new Promise<T>((resolve, reject) => {
+        const request = run(db.transaction(STORE_NAME, mode).objectStore(STORE_NAME));
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
 };
+
+/**
+ * Whether the store holds anything, so a clear that would delete nothing can skip the
+ * database entirely. A run rewrites node status continuously and every burst ends in a
+ * clear, since none of that churn is work worth keeping.
+ *
+ * Starts unknown rather than false: a draft from a previous session is exactly what the
+ * next boot is looking for, and a read is what settles it.
+ */
+let hasDraft: boolean | null = null;
 
 export const readDraft = async (): Promise<FlowDraft | null> => {
     try {
-        return (await withStore('readonly', store => store.get(DRAFT_KEY))) ?? null;
+        const draft = (await withStore<FlowDraft | undefined>('readonly', store => store.get(DRAFT_KEY))) ?? null;
+        hasDraft = draft !== null;
+        return draft;
     } catch {
         return null;
     }
@@ -60,14 +77,17 @@ export const readDraft = async (): Promise<FlowDraft | null> => {
 export const writeDraft = async (draft: FlowDraft): Promise<void> => {
     try {
         await withStore('readwrite', store => store.put(draft, DRAFT_KEY));
+        hasDraft = true;
     } catch {
         console.warn('[draftStorage] Could not keep a local copy of this flow');
     }
 };
 
 export const clearDraft = async (): Promise<void> => {
+    if (hasDraft === false) return;
     try {
         await withStore('readwrite', store => store.delete(DRAFT_KEY));
+        hasDraft = false;
     } catch {
         /* nothing to clean up if the store will not open */
     }

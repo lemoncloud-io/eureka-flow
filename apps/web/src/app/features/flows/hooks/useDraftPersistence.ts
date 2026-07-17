@@ -6,11 +6,7 @@ import { clearDraft, draftFor, useCanvasStore, writeDraft } from '@flows/flows';
 const DRAFT_DELAY = 800;
 
 interface UseDraftPersistenceParams {
-    /**
-     * Editor pages opt in; nothing else may. The tutorial drives the same canvas store
-     * with its own demo flow and no flow id, so an always-on subscription would file that
-     * as an unsaved new flow and offer it back on the next visit to the editor.
-     */
+    /** Whether this mount is ready and allowed to persist — boot has finished and the user could save. */
     enabled: boolean;
 }
 
@@ -19,6 +15,10 @@ interface UseDraftPersistenceParams {
  *
  * Auto-save defaults to off, so this is the only thing standing between an unsaved flow
  * and a refresh.
+ *
+ * Editor pages mount this; nothing else does, and that is deliberate. The tutorial drives
+ * the same canvas store with a demo flow and no flow id, so anything always-on would file
+ * that as an unsaved new flow and offer it back on the next visit to the editor.
  */
 export const useDraftPersistence = ({ enabled }: UseDraftPersistenceParams): void => {
     const timerRef = useRef<number | null>(null);

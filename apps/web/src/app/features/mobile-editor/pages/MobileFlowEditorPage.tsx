@@ -211,15 +211,14 @@ export const MobileFlowEditorPage = () => {
     }, [stepNav, saveCurrentFlow]);
 
     const handleRunNode = useCallback(
-        async (nodeId: string) => {
-            const { nodes, connections } = useCanvasStore.getState();
-            if (!(await runGate({ nodes, connections }))) return;
+        async (nodeId: string, options?: { propagate?: boolean }) => {
+            const runFlowId = await runGate();
+            if (!runFlowId) return;
             await executeNodeWithToast(nodeId, {
-                // A new flow claims its id in the save the gate just made, so read it now
-                // rather than trusting what this callback closed over.
-                flowId: useFlowsStore.getState().currentFlowId,
+                flowId: runFlowId,
                 socketConnectionId,
                 canEdit: permissions.canEditStructure,
+                propagate: options?.propagate,
             });
         },
         [runGate, socketConnectionId, permissions.canEditStructure]
@@ -432,9 +431,8 @@ export const MobileFlowEditorPage = () => {
             {/* Full-screen step detail */}
             <MobileStepDetail
                 nodeId={stepNav.activeNodeId}
-                flowId={currentFlowId}
-                socketConnectionId={socketConnectionId}
                 role={role}
+                onRun={handleRunNode}
                 onClose={handleCloseStep}
                 onOpenOutputConnection={connectionMode.openForPort}
                 onOpenInputConnection={connectionMode.openForInputPort}

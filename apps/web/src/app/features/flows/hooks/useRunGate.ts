@@ -3,49 +3,52 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { runRequirement, useFlows } from '@flows/flows';
-
-import type { GraphLike } from '@flows/flows';
+import { runRequirement, useCanvasStore, useFlows, useFlowsStore } from '@flows/flows';
 
 /**
- * Clears a graph for running, saving it first if the server has not seen it yet.
+ * Clears the canvas for running, saving it first if the server has not seen it yet.
  *
- * Returns false when the run must not go ahead — either the user declined the save, the
- * save failed, or saving could not have helped. Callers stop on false rather than firing a
- * run the server would reject.
+ * Returns the flow's id, or null when the run must not go ahead — the user declined the
+ * save, the save failed, or saving could not have helped. Callers stop on null rather than
+ * firing a run the server would reject.
  *
- * Only user-initiated runs go through here. A run continuing through the canvas on a
- * socket READY message must not, both because a prompt mid-run is absurd and because the
- * server sending that message is proof it already knows the node.
+ * The id comes back because this is what mints it: a flow with no id gets one from the
+ * save that happens here, and the store write behind it has not re-rendered anyone by the
+ * time this returns. Callers reading `currentFlowId` themselves would each get the stale
+ * one, which on a brand-new flow is null.
+ *
+ * Only user-initiated runs come through here. A run continuing on a socket READY message
+ * must not, both because a prompt mid-run is absurd and because the server sending that
+ * message is proof it already knows the node.
  */
 export const useRunGate = () => {
     const { t } = useTranslation(['flows']);
     const { saveCurrentFlow } = useFlows();
 
-    return useCallback(
-        async (graph: GraphLike): Promise<boolean> => {
-            const requirement = runRequirement(graph);
-            if (requirement === 'ready') return true;
+    return useCallback(async (): Promise<string | null> => {
+        const { nodes, connections } = useCanvasStore.getState();
+        const graph = { nodes, connections };
 
-            if (requirement === 'editor-structure') {
-                toast.error(
-                    t(
-                        'flowEditor.runNeedsOwnerForStructure',
-                        'Added and deleted steps are not saved with editor access, so this flow cannot run. Ask the owner to make the change.'
-                    )
-                );
-                return false;
-            }
+        const requirement = runRequirement(graph);
+        if (requirement === 'ready') return useFlowsStore.getState().currentFlowId;
 
-            if (!window.confirm(t('flowEditor.confirmSaveBeforeRun', 'Save your changes and run?'))) return false;
+        if (requirement === 'editor-structure') {
+            toast.error(
+                t(
+                    'flowEditor.runNeedsOwnerForStructure',
+                    'Added and deleted steps are not saved with editor access, so this flow cannot run. Ask the owner to make the change.'
+                )
+            );
+            return null;
+        }
 
-            const result = await saveCurrentFlow(graph);
-            if (!result.success) {
-                toast.error(t('flowEditor.failedToSaveWorkflow'));
-                return false;
-            }
-            return true;
-        },
-        [saveCurrentFlow, t]
-    );
+        if (!window.confirm(t('flowEditor.confirmSaveBeforeRun', 'Save your changes and run?'))) return null;
+
+        const result = await saveCurrentFlow(graph);
+        if (!result.success) {
+            toast.error(t('flowEditor.failedToSaveWorkflow'));
+            return null;
+        }
+        return result.id;
+    }, [saveCurrentFlow, t]);
 };

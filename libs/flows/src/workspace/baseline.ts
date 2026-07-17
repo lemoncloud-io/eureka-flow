@@ -29,9 +29,12 @@ export const captureBaseline = (graph: GraphLike): void => {
  * this is the only warning the client gets — hence one predicate, read both by the save
  * that must not trust its own success and by the run that must not be attempted.
  */
-export const willDropStructure = (diff: FlowDiff): boolean => {
+export const willDropStructure = (diff: FlowDiff): boolean => isNonOwnerEditor() && hasStructuralChange(diff);
+
+/** Only a non-owner editor's writes go through the overlay the server drops structure from. */
+const isNonOwnerEditor = (): boolean => {
     const { isEditable, hasOwned } = useFlowsStore.getState();
-    return isEditable && !hasOwned && hasStructuralChange(diff);
+    return isEditable && !hasOwned;
 };
 
 /**
@@ -52,7 +55,10 @@ export const willDropStructure = (diff: FlowDiff): boolean => {
  */
 export const rebaseline = (sent: FlowSnapshot): boolean => {
     const { baseline, setBaseline } = useFlowsStore.getState();
-    const dropped = willDropStructure(diffSnapshots(sent, baseline ?? emptySnapshot()));
+    // Ask who is saving before diffing, not after. Only a non-owner editor can have their
+    // structure dropped, so for everyone else the diff is built and thrown away — and
+    // with an unsaved image in config that is megabytes of string per save.
+    const dropped = isNonOwnerEditor() && willDropStructure(diffSnapshots(sent, baseline ?? emptySnapshot()));
     if (!dropped) setBaseline(sent);
     return dropped;
 };

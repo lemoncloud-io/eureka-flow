@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { captureBaseline, runRequirement, useFlowsStore } from '@flows/flows';
+import { captureBaseline, runRequirement, useCanvasStore, useFlowsStore } from '@flows/flows';
 
 import { useRunGate } from '../app/features/flows/hooks/useRunGate';
 
@@ -73,7 +73,8 @@ describe('runRequirement', () => {
 });
 
 describe('useRunGate', () => {
-    const graph = { nodes: [node('n01'), node('n02')], connections: [] };
+    /** The gate reads the live canvas, so put the graph where it will look. */
+    const onCanvas = (nodes: NodeData[]) => useCanvasStore.getState().loadWorkflow({ nodes, connections: [] } as never);
 
     beforeEach(() => {
         postMock.mockReset();
@@ -82,13 +83,15 @@ describe('useRunGate', () => {
         useFlowsStore.setState({ currentFlowId: '1008888', blockRegistry: registry, baseline: null });
         asOwner();
         captureBaseline({ nodes: [node('n01')], connections: [] });
+        onCanvas([node('n01'), node('n02')]);
         vi.restoreAllMocks();
     });
 
-    it('lets a clean graph through without saving', async () => {
+    it('hands back the flow id for a clean graph, without saving', async () => {
+        onCanvas([node('n01')]);
         const { result } = renderHook(() => useRunGate(), { wrapper: createWrapper() });
 
-        await expect(result.current({ nodes: [node('n01')], connections: [] })).resolves.toBe(true);
+        await expect(result.current()).resolves.toBe('1008888');
         expect(postMock).not.toHaveBeenCalled();
     });
 
@@ -96,15 +99,27 @@ describe('useRunGate', () => {
         vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { result } = renderHook(() => useRunGate(), { wrapper: createWrapper() });
 
-        await expect(result.current(graph)).resolves.toBe(true);
+        await expect(result.current()).resolves.toBe('1008888');
         expect(postMock).toHaveBeenCalledOnce();
+    });
+
+    it('hands back the id a brand-new flow just claimed, not the null it started with', async () => {
+        // The save mints the id, and the store write behind it has not re-rendered anyone
+        // yet — so a caller reading currentFlowId itself would get null and quietly skip
+        // the run. This is the whole reason the gate returns it.
+        useFlowsStore.setState({ currentFlowId: null, baseline: null });
+        postMock.mockResolvedValue({ data: { id: '1009999' } });
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        const { result } = renderHook(() => useRunGate(), { wrapper: createWrapper() });
+
+        await expect(result.current()).resolves.toBe('1009999');
     });
 
     it('stops the run when the user declines, and saves nothing', async () => {
         vi.spyOn(window, 'confirm').mockReturnValue(false);
         const { result } = renderHook(() => useRunGate(), { wrapper: createWrapper() });
 
-        await expect(result.current(graph)).resolves.toBe(false);
+        await expect(result.current()).resolves.toBeNull();
         expect(postMock).not.toHaveBeenCalled();
     });
 
@@ -114,7 +129,7 @@ describe('useRunGate', () => {
         postMock.mockRejectedValue(new Error('network down'));
         const { result } = renderHook(() => useRunGate(), { wrapper: createWrapper() });
 
-        await expect(result.current(graph)).resolves.toBe(false);
+        await expect(result.current()).resolves.toBeNull();
     });
 
     it('stops a non-owner editor without saving, and says why', async () => {
@@ -122,7 +137,7 @@ describe('useRunGate', () => {
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { result } = renderHook(() => useRunGate(), { wrapper: createWrapper() });
 
-        await expect(result.current(graph)).resolves.toBe(false);
+        await expect(result.current()).resolves.toBeNull();
         expect(postMock).not.toHaveBeenCalled();
         expect(confirmSpy).not.toHaveBeenCalled();
         expect(toastError).toHaveBeenCalledOnce();

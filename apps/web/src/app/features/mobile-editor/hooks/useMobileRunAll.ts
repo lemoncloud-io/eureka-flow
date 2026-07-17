@@ -30,14 +30,7 @@ export const useMobileRunAll = ({ socketConnectionId }: UseMobileRunAllParams = 
     );
 
     const handleRunAll = useCallback(async () => {
-        const { nodes: working, connections } = useCanvasStore.getState();
-        if (!(await runGate({ nodes: working, connections }))) return;
-
-        // Read the id after the gate, not before: a flow with no id yet gets one from the
-        // save the gate just made, and that store write has not re-rendered this callback.
-        // The id it closed over is null, so the run would silently do nothing on exactly
-        // the new-flow path.
-        const runFlowId = useFlowsStore.getState().currentFlowId;
+        const runFlowId = await runGate();
         if (!runFlowId) return;
 
         const { nodes, updateNodeData } = useCanvasStore.getState();

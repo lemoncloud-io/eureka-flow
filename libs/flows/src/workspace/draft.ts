@@ -1,6 +1,5 @@
-import { diffAgainstBaseline } from './baseline';
 import { diffSnapshots } from './diff';
-import { toSnapshot } from './snapshot';
+import { emptySnapshot, toSnapshot } from './snapshot';
 import { useFlowsStore } from '../stores/useFlowsStore';
 
 import type { FlowSnapshot, GraphLike } from './snapshot';
@@ -32,10 +31,11 @@ export interface FlowDraft {
  * none of that is work anyone needs kept.
  */
 export const draftFor = (graph: GraphLike): FlowDraft | null => {
-    if (diffAgainstBaseline(graph).isEmpty) return null;
-
     const { currentFlowId, baseline, blockRegistry } = useFlowsStore.getState();
-    return { flowId: currentFlowId, working: toSnapshot(graph, blockRegistry), baseline };
+    const working = toSnapshot(graph, blockRegistry);
+    if (diffSnapshots(working, baseline ?? emptySnapshot()).isEmpty) return null;
+
+    return { flowId: currentFlowId, working, baseline };
 };
 
 /**
