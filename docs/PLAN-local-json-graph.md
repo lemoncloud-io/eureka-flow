@@ -112,11 +112,18 @@ S6 구현 시 주의: `loadWorkflow`가 undo 히스토리를 지우므로(`Workf
     - `WorkflowCanvasRef` 18개 메서드 시그니처 **불변**
     - blocked-by: S1
     - **결과**: 91개 green, 빌드 green, eslint 0
-    - ⚠️ **검증 한계**: 결정적 스위트가 이 슬라이스의 위험면을 **안 건드린다** (nodes/connections/history를 타는 테스트 0개 — 위 Verifier 박스 참조). 그래서 `/tutorial`(인증 불필요, `TutorialPage`가 `WorkflowCanvasRef` 보유)에서 실브라우저 확인:
-        - 로드 시 노드 2개 실렌더 + 줌/미니맵/flow명 정상
-        - 블록 추가 → 2→3 리렌더. `nodes`의 유일한 출처가 `useCanvasNodes()`이므로 **3개 렌더 = 스토어에 3개** (구성상 확정) → **AC6 충족**
-        - 콘솔 error 0 / 26 messages
-    - ❗ **미검증(인증 필요)**: 드래그, undo/redo, executeNode, runAll, 소켓 경로 — 전부 `FlowEditorPage` 구동이라 `/tutorial`에서 안 탄다. **DEV 수동 스모크 필요**
+    - ⚠️ **검증 한계**: 결정적 스위트가 이 슬라이스의 위험면을 **안 건드린다** (nodes/connections/history를 타는 테스트 0개 — 위 Verifier 박스 참조).
+    - **실브라우저 스모크 (`/tutorial`, 인증 불필요, `role="owner"`)** — 튜토리얼 모달은 `localStorage['eureka-flow-tutorial-completed']='true'`로 우회:
+      | 경로 | 결과 |
+      | --- | --- |
+      | `loadWorkflow` → 렌더 | 노드 2개 실렌더 + 줌/미니맵/flow명 정상 |
+      | `addNode` (블록 클릭) | 2→3 리렌더 |
+      | **드래그** (마우스 이벤트) | `left:200 top:250` → `left:300 top:360` (그리드 스냅 반영), 선택 `z-index:10` |
+      | **Delete 키** | 2→1 |
+      | 콘솔 | error **0** |
+      `nodes`의 유일한 출처가 `useCanvasNodes()`이므로 **렌더된 개수 = 스토어 개수** (구성상 확정) → **AC6 충족**.
+      드래그는 `dragStartSnapshotRef`(:1845), Delete는 `saveCheckpoint()`(:1631)를 타므로 **스토어 기반 `nodes`로부터의 체크포인트 캡처도 함께 검증됨**.
+    - ❗ **미검증**: undo/redo (TutorialPage Header가 `onUndo: noop`으로 스텁 → `/tutorial`에서 도달 불가. 다만 체크포인트 *캡처*는 위에서 검증됐고, pop → `setNodes` 경로의 `setNodes`도 검증됨 — 남은 미검증 구간은 pop 자체), executeNode/runAll/소켓 (백엔드 필요). **DEV 수동 스모크 권장**
 
 - [ ] **S3 — R2: 클라 ID + 철거** (P0)
     - `libs/flows/src/utils/graphId.ts` 신설 (D-A)
