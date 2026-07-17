@@ -56,7 +56,14 @@
 `diff()` 비교 대상 = `transformNodesForSave`가 남기는 것과 일치시킨다:
 `{ id, type, blockId, position, width, height, customLabel, description, config }` + edges.
 
-### D-C. editor 재베이스라인 → **(a) 서버 재로드** ✅ 확정 (2026-07-17)
+### D-C. editor 재베이스라인 → ~~(a) 서버 재로드~~ → **❌ 폐기 (2026-07-17, S6)**
+
+> **폐기.** 아래 분석은 "`baseline ← working`이 editor에서 false-clean을 만든다"까지는 옳았으나, **해법을 틀렸다.**
+> S5가 채택한 **"구조 변경이면 baseline을 아예 안 잡는다"**(`rebaseline`이 `willDropStructure`면 declines)가 false-clean을 이미 죽인다 — 재로드 없이.
+> 재로드를 추가해도 **양쪽 다 dirty로 끝난다**(§3 S6의 표 참조). 유일한 차이는 config가 clean으로 읽히는 것 = 이미 실행이 막힌 사용자를 위한 auto-save 멱등 효율. **정합성 아님.**
+> 대가: editor 구조 save마다 GET 1회 + 재로드 스냅샷의 정규화 재구현(착수 조건 1 재발). **D-D 착수 시 재검토.**
+>
+> 아래는 원 기록.
 
 `baseline ← working`은 **owner에서만** 옳다. editor(비소유자)는 서버가 config만 저장하고 구조를 버리므로, 노드 추가 → save 200 → `baseline←working` → `isDirty=false` → 리로드 시 노드 증발.
 
