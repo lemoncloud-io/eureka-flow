@@ -155,22 +155,42 @@ S6 구현 시 주의: `loadWorkflow`가 undo 히스토리를 지우므로(`Workf
     - 검증: diff 단위 테스트 (런타임 상태 변경 → `isEmpty` 유지)
     - blocked-by: S3
 
-- [ ] **S5 — R4: save 일원화 + flow 지연 생성** (P0)
-    - 부팅 시 `POST /flows/0/save` 제거 → 첫 save 때 발급
-    - save 성공 시 `baseline ← working` (owner) / D-C (editor)
-    - `setQueryData` 유지, `invalidateQueries` 금지 (CLAUDE.md)
-    - **`nodes: []`도 반드시 전송** (C8)
-    - 검증: **AC1** 부분 (새 플로우 오프라인 시작)
+- [x] **S5 — R4: save 일원화 + flow 지연 생성 + baseline 배선** (P0) ✅ 2026-07-17
+    - `initializeFlow`/`createNewFlow`의 즉시 `POST /flows/0/save` 제거 → 첫 save가 ID를 발급. `createNewFlow`는 이제 **동기 로컬 리셋**(`Promise<string|null>` → `void`) — 호출처 3곳(데스크톱 `handleNew`, 모바일 `handleCreateNewFlow`, `MobileNewFlowSheet`) 정리. 시트의 `isCreating` 스피너는 기다릴 게 없어져 삭제
+    - `libs/flows/src/workspace/baseline.ts` 신설: `captureBaseline` / `rebaseline` / `diffAgainstBaseline`
+    - **`lastSavedStateRef` 3곳 전부 교체** (계획대로 전부-아니면-전무): `FlowEditorPage`, `MobileFlowEditorPage`, `useSocketHandlers`. `serializeWorkflowState` 2벌 + `hooks/types.ts`(`SerializeWorkflowFn`) 삭제
     - blocked-by: S4
+
+    **착수 조건 3개 처리 결과**:
+    1. ✅ **정규화 후·blocks 로드 후 캡처** — 로드 경로 4곳 전부 캔버스/스토어의 작업본에서 baseline을 뜬다. `useSocketHandlers.ts:68`이 **원본 응답에서 뜨고 있었다** (정확히 이 함정) → 고침
+    2. **S6로 이월** (아래 D-C 정정 참조)
+    3. ✅ **전송 시점 캡처가 구조로 확정** — `rebaseline(saveBody)`가 *보낸 body*를 인자로 받는다. `saveCurrentFlow`는 그래프를 위해 라이브 스토어를 읽지 않으므로(`nodes`/`edgesData`는 `body`에서 await 이전에 캡처) **응답 시점 캡처가 불가능**하다. 테스트가 아니라 구성으로 배제됨
+
+    **D-C 정정 — editor 재로드는 S6로, `baseline←sent`는 S5에서 조건부로.**
+    초안은 S5에서 editor에게 `loadFlow` 재호출을 계획했다. 그러나 (a) 무조건 재로드는 config-only save(=서버가 다 받는 경우)에도 왕복 + undo 히스토리 삭제를 유발하고, (b) 재베이스라인은 캔버스 재로드가 **필요 없다** — baseline만 갈면 되고 작업본은 건드리면 안 된다(editor 작업 유실). 대신 S5는 **구조 변경 시 baseline을 안 잡는다**(dirty 유지 = 정직). 서버 재로드 + R5-b 경고는 S6.
+    ❗ **S6 게이트는 run 경로다, save 경로가 아니다** — editor는 `canSave: true`이고 auto-save는 `canSave`만 본다. 즉 S6 이후에도 editor의 구조 변경은 auto-save로 전송된다 → D-C는 S6가 대체하지 못한다. 상보적임
+
+    **결과**: `yarn lint` 에러 0 / 9개 프로젝트, 빌드 green, **126 → 137 테스트 green** (`baseline.spec.tsx` 11개 신규)
+
+    **뮤테이션 테스트 3회**:
+    | 뮤테이션 | 결과 |
+    | --- | --- |
+    | `rebaseline`의 editor 가드 제거 | 1개 실패 ✅ |
+    | `rebaseline(saveBody)` → `rebaseline(toSnapshot(nodes, ...))` | **0개 실패** — 의미 동일(둘 다 send-time). 구조상 등가라 뮤테이션이 아니었음 |
+    | `rebaseline`이 **응답 시점 라이브 캔버스**를 읽도록 | 3개 실패 ✅ (테스트 보강 후. 보강 전엔 0개 — 처음 쓴 in-flight 테스트는 이름값을 못 했다) |
+
+    ❗ **미검증**: `FlowEditorPage`/`useMobileEditorBoot`의 **boot 배선 자체**는 결정적 스위트가 못 탄다(인증 필요). 단위 테스트는 `captureBaseline` *의미*와 두 함정(원본 응답/registry 타이밍)이 실제로 dirty를 만든다는 것까지 고정했으나, 페이지가 그 함수를 **옳은 인자로** 부르는지는 **DEV 수동 검증 필요**. 수용 기준 재확인: 플로우 로드 → 무조작 → dirty 표시 없음 + save 요청 0회
 
 **→ 체크포인트: AC 1(부분)/2/3/5/6 데모 가능**
 
-- [ ] **S6 — R5: 실행 게이트 + editor 경고** (P1)
-    - R5-a: dirty면 저장 확인 → save 완료 후 run. 거부 시 중단
-    - R5-b: editor + 구조 diff → 유실 경고 (**로컬 재현 불가, DEV 검증** — C11)
+- [ ] **S6 — R5: 실행 게이트 + editor 경고** (P1) ← **다음. 🔴 실행 회귀를 닫는 슬라이스**
+    - R5-a: dirty면 저장 확인 → save 완료 후 run. 거부 시 중단. `diffAgainstBaseline`(S5) 사용
+    - R5-b: editor + `hasStructuralChange` → 유실 경고 (**로컬 재현 불가, DEV 검증** — C11)
+    - **owner/editor 분기 필수** (착수 조건 2): save-before-run은 owner만 고친다. editor의 구조 변경은 서버가 버리므로 save 200 → run 여전히 404 → *처리한 척*만 한다. `hasStructuralChange`로 차단/경고
+    - **D-C 잔여분**: editor 구조 save 후 `loadFlow` 재호출로 baseline만 서버 진실로 재설정 (**캔버스는 재로드하지 말 것** — 작업본 유실 + undo 히스토리 삭제 `WorkflowCanvas.tsx:813-814`). 단 재로드 스냅샷도 정규화 경로를 타야 함(착수 조건 1) — 원본 응답을 그대로 baseline으로 쓰면 영구 dirty
     - C5 해소 확인: `buildRunBody`가 `{}` 반환해도 config가 서버에 있음
     - 검증: **AC4**
-    - blocked-by: S5
+    - blocked-by: S5 ✅
 
 - [ ] **S7 — R6: 로컬 지속성 + 오프라인** (P1)
     - working + baseline + flowId → localStorage (IndexedDB 폴백)
@@ -248,7 +268,7 @@ S3가 실행 전 `flushPendingUpdates`/`flushPendingEdges` 대기를 제거했�
 
     ❗ 남은 미검증: `onChange → triggerAutoSave → saveCurrentFlow` 전체 체인은 `FlowEditorPage` 구동이라 인증 필요.
 
-### 🟠 S5 착수 조건 — baseline의 **출처와 시점** (S4의 순수 diff 테스트가 구조적으로 못 잡는 것)
+### ✅ S5 착수 조건 — 처리 완료 (2026-07-17). 아래는 착수 전 기록, 결과는 §3 S5 항목 참조
 
 S4의 diff 테스트는 양쪽을 같은 registry로 `snap()`하므로 아래 셋을 **원리상 볼 수 없다**. 전부 S5에서 착륙.
 
