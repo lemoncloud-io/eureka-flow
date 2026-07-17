@@ -248,6 +248,30 @@ S3가 실행 전 `flushPendingUpdates`/`flushPendingEdges` 대기를 제거했�
 
     ❗ 남은 미검증: `onChange → triggerAutoSave → saveCurrentFlow` 전체 체인은 `FlowEditorPage` 구동이라 인증 필요.
 
+### 🟠 S5 착수 조건 — baseline의 **출처와 시점** (S4의 순수 diff 테스트가 구조적으로 못 잡는 것)
+
+S4의 diff 테스트는 양쪽을 같은 registry로 `snap()`하므로 아래 셋을 **원리상 볼 수 없다**. 전부 S5에서 착륙.
+
+**S5의 수용 기준 = "방금 로드한 플로우가 clean으로 읽히는가".** 플로우 로드 → 아무것도 안 건드림 → `isDirty === false` **그리고 save 요청 0회.** 이게 S5 정합성의 전부다.
+
+1. **baseline은 정규화된 작업본에서, blockRegistry 로드 후에 떠야 한다** — 조용히 무는 놈.
+   `toSnapshot`은 `type: blockDef?.type ?? node.type`으로 매핑하고 `getNodeHeight`를 넣는다. `loadWorkflow`는 캔버스에 넣기 전 정규화한다(`config ?? {}`, `position ?? {x:0,y:0}`, `deduplicateEdges`).
+   → **원본 `loadFlow` 응답에서 baseline을 뜨면**, 또는 **blocks가 아직 안 실려 `blockRegistry`가 `{}`일 때 뜨면**, `type`/`position`/`height`/엣지 개수가 어긋나 **로드 직후 아무것도 안 건드렸는데 dirty로 읽힌다.**
+   연쇄: 로드마다 auto-save 발화 + D-D("dirty면 WS 업데이트 스킵")가 영구 오발화.
+   → baseline은 **캔버스가 실제로 받은 정규화 후 노드**에서, **blocks 로드 후에** 뜬다.
+   ✅ 하위 위험 해소: `getNodeHeight`는 순수함 (`node.height` / `node.config.textareaHeight`만 읽음, DOM 측정 없음) — 확인함.
+
+2. **실행 회귀는 S6에서 editor에겐 안 닫힌다** — 지금 결정할 것, 나중에 발견하지 말 것.
+   save-before-run은 **owner 경로**를 고친다(dirty → save → 서버가 노드를 알게 됨 → run 성공). 그러나 **비소유자 editor의 구조 변경은 서버가 조용히 버린다(C11)**. → editor가 노드 추가 → dirty → save "성공"(200) → **서버엔 여전히 그 노드 없음 → run이 그대로 404.**
+   save-before-run이 _처리한 것처럼 보이게_ 만들 뿐이다.
+   → **S6를 `hasStructuralChange`에 묶는다**(S4에서 정확히 이걸 위해 만들었다): editor + 구조 diff → 그 save는 구조를 영속화 못 하므로 run이 성공할 수 없다 → **save-then-404 대신 차단/경고**. owner가 깨끗한 경로.
+
+3. **`baseline ← 보낸 스냅샷`을, 응답 시점의 작업본이 아니라 전송 시점에 캡처.**
+   save는 비동기다. 전송 중 사용자가 편집했는데 응답 도착 시 `baseline = 현재 작업본`으로 잡으면, **그 편집이 "이미 저장됨"으로 표시돼 다음 diff에서 증발한다.**
+   → 보낸 body(`saveBody` — 이미 슬림 스냅샷이다)가 옳은 baseline. D-C의 owner/editor 분기와도 깔끔히 맞는다: owner → `baseline = 보낸 스냅샷`, editor → `baseline = 서버 재로드`(그들에겐 보낸 것 ≠ 저장된 것이므로).
+
+**`lastSavedStateRef` 교체 범위**: 3곳에 산다 — `FlowEditorPage`, 모바일 페이지, `useSocketHandlers`. `isDirty`로 바꾸려면 **셋 다 하거나 하나도 하지 말 것** — 반만 바꾸면 dirty 추적기 둘이 서로 다른 말을 한다. 그리고 "clean이면 저장 안 함" 게이트를 보존할 것 — 없애면 auto-save가 루프하거나 아예 안 뜬다.
+
 ### 기타
 
 | 위험                                                                                | 완화                                                |
