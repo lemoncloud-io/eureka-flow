@@ -36,6 +36,9 @@ import { ProductProgressBanner } from '../components/ProductProgressBanner';
 import { PublishDialog } from '../components/PublishDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
+import { useDraftPersistence } from '../hooks/useDraftPersistence';
+import { useDraftRecovery } from '../hooks/useDraftRecovery';
+import { useReconnectNotice } from '../hooks/useReconnectNotice';
 import { useRunGate } from '../hooks/useRunGate';
 import { useSocketHandlers } from '../hooks/useSocketHandlers';
 import { useSocketRecorder } from '../hooks/useSocketRecorder';
@@ -107,6 +110,7 @@ export const FlowEditorPage = () => {
     });
 
     const runGate = useRunGate();
+    const recoverDraft = useDraftRecovery();
     const socketRecorder = useSocketRecorder();
     const { record: recordSocketMessage } = socketRecorder;
     const refreshCredits = useCreditsRefresh();
@@ -193,6 +197,12 @@ export const FlowEditorPage = () => {
     const [devRoleOverride, setDevRoleOverride] = useState<FlowRole | null>(null);
     const role: FlowRole = devRoleOverride ?? computedRole;
     const permissions = getPermissions(role);
+
+    // Auto-save is off by default, so this is what stands between an unsaved flow and a
+    // refresh. Only for users who could save it: there is no unsaved work to keep for
+    // someone the server would not accept it from anyway.
+    useDraftPersistence({ enabled: isAppReady && permissions.canSave });
+    useReconnectNotice();
 
     const autoSaveTimerRef = useRef<number | null>(null);
 
@@ -328,6 +338,11 @@ export const FlowEditorPage = () => {
                             // it reads dirty against a flow nobody has touched, and every
                             // load would trip auto-save.
                             captureBaseline(canvasRef.current.getWorkflow());
+                            // Only now: the draft is judged against this baseline, and
+                            // before it exists every flow looks unsaved.
+                            await recoverDraft(working => {
+                                void canvasRef.current?.loadWorkflow(working);
+                            });
                         } catch (error) {
                             console.error('[FlowEditor] Failed to load workflow:', error);
                         }

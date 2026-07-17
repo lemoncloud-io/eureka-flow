@@ -12,6 +12,8 @@ import {
 } from '@flows/flows';
 import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 
+import { useDraftRecovery } from '../../flows/hooks/useDraftRecovery';
+
 interface UseMobileEditorBootReturn {
     isAppReady: boolean;
     loadingText: string;
@@ -27,6 +29,7 @@ export const useMobileEditorBoot = (): UseMobileEditorBootReturn => {
     const { t } = useTranslation(['flows']);
     const { loadBlocks } = useBlocks();
     const { initializeFlow, loadFlowById } = useFlows();
+    const recoverDraft = useDraftRecovery();
     const { apiKey, setApiKey } = useWebCoreStore();
 
     const [isAppReady, setIsAppReady] = useState(false);
@@ -115,6 +118,10 @@ export const useMobileEditorBoot = (): UseMobileEditorBootReturn => {
                 const { nodes, connections } = useCanvasStore.getState();
                 captureBaseline({ nodes, connections });
             }
+
+            // After the baseline: the draft is judged against it, and before it exists
+            // every flow looks unsaved.
+            await recoverDraft(working => useCanvasStore.getState().loadWorkflow(working));
 
             if (loadedId) {
                 updateUrl(loadedId);

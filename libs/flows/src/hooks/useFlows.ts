@@ -13,7 +13,7 @@ import {
 } from './queries';
 import { useFlowsStore } from '../stores/useFlowsStore';
 import { flowStorage } from '../utils/flowStorage';
-import { emptySnapshot, rebaseline, toSnapshot } from '../workspace';
+import { clearDraft, emptySnapshot, rebaseline, toSnapshot } from '../workspace';
 
 import type { SaveStatus } from '../stores/useFlowsStore';
 import type { LoadFlowResult, SaveFlowBody, UpdateFlowBody } from '../types';
@@ -287,6 +287,12 @@ export const useFlows = () => {
                 }
 
                 const structureDropped = rebaseline(saveBody);
+
+                // The server has it now, so the local copy has nothing left to protect.
+                // Leaving it would offer to recover work that is already saved on the next
+                // boot. A dropped structure is the exception: that work really is still
+                // only here, so the draft stays as the one place it survives a refresh.
+                if (!structureDropped) void clearDraft();
 
                 setLastSavedAt(new Date());
                 updateSaveStatus('success');

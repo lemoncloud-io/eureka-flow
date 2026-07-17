@@ -24,7 +24,9 @@ import { AiKeyDialog } from '../../flows/components/AiKeyDialog';
 import { ContentPreviewModal } from '../../flows/components/ContentPreviewModal';
 import { DevSocketPanel } from '../../flows/components/DevSocketPanel';
 import { FlowListDialog } from '../../flows/components/FlowListDialog';
+import { useDraftPersistence } from '../../flows/hooks/useDraftPersistence';
 import { useProductProgressToasts } from '../../flows/hooks/useProductProgressToasts';
+import { useReconnectNotice } from '../../flows/hooks/useReconnectNotice';
 import { useRunGate } from '../../flows/hooks/useRunGate';
 import { useSocketRecorder } from '../../flows/hooks/useSocketRecorder';
 import {
@@ -119,6 +121,11 @@ export const MobileFlowEditorPage = () => {
         canSave: permissions.canSave,
         lastLocalUpdateTimestampRef,
     });
+
+    // Auto-save is off by default, so this is what stands between an unsaved flow and a
+    // refresh. Only for users who could save it.
+    useDraftPersistence({ enabled: isAppReady && permissions.canSave });
+    useReconnectNotice();
 
     const socketRecorder = useSocketRecorder();
     const { record: recordSocketMessage } = socketRecorder;

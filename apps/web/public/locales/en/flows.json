@@ -267,7 +267,10 @@
         "failedToRunFlow": "Failed to run flow",
         "confirmSaveBeforeRun": "Save your changes and run?",
         "runNeedsOwnerForStructure": "Added and deleted steps are not saved with editor access, so this flow cannot run. Ask the owner to make the change.",
-        "savedWithoutStructure": "Saved the step settings only. Added and deleted steps need owner access."
+        "savedWithoutStructure": "Saved the step settings only. Added and deleted steps need owner access.",
+        "confirmRecoverDraft": "This flow has changes that were never saved. Restore them?",
+        "draftRecovered": "Restored your unsaved changes.",
+        "backOnlineRetrySave": "Back online. Save again to send your changes."
     },
     "publicFlows": {
         "title": "Public Flows",
