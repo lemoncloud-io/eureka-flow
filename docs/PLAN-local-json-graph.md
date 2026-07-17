@@ -238,9 +238,27 @@ S6 구현 시 주의: `loadWorkflow`가 undo 히스토리를 지우므로(`Workf
     - **R5-b는 auto-save 경로에 침묵.** editor가 auto-save 켜고 노드 추가 → 저장됨(구조 유실) → **토스트 없음**. 경고는 _명시적_ save와 실행 차단 시에만. 좁은 창(auto-save 기본 off + C11로 localhost는 구조까지 저장) + 매 틱 토스트는 스팸이라 명시적 save 전용으로 확정. "R5-b 완료"가 auto-save까지 덮는다고 읽지 말 것
     - **`useRunGate`가 `useFlows()` 인스턴스를 늘린다** (`MobileStepDetail`/`useMobileRunAll`/양 페이지). 기존 패턴이고 TanStack이 쿼리를 dedupe하므로 정합성 문제 아님 — 의식적 선택으로 기록
 
-- [ ] **S7 — R6: 로컬 지속성 + 오프라인** (P1) ← **정찰 완료, 설계 확정 대기**
-    - 검증: **AC1** 전체
+- [x] **S7 — R6: 로컬 지속성 + 오프라인** (P1) ✅ 2026-07-17 — **auto-save off 영속화 공백 닫힘**
+    - 검증: **AC1** 전체 (코드 상. DEV 스모크 대기)
     - blocked-by: S5 ✅
+
+    **구현**: `workspace/draft.ts`(순수 결정: `draftFor`/`draftHasUnsavedWork`/`baselineForRecovery`) + `workspace/draftStorage.ts`(IDB 어댑터, 전부 실패 삼킴) + `useDraftPersistence`(에디터 페이지 opt-in, `canSave` 게이트) + `useDraftRecovery`(양 페이지 공유 — C2) + `useReconnectNotice`
+
+    **설계 3개**:
+    1. **IDB 기본** (C12) — localStorage는 이미지 1개에 터짐. base64는 draft에서 못 뺌
+    2. **복구 시 baseline 분기** — 온라인이면 로드가 뜬 **신선한** baseline 우선(draft 것 쓰면 다른 세션 변경을 가림), 오프라인이면 `draft.baseline`이 유일한 출처. R6가 baseline을 저장하라는 이유가 이것
+    3. **나갈 때 경고 대신 조용히 write** — `visibilitychange`(모바일에서 `beforeunload`는 발화 안 함). 확인창은 **되살리지 않음**: louis가 2026-05 의도적으로 지웠고(obs 10244), draft가 그 의도("작업 유실 방지")를 이미 달성하므로 되살리면 *일어나지도 않을 유실*을 막겠다고 방해만 되돌리는 것
+
+    **결과**: lint 에러 0 / 9개 프로젝트, 빌드 green, **147 → 160 테스트 green** (`draft.spec.ts` 13개)
+
+    **뮤테이션 3/3 사살**: clean일 때도 draft 기록(2 실패) / 복구가 항상 `draft.baseline` 채택(1 실패) / `flowId` 소유권 검사 제거(2 실패)
+
+    ⚠️ **미충족 — R6 3번째 불릿의 절반 (의식적 이월)**: **플로우 전환 시 이전 플로우의 미저장 작업이 사라진다.** A(dirty) → B 선택 → `loadWorkflow(B)` → 구독 발화 → `draftFor(B)`가 clean → `clearDraft()` → **A의 draft 소멸.** 원인은 단일 슬롯 키(`'current'`).
+    - **회귀 아님** — auto-save off + 전환은 S7 이전에도 유실했다. 그래서 배포를 막지 않는다
+    - **제대로 닫으려면**: `flowId ?? 'new'`로 키 분리 → 전환해도 각자 보존 → "전환 시 확인" 다이얼로그도 exit 다이얼로그처럼 불필요해짐(같은 철학: 알리지 말고 보존하라). **대가**: draft 1개가 20MB+ 가능(C12) → 여러 개면 쿼터 → viewport LRU 50 같은 **축출 필요**. 실제 스코프
+    - `savedAt` 필드는 **삭제함** — 저장만 하고 아무도 안 읽어서 있지도 않은 recency 검사를 암시하는 죽은 데이터였다. R6의 "draft가 더 최신이면"은 "다르면"으로 근사 중(사용자가 확인창에서 판단 + 재저장은 S6 게이트를 탐)
+
+    ❗ **미검증**: IDB 어댑터 / `visibilitychange` flush / 복구 **배선**은 jsdom·무인증 스위트가 못 본다 (S5·S6와 같은 클래스). 순수 로직만 증명됨
     - ⚠️ `getAutoSaveEnabled`는 키 부재 시 **false 기본**(`flowStorage.ts:54`). S3 이후 auto-save off 사용자는 수동 save 전까지 영속화 0 → S7이 이 창을 메운다. S3~S7은 한 브랜치로 함께 나가야 한다
 
     **정찰 결과 3개 — 요구사항 R6의 전제 2개가 틀렸다:**
@@ -373,6 +391,18 @@ S5 배선은 **구성 + 단위로만 검증됨**(로드 4곳이 `captureBaseline
 - [ ] **신규 flow(`/editor`) → 노드 추가 → Run All** → 저장·flow 생성 후 **실제로 실행됨** (조용히 no-op 아님 ← 어드바이저가 잡은 stale flowId 함정). **모바일도 동일 확인**
 - [ ] 실행 중 소켓 READY 연쇄 → 확인창 **안 뜸** (비게이트가 유지되는지)
 - [ ] editor로 config만 편집 → 실행 → 확인창 → 저장 → 실행 성공 (`editor-structure`로 잘못 막지 않는지)
+
+**S7이 추가한 항목** (전부 jsdom/무인증으로 검증 불가):
+
+- [ ] **⭐ 이미지 업로드 → 저장 없이 새로고침 → 복구 확인 → 이미지가 살아서 돌아옴.** ← **C12 결정 전체를 검증하는 단 하나의 항목.** "localStorage 아니고 IDB"가 옳았는지 + 실제로 동작하는지를 이것 하나가 증명한다. 실패하면 IDB 쿼터/직렬화 문제
+- [ ] 편집 → 새로고침 → **복구 거부** → draft 삭제됨 + 서버 사본이 보임 (다음 새로고침에 또 안 물어봄)
+- [ ] **오프라인 분기**: 네트워크 끊기 → 편집 → 새로고침 → 복구 → `draft.baseline`이 쓰임 (전 노드가 "신규 추가"로 안 읽히는지)
+- [ ] 편집 → 저장 → 새로고침 → **복구 안 물어봄** (저장 성공 시 draft 삭제되는지)
+- [ ] 노드 실행 → 새로고침 → **복구 안 물어봄** (런타임 상태가 draft를 안 만드는지)
+- [ ] **튜토리얼 → `/editor`** → 튜토리얼 노드가 **안 나타남** (draft가 튜토리얼을 안 삼키는지)
+- [ ] 편집 후 **탭 전환/닫기**(디바운스 800ms 이내) → 새로고침 → 복구됨 (`visibilitychange` flush)
+- [ ] 오프라인 → 저장 실패 → 온라인 복귀 → 재시도 안내 토스트
+- [ ] Safari/Firefox **사생활 보호 모드** → IDB 실패해도 **편집은 정상**(콘솔 경고만)
 
 ### 기타
 

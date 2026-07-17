@@ -28,7 +28,7 @@ export const useDraftPersistence = ({ enabled }: UseDraftPersistenceParams): voi
 
         const persistNow = () => {
             const { nodes, connections } = useCanvasStore.getState();
-            const draft = draftFor({ nodes, connections }, Date.now());
+            const draft = draftFor({ nodes, connections });
             // Null means the graph matches the server, and a draft that agrees with the
             // server is worse than none — the next boot would offer to recover it.
             void (draft ? writeDraft(draft) : clearDraft());

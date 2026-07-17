@@ -21,7 +21,6 @@ export interface FlowDraft {
      * but it is the only baseline that exists if the next boot cannot reach the server.
      */
     baseline: FlowSnapshot | null;
-    savedAt: number;
 }
 
 /**
@@ -32,11 +31,11 @@ export interface FlowDraft {
  * a store subscription, is what decides — a run rewrites node status and port data, and
  * none of that is work anyone needs kept.
  */
-export const draftFor = (graph: GraphLike, savedAt: number): FlowDraft | null => {
+export const draftFor = (graph: GraphLike): FlowDraft | null => {
     if (diffAgainstBaseline(graph).isEmpty) return null;
 
     const { currentFlowId, baseline, blockRegistry } = useFlowsStore.getState();
-    return { flowId: currentFlowId, working: toSnapshot(graph, blockRegistry), baseline, savedAt };
+    return { flowId: currentFlowId, working: toSnapshot(graph, blockRegistry), baseline };
 };
 
 /**

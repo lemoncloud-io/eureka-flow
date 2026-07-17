@@ -17,6 +17,15 @@ import type { FlowDraft } from './draft';
  */
 const DB_NAME = 'eureka-flow';
 const STORE_NAME = 'drafts';
+
+/**
+ * One slot, so only the open flow's work survives a refresh.
+ *
+ * Switching flows mid-edit still drops the first one's unsaved changes — the same as
+ * before any of this existed, but not something this closes. Keying by flow id would,
+ * and would also let several multi-megabyte drafts pile up, so it needs eviction to go
+ * with it. See the plan's S7 entry.
+ */
 const DRAFT_KEY = 'current';
 
 const openDb = (): Promise<IDBDatabase> =>

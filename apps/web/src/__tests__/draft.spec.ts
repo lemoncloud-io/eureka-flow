@@ -33,18 +33,18 @@ describe('draftFor', () => {
     it('keeps nothing when the graph matches the server', () => {
         // A draft equal to the server is worse than none: the next boot would offer to
         // recover work that is already saved.
-        expect(draftFor({ nodes: [node('n01')], connections: [] }, 1)).toBeNull();
+        expect(draftFor({ nodes: [node('n01')], connections: [] })).toBeNull();
     });
 
     it('keeps the working copy once it differs', () => {
-        const draft = draftFor({ nodes: [node('n01'), node('n02')], connections: [] }, 42);
+        const draft = draftFor({ nodes: [node('n01'), node('n02')], connections: [] });
 
-        expect(draft).toMatchObject({ flowId: '1008888', savedAt: 42 });
+        expect(draft).toMatchObject({ flowId: '1008888' });
         expect(draft?.working.nodes.map(n => n.id)).toEqual(['n01', 'n02']);
     });
 
     it('keeps the baseline too — offline it is the only record of what the server had', () => {
-        const draft = draftFor({ nodes: [node('n01'), node('n02')], connections: [] }, 1);
+        const draft = draftFor({ nodes: [node('n01'), node('n02')], connections: [] });
 
         expect(draft?.baseline?.nodes.map(n => n.id)).toEqual(['n01']);
     });
@@ -55,13 +55,13 @@ describe('draftFor', () => {
             connections: [],
         };
 
-        expect(draftFor(afterRun as never, 1)).toBeNull();
+        expect(draftFor(afterRun as never)).toBeNull();
     });
 
     it('marks a never-saved flow with a null id', () => {
         useFlowsStore.setState({ currentFlowId: null, baseline: null });
 
-        expect(draftFor({ nodes: [node('n01')], connections: [] }, 1)?.flowId).toBeNull();
+        expect(draftFor({ nodes: [node('n01')], connections: [] })?.flowId).toBeNull();
     });
 });
 
@@ -70,7 +70,6 @@ describe('draftHasUnsavedWork', () => {
         flowId: '1008888',
         working: snap([node('n01'), node('n02')]),
         baseline: snap([node('n01')]),
-        savedAt: 1,
         ...over,
     });
 
@@ -114,7 +113,6 @@ describe('baselineForRecovery', () => {
         flowId: '1008888',
         working: snap([node('n01'), node('n02')]),
         baseline: snap([node('n01', { customLabel: 'stale' })]),
-        savedAt: 1,
     };
 
     beforeEach(() => {
