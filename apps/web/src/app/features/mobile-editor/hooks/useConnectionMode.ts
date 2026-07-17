@@ -36,10 +36,7 @@ export interface CompatibleTarget {
     occupiedByNode?: string;
 }
 
-export const useConnectionMode = (
-    blockRegistry: Record<string, BlockDefinitionWithFrontend>,
-    flowId: string | null
-) => {
+export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionWithFrontend>) => {
     const { t } = useTranslation(['flows']);
     const [source, setSource] = useState<PortSelection | null>(null);
     const connections = useCanvasConnections();
@@ -163,7 +160,7 @@ export const useConnectionMode = (
             const tgtPortId = source.direction === 'output' ? targetPortId : source.portId;
 
             const storeState = useCanvasStore.getState();
-            const { connections: currentConnections, addConnection, updateConnection, deleteConnection } = storeState;
+            const { connections: currentConnections, addConnection, deleteConnection } = storeState;
 
             const existing = currentConnections.find(
                 c =>
@@ -223,7 +220,7 @@ export const useConnectionMode = (
     const connectPorts = useCallback(
         async (sourceNodeId: string, sourcePortId: string, targetNodeId: string, targetPortId: string) => {
             const storeState = useCanvasStore.getState();
-            const { connections: currentConnections, updateConnection } = storeState;
+            const { connections: currentConnections } = storeState;
 
             const existing = currentConnections.find(
                 c =>

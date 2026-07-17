@@ -169,7 +169,7 @@ export const MobileFlowEditorPage = () => {
         lastLocalUpdateTimestampRef,
     });
 
-    const connectionMode = useConnectionMode(blockRegistry, currentFlowId);
+    const connectionMode = useConnectionMode(blockRegistry);
     const { recentIds, addRecent } = useRecentBlocks();
 
     // Pending auto-connect: when user adds a new block via "Add new block & connect"
