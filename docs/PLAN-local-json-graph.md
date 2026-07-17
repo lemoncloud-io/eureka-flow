@@ -125,12 +125,27 @@ S6 구현 시 주의: `loadWorkflow`가 undo 히스토리를 지우므로(`Workf
       드래그는 `dragStartSnapshotRef`(:1845), Delete는 `saveCheckpoint()`(:1631)를 타므로 **스토어 기반 `nodes`로부터의 체크포인트 캡처도 함께 검증됨**.
     - ❗ **미검증**: undo/redo (TutorialPage Header가 `onUndo: noop`으로 스텁 → `/tutorial`에서 도달 불가. 다만 체크포인트 *캡처*는 위에서 검증됐고, pop → `setNodes` 경로의 `setNodes`도 검증됨 — 남은 미검증 구간은 pop 자체), executeNode/runAll/소켓 (백엔드 필요). **DEV 수동 스모크 권장**
 
-- [ ] **S3 — R2: 클라 ID + 철거** (P0)
-    - `libs/flows/src/utils/graphId.ts` 신설 (D-A)
-    - 철거: `tempId.ts`, `saveFilter.ts`, 두 spec, `useEdgeSync.ts`(전체), `useNodeSync.ts`(`getSyncedConfig` 제외 전부), `api/edges.ts`(이미 死), `upsertEdge`, `upsertFlow`(+10개 호출처), `createNode`, `deleteNode`, `createNodeOnBackend`, `useCreateNodeMutation`, `useCreateEdgeMutation`, `useUpsertNodeMutation`
-    - **생존 필수**: `upsertPortNode`(실행 경로 — `/nodes/0/upsert` 공유), `updateFlowMetadata`(`/flows/:id/upsert` 공유), `runNode`, `getNode`, `getPortData`, `saveFlow`, `loadFlow`
-    - 검증: **AC2** (생성 시 네트워크 0회), **AC3** (ID 라운드트립)
+- [x] **S3 — R2: 클라 ID + 철거** (P0) ✅ 2026-07-17
+    - `libs/flows/src/utils/graphId.ts` 신설 (D-A) — `newNodeId()`/`newEdgeId()`
+    - 철거 완료: `tempId.ts`, `saveFilter.ts`, 두 spec, `useEdgeSync.ts`(전체), `useNodeSync.ts`(**전체** — 아래 정정), `useNodesQuery.ts`(전체), `api/edges.ts`(이미 死), `upsertEdge`, `upsertNode`, `upsertFlow`(+10개 호출처), `createNode`, `deleteNode`(api), `replaceNodeIdInState`, `deleteNodeWithSync`, `upsertMovedPositions`, `useNodeConfig.syncNodeToServer`, `generateId`, 엣지 dedup의 temp tie-break
+    - **생존 확인**: `upsertPortNode`(실행 경로 — `/nodes/0/upsert` 공유), `updateFlowMetadata`(`/flows/:id/upsert` 공유), `runNode`, `getNode`, `getPortData`, `saveFlow`, `loadFlow`, `hydrateInputPorts`
     - blocked-by: S2
+
+    **C5 정정 — `getSyncedConfig`도 삭제했다.** 계획 초안은 R5까지 남기려 했으나, 그러면 upsert 제거 직후부터 R5 착륙까지 **서버가 낡은 config로 실행하는 회귀 창**이 열린다(`syncedConfigRef`를 채우던 upsert 성공 핸들러가 사라지므로 `buildRunBody`가 항상 `{}`). 대신 실행 시 **항상 `{ config }` 전송** — 게스트 경로가 이미 그렇게 하고 있었다. 회귀 0이고 R2↔R5 결합도 끊었다. `buildRunBody`/`isConfigEqual`도 같이 삭제.
+
+    **결과**: `yarn lint` **에러 0 / 9개 프로젝트 통과** (경고 37→9로 순감), 빌드 green, 91 테스트 green, `graphId.spec.ts` 11개 green.
+
+    **실브라우저 검증 (`/tutorial`)** — 요청 카운터를 `XMLHttpRequest.open`/`fetch`에 심고 측정:
+    | 조작 | 결과 | 네트워크 |
+    | --- | --- | --- |
+    | 복사/붙여넣기 (노드 생성) | 1→2 | **0회** |
+    | 드래그 | 위치 이동 + 그리드 스냅 | **0회** |
+    | Delete | 2→1 | **0회** |
+    → **AC2 충족** (생성 시 네트워크 요청 0회)
+    - 생성된 ID 실측: `n54372855c34845ef9197f2fbee88478c` — `n` + 32 hex = 33자, 대시 없음. D-A 설계대로
+    - 콘솔 error 0
+
+    ❗ **AC3(ID 라운드트립) 미검증** — save→load 왕복이 필요해 인증 없이는 불가. **DEV 검증 필수.** 서버측 근거는 확보돼 있다(§1 D1 게이트: `flow-save-use-cases.spec.ts:80-89`가 `n01`/`n02` 왕복을 이미 검증).
 
 - [ ] **S4 — R3: workspace 모듈** (P0)
     - `libs/flows/src/workspace/`: baseline / working / `diff()` / `isDirty`

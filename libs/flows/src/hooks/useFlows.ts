@@ -13,7 +13,6 @@ import {
 } from './queries';
 import { useFlowsStore } from '../stores/useFlowsStore';
 import { flowStorage } from '../utils/flowStorage';
-import { excludeUnresolvedFromSave } from '../utils/saveFilter';
 import { transformNodesForSave } from '../utils/transformNodes';
 
 import type { SaveStatus } from '../stores/useFlowsStore';
@@ -258,15 +257,12 @@ export const useFlows = () => {
                 const { nodes = [], edges, connections } = body;
                 const edgesData = edges ?? connections ?? [];
 
-                // Save replaces the flow's whole node list on the server — unresolved
-                // session temp IDs must never reach it (they get persisted as canonical
-                // IDs and corrupt the flow; excluded entities are saved on the next
-                // autosave once the server assigns their ID).
-                const savable = excludeUnresolvedFromSave(nodes, edgesData);
-
+                // Always send the whole working copy: the server replaces the flow's node
+                // and edge lists with whatever this body carries, so anything left out is
+                // dropped from the flow. That is also how deletes are expressed.
                 const { blockRegistry } = useFlowsStore.getState();
-                const slimNodes = transformNodesForSave(savable.nodes, blockRegistry);
-                const saveBody: SaveFlowBody = { nodes: slimNodes, edges: savable.edges };
+                const slimNodes = transformNodesForSave(nodes, blockRegistry);
+                const saveBody: SaveFlowBody = { nodes: slimNodes, edges: edgesData };
 
                 // Store for retry on failure
                 lastSaveBodyRef.current = saveBody;

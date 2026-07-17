@@ -100,7 +100,6 @@ export const MobileTutorialPage = () => {
                     onAddStep={() => {
                         /* tutorial does not allow adding steps */
                     }}
-                    flowId={null}
                     role="editor"
                 />
             </div>

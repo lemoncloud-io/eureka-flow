@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle, ArrowLeft, ArrowRight, FileText, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-import { isAiBlock, isMissingAiKey, useCanvasConnections } from '@flows/flows';
+import { isAiBlock, isMissingAiKey, useCanvasConnections, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Input, Label, Switch } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -13,7 +13,7 @@ import { AiKeyWarningBanner } from '../../flows/components/AiKeyWarningBanner';
 import { BlockIcon } from '../../flows/components/BlockIcon';
 import { getPortStyleKey } from '../../flows/utils';
 import { useNodeConfig } from '../hooks/useNodeConfig';
-import { deleteNodeWithSync, executeNodeWithToast } from '../utils';
+import { executeNodeWithToast } from '../utils';
 import { AddConnectionRow } from './AddConnectionRow';
 import { ConfigFieldList } from './ConfigFieldList';
 import { STEREO_FALLBACK_LABEL, STEREO_I18N_KEY, STEREO_ICON_BG, TYPE_DOT } from './consts';
@@ -112,7 +112,7 @@ export const MobileStepDetail = ({
             setConfirmingDelete(true);
             return;
         }
-        deleteNodeWithSync(nodeId, flowId);
+        useCanvasStore.getState().deleteNode(nodeId);
         onClose();
     };
 

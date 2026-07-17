@@ -3,9 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { upsertNode, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
-
-import { generateTempId } from '../../flows/utils';
+import { newNodeId, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 
 import type { SerializeWorkflowFn } from './types';
 import type { NodeState } from '@flows/flows';
@@ -21,7 +19,7 @@ interface UseMobileFlowActionsParams {
 interface UseMobileFlowActionsReturn {
     handleSave: () => Promise<void>;
     handleSelectFlow: (flowId: string) => Promise<void>;
-    /** Returns the final node ID (server-assigned or temp) */
+    /** Returns the new node's ID */
     handleAddBlock: (type: string) => Promise<string | null>;
     handleExport: () => void;
     /** Creates new flow without confirm — for MobileNewFlowSheet */
@@ -83,13 +81,13 @@ export const useMobileFlowActions = ({
             if (!def) return null;
 
             // Place new node at the top: y less than current min so it sorts first.
-            const tempNodeId = generateTempId('node');
+            const nodeId = newNodeId();
             const minY = nodes.reduce((m, n) => Math.min(m, n.position?.y ?? Infinity), Infinity);
             const posX = nodes[0]?.position?.x ?? 100;
             const posY = nodes.length === 0 ? 100 : minY - 200;
 
             const newNode: NodeData = {
-                id: tempNodeId,
+                id: nodeId,
                 type,
                 position: { x: posX, y: posY },
                 config: { ...def.defaultConfig },
@@ -103,27 +101,6 @@ export const useMobileFlowActions = ({
             useCanvasStore.getState().setNodes(prev => [...prev, newNode]);
 
             try {
-                const result = await upsertNode('0', currentFlowId ?? '', {
-                    blockId: type,
-                    position: newNode.position,
-                    config: newNode.config,
-                });
-                const serverId = result?.nodes?.[0]?.id;
-                const finalId = serverId && serverId !== tempNodeId ? serverId : tempNodeId;
-
-                if (serverId && serverId !== tempNodeId) {
-                    useCanvasStore
-                        .getState()
-                        .setNodes(prev => prev.map(n => (n.id === tempNodeId ? { ...n, id: serverId } : n)));
-                    useCanvasStore.getState().setConnections(prev =>
-                        prev.map(c => ({
-                            ...c,
-                            sourceNodeId: c.sourceNodeId === tempNodeId ? serverId : c.sourceNodeId,
-                            targetNodeId: c.targetNodeId === tempNodeId ? serverId : c.targetNodeId,
-                        }))
-                    );
-                }
-
                 // Persist immediately so refresh within autosave debounce keeps the node.
                 const { nodes: latestNodes, connections: latestConnections } = useCanvasStore.getState();
                 lastLocalUpdateTimestampRef.current = Date.now();
@@ -136,9 +113,9 @@ export const useMobileFlowActions = ({
                     if (saveResult.id && saveResult.id !== currentFlowId) updateUrl(saveResult.id);
                 }
 
-                return finalId;
+                return nodeId;
             } catch {
-                useCanvasStore.getState().setNodes(prev => prev.filter(n => n.id !== tempNodeId));
+                useCanvasStore.getState().setNodes(prev => prev.filter(n => n.id !== nodeId));
                 toast.error(t('mobile.failedToCreateNode', 'Failed to create node'));
                 return null;
             }

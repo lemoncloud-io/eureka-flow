@@ -196,10 +196,9 @@ export const MobileFlowEditorPage = () => {
         [stepNav]
     );
 
-    // Flush pending config edits before closing detail so refresh within the
-    // 500ms node-sync debounce (see useNodeConfig.syncNodeToServer) does not
-    // drop edits made in MobileStepDetail. Skipped when Auto Save is off —
-    // the flow reaches the server only through the header's save button.
+    // Save on close so a refresh before the autosave debounce fires does not drop
+    // edits made in MobileStepDetail. Skipped when Auto Save is off — the flow
+    // reaches the server only through the header's save button.
     const handleCloseStep = useCallback(async () => {
         if (useFlowsStore.getState().isAutoSaveEnabled) {
             const { nodes, connections } = useCanvasStore.getState();
@@ -422,7 +421,6 @@ export const MobileFlowEditorPage = () => {
                         onAddStep={() => setIsBlockLibraryOpen(true)}
                         onAddBlockDirect={handleAddBlockWithRecent}
                         onRunNode={handleRunNode}
-                        flowId={currentFlowId}
                         searchQuery={searchQuery}
                         role={role}
                     />
