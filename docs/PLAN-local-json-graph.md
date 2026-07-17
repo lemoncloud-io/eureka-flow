@@ -229,16 +229,24 @@ S3가 실행 전 `flushPendingUpdates`/`flushPendingEdges` 대기를 제거했�
 **함의: R5-a(S6)는 P1 편의가 아니라 실행 정합성의 복구다.** 창은 S4+S5 두 슬라이스뿐(R5-a는 isDirty(S4) + save 일원화(S5)를 전제로 함).
 → **S3~S7은 반드시 한 브랜치로. 브랜치는 S6 착륙 전 배포 금지.**
 
-### 🟡 S4 착수 전 메울 것 (S3 검증의 구멍)
+### ✅ S3 검증 구멍 — 메웠다 (2026-07-17)
 
-1. **검증이 전부 부정형이었다.** "편집이 네트워크를 안 탄다"는 증명했으나, **"save가 클라 ID + 작업본 전체로 서버에 실제 도달한다"**(AC1 후반 + AC3 = 이 마이그레이션의 전제)는 미검증. body 구성은 백엔드 없이 단위 테스트 가능:
-    - `saveCurrentFlow`가 `{ nodes: [클라ID 슬림노드 전부], edges: [...] }`를 내보내는가
-    - 삭제한 노드가 body에서 빠지는가
-    - 빈 플로우도 `nodes: []`를 싣는가 (C8 — 생략하면 서버가 멤버십을 안 건드린다)
+1. **save body 미검증** → `apps/web/src/__tests__/saveFlowBody.spec.tsx` **6개 green**. `@flows/web-core`를 스텁해 `api.post`에 실제로 실리는 body를 검사 (백엔드 불필요):
+    - 모든 노드가 클라 ID로 실리는가 ✅
+    - 삭제한 노드가 body에서 빠지는가 (= 삭제의 표현) ✅
+    - 빈 플로우도 `nodes: []`를 싣는가 (C8) ✅
+    - 런타임 상태(`state`/`status`/`inputData`/`outputData`/`executionStats`)가 벗겨지는가 ✅ ← D-B의 전제
+    - UI측 `connections` 별칭 수용 ✅
+    - flow 없을 때 `/flows/0/save`로 생성 ✅
 
-    생존한 `transformNodes.spec.ts`는 **노드 단위 shape만** 덮고 이 오케스트레이션은 안 덮는다 — S3가 바꾼 바로 그 코드.
+    **뮤테이션 테스트로 스위트가 무는지 확인**: `slimNodes`를 빈 배열로 바꾸자 3개가 즉시 실패 → 통과가 우연이 아님을 확인.
 
-2. **auto-save 트리거 미검증.** `nodes`/`connections`가 이제 스토어 구독에서 온다. `onChange → triggerAutoSave`는 `[nodes, connections]` 참조 동일성에 걸려 있다(`setNodes`가 새 배열을 만드니 동작해야 하나 미확인). **이제 유일하게 살아남은 영속화 트리거** — 조용히 안 뜨면 auto-save를 켜도 아무것도 저장 안 되고, 현재 어떤 테스트도 못 잡는다.
+2. **auto-save 트리거 미검증** → `createCanvasStore.spec.ts`에 3개 추가 (총 8개 green). 체인은 `setNodes → 스토어 → useCanvasNodes() → 새 nodes 값 → effect [nodes, connections] → onChange`. S2 스모크에서 **노드 리렌더를 실측**했고, 리렌더 자체가 "구독이 새 값을 전달했다"는 증거 → effect dep도 새 값 → 발화. 이행적으로 증명됨. 그 링크(참조 동일성)를 테스트로 고정:
+    - `setNodes`가 배열/updater 양쪽에서 새 참조를 내는가 ✅
+    - `updateNodeData`/`addConnection`/`deleteNode`도 새 참조를 내는가 ✅
+    - 모든 그래프 쓰기가 구독자에게 통지되는가 ✅
+
+    ❗ 남은 미검증: `onChange → triggerAutoSave → saveCurrentFlow` 전체 체인은 `FlowEditorPage` 구동이라 인증 필요.
 
 ### 기타
 
