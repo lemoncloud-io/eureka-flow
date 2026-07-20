@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
     getPermissions,
     resolveNodeName,
-    translateServerKey,
+    translateField,
     useBlockRegistry,
     useCanvasConnections,
     useCanvasNodes,
@@ -104,7 +104,7 @@ export const MobileConnectionSheet = ({
                 targetNodeId: otherNodeId,
                 targetNodeName: resolveNodeName(otherNode, otherDef, t, otherNodeId),
                 targetIcon: otherDef?.icon,
-                breadcrumb: `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${translateServerKey(t, otherDef?.label) || otherNodeId}`,
+                breadcrumb: `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${translateField(t, otherDef, 'label') || otherNodeId}`,
                 stereo,
             };
         });
@@ -278,7 +278,7 @@ export const MobileConnectionSheet = ({
                                         const targetNode = nodes.find(n => n.id === target.nodeId);
                                         const targetDef = targetNode ? blockRegistry[targetNode.type] : undefined;
                                         const stereo = targetDef?.stereo ?? 'process';
-                                        const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${translateServerKey(t, targetDef?.label) || target.nodeId}`;
+                                        const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${translateField(t, targetDef, 'label') || target.nodeId}`;
 
                                         return (
                                             <button

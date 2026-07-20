@@ -8,7 +8,7 @@ import {
     isAiBlock,
     isMissingAiKey,
     resolveNodeName,
-    translateServerKey,
+    translateField,
     useCanvasConnections,
     useCanvasStore,
 } from '@flows/flows';
@@ -144,7 +144,7 @@ export const MobileStepDetail = ({
                         <div className="flex items-center gap-1.5 min-w-0">
                             <span className="text-sm font-semibold text-muted-foreground shrink-0">{stereoLabel}</span>
                             <span className="text-sm font-semibold text-foreground truncate">
-                                {translateServerKey(t, blockDef.label) || node.type}
+                                {translateField(t, blockDef, 'label') || node.type}
                             </span>
                         </div>
                     </header>
@@ -169,7 +169,7 @@ export const MobileStepDetail = ({
                                     <Input
                                         value={customLabel}
                                         onChange={e => handleCustomLabelChange(e.target.value)}
-                                        placeholder={translateServerKey(t, blockDef.label)}
+                                        placeholder={translateField(t, blockDef, 'label')}
                                         className="h-9 text-sm"
                                         disabled={!canEditStructure}
                                     />
@@ -376,7 +376,7 @@ const PortButton = ({
         >
             <Icon className={cn('w-3 h-3 shrink-0', isConnected ? 'text-success' : 'text-primary/40')} />
             <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', TYPE_DOT[styleKey])} />
-            <span className="font-medium">{translateServerKey(t, port.label) || port.id}</span>
+            <span className="font-medium">{translateField(t, port, 'label') || port.id}</span>
             {isConnected ? (
                 <span className="text-success truncate flex-1">
                     {arrow} {connectedNames}
@@ -427,7 +427,7 @@ const renderPortGroup = ({ nodeId, ports, conns, direction, canEdit, displayName
     return ports.map(port => {
         const portConns = conns.filter(c => (isInput ? c.targetPortId : c.sourcePortId) === port.id);
         const open = () =>
-            onOpen?.(nodeId, port.id, port.type ?? 'any', displayName, translateServerKey(t, port.label) || port.id);
+            onOpen?.(nodeId, port.id, port.type ?? 'any', displayName, translateField(t, port, 'label') || port.id);
 
         if (portConns.length === 0) {
             return (

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, Check, ChevronDown, ChevronUp, Unlink } from 'lucide-react';
 
-import { resolveNodeName, translateServerKey, useBlockRegistry, useCanvasStore } from '@flows/flows';
+import { resolveNodeName, translateField, useBlockRegistry, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
@@ -50,7 +50,7 @@ export const MobileConnectionCard = ({
 
     const stereo = blockDef.stereo ?? 'process';
     const displayName = resolveNodeName(node, blockDef, t);
-    const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${translateServerKey(t, blockDef.label) || node.type}`;
+    const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${translateField(t, blockDef, 'label') || node.type}`;
     const nodeState = (node.state ?? 'IDLE') as string;
     const isError = nodeState === 'ERROR';
     const errorMessage =

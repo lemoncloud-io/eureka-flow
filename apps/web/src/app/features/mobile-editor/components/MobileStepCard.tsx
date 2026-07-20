@@ -3,14 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AlertTriangle, Loader2, Maximize2, MoreVertical, Play, Trash2 } from 'lucide-react';
 
-import {
-    getPermissions,
-    isAiBlock,
-    isMissingAiKey,
-    translateServerKey,
-    useBlockRegistry,
-    useS3Image,
-} from '@flows/flows';
+import { getPermissions, isAiBlock, isMissingAiKey, translateField, useBlockRegistry, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -265,8 +258,7 @@ export const MobileStepCard = React.memo(
                 <div className="px-3 pb-1.5">
                     <div className="text-sm font-semibold truncate leading-tight">{displayName}</div>
                     <div className="text-[10px] text-muted-foreground mt-0.5">
-                        {STEREO_FALLBACK_LABEL[stereo] ?? stereo} ·{' '}
-                        {translateServerKey(t, blockDef?.label) || node.type}
+                        {STEREO_FALLBACK_LABEL[stereo] ?? stereo} · {translateField(t, blockDef, 'label') || node.type}
                     </div>
                 </div>
 

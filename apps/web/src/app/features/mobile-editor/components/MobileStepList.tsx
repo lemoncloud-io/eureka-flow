@@ -6,7 +6,7 @@ import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 
 import {
     getPermissions,
-    translateServerKey,
+    translateField,
     useBlockRegistry,
     useCanvasConnections,
     useCanvasNodes,
@@ -135,7 +135,7 @@ export const MobileStepList = ({
                                             >
                                                 <BlockIcon icon={block.icon} size={16} />
                                             </div>
-                                            {translateServerKey(t, block.label)}
+                                            {translateField(t, block, 'label')}
                                         </button>
                                     ))}
                                 </div>

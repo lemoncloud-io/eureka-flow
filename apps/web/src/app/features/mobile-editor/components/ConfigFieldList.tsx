@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { isAiBlock, translateServerKey } from '@flows/flows';
+import { isAiBlock, translateField } from '@flows/flows';
 import { Input, Label, Switch, Textarea } from '@flows/ui-kit';
 
 import { MobileFileField } from './MobileFileField';
@@ -36,7 +36,7 @@ export const ConfigFieldList = ({ fields, config, onConfigChange, blockType }: C
                                 <div className="flex-1 h-px bg-border/50" />
                                 {field.label && (
                                     <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">
-                                        {translateServerKey(t, field.label)}
+                                        {translateField(t, field, 'label')}
                                     </span>
                                 )}
                                 <div className="flex-1 h-px bg-border/50" />
@@ -47,7 +47,7 @@ export const ConfigFieldList = ({ fields, config, onConfigChange, blockType }: C
                     return (
                         <div key={field.key}>
                             <Label className="text-xs text-muted-foreground mb-1.5 block">
-                                {translateServerKey(t, field.label) || field.key}
+                                {translateField(t, field, 'label') || field.key}
                             </Label>
 
                             {field.type === 'boolean' || field.type === 'checkbox' ? (
@@ -67,7 +67,7 @@ export const ConfigFieldList = ({ fields, config, onConfigChange, blockType }: C
                                 >
                                     {field.options.map(opt => (
                                         <option key={opt.value} value={opt.value}>
-                                            {translateServerKey(t, opt.label)}
+                                            {translateField(t, opt, 'label')}
                                         </option>
                                     ))}
                                 </select>

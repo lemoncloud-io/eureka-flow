@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
     newEdgeId,
     resolveNodeName,
-    translateServerKey,
+    translateField,
     useCanvasConnections,
     useCanvasNodes,
     useCanvasStore,
@@ -97,7 +97,7 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
                         nodeName,
                         nodeIcon: blockDef.icon,
                         portId: port.id,
-                        portName: translateServerKey(t, port.label) || port.id,
+                        portName: translateField(t, port, 'label') || port.id,
                         portDataType: port.type ?? 'any',
                         alreadyConnected,
                         occupiedByNode,
@@ -131,7 +131,7 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
                         nodeName,
                         nodeIcon: blockDef.icon,
                         portId: port.id,
-                        portName: translateServerKey(t, port.label) || port.id,
+                        portName: translateField(t, port, 'label') || port.id,
                         portDataType: port.type ?? 'any',
                         alreadyConnected,
                     });
