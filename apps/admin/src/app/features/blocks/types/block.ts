@@ -9,6 +9,8 @@ export interface Port {
     label: string;
     labelEn?: string;
     type: string;
+    /** Not editable here, but carried so saving a block does not clear it. */
+    required?: boolean;
 }
 
 export interface ConfigOption {

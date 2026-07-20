@@ -75,7 +75,13 @@ export interface BlockBody {
 const isStereo = (s: string | undefined): s is BlockStereo => s === 'input' || s === 'process' || s === 'output';
 
 const toUiPorts = (ports: ServerPort[] | undefined): Port[] =>
-    (ports ?? []).map(p => ({ id: p.id, label: p.label ?? '', labelEn: p.labelEn, type: p.type ?? 'any' }));
+    (ports ?? []).map(p => ({
+        id: p.id,
+        label: p.label ?? '',
+        labelEn: p.labelEn,
+        type: p.type ?? 'any',
+        required: p.required,
+    }));
 
 const toUiConfigs = (configs: ServerConfig[] | undefined): ConfigItem[] =>
     (configs ?? []).map(c => ({
@@ -113,7 +119,7 @@ export const blockViewToBlock = (v: BlockView): Block => ({
 });
 
 const toServerPorts = (ports: Port[]): ServerPort[] =>
-    ports.map(p => ({ id: p.id, label: p.label, labelEn: p.labelEn, type: p.type }));
+    ports.map(p => ({ id: p.id, label: p.label, labelEn: p.labelEn, type: p.type, required: p.required }));
 
 const toServerConfigs = (configs: ConfigItem[]): ServerConfig[] =>
     configs.map(c => ({

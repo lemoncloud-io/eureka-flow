@@ -27,7 +27,7 @@ const keyedBlock: BlockView = {
     order: 1,
     processType: 'input-text',
     isFrontend: true,
-    input$$: [],
+    input$$: [{ id: 'in', label: '입력', type: 'text', required: true }],
     output$$: [{ id: 'out', label: '텍스트', labelEn: 'text', type: 'text' }],
     config$$: [
         {
@@ -77,6 +77,13 @@ describe('round trip', () => {
         expect(body.output$$?.[0].labelEn).toBe('text');
         expect(body.config$$?.[0].labelEn).toBe('text');
         expect(body.config$$?.[0].placeholderEn).toBe('input_text_hint');
+    });
+
+    it('preserves port flags the editor cannot change', () => {
+        // The mappers copy field by field, so anything they omit is wiped on save.
+        // `required` drives the missing-input check in the flow editor.
+        const body = blockToBlockBody(toFormData(keyedBlock));
+        expect(body.input$$?.[0].required).toBe(true);
     });
 
     it('keeps the human-readable text alongside the keys', () => {
