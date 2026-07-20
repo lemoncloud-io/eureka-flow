@@ -3,6 +3,9 @@ import { Input } from '@flows/ui-kit';
 
 import { useBlockKeyDictionary } from '../hooks';
 
+/** One shared list for every key field on the page — the browser dedupes by id. */
+const KEY_LIST_ID = 'block-language-keys';
+
 interface KeyInputProps {
     value: string | undefined;
     onChange: (value: string | undefined) => void;
@@ -13,12 +16,21 @@ interface KeyInputProps {
 /**
  * Language key for the text field above it. Blank means "show the original text",
  * which is also what a typo produces — so this shows the translation the key
- * resolves to, and says so when it resolves to nothing.
+ * resolves to, says so when it resolves to nothing, and offers the keys that
+ * already exist rather than leaving every key to be retyped from memory.
  */
 export const KeyInput = ({ value, onChange, placeholder = 'snake_case', disabled = false }: KeyInputProps) => {
-    const { data: dictionary } = useBlockKeyDictionary();
+    const { data: dictionary, isError } = useBlockKeyDictionary();
     const translation = value && dictionary ? dictionary[value] : undefined;
     const isUnregistered = !!value && !!dictionary && !translation;
+
+    const hint = () => {
+        if (!value) return '원문 사용';
+        if (translation) return translation;
+        if (isUnregistered) return 'blocks.json에 없음';
+        // No dictionary to check against — say so, rather than looking like a pass.
+        return isError ? '확인 불가' : '';
+    };
 
     return (
         <div className="flex items-center gap-2">
@@ -28,17 +40,27 @@ export const KeyInput = ({ value, onChange, placeholder = 'snake_case', disabled
                 onChange={e => onChange(e.target.value.trim() || undefined)}
                 placeholder={placeholder}
                 disabled={disabled}
+                list={dictionary ? KEY_LIST_ID : undefined}
                 className={cn('h-7 font-mono text-xs', isUnregistered && 'border-warning')}
             />
+            {dictionary && (
+                <datalist id={KEY_LIST_ID}>
+                    {Object.entries(dictionary).map(([key, text]) => (
+                        <option key={key} value={key}>
+                            {text}
+                        </option>
+                    ))}
+                </datalist>
+            )}
             <span
                 className={cn(
                     'shrink-0 truncate text-xs',
                     isUnregistered ? 'text-warning' : 'text-muted-foreground',
-                    !value && 'text-muted-foreground/60'
+                    (!value || isError) && 'text-muted-foreground/60'
                 )}
                 title={translation}
             >
-                {!value ? '원문 사용' : (translation ?? (isUnregistered ? 'blocks.json에 없음' : ''))}
+                {hint()}
             </span>
         </div>
     );

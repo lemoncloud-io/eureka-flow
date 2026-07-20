@@ -3,9 +3,10 @@ import { Plus, X } from 'lucide-react';
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@flows/ui-kit';
 
 import { CONFIG_TYPE_OPTIONS } from '../types';
+import { ConfigOptionEditor } from './ConfigOptionEditor';
 import { KeyInput } from './KeyInput';
 
-import type { ConfigItem } from '../types';
+import type { ConfigItem, ConfigOption } from '../types';
 
 interface ConfigEditorProps {
     configs: ConfigItem[];
@@ -33,6 +34,10 @@ export const ConfigEditor = ({ configs, onChange, disabled = false }: ConfigEdit
 
     const removeConfig = (index: number) => {
         onChange(configs.filter((_, i) => i !== index));
+    };
+
+    const setOptions = (index: number, options: ConfigOption[]) => {
+        onChange(configs.map((cfg, i) => (i === index ? { ...cfg, options } : cfg)));
     };
 
     return (
@@ -116,6 +121,13 @@ export const ConfigEditor = ({ configs, onChange, disabled = false }: ConfigEdit
                             disabled={disabled}
                         />
                     </div>
+                    {cfg.type === 'select' && (
+                        <ConfigOptionEditor
+                            options={cfg.options ?? []}
+                            onChange={options => setOptions(index, options)}
+                            disabled={disabled}
+                        />
+                    )}
                 </div>
             ))}
         </div>
