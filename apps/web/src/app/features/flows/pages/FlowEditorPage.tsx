@@ -291,7 +291,10 @@ export const FlowEditorPage = () => {
             // and ports resolve through it), so awaiting it below rather than here turns two
             // serial round-trips into one.
             const blocksPromise = loadBlocks();
-            void blocksPromise.catch(() => undefined); // the await below still surfaces any failure
+            // Guard against an unhandled rejection when the flow fetch throws first and the
+            // join below is never reached. (loadBlocks itself resolves even on a failed fetch
+            // — refetch() reports errors in its result — so the join guarantees settled, not ok.)
+            void blocksPromise.catch(() => undefined);
 
             const nodeIdFromHash = window.location.hash.replace('#', '') || null;
 
