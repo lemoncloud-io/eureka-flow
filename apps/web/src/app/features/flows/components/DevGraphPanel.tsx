@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 
-import { Braces, Copy, Download, Upload, X } from 'lucide-react';
+import { Braces, Download, Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import {
     diffAgainstBaseline,
@@ -19,13 +20,14 @@ interface DevGraphPanelProps {
     onImport: (graph: FlowJson) => Promise<void>;
 }
 
-const ICON_BTN =
-    'p-1 text-muted-foreground/50 hover:text-muted-foreground rounded-lg hover:bg-muted/30 transition-colors';
+const ACTION_BTN =
+    'flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono bg-muted/30 text-muted-foreground hover:bg-muted/50 transition-colors';
 
 /**
  * Dev-only window onto the internal JSON graph: shows the live `{nodes, edges}` the canvas
- * holds (client ids, config, dirty/baseline state) and round-trips it through export/import
- * so the local-graph model (S1–S9) can be inspected and replayed by hand.
+ * holds (client ids, config, dirty/baseline state) and round-trips it through JSON files —
+ * export downloads the graph, import loads one back — so the local-graph model (S1–S9) can
+ * be inspected and replayed by hand.
  */
 export const DevGraphPanel = ({ onImport }: DevGraphPanelProps) => {
     const nodes = useCanvasNodes();
@@ -39,9 +41,6 @@ export const DevGraphPanel = ({ onImport }: DevGraphPanelProps) => {
     const isDirty = !diffAgainstBaseline({ nodes, connections }).isEmpty;
 
     const [isExpanded, setIsExpanded] = useState(false);
-    const [importOpen, setImportOpen] = useState(false);
-    const [importText, setImportText] = useState('');
-    const [importError, setImportError] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
     const [pos, setPos] = useState({ x: 16, y: 80 });
@@ -50,7 +49,7 @@ export const DevGraphPanel = ({ onImport }: DevGraphPanelProps) => {
 
     const handlePointerDown = useCallback(
         (e: React.PointerEvent) => {
-            if ((e.target as HTMLElement).closest('button, textarea, input, [data-json]')) return;
+            if ((e.target as HTMLElement).closest('button, input, [data-json]')) return;
             e.preventDefault();
             dragState.current = { startX: e.clientX, startY: e.clientY, originX: pos.x, originY: pos.y };
             dragRef.current?.setPointerCapture(e.pointerId);
@@ -69,42 +68,33 @@ export const DevGraphPanel = ({ onImport }: DevGraphPanelProps) => {
         dragState.current = null;
     }, []);
 
-    const handleCopy = useCallback(() => {
-        void navigator.clipboard.writeText(serializeFlowJson(graph));
-    }, [graph]);
-
-    const handleDownload = useCallback(() => {
+    const handleExport = useCallback(() => {
+        const fileName = `graph-${currentFlowId || 'new'}.json`;
         const blob = new Blob([serializeFlowJson(graph)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `graph-${currentFlowId || 'new'}.json`;
+        link.download = fileName;
         link.click();
         URL.revokeObjectURL(url);
+        toast.success(`Exported ${fileName}`);
     }, [graph, currentFlowId]);
-
-    const runImport = useCallback(
-        async (text: string) => {
-            const result = parseFlowJson(text);
-            if (!result.ok) {
-                setImportError(result.error);
-                return;
-            }
-            setImportError(null);
-            await onImport(result.graph);
-            setImportText('');
-            setImportOpen(false);
-        },
-        [onImport]
-    );
 
     const handleFile = useCallback(
         async (e: React.ChangeEvent<HTMLInputElement>) => {
             const file = e.target.files?.[0];
             e.target.value = '';
-            if (file) await runImport(await file.text());
+            if (!file) return;
+
+            const result = parseFlowJson(await file.text());
+            if (!result.ok) {
+                toast.error(`Import failed: ${result.error}`);
+                return;
+            }
+            await onImport(result.graph);
+            toast.success(`Imported ${result.graph.nodes.length} nodes from ${file.name}`);
         },
-        [runImport]
+        [onImport]
     );
 
     if (!isExpanded) {
@@ -147,20 +137,29 @@ export const DevGraphPanel = ({ onImport }: DevGraphPanelProps) => {
                         {isDirty && <span className="text-[10px] font-mono text-amber-400">dirty</span>}
                     </div>
                     <div className="flex items-center gap-1">
-                        <button onClick={handleCopy} title="Copy JSON" className={ICON_BTN}>
-                            <Copy className="w-3 h-3" />
-                        </button>
-                        <button onClick={handleDownload} title="Download JSON" className={ICON_BTN}>
+                        <button onClick={handleExport} title="Download graph as JSON file" className={ACTION_BTN}>
                             <Download className="w-3 h-3" />
+                            Export
                         </button>
                         <button
-                            onClick={() => setImportOpen(o => !o)}
-                            title="Import JSON"
-                            className={importOpen ? ICON_BTN.replace('/50', '') : ICON_BTN}
+                            onClick={() => fileRef.current?.click()}
+                            title="Load a graph from a JSON file"
+                            className={ACTION_BTN}
                         >
                             <Upload className="w-3 h-3" />
+                            Import
                         </button>
-                        <button onClick={() => setIsExpanded(false)} className={ICON_BTN}>
+                        <input
+                            ref={fileRef}
+                            type="file"
+                            accept="application/json,.json"
+                            onChange={handleFile}
+                            className="hidden"
+                        />
+                        <button
+                            onClick={() => setIsExpanded(false)}
+                            className="p-1 text-muted-foreground/50 hover:text-muted-foreground rounded-lg hover:bg-muted/30 transition-colors"
+                        >
                             <X className="w-3 h-3" />
                         </button>
                     </div>
@@ -172,40 +171,6 @@ export const DevGraphPanel = ({ onImport }: DevGraphPanelProps) => {
                     <span>edges: {connections.length}</span>
                     <span>baseline: {baseline ? 'yes' : 'no'}</span>
                 </div>
-
-                {importOpen && (
-                    <div className="px-3 py-2 border-b border-border/20 space-y-1.5">
-                        <textarea
-                            value={importText}
-                            onChange={e => setImportText(e.target.value)}
-                            placeholder='Paste {"nodes":[...],"edges":[...]}'
-                            rows={4}
-                            className="w-full text-[10px] font-mono bg-black/20 border border-border/30 rounded p-1.5 resize-y outline-none"
-                        />
-                        {importError && <div className="text-[10px] font-mono text-red-400">{importError}</div>}
-                        <div className="flex items-center gap-1.5">
-                            <button
-                                onClick={() => void runImport(importText)}
-                                className="px-2 py-0.5 rounded-lg text-[10px] font-mono bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
-                            >
-                                Load
-                            </button>
-                            <button
-                                onClick={() => fileRef.current?.click()}
-                                className="px-2 py-0.5 rounded-lg text-[10px] font-mono bg-muted/30 text-muted-foreground hover:bg-muted/50 transition-colors"
-                            >
-                                File…
-                            </button>
-                            <input
-                                ref={fileRef}
-                                type="file"
-                                accept="application/json,.json"
-                                onChange={handleFile}
-                                className="hidden"
-                            />
-                        </div>
-                    </div>
-                )}
 
                 <div data-json className="px-3 py-2">
                     <JsonViewer
