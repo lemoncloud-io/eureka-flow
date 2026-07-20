@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChevronDown, Loader2, Lock, Sparkles } from 'lucide-react';
 
-import { isMissingAiKey, translateServerKey, useModelOptions } from '@flows/flows';
+import { isMissingAiKey, translateField, useModelOptions } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -122,7 +122,7 @@ export const ModelSelect = ({ blockType, value, onChange, disabled, dense, fallb
             <select className={fieldBase} value={value} onChange={e => onChange(e.target.value)} disabled={disabled}>
                 {fallbackOptions.map(opt => (
                     <option key={opt.value} value={opt.value}>
-                        {translateServerKey(t, opt.label)}
+                        {translateField(t, opt, 'label')}
                     </option>
                 ))}
             </select>

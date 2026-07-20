@@ -24,7 +24,7 @@ import {
     runNode,
     shouldUpdateState,
     toPortVariantData,
-    translateServerKey,
+    translateField,
     upsertPortNode,
     useBlockRegistry,
     useCanvasConnections,
@@ -1175,7 +1175,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 });
 
                 if (missingInputs.length > 0) {
-                    const missingLabels = missingInputs.map(p => translateServerKey(t, p.label) || p.id).join(', ');
+                    const missingLabels = missingInputs.map(p => translateField(t, p, 'label') || p.id).join(', ');
                     setNodes(prev =>
                         prev.map(n =>
                             n.id === nodeId

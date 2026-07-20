@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChevronUp, LayoutGrid, Search, X } from 'lucide-react';
 
-import { BLOCK_CATEGORIES, BLOCK_CATEGORY_CONFIG, translateServerKey, useBlockGroups } from '@flows/flows';
+import { BLOCK_CATEGORIES, BLOCK_CATEGORY_CONFIG, translateField, useBlockGroups } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import {
     Collapsible,
@@ -280,10 +280,11 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                                 <BlockCard
                                                                     key={block.id}
                                                                     type={block.id}
-                                                                    label={translateServerKey(t, block.label)}
-                                                                    description={translateServerKey(
+                                                                    label={translateField(t, block, 'label')}
+                                                                    description={translateField(
                                                                         t,
-                                                                        block.description
+                                                                        block,
+                                                                        'description'
                                                                     )}
                                                                     icon={block.icon}
                                                                     onAdd={() => handleAddNode(block.id)}

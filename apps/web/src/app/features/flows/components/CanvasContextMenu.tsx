@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChevronRight, Search, X } from 'lucide-react';
 
-import { BLOCK_CATEGORIES, BLOCK_CATEGORY_CONFIG, translateServerKey, useBlockGroups } from '@flows/flows';
+import { BLOCK_CATEGORIES, BLOCK_CATEGORY_CONFIG, translateField, useBlockGroups } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { BlockIcon } from './BlockIcon';
@@ -135,7 +135,7 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ screenX, s
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-1">
                                             <span className="text-xs font-medium text-foreground truncate">
-                                                {translateServerKey(t, block.label)}
+                                                {translateField(t, block, 'label')}
                                             </span>
                                         </div>
                                     </div>

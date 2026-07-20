@@ -32,7 +32,7 @@ import {
     isAiBlock,
     isMissingAiKey,
     processImageWithConfig,
-    translateServerKey,
+    translateField,
     useBlockRegistry,
     useS3Image,
 } from '@flows/flows';
@@ -686,7 +686,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
-                        placeholder={translateServerKey(t, field.placeholder)}
+                        placeholder={translateField(t, field, 'placeholder')}
                         disabled={isDisabled}
                     />
                 ) : (
@@ -695,7 +695,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
-                        placeholder={translateServerKey(t, field.placeholder)}
+                        placeholder={translateField(t, field, 'placeholder')}
                         disabled={isDisabled}
                     />
                 );
@@ -707,7 +707,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
-                        placeholder={translateServerKey(t, field.placeholder)}
+                        placeholder={translateField(t, field, 'placeholder')}
                         disabled={isDisabled}
                     />
                 );
@@ -756,7 +756,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     >
                         {field.options?.map(opt => (
                             <option key={opt.value} value={opt.value}>
-                                {translateServerKey(t, opt.label)}
+                                {translateField(t, opt, 'label')}
                             </option>
                         ))}
                     </select>
@@ -783,7 +783,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         <div className="flex-1 h-px bg-border/50" />
                         {field.label && (
                             <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">
-                                {translateServerKey(t, field.label)}
+                                {translateField(t, field, 'label')}
                             </span>
                         )}
                         <div className="flex-1 h-px bg-border/50" />
@@ -832,7 +832,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             </div>
                             <input
                                 type="text"
-                                value={selectedNode.customLabel || translateServerKey(t, def.label)}
+                                value={selectedNode.customLabel || translateField(t, def, 'label')}
                                 onChange={e => onLabelChange(selectedNode.id, e.target.value)}
                                 disabled={!canModifyCanvas}
                                 className="bg-transparent font-semibold text-sm text-foreground focus:bg-muted/30 outline-none rounded px-1.5 py-0.5 -ml-1 flex-1 min-w-0 border border-transparent focus:border-primary/40 transition-colors disabled:opacity-60 disabled:cursor-default"
@@ -995,7 +995,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                         ) : (
                                             <div key={field.key}>
                                                 <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
-                                                    {translateServerKey(t, field.label)}
+                                                    {translateField(t, field, 'label')}
                                                 </label>
                                                 {renderConfigInput(selectedNode, field, def)}
                                             </div>
@@ -1031,7 +1031,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                             <div className="flex justify-between items-center mb-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[11px] font-semibold text-foreground">
-                                                        {translateServerKey(t, input.label)}
+                                                        {translateField(t, input, 'label')}
                                                     </span>
                                                     {incomingConn && (
                                                         <button
@@ -1091,7 +1091,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                             <div className="flex justify-between items-center mb-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[11px] font-semibold text-foreground">
-                                                        {translateServerKey(t, output.label)}
+                                                        {translateField(t, output, 'label')}
                                                     </span>
                                                     {outgoingConns.length > 0 && (
                                                         <div className="flex gap-1">
@@ -1282,10 +1282,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 {t('flows:detailPanel.from')}
                             </div>
                             <div className="font-semibold text-sm text-primary group-hover:text-foreground transition-colors">
-                                {translateServerKey(t, sourceDef?.label) || t('flows:detailPanel.unknown')}
+                                {translateField(t, sourceDef, 'label') || t('flows:detailPanel.unknown')}
                             </div>
                             <div className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 bg-muted/50 px-2 py-0.5 rounded">
-                                {translateServerKey(t, sourcePort?.label)}
+                                {translateField(t, sourcePort, 'label')}
                             </div>
                         </div>
 
@@ -1311,10 +1311,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 {t('flows:detailPanel.to')}
                             </div>
                             <div className="font-semibold text-sm text-status-completed group-hover:text-foreground transition-colors">
-                                {translateServerKey(t, targetDef?.label) || t('flows:detailPanel.unknown')}
+                                {translateField(t, targetDef, 'label') || t('flows:detailPanel.unknown')}
                             </div>
                             <div className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 bg-muted/50 px-2 py-0.5 rounded">
-                                {translateServerKey(t, targetPort?.label)}
+                                {translateField(t, targetPort, 'label')}
                             </div>
                         </div>
                     </div>
