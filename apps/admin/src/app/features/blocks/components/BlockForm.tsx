@@ -11,6 +11,7 @@ import {
 } from '@flows/ui-kit';
 
 import { STEREO_OPTIONS } from '../types';
+import { KeyInput } from './KeyInput';
 
 import type { BlockFormData } from '../types';
 
@@ -34,6 +35,12 @@ export const BlockForm = ({ data, onChange, disabled = false }: BlockFormProps) 
             <div className="flex flex-col gap-2">
                 <Label>Label</Label>
                 <Input value={data.label} onChange={e => update('label', e.target.value)} disabled={disabled} />
+                <KeyInput
+                    value={data.labelEn}
+                    onChange={v => update('labelEn', v)}
+                    placeholder="input_text"
+                    disabled={disabled}
+                />
             </div>
             <div className="flex flex-col gap-2">
                 <Label>Icon</Label>
@@ -86,6 +93,12 @@ export const BlockForm = ({ data, onChange, disabled = false }: BlockFormProps) 
                     value={data.description}
                     onChange={e => update('description', e.target.value)}
                     rows={3}
+                    disabled={disabled}
+                />
+                <KeyInput
+                    value={data.descriptionEn}
+                    onChange={v => update('descriptionEn', v)}
+                    placeholder="input_text_desc"
                     disabled={disabled}
                 />
             </div>

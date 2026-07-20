@@ -8,12 +8,14 @@ import type { Block, BlockFormData, BlockStereo, ConfigItem, Port } from '../typ
 interface ServerPort {
     id: string;
     label?: string;
+    labelEn?: string;
     type?: string;
     required?: boolean;
 }
 
 interface ServerConfigOption {
     label: string;
+    labelEn?: string;
     value: string;
 }
 
@@ -21,7 +23,9 @@ interface ServerConfig {
     key: string;
     type: string;
     label?: string;
+    labelEn?: string;
     placeholder?: string;
+    placeholderEn?: string;
     defaultValue?: string;
     options?: ServerConfigOption[];
     short?: 0 | 1;
@@ -32,10 +36,18 @@ export interface BlockView {
     id: string;
     stereo?: string;
     name?: string;
+    /**
+     * Language key for the block name. The server may expose it as `labelEn` or
+     * `nameEn` — `name` and `label` hold the same text today — so read both and
+     * write the one the web app's `$definition.label` pairs with.
+     */
+    labelEn?: string;
+    nameEn?: string;
     visualType?: string;
     label?: string;
     icon?: string;
     description?: string;
+    descriptionEn?: string;
     order?: number;
     processType?: string;
     isFrontend?: boolean;
@@ -52,8 +64,10 @@ export interface BlockBody {
     stereo?: string;
     name?: string;
     label?: string;
+    labelEn?: string;
     icon?: string;
     description?: string;
+    descriptionEn?: string;
     order?: number;
     processType?: string;
     isFrontend?: boolean;
@@ -65,14 +79,16 @@ export interface BlockBody {
 const isStereo = (s: string | undefined): s is BlockStereo => s === 'input' || s === 'process' || s === 'output';
 
 const toUiPorts = (ports: ServerPort[] | undefined): Port[] =>
-    (ports ?? []).map(p => ({ id: p.id, label: p.label ?? '', type: p.type ?? 'any' }));
+    (ports ?? []).map(p => ({ id: p.id, label: p.label ?? '', labelEn: p.labelEn, type: p.type ?? 'any' }));
 
 const toUiConfigs = (configs: ServerConfig[] | undefined): ConfigItem[] =>
     (configs ?? []).map(c => ({
         key: c.key,
         type: (c.type as ConfigItem['type']) ?? 'text',
         label: c.label ?? '',
+        labelEn: c.labelEn,
         placeholder: c.placeholder,
+        placeholderEn: c.placeholderEn,
         defaultValue: c.defaultValue,
         options: c.options,
         short: c.short,
@@ -87,8 +103,10 @@ export const blockViewToBlock = (v: BlockView): Block => ({
     stereo: isStereo(v.stereo) ? v.stereo : 'process',
     name: v.name ?? '',
     label: v.label ?? '',
+    labelEn: v.labelEn ?? v.nameEn,
     icon: v.icon ?? '',
     description: v.description ?? '',
+    descriptionEn: v.descriptionEn,
     order: v.order ?? 0,
     processType: v.processType ?? v.visualType ?? '',
     input$: toUiPorts(v.input$$),
@@ -97,14 +115,17 @@ export const blockViewToBlock = (v: BlockView): Block => ({
     isFrontend: !!v.isFrontend,
 });
 
-const toServerPorts = (ports: Port[]): ServerPort[] => ports.map(p => ({ id: p.id, label: p.label, type: p.type }));
+const toServerPorts = (ports: Port[]): ServerPort[] =>
+    ports.map(p => ({ id: p.id, label: p.label, labelEn: p.labelEn, type: p.type }));
 
 const toServerConfigs = (configs: ConfigItem[]): ServerConfig[] =>
     configs.map(c => ({
         key: c.key,
         type: c.type,
         label: c.label,
+        labelEn: c.labelEn,
         placeholder: c.placeholder,
+        placeholderEn: c.placeholderEn,
         // server stores defaultValue as a string
         defaultValue: c.defaultValue != null ? String(c.defaultValue) : undefined,
         options: c.options,
@@ -116,8 +137,10 @@ export const blockToBlockBody = (form: BlockFormData): BlockBody => ({
     stereo: form.stereo,
     name: form.name,
     label: form.label,
+    labelEn: form.labelEn,
     icon: form.icon,
     description: form.description,
+    descriptionEn: form.descriptionEn,
     order: form.order,
     processType: form.processType,
     isFrontend: form.isFrontend,

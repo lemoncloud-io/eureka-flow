@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react';
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@flows/ui-kit';
 
 import { CONFIG_TYPE_OPTIONS } from '../types';
+import { KeyInput } from './KeyInput';
 
 import type { ConfigItem } from '../types';
 
@@ -18,14 +19,14 @@ const EMPTY_CONFIG: ConfigItem = {
     label: '',
 };
 
-type EditableConfigField = 'key' | 'type' | 'label' | 'placeholder' | 'defaultValue';
+type EditableConfigField = 'key' | 'type' | 'label' | 'labelEn' | 'placeholder' | 'defaultValue';
 
 export const ConfigEditor = ({ configs, onChange, disabled = false }: ConfigEditorProps) => {
     const addConfig = () => {
         onChange([...configs, { ...EMPTY_CONFIG }]);
     };
 
-    const updateConfig = (index: number, field: EditableConfigField, value: string) => {
+    const updateConfig = (index: number, field: EditableConfigField, value: string | undefined) => {
         const updated = configs.map((cfg, i) => (i === index ? { ...cfg, [field]: value } : cfg));
         onChange(updated);
     };
@@ -92,6 +93,14 @@ export const ConfigEditor = ({ configs, onChange, disabled = false }: ConfigEdit
                             <X className="h-4 w-4" />
                         </Button>
                     )}
+                    <div className="w-full">
+                        <KeyInput
+                            value={cfg.labelEn}
+                            onChange={v => updateConfig(index, 'labelEn', v)}
+                            placeholder="prompt"
+                            disabled={disabled}
+                        />
+                    </div>
                 </div>
             ))}
         </div>
