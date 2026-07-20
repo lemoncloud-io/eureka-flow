@@ -292,8 +292,8 @@ export const FlowEditorPage = () => {
             // serial round-trips into one.
             const blocksPromise = loadBlocks();
             // Guard against an unhandled rejection when the flow fetch throws first and the
-            // join below is never reached. (loadBlocks itself resolves even on a failed fetch
-            // — refetch() reports errors in its result — so the join guarantees settled, not ok.)
+            // join below is never reached; the join itself surfaces a blocks failure as the
+            // boot error.
             void blocksPromise.catch(() => undefined);
 
             const nodeIdFromHash = window.location.hash.replace('#', '') || null;
