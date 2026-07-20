@@ -1,5 +1,60 @@
 # Changelog
 
+## [2026-07-20] - root@0.61.0, @flows/web@0.61.0, @flows/admin@0.35.0
+
+### Features
+
+- (flows) add dev graph panel to inspect and round-trip the JSON graph
+- (flows) keep the working copy across a refresh
+- (flows) save before running, and stop runs a save cannot rescue
+- (flows) start flows locally and track saves against a baseline
+- (flows) add the workspace baseline and diff
+- (flows) generate node and edge IDs on the client
+- (flows) add headless canvas store factory
+
+### Bug Fixes
+
+- (mobile) stop nesting buttons inside the step card
+- (mobile) destructure the onRun prop MobileStepDetail already declares
+- (flows) surface a failed blocks fetch as the boot error
+
+### Documentation
+
+- (flows) correct the boot-join comment — settled, not surfaced
+- (plan) record boot parallelization done, staged-render B/C deferred
+- (plan) defer S8 staged loading with rationale
+- (plan) record the DEV smoke results
+- (plan) record what S7 recon overturned
+- (plan) prove the run surface rather than assert it
+- (plan) mark D-C retired where it was decided
+- (plan) record S6 and retire D-C
+- (plan) fold the S5 wiring check into the pre-ship DEV smoke
+- (plan) record S5 and re-aim D-C at the slice that can carry it
+- (plan) pin the baseline provenance questions S5 has to answer
+- (plan) record the run regression S3 opens
+- (plan) record S2 browser smoke results
+
+### Refactor
+
+- refactor code
+- (flows) save and run without the confirm prompt
+- (flows) auto-restore the draft silently with an undo instead of prompting
+- (flows) offer draft recovery as a non-blocking toast, not a modal confirm
+- (flows) make dev graph panel import/export file-based
+- (flows) remove dead canvas engine/history/layout hooks
+- (flows) let the run gate hand back the id it mints
+- (flows) drop the draft timestamp nobody reads
+- (flows) source the desktop canvas graph from the store
+
+### Chores
+
+- (docs) move local-json-graph working docs out of the repo
+
+### Other
+
+- perf: (flows) fetch blocks and flow in parallel during boot
+- test: (flows) cover the save body and the store's write notifications
+
 ## [2026-07-16] - root@0.60.0, @flows/web@0.60.0, @flows/admin@0.34.0
 
 ### Features
