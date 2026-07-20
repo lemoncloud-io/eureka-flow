@@ -274,10 +274,11 @@ S6 구현 시 주의: `loadWorkflow`가 undo 히스토리를 지우므로(`Workf
     - **오프라인 / 서버 로드 실패**: 신선한 baseline이 없다 → `draft.baseline`이 **유일하게 옳은 출처**. ← R6가 baseline을 저장하라는 이유가 정확히 이것
     - **draft 수명은 dirty 게이트** (autosave와 같은 D-B 논리): `diffAgainstBaseline`이 non-empty일 때만 쓰고, **clean이 되면 지운다**(save 성공). 안 지우면 서버와 같은 낡은 draft가 다음 부팅에서 "미저장 변경 복구?"를 헛발화. 그리고 스토어 변경이 아니라 **`diffAgainstBaseline` 기준으로 write** — 아니면 실행(상태/포트 변경)이 draft를 쓴다
 
-- [ ] **S8 — R7: 단계적 로딩** (P2)
+- [ ] **S8 — R7: 단계적 로딩** (P2) — **보류 (2026-07 조사 후 결정)**
     - 응답 수신 즉시 노드 골격 → config/port 하이드레이션 후속 마이크로태스크
     - C6대로 S3 오프로드는 범위 밖
     - blocked-by: S5
+    - **보류 근거**: (1) 진짜 비싼 부분(멀티-MB base64 이미지 디코드)은 이미 `S3Image`의 `<img>` 기본 async decode로 골격 뒤에 처리됨 — 시각적 staging은 공짜. S8이 없애는 건 config props의 React reconciliation뿐(노드 수백 개 아니면 미미). (2) spec의 "마이크로태스크"는 paint 전 flush라 2단계 페인트가 안 생김 — 실제론 `startTransition`/rAF 필요. (3) 대가는 `captureBaseline`을 하이드레이션 후로 옮기는 6사이트(데스크톱+모바일+소켓) 리팩터 = 이미 데인 baseline-타이밍 버그류 재노출. (4) 효과적 버전(서버 `/load`를 구조/데이터로 분할)은 §7대로 백엔드 과제 = 스코프 밖. → 착수 조건: 이미지-heavy flow에서 first-paint 실측 jank 확인되거나 서버 분할 API 선행.
 
 - [ ] **S9 — R8: undo/redo 재정의 + 죽은 코드 제거** (P2)
     - C1 재조준: 인라인(`WorkflowCanvas.tsx:405-442`)이 진짜. `useCanvasHistory`/`useCanvasEngine`/`useCanvasLayout`은 死
