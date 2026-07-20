@@ -53,6 +53,13 @@ describe('translateField', () => {
         expect(translateField(t, { label: 42 } as unknown as { label: string }, 'label')).toBe('');
     });
 
+    it('returns empty when a key resolves to nothing and the original was cleared', () => {
+        // Reachable once an operator sets a key and blanks the text it replaced: callers
+        // must fall back to an identifier rather than render an empty label.
+        const t = makeT();
+        expect(translateField(t, { label: '', labelEn: 'input_text' }, 'label')).toBe('');
+    });
+
     it('does not guess: snake_case original text stays as-is without an `<field>En` sibling', () => {
         const t = makeT({ 'blocks:input_text': '텍스트 입력' });
         expect(translateField(t, { label: 'input_text' }, 'label')).toBe('input_text');

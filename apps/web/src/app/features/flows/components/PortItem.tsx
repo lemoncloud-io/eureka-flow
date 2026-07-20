@@ -239,7 +239,9 @@ export const PortItem: React.FC<PortItemProps> = ({
             >
                 <div className="flex items-center gap-1">
                     {PortIcon && <PortIcon className="w-2.5 h-2.5 shrink-0" />}
-                    <span className="font-semibold uppercase tracking-wider">{translateField(t, port, 'label')}</span>
+                    <span className="font-semibold uppercase tracking-wider">
+                        {translateField(t, port, 'label') || port.id}
+                    </span>
                 </div>
                 {portData && (
                     <div className="mt-1 pt-1 border-t border-border/50">

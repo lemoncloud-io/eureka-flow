@@ -995,7 +995,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                         ) : (
                                             <div key={field.key}>
                                                 <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
-                                                    {translateField(t, field, 'label')}
+                                                    {translateField(t, field, 'label') || field.key}
                                                 </label>
                                                 {renderConfigInput(selectedNode, field, def)}
                                             </div>
@@ -1031,7 +1031,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                             <div className="flex justify-between items-center mb-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[11px] font-semibold text-foreground">
-                                                        {translateField(t, input, 'label')}
+                                                        {translateField(t, input, 'label') || input.id}
                                                     </span>
                                                     {incomingConn && (
                                                         <button
@@ -1091,7 +1091,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                             <div className="flex justify-between items-center mb-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[11px] font-semibold text-foreground">
-                                                        {translateField(t, output, 'label')}
+                                                        {translateField(t, output, 'label') || output.id}
                                                     </span>
                                                     {outgoingConns.length > 0 && (
                                                         <div className="flex gap-1">

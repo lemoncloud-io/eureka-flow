@@ -280,7 +280,9 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                                 <BlockCard
                                                                     key={block.id}
                                                                     type={block.id}
-                                                                    label={translateField(t, block, 'label')}
+                                                                    label={
+                                                                        translateField(t, block, 'label') || block.type
+                                                                    }
                                                                     description={translateField(
                                                                         t,
                                                                         block,
