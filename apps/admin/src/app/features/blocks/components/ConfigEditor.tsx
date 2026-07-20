@@ -53,74 +53,76 @@ export const ConfigEditor = ({ configs, onChange, disabled = false }: ConfigEdit
             </div>
             {configs.length === 0 && <p className="text-sm text-muted-foreground">설정 항목이 없습니다.</p>}
             {configs.map((cfg, index) => (
-                <div key={index} className="flex flex-wrap items-center gap-2 rounded-md border p-2">
-                    <Input
-                        placeholder="Key"
-                        value={cfg.key}
-                        onChange={e => updateConfig(index, 'key', e.target.value)}
-                        className="w-32"
-                        disabled={disabled}
-                    />
-                    <Select value={cfg.type} onValueChange={v => updateConfig(index, 'type', v)} disabled={disabled}>
-                        <SelectTrigger className="w-28">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {CONFIG_TYPE_OPTIONS.map(opt => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Input
-                        placeholder="Label"
-                        value={cfg.label}
-                        onChange={e => updateConfig(index, 'label', e.target.value)}
-                        className="flex-1"
-                        disabled={disabled}
-                    />
-                    <Input
-                        placeholder="Default Value"
-                        value={cfg.defaultValue ?? ''}
-                        onChange={e => updateConfig(index, 'defaultValue', e.target.value)}
-                        className="w-40"
-                        disabled={disabled}
-                    />
-                    {!disabled && (
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => removeConfig(index)}
-                        >
-                            <X className="h-4 w-4" />
-                        </Button>
-                    )}
-                    <div className="w-full">
-                        <KeyInput
-                            value={cfg.labelEn}
-                            onChange={v => updateConfig(index, 'labelEn', v)}
-                            placeholder="prompt"
+                <div key={index} className="flex flex-col gap-2 rounded-md border p-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                            placeholder="Key"
+                            value={cfg.key}
+                            onChange={e => updateConfig(index, 'key', e.target.value)}
+                            className="w-32"
                             disabled={disabled}
                         />
+                        <Select
+                            value={cfg.type}
+                            onValueChange={v => updateConfig(index, 'type', v)}
+                            disabled={disabled}
+                        >
+                            <SelectTrigger className="w-28">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {CONFIG_TYPE_OPTIONS.map(opt => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Input
+                            placeholder="Label"
+                            value={cfg.label}
+                            onChange={e => updateConfig(index, 'label', e.target.value)}
+                            className="flex-1"
+                            disabled={disabled}
+                        />
+                        <Input
+                            placeholder="Default Value"
+                            value={cfg.defaultValue ?? ''}
+                            onChange={e => updateConfig(index, 'defaultValue', e.target.value)}
+                            className="w-40"
+                            disabled={disabled}
+                        />
+                        {!disabled && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => removeConfig(index)}
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        )}
                     </div>
+
+                    <KeyInput
+                        value={cfg.labelEn}
+                        onChange={v => updateConfig(index, 'labelEn', v)}
+                        placeholder="prompt"
+                        disabled={disabled}
+                    />
                     <Input
                         placeholder="Placeholder"
                         value={cfg.placeholder ?? ''}
                         onChange={e => updateConfig(index, 'placeholder', e.target.value || undefined)}
-                        className="w-full"
                         disabled={disabled}
                     />
-                    <div className="w-full">
-                        <KeyInput
-                            value={cfg.placeholderEn}
-                            onChange={v => updateConfig(index, 'placeholderEn', v)}
-                            placeholder="prompt_hint"
-                            disabled={disabled}
-                        />
-                    </div>
+                    <KeyInput
+                        value={cfg.placeholderEn}
+                        onChange={v => updateConfig(index, 'placeholderEn', v)}
+                        placeholder="prompt_hint"
+                        disabled={disabled}
+                    />
                     {cfg.type === 'select' && (
                         <ConfigOptionEditor
                             options={cfg.options ?? []}

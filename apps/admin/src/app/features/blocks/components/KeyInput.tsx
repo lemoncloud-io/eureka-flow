@@ -2,9 +2,7 @@ import { cn } from '@flows/lib/utils';
 import { Input } from '@flows/ui-kit';
 
 import { useBlockKeyDictionary } from '../hooks';
-
-/** One shared list for every key field on the page — the browser dedupes by id. */
-const KEY_LIST_ID = 'block-language-keys';
+import { BLOCK_KEY_LIST_ID } from './BlockKeyDatalist';
 
 interface KeyInputProps {
     value: string | undefined;
@@ -18,6 +16,8 @@ interface KeyInputProps {
  * which is also what a typo produces — so this shows the translation the key
  * resolves to, says so when it resolves to nothing, and offers the keys that
  * already exist rather than leaving every key to be retyped from memory.
+ *
+ * The suggestion list itself lives in `BlockKeyDatalist`, mounted once per page.
  */
 export const KeyInput = ({ value, onChange, placeholder = 'snake_case', disabled = false }: KeyInputProps) => {
     const { data: dictionary, isError } = useBlockKeyDictionary();
@@ -40,18 +40,9 @@ export const KeyInput = ({ value, onChange, placeholder = 'snake_case', disabled
                 onChange={e => onChange(e.target.value.trim() || undefined)}
                 placeholder={placeholder}
                 disabled={disabled}
-                list={dictionary ? KEY_LIST_ID : undefined}
+                list={BLOCK_KEY_LIST_ID}
                 className={cn('h-7 font-mono text-xs', isUnregistered && 'border-warning')}
             />
-            {dictionary && (
-                <datalist id={KEY_LIST_ID}>
-                    {Object.entries(dictionary).map(([key, text]) => (
-                        <option key={key} value={key}>
-                            {text}
-                        </option>
-                    ))}
-                </datalist>
-            )}
             <span
                 className={cn(
                     'shrink-0 truncate text-xs',

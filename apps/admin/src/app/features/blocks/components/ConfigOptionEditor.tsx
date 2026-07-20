@@ -70,6 +70,7 @@ export const ConfigOptionEditor = ({ options, onChange, disabled = false }: Conf
                             </Button>
                         )}
                     </div>
+                    {/* Mirrors the row above — same width and gap — so the key lines up under Label. */}
                     <div className="flex gap-2 pr-9">
                         <div className="w-32 shrink-0" aria-hidden />
                         <div className="flex-1">

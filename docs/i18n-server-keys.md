@@ -84,8 +84,9 @@ admin이 최상위 *En 저장 → 서버가 $definition에 접어넣음 → web�
 셋 다 서버에 생기고 admin은 셋 다 편집한다.
 
 다만 **web이 렌더하는 건 `$definition`의 `label`/`description`뿐이다.** `$definition`이 따르는
-SDK 타입 `BlockDefinition`에는 `name` 필드가 없다. 즉 `nameEn`은 admin 목록 표시용이고,
-화면 번역을 좌우하는 건 `labelEn`·`descriptionEn`이므로 이 둘이 `$definition`에 실려야 한다.
+SDK 타입 `BlockDefinition`에는 `name` 필드가 없다. 즉 화면 번역을 좌우하는 건 `labelEn`·`descriptionEn`이므로 이 둘이 `$definition`에 실려야 한다.
+`nameEn`은 admin이 보관·편집만 하고 **현재 렌더하는 곳이 없다** — admin 목록은 원문 `name`을
+그대로 표시한다.
 
 ## 6. 적용 지점
 

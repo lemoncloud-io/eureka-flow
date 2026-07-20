@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Button, Card, CardContent, CardHeader, CardTitle, Separator } from '@flows/ui-kit';
 
 import { BlockForm } from '../components/BlockForm';
+import { BlockKeyDatalist } from '../components/BlockKeyDatalist';
 import { ConfigEditor } from '../components/ConfigEditor';
 import { PortEditor } from '../components/PortEditor';
 import { useBlocksQuery, useCreateBlockMutation, useUpdateBlockMutation } from '../hooks';
@@ -87,6 +88,7 @@ export const BlockDetailPage = () => {
 
     return (
         <div className="flex flex-col gap-6">
+            <BlockKeyDatalist />
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <Button variant="ghost" size="sm" onClick={() => navigate('/blocks')}>

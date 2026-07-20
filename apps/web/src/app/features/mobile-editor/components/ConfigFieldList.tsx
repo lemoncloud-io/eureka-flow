@@ -67,7 +67,7 @@ export const ConfigFieldList = ({ fields, config, onConfigChange, blockType }: C
                                 >
                                     {field.options.map(opt => (
                                         <option key={opt.value} value={opt.value}>
-                                            {translateField(t, opt, 'label')}
+                                            {translateField(t, opt, 'label') || opt.value}
                                         </option>
                                     ))}
                                 </select>
