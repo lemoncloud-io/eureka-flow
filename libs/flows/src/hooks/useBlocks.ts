@@ -24,10 +24,15 @@ export const useBlocks = () => {
     }, [blocksQuery.data, setBlockRegistry, setBlocksLoaded]);
 
     /**
-     * Manually refetch blocks
+     * Manually refetch blocks.
+     *
+     * Throws on a failed fetch — refetch() alone resolves with the error tucked in its
+     * result, which let a dead blocks endpoint boot the editor with an empty registry
+     * instead of the error screen. Callers that can live without the server catch and
+     * fall back (the tutorials); the editors let it reach their boot error.
      */
     const loadBlocks = useCallback(async () => {
-        const result = await blocksQuery.refetch();
+        const result = await blocksQuery.refetch({ throwOnError: true });
         return result.data ?? [];
     }, [blocksQuery]);
 

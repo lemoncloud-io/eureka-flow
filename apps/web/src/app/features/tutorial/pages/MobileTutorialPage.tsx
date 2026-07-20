@@ -35,7 +35,7 @@ export const MobileTutorialPage = () => {
         return () => useCanvasStore.getState().setTutorialHint(null);
     }, []);
 
-    const connectionMode = useConnectionMode(blockRegistry as Record<string, BlockDefinitionWithFrontend>, null);
+    const connectionMode = useConnectionMode(blockRegistry as Record<string, BlockDefinitionWithFrontend>);
     const handleTapCard = useCallback(() => {
         /* intentionally empty — tutorial doesn't open config */
     }, []);
@@ -100,7 +100,6 @@ export const MobileTutorialPage = () => {
                     onAddStep={() => {
                         /* tutorial does not allow adding steps */
                     }}
-                    flowId={null}
                     role="editor"
                 />
             </div>

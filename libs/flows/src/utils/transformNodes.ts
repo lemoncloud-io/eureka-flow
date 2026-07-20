@@ -32,8 +32,8 @@ export const transformNodeForSave = (
     if (height) slim.height = height;
     if (node.customLabel) slim.customLabel = node.customLabel;
     if (node.description) slim.description = node.description;
-    // Persist config: server replaces (does not merge) on /flows/:id/save,
-    // so omitting it overwrites prior upsertNode writes with an empty object.
+    // Save is the only writer of config, and the server replaces rather than merges,
+    // so whatever we send here is the config the flow ends up with.
     if (node.config && Object.keys(node.config).length > 0) slim.config = node.config;
 
     // id, type, blockId, position are always set above — Partial used for conditional fields only

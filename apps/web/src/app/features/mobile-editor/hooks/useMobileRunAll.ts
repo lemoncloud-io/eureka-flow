@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { runFlow, useCanvasStore, useFlows, useFlowsStore } from '@flows/flows';
+import { runFlow, useCanvasStore, useFlowsStore } from '@flows/flows';
+
+import { useRunGate } from '../../flows/hooks/useRunGate';
 
 import type { NodeData, NodeState } from '@lemoncloud/eureka-flows-api';
 
@@ -22,13 +24,14 @@ interface UseMobileRunAllParams {
 
 export const useMobileRunAll = ({ socketConnectionId }: UseMobileRunAllParams = {}): UseMobileRunAllReturn => {
     const { t } = useTranslation(['flows']);
-    const { currentFlowId } = useFlows();
+    const runGate = useRunGate();
     const [runProgress, setRunProgress] = useState<{ current: number; total: number; currentNodeId?: string } | null>(
         null
     );
 
     const handleRunAll = useCallback(async () => {
-        if (!currentFlowId) return;
+        const runFlowId = await runGate();
+        if (!runFlowId) return;
 
         const { nodes, updateNodeData } = useCanvasStore.getState();
         const blockRegistry = useFlowsStore.getState().blockRegistry;
@@ -52,7 +55,7 @@ export const useMobileRunAll = ({ socketConnectionId }: UseMobileRunAllParams = 
         setRunProgress({ current: 0, total });
 
         try {
-            await runFlow(currentFlowId, inputNodeIds, { connection: socketConnectionId });
+            await runFlow(runFlowId, inputNodeIds, { connection: socketConnectionId });
         } catch {
             // Reset input nodes to IDLE on failure
             for (const id of inputNodeIds) {
@@ -62,7 +65,7 @@ export const useMobileRunAll = ({ socketConnectionId }: UseMobileRunAllParams = 
         } finally {
             setRunProgress(null);
         }
-    }, [currentFlowId, socketConnectionId, t]);
+    }, [runGate, socketConnectionId, t]);
 
     return {
         runProgress,

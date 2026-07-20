@@ -90,28 +90,6 @@ export const createFlow = async (body?: Partial<SaveFlowBody>): Promise<SaveFlow
 };
 
 /**
- * Upsert flow (batch update nodes and edges)
- * POST /flows/:id/upsert
- *
- * Use this for batch operations like:
- * - Moving multiple nodes at once
- * - Bulk node/edge updates
- *
- * @see eureka-flows-api v0.26.212
- * @param id - Flow ID to upsert into
- * @param body - SaveFlowBody { nodes: NodeData[], edges: EdgeData[] }
- * @returns SaveFlowView with updated nodes, edges, ports
- */
-export const upsertFlow = async (id: string, body: SaveFlowBody): Promise<SaveFlowView> => {
-    if (!id) {
-        throw new Error('Flow ID is required');
-    }
-    _log(`> upsertFlow(${id})`, { nodeCount: body.nodes?.length ?? 0, edgeCount: body.edges?.length ?? 0 });
-    const response = await api.post<SaveFlowView>(`/flows/${encodePathSegment(id)}/upsert`, body);
-    return response.data;
-};
-
-/**
  * Update flow metadata (name, description, isPublic, etc.)
  * POST /flows/:id/upsert
  *

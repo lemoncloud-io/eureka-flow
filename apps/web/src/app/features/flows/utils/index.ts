@@ -1,15 +1,7 @@
-import {
-    TEMP_ID_PREFIXES,
-    compressImageIfNeeded,
-    generateTempId,
-    isTempId,
-    isUnresolvedTempId,
-    resolveTempId,
-} from '@flows/flows';
+import { compressImageIfNeeded } from '@flows/flows';
 
 import type { UploadHtmlProductView } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
-import type { Dispatch, SetStateAction } from 'react';
 
 // ============================================================
 // Port Type Utilities
@@ -113,6 +105,13 @@ export const getVisiblePorts = (
 export const getConnectionKey = (conn: Connection): string =>
     `${conn.sourceNodeId}:${conn.sourcePortId}→${conn.targetNodeId}:${conn.targetPortId}`;
 
+/**
+ * Collapse edges that describe the same connection, keeping the first.
+ *
+ * Nothing creates duplicates any more — an edge gets one client-generated ID and keeps
+ * it — but flows saved before that can carry two edges for one connection, so loaded
+ * data still needs this.
+ */
 export const deduplicateEdges = (edges: Connection[]): Connection[] => {
     const edgeMap = new Map<string, Connection>();
     const seenIds = new Set<string>();
@@ -124,36 +123,16 @@ export const deduplicateEdges = (edges: Connection[]): Connection[] => {
         }
 
         const key = getConnectionKey(edge);
-        const existing = edgeMap.get(key);
-
-        if (!existing) {
-            edgeMap.set(key, edge);
-            if (edge.id) seenIds.add(edge.id);
-        } else {
-            const existingIsTemp = isTempId(existing.id);
-            const newIsTemp = isTempId(edge.id);
-
-            if (existingIsTemp && !newIsTemp) {
-                // Remove the old temp ID from seenIds before replacing
-                if (existing.id) seenIds.delete(existing.id);
-                edgeMap.set(key, edge);
-                if (edge.id) seenIds.add(edge.id);
-            }
+        if (edgeMap.has(key)) {
+            return;
         }
+
+        edgeMap.set(key, edge);
+        if (edge.id) seenIds.add(edge.id);
     });
 
     return Array.from(edgeMap.values());
 };
-
-/**
- * Generate a unique ID
- * @deprecated Use generateTempId for new node/edge creation (server assigns final ID)
- */
-export const generateId = (): string => Math.random().toString(36).slice(2, 11);
-
-// Temp-ID utilities now live in @flows/flows (single source of truth shared with the
-// lib sync hooks). Re-exported here so existing imports from this barrel keep working.
-export { generateTempId, isTempId, isUnresolvedTempId, resolveTempId, TEMP_ID_PREFIXES };
 
 /**
  * Calculate bezier curve path for connection lines
@@ -203,47 +182,6 @@ export const isValidConnection = (
 ): boolean => {
     if (sourceNode.id === targetNode.id) return false;
     return arePortTypesCompatible(sourceType, targetType);
-};
-
-/**
- * Replace a temporary node ID with server-assigned ID in all state
- * Used after server assigns real ID to a node created with temp ID
- *
- * @param oldTempId - Temporary ID to replace
- * @param newServerId - Server-assigned ID
- * @param setNodes - React state setter for nodes
- * @param setConnections - React state setter for connections
- * @param setSelectedNodeIds - React state setter for selected node IDs
- */
-export const replaceNodeIdInState = (
-    oldTempId: string,
-    newServerId: string,
-    setNodes: Dispatch<SetStateAction<NodeData[]>>,
-    setConnections: Dispatch<SetStateAction<Connection[]>>,
-    setSelectedNodeIds: Dispatch<SetStateAction<Set<string>>>
-): void => {
-    // Replace temp node ID with server ID in nodes array
-    setNodes(prev => prev.map(n => (n.id === oldTempId ? { ...n, id: newServerId } : n)));
-
-    // Replace temp node ID in connections (sourceNodeId or targetNodeId)
-    setConnections(prev =>
-        prev.map(c => ({
-            ...c,
-            sourceNodeId: c.sourceNodeId === oldTempId ? newServerId : c.sourceNodeId,
-            targetNodeId: c.targetNodeId === oldTempId ? newServerId : c.targetNodeId,
-        }))
-    );
-
-    // Update selection if the temp ID was selected
-    setSelectedNodeIds(prev => {
-        if (prev.has(oldTempId)) {
-            const next = new Set(prev);
-            next.delete(oldTempId);
-            next.add(newServerId);
-            return next;
-        }
-        return prev;
-    });
 };
 
 export { wouldCreateCycle } from './graph';

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 
-import { createFlow, loadFlow } from '../api';
+import { loadFlow } from '../api';
 import { FLOW_FORBIDDEN } from '../consts';
 import {
     flowsKeys,
@@ -13,8 +13,7 @@ import {
 } from './queries';
 import { useFlowsStore } from '../stores/useFlowsStore';
 import { flowStorage } from '../utils/flowStorage';
-import { excludeUnresolvedFromSave } from '../utils/saveFilter';
-import { transformNodesForSave } from '../utils/transformNodes';
+import { clearDraft, emptySnapshot, rebaseline, toSnapshot } from '../workspace';
 
 import type { SaveStatus } from '../stores/useFlowsStore';
 import type { LoadFlowResult, SaveFlowBody, UpdateFlowBody } from '../types';
@@ -58,6 +57,7 @@ export const useFlows = () => {
         setHasOwned,
         flowThumbnail,
         setFlowThumbnail,
+        setBaseline,
     } = useFlowsStore();
 
     // Cleanup timeout on unmount to prevent memory leaks
@@ -84,7 +84,7 @@ export const useFlows = () => {
      * @returns LoadFlowResult if flow loaded, null if new flow created
      */
     const initializeFlow = useCallback(async (): Promise<{
-        flowId: string;
+        flowId: string | null;
         flowData: LoadFlowResult | null;
         isNew: boolean;
     }> => {
@@ -119,25 +119,21 @@ export const useFlows = () => {
             }
         }
 
-        // No saved flow or failed to load - create new flow
-        console.log('[useFlows] Creating new flow via POST /flows/0/save');
-        const result = await createFlow({ nodes: [], edges: [] });
-        const newFlowId = result.id;
-
-        if (!newFlowId) {
-            throw new Error('Failed to create new flow: no ID returned');
-        }
-
-        setCurrentFlowId(newFlowId);
-        flowStorage.setFlowId(newFlowId);
+        // No saved flow, or it would not load: start on a purely local working copy.
+        // The flow claims an ID from its first save, so a session can open, build a
+        // graph and undo it all again without the network being reachable at all.
+        setCurrentFlowId(null);
+        flowStorage.clearFlowId();
         setFlowName('Untitled Workflow');
         setFlowDescription('');
         setIsPublic(false);
         setIsEditable(true);
         setHasOwned(true);
         setFlowThumbnail('');
-        return { flowId: newFlowId, flowData: null, isNew: true };
+        setBaseline(emptySnapshot());
+        return { flowId: null, flowData: null, isNew: true };
     }, [
+        setBaseline,
         queryClient,
         setCurrentFlowId,
         setFlowName,
@@ -249,7 +245,7 @@ export const useFlows = () => {
     const saveCurrentFlow = useCallback(
         async (
             body: Partial<SaveFlowBody> & { connections?: SaveFlowBody['edges'] }
-        ): Promise<{ success: boolean; id: string }> => {
+        ): Promise<{ success: boolean; id: string; structureDropped: boolean }> => {
             // Set saving status (subtle indicator, not blocking)
             updateSaveStatus('saving');
 
@@ -258,15 +254,16 @@ export const useFlows = () => {
                 const { nodes = [], edges, connections } = body;
                 const edgesData = edges ?? connections ?? [];
 
-                // Save replaces the flow's whole node list on the server — unresolved
-                // session temp IDs must never reach it (they get persisted as canonical
-                // IDs and corrupt the flow; excluded entities are saved on the next
-                // autosave once the server assigns their ID).
-                const savable = excludeUnresolvedFromSave(nodes, edgesData);
-
+                // Always send the whole working copy: the server replaces the flow's node
+                // and edge lists with whatever this body carries, so anything left out is
+                // dropped from the flow. That is also how deletes are expressed.
+                //
+                // The body is a snapshot in the workspace sense, not merely shaped like
+                // one. That is what lets it become the next baseline below, and what makes
+                // "is there anything to save" and "does the graph differ from the baseline"
+                // the same question rather than two that drift apart.
                 const { blockRegistry } = useFlowsStore.getState();
-                const slimNodes = transformNodesForSave(savable.nodes, blockRegistry);
-                const saveBody: SaveFlowBody = { nodes: slimNodes, edges: savable.edges };
+                const saveBody: SaveFlowBody = toSnapshot({ nodes, edges: edgesData }, blockRegistry);
 
                 // Store for retry on failure
                 lastSaveBodyRef.current = saveBody;
@@ -289,13 +286,21 @@ export const useFlows = () => {
                     await saveFlowMutation.mutateAsync({ id: flowId, body: saveBody });
                 }
 
+                const structureDropped = rebaseline(saveBody);
+
+                // The server has it now, so the local copy has nothing left to protect.
+                // Leaving it would offer to recover work that is already saved on the next
+                // boot. A dropped structure is the exception: that work really is still
+                // only here, so the draft stays as the one place it survives a refresh.
+                if (!structureDropped) void clearDraft();
+
                 setLastSavedAt(new Date());
                 updateSaveStatus('success');
-                return { success: true, id: flowId || '' };
+                return { success: true, id: flowId || '', structureDropped };
             } catch (error) {
                 console.error('[useFlows] Failed to save flow:', error);
                 updateSaveStatus('error', error instanceof Error ? error : new Error('Failed to save flow'));
-                return { success: false, id: '' };
+                return { success: false, id: '', structureDropped: false };
             }
         },
         [currentFlowId, createFlowMutation, saveFlowMutation, setLastSavedAt, setCurrentFlowId, updateSaveStatus]
@@ -307,41 +312,30 @@ export const useFlows = () => {
     const retrySave = useCallback(async () => {
         if (!lastSaveBodyRef.current) {
             updateSaveStatus('idle');
-            return { success: false, id: '' };
+            return { success: false, id: '', structureDropped: false };
         }
         // Retry with stored save body
         return saveCurrentFlow(lastSaveBodyRef.current);
     }, [saveCurrentFlow, updateSaveStatus]);
 
     /**
-     * Create a new flow (local state + server)
+     * Start a new flow on a local working copy. No network — the flow claims an ID from
+     * its first save, and stays purely local until then.
      */
-    const createNewFlow = useCallback(async (): Promise<string | null> => {
-        try {
-            console.log('[useFlows] Creating new flow');
-            const result = await createFlowMutation.mutateAsync({ nodes: [], edges: [] });
-            const newFlowId = result.id;
-
-            if (newFlowId) {
-                setCurrentFlowId(newFlowId);
-                flowStorage.setFlowId(newFlowId);
-                setFlowName('Untitled Workflow');
-                setFlowDescription('');
-                setLastSavedAt(null);
-                setChannelId(null);
-                setIsPublic(false);
-                setIsEditable(true);
-                setHasOwned(true);
-                setFlowThumbnail('');
-                return newFlowId;
-            }
-            return null;
-        } catch (error) {
-            console.error('[useFlows] Failed to create new flow:', error);
-            return null;
-        }
+    const createNewFlow = useCallback((): void => {
+        setCurrentFlowId(null);
+        flowStorage.clearFlowId();
+        setFlowName('Untitled Workflow');
+        setFlowDescription('');
+        setLastSavedAt(null);
+        setChannelId(null);
+        setIsPublic(false);
+        setIsEditable(true);
+        setHasOwned(true);
+        setFlowThumbnail('');
+        setBaseline(emptySnapshot());
     }, [
-        createFlowMutation,
+        setBaseline,
         setCurrentFlowId,
         setFlowName,
         setFlowDescription,

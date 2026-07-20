@@ -7,7 +7,9 @@ import { toast } from 'sonner';
 
 import {
     FLOW_FORBIDDEN,
+    captureBaseline,
     deriveRole,
+    diffAgainstBaseline,
     getPermissions,
     getProfile,
     toAiKeyStatus,
@@ -24,6 +26,7 @@ import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
 import { AiKeyDialog } from '../components/AiKeyDialog';
 import { DesktopMobileSwitchCta } from '../components/DesktopMobileSwitchCta';
+import { DevGraphPanel } from '../components/DevGraphPanel';
 import { DevRoleChip } from '../components/DevRoleChip';
 import { DevSocketPanel } from '../components/DevSocketPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
@@ -34,17 +37,18 @@ import { ProductProgressBanner } from '../components/ProductProgressBanner';
 import { PublishDialog } from '../components/PublishDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
+import { useDraftPersistence } from '../hooks/useDraftPersistence';
+import { useDraftRecovery } from '../hooks/useDraftRecovery';
+import { useReconnectNotice } from '../hooks/useReconnectNotice';
+import { useRunGate } from '../hooks/useRunGate';
 import { useSocketHandlers } from '../hooks/useSocketHandlers';
 import { useSocketRecorder } from '../hooks/useSocketRecorder';
 
 import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
-import type { FlowRole } from '@flows/flows';
+import type { FlowJson, FlowRole } from '@flows/flows';
 import type { ProductProgressInfo, WebSocketMessage } from '@flows/socket';
-
-const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[]; edges?: unknown[] }): string =>
-    JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? data.edges ?? [] });
 
 const STAGGER_DELAY_MS = 80;
 const staggerStyle = (index: number): React.CSSProperties => ({
@@ -89,8 +93,6 @@ export const FlowEditorPage = () => {
         publishFlow,
     } = useFlows();
 
-    const lastSavedStateRef = useRef<string | null>(null);
-
     const {
         handleFlowUpdate,
         handleNodeUpdate,
@@ -106,10 +108,10 @@ export const FlowEditorPage = () => {
         blockRegistry,
         currentFlowId,
         loadFlowById,
-        lastSavedStateRef,
-        serializeWorkflowState,
     });
 
+    const runGate = useRunGate();
+    const recoverDraft = useDraftRecovery();
     const socketRecorder = useSocketRecorder();
     const { record: recordSocketMessage } = socketRecorder;
     const refreshCredits = useCreditsRefresh();
@@ -197,6 +199,12 @@ export const FlowEditorPage = () => {
     const role: FlowRole = devRoleOverride ?? computedRole;
     const permissions = getPermissions(role);
 
+    // Auto-save is off by default, so this is what stands between an unsaved flow and a
+    // refresh. Only for users who could save it: there is no unsaved work to keep for
+    // someone the server would not accept it from anyway.
+    useDraftPersistence({ enabled: isAppReady && permissions.canSave });
+    useReconnectNotice();
+
     const autoSaveTimerRef = useRef<number | null>(null);
 
     const handleOpenLibrary = useCallback(() => {
@@ -238,7 +246,7 @@ export const FlowEditorPage = () => {
                 const flowData = await loadFlowById(flowId);
                 if (canvasRef.current && flowData) {
                     await canvasRef.current.loadWorkflow(flowData);
-                    lastSavedStateRef.current = serializeWorkflowState(flowData);
+                    captureBaseline(canvasRef.current.getWorkflow());
                 }
                 updateUrl(flowId, null);
             } catch (error) {
@@ -278,7 +286,15 @@ export const FlowEditorPage = () => {
             }
 
             setLoadingText(t('flowEditor.loadingBlockRegistry'));
-            await loadBlocks();
+            // Blocks and the flow are independent fetches; start them together and join before
+            // render. The registry only has to be in before the canvas draws a node (its type
+            // and ports resolve through it), so awaiting it below rather than here turns two
+            // serial round-trips into one.
+            const blocksPromise = loadBlocks();
+            // Guard against an unhandled rejection when the flow fetch throws first and the
+            // join below is never reached; the join itself surfaces a blocks failure as the
+            // boot error.
+            void blocksPromise.catch(() => undefined);
 
             const nodeIdFromHash = window.location.hash.replace('#', '') || null;
 
@@ -317,6 +333,8 @@ export const FlowEditorPage = () => {
                 }
             }
 
+            // Join the block fetch started above before anything renders a node.
+            await blocksPromise;
             setIsAppReady(true);
 
             // Wait for canvas to mount after render
@@ -325,7 +343,17 @@ export const FlowEditorPage = () => {
                     if (initialFlow) {
                         try {
                             await canvasRef.current.loadWorkflow(initialFlow);
-                            lastSavedStateRef.current = serializeWorkflowState(initialFlow);
+                            // Baseline off the canvas rather than initialFlow, and only
+                            // here — after loadBlocks. The response omits fields the canvas
+                            // fills in and the registry resolves, so a baseline built from
+                            // it reads dirty against a flow nobody has touched, and every
+                            // load would trip auto-save.
+                            captureBaseline(canvasRef.current.getWorkflow());
+                            // Only now: the draft is judged against this baseline, and
+                            // before it exists every flow looks unsaved.
+                            await recoverDraft(working => {
+                                void canvasRef.current?.loadWorkflow(working);
+                            });
                         } catch (error) {
                             console.error('[FlowEditor] Failed to load workflow:', error);
                         }
@@ -380,12 +408,13 @@ export const FlowEditorPage = () => {
         autoSaveTimerRef.current = window.setTimeout(() => {
             if (canvasRef.current) {
                 const data = canvasRef.current.getWorkflow();
-                const currentState = serializeWorkflowState(data);
 
-                if (currentState !== lastSavedStateRef.current) {
+                // Nothing to save if the graph matches the baseline. A run rewrites node
+                // status and port data, and the diff ignores all of it — otherwise
+                // running a flow would look like an edit and save itself in a circle.
+                if (!diffAgainstBaseline(data).isEmpty) {
                     lastLocalUpdateTimestampRef.current = Date.now(); // Mark save time to ignore self-echo
                     saveCurrentFlow(data);
-                    lastSavedStateRef.current = currentState;
                 }
             }
         }, 2000);
@@ -406,8 +435,21 @@ export const FlowEditorPage = () => {
         lastLocalUpdateTimestampRef.current = Date.now(); // Mark save time to ignore self-echo from socket
         const result = await saveCurrentFlow(data);
         if (result.success) {
-            lastSavedStateRef.current = serializeWorkflowState(data);
-            showNotification(t('flowEditor.savedAs', { flowName }), 'success');
+            // A 200 does not mean the whole graph landed — an editor's added and deleted
+            // steps are dropped server-side without complaint, and this is the only place
+            // the user would ever hear about it. Say that instead of "saved", which here
+            // would be the more misleading of the two.
+            if (result.structureDropped) {
+                showNotification(
+                    t(
+                        'flowEditor.savedWithoutStructure',
+                        'Saved the step settings only. Added and deleted steps need owner access.'
+                    ),
+                    'error'
+                );
+            } else {
+                showNotification(t('flowEditor.savedAs', { flowName }), 'success');
+            }
             if (result.id !== currentFlowId) {
                 updateUrl(result.id, window.location.hash.replace('#', ''));
             }
@@ -416,18 +458,15 @@ export const FlowEditorPage = () => {
         }
     };
 
-    const handleNew = async () => {
+    const handleNew = () => {
         if (!canvasRef.current) return;
         if (window.confirm(t('flowEditor.confirmNewFlow'))) {
             canvasRef.current.newWorkflow();
-            lastSavedStateRef.current = serializeWorkflowState({ nodes: [], connections: [] });
-            const newId = await createNewFlow();
-            if (newId) {
-                updateUrl(newId, null);
-                showNotification(t('flowEditor.newFlowCreated'), 'success');
-            } else {
-                showNotification(t('flowEditor.failedToCreateFlow'), 'error');
-            }
+            // No server flow yet — the first save claims the ID, so the URL has nothing
+            // to point at until then.
+            createNewFlow();
+            updateUrl(null, null);
+            showNotification(t('flowEditor.newFlowCreated'), 'success');
         }
     };
 
@@ -461,13 +500,16 @@ export const FlowEditorPage = () => {
         canvasRef.current?.addNode(type);
     }, []);
 
+    const handleBeforeRun = useCallback(async (): Promise<boolean> => Boolean(await runGate()), [runGate]);
+
     const handleRunAll = useCallback(async () => {
+        if (!(await handleBeforeRun())) return;
         try {
             await canvasRef.current?.runAll();
         } catch {
             showNotification(t('flowEditor.failedToRunFlow', 'Failed to run flow'), 'error');
         }
-    }, [t]);
+    }, [handleBeforeRun, t]);
 
     const handleSelectionChange = (nodeId: string | null) => {
         updateUrl(currentFlowId, nodeId);
@@ -497,6 +539,13 @@ export const FlowEditorPage = () => {
             showNotification(t('flowEditor.exportImageFailed'), 'error');
         }
     };
+
+    const handleDevImport = useCallback(async (graph: FlowJson) => {
+        if (!canvasRef.current) return;
+        await canvasRef.current.loadWorkflow(graph);
+        // Leave the baseline untouched so the imported graph reads dirty and can be saved
+        // through the normal path — that round-trip is the whole point of the dev panel.
+    }, []);
 
     const handleExport = () => {
         if (!canvasRef.current) return;
@@ -703,6 +752,7 @@ export const FlowEditorPage = () => {
                     connectionId={socketConnectionId ?? undefined}
                     onNodeSelect={handleSelectionChange}
                     onChange={handleCanvasChange}
+                    onBeforeRun={handleBeforeRun}
                     onOpenLibrary={handleOpenLibrary}
                     onConnectionError={handleConnectionError}
                     onShowNotification={showNotification}
@@ -884,6 +934,8 @@ export const FlowEditorPage = () => {
                     onMarkReplayed={socketRecorder.markReplayed}
                 />
             )}
+
+            {showDevTools && <DevGraphPanel onImport={handleDevImport} />}
 
             {/* Loading Overlay */}
             {isLoading && (

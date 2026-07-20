@@ -3,35 +3,28 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { upsertNode, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { captureBaseline, newNodeId, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 
-import { generateTempId } from '../../flows/utils';
-
-import type { SerializeWorkflowFn } from './types';
 import type { NodeState } from '@flows/flows';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 interface UseMobileFlowActionsParams {
     updateUrl: (flowId: string | null) => void;
-    serializeWorkflowState: SerializeWorkflowFn;
-    lastSavedStateRef: React.MutableRefObject<string | null>;
     lastLocalUpdateTimestampRef: React.MutableRefObject<number | null>;
 }
 
 interface UseMobileFlowActionsReturn {
     handleSave: () => Promise<void>;
     handleSelectFlow: (flowId: string) => Promise<void>;
-    /** Returns the final node ID (server-assigned or temp) */
+    /** Returns the new node's ID */
     handleAddBlock: (type: string) => Promise<string | null>;
     handleExport: () => void;
     /** Creates new flow without confirm — for MobileNewFlowSheet */
-    handleCreateNewFlow: () => Promise<string | null>;
+    handleCreateNewFlow: () => void;
 }
 
 export const useMobileFlowActions = ({
     updateUrl,
-    serializeWorkflowState,
-    lastSavedStateRef,
     lastLocalUpdateTimestampRef,
 }: UseMobileFlowActionsParams): UseMobileFlowActionsReturn => {
     const { t } = useTranslation(['flows']);
@@ -43,37 +36,41 @@ export const useMobileFlowActions = ({
         lastLocalUpdateTimestampRef.current = Date.now();
         const result = await saveCurrentFlow({ nodes, connections });
         if (result.success) {
-            lastSavedStateRef.current = serializeWorkflowState({ nodes, connections });
-            toast.success(t('flowEditor.savedAs', { flowName }));
+            // A 200 does not mean the whole graph landed — an editor's added and deleted
+            // steps are dropped server-side without complaint. Saying "saved" here would
+            // be the more misleading of the two.
+            if (result.structureDropped) {
+                toast.error(
+                    t(
+                        'flowEditor.savedWithoutStructure',
+                        'Saved the step settings only. Added and deleted steps need owner access.'
+                    )
+                );
+            } else {
+                toast.success(t('flowEditor.savedAs', { flowName }));
+            }
             if (result.id !== currentFlowId) updateUrl(result.id);
         } else {
             toast.error(t('flowEditor.failedToSaveWorkflow'));
         }
-    }, [
-        saveCurrentFlow,
-        flowName,
-        currentFlowId,
-        updateUrl,
-        t,
-        serializeWorkflowState,
-        lastSavedStateRef,
-        lastLocalUpdateTimestampRef,
-    ]);
+    }, [saveCurrentFlow, flowName, currentFlowId, updateUrl, t, lastLocalUpdateTimestampRef]);
 
     const handleSelectFlow = useCallback(
         async (flowId: string) => {
             try {
                 const flowData = await loadFlowById(flowId);
                 if (flowData) {
-                    useCanvasStore.getState().loadWorkflow(flowData);
-                    lastSavedStateRef.current = serializeWorkflowState(flowData);
+                    const { loadWorkflow } = useCanvasStore.getState();
+                    loadWorkflow(flowData);
+                    const { nodes, connections } = useCanvasStore.getState();
+                    captureBaseline({ nodes, connections });
                 }
                 updateUrl(flowId);
             } catch {
                 toast.error(t('flowEditor.failedToLoadFlow'));
             }
         },
-        [loadFlowById, updateUrl, t, serializeWorkflowState, lastSavedStateRef]
+        [loadFlowById, updateUrl, t]
     );
 
     const handleAddBlock = useCallback(
@@ -83,13 +80,13 @@ export const useMobileFlowActions = ({
             if (!def) return null;
 
             // Place new node at the top: y less than current min so it sorts first.
-            const tempNodeId = generateTempId('node');
+            const nodeId = newNodeId();
             const minY = nodes.reduce((m, n) => Math.min(m, n.position?.y ?? Infinity), Infinity);
             const posX = nodes[0]?.position?.x ?? 100;
             const posY = nodes.length === 0 ? 100 : minY - 200;
 
             const newNode: NodeData = {
-                id: tempNodeId,
+                id: nodeId,
                 type,
                 position: { x: posX, y: posY },
                 config: { ...def.defaultConfig },
@@ -103,56 +100,22 @@ export const useMobileFlowActions = ({
             useCanvasStore.getState().setNodes(prev => [...prev, newNode]);
 
             try {
-                const result = await upsertNode('0', currentFlowId ?? '', {
-                    blockId: type,
-                    position: newNode.position,
-                    config: newNode.config,
-                });
-                const serverId = result?.nodes?.[0]?.id;
-                const finalId = serverId && serverId !== tempNodeId ? serverId : tempNodeId;
-
-                if (serverId && serverId !== tempNodeId) {
-                    useCanvasStore
-                        .getState()
-                        .setNodes(prev => prev.map(n => (n.id === tempNodeId ? { ...n, id: serverId } : n)));
-                    useCanvasStore.getState().setConnections(prev =>
-                        prev.map(c => ({
-                            ...c,
-                            sourceNodeId: c.sourceNodeId === tempNodeId ? serverId : c.sourceNodeId,
-                            targetNodeId: c.targetNodeId === tempNodeId ? serverId : c.targetNodeId,
-                        }))
-                    );
-                }
-
                 // Persist immediately so refresh within autosave debounce keeps the node.
                 const { nodes: latestNodes, connections: latestConnections } = useCanvasStore.getState();
                 lastLocalUpdateTimestampRef.current = Date.now();
                 const saveResult = await saveCurrentFlow({ nodes: latestNodes, connections: latestConnections });
-                if (saveResult.success) {
-                    lastSavedStateRef.current = serializeWorkflowState({
-                        nodes: latestNodes,
-                        connections: latestConnections,
-                    });
-                    if (saveResult.id && saveResult.id !== currentFlowId) updateUrl(saveResult.id);
+                if (saveResult.success && saveResult.id && saveResult.id !== currentFlowId) {
+                    updateUrl(saveResult.id);
                 }
 
-                return finalId;
+                return nodeId;
             } catch {
-                useCanvasStore.getState().setNodes(prev => prev.filter(n => n.id !== tempNodeId));
+                useCanvasStore.getState().setNodes(prev => prev.filter(n => n.id !== nodeId));
                 toast.error(t('mobile.failedToCreateNode', 'Failed to create node'));
                 return null;
             }
         },
-        [
-            blockRegistry,
-            currentFlowId,
-            saveCurrentFlow,
-            updateUrl,
-            serializeWorkflowState,
-            lastSavedStateRef,
-            lastLocalUpdateTimestampRef,
-            t,
-        ]
+        [blockRegistry, currentFlowId, saveCurrentFlow, updateUrl, lastLocalUpdateTimestampRef, t]
     );
 
     const handleExport = useCallback(() => {
@@ -171,16 +134,14 @@ export const useMobileFlowActions = ({
     }, [flowName, currentFlowId, t]);
 
     /** Creates new flow without confirmation — for use by MobileNewFlowSheet */
-    const handleCreateNewFlow = useCallback(async (): Promise<string | null> => {
+    const handleCreateNewFlow = useCallback((): void => {
         useCanvasStore.getState().clearWorkflow();
-        lastSavedStateRef.current = serializeWorkflowState({ nodes: [], connections: [] });
-        const newId = await createNewFlow();
-        if (newId) {
-            updateUrl(newId);
-            toast.success(t('flowEditor.newFlowCreated'));
-        }
-        return newId;
-    }, [createNewFlow, updateUrl, t, serializeWorkflowState, lastSavedStateRef]);
+        // No server flow yet — the first save claims the ID, so the URL has nothing to
+        // point at until then.
+        createNewFlow();
+        updateUrl(null);
+        toast.success(t('flowEditor.newFlowCreated'));
+    }, [createNewFlow, updateUrl, t]);
 
     return {
         handleSave,

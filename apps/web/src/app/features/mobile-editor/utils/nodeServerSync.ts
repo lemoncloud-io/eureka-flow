@@ -1,31 +1,4 @@
-import { toPortVariantData, upsertFlow, upsertPortNode, useCanvasStore } from '@flows/flows';
-
-import { isUnresolvedTempId, resolveTempId } from '../../flows/utils';
-
-import type { Connection } from '@lemoncloud/eureka-flows-api';
-
-/**
- * Delete a node and its connected edges from the server.
- * Uses the `#` prefix convention to signal deletion via upsertFlow.
- */
-export const deleteNodeWithSync = (nodeId: string, flowId: string | null): void => {
-    const { connections, deleteNode } = useCanvasStore.getState();
-    const connectedEdges = connections.filter(c => c.sourceNodeId === nodeId || c.targetNodeId === nodeId);
-
-    deleteNode(nodeId);
-
-    if (flowId && !isUnresolvedTempId(nodeId)) {
-        const serverEdgeIds = connectedEdges
-            .map((e: Connection) => e.id)
-            .filter((id): id is string => !!id && !isUnresolvedTempId(id));
-        upsertFlow(flowId, {
-            nodes: [{ id: `#${resolveTempId(nodeId)}` }] as never[],
-            edges: serverEdgeIds.map(id => ({ id: `#${resolveTempId(id)}` })) as never[],
-        }).catch(err => {
-            console.error('[deleteNodeWithSync] Failed to delete node:', err);
-        });
-    }
-};
+import { toPortVariantData, upsertPortNode } from '@flows/flows';
 
 /**
  * Save input port data to the server before node execution.

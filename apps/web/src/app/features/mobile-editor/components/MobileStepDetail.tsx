@@ -4,31 +4,30 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle, ArrowLeft, ArrowRight, FileText, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-import { isAiBlock, isMissingAiKey, useCanvasConnections } from '@flows/flows';
+import { isAiBlock, isMissingAiKey, useCanvasConnections, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Input, Label, Switch } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
-import { AiKeyWarningBanner } from '../../flows/components/AiKeyWarningBanner';
-import { BlockIcon } from '../../flows/components/BlockIcon';
-import { getPortStyleKey } from '../../flows/utils';
-import { useNodeConfig } from '../hooks/useNodeConfig';
-import { deleteNodeWithSync, executeNodeWithToast } from '../utils';
 import { AddConnectionRow } from './AddConnectionRow';
 import { ConfigFieldList } from './ConfigFieldList';
 import { STEREO_FALLBACK_LABEL, STEREO_I18N_KEY, STEREO_ICON_BG, TYPE_DOT } from './consts';
 import { MobileConnectionCard } from './MobileConnectionCard';
 import { MobileImageUpload } from './MobileImageUpload';
 import { MobileTextInput } from './MobileTextInput';
+import { AiKeyWarningBanner } from '../../flows/components/AiKeyWarningBanner';
+import { BlockIcon } from '../../flows/components/BlockIcon';
+import { getPortStyleKey } from '../../flows/utils';
+import { useNodeConfig } from '../hooks/useNodeConfig';
 
 import type { FlowRole } from '@flows/flows';
 import type { NodeState } from '@lemoncloud/eureka-flows-api';
 
 interface MobileStepDetailProps {
     nodeId: string | null;
-    flowId: string | null;
-    socketConnectionId?: string;
     role?: FlowRole;
+    /** Runs the node, once the page has cleared it with the server. */
+    onRun?: (nodeId: string, options?: { propagate?: boolean }) => Promise<void>;
     onClose: () => void;
     onOpenOutputConnection?: (
         nodeId: string,
@@ -49,9 +48,8 @@ interface MobileStepDetailProps {
 
 export const MobileStepDetail = ({
     nodeId,
-    flowId,
-    socketConnectionId,
     role = 'owner',
+    onRun,
     onClose,
     onOpenOutputConnection,
     onOpenInputConnection,
@@ -68,19 +66,14 @@ export const MobileStepDetail = ({
         handleConfigChange,
         handleCustomLabelChange,
         handleToggleAuto,
-    } = useNodeConfig(nodeId, flowId, role);
+    } = useNodeConfig(nodeId, role);
 
     const handleRun = useCallback(
         async (options?: { propagate?: boolean }) => {
             if (!canRun || !nodeId) return;
-            await executeNodeWithToast(nodeId, {
-                flowId,
-                socketConnectionId,
-                canEdit: canEditStructure,
-                propagate: options?.propagate,
-            });
+            await onRun?.(nodeId, options);
         },
-        [canRun, canEditStructure, nodeId, flowId, socketConnectionId]
+        [canRun, nodeId, onRun]
     );
     const isRunning = (node?.state as string) === 'RUNNING';
 
@@ -112,7 +105,7 @@ export const MobileStepDetail = ({
             setConfirmingDelete(true);
             return;
         }
-        deleteNodeWithSync(nodeId, flowId);
+        useCanvasStore.getState().deleteNode(nodeId);
         onClose();
     };
 

@@ -1,7 +1,9 @@
 import { create } from 'zustand';
+import { createStore } from 'zustand/vanilla';
 
 import type { EdgeView, RunContext, RunPortUpdate, TraceEntry } from '../types';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type { StateCreator } from 'zustand';
 
 const MAX_TRACE_ENTRIES = 500;
 const MAX_RUNS_PER_NODE = 20;
@@ -168,7 +170,7 @@ interface CanvasState {
 
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
 
-export const useCanvasStore = create<CanvasState>((set, _get) => ({
+export const canvasStateCreator: StateCreator<CanvasState> = (set, _get) => ({
     // Initial State
     nodes: [],
     connections: [],
@@ -439,7 +441,16 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             connections: state.connections.filter(c => c.id !== connectionId),
             selectedConnectionId: state.selectedConnectionId === connectionId ? null : state.selectedConnectionId,
         })),
-}));
+});
+
+/** Live singleton: the canvas the user sees. */
+export const useCanvasStore = create<CanvasState>(canvasStateCreator);
+
+/**
+ * Headless instance sharing the live store's behavior but none of its state.
+ * Edit a graph off-screen (agent draft, working copy) without touching the canvas.
+ */
+export const createCanvasStore = () => createStore<CanvasState>(canvasStateCreator);
 
 // Selector hooks for better performance
 export const useCanvasNodes = () => useCanvasStore(state => state.nodes);
