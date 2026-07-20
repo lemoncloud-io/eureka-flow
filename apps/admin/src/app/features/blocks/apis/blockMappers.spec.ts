@@ -80,5 +80,7 @@ describe('round trip', () => {
         expect(body.label).toBe('텍스트 입력');
         expect(body.description).toBe('User text input');
         expect(body.output$$?.[0].label).toBe('텍스트');
+        expect(body.config$$?.[0].label).toBe('텍스트');
+        expect(body.config$$?.[0].placeholder).toBe('입력이 연결되지 않은 경우 사용');
     });
 });

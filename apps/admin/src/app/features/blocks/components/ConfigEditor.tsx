@@ -104,7 +104,7 @@ export const ConfigEditor = ({ configs, onChange, disabled = false }: ConfigEdit
                     <Input
                         placeholder="Placeholder"
                         value={cfg.placeholder ?? ''}
-                        onChange={e => updateConfig(index, 'placeholder', e.target.value)}
+                        onChange={e => updateConfig(index, 'placeholder', e.target.value || undefined)}
                         className="w-full"
                         disabled={disabled}
                     />
