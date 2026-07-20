@@ -49,6 +49,7 @@ interface MobileStepDetailProps {
 export const MobileStepDetail = ({
     nodeId,
     role = 'owner',
+    onRun,
     onClose,
     onOpenOutputConnection,
     onOpenInputConnection,
