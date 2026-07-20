@@ -1,7 +1,7 @@
 import { cn } from '@flows/lib/utils';
 import { Input } from '@flows/ui-kit';
 
-import { useBlockKeyDictionary } from '../hooks/useBlockKeyDictionary';
+import { useBlockKeyDictionary } from '../hooks';
 
 interface KeyInputProps {
     value: string | undefined;
