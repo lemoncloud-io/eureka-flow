@@ -22,7 +22,9 @@ port.label  ↔ port.labelEn
 config.label / config.placeholder ↔ config.labelEn / config.placeholderEn
 ```
 
-이 규칙은 `libs/flows/src/utils/i18nServerKey.ts`의 `EN_SUFFIX` 상수 한 곳에만 존재한다. 호출부 46곳은 접미사를 모른다 — 필드명이 바뀌어도 수정은 1줄.
+**읽기 쪽**은 `libs/flows/src/utils/i18nServerKey.ts`의 `EN_SUFFIX` 한 곳에만 규칙이 있다. 렌더 호출부 46곳은 접미사를 모른다.
+
+**쓰기 쪽(admin)은 별개다.** 블록 편집기는 `*En`을 직접 편집하므로 `apps/admin/.../blocks/types/block.ts`와 `apis/blockMappers.ts`에 필드명을 실제 인터페이스로 선언한다. 접미사를 바꾸면 **컴파일은 통과하고 번역만 조용히 멈춘다** → 두 곳을 반드시 함께 고칠 것.
 
 ## 3. 변환 규칙
 

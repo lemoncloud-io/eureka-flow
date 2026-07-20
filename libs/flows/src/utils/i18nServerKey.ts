@@ -2,9 +2,16 @@ import type { TFunction } from 'i18next';
 
 /**
  * Server text ships as a pair: the human-readable original (`label`) and its language
- * key in a sibling field suffixed `En` (`labelEn`). This convention is the single
- * source of truth for the pairing — nothing outside this module reads an `*En` field,
- * so renaming the suffix is a one-line change here.
+ * key in a sibling field suffixed `En` (`labelEn`).
+ *
+ * This is the only place that *resolves* a translation from an `*En` field — all 46
+ * render sites go through `translateField`, so none of them name the suffix.
+ *
+ * It is not the only place that *spells* it: the admin block editor declares
+ * `labelEn`/`descriptionEn`/`placeholderEn` as real interface fields
+ * (`apps/admin/.../blocks/types/block.ts`, `apis/blockMappers.ts`) because it edits
+ * them directly. Changing the suffix here compiles fine and silently stops resolving
+ * until those are changed in lockstep.
  */
 const EN_SUFFIX = 'En';
 

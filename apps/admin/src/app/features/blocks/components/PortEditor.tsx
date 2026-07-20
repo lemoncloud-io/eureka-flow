@@ -81,13 +81,17 @@ export const PortEditor = ({ label, ports, onChange, disabled = false }: PortEdi
                             </Button>
                         )}
                     </div>
-                    <div className="pl-[7.5rem] pr-10">
-                        <KeyInput
-                            value={port.labelEn}
-                            onChange={v => updatePort(index, 'labelEn', v)}
-                            placeholder="text"
-                            disabled={disabled}
-                        />
+                    {/* Mirrors the row above — same width and gap — so the key lines up under Label. */}
+                    <div className="flex gap-2 pr-10">
+                        <div className="w-28 shrink-0" aria-hidden />
+                        <div className="flex-1">
+                            <KeyInput
+                                value={port.labelEn}
+                                onChange={v => updatePort(index, 'labelEn', v)}
+                                placeholder="text"
+                                disabled={disabled}
+                            />
+                        </div>
                     </div>
                 </div>
             ))}
