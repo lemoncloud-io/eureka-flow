@@ -26,6 +26,7 @@ import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
 import { AiKeyDialog } from '../components/AiKeyDialog';
 import { DesktopMobileSwitchCta } from '../components/DesktopMobileSwitchCta';
+import { DevGraphPanel } from '../components/DevGraphPanel';
 import { DevRoleChip } from '../components/DevRoleChip';
 import { DevSocketPanel } from '../components/DevSocketPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
@@ -46,7 +47,7 @@ import { useSocketRecorder } from '../hooks/useSocketRecorder';
 import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
-import type { FlowRole } from '@flows/flows';
+import type { FlowJson, FlowRole } from '@flows/flows';
 import type { ProductProgressInfo, WebSocketMessage } from '@flows/socket';
 
 const STAGGER_DELAY_MS = 80;
@@ -529,6 +530,13 @@ export const FlowEditorPage = () => {
         }
     };
 
+    const handleDevImport = useCallback(async (graph: FlowJson) => {
+        if (!canvasRef.current) return;
+        await canvasRef.current.loadWorkflow(graph);
+        // Leave the baseline untouched so the imported graph reads dirty and can be saved
+        // through the normal path — that round-trip is the whole point of the dev panel.
+    }, []);
+
     const handleExport = () => {
         if (!canvasRef.current) return;
 
@@ -916,6 +924,8 @@ export const FlowEditorPage = () => {
                     onMarkReplayed={socketRecorder.markReplayed}
                 />
             )}
+
+            {showDevTools && <DevGraphPanel onImport={handleDevImport} />}
 
             {/* Loading Overlay */}
             {isLoading && (
