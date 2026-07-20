@@ -1,4 +1,4 @@
-import { translateServerKey } from './i18nServerKey';
+import { fieldKey, translateField } from './i18nServerKey';
 
 import type { BlockDefinitionWithFrontend } from '../types';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
@@ -7,18 +7,19 @@ import type { TFunction } from 'i18next';
 /**
  * Resolve a node's display name with the standard precedence:
  * user `customLabel` (never translated) → translated block label → fallback (defaults to node type).
- * Centralizes the "customLabel wins, label is a server key" invariant used across editor surfaces.
+ * Centralizes the "customLabel wins" invariant used across editor surfaces.
  */
 export const resolveNodeName = (
     node: Pick<NodeData, 'customLabel' | 'type'> | undefined,
     def: BlockDefinitionWithFrontend | undefined,
     t: TFunction,
     fallback: string | undefined = node?.type
-): string => node?.customLabel || translateServerKey(t, def?.label) || fallback || '';
+): string => node?.customLabel || translateField(t, def, 'label') || fallback || '';
 
 /**
- * Match a block against a search query, testing both the translated text and the raw key/type,
- * so search works in any language and against un-migrated raw text.
+ * Match a block against a search query, testing the translated text, the original text,
+ * the language key and the type — so search works in any language, before or after the
+ * server keys a block, and against the key itself.
  */
 export const blockMatchesQuery = (
     t: TFunction,
@@ -26,12 +27,14 @@ export const blockMatchesQuery = (
     query: string
 ): boolean =>
     [
-        translateServerKey(t, block.label),
-        translateServerKey(t, block.description),
+        translateField(t, block, 'label'),
+        translateField(t, block, 'description'),
         block.label,
         block.description,
+        fieldKey(block, 'label'),
+        fieldKey(block, 'description'),
         block.type,
-    ].some(value => value.toLowerCase().includes(query));
+    ].some(value => value?.toLowerCase().includes(query));
 
 /**
  * Find block definition by config keys when node.type doesn't match registry
