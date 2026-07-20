@@ -3,7 +3,7 @@ import { StrictMode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createInMemoryCanvasBinding } from '@flows/agent';
+import { BufferAgentTraceReporter, createBrowserAgentEnvironment, createInMemoryCanvasBinding } from '@flows/agent';
 
 import { useLocatorAgent } from '../../app/features/flows/hooks/useLocatorAgent';
 
@@ -11,6 +11,18 @@ import type { Chunk, LlmGateway } from '@flows/agent';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const makeNode = (id: string): NodeData => ({ id, type: 'test', position: { x: 0, y: 0 } });
+
+// `send` is gated until the async storage read settles (hydration). Flush that microtask so a
+// test that sends right after mount isn't a no-op. Mirrors the sub-millisecond real-app window.
+const flushHydration = () =>
+    act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+    });
+
+// The real browser environment over jsdom's localStorage — sessions land under the
+// flow_mosaic_agent_ namespace, exactly as in the app.
+const makeEnvironment = () => createBrowserAgentEnvironment({ traceReporter: new BufferAgentTraceReporter() });
 
 /** A gateway whose turn hangs until aborted, exposing the AbortSignals it received. */
 const makeHangingGateway = () => {
@@ -27,8 +39,8 @@ const makeHangingGateway = () => {
     return { gateway, signals };
 };
 
-// Sessions persist to localStorage keyed by flowId; clear between tests so they stay isolated
-// (and so the StrictMode test genuinely starts from an empty transcript).
+// Sessions persist through the environment storage (localStorage-backed); clear between tests
+// so they stay isolated (and so the StrictMode test genuinely starts from an empty transcript).
 afterEach(() => localStorage.clear());
 
 describe('useLocatorAgent', () => {
@@ -36,12 +48,14 @@ describe('useLocatorAgent', () => {
         const bindingA = createInMemoryCanvasBinding({ nodes: [makeNode('a')], edges: [] });
         const bindingB = createInMemoryCanvasBinding({ nodes: [makeNode('b')], edges: [] });
         const { gateway, signals } = makeHangingGateway();
+        const environment = makeEnvironment();
 
         const { result, rerender } = renderHook(
-            ({ flowId, binding }) => useLocatorAgent({ binding, flowId, gateway }),
+            ({ flowId, binding }) => useLocatorAgent({ binding, flowId, gateway, environment }),
             { initialProps: { flowId: 'A', binding: bindingA } }
         );
 
+        await flushHydration();
         act(() => result.current.send('move a node'));
         await waitFor(() => expect(signals).toHaveLength(1));
         expect(signals[0]?.aborted).toBe(false);
@@ -66,11 +80,13 @@ describe('useLocatorAgent', () => {
                 yield { done: true };
             },
         };
+        const environment = makeEnvironment();
 
-        const { result } = renderHook(() => useLocatorAgent({ binding, flowId: 'A', gateway }), {
+        const { result } = renderHook(() => useLocatorAgent({ binding, flowId: 'A', gateway, environment }), {
             wrapper: StrictMode,
         });
 
+        await flushHydration();
         act(() => result.current.send('move a right'));
 
         await waitFor(() => {
@@ -78,7 +94,7 @@ describe('useLocatorAgent', () => {
         });
     });
 
-    it('persists the transcript and rehydrates it on a fresh mount (reload)', async () => {
+    it('persists the transcript through the environment and rehydrates it on a fresh mount (reload)', async () => {
         const binding = createInMemoryCanvasBinding({ nodes: [makeNode('a')], edges: [] });
         const gateway: LlmGateway = {
             async *chat(): AsyncIterable<Chunk> {
@@ -87,21 +103,31 @@ describe('useLocatorAgent', () => {
             },
         };
 
-        const first = renderHook(() => useLocatorAgent({ binding, flowId: 'persist', gateway }));
+        const firstEnvironment = makeEnvironment();
+        const first = renderHook(() =>
+            useLocatorAgent({ binding, flowId: 'persist', gateway, environment: firstEnvironment })
+        );
+        await flushHydration();
         act(() => first.result.current.send('move a right'));
         await waitFor(() => expect(first.result.current.session?.phase).toBe('done'));
         first.unmount();
 
-        // A brand-new mount (≈ page reload) reads the persisted transcript back from localStorage.
-        const second = renderHook(() => useLocatorAgent({ binding, flowId: 'persist', gateway }));
+        // The run itself persisted under the environment's namespace — the real data path.
+        expect(localStorage.getItem('flow_mosaic_agent_session:persist')).toBeTruthy();
+
+        // A brand-new mount with a brand-new environment (≈ page reload) reads it back.
+        const secondEnvironment = makeEnvironment();
+        const second = renderHook(() =>
+            useLocatorAgent({ binding, flowId: 'persist', gateway, environment: secondEnvironment })
+        );
         await waitFor(() =>
             expect(second.result.current.session?.messages.map(m => m.content)).toContain('move a right')
         );
     });
 
-    it('sanitizes a persisted `thinking` phase to `idle` on rehydrate (reload mid-turn)', () => {
+    it('sanitizes a persisted `thinking` phase to `idle` on rehydrate (reload mid-turn)', async () => {
         // A turn can't survive a reload; if it did, a stale `thinking` would leave the composer
-        // disabled and block the next send. readPersistedSession clears it on the way in.
+        // disabled and block the next send. Hydration clears it on the way in.
         const binding = createInMemoryCanvasBinding({ nodes: [makeNode('a')], edges: [] });
         const gateway: LlmGateway = {
             async *chat(): AsyncIterable<Chunk> {
@@ -109,7 +135,7 @@ describe('useLocatorAgent', () => {
             },
         };
         localStorage.setItem(
-            'flow-agent-session:stuck',
+            'flow_mosaic_agent_session:stuck',
             JSON.stringify({
                 flowId: 'stuck',
                 messages: [{ id: 'u1', role: 'user', content: 'move a', ts: 1 }],
@@ -117,17 +143,23 @@ describe('useLocatorAgent', () => {
             })
         );
 
-        const { result } = renderHook(() => useLocatorAgent({ binding, flowId: 'stuck', gateway }));
+        const environment = makeEnvironment();
+        const { result } = renderHook(() => useLocatorAgent({ binding, flowId: 'stuck', gateway, environment }));
 
-        expect(result.current.session?.phase).toBe('idle');
-        expect(result.current.session?.messages.some(m => m.content === 'move a')).toBe(true);
+        // Hydration is async (Promise-based storage port); assert once it lands.
+        await waitFor(() => {
+            expect(result.current.session?.phase).toBe('idle');
+            expect(result.current.session?.messages.some(m => m.content === 'move a')).toBe(true);
+        });
     });
 
     it('aborts the agent on unmount', async () => {
         const binding = createInMemoryCanvasBinding({ nodes: [makeNode('a')], edges: [] });
         const { gateway, signals } = makeHangingGateway();
 
-        const { result, unmount } = renderHook(() => useLocatorAgent({ binding, flowId: 'A', gateway }));
+        const environment = makeEnvironment();
+        const { result, unmount } = renderHook(() => useLocatorAgent({ binding, flowId: 'A', gateway, environment }));
+        await flushHydration();
         act(() => result.current.send('move a node'));
         await waitFor(() => expect(signals).toHaveLength(1));
 

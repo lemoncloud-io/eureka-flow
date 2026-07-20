@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { createToolExecutor } from '@flows/agent';
 import {
     FLOW_FORBIDDEN,
     deriveRole,
@@ -35,9 +36,11 @@ import { ProductProgressBanner } from '../components/ProductProgressBanner';
 import { PublishDialog } from '../components/PublishDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
+import { useAgentEnvironment } from '../hooks/useAgentEnvironment';
 import { useSocketHandlers } from '../hooks/useSocketHandlers';
 import { useSocketRecorder } from '../hooks/useSocketRecorder';
 import { createCommandLlmGateway, createDesktopCanvasBinding } from '../utils';
+import { withExecutorTracing, withGatewayTracing } from '../utils/agentTracing';
 
 import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
@@ -66,10 +69,22 @@ export const FlowEditorPage = () => {
 
     // The one seam between agent code and the React-owned live canvas (SPEC §6.5).
     const canvasBinding = useMemo(() => createDesktopCanvasBinding(canvasRef), []);
+    // The browser Agent Environment: real session data flows through its storage port and
+    // real run lifecycle through its trace reporter (buffered in dev, noop in prod).
+    const { environment: agentEnvironment, traceReporter: agentTraceReporter } = useAgentEnvironment();
     // The outbound LLM dependency for the agent panel. Today this is the offline command
     // gateway (structured commands → tool calls, no network/key); the real gateway is the
     // backend-proxied one, still deferred (SPEC §9). Swap this line when it lands.
-    const agentGateway = useMemo(() => createCommandLlmGateway(), []);
+    // Gateway and executor are wrapped with trace decorators so the actual run emits
+    // llm.chat.* and tool.* lifecycle events through the environment.
+    const agentGateway = useMemo(
+        () => withGatewayTracing(createCommandLlmGateway(), agentTraceReporter),
+        [agentTraceReporter]
+    );
+    const agentExecutor = useMemo(
+        () => withExecutorTracing(createToolExecutor(), agentTraceReporter),
+        [agentTraceReporter]
+    );
 
     const { loadBlocks, blockRegistry } = useBlocks();
     const {
@@ -926,7 +941,13 @@ export const FlowEditorPage = () => {
             </div>
 
             {/* Always-present agent panel, docked right; the canvas region above shrinks for it (SPEC 0002 §6.5) */}
-            <AgentPanel binding={canvasBinding} flowId={currentFlowId ?? ''} gateway={agentGateway} />
+            <AgentPanel
+                binding={canvasBinding}
+                flowId={currentFlowId ?? ''}
+                gateway={agentGateway}
+                environment={agentEnvironment}
+                executor={agentExecutor}
+            />
         </div>
     );
 };

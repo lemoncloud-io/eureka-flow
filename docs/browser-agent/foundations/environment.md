@@ -173,3 +173,45 @@ agent logic can use storage, tracing, time, and cancellation through the same ru
   all pass (build output under `libs/agent/dist`, not tracked in git).
 - The runtime source uses no Node-only APIs (`fs`, `path`, `child_process`, `process`) and no
   `eval`/`Function` constructor, keeping the package browser-safe.
+
+## 11. Real-browser verification (manual)
+
+The Environment must be verified through the actual app flow — a real agent run in the real
+AgentPanel UI — **not** by the DevTools console and **not** by calling
+`runAgentEnvironmentSelfCheck()`. The app wires `createBrowserAgentEnvironment` into the agent
+session (`useAgentEnvironment`), persists session state through the Environment's storage port,
+and emits lifecycle/tool trace events via `withGatewayTracing` / `withExecutorTracing`. A
+dev-only harness route exercises this end-to-end with the fake LLM — no editor auth, no backend.
+
+Steps (real Chrome, dev server running):
+
+1. Open **`/dev/agent-harness`** (dev-only route; the observability panel is rendered by the app
+   itself, not the console).
+2. In the AgentPanel, type any request and send. The fake LLM is scripted to emit a
+   `move_node` tool call (move the text-input node 10px right) regardless of the text.
+3. **Node moved:** the panel shows the text-input node go from **x=100 → x=110** (y unchanged).
+4. **Environment storage (real namespace):** in DevTools → Application → Local Storage →
+   the dev origin, confirm the key **`flow_mosaic_agent_session:agent-harness`** exists — written
+   by the run itself, through `BrowserAgentStorage`. (Inspecting storage is passive observation,
+   not console-triggering. The harness's own "storage keys" line shows it as `session:agent-harness`
+   because the storage port strips the `flow_mosaic_agent_` prefix — same key.)
+5. **Trace events (real run):** the harness "trace events" list shows the actual lifecycle in
+   order: `agent.run.start → llm.chat.start → llm.chat.done → tool.dispatch → tool.result →
+llm.chat.start → llm.chat.done → agent.run.done`.
+6. **Persistence:** reload the page. The in-memory node resets to x=100 (the harness binding is
+   not persisted), but the **transcript reappears** — proof the session round-tripped through the
+   Environment storage.
+
+This verification does **not** call `runAgentEnvironmentSelfCheck()` and does **not** use the
+DevTools console to trigger behavior — the run is driven entirely from the AgentPanel UI. The
+same path runs in the real editor (`FlowEditorPage`), differing only in the canvas binding
+(desktop vs. in-memory) and the gateway (offline command gateway vs. fake).
+
+### Follow-up (not in this PR)
+
+Automating this as a Playwright/Chromium test is a planned follow-up, not implemented here. The
+harness already exposes stable hooks for it — `data-testid` surfaces (`node-position`,
+`storage-keys`, `trace-events`) and a read-only `window.__flowAgentTrace()` snapshot (level +
+message + ts only, no payloads) — so the future spec can assert the three facts above
+(node x 100→110, the `flow_mosaic_agent_session:agent-harness` key, the ordered trace) without
+new app changes.

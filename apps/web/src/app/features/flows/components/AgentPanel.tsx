@@ -7,12 +7,16 @@ import { cn } from '@flows/lib/utils';
 
 import { useLocatorAgent } from '../hooks/useLocatorAgent';
 
-import type { CanvasBinding, LlmGateway, Message } from '@flows/agent';
+import type { AgentEnvironmentSupportable, CanvasBinding, LlmGateway, Message, ToolExecutor } from '@flows/agent';
 
 interface AgentPanelProps {
     binding: CanvasBinding;
     flowId: string;
     gateway: LlmGateway;
+    /** The browser Agent Environment; session persistence and run tracing flow through it. */
+    environment: AgentEnvironmentSupportable;
+    /** Optional executor override (e.g. wrapped with tracing). */
+    executor?: ToolExecutor;
 }
 
 /** Messages the user should see: their own turns and the agent's text replies. */
@@ -25,9 +29,9 @@ const isVisible = (m: Message): boolean =>
  * editor of the canvas (§2.1). Docked as a fixed-width column that shrinks the canvas region
  * (§6.5) — it does not overlay it.
  */
-export const AgentPanel = ({ binding, flowId, gateway }: AgentPanelProps) => {
+export const AgentPanel = ({ binding, flowId, gateway, environment, executor }: AgentPanelProps) => {
     const { t } = useTranslation(['flows']);
-    const { session, send } = useLocatorAgent({ binding, flowId, gateway });
+    const { session, send } = useLocatorAgent({ binding, flowId, gateway, environment, executor });
     const [draft, setDraft] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
 
