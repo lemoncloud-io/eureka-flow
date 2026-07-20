@@ -268,8 +268,11 @@
         "confirmSaveBeforeRun": "변경사항을 저장하고 실행할까요?",
         "runNeedsOwnerForStructure": "편집자 권한에서는 추가·삭제한 단계가 저장되지 않아 실행할 수 없습니다. 소유자에게 요청하세요.",
         "savedWithoutStructure": "단계 설정만 저장했습니다. 추가·삭제한 단계는 소유자 권한이 필요합니다.",
-        "confirmRecoverDraft": "저장되지 않은 변경사항이 있습니다. 복구할까요?",
+        "draftAvailable": "이전에 저장하지 않은 변경사항이 있습니다.",
+        "draftRestore": "복구",
+        "draftDiscard": "삭제",
         "draftRecovered": "저장되지 않은 변경사항을 복구했습니다.",
+        "draftDiscarded": "저장되지 않은 변경사항을 삭제했습니다.",
         "backOnlineRetrySave": "다시 연결됐습니다. 저장을 눌러 변경사항을 보내세요."
     },
     "publicFlows": {
