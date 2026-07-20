@@ -286,7 +286,12 @@ export const FlowEditorPage = () => {
             }
 
             setLoadingText(t('flowEditor.loadingBlockRegistry'));
-            await loadBlocks();
+            // Blocks and the flow are independent fetches; start them together and join before
+            // render. The registry only has to be in before the canvas draws a node (its type
+            // and ports resolve through it), so awaiting it below rather than here turns two
+            // serial round-trips into one.
+            const blocksPromise = loadBlocks();
+            void blocksPromise.catch(() => undefined); // the await below still surfaces any failure
 
             const nodeIdFromHash = window.location.hash.replace('#', '') || null;
 
@@ -325,6 +330,8 @@ export const FlowEditorPage = () => {
                 }
             }
 
+            // Join the block fetch started above before anything renders a node.
+            await blocksPromise;
             setIsAppReady(true);
 
             // Wait for canvas to mount after render
