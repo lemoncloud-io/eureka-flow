@@ -279,6 +279,7 @@ S6 구현 시 주의: `loadWorkflow`가 undo 히스토리를 지우므로(`Workf
     - C6대로 S3 오프로드는 범위 밖
     - blocked-by: S5
     - **보류 근거**: (1) 진짜 비싼 부분(멀티-MB base64 이미지 디코드)은 이미 `S3Image`의 `<img>` 기본 async decode로 골격 뒤에 처리됨 — 시각적 staging은 공짜. S8이 없애는 건 config props의 React reconciliation뿐(노드 수백 개 아니면 미미). (2) spec의 "마이크로태스크"는 paint 전 flush라 2단계 페인트가 안 생김 — 실제론 `startTransition`/rAF 필요. (3) 대가는 `captureBaseline`을 하이드레이션 후로 옮기는 6사이트(데스크톱+모바일+소켓) 리팩터 = 이미 데인 baseline-타이밍 버그류 재노출. (4) 효과적 버전(서버 `/load`를 구조/데이터로 분할)은 §7대로 백엔드 과제 = 스코프 밖. → 착수 조건: 이미지-heavy flow에서 first-paint 실측 jank 확인되거나 서버 분할 API 선행.
+    - **2026-07 후속 (로딩 개선 재검토)**: 부팅이 `blocks`와 `/load`를 **직렬**로 await하던 것을 확인 → **병렬화만 착수·완료**(`Promise.all` 형태, blocks를 flow fetch와 동시 시작 후 렌더 직전 join). 로딩 시간 실제 단축, `isAppReady`·baseline 무관, 저위험. 남은 두 갈래는 보류: **B**(로딩 중 전체 스피너→에디터 셸/스켈레톤 화면) = 비주얼만, **노드는 여전히 blocks+`/load` 후 한 번에** — `isAppReady` 게이트(부팅·복구·투어) 리팩터 위험 대비 이득 작아 스킵. **C**(노드가 로딩되며 점진적으로 그려짐) = **클라 불가 확정**, 서버 `/load` 구조/데이터 분할 필요 = 백엔드.
 
 - [ ] **S9 — R8: undo/redo 재정의 + 죽은 코드 제거** (P2)
     - C1 재조준: 인라인(`WorkflowCanvas.tsx:405-442`)이 진짜. `useCanvasHistory`/`useCanvasEngine`/`useCanvasLayout`은 死
