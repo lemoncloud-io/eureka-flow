@@ -176,12 +176,22 @@ export const MobileStepCard = React.memo(
                 : 'border-border';
 
         return (
-            <button
-                type="button"
+            // A div, not a button: the card holds interactive children (expand, menu), and
+            // HTML forbids interactive content inside a button — React flags it as a
+            // nested-button hydration error.
+            <div
+                role="button"
+                tabIndex={0}
                 data-node-id={node.id}
                 onClick={() => onTapCard(node.id)}
+                onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onTapCard(node.id);
+                    }
+                }}
                 className={cn(
-                    'w-full rounded-xl border bg-card text-left',
+                    'w-full rounded-xl border bg-card text-left cursor-pointer',
                     'transition-colors overflow-hidden',
                     borderColor
                 )}
@@ -288,7 +298,7 @@ export const MobileStepCard = React.memo(
                         <div className="text-[11px] text-destructive line-clamp-2 mt-0.5">{errorMessage}</div>
                     </div>
                 )}
-            </button>
+            </div>
         );
     }
 );
