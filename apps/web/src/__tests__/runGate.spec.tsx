@@ -95,8 +95,7 @@ describe('useRunGate', () => {
         expect(postMock).not.toHaveBeenCalled();
     });
 
-    it('saves first when the user accepts', async () => {
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
+    it('saves the dirty flow, then hands back its id — no prompt', async () => {
         const { result } = renderHook(() => useRunGate(), { wrapper: createWrapper() });
 
         await expect(result.current()).resolves.toBe('1008888');
@@ -109,23 +108,13 @@ describe('useRunGate', () => {
         // the run. This is the whole reason the gate returns it.
         useFlowsStore.setState({ currentFlowId: null, baseline: null });
         postMock.mockResolvedValue({ data: { id: '1009999' } });
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { result } = renderHook(() => useRunGate(), { wrapper: createWrapper() });
 
         await expect(result.current()).resolves.toBe('1009999');
     });
 
-    it('stops the run when the user declines, and saves nothing', async () => {
-        vi.spyOn(window, 'confirm').mockReturnValue(false);
-        const { result } = renderHook(() => useRunGate(), { wrapper: createWrapper() });
-
-        await expect(result.current()).resolves.toBeNull();
-        expect(postMock).not.toHaveBeenCalled();
-    });
-
     it('stops the run when the save fails', async () => {
         // Running anyway would hit the server with a node it never stored.
-        vi.spyOn(window, 'confirm').mockReturnValue(true);
         postMock.mockRejectedValue(new Error('network down'));
         const { result } = renderHook(() => useRunGate(), { wrapper: createWrapper() });
 
@@ -134,12 +123,10 @@ describe('useRunGate', () => {
 
     it('stops a non-owner editor without saving, and says why', async () => {
         asEditor();
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const { result } = renderHook(() => useRunGate(), { wrapper: createWrapper() });
 
         await expect(result.current()).resolves.toBeNull();
         expect(postMock).not.toHaveBeenCalled();
-        expect(confirmSpy).not.toHaveBeenCalled();
         expect(toastError).toHaveBeenCalledOnce();
     });
 });

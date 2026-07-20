@@ -8,9 +8,9 @@ import { runRequirement, useCanvasStore, useFlows, useFlowsStore } from '@flows/
 /**
  * Clears the canvas for running, saving it first if the server has not seen it yet.
  *
- * Returns the flow's id, or null when the run must not go ahead — the user declined the
- * save, the save failed, or saving could not have helped. Callers stop on null rather than
- * firing a run the server would reject.
+ * Returns the flow's id, or null when the run must not go ahead — the save failed, or
+ * saving could not have helped (a non-owner editor's structural change). Callers stop on
+ * null rather than firing a run the server would reject.
  *
  * The id comes back because this is what mints it: a flow with no id gets one from the
  * save that happens here, and the store write behind it has not re-rendered anyone by the
@@ -42,8 +42,7 @@ export const useRunGate = () => {
             return null;
         }
 
-        if (!window.confirm(t('flowEditor.confirmSaveBeforeRun', 'Save your changes and run?'))) return null;
-
+        // The user pressed Run — that is the intent. Save silently, then run; no confirm.
         const result = await saveCurrentFlow(graph);
         if (!result.success) {
             toast.error(t('flowEditor.failedToSaveWorkflow'));
