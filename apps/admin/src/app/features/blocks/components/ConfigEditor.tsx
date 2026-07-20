@@ -19,7 +19,7 @@ const EMPTY_CONFIG: ConfigItem = {
     label: '',
 };
 
-type EditableConfigField = 'key' | 'type' | 'label' | 'labelEn' | 'placeholder' | 'defaultValue';
+type EditableConfigField = 'key' | 'type' | 'label' | 'labelEn' | 'placeholder' | 'placeholderEn' | 'defaultValue';
 
 export const ConfigEditor = ({ configs, onChange, disabled = false }: ConfigEditorProps) => {
     const addConfig = () => {
@@ -98,6 +98,21 @@ export const ConfigEditor = ({ configs, onChange, disabled = false }: ConfigEdit
                             value={cfg.labelEn}
                             onChange={v => updateConfig(index, 'labelEn', v)}
                             placeholder="prompt"
+                            disabled={disabled}
+                        />
+                    </div>
+                    <Input
+                        placeholder="Placeholder"
+                        value={cfg.placeholder ?? ''}
+                        onChange={e => updateConfig(index, 'placeholder', e.target.value)}
+                        className="w-full"
+                        disabled={disabled}
+                    />
+                    <div className="w-full">
+                        <KeyInput
+                            value={cfg.placeholderEn}
+                            onChange={v => updateConfig(index, 'placeholderEn', v)}
+                            placeholder="prompt_hint"
                             disabled={disabled}
                         />
                     </div>
