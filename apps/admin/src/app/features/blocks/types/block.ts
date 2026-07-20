@@ -38,6 +38,7 @@ export interface Block {
     deletedAt: number;
     stereo: BlockStereo;
     name: string;
+    nameEn?: string;
     label: string;
     labelEn?: string;
     icon: string;

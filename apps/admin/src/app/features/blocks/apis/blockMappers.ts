@@ -36,13 +36,8 @@ export interface BlockView {
     id: string;
     stereo?: string;
     name?: string;
-    /**
-     * Language key for the block name. The server may expose it as `labelEn` or
-     * `nameEn` — `name` and `label` hold the same text today — so read both and
-     * write the one the web app's `$definition.label` pairs with.
-     */
-    labelEn?: string;
     nameEn?: string;
+    labelEn?: string;
     visualType?: string;
     label?: string;
     icon?: string;
@@ -63,6 +58,7 @@ export interface BlockView {
 export interface BlockBody {
     stereo?: string;
     name?: string;
+    nameEn?: string;
     label?: string;
     labelEn?: string;
     icon?: string;
@@ -102,8 +98,9 @@ export const blockViewToBlock = (v: BlockView): Block => ({
     deletedAt: v.deletedAt ?? 0,
     stereo: isStereo(v.stereo) ? v.stereo : 'process',
     name: v.name ?? '',
+    nameEn: v.nameEn,
     label: v.label ?? '',
-    labelEn: v.labelEn ?? v.nameEn,
+    labelEn: v.labelEn,
     icon: v.icon ?? '',
     description: v.description ?? '',
     descriptionEn: v.descriptionEn,
@@ -136,6 +133,7 @@ const toServerConfigs = (configs: ConfigItem[]): ServerConfig[] =>
 export const blockToBlockBody = (form: BlockFormData): BlockBody => ({
     stereo: form.stereo,
     name: form.name,
+    nameEn: form.nameEn,
     label: form.label,
     labelEn: form.labelEn,
     icon: form.icon,

@@ -31,6 +31,12 @@ export const BlockForm = ({ data, onChange, disabled = false }: BlockFormProps) 
             <div className="flex flex-col gap-2">
                 <Label>Name</Label>
                 <Input value={data.name} onChange={e => update('name', e.target.value)} disabled={disabled} />
+                <KeyInput
+                    value={data.nameEn}
+                    onChange={v => update('nameEn', v)}
+                    placeholder="input_text"
+                    disabled={disabled}
+                />
             </div>
             <div className="flex flex-col gap-2">
                 <Label>Label</Label>

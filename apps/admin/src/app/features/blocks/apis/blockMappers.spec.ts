@@ -18,6 +18,7 @@ const keyedBlock: BlockView = {
     id: '0008',
     stereo: 'input',
     name: '텍스트 입력',
+    nameEn: 'input_text',
     label: '텍스트 입력',
     labelEn: 'input_text',
     description: 'User text input',
@@ -43,6 +44,7 @@ const keyedBlock: BlockView = {
 describe('blockViewToBlock', () => {
     it('reads the language key of every text field', () => {
         const block = blockViewToBlock(keyedBlock);
+        expect(block.nameEn).toBe('input_text');
         expect(block.labelEn).toBe('input_text');
         expect(block.descriptionEn).toBe('input_text_desc');
         expect(block.output$[0].labelEn).toBe('text');
@@ -50,13 +52,15 @@ describe('blockViewToBlock', () => {
         expect(block.config$[0].placeholderEn).toBe('input_text_hint');
     });
 
-    it('accepts nameEn as the block key while the server field name is unsettled', () => {
-        const keyedUnderNameEn: BlockView = { ...keyedBlock, labelEn: undefined, nameEn: 'input_text' };
-        expect(blockViewToBlock(keyedUnderNameEn).labelEn).toBe('input_text');
+    it('keeps nameEn and labelEn as separate fields', () => {
+        const block = blockViewToBlock({ ...keyedBlock, nameEn: 'block_name', labelEn: 'block_label' });
+        expect(block.nameEn).toBe('block_name');
+        expect(block.labelEn).toBe('block_label');
     });
 
     it('leaves keys undefined for a block the server has not keyed', () => {
         const block = blockViewToBlock({ id: '1', label: '버퍼', description: '지연', output$$: [{ id: 'out' }] });
+        expect(block.nameEn).toBeUndefined();
         expect(block.labelEn).toBeUndefined();
         expect(block.descriptionEn).toBeUndefined();
         expect(block.output$[0].labelEn).toBeUndefined();
@@ -67,6 +71,7 @@ describe('round trip', () => {
     it('saving an unedited block preserves every language key', () => {
         const body = blockToBlockBody(toFormData(keyedBlock));
 
+        expect(body.nameEn).toBe('input_text');
         expect(body.labelEn).toBe('input_text');
         expect(body.descriptionEn).toBe('input_text_desc');
         expect(body.output$$?.[0].labelEn).toBe('text');

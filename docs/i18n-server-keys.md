@@ -74,10 +74,18 @@ admin이 최상위 *En 저장 → 서버가 $definition에 접어넣음 → web�
 
 **서버팀 확정 필요:**
 
-- (a) `$definition` 안에 `*En`이 채워질 것
-- (b) admin이 쓴 최상위 `*En`이 저장 시 `$definition`으로 전파될 것 (지금 `label`이 가는 경로와 동일)
+**(a) `$definition` 안에 `*En`이 채워질 것.** 미충족 시 web 번역이 전혀 동작하지 않는다 — 블록 라벨뿐 아니라 포트·config 키까지 전부. 단 fallback 설계라 **앱은 원문으로 정상 동작**한다(회귀 없음).
 
-(a) 미충족 시 web 번역이 동작하지 않는다. 단 fallback 설계라 **앱은 원문으로 정상 동작**한다(회귀 없음).
+**(b) admin이 쓴 최상위 `*En`이 저장 시 `$definition`으로 전파될 것** (지금 `label`이 가는 경로와 동일).
+
+**(c) `$definition`에 들어가는 키는 `labelEn`·`descriptionEn`이다.**
+
+`*En`은 각 텍스트 필드의 짝이다 — `name↔nameEn`, `label↔labelEn`, `description↔descriptionEn`.
+셋 다 서버에 생기고 admin은 셋 다 편집한다.
+
+다만 **web이 렌더하는 건 `$definition`의 `label`/`description`뿐이다.** `$definition`이 따르는
+SDK 타입 `BlockDefinition`에는 `name` 필드가 없다. 즉 `nameEn`은 admin 목록 표시용이고,
+화면 번역을 좌우하는 건 `labelEn`·`descriptionEn`이므로 이 둘이 `$definition`에 실려야 한다.
 
 ## 6. 적용 지점
 
