@@ -13,7 +13,7 @@ const TEXT_INPUT_NODE: NodeData = { id: 'text-1', type: 'text-input', position: 
 
 /**
  * Dev-only harness route (`/dev/agent-harness`) for real-browser verification of the
- * environment-backed agent flow — the W04/W05 meeting scenario, runnable without editor
+ * environment-backed agent flow, runnable without editor
  * auth or any backend: the real AgentPanel UI drives a scripted fake LLM whose tool call
  * flows through the real ToolExecutor into an in-memory canvas binding, while session
  * state persists through BrowserAgentStorage and lifecycle events hit the trace reporter.

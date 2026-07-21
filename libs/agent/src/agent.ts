@@ -7,7 +7,7 @@ import type { ToolProvider } from './tools/toolTypes';
  */
 export interface AgentConfig {
     id: string;
-    /** What it handles — used by the future router (spec 0001 §9). */
+    /** What it handles — for a future agent router. */
     description: string;
     /** Persona / instructions. */
     systemPrompt: string;
@@ -19,8 +19,7 @@ export interface AgentConfig {
 
 /**
  * The turn surface the Panel drives. The locator agent owns the whole turn inside
- * `send`; there is no plan/approval gate this version (moves apply live), so unlike the
- * flow-edit agent (spec 0001) there is no `resolvePlan`.
+ * `send`; there is no plan/approval gate (moves apply live), so there is no `resolvePlan`.
  */
 export interface Agent {
     /** Append the user message and run the whole turn to completion. */

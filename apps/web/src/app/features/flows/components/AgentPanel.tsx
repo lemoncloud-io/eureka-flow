@@ -24,10 +24,9 @@ const isVisible = (m: Message): boolean =>
     m.role === 'user' || (m.role === 'assistant' && !!m.content && m.content.trim().length > 0);
 
 /**
- * The always-present, right-docked assistant panel (spec 0002 §6.5). It renders purely from
- * the session store and emits `send` — all editing goes through the agent, which is the sole
- * editor of the canvas (§2.1). Docked as a fixed-width column that shrinks the canvas region
- * (§6.5) — it does not overlay it.
+ * The always-present, right-docked assistant panel. It renders purely from the session store
+ * and emits `send` — all editing goes through the agent, which is the sole editor of the
+ * canvas. Docked as a fixed-width column that shrinks the canvas region — it does not overlay it.
  */
 export const AgentPanel = ({ binding, flowId, gateway, environment, executor }: AgentPanelProps) => {
     const { t } = useTranslation(['flows']);

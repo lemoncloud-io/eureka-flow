@@ -64,8 +64,7 @@ export interface LlmGatewayCapabilities {
  * {@link ../llm/GeminiLlmGateway.createGeminiLlmGateway} (the first HTTP provider,
  * text-only, over the HttpRequest port); the app adds an offline dev command gateway (no
  * network, no key) that parses a command and emits real tool calls, with a backend-proxied
- * production gateway deferred until an endpoint exists (see
- * docs/browser-agent/agents/locator/SPEC.md §9).
+ * production gateway deferred until an endpoint exists.
  */
 export interface LlmGateway {
     /**

@@ -12,8 +12,8 @@ import type { ToolCall, ToolProvider, ToolResult } from '../tools/toolTypes';
  *
  * Read vs. mutate is **not** a provider boundary — it's a per-tool property, carried by each
  * tool's `requires` (`list_nodes` needs nothing; `move_node` needs `canModifyCanvas`) and
- * enforced by the executor per call. Providers are split by **domain** instead: a future
- * flow-edit agent adds a `configToolProvider` / `edgeToolProvider` alongside this one,
+ * enforced by the executor per call. Providers are split by **domain** instead: another
+ * agent could add a `configToolProvider` / `edgeToolProvider` alongside this one,
  * not more read/mutate splits.
  *
  * (If an agent should not even *see* a tool it can't use, the executor can later filter
@@ -21,13 +21,13 @@ import type { ToolCall, ToolProvider, ToolResult } from '../tools/toolTypes';
  * reduced-surface agent actually exists.)
  */
 
-/** A node trimmed to what relocation needs (spec §5). */
+/** A node trimmed to what relocation needs. */
 export interface NodeLocation {
     id: string;
     type: string;
     /**
      * `customLabel` if set, else undefined. v0 does not resolve the block's default label
-     * (no block-registry dependency) — the model matches on `type` instead (SPEC §5 / §9).
+     * (no block-registry dependency) — the model matches on `type` instead.
      */
     label?: string;
     position: XY;
@@ -89,7 +89,7 @@ export const listNodeLocations = (binding: CanvasBinding): NodeLocation[] => {
 
 /**
  * The canvas domain's built-in tool provider: `list_nodes` (read) + `move_node` (mutate,
- * applied straight through the {@link CanvasBinding} — no draft, per spec §2.2). `move_node`
+ * applied straight through the {@link CanvasBinding} — no draft). `move_node`
  * returns `{ nodeId, label, from, to }` so the model can confirm and chain follow-up moves.
  */
 export const createCanvasToolProvider = (binding: CanvasBinding): ToolProvider => ({

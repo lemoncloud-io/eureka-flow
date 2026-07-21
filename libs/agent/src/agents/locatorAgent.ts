@@ -58,7 +58,7 @@ const buildLocatorConfig = (deps: LocatorAgentDeps): AgentConfig => ({
  *
  * The whole think/act turn — applying each `move_node` straight to the live canvas via the
  * {@link CanvasBinding}, ending on the model's confirmation — is inherited from `BaseAgent`.
- * There is no draft and no approval gate (spec 0002 §2.2).
+ * There is no draft and no approval gate.
  */
 export class LocatorAgent extends BaseAgent {
     private readonly binding: CanvasBinding;

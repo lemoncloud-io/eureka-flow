@@ -1,5 +1,5 @@
 /**
- * HTTP port for agent-layer services (W04)
+ * HTTP port for agent-layer services
  *
  * Gateways never call the global `fetch` directly — they depend on this small port. That
  * matters for two reasons:

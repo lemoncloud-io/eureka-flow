@@ -8,7 +8,7 @@ import type { ChatMessage, ChatRequest, Chunk, Direction, LlmGateway } from '@fl
  * a structured command out of the latest user message, and emits the matching tool call — so
  * the whole agent → ToolExecutor → CanvasBinding pipeline runs for real and actually moves the
  * node. Everything it "sees" and "decides" is logged to the console, so you can confirm the
- * wiring is correct before swapping in a real (backend-proxied) gateway (SPEC 0002 §9).
+ * wiring is correct before swapping in a real (backend-proxied) gateway.
  *
  * Type these into the panel:
  *   move(<node>, <direction>, <distance?>)   e.g. move(Fetch, up, 10)        — relative; distance defaults to DEFAULT_STEP

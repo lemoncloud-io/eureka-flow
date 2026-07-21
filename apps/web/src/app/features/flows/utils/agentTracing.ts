@@ -9,7 +9,7 @@ import type {
 } from '@flows/agent';
 
 /**
- * Trace decorators for the real agent run (W05 environment wiring). The agent core stays
+ * Trace decorators for the real agent run (environment wiring). The agent core stays
  * untouched: the gateway and executor are already injected seams, so lifecycle tracing is
  * layered on at wiring time. Payloads are never traced — only counts, names, and flags —
  * and the reporters additionally redact secret-looking fields on their side.

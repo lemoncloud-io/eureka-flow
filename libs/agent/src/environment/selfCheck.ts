@@ -17,7 +17,7 @@ const SELF_CHECK_KEY_PREFIX = 'selfcheck:';
 const toErrorDetail = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 /**
- * Verify the environment's base services in the runtime it actually runs in — W04's
+ * Verify the environment's base services in the runtime it actually runs in — the
  * real-browser self-check. Storage is probed with a write/read/remove round-trip under a
  * `selfcheck:` key (cleaned up afterwards); trace by emitting and flushing one entry.
  *

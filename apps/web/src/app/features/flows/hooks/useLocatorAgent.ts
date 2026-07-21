@@ -20,7 +20,7 @@ interface UseLocatorAgentArgs {
 /**
  * React binding for the locator {@link createLocatorAgent}. A thin wrapper over the generic
  * {@link useAgentSession}, which owns everything agent-agnostic — the per-flow session store
- * (persisted through the Agent Environment, survives reload — §6.4) and the StrictMode-safe,
+ * (persisted through the Agent Environment, survives reload) and the StrictMode-safe,
  * abort-on-flow-switch lifecycle. This hook supplies only the locator factory (its binding is
  * the canvas seam); a future agent reuses `useAgentSession` the same way with its own factory,
  * so none of that machinery is copied.

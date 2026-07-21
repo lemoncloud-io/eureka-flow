@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import type { Agent, AgentEnvironmentSupportable, SessionState, Storage } from '@flows/agent';
 
-// Per-flow session persistence (SPEC 0002 §6.4 / 0001 §6.6): the transcript survives a page
+// Per-flow session persistence: the transcript survives a page
 // reload and re-opening the flow. Persistence goes through the Agent Environment's storage
 // port — never raw localStorage — so real run data lands in the `flow_mosaic_agent_`
 // namespace and the browser/virtual runtimes stay swappable. Best-effort as before: storage
@@ -52,8 +52,8 @@ export interface UseAgentSessionResult {
 /**
  * The generic React binding shared by every in-browser agent: it owns a per-flow session store
  * (persisted through the Agent Environment's storage, so it survives a page reload / re-opening
- * the flow — §6.4) and re-renders on every `save` — the one-way render loop from the spec (Panel
- * emits `send` → the agent writes `SessionState` → store → Panel; §6.4). What agent it drives is
+ * the flow) and re-renders on every `save` — the one-way render loop (Panel emits `send` → the
+ * agent writes `SessionState` → store → Panel). What agent it drives is
  * the caller's only choice, made through `createAgent`; nothing here is locator-specific.
  *
  * Hydration is asynchronous (the storage port is Promise-based): the working copy starts empty

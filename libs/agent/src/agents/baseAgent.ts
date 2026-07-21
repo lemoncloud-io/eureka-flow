@@ -100,9 +100,8 @@ const resultToContent = (result: ToolResult): string =>
  * Nothing here touches the DOM or a specific domain; the locator's canvas knowledge lives entirely
  * in its subclass.
  *
- * There is no draft and no approval gate in this version (spec 0002 §2.2) — a tool call is applied
- * the moment the executor routes it. That is why, unlike the flow-edit agent (spec 0001), the
- * {@link Agent} surface has no `resolvePlan`.
+ * There is no draft and no approval gate — a tool call is applied the moment the executor routes
+ * it. That is why the {@link Agent} surface has no `resolvePlan`.
  */
 export abstract class BaseAgent implements Agent {
     protected readonly gateway: LlmGateway;
@@ -149,7 +148,7 @@ export abstract class BaseAgent implements Agent {
         const existing = storage.load(flowId);
         if (existing?.phase === 'thinking') {
             // A turn is already in flight; ignore concurrent sends. The turn model is
-            // single-active (spec §6.1); the Panel disables input while thinking.
+            // single-active; the Panel disables input while thinking.
             return;
         }
         const state = existing ?? storage.create(flowId);
@@ -181,7 +180,7 @@ export abstract class BaseAgent implements Agent {
                 const res = await collect(gateway.chat({ messages: chatMessages, tools, stream: true }, { signal }));
 
                 // The response finished draining; if the turn was aborted meanwhile, stop
-                // before applying any of its moves (already-applied moves stay applied, §6.1).
+                // before applying any of its moves (already-applied moves stay applied).
                 if (signal.aborted) {
                     state.phase = 'done';
                     storage.save(state);

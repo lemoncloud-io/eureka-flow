@@ -1,11 +1,10 @@
 /**
  * Public entry for @flows/agent.
  *
- * Environment foundation (07.07): the environment / storage / trace-reporter contracts,
- * their browser and node-virtual implementations, and the environment self-check.
- * W04 (07.14): the HTTP port and the LLM gateway (fake gateway for tests + the Gemini
- * 2.5 Flash provider), plus the locator agent vertical: canvas seam, tools + executor,
- * session, and the generic BaseAgent.
+ * Groups: the environment / storage / trace-reporter contracts and their browser and
+ * node-virtual implementations (plus the environment self-check); the HTTP port and the
+ * LLM gateway (fake gateway for tests + the Gemini 2.5 Flash provider); and the locator
+ * agent vertical — canvas seam, tools + executor, session, and the generic BaseAgent.
  */
 
 // Environment foundation + self-check

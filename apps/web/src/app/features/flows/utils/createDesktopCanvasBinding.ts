@@ -4,7 +4,7 @@ import type { NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 import type { RefObject } from 'react';
 
 // The CanvasBinding contract (CanvasBinding / Graph / XY) is owned by @flows/agent; app code
-// imports those types from @flows/agent directly. See docs/browser-agent/agents/locator SPEC §6.5.
+// imports those types from @flows/agent directly. See docs/browser-agent/design/canvas-binding.md.
 
 /**
  * Desktop binding: wraps the imperative `WorkflowCanvas` ref, because on desktop the

@@ -1,7 +1,7 @@
 /**
  * An agent turn's lifecycle phase — generic across agents, not locator-specific. More
  * phases join as agents are added (e.g. `awaiting_plan` for an approval-gated agent); the
- * locator uses this subset because its moves apply live, with no approval gate (spec 0002 §2.2).
+ * locator uses this subset because its moves apply live, with no approval gate.
  */
 export type AgentPhase = 'idle' | 'thinking' | 'done' | 'error';
 
@@ -37,8 +37,8 @@ const emptySession = (flowId: string): SessionState => ({ flowId, messages: [], 
 
 /**
  * A process-memory {@link Storage} — the default for tests and Node runs. The browser app
- * wraps its own localStorage-backed Storage in `useLocatorAgent`, so reload survival ships
- * there (spec 0002 §6.4); durable server persistence remains out of scope.
+ * persists its session through the Agent Environment's storage port (see `useAgentSession`),
+ * so reload survival ships there; durable server persistence remains out of scope.
  */
 export const createInMemoryStorage = (): Storage => {
     const sessions = new Map<string, SessionState>();

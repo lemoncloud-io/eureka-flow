@@ -15,8 +15,8 @@ import type { ToolDef } from '../llm/llmGateway';
  *   3. check the tool's required capability against the agent's grant,
  *   4. run it — wrapping any thrown error into a `ToolResult` (never throws).
  *
- * Permission note (spec 0002 §4): the session-role ceiling of spec 0001 is not wired in
- * this version, so the effective set is just the agent's grant. The locator agent is
+ * Permission note: a session-role ceiling is not wired in this version, so the effective
+ * set is just the agent's grant. The locator agent is
  * granted exactly the capabilities its tools require, so its moves pass; a tool whose
  * `requires` is outside the grant is denied.
  */
@@ -29,7 +29,7 @@ export const createToolExecutor = (): ToolExecutor => {
         for (const provider of agent.tools) {
             const providerDefs = await provider.listTools();
             for (const def of providerDefs) {
-                // Tool names are assumed unique across an agent's providers (spec 0001);
+                // Tool names are assumed unique across an agent's providers;
                 // first writer wins and we skip a duplicate rather than shadow it.
                 if (!byName.has(def.name)) {
                     byName.set(def.name, { def, provider });

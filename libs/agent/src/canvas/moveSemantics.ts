@@ -18,7 +18,7 @@ export interface MoveNodeArgs {
 /** The eight relocation directions the model may name. */
 export type Direction = 'right' | 'left' | 'up' | 'down' | 'up-right' | 'up-left' | 'down-right' | 'down-left';
 
-/** The default step (px) for a vague amount ("nudge it right"), per spec §6.2. */
+/** The default step (px) for a vague amount ("nudge it right"). */
 export const DEFAULT_STEP = 20;
 
 /**
