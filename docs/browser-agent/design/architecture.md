@@ -56,26 +56,88 @@ commands and renders what's in the store; it never touches the flow itself.
 | **CanvasBinding** | The single seam to the real, React-owned canvas: read it, edit a node.                                           |
 | **Storage**       | Loads/creates/saves the `SessionState` the Panel renders from, keyed by `flowId`.                                |
 
+### The pieces (UML)
+
+```mermaid
+classDiagram
+    class Agent {
+        <<owns the turn, sole writer>>
+        +send(text) Promise
+        +abort()
+    }
+    class AgentConfig {
+        +id
+        +systemPrompt
+        +tools ToolProvider[]
+        +grant AgentGrant
+    }
+    class LlmGateway {
+        <<thinking>>
+        +capabilities
+        +chat(req, opts) AsyncIterable~Chunk~
+    }
+    class ToolExecutor {
+        <<one engine — acting agent passed in>>
+        +listTools(agent) ToolDef[]
+        +dispatch(agent, call) ToolResult
+    }
+    class ToolProvider {
+        <<a source of tools>>
+        +listTools() ToolDef[]
+        +dispatch(call) ToolResult
+    }
+    class CanvasBinding {
+        <<door to the live canvas>>
+        +readGraph() Graph
+        +updateNode(id, patch)
+    }
+    class Storage {
+        +load(flowId)
+        +create(flowId)
+        +save(state)
+    }
+    Agent --> AgentConfig : configured by
+    Agent --> LlmGateway : think
+    Agent --> ToolExecutor : act
+    Agent --> Storage : persist SessionState
+    AgentConfig --> ToolProvider : tools
+    ToolExecutor --> ToolProvider : routes to
+    ToolProvider --> CanvasBinding : canvas tools wrap
+```
+
 ## The turn (think/act loop)
 
 The generic loop is written once, in `BaseAgent` (`libs/agent/src/agents/baseAgent.ts`); a concrete
-agent supplies only its `AgentConfig` and, optionally, per-turn context messages.
+agent supplies only its `AgentConfig` and, optionally, per-turn context messages recomputed each
+iteration.
 
-`send(text)`:
+```mermaid
+sequenceDiagram
+    actor User
+    participant Panel as Agent Panel
+    participant Agent
+    participant LLM as LlmGateway
+    participant Tools as ToolExecutor
+    participant Canvas as CanvasBinding
 
-1. Append the user message; set `phase = 'thinking'`; save.
-2. **Reasoning loop** (bounded by a per-turn iteration cap):
-    - Build the request: the agent's `systemPrompt` + any per-turn context + the transcript +
-      `executor.listTools(agent)`.
-    - `gateway.chat(req)`; accumulate streamed text and tool-call deltas.
-    - If the model emitted **tool calls** → `executor.dispatch(agent, call)` for each, append the
-      results, and continue the loop.
-    - If it returned **final text only** → append it and exit.
-3. Set `phase = 'done'`.
+    User->>Panel: message
+    Panel->>Agent: send(text)
+    loop think and act (bounded by an iteration cap)
+        Agent->>LLM: chat(prompt + context + history + tool defs)
+        LLM-->>Agent: tool call(s) and/or text
+        Agent->>Tools: dispatch(agent, call)
+        Tools->>Canvas: read / mutate (within the grant)
+        Canvas-->>Tools: applied
+        Tools-->>Agent: ToolResult
+    end
+    LLM-->>Agent: final text
+    Agent-->>Panel: SessionState (done) → render
+```
 
-`abort()` cancels the in-flight gateway stream; work already applied stays applied. Concurrent `send`s
-while a turn is in flight are ignored (single active turn). A gateway error ends the turn in `error`, as
-does exceeding the iteration cap.
+Not shown in the diagram: the turn moves through phases `idle → thinking → done`, ending in `error` on a
+gateway failure or on exceeding the iteration cap. `abort()` cancels the in-flight gateway stream, but
+work already applied stays applied; and a `send` arriving while a turn is in flight is ignored — a single
+active turn.
 
 ## Interfaces
 
@@ -152,7 +214,7 @@ interface ToolProvider {
 // The acting agent (its tools + grant) is passed in each call.
 interface ToolExecutor {
     listTools(agent: AgentConfig): Promise<ToolDef[]>; // the agent's providers' tools, unioned
-    dispatch(agent: AgentConfig, call: ToolCall): Promise<ToolResult>; // validate → check grant → route → run
+    dispatch(agent: AgentConfig, call: ToolCall): Promise<ToolResult>; // route by name → validate → check grant → run
 }
 
 // ── CanvasBinding — the one door to the live canvas ──────────────────────────
@@ -210,9 +272,10 @@ The desktop implementation and the primitives it wraps are in [canvas-binding.md
 ## Session & storage
 
 `SessionState` is the whole persisted turn state; the Panel is a pure function of it. `Storage`
-loads/creates a session keyed by `flowId` and `save`s on every change (streamed text, phase
-transitions). The render loop is one-way: Panel emits commands → the Agent writes `SessionState` →
-store → Panel re-renders.
+loads/creates a session keyed by `flowId` and `save`s at each turn step — after the user message, after
+the fully-collected assistant reply, after each tool result, and on phase transitions. The gateway
+stream is drained in full before the reply is persisted; text is not saved token-by-token. The render
+loop is one-way: Panel emits commands → the Agent writes `SessionState` → store → Panel re-renders.
 
 `@flows/agent` ships an in-memory `Storage` (the default for tests and Node runs); the browser app
 wraps a localStorage-backed `Storage` so a transcript survives a page reload.
@@ -226,7 +289,7 @@ backend work.
 | ------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------ |
 | `readGraph` (live) | `WorkflowCanvasRef.getWorkflow()` → `{ nodes, edges }`                           | `apps/web/.../components/WorkflowCanvas.tsx`     |
 | `updateNode`       | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — local `setNodes`, immediate | `apps/web/.../components/WorkflowCanvas.tsx`     |
-| permissions        | `FlowPermissions` (`canModifyCanvas`, `canEditConfig`, `canEditStructure`, `canRun`) | `libs/flows/.../types/permissions.ts`            |
+| permissions        | `FlowPermissions` (7 flags; the agent's `Capability` mirrors `canModifyCanvas`, `canEditConfig`, `canEditStructure`, `canRun`) | `libs/flows/.../types/permissions.ts` |
 | node shape         | `NodeData` (`id`, `type`, `position`, `customLabel`)                              | `@lemoncloud/eureka-flows-api`                   |
 
 New agent code lives in `libs/agent/src`, mirroring how `flows`/`socket` are structured.

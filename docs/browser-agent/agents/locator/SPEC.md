@@ -90,8 +90,8 @@ each iteration with the live node list and finishing on the confirmation text. M
   **up** `dy = −n`, **down** `dy = +n`. Diagonals combine (e.g. "up-right 10" → `dx = +10, dy = −10`).
   With no number given ("nudge it right"), a default step of **20px** is used and said so.
 - **Absolute (`to`).** New position = `to` verbatim.
-- **`move_node`** validates that exactly one of `by` / `to` is present and that `nodeId` exists, rejects
-  a non-finite result, then computes the final `XY` and calls `binding.updateNode(nodeId, { position })`.
+- **`move_node`** validates that exactly one of `by` / `to` is present and that `nodeId` exists, computes
+  the final `XY`, rejects a non-finite result, then calls `binding.updateNode(nodeId, { position })`.
   Positions may go negative — no clamping.
 
 ### 5.2 Tools
