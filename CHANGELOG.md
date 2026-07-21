@@ -1,5 +1,46 @@
 # Changelog
 
+## [2026-07-21] - root@0.62.0, @flows/web@0.62.0, @flows/admin@0.36.0
+
+### Features
+
+- (admin) give name its own language key
+- (admin) edit select options and suggest existing keys
+- (admin) let the editor set the config placeholder and its key
+- (admin) carry and edit the *En language keys
+- (i18n) add translateField resolver for *En language-key fields
+- (admin) redesign UI as a dataflow instrument panel
+- (admin) extend block migration to port/config labels
+- (i18n) seed port/config field keys in blocks.json
+- (admin) add dev-only block label→key migration tool
+- (i18n) seed blocks.json with label/description translations
+- (admin) enable block update (full CRUD, assuming server remote update)
+- (admin) wire block editor to server API (list + create)
+- (i18n) translate server block text via language keys at render time
+
+### Bug Fixes
+
+- (admin) stop saving a block from clearing its required ports
+- (i18n) fall back to an identifier when a label resolves to nothing
+- (admin) align sidebar wire through node marker centers
+
+### Refactor
+
+- mount the key suggestion list once, and finish the label fallbacks
+- (admin) make an empty placeholder mean one thing
+- (i18n) correct the centralization claim and drop a magic indent
+- (admin) tidy the key dictionary hook after review
+- (i18n) drop the label-as-key resolver and its migration tool
+- (i18n) read mobile editor block text through translateField
+- (i18n) read desktop editor block text through translateField
+- (i18n) replace S3/presign storage with repo files + JSON export/import
+- (i18n) consolidate supported languages into one constant
+
+### Other
+
+- style: (admin) shrink inner-page table type and unify row density
+- style: (admin) drop background grid, tighten spacing
+
 ## [2026-07-20] - root@0.61.0, @flows/web@0.61.0, @flows/admin@0.35.0
 
 ### Features
