@@ -10,12 +10,12 @@ import type { AppSeoMeta } from '@flows/flows';
 
 export const AppCard = ({ app }: { app: AppSeoMeta }) => {
     const { t } = useTranslation();
-    const { slug, name } = deriveAppIdentity(app);
 
     // A gallery card's only job is to open the App; without the server-provided url there is
     // nothing to open, so drop the card rather than render a dead, non-navigable tile.
     if (!app.url) return null;
 
+    const { slug, name } = deriveAppIdentity(app);
     const updated = formatRelativeTime(app.lastmod, t);
     const fresh = isRecent(app.lastmod);
 

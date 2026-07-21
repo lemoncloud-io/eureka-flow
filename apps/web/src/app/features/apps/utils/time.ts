@@ -18,6 +18,6 @@ export const formatRelativeTime = (timestamp: number | undefined, t: TFunc): str
     return new Date(timestamp).toLocaleDateString();
 };
 
-/** Whether an epoch-ms timestamp falls within the last `windowMs` (default 7 days). */
-export const isRecent = (timestamp: number | undefined, windowMs = RECENT_WINDOW_MS): boolean =>
-    timestamp != null && Date.now() - timestamp < windowMs;
+/** Whether an epoch-ms timestamp falls within the last 7 days. */
+export const isRecent = (timestamp: number | undefined): boolean =>
+    timestamp != null && Date.now() - timestamp < RECENT_WINDOW_MS;

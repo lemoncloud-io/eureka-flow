@@ -12,7 +12,7 @@ import { listAppsSeo } from '../../api';
 export const useAppsListInfiniteQuery = () =>
     useInfiniteQuery({
         queryKey: appsKeys.list(),
-        queryFn: ({ pageParam }) => listAppsSeo({ page: pageParam }),
+        queryFn: ({ pageParam }) => listAppsSeo(pageParam),
         initialPageParam: 0,
         getNextPageParam: (lastPage, allPages) => {
             const loaded = allPages.reduce((sum, page) => sum + page.list.length, 0);

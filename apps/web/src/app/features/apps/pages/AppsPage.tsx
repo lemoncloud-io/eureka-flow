@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -6,7 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowDownUp, Github, Loader2, Search } from 'lucide-react';
 
 import { useAppsListInfiniteQuery } from '@flows/flows';
-import { GITHUB_URL } from '@flows/shared';
+import { GITHUB_URL, useInfiniteScrollObserver } from '@flows/shared';
 import { Badge, Button, Input, LanguageSwitcher, ThemeToggle } from '@flows/ui-kit';
 
 import { AppCard, AppsEmptyState, AppsErrorState, AppsMockToggle } from '../components';
@@ -97,25 +97,13 @@ export const AppsPage = () => {
 
     const hasResults = apps.length > 0;
 
-    // Infinite scroll: fetch the next page when the sentinel scrolls into view. A ref mirror lets
-    // the observer callback read fresh query state without re-subscribing on every render.
-    const loadMoreRef = useRef<HTMLDivElement>(null);
-    const scrollStateRef = useRef({ hasNextPage, isFetchingNextPage, fetchNextPage });
-    scrollStateRef.current = { hasNextPage, isFetchingNextPage, fetchNextPage };
-
-    useEffect(() => {
-        const el = loadMoreRef.current;
-        if (!el) return;
-        const observer = new IntersectionObserver(
-            entries => {
-                const { hasNextPage: has, isFetchingNextPage: fetching, fetchNextPage: fetch } = scrollStateRef.current;
-                if (entries[0]?.isIntersecting && has && !fetching) fetch();
-            },
-            { threshold: 0.1 }
-        );
-        observer.observe(el);
-        return () => observer.disconnect();
-    }, [isLoading, hasResults]);
+    // Sentinel scrolls into view → fetch the next page. Only active once results are shown.
+    const loadMoreRef = useInfiniteScrollObserver({
+        hasNextPage,
+        isFetchingNextPage,
+        fetchNextPage,
+        enabled: !isLoading && hasResults,
+    });
 
     const renderBody = () => {
         if (isLoading) {

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { FlaskConical } from 'lucide-react';
 
-import { APPS_MOCK_FLAG } from '@flows/flows';
+import { APPS_MOCK_FLAG, appsKeys } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 /**
@@ -22,7 +22,7 @@ export const AppsMockToggle = () => {
         if (next) localStorage.setItem(APPS_MOCK_FLAG, '1');
         else localStorage.removeItem(APPS_MOCK_FLAG);
         setOn(next);
-        queryClient.invalidateQueries({ queryKey: ['apps'] });
+        queryClient.invalidateQueries({ queryKey: appsKeys.all });
     };
 
     return (

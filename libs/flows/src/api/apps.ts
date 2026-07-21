@@ -59,18 +59,9 @@ const getMockAppsSeo = (): AppsSeoListResult => ({
     ],
 });
 
-export interface ListAppsSeoParams {
-    /** 0-based page index. */
-    page?: number;
-    /** Max Apps per page (server default when omitted). */
-    limit?: number;
-    /** Upstream sort condition. */
-    sort?: string;
-}
-
 /**
  * List deployed Apps as SEO metadata, for the public `/apps` gallery.
- * `GET {VITE_API_URL}/_seo_/apps/0/list?page=N` — omitted params are dropped, per spec.
+ * `GET {VITE_API_URL}/_seo_/apps/0/list?page=N`
  *
  * Hits the bare API base directly and unauthenticated — deliberately NOT through the shared
  * `api` client. The `_seo_` proxy resolves ONLY at the bare base: the client injects `/public`
@@ -80,7 +71,7 @@ export interface ListAppsSeoParams {
  * Command is `list`, not `list-seo`: the server currently routes the SEO result under `list`;
  * `list-seo` is not wired yet. Flip the last path segment once the server connects it.
  */
-export const listAppsSeo = async (params: ListAppsSeoParams = {}): Promise<AppsSeoListResult> => {
+export const listAppsSeo = async (page?: number): Promise<AppsSeoListResult> => {
     // `import.meta.env.DEV` is a literal `false` in prod builds, so this whole branch — and
     // `getMockAppsSeo` with it — is dead-code eliminated from every production bundle.
     if (import.meta.env.DEV && localStorage.getItem(APPS_MOCK_FLAG) === '1') {
@@ -89,13 +80,8 @@ export const listAppsSeo = async (params: ListAppsSeoParams = {}): Promise<AppsS
     }
 
     const base = `${import.meta.env.VITE_API_URL}/_seo_/apps/0/list`;
-    const query = new URLSearchParams(
-        Object.entries(params)
-            .filter(([, value]) => value != null)
-            .map(([key, value]) => [key, String(value)])
-    ).toString();
-    const url = query ? `${base}?${query}` : base;
-    _log(`> listAppsSeo(${query || 'page=0'}) → ${url}`);
+    const url = page != null ? `${base}?page=${page}` : base;
+    _log(`> listAppsSeo(page=${page ?? 0}) → ${url}`);
 
     const response = await fetch(url);
     if (!response.ok) throw new Error(`listAppsSeo failed: HTTP ${response.status}`);
