@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AlertTriangle, Loader2, Maximize2, MoreVertical, Play, Trash2 } from 'lucide-react';
 
-import { getPermissions, isAiBlock, isMissingAiKey, useBlockRegistry, useS3Image } from '@flows/flows';
+import { getPermissions, isAiBlock, isMissingAiKey, translateField, useBlockRegistry, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -76,7 +76,7 @@ interface MobileStepCardProps {
 
 export const MobileStepCard = React.memo(
     ({ node, displayName, onTapCard, onExpandContent, onRun, onDelete, role = 'owner' }: MobileStepCardProps) => {
-        const { t } = useTranslation(['flows']);
+        const { t } = useTranslation(['flows', 'blocks']);
         const blockRegistry = useBlockRegistry();
         const { canEditStructure, canRun } = useMemo(() => getPermissions(role), [role]);
         const blockDef = blockRegistry[node.type];
@@ -258,7 +258,7 @@ export const MobileStepCard = React.memo(
                 <div className="px-3 pb-1.5">
                     <div className="text-sm font-semibold truncate leading-tight">{displayName}</div>
                     <div className="text-[10px] text-muted-foreground mt-0.5">
-                        {STEREO_FALLBACK_LABEL[stereo] ?? stereo} · {blockDef?.label ?? node.type}
+                        {STEREO_FALLBACK_LABEL[stereo] ?? stereo} · {translateField(t, blockDef, 'label') || node.type}
                     </div>
                 </div>
 

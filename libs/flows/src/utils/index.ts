@@ -11,4 +11,5 @@ export * from './urlUtils';
 export * from './aiBlockUtils';
 export * from './graphId';
 export * from './transformNodes';
+export * from './i18nServerKey';
 export * from './process';

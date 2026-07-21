@@ -1,3 +1,3 @@
 export * from './json-utils';
 export * from './namespaces';
-export * from './s3-client';
+export * from './translation-files';

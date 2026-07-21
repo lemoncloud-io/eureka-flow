@@ -3,7 +3,14 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { newEdgeId, useCanvasConnections, useCanvasNodes, useCanvasStore } from '@flows/flows';
+import {
+    newEdgeId,
+    resolveNodeName,
+    translateField,
+    useCanvasConnections,
+    useCanvasNodes,
+    useCanvasStore,
+} from '@flows/flows';
 
 import { markConnectionNew } from './useRecentConnections';
 import { arePortTypesCompatible, wouldCreateCycle } from '../../flows/utils';
@@ -37,7 +44,7 @@ export interface CompatibleTarget {
 }
 
 export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionWithFrontend>) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const [source, setSource] = useState<PortSelection | null>(null);
     const connections = useCanvasConnections();
     const nodes = useCanvasNodes();
@@ -59,7 +66,7 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
                 const blockDef = blockRegistry[node.type];
                 if (!blockDef?.inputs) continue;
 
-                const nodeName = node.customLabel || blockDef.label || node.type;
+                const nodeName = resolveNodeName(node, blockDef, t);
 
                 for (const port of blockDef.inputs) {
                     if (!arePortTypesCompatible(source.portDataType, port.type)) continue;
@@ -81,7 +88,7 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
                             ? (() => {
                                   const srcNode = nodes.find(n => n.id === existingConn.sourceNodeId);
                                   const srcDef = srcNode ? blockRegistry[srcNode.type] : undefined;
-                                  return srcNode?.customLabel || srcDef?.label || existingConn.sourceNodeId;
+                                  return resolveNodeName(srcNode, srcDef, t, existingConn.sourceNodeId);
                               })()
                             : undefined;
 
@@ -90,7 +97,7 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
                         nodeName,
                         nodeIcon: blockDef.icon,
                         portId: port.id,
-                        portName: port.label || port.id,
+                        portName: translateField(t, port, 'label') || port.id,
                         portDataType: port.type ?? 'any',
                         alreadyConnected,
                         occupiedByNode,
@@ -106,7 +113,7 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
                 const blockDef = blockRegistry[node.type];
                 if (!blockDef?.outputs) continue;
 
-                const nodeName = node.customLabel || blockDef.label || node.type;
+                const nodeName = resolveNodeName(node, blockDef, t);
 
                 for (const port of blockDef.outputs) {
                     if (!arePortTypesCompatible(port.type ?? 'any', source.portDataType)) continue;
@@ -124,7 +131,7 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
                         nodeName,
                         nodeIcon: blockDef.icon,
                         portId: port.id,
-                        portName: port.label || port.id,
+                        portName: translateField(t, port, 'label') || port.id,
                         portDataType: port.type ?? 'any',
                         alreadyConnected,
                     });
@@ -133,7 +140,7 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
         }
 
         return targets;
-    }, [source, nodes, connections, blockRegistry]);
+    }, [source, nodes, connections, blockRegistry, t]);
 
     const openForPort = useCallback(
         (nodeId: string, portId: string, portDataType: string, nodeName: string, portName: string) => {

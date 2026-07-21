@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { EXECUTE_FUNCTIONS, captureBaseline, getNode, getPortData, useCanvasStore } from '@flows/flows';
+import { EXECUTE_FUNCTIONS, captureBaseline, getNode, getPortData, translateField, useCanvasStore } from '@flows/flows';
 
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
@@ -13,6 +14,7 @@ import type {
     ProgressUpdateInfo,
     TraceUpdateInfo,
 } from '@flows/socket';
+import type { TFunction } from 'i18next';
 import type { RefObject } from 'react';
 
 interface UseSocketHandlersParams {
@@ -25,10 +27,11 @@ interface UseSocketHandlersParams {
 const getNodeDisplayName = (
     nodeId: string,
     canvasRef: RefObject<WorkflowCanvasRef | null>,
-    blockRegistry: Record<string, BlockDefinitionWithFrontend>
+    blockRegistry: Record<string, BlockDefinitionWithFrontend>,
+    t: TFunction
 ): string => {
     const node = canvasRef.current?.getWorkflow()?.nodes?.find(n => n.id === nodeId);
-    const label = node?.customLabel || (node?.type ? blockRegistry[node.type]?.label : undefined);
+    const label = node?.customLabel || (node?.type ? translateField(t, blockRegistry[node.type], 'label') : '');
     return label ? `${label} (${nodeId})` : nodeId;
 };
 
@@ -38,6 +41,7 @@ export const useSocketHandlers = ({
     currentFlowId,
     loadFlowById,
 }: UseSocketHandlersParams) => {
+    const { t } = useTranslation(['flows', 'blocks']);
     const nodeNoRef = useRef<Map<string, number>>(new Map());
     const nodeRunIdRef = useRef<Map<string, string>>(new Map());
     const portNoRef = useRef<Map<string, number>>(new Map());
@@ -143,7 +147,7 @@ export const useSocketHandlers = ({
                     errorMessage: errMsg,
                 });
 
-                const displayName = getNodeDisplayName(nodeId, canvasRef, blockRegistry);
+                const displayName = getNodeDisplayName(nodeId, canvasRef, blockRegistry, t);
                 toast.error(`${displayName} failed`, {
                     description: errMsg ? String(errMsg).slice(0, 80) : undefined,
                     duration: 8000,
@@ -164,7 +168,7 @@ export const useSocketHandlers = ({
             canvasRef.current.updateNodeFromServer(nodeId, { state, status: state, executionStats });
 
             if (state === 'COMPLETED') {
-                const displayName = getNodeDisplayName(nodeId, canvasRef, blockRegistry);
+                const displayName = getNodeDisplayName(nodeId, canvasRef, blockRegistry, t);
                 toast.success(`${displayName} completed`, { duration: 4000 });
             }
 
@@ -183,7 +187,7 @@ export const useSocketHandlers = ({
 
             setTimeout(() => canvasRef.current?.executeNode(nodeId), 0);
         },
-        [blockRegistry, currentFlowId, clearTraceLogs, beginRun, finalizeRun, canvasRef]
+        [blockRegistry, currentFlowId, clearTraceLogs, beginRun, finalizeRun, canvasRef, t]
     );
 
     const handlePortUpdate = useCallback(
@@ -300,7 +304,7 @@ export const useSocketHandlers = ({
             });
 
             if (state === 'ERROR') {
-                const displayName = getNodeDisplayName(nodeId, canvasRef, blockRegistry);
+                const displayName = getNodeDisplayName(nodeId, canvasRef, blockRegistry, t);
                 toast.error(`${displayName} failed`, {
                     description: error ? String(error).slice(0, 80) : label,
                     duration: 8000,
@@ -308,7 +312,7 @@ export const useSocketHandlers = ({
             }
             // ponytail: no success toast here — node COMPLETED events already toast; avoids duplicates.
         },
-        [blockRegistry, canvasRef]
+        [blockRegistry, canvasRef, t]
     );
 
     const handleLogTrace = useCallback(
