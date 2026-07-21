@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-07-21] - root@0.63.0, @flows/web@0.63.0, @flows/admin@0.37.0
+
+### Features
+
+- (apps) relative time, New badge, search/sort, and a11y on the gallery
+- (apps) make /apps a public gallery on the SEO list endpoint
+
+### Refactor
+
+- (apps) apply /simplify cleanups + extract useInfiniteScrollObserver
+
 ## [2026-07-21] - root@0.62.0, @flows/web@0.62.0, @flows/admin@0.36.0
 
 ### Features
