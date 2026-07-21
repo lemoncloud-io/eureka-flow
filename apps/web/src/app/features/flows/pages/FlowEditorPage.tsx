@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { createToolExecutor } from '@flows/agent';
 import {
     FLOW_FORBIDDEN,
     deriveRole,
@@ -23,11 +22,11 @@ import { redirectToLogin, useWebCoreStore, validateApiKey } from '@flows/web-cor
 
 import { useDebugMode } from '../../../hooks/useDebugMode';
 import { BlockTutorial, GuideTour, useTour } from '../../tutorial';
-import { AgentPanel } from '../components/AgentPanel';
 import { AiKeyDialog } from '../components/AiKeyDialog';
 import { DesktopMobileSwitchCta } from '../components/DesktopMobileSwitchCta';
 import { DevRoleChip } from '../components/DevRoleChip';
 import { DevSocketPanel } from '../components/DevSocketPanel';
+import { FlowAgentPanel } from '../components/FlowAgentPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
 import { FlowListDialog } from '../components/FlowListDialog';
 import { Header } from '../components/Header';
@@ -36,11 +35,8 @@ import { ProductProgressBanner } from '../components/ProductProgressBanner';
 import { PublishDialog } from '../components/PublishDialog';
 import { Sidebar } from '../components/Sidebar';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
-import { useAgentEnvironment } from '../hooks/useAgentEnvironment';
 import { useSocketHandlers } from '../hooks/useSocketHandlers';
 import { useSocketRecorder } from '../hooks/useSocketRecorder';
-import { createCommandLlmGateway, createDesktopCanvasBinding } from '../utils';
-import { withExecutorTracing, withGatewayTracing } from '../utils/agentTracing';
 
 import type { HelpTab } from '../components/help';
 import type { SidebarRef } from '../components/Sidebar';
@@ -66,25 +62,6 @@ export const FlowEditorPage = () => {
     const { t } = useTranslation(['flows']);
     const canvasRef = useRef<WorkflowCanvasRef>(null);
     const sidebarRef = useRef<SidebarRef>(null);
-
-    // The one seam between agent code and the React-owned live canvas (SPEC §6.5).
-    const canvasBinding = useMemo(() => createDesktopCanvasBinding(canvasRef), []);
-    // The browser Agent Environment: real session data flows through its storage port and
-    // real run lifecycle through its trace reporter (buffered in dev, noop in prod).
-    const { environment: agentEnvironment, traceReporter: agentTraceReporter } = useAgentEnvironment();
-    // The outbound LLM dependency for the agent panel. Today this is the offline command
-    // gateway (structured commands → tool calls, no network/key); the real gateway is the
-    // backend-proxied one, still deferred (SPEC §9). Swap this line when it lands.
-    // Gateway and executor are wrapped with trace decorators so the actual run emits
-    // llm.chat.* and tool.* lifecycle events through the environment.
-    const agentGateway = useMemo(
-        () => withGatewayTracing(createCommandLlmGateway(), agentTraceReporter),
-        [agentTraceReporter]
-    );
-    const agentExecutor = useMemo(
-        () => withExecutorTracing(createToolExecutor(), agentTraceReporter),
-        [agentTraceReporter]
-    );
 
     const { loadBlocks, blockRegistry } = useBlocks();
     const {
@@ -718,7 +695,7 @@ export const FlowEditorPage = () => {
 
     return (
         <div className="relative flex h-screen bg-canvas text-foreground font-sans overflow-hidden animate-in fade-in duration-500">
-            {/* Canvas region — shrinks to leave room for the docked agent panel (SPEC 0002 §6.5) */}
+            {/* Canvas region — shrinks to leave room for the docked agent panel */}
             <div className="relative h-full min-w-0 flex-1 overflow-hidden">
                 {/* Full-screen Canvas */}
                 <div data-tour="canvas" className="absolute inset-0 editor-grain">
@@ -940,14 +917,8 @@ export const FlowEditorPage = () => {
                 )}
             </div>
 
-            {/* Always-present agent panel, docked right; the canvas region above shrinks for it (SPEC 0002 §6.5) */}
-            <AgentPanel
-                binding={canvasBinding}
-                flowId={currentFlowId ?? ''}
-                gateway={agentGateway}
-                environment={agentEnvironment}
-                executor={agentExecutor}
-            />
+            {/* Always-present agent panel, docked right; the canvas region above shrinks for it */}
+            <FlowAgentPanel canvasRef={canvasRef} flowId={currentFlowId ?? ''} />
         </div>
     );
 };
