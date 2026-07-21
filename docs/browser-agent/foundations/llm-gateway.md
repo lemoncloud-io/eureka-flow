@@ -2,14 +2,14 @@
 
 ## 1. Summary
 
-The LLM access layer is now one shared contract, reconciled between the W04 gateway work
+The LLM access layer is now one shared contract, reconciled between the gateway work
 and the locator-agent design: `LlmGateway.chat()` — provider-neutral chat messages and
 tool definitions in, an async stream of `Chunk`s (text deltas, tool-call arg deltas, a
 final `done`) out. `BaseAgent`/`LocatorAgent` and the `ToolExecutor` consume exactly this
 contract; the fake gateway proves the tool-call path deterministically; Gemini 2.5 Flash
 is the first HTTP provider behind it, text-only for now.
 
-The former W04 `LlmGatewaySupportable.complete()` interface is retired — one contract,
+The former `LlmGatewaySupportable.complete()` interface is retired — one contract,
 no duplicate surface.
 
 ## 2. The shared contract

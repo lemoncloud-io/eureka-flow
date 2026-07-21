@@ -96,8 +96,8 @@ describe('AgentPanel', () => {
     });
 
     it('runs real data through the environment: namespaced session key + lifecycle trace', async () => {
-        // Steve's W05 verification, component form: the actual run (fake LLM → executor →
-        // canvas) must persist through BrowserAgentStorage and emit lifecycle trace events.
+        // Real-browser Environment verification, component form: the actual run (fake LLM →
+        // executor → canvas) must persist through BrowserAgentStorage and emit lifecycle trace events.
         // No self-check helper involved — this is the real flow's own behavior.
         const binding = createInMemoryCanvasBinding({
             nodes: [makeNode('text-1', 100, 200, { type: 'text-input' })],
