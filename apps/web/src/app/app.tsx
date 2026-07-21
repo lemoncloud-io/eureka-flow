@@ -69,11 +69,10 @@ export const App = () => {
                 <Route path="/editor" element={<FlowEditorRouter />} />
                 <Route path="/flows/:id" element={<FlowEditorRouter />} />
 
-                {/* Apps: the list only. `/apps/:id` is served by CloudFront (the deployed App's
-                    own bundle), never by this SPA — see docs/adr/0003-apps-route-ownership.md.
-                    Local dev only for now: `import.meta.env.DEV` is a build-time constant, so the
-                    route (and its AppsPage import) is dropped from every deployed bundle. */}
-                {import.meta.env.DEV && <Route path="/apps" element={<AppsPage />} />}
+                {/* Apps: the public gallery list only. `/apps/:id` is served by CloudFront (the
+                    deployed App's own bundle), never by this SPA — see
+                    docs/adr/0003-apps-route-ownership.md. */}
+                <Route path="/apps" element={<AppsPage />} />
 
                 {/* Other routes */}
                 <Route path="/tutorial" element={<TutorialRouter />} />

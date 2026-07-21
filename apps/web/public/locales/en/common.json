@@ -185,16 +185,12 @@
         "keyCreatedSuccess": "API key creation complete."
     },
     "apps": {
-        "title": "My Apps",
-        "description": "Apps deployed to your workspace. Click one to open it.",
-        "empty": "No apps deployed yet",
-        "emptyDescription": "Deployed apps will appear here.",
-        "loadFailed": "Couldn't load your apps",
-        "loadFailedDescription": "Something went wrong while fetching the list.",
-        "status": {
-            "deployed": "Deployed",
-            "deploying": "Deploying",
-            "failed": "Failed"
-        }
+        "title": "Apps built on Eureka Flow",
+        "description": "Live AI web apps, built visually. Open one to try it.",
+        "live": "{{count}} live",
+        "empty": "No apps published yet",
+        "emptyDescription": "Published apps will appear here.",
+        "loadFailed": "Couldn't load apps",
+        "loadFailedDescription": "Something went wrong while fetching the list."
     }
 }

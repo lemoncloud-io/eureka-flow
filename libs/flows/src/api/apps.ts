@@ -1,45 +1,103 @@
-import { api, withRetry } from '@flows/web-core';
-
-import type { ApiListResult, AppView } from '../types';
+import type { AppsSeoListResult } from '../types';
 
 const _log = console.log.bind(console, '[apps-api]');
 
+/** localStorage flag the dev-only mock toggle writes (see `AppsMockToggle`). */
+export const APPS_MOCK_FLAG = 'flows:apps-mock';
+
 /**
- * The list endpoint does not exist on the server yet. Until it does, `listApps()`
- * returns mock rows. Flip to the real call with `VITE_APPS_API=real`.
+ * Dev-only sample rows so the gallery can be styled without the live endpoint (dev returns 0
+ * apps). Behind `import.meta.env.DEV`, so the whole function — and this data — is dead-code
+ * eliminated from every production bundle. Real dev payload (2026-07-21).
+ */
+const getMockAppsSeo = (): AppsSeoListResult => ({
+    aggr: [{ key: 'approved', val: 4 }],
+    limit: 120,
+    page: 0,
+    total: 4,
+    list: [
+        {
+            description: '[Flow] AIStudio WebApp : photo-figure-creator',
+            id: '1018107',
+            image: 'https://flow.eureka.codes/images/screenshot-light.jpg',
+            lastmod: 1784538551308,
+            siteName: 'AI Visual 워크플로우(Workflow) / 유레카(Eureka) 플로우(Flow)',
+            title: 'AIStudio App : photo-figure-creator | AI Visual 워크플로우(Workflow) / 유레카(Eureka) 플로우(Flow)',
+            type: 'website',
+            url: 'https://flow-dev.eureka.codes/1018107',
+        },
+        {
+            description: '[Flow] AIStudio WebApp : upload-processor-deploy',
+            id: '1017950',
+            image: 'https://flow.eureka.codes/images/screenshot-light.jpg',
+            lastmod: 1784535478408,
+            siteName: 'AI Visual 워크플로우(Workflow) / 유레카(Eureka) 플로우(Flow)',
+            title: 'AIStudio App : upload-processor-deploy | AI Visual 워크플로우(Workflow) / 유레카(Eureka) 플로우(Flow)',
+            type: 'website',
+            url: 'https://flow-dev.eureka.codes/1017950',
+        },
+        {
+            description: '[Flow] AIStudio WebApp : ai-image-stylist',
+            id: '1017774',
+            image: 'https://flow.eureka.codes/images/screenshot-light.jpg',
+            lastmod: 1784538610853,
+            siteName: 'AI Visual 워크플로우(Workflow) / 유레카(Eureka) 플로우(Flow)',
+            title: 'AIStudio App : ai-image-stylist | AI Visual 워크플로우(Workflow) / 유레카(Eureka) 플로우(Flow)',
+            type: 'website',
+            url: 'https://flow-dev.eureka.codes/1017774',
+        },
+        {
+            description: '[Flow] AIStudio WebApp : ai-content-banner-generator',
+            id: '1017700',
+            image: 'https://flow.eureka.codes/images/screenshot-light.jpg',
+            lastmod: 1784538587845,
+            siteName: 'AI Visual 워크플로우(Workflow) / 유레카(Eureka) 플로우(Flow)',
+            title: 'AIStudio App : ai-content-banner-generator | AI Visual 워크플로우(Workflow) / 유레카(Eureka) 플로우(Flow)',
+            type: 'website',
+            url: 'https://flow-dev.eureka.codes/1017700',
+        },
+    ],
+});
+
+export interface ListAppsSeoParams {
+    /** 0-based page index. */
+    page?: number;
+    /** Max Apps per page (server default when omitted). */
+    limit?: number;
+    /** Upstream sort condition. */
+    sort?: string;
+}
+
+/**
+ * List deployed Apps as SEO metadata, for the public `/apps` gallery.
+ * `GET {VITE_API_URL}/_seo_/apps/0/list?page=N` — omitted params are dropped, per spec.
  *
- * Same mock/real swap convention as the Process Navigator (`api/process/index.ts`).
+ * Hits the bare API base directly and unauthenticated — deliberately NOT through the shared
+ * `api` client. The `_seo_` proxy resolves ONLY at the bare base: the client injects `/public`
+ * (→ 404) or `/_api_` (→ 403). No `x-api-key` is sent, so a stray 403 can never clear a
+ * signed-in user's key.
+ *
+ * Command is `list`, not `list-seo`: the server currently routes the SEO result under `list`;
+ * `list-seo` is not wired yet. Flip the last path segment once the server connects it.
  */
-const useReal = import.meta.env.VITE_APPS_API === 'real';
+export const listAppsSeo = async (params: ListAppsSeoParams = {}): Promise<AppsSeoListResult> => {
+    // `import.meta.env.DEV` is a literal `false` in prod builds, so this whole branch — and
+    // `getMockAppsSeo` with it — is dead-code eliminated from every production bundle.
+    if (import.meta.env.DEV && localStorage.getItem(APPS_MOCK_FLAG) === '1') {
+        _log('> listAppsSeo() [DEV MOCK]');
+        return getMockAppsSeo();
+    }
 
-/**
- * Only ids verified to resolve against `https://flow.eureka.codes/apps/:id` belong here —
- * a card whose link 404s is worse than no card. Add more real ids as Apps are deployed.
- * Delete the whole list once the server list endpoint ships.
- */
-const MOCK_APPS: AppView[] = [
-    {
-        id: '1016828',
-        name: 'AI Content Banner Generator',
-        code: 'ai-content-banner-generator',
-        status: 'deployed',
-        deployedAt: 1748390400000,
-        updatedAt: 1748390400000,
-    },
-];
+    const base = `${import.meta.env.VITE_API_URL}/_seo_/apps/0/list`;
+    const query = new URLSearchParams(
+        Object.entries(params)
+            .filter(([, value]) => value != null)
+            .map(([key, value]) => [key, String(value)])
+    ).toString();
+    const url = query ? `${base}?${query}` : base;
+    _log(`> listAppsSeo(${query || 'page=0'}) → ${url}`);
 
-/**
- * List the Apps owned by the signed-in user's workspace
- * GET /apps?view=mine&page=N
- */
-export const listApps = async (page = 0): Promise<ApiListResult<AppView>> => {
-    _log(`> listApps(page=${page}, real=${useReal})`);
-    if (!useReal) return { list: MOCK_APPS, total: MOCK_APPS.length, page: 0 };
-
-    const response = await withRetry(
-        () => api.get<ApiListResult<AppView>>('/apps', { params: { view: 'mine', page } }),
-        3,
-        'listApps'
-    );
-    return response.data;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`listAppsSeo failed: HTTP ${response.status}`);
+    return (await response.json()) as AppsSeoListResult;
 };

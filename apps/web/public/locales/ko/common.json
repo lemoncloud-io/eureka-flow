@@ -185,16 +185,12 @@
         "keyCreatedSuccess": "API 키 생성이 완료되었습니다."
     },
     "apps": {
-        "title": "내 앱",
-        "description": "워크스페이스에 배포된 앱입니다. 클릭하면 앱이 열립니다.",
-        "empty": "아직 배포된 앱이 없습니다",
-        "emptyDescription": "앱을 배포하면 여기에 표시됩니다.",
-        "loadFailed": "앱 목록을 불러오지 못했습니다",
-        "loadFailedDescription": "목록을 가져오는 중 문제가 발생했습니다.",
-        "status": {
-            "deployed": "배포됨",
-            "deploying": "배포 중",
-            "failed": "실패"
-        }
+        "title": "Eureka Flow로 만든 앱",
+        "description": "비주얼로 만든 라이브 AI 웹앱. 클릭하면 열립니다.",
+        "live": "{{count}}개 공개",
+        "empty": "아직 게시된 앱이 없습니다",
+        "emptyDescription": "게시된 앱이 여기에 표시됩니다.",
+        "loadFailed": "앱을 불러오지 못했습니다",
+        "loadFailedDescription": "목록을 가져오는 중 문제가 발생했습니다."
     }
 }

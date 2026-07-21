@@ -1,16 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { appsKeys } from './keys';
-import { listApps } from '../../api';
+import { listAppsSeo } from '../../api';
 
 /**
- * Query hook for listing the Apps owned by the signed-in user's workspace
- * GET /apps?view=mine
+ * Infinite query for the public Apps gallery — pages the SEO list.
+ * `GET /_seo_/apps/0/list?page=N` (public, unauthenticated)
+ *
+ * Stops paging once a page comes back empty or the accumulated count reaches `total`.
  */
-export const useAppsListQuery = (enabled = true) => {
-    return useQuery({
+export const useAppsListInfiniteQuery = () =>
+    useInfiniteQuery({
         queryKey: appsKeys.list(),
-        queryFn: () => listApps(),
-        enabled,
+        queryFn: ({ pageParam }) => listAppsSeo({ page: pageParam }),
+        initialPageParam: 0,
+        getNextPageParam: (lastPage, allPages) => {
+            const loaded = allPages.reduce((sum, page) => sum + page.list.length, 0);
+            const total = lastPage.total ?? loaded;
+            if (lastPage.list.length === 0 || loaded >= total) return undefined;
+            return allPages.length;
+        },
     });
-};
