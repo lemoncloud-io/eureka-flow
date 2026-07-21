@@ -188,9 +188,21 @@
         "title": "Apps built on Eureka Flow",
         "description": "Live AI web apps, built visually. Open one to try it.",
         "live": "{{count}} live",
+        "new": "New",
+        "searchPlaceholder": "Search apps",
+        "sortNewest": "Newest",
+        "sortOldest": "Oldest",
+        "noResults": "No apps match your search",
+        "openApp": "Open {{name}}",
         "empty": "No apps published yet",
         "emptyDescription": "Published apps will appear here.",
         "loadFailed": "Couldn't load apps",
         "loadFailedDescription": "Something went wrong while fetching the list."
+    },
+    "time": {
+        "justNow": "just now",
+        "minutesAgo": "{{count}}m ago",
+        "hoursAgo": "{{count}}h ago",
+        "daysAgo": "{{count}}d ago"
     }
 }
