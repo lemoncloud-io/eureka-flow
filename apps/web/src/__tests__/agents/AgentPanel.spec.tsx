@@ -10,6 +10,7 @@ import {
 } from '@flows/agent';
 
 import { AgentPanel } from '../../app/features/flows/components/AgentPanel';
+import { useLocatorAgent } from '../../app/features/flows/hooks/useLocatorAgent';
 import { withExecutorTracing, withGatewayTracing } from '../../app/features/flows/utils/agentTracing';
 import { createCommandLlmGateway } from '../../app/features/flows/utils/createCommandLlmGateway';
 
@@ -51,6 +52,13 @@ afterEach(() => {
     localStorage.clear(); // sessions persist per flowId; isolate tests that share flowId="f"
 });
 
+// AgentPanel is now a pure view; this harness reunites it with the real agent hook (fed injected
+// fakes) so these tests still drive the whole flow end-to-end — hook → executor → canvas + environment.
+const Harness = (args: Parameters<typeof useLocatorAgent>[0]) => {
+    const { session, send } = useLocatorAgent(args);
+    return <AgentPanel session={session} onSend={send} />;
+};
+
 describe('AgentPanel', () => {
     it('applies a move and shows the transcript when the gateway returns a tool call', async () => {
         const binding = createInMemoryCanvasBinding({
@@ -63,7 +71,7 @@ describe('AgentPanel', () => {
         ]);
         const { environment } = makeEnvironment();
 
-        render(<AgentPanel binding={binding} flowId="f" gateway={gateway} environment={environment} />);
+        render(<Harness binding={binding} flowId="f" gateway={gateway} environment={environment} />);
         await flushHydration();
         typeAndSend('move Fetch right 10');
 
@@ -83,9 +91,7 @@ describe('AgentPanel', () => {
         });
         const { environment } = makeEnvironment();
 
-        render(
-            <AgentPanel binding={binding} flowId="f" gateway={createCommandLlmGateway()} environment={environment} />
-        );
+        render(<Harness binding={binding} flowId="f" gateway={createCommandLlmGateway()} environment={environment} />);
         await flushHydration();
         typeAndSend('move(Fetch, up, 10)');
 
@@ -117,7 +123,7 @@ describe('AgentPanel', () => {
         const executor = withExecutorTracing(createToolExecutor(), traceReporter);
 
         render(
-            <AgentPanel
+            <Harness
                 binding={binding}
                 flowId="harness"
                 gateway={gateway}
@@ -167,7 +173,7 @@ describe('AgentPanel', () => {
         };
         const { environment, traceReporter } = makeEnvironment();
 
-        render(<AgentPanel binding={binding} flowId="f" gateway={failingGateway} environment={environment} />);
+        render(<Harness binding={binding} flowId="f" gateway={failingGateway} environment={environment} />);
         await flushHydration();
         typeAndSend('do something');
 

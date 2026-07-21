@@ -4,6 +4,7 @@ import { createToolExecutor } from '@flows/agent';
 
 import { AgentPanel } from './AgentPanel';
 import { useAgentEnvironment } from '../hooks/useAgentEnvironment';
+import { useLocatorAgent } from '../hooks/useLocatorAgent';
 import { createCommandLlmGateway, createDesktopCanvasBinding } from '../utils';
 import { withExecutorTracing, withGatewayTracing } from '../utils/agentTracing';
 
@@ -17,10 +18,11 @@ interface FlowAgentPanelProps {
 }
 
 /**
- * App-side adaptor: wires the editor's world (the canvas ref + flow id) to the generic
- * {@link AgentPanel}. It owns all the agent construction — the desktop CanvasBinding, the browser
- * Agent Environment, and the (trace-wrapped) command gateway + tool executor — so FlowEditorPage
- * carries none of it and only mounts `<FlowAgentPanel />`.
+ * App-side container for the locator agent: it builds the concrete ports — desktop CanvasBinding,
+ * browser Agent Environment, and the (trace-wrapped) command gateway + tool executor — drives the
+ * agent via {@link useLocatorAgent}, and hands the resulting `session` + `send` to the
+ * presentational {@link AgentPanel}. All the agent wiring lives here, so FlowEditorPage only mounts
+ * `<FlowAgentPanel />` and the panel itself stays a pure view.
  */
 export const FlowAgentPanel = ({ canvasRef, flowId }: FlowAgentPanelProps) => {
     // The one seam between agent code and the React-owned live canvas.
@@ -34,7 +36,7 @@ export const FlowAgentPanel = ({ canvasRef, flowId }: FlowAgentPanelProps) => {
     const gateway = useMemo(() => withGatewayTracing(createCommandLlmGateway(), traceReporter), [traceReporter]);
     const executor = useMemo(() => withExecutorTracing(createToolExecutor(), traceReporter), [traceReporter]);
 
-    return (
-        <AgentPanel binding={binding} flowId={flowId} gateway={gateway} environment={environment} executor={executor} />
-    );
+    const { session, send } = useLocatorAgent({ binding, flowId, gateway, environment, executor });
+
+    return <AgentPanel session={session} onSend={send} />;
 };

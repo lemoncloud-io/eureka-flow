@@ -4,6 +4,7 @@ import { createFakeGateway, createInMemoryCanvasBinding, createToolExecutor } fr
 
 import { AgentPanel } from '../components/AgentPanel';
 import { useAgentEnvironment } from '../hooks/useAgentEnvironment';
+import { useLocatorAgent } from '../hooks/useLocatorAgent';
 import { withExecutorTracing, withGatewayTracing } from '../utils/agentTracing';
 
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
@@ -41,6 +42,8 @@ export const AgentHarnessPage = () => {
         [traceReporter]
     );
     const executor = useMemo(() => withExecutorTracing(createToolExecutor(), traceReporter), [traceReporter]);
+
+    const { session, send } = useLocatorAgent({ binding, flowId: HARNESS_FLOW_ID, gateway, environment, executor });
 
     // The in-memory binding has no subscription; poll it (and the observability surfaces)
     // a few times per second — plenty for a dev harness.
@@ -82,13 +85,7 @@ export const AgentHarnessPage = () => {
                     </ol>
                 </div>
             </div>
-            <AgentPanel
-                binding={binding}
-                flowId={HARNESS_FLOW_ID}
-                gateway={gateway}
-                environment={environment}
-                executor={executor}
-            />
+            <AgentPanel session={session} onSend={send} />
         </div>
     );
 };

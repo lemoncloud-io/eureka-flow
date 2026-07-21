@@ -5,18 +5,13 @@ import { Send, Sparkles } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 
-import { useLocatorAgent } from '../hooks/useLocatorAgent';
-
-import type { AgentEnvironmentSupportable, CanvasBinding, LlmGateway, Message, ToolExecutor } from '@flows/agent';
+import type { Message, SessionState } from '@flows/agent';
 
 interface AgentPanelProps {
-    binding: CanvasBinding;
-    flowId: string;
-    gateway: LlmGateway;
-    /** The browser Agent Environment; session persistence and run tracing flow through it. */
-    environment: AgentEnvironmentSupportable;
-    /** Optional executor override (e.g. wrapped with tracing). */
-    executor?: ToolExecutor;
+    /** The session to render; null before the first turn / while the transcript is hydrating. */
+    session: SessionState | null;
+    /** Emit a user message. The container owns the agent; this panel is a pure view. */
+    onSend: (text: string) => void;
 }
 
 /** Messages the user should see: their own turns and the agent's text replies. */
@@ -24,13 +19,14 @@ const isVisible = (m: Message): boolean =>
     m.role === 'user' || (m.role === 'assistant' && !!m.content && m.content.trim().length > 0);
 
 /**
- * The always-present, right-docked assistant panel. It renders purely from the session store
- * and emits `send` — all editing goes through the agent, which is the sole editor of the
- * canvas. Docked as a fixed-width column that shrinks the canvas region — it does not overlay it.
+ * The always-present, right-docked assistant panel — a pure view over the agent session. It
+ * renders the transcript and emits `onSend`; it owns no agent, ports, or wiring (a container such
+ * as `FlowAgentPanel` supplies `session` + `onSend`). All editing goes through the agent, which is
+ * the sole editor of the canvas. Docked as a fixed-width column that shrinks the canvas region — it
+ * does not overlay it.
  */
-export const AgentPanel = ({ binding, flowId, gateway, environment, executor }: AgentPanelProps) => {
+export const AgentPanel = ({ session, onSend }: AgentPanelProps) => {
     const { t } = useTranslation(['flows']);
-    const { session, send } = useLocatorAgent({ binding, flowId, gateway, environment, executor });
     const [draft, setDraft] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -54,7 +50,7 @@ export const AgentPanel = ({ binding, flowId, gateway, environment, executor }: 
             return;
         }
         setDraft('');
-        send(text);
+        onSend(text);
     };
 
     const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
