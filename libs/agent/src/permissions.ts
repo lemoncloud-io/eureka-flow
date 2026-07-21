@@ -1,10 +1,10 @@
 /**
  * The capabilities a tool can require and an agent can be granted.
  *
- * This is a local, dependency-free mirror of the flow editor's `FlowPermissions`
- * (`libs/flows`) — the locator agent needs only the capability *names* to gate its
- * tools, not the flow lib's role-derivation. When this folds into the flow-edit agent
- * (spec 0001) these align with `FlowPermissions` keys.
+ * Deliberately a small, dependency-free mirror of the capability names in the flow editor's
+ * `FlowPermissions` (`libs/flows`): the agent core stays standalone — it never imports `libs/flows`
+ * — and needs only the names to gate its tools, not the flow lib's role-derivation. This is the
+ * single source of these names for the agent; keep them in sync with `FlowPermissions` by hand.
  */
 export type Capability = 'canModifyCanvas' | 'canEditConfig' | 'canEditStructure' | 'canRun';
 
