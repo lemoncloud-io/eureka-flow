@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createInMemoryCanvasBinding, createInMemoryStorage, createLocatorAgent } from '@flows/agent';
 
-import { createCommandLlmGateway } from './createCommandLlmGateway';
+import { createCommandLlmGateway } from '../../app/features/flows/utils/createCommandLlmGateway';
 
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 

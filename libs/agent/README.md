@@ -5,7 +5,7 @@ existing node on the canvas from a plain-language request ("nudge the Fetch node
 the right", "put Email at x=100, y=100").
 
 Spec: [`docs/browser-agent/agents/locator/SPEC.md`](../../docs/browser-agent/agents/locator/SPEC.md)
-(builds on [`design`](../../docs/browser-agent/design/SPEC.md)).
+(builds on [`design/architecture.md`](../../docs/browser-agent/design/architecture.md)).
 
 ## What's here
 

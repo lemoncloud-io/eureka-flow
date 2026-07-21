@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createInMemoryCanvasBinding } from '@flows/agent';
 
-import { useLocatorAgent } from './useLocatorAgent';
+import { useLocatorAgent } from '../../app/features/flows/hooks/useLocatorAgent';
 
 import type { Chunk, LlmGateway } from '@flows/agent';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';

@@ -41,10 +41,5 @@ export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | nu
             }
             canvas().updateNode(id, updates);
         },
-
-        swapFlow: graph => {
-            // `loadWorkflow` reads `state.edges ?? state.connections`; emit `edges`.
-            void canvas().loadWorkflow({ nodes: graph.nodes, edges: graph.edges });
-        },
     };
 };

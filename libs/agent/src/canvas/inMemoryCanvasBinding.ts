@@ -12,7 +12,7 @@ import type { NodeData } from '@lemoncloud/eureka-flows-api';
  * - `updateNode` shallow-merges a node and **replaces `position` whole** (never a
  *   partial axis), and maps `label` → `customLabel` where `''`/falsy clears it so the
  *   node falls back to its block-definition label.
- * - `readGraph` returns the current graph; `swapFlow` replaces it wholesale.
+ * - `readGraph` returns the current graph.
  */
 export const createInMemoryCanvasBinding = (initial?: Graph): CanvasBinding => {
     let graph: Graph = initial ?? { nodes: [], edges: [] };
@@ -40,10 +40,6 @@ export const createInMemoryCanvasBinding = (initial?: Graph): CanvasBinding => {
                     return next;
                 }),
             };
-        },
-
-        swapFlow: (next: Graph) => {
-            graph = next;
         },
     };
 };

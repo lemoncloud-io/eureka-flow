@@ -18,18 +18,14 @@ export interface Graph {
 
 /**
  * The single seam between (non-React) agent code and the React-owned live canvas.
- * See docs/browser-agent/agents/locator/SPEC.md §6.5 and the desktop implementation in
+ * See docs/browser-agent/design/canvas-binding.md and the desktop implementation in
  * apps/web (`createDesktopCanvasBinding`).
  *
- * The locator agent uses only `readGraph` (to find a node) and `updateNode` (to move
- * it); `swapFlow` exists for the fuller flow-edit agent (spec 0001) and is part of the
- * shared contract.
+ * The locator agent uses `readGraph` (to find a node) and `updateNode` (to move it).
  */
 export interface CanvasBinding {
     /** Live structural read of the current canvas graph. */
     readGraph(): Graph;
     /** Edit one node's label / position, applied immediately (frontend-only). */
     updateNode(id: string, patch: { label?: string; position?: XY }): void;
-    /** Replace the whole flow at once (apply a draft). */
-    swapFlow(graph: Graph): void;
 }

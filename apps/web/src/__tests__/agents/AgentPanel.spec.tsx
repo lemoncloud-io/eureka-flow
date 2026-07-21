@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { createFakeGateway, createInMemoryCanvasBinding } from '@flows/agent';
 
-import { AgentPanel } from './AgentPanel';
-import { createCommandLlmGateway } from '../utils/createCommandLlmGateway';
+import { AgentPanel } from '../../app/features/flows/components/AgentPanel';
+import { createCommandLlmGateway } from '../../app/features/flows/utils/createCommandLlmGateway';
 
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
