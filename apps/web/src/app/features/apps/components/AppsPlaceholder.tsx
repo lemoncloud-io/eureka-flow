@@ -36,7 +36,7 @@ const Placeholder = ({ icon: Icon, title, description, action, tone = 'muted' }:
 );
 
 /**
- * Shown when the workspace owns no Apps.
+ * Shown when no Apps are published.
  *
  * No call to action: flow cannot create an App — an App is produced by the Injection
  * pipeline and owned by codes (see `CONTEXT.md`). Offering a "create" button here would
@@ -48,8 +48,8 @@ export const AppsEmptyState = () => {
     return (
         <Placeholder
             icon={LayoutGrid}
-            title={t('apps.empty', 'No apps deployed yet')}
-            description={t('apps.emptyDescription', 'Deployed apps will appear here.')}
+            title={t('apps.empty', 'No apps published yet')}
+            description={t('apps.emptyDescription', 'Published apps will appear here.')}
         />
     );
 };
@@ -62,7 +62,7 @@ export const AppsErrorState = ({ onRetry }: { onRetry: () => void }) => {
         <Placeholder
             tone="danger"
             icon={AlertTriangle}
-            title={t('apps.loadFailed', "Couldn't load your apps")}
+            title={t('apps.loadFailed', "Couldn't load apps")}
             description={t('apps.loadFailedDescription', 'Something went wrong while fetching the list.')}
             action={
                 <Button variant="outline" size="sm" onClick={onRetry} className="h-8 gap-1.5 rounded-xl text-xs">
