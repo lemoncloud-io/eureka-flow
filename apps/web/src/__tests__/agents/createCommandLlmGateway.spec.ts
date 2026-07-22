@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createInMemoryCanvasBinding, createInMemoryStorage, createLocatorAgent } from '@flows/agent';
+import { createInMemoryCanvasBinding, createInMemorySessionStore, createLocatorAgent } from '@flows/agent';
 
 import { createCommandLlmGateway } from '../../app/features/flows/utils/createCommandLlmGateway';
 
@@ -16,7 +16,7 @@ const node = (id: string, x: number, y: number, extra: Partial<NodeData> = {}): 
 /** Run one command through the real agent + executor + in-memory canvas — no network. */
 const run = async (nodes: NodeData[], command: string) => {
     const binding = createInMemoryCanvasBinding({ nodes, edges: [] });
-    const storage = createInMemoryStorage();
+    const storage = createInMemorySessionStore();
     const agent = createLocatorAgent({ gateway: createCommandLlmGateway(), binding, storage, flowId: 'f' });
     await agent.send(command);
     return { binding, session: storage.load('f') };

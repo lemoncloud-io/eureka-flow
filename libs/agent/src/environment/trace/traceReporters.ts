@@ -1,19 +1,12 @@
 import type { AgentTraceLevel, AgentTraceReporterSupportable } from '../types';
 
-/**
- * Key names whose values must never appear in a trace. Deliberately broad — matching
- * "key" also redacts e.g. "apiKey"/"providerKey"; erring on the redaction side is the
- * point. Deep-value scanning (secrets embedded inside strings) is out of scope here.
- */
+/** Key names whose values must never appear in a trace. Deliberately broad: matching "key" also redacts "apiKey" etc. */
 const SECRET_KEY_PATTERN = /key|token|secret|password|credential|authorization/i;
 
 const REDACTED = '[redacted]';
 const MAX_REDACT_DEPTH = 3;
 
-/**
- * Shallow-recursive copy of a trace payload with secret-looking fields replaced by
- * "[redacted]". Reporters apply this before storing/forwarding any entry.
- */
+/** Copy of a trace payload with secret-looking fields replaced by "[redacted]". */
 export const redactSecrets = (json: Record<string, unknown>, depth = MAX_REDACT_DEPTH): Record<string, unknown> => {
     const result: Record<string, unknown> = {};
 
@@ -68,11 +61,7 @@ export interface AgentTraceEntry {
     ts: number;
 }
 
-/**
- * A reporter that buffers entries in memory — the node-virtual sink, letting tests assert
- * on what the agent traced. Entries are redacted on the way in; a closed reporter drops
- * further entries.
- */
+/** A reporter that buffers redacted entries in memory; a closed reporter drops further entries. */
 export class BufferAgentTraceReporter implements AgentTraceReporterSupportable {
     readonly entries: AgentTraceEntry[] = [];
     flushCount = 0;

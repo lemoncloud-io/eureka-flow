@@ -1,3 +1,5 @@
+import { errorMessage } from '../utils/errors';
+
 import type { AgentEnvironmentSupportable, AgentRuntime } from './types';
 
 export interface AgentEnvironmentCheck {
@@ -14,19 +16,7 @@ export interface AgentEnvironmentSelfCheckResult {
 
 const SELF_CHECK_KEY_PREFIX = 'selfcheck:';
 
-const toErrorDetail = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-
-/**
- * Verify the environment's base services in the runtime it actually runs in — the
- * real-browser self-check. Storage is probed with a write/read/remove round-trip under a
- * `selfcheck:` key (cleaned up afterwards); trace by emitting and flushing one entry.
- *
- * In the real browser, run it from the app (or console) against the live environment:
- *
- *     const result = await runAgentEnvironmentSelfCheck(createBrowserAgentEnvironment());
- *
- * The result reports per-check status; it never throws.
- */
+/** Probe the environment's base services (storage write/read/remove round-trip, trace emit/flush); reports per-check status and never throws. */
 export const runAgentEnvironmentSelfCheck = async (
     environment: AgentEnvironmentSupportable
 ): Promise<AgentEnvironmentSelfCheckResult> => {
@@ -48,7 +38,7 @@ export const runAgentEnvironmentSelfCheck = async (
             detail: ok ? 'write/read/remove round-trip succeeded' : 'round-trip returned an unexpected value',
         });
     } catch (error) {
-        checks.push({ name: 'storage', ok: false, detail: toErrorDetail(error) });
+        checks.push({ name: 'storage', ok: false, detail: errorMessage(error) });
     }
 
     try {
@@ -62,7 +52,7 @@ export const runAgentEnvironmentSelfCheck = async (
             checks.push({ name: 'trace', ok: true, detail: 'no trace reporter configured (noop path)' });
         }
     } catch (error) {
-        checks.push({ name: 'trace', ok: false, detail: toErrorDetail(error) });
+        checks.push({ name: 'trace', ok: false, detail: errorMessage(error) });
     }
 
     return {

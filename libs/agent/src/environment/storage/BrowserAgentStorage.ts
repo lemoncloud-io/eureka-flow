@@ -2,11 +2,7 @@ import { assertStorageKey, parseStoredJson, serializeJson } from './json';
 
 import type { AgentStorageSupportable } from '../types';
 
-/**
- * The subset of the DOM Storage API the browser storage needs. Injectable so the
- * implementation is testable in the node-virtual runtime without jsdom, and so nothing
- * outside this file ever touches `localStorage` directly.
- */
+/** The subset of the DOM Storage API the browser storage needs; injectable for tests. */
 export interface WebStorageLike {
     readonly length: number;
     getItem(key: string): string | null;
@@ -16,10 +12,7 @@ export interface WebStorageLike {
 }
 
 export interface BrowserAgentStorageOptions {
-    /**
-     * Namespace prepended to every physical key. Scopes listKeys/clear to the agent's own
-     * entries so clear() can never wipe unrelated app localStorage.
-     */
+    /** Namespace prepended to every physical key so clear() can't wipe unrelated app localStorage. */
     keyPrefix?: string;
     /** The backing store; defaults to globalThis.localStorage. Injectable for tests. */
     webStorage?: WebStorageLike;
@@ -44,11 +37,7 @@ const resolveWebStorage = (provided?: WebStorageLike): WebStorageLike => {
     return globalStorage;
 };
 
-/**
- * AgentStorageSupportable backed by localStorage — the single place the agent touches
- * browser persistent state. All keys live under a namespace prefix; logical keys (the
- * ones callers see) never include it.
- */
+/** AgentStorageSupportable backed by localStorage; all keys live under a namespace prefix. */
 export const createBrowserAgentStorage = (options: BrowserAgentStorageOptions = {}): AgentStorageSupportable => {
     const webStorage = resolveWebStorage(options.webStorage);
     const namespace = options.keyPrefix ?? DEFAULT_KEY_PREFIX;

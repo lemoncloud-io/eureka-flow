@@ -5,7 +5,7 @@ import { createLocatorAgent } from '@flows/agent';
 import { useAgentSession } from './useAgentSession';
 
 import type { UseAgentSessionResult } from './useAgentSession';
-import type { AgentEnvironmentSupportable, CanvasBinding, LlmGateway, Storage, ToolExecutor } from '@flows/agent';
+import type { AgentEnvironmentSupportable, CanvasBinding, LlmGateway, SessionStore, ToolExecutor } from '@flows/agent';
 
 interface UseLocatorAgentArgs {
     binding: CanvasBinding;
@@ -18,12 +18,9 @@ interface UseLocatorAgentArgs {
 }
 
 /**
- * React binding for the locator {@link createLocatorAgent}. A thin wrapper over the generic
- * {@link useAgentSession}, which owns everything agent-agnostic — the per-flow session store
- * (persisted through the Agent Environment, survives reload) and the StrictMode-safe,
- * abort-on-flow-switch lifecycle. This hook supplies only the locator factory (its binding is
- * the canvas seam); a future agent reuses `useAgentSession` the same way with its own factory,
- * so none of that machinery is copied.
+ * React binding for the locator {@link createLocatorAgent}: a thin wrapper over the generic
+ * {@link useAgentSession} (which owns the per-flow session store and lifecycle), supplying only
+ * the locator factory.
  */
 export const useLocatorAgent = ({
     binding,
@@ -33,7 +30,7 @@ export const useLocatorAgent = ({
     executor,
 }: UseLocatorAgentArgs): UseAgentSessionResult => {
     const createAgent = useCallback(
-        (storage: Storage) =>
+        (storage: SessionStore) =>
             createLocatorAgent({ gateway, binding, storage, flowId, ...(executor ? { executor } : {}) }),
         [gateway, binding, flowId, executor]
     );

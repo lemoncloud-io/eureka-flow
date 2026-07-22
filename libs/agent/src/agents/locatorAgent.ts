@@ -51,15 +51,7 @@ const buildLocatorConfig = (deps: LocatorAgentDeps): AgentConfig => ({
     tools: [createCanvasToolProvider(deps.binding)],
 });
 
-/**
- * The first concrete agent. It adds just two things to {@link BaseAgent}: the canvas tool
- * provider + persona (through its {@link AgentConfig}), and per-turn seeding of the live node
- * list so the model can resolve the node the user means and read its current position.
- *
- * The whole think/act turn — applying each `move_node` straight to the live canvas via the
- * {@link CanvasBinding}, ending on the model's confirmation — is inherited from `BaseAgent`.
- * There is no draft and no approval gate.
- */
+/** Concrete agent that relocates canvas nodes: adds the canvas tools + persona and seeds the live node list each turn. */
 export class LocatorAgent extends BaseAgent {
     private readonly binding: CanvasBinding;
 
@@ -74,8 +66,5 @@ export class LocatorAgent extends BaseAgent {
     }
 }
 
-/**
- * Create the locator {@link Agent}. Thin factory over `new LocatorAgent(deps)`, kept so existing
- * call sites (the React hook, the tests) read the same. `send(text)` runs the whole think/act turn.
- */
+/** Create the locator {@link Agent}. */
 export const createLocatorAgent = (deps: LocatorAgentDeps): Agent => new LocatorAgent(deps);

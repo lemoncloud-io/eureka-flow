@@ -1,26 +1,13 @@
-import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { Position, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 /** A point on the canvas. */
-export interface XY {
-    x: number;
-    y: number;
-}
+export type XY = Position;
 
-/**
- * The live canvas graph, normalized to the agent's shape: `nodes` + `edges`. `edges` uses the
- * exported `EdgeData` shape and matches the canvas's own `edges` field (`WorkflowState`). (The
- * app also refers to the same shape as a `Connection` in some places.)
- */
-export interface Graph {
-    nodes: NodeData[];
-    edges: EdgeData[];
-}
+/** The live canvas graph: `nodes` + `edges`, matching the canvas's own `WorkflowState`. */
+export type Graph = WorkflowState;
 
 /**
  * The single seam between (non-React) agent code and the React-owned live canvas.
- * See docs/browser-agent/design/canvas-binding.md and the desktop implementation in
- * apps/web (`createDesktopCanvasBinding`).
- *
  * The locator agent uses `readGraph` (to find a node) and `updateNode` (to move it).
  */
 export interface CanvasBinding {

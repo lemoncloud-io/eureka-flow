@@ -1,45 +1,13 @@
 /**
- * Public entry for @flows/agent.
- *
- * Groups: the environment / storage / trace-reporter contracts and their browser and
- * node-virtual implementations (plus the environment self-check); the HTTP port and the
- * LLM gateway (fake gateway for tests + the Gemini 2.5 Flash provider); and the locator
- * agent vertical — canvas seam, tools + executor, session, and the generic BaseAgent.
+ * Public entry for @flows/agent: the browser Agent Environment (storage, trace, self-check),
+ * the HTTP and LLM ports, and the locator agent vertical (canvas seam, tools, session, agents).
  */
-
-// Environment foundation + self-check
 export * from './environment';
-
-// HTTP port (provider/proxy calls go through this, never raw fetch)
 export * from './http';
-
-// LLM gateway: chat contract + fake gateway + Gemini provider
 export * from './llm';
-
-// Agent + permissions
-export type { Agent, AgentConfig } from './agent';
-export type { AgentGrant, Capability } from './permissions';
-export { effectiveCapabilities } from './permissions';
-
-// Canvas seam
-export type { CanvasBinding, Graph, XY } from './canvas/canvasBinding';
-export { createInMemoryCanvasBinding } from './canvas/inMemoryCanvasBinding';
-export { createCanvasToolProvider, listNodeLocations } from './canvas/canvasTools';
-export type { NodeLocation } from './canvas/canvasTools';
-export { applyMove, directionToDelta, hasExactlyOneTarget, DEFAULT_STEP } from './canvas/moveSemantics';
-export type { Delta, Direction, MoveNodeArgs } from './canvas/moveSemantics';
-
-// Tools + executor
-export type { ToolCall, ToolExecutor, ToolProvider, ToolResult } from './tools/toolTypes';
-export { createToolExecutor } from './tools/toolExecutor';
-export { validateArgs } from './tools/validateArgs';
-
-// Session
-export type { AgentPhase, Message, SessionState, Storage } from './session/session';
-export { createInMemoryStorage } from './session/session';
-
-// Agents — generic base + concrete agents
-export { BaseAgent, DEFAULT_MAX_ITERATIONS } from './agents/baseAgent';
-export type { BaseAgentDeps } from './agents/baseAgent';
-export { createLocatorAgent, LocatorAgent, LOCATOR_SYSTEM_PROMPT } from './agents/locatorAgent';
-export type { LocatorAgentDeps } from './agents/locatorAgent';
+export * from './canvas';
+export * from './tools';
+export * from './session';
+export * from './agents';
+export * from './agent';
+export * from './permissions';

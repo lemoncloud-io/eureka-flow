@@ -1,10 +1,6 @@
 import type { Capability } from '../permissions';
 
-/**
- * A minimal JSON-Schema shape — enough to describe tool parameters to the model and
- * to drive the executor's structural validation (see `toolExecutor`). Not a complete
- * JSON-Schema implementation; extended as tools need it.
- */
+/** Minimal JSON-Schema shape for tool parameters; extended as tools need it. */
 export interface JsonSchema {
     type?: 'object' | 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'null';
     properties?: Record<string, JsonSchema>;
@@ -49,28 +45,15 @@ export interface Chunk {
     usage?: { inputTokens?: number; outputTokens?: number };
 }
 
-/**
- * What a gateway/model supports. Callers that need tool calling should check this before
- * sending tool definitions; a text-only gateway rejects requests that carry them.
- */
+/** What a gateway/model supports; check before sending tool definitions. */
 export interface LlmGatewayCapabilities {
     /** Whether the gateway/model can emit tool calls. */
     readonly toolCalls: boolean;
 }
 
-/**
- * The one outbound LLM dependency, behind a single interface so it can be swapped.
- * This lib ships {@link ../llm/fakeGateway.createFakeGateway} (it backs the tests) and
- * {@link ../llm/GeminiLlmGateway.createGeminiLlmGateway} (the first HTTP provider,
- * text-only, over the HttpRequest port); the app adds an offline dev command gateway (no
- * network, no key) that parses a command and emits real tool calls, with a backend-proxied
- * production gateway deferred until an endpoint exists.
- */
+/** The one outbound LLM dependency, behind a single interface so it can be swapped. */
 export interface LlmGateway {
-    /**
-     * Capability metadata; optional for backward compatibility — absent means unspecified
-     * (callers should not assume tool support).
-     */
+    /** Capability metadata; absent means unspecified (don't assume tool support). */
     readonly capabilities?: LlmGatewayCapabilities;
     chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk>;
 }

@@ -3,20 +3,13 @@ import { DEFAULT_STEP, directionToDelta } from '@flows/agent';
 import type { ChatMessage, ChatRequest, Chunk, Direction, LlmGateway } from '@flows/agent';
 
 /**
- * Offline command gateway (DEV) — no network, no API key. It receives the **exact same
- * request a real LLM would** (system prompt + live node list + transcript + tool defs), parses
- * a structured command out of the latest user message, and emits the matching tool call — so
- * the whole agent → ToolExecutor → CanvasBinding pipeline runs for real and actually moves the
- * node. Everything it "sees" and "decides" is logged to the console, so you can confirm the
- * wiring is correct before swapping in a real (backend-proxied) gateway.
- *
- * Type these into the panel:
- *   move(<node>, <direction>, <distance?>)   e.g. move(Fetch, up, 10)        — relative; distance defaults to DEFAULT_STEP
+ * Offline command gateway (DEV) — no network, no API key. Receives the same request a real LLM
+ * would, parses a command from the latest user message, and emits the matching tool call, so the
+ * whole agent → ToolExecutor → CanvasBinding pipeline runs for real. Commands:
+ *   move(<node>, <direction>, <distance?>)   e.g. move(Fetch, up, 10)        — relative (distance defaults to DEFAULT_STEP)
  *   move(<node>, to, <x>, <y>)               e.g. move(Email, to, 100, 200)  — absolute
  *   list                                     — list the nodes it can see
- *
- * <node> matches a node's label / type / id (case-insensitive), mirroring the system prompt's
- * resolution rules. Unmatched / ambiguous targets reply with text, exactly like a real turn.
+ * <node> matches a node's label / type / id (case-insensitive).
  */
 
 const DIRECTIONS: Direction[] = ['right', 'left', 'up', 'down', 'up-right', 'up-left', 'down-right', 'down-left'];
@@ -54,10 +47,8 @@ const parseNodeContext = (messages: ChatMessage[]): SeenNode[] => {
 };
 
 /**
- * Resolve a target to node(s) by an **exact** (case-insensitive) match on label / type / id.
- * Exact only, on purpose: a substring fallback fuzzy-matches a non-existent target onto a real
- * node (e.g. "Beta" onto "Betamax"), silently moving the wrong node instead of reporting that
- * the target doesn't exist. A deterministic test harness should never guess.
+ * Resolve a target to node(s) by an exact (case-insensitive) match on label / type / id.
+ * Exact only, on purpose: a substring fallback would silently move the wrong node (e.g. "Beta" → "Betamax").
  */
 const resolveNode = (nodes: SeenNode[], target: string): SeenNode[] => {
     const t = target.trim().toLowerCase();

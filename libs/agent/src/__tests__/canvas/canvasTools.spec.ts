@@ -5,7 +5,7 @@ import { createInMemoryCanvasBinding } from '../../canvas/inMemoryCanvasBinding'
 import { createToolExecutor } from '../../tools/toolExecutor';
 
 import type { AgentConfig } from '../../agent';
-import type { ToolCall } from '../../tools/toolTypes';
+import type { ToolCall } from '../../tools/types';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const makeNode = (id: string, x = 0, y = 0, extra: Partial<NodeData> = {}): NodeData => ({

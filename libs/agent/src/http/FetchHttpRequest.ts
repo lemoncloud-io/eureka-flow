@@ -5,11 +5,7 @@ export interface FetchHttpRequestOptions {
     fetchFn?: typeof fetch;
 }
 
-/**
- * The browser (and modern Node) implementation of the HTTP port, backed by `fetch`. JSON
- * bodies are encoded here so callers pass plain values; an explicit content-type header
- * from the caller wins over the default.
- */
+/** HTTP port implementation backed by the global `fetch`. */
 export const createFetchHttpRequest = (options: FetchHttpRequestOptions = {}): HttpRequestSupportable => {
     if (!options.fetchFn && typeof globalThis.fetch !== 'function') {
         throw new Error('createFetchHttpRequest: no global fetch available; pass options.fetchFn');

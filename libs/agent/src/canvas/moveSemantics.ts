@@ -21,15 +21,7 @@ export type Direction = 'right' | 'left' | 'up' | 'down' | 'up-right' | 'up-left
 /** The default step (px) for a vague amount ("nudge it right"). */
 export const DEFAULT_STEP = 20;
 
-/**
- * Canonical direction → delta mapping in canvas coordinates (origin top-left,
- * x increases right, y increases down): right = +x, left = −x, up = −y, down = +y.
- * Diagonals combine the two axes.
- *
- * NOTE: the live path does not call this — the model emits `by` directly, steered by the
- * coordinate convention stated in the system prompt + tool description. This is the
- * reference/tested encoding of that convention for any future non-LLM caller.
- */
+/** Canonical direction → delta in canvas coords: right = +x, left = −x, up = −y, down = +y; diagonals combine axes. */
 export const directionToDelta = (direction: Direction, amount: number = DEFAULT_STEP): Delta => {
     const right = direction.includes('right') ? amount : 0;
     const left = direction.includes('left') ? amount : 0;
@@ -44,10 +36,8 @@ export const hasExactlyOneTarget = (args: Pick<MoveNodeArgs, 'by' | 'to'>): bool
 
 /**
  * Compute a node's new position from a relative delta or an absolute point.
- * No clamping — negative coordinates are allowed (off-origin nodes are valid).
- *
- * @throws if neither or both of `by`/`to` are provided (a caller-side bug; the tool
- *   handler validates this and returns a `ToolResult` error instead of throwing).
+ * No clamping — negative coordinates are valid (off-origin nodes allowed).
+ * @throws if neither or both of `by`/`to` are provided.
  */
 export const applyMove = (current: XY, args: Pick<MoveNodeArgs, 'by' | 'to'>): XY => {
     if (!hasExactlyOneTarget(args)) {

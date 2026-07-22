@@ -3,15 +3,15 @@ import type { HttpRequestSupportable } from '../http';
 import type { ChatRequest, Chunk, LlmGateway, LlmGatewayCapabilities } from './llmGateway';
 
 export interface GeminiLlmGatewayOptions {
-    /** Provides tracing, time, and cancellation; the gateway touches no browser globals. */
+    /** Provides tracing, time, and cancellation. */
     environment: AgentEnvironmentSupportable;
-    /** HTTP port. Swap the implementation (or baseUrl) for a backend proxy when direct browser calls are blocked. */
+    /** HTTP port. */
     http: HttpRequestSupportable;
-    /** Gemini API key. Sent as the x-goog-api-key header — never in the URL, never traced. */
+    /** Gemini API key; sent as the x-goog-api-key header, never traced. */
     apiKey: string;
-    /** Defaults to gemini-2.5-flash, the first provider. */
+    /** Defaults to gemini-2.5-flash. */
     model?: string;
-    /** Override to route through a backend proxy without changing the gateway. */
+    /** Override to route through a backend proxy. */
     baseUrl?: string;
     /** Optional generation parameters applied to every request. */
     generation?: { temperature?: number; maxOutputTokens?: number };
@@ -38,11 +38,7 @@ interface GeminiContent {
     parts: Array<{ text: string }>;
 }
 
-/**
- * Map the provider-neutral request onto Gemini's generateContent shape. Gemini has no
- * system role in `contents`, so system messages become the `systemInstruction`. Tool
- * definitions and tool messages are rejected until Gemini tool calling is implemented.
- */
+/** Map the provider-neutral request onto Gemini's generateContent shape; system messages become the systemInstruction. */
 const toGeminiRequest = (req: ChatRequest, generation?: GeminiLlmGatewayOptions['generation']) => {
     if (req.tools.length > 0) {
         throw new Error(`${TEXT_ONLY}: tool definitions are not supported`);
@@ -82,14 +78,7 @@ interface GeminiResponse {
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
 }
 
-/**
- * The first HTTP provider behind the shared {@link LlmGateway} contract: Google Gemini
- * (generateContent API), text-only for now — `capabilities.toolCalls` is `false` and
- * requests carrying tool definitions or tool messages are rejected loudly. The response
- * is not streamed by the provider call; it is yielded as one text chunk followed by a
- * `done` chunk carrying usage. Errors carry the HTTP status and a short, key-redacted
- * body snippet; the API key appears in neither errors nor traces.
- */
+/** LlmGateway backed by Google Gemini's generateContent API; text-only (no tool calls). */
 export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): GeminiLlmGateway => {
     const { environment, http, apiKey } = options;
     const model = options.model ?? DEFAULT_MODEL;

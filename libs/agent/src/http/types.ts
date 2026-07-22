@@ -1,15 +1,4 @@
-/**
- * HTTP port for agent-layer services
- *
- * Gateways never call the global `fetch` directly — they depend on this small port. That
- * matters for two reasons:
- *
- *  1. CORS/security: some provider APIs cannot be called reliably from the browser. The
- *     planned backend proxy becomes just another HttpRequestSupportable implementation
- *     (or a different base URL), with no change to gateway code.
- *  2. The environment forbids arbitrary network access. Agent services reach the network
- *     only through an explicitly injected HTTP port aimed at approved endpoints.
- */
+/** HTTP port for agent-layer services; gateways depend on this instead of calling `fetch` directly. */
 
 export type HttpMethod = 'GET' | 'POST';
 

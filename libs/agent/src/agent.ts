@@ -1,26 +1,20 @@
 import type { AgentGrant } from './permissions';
-import type { ToolProvider } from './tools/toolTypes';
+import type { ToolProvider } from './tools/types';
 
-/**
- * What makes an agent the agent it is — the parts that vary between capabilities. The
- * locator agent is built with the locator tool provider + a canvas-edit grant.
- */
+/** An agent's varying parts: tool provider(s) plus a capability grant. */
 export interface AgentConfig {
     id: string;
-    /** What it handles — for a future agent router. */
+    /** What it handles. */
     description: string;
     /** Persona / instructions. */
     systemPrompt: string;
-    /** Its tool sources — one or more; the executor unions + routes across them. */
+    /** Its tool sources; the executor unions + routes across them. */
     tools: ToolProvider[];
     /** Capabilities it is allowed to use. */
     grant: AgentGrant;
 }
 
-/**
- * The turn surface the Panel drives. The locator agent owns the whole turn inside
- * `send`; there is no plan/approval gate (moves apply live), so there is no `resolvePlan`.
- */
+/** The turn surface the Panel drives. */
 export interface Agent {
     /** Append the user message and run the whole turn to completion. */
     send(text: string): Promise<void>;

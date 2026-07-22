@@ -1,12 +1,6 @@
 import type { JsonSchema } from '../llm/llmGateway';
 
-/**
- * A deliberately small JSON-Schema validator — enough to make the executor a real
- * structural choke-point for the tool shapes this lib uses (objects, required keys,
- * primitive/array/nested-object types). It is NOT a full JSON-Schema implementation;
- * semantic rules that basic schema can't express (e.g. "exactly one of by/to") live in
- * the tool handler. Returns a list of human-readable errors (empty = valid).
- */
+/** Minimal JSON-Schema validator; returns human-readable errors (empty = valid). */
 export const validateArgs = (schema: JsonSchema, value: unknown, path = ''): string[] => {
     const at = path || 'value';
 
@@ -45,8 +39,7 @@ export const validateArgs = (schema: JsonSchema, value: unknown, path = ''): str
     }
     if (schema.type === 'number' || schema.type === 'integer') {
         if (typeof value !== 'number' || !Number.isFinite(value)) {
-            // Reject NaN / ±Infinity — `typeof NaN === 'number'` would otherwise slip through
-            // (Infinity is reachable via JSON.parse of an overflowing literal like 1e999).
+            // Reject NaN / ±Infinity — `typeof NaN === 'number'` would otherwise slip through.
             return [`${at} must be a finite number`];
         }
         if (schema.type === 'integer' && !Number.isInteger(value)) {

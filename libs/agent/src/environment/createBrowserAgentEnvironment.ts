@@ -1,5 +1,5 @@
+import { createAgentEnvironment } from './createAgentEnvironment';
 import { createBrowserAgentStorage } from './storage/BrowserAgentStorage';
-import { AGENT_ENVIRONMENT_CAPABILITIES } from './types';
 
 import type { AgentEnvironmentSupportable, AgentStorageSupportable, AgentTraceReporterSupportable } from './types';
 
@@ -13,27 +13,15 @@ export interface BrowserAgentEnvironmentOptions {
 }
 
 /**
- * The live-editor environment: `runtime: 'browser'`, persistent state via localStorage
- * behind the Storage interface, real clock, real AbortController — and every forbidden
- * capability (eval, Function constructor, filesystem, arbitrary network/script) declared
- * immutably false.
+ * The live-editor environment: `runtime: 'browser'`, persistent state via localStorage behind
+ * the Storage interface, real clock and AbortController, forbidden capabilities frozen false.
  */
 export const createBrowserAgentEnvironment = (
     options: BrowserAgentEnvironmentOptions = {}
-): AgentEnvironmentSupportable => {
-    const storage = options.storage ?? createBrowserAgentStorage({ keyPrefix: options.keyPrefix });
-    const traceReporter = options.traceReporter;
-
-    return {
+): AgentEnvironmentSupportable =>
+    createAgentEnvironment({
         runtime: 'browser',
-        storage,
-        ...(traceReporter ? { traceReporter } : {}),
-        capabilities: AGENT_ENVIRONMENT_CAPABILITIES,
+        storage: options.storage ?? createBrowserAgentStorage({ keyPrefix: options.keyPrefix }),
         now: () => Date.now(),
-        createAbortController: () => new AbortController(),
-        close: () => {
-            traceReporter?.flush();
-            traceReporter?.close();
-        },
-    };
-};
+        traceReporter: options.traceReporter,
+    });

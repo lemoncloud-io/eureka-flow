@@ -3,32 +3,13 @@ import { applyMove, hasExactlyOneTarget } from './moveSemantics';
 import type { CanvasBinding, XY } from './canvasBinding';
 import type { MoveNodeArgs } from './moveSemantics';
 import type { ToolDef } from '../llm/llmGateway';
-import type { ToolCall, ToolProvider, ToolResult } from '../tools/toolTypes';
-
-/**
- * The canvas domain's tool provider — a single source (a `ToolProvider` maps 1:1 to one MCP
- * server) bundling every tool that operates on the {@link CanvasBinding}: `list_nodes` (read)
- * and `move_node` (mutate). Any agent can carry it via `AgentConfig.tools`.
- *
- * Read vs. mutate is **not** a provider boundary — it's a per-tool property, carried by each
- * tool's `requires` (`list_nodes` needs nothing; `move_node` needs `canModifyCanvas`) and
- * enforced by the executor per call. Providers are split by **domain** instead: another
- * agent could add a `configToolProvider` / `edgeToolProvider` alongside this one,
- * not more read/mutate splits.
- *
- * (If an agent should not even *see* a tool it can't use, the executor can later filter
- * `listTools` by the grant — a small add-on that still keys off `requires`, deferred until a
- * reduced-surface agent actually exists.)
- */
+import type { ToolCall, ToolProvider, ToolResult } from '../tools/types';
 
 /** A node trimmed to what relocation needs. */
 export interface NodeLocation {
     id: string;
     type: string;
-    /**
-     * `customLabel` if set, else undefined. v0 does not resolve the block's default label
-     * (no block-registry dependency) — the model matches on `type` instead.
-     */
+    /** `customLabel` if set, else undefined; the model matches on `type` instead. */
     label?: string;
     position: XY;
 }
@@ -87,11 +68,7 @@ export const listNodeLocations = (binding: CanvasBinding): NodeLocation[] => {
     return locations;
 };
 
-/**
- * The canvas domain's built-in tool provider: `list_nodes` (read) + `move_node` (mutate,
- * applied straight through the {@link CanvasBinding} — no draft). `move_node`
- * returns `{ nodeId, label, from, to }` so the model can confirm and chain follow-up moves.
- */
+/** Canvas tool provider: `list_nodes` (read) + `move_node` (mutate, straight through the binding). */
 export const createCanvasToolProvider = (binding: CanvasBinding): ToolProvider => ({
     listTools: (): ToolDef[] => [LIST_NODES_DEF, MOVE_NODE_DEF],
 
@@ -123,8 +100,7 @@ export const createCanvasToolProvider = (binding: CanvasBinding): ToolProvider =
             const from: XY = { x: node.position.x, y: node.position.y };
             const to = applyMove(from, args);
             if (!Number.isFinite(to.x) || !Number.isFinite(to.y)) {
-                // Defense-in-depth: the executor's validator also rejects non-finite deltas,
-                // but guard here too so a direct provider caller can't corrupt a position.
+                // Defense-in-depth: guard here too so a direct provider caller can't corrupt a position.
                 return {
                     toolCallId: call.id,
                     ok: false,

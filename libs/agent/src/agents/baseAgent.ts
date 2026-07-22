@@ -1,21 +1,18 @@
 import { createToolExecutor } from '../tools/toolExecutor';
+import { errorMessage } from '../utils/errors';
 
 import type { Agent, AgentConfig } from '../agent';
 import type { ChatMessage, Chunk, LlmGateway } from '../llm/llmGateway';
-import type { Message, Storage } from '../session/session';
-import type { ToolCall, ToolExecutor, ToolResult } from '../tools/toolTypes';
+import type { Message, SessionStore } from '../session/session';
+import type { ToolCall, ToolExecutor, ToolResult } from '../tools/types';
 
 /** Safety cap on think/act iterations per turn, if a subclass/caller doesn't set one. */
 export const DEFAULT_MAX_ITERATIONS = 8;
 
-/**
- * The dependencies every agent needs to run a turn — independent of what the agent actually
- * *does*. A concrete agent extends this with its own domain seams (e.g. the locator adds a
- * `binding`). See {@link BaseAgent}.
- */
+/** Dependencies every agent needs to run a turn; a concrete agent extends this with its own seams. */
 export interface BaseAgentDeps {
     gateway: LlmGateway;
-    storage: Storage;
+    storage: SessionStore;
     flowId: string;
     /** Defaults to a fresh {@link createToolExecutor}. */
     executor?: ToolExecutor;
@@ -90,22 +87,13 @@ const resultToContent = (result: ToolResult): string =>
     result.ok ? JSON.stringify(result.data ?? { ok: true }) : JSON.stringify({ error: result.error });
 
 /**
- * The generic think/act turn engine shared by every concrete agent — the part that is the same
- * for all of them, so it is written once here. It owns the whole turn inside {@link send}: guard
- * concurrent sends, append the user message, then loop (ask the model → dispatch its tool calls →
- * feed the results back) until the model replies with no more tool calls, or a safety cap trips.
- *
- * A subclass supplies only what makes it *that* agent: an {@link AgentConfig} (persona + tools +
- * grant), passed up to the constructor, and — optionally — per-turn {@link buildContextMessages}.
- * Nothing here touches the DOM or a specific domain; the locator's canvas knowledge lives entirely
- * in its subclass.
- *
- * There is no draft and no approval gate — a tool call is applied the moment the executor routes
- * it. That is why the {@link Agent} surface has no `resolvePlan`.
+ * Generic think/act turn engine shared by every agent: loop model → dispatch tool calls → feed
+ * results back, until no more tool calls or the safety cap trips. A subclass supplies an
+ * {@link AgentConfig} and optional per-turn {@link buildContextMessages}.
  */
 export abstract class BaseAgent implements Agent {
     protected readonly gateway: LlmGateway;
-    protected readonly storage: Storage;
+    protected readonly storage: SessionStore;
     protected readonly flowId: string;
     protected readonly executor: ToolExecutor;
     protected readonly maxIterations: number;
@@ -125,11 +113,7 @@ export abstract class BaseAgent implements Agent {
         this.config = config;
     }
 
-    /**
-     * Per-turn dynamic context, injected as system message(s) right after the persona and
-     * recomputed on every iteration so the model always sees fresh state. The base agent has
-     * none; the locator overrides this to seed the current node list (label/type/position).
-     */
+    /** Per-turn dynamic context injected as system message(s) after the persona, recomputed each iteration. */
     protected buildContextMessages(): ChatMessage[] {
         return [];
     }
@@ -147,13 +131,11 @@ export abstract class BaseAgent implements Agent {
 
         const existing = storage.load(flowId);
         if (existing?.phase === 'thinking') {
-            // A turn is already in flight; ignore concurrent sends. The turn model is
-            // single-active; the Panel disables input while thinking.
+            // A turn is already in flight; ignore concurrent sends.
             return;
         }
         const state = existing ?? storage.create(flowId);
-        // Seed the id counter past any persisted transcript so ids stay unique after a
-        // reload (a fresh agent instance restarts `seq` at 0).
+        // Seed the id counter past the persisted transcript so ids stay unique after a reload.
         this.seq = Math.max(this.seq, state.messages.length);
         this.controller = new AbortController();
         const { signal } = this.controller;
@@ -179,8 +161,7 @@ export abstract class BaseAgent implements Agent {
                 const tools = await executor.listTools(config);
                 const res = await collect(gateway.chat({ messages: chatMessages, tools, stream: true }, { signal }));
 
-                // The response finished draining; if the turn was aborted meanwhile, stop
-                // before applying any of its moves (already-applied moves stay applied).
+                // If the turn was aborted while draining, stop before applying any of its moves.
                 if (signal.aborted) {
                     state.phase = 'done';
                     storage.save(state);
@@ -206,8 +187,7 @@ export abstract class BaseAgent implements Agent {
                     for (const tc of res.toolCalls) {
                         const call: ToolCall = { id: tc.id, name: tc.name, args: tc.args };
                         const result = await executor.dispatch(config, call);
-                        // Patch the assistant message by stable reference — the array's last
-                        // element is a tool message on the 2nd+ iteration.
+                        // Patch the assistant message by stable reference (it is no longer the array's last element).
                         const recorded = assistantMsg.toolCalls?.find(c => c.id === tc.id);
                         if (recorded) {
                             recorded.status = result.ok ? 'ok' : 'error';
@@ -248,7 +228,7 @@ export abstract class BaseAgent implements Agent {
                 return;
             }
             state.phase = 'error';
-            state.error = err instanceof Error ? err.message : String(err);
+            state.error = errorMessage(err);
             storage.save(state);
         }
     }

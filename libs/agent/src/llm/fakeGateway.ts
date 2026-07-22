@@ -6,21 +6,10 @@ export interface FakeResponse {
     toolCalls?: { name: string; args: unknown }[];
 }
 
-/**
- * A response, or a function that produces one from the request (so a script can react
- * to the running conversation — e.g. emit a confirmation only after a tool result).
- */
+/** A response, or a function that derives one from the request (so a script can react to prior tool results). */
 export type FakeScriptStep = FakeResponse | ((req: ChatRequest) => FakeResponse);
 
-/**
- * A deterministic {@link LlmGateway} for tests. Each call to `chat()` consumes the next
- * scripted step and streams it as {@link Chunk}s (tool-call args are emitted as a single
- * JSON `argsDelta`, exercising the agent's accumulate-then-parse path). When the script
- * is exhausted it yields an empty final turn (text `''`, no tool calls), which ends a
- * turn cleanly.
- *
- * `calls` records every request received, for assertions.
- */
+/** A deterministic {@link LlmGateway} for tests: each chat() consumes the next scripted step and streams it as {@link Chunk}s. */
 export interface FakeGateway extends LlmGateway {
     /** The fake can script tool calls, so it declares tool support. */
     readonly capabilities: LlmGatewayCapabilities;

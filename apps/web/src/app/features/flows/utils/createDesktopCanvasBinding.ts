@@ -3,16 +3,10 @@ import type { CanvasBinding } from '@flows/agent';
 import type { NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 import type { RefObject } from 'react';
 
-// The CanvasBinding contract (CanvasBinding / Graph / XY) is owned by @flows/agent; app code
-// imports those types from @flows/agent directly. See docs/browser-agent/design/canvas-binding.md.
-
 /**
- * Desktop binding: wraps the imperative `WorkflowCanvas` ref, because on desktop the
- * live canvas renders from component-local state, not the store — so agent code can't
- * read or write it directly.
- *
- * Pass the same ref object that is wired to `<WorkflowCanvas ref={...} />`; the binding
- * reads `ref.current` lazily on every call, so it stays valid across canvas re-renders.
+ * Desktop {@link CanvasBinding}: wraps the imperative `WorkflowCanvas` ref (the desktop canvas
+ * renders from component-local state, not the store). Reads `ref.current` lazily so it stays
+ * valid across canvas re-renders.
  */
 export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | null>): CanvasBinding => {
     const canvas = (): WorkflowCanvasRef => {

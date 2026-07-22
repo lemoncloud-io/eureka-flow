@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import type { Agent, AgentEnvironmentSupportable, SessionState, Storage } from '@flows/agent';
+import type { Agent, AgentEnvironmentSupportable, SessionState, SessionStore } from '@flows/agent';
 
-// Per-flow session persistence: the transcript survives a page
-// reload and re-opening the flow. Persistence goes through the Agent Environment's storage
-// port — never raw localStorage — so real run data lands in the `flow_mosaic_agent_`
-// namespace and the browser/virtual runtimes stay swappable. Best-effort as before: storage
-// errors are swallowed, and a stale `thinking` phase (a turn that didn't survive the reload)
-// is cleared so the panel isn't stuck and the next send isn't blocked by the guard.
+// Per-flow session persistence through the Agent Environment's storage port (survives reload).
+// Best-effort: storage errors are swallowed, and a stale `thinking` phase is cleared so the panel isn't stuck.
 const SESSION_KEY_PREFIX = 'session:';
 const keyFor = (flowId: string): string => `${SESSION_KEY_PREFIX}${flowId}`;
 
@@ -21,11 +17,7 @@ interface AgentInstance {
     arm: () => void;
     /** Stop the agent and silence its late `save` writes. Called on replace/unmount. */
     dispose: () => void;
-    /**
-     * Read this flow's persisted session and apply it if nothing has happened yet. Driven by an
-     * effect (not the memo factory) so it has no side effect during render/StrictMode double-invoke.
-     * Always resolves — read errors are swallowed — so callers can use it to flip a "hydrated" gate.
-     */
+    /** Read the persisted session and apply it if nothing has happened yet. Always resolves (read errors swallowed). */
     hydrate: () => Promise<void>;
     /** The live working copy's phase after a turn settles — lets tracing tell done from errored. */
     getPhase: () => SessionState['phase'] | null;
@@ -35,12 +27,8 @@ export interface UseAgentSessionArgs {
     flowId: string;
     /** The browser Agent Environment: session persistence flows through its storage port, run lifecycle through its trace reporter. */
     environment: AgentEnvironmentSupportable;
-    /**
-     * Build the agent over the hook's persisted, panel-re-rendering {@link Storage}. Must be
-     * stable for a given (flowId + agent inputs): wrap it in `useCallback` keyed on those inputs
-     * so the agent is rebuilt exactly when they change (flow switch, gateway/binding swap).
-     */
-    createAgent: (storage: Storage) => Agent;
+    /** Build the agent over the hook's {@link SessionStore}. Wrap in `useCallback` so it's stable per (flowId + agent inputs). */
+    createAgent: (storage: SessionStore) => Agent;
 }
 
 export interface UseAgentSessionResult {
@@ -50,22 +38,11 @@ export interface UseAgentSessionResult {
 }
 
 /**
- * The generic React binding shared by every in-browser agent: it owns a per-flow session store
- * (persisted through the Agent Environment's storage, so it survives a page reload / re-opening
- * the flow) and re-renders on every `save` — the one-way render loop (Panel emits `send` → the
- * agent writes `SessionState` → store → Panel). What agent it drives is
- * the caller's only choice, made through `createAgent`; nothing here is locator-specific.
- *
- * Hydration is asynchronous (the storage port is Promise-based): the working copy starts empty
- * and an effect reads the persisted transcript, applying it unless a send already created fresh
- * state. `send` is gated on a `hydrated` flag so a very early send can't make the agent create a
- * fresh session on top of an unread transcript — closing the read/write race even if the storage
- * port is backed by something slower than localStorage later.
- *
- * The agent (and its storage) are rebuilt when `createAgent` changes. Crucially, the outgoing
- * agent is **aborted and silenced** when it is replaced or the panel unmounts, so an in-flight
- * turn from flow A can't mutate flow B's canvas or clobber its transcript, and the LLM stream is
- * freed.
+ * The generic React binding shared by every in-browser agent: owns a per-flow session store
+ * (persisted through the Agent Environment, survives reload) and re-renders on every `save`
+ * (Panel emits `send` → agent writes SessionState → store → Panel). The agent it drives is the
+ * caller's choice via `createAgent`; nothing here is locator-specific. `send` is gated on async
+ * hydration, and the outgoing agent is aborted + silenced on flow switch / unmount.
  */
 export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSessionArgs): UseAgentSessionResult => {
     const [session, setSession] = useState<SessionState | null>(null);
@@ -73,15 +50,14 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
     const instance = useMemo<AgentInstance>(() => {
         // The agent's working copy; hydrated asynchronously from the environment storage below.
         let current: SessionState | null = null;
-        // `alive` gates state writes: once disposed, a superseded agent's late `save`
-        // (e.g. its abort/finalize) can no longer touch the new flow's session.
+        // `alive` gates state writes: a disposed agent's late `save` can't touch the new flow's session.
         let alive = true;
         // Snapshot with fresh object identities so React re-renders on each save.
         const snapshot = (s: SessionState): SessionState => ({
             ...s,
             messages: s.messages.map(m => ({ ...m, toolCalls: m.toolCalls?.map(tc => ({ ...tc })) })),
         });
-        const storage: Storage = {
+        const storage: SessionStore = {
             load: () => current,
             create: id => {
                 current = { flowId: id, messages: [], phase: 'idle' };
@@ -106,9 +82,7 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
                 alive = false;
                 agent.abort();
             },
-            // Read + apply the persisted transcript. Applied only while this instance is live and
-            // nothing (a user send) has produced state in the meantime. Invoked from an effect,
-            // never the factory, so the memo stays pure through StrictMode's double-invoke.
+            // Applied only while live and nothing has produced state yet; invoked from an effect (pure memo through StrictMode).
             hydrate: async () => {
                 try {
                     const persisted = await environment.storage.getJson<SessionState>(keyFor(flowId));
@@ -125,13 +99,11 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
         };
     }, [flowId, environment, createAgent]);
 
-    // `send` is blocked until this instance's persisted transcript has been read (or the read
-    // settled). Reset per instance below; flipped true by the hydration effect.
+    // `send` is blocked until this instance's transcript has been read; flipped true by the hydration effect below.
     const [hydrated, setHydrated] = useState(false);
 
-    // When the agent changes (flow switch / first mount / reload), clear the visible transcript
-    // immediately — the new instance's async hydration fills it in — so the previous flow's
-    // messages are never shown under the new flow. React's adjust-state-during-render pattern.
+    // On agent change (flow switch / mount / reload) clear the visible transcript immediately so the
+    // previous flow's messages never show under the new flow (React adjust-state-during-render).
     const prevRef = useRef<AgentInstance | null>(null);
     if (prevRef.current !== instance) {
         prevRef.current = instance;
@@ -139,21 +111,16 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
         setHydrated(false);
     }
 
-    // Arm on mount, tear down on replace (flow switch) / unmount. This is a *layout* effect
-    // on purpose: its cleanup runs synchronously at commit (before paint), so on a flow switch
-    // the outgoing agent is silenced+aborted before any in-flight stream chunk can resolve and
-    // clobber the new flow's panel through the shared `setSession` (a passive effect would run
-    // after paint, leaving that window open). `arm()` on setup re-enables writes, which also
-    // makes the whole thing survive StrictMode's mount→unmount→remount — without it the
-    // simulated unmount's dispose (alive=false) would keep the transcript invisible all session.
+    // A *layout* effect on purpose: cleanup runs before paint, so on a flow switch the outgoing agent
+    // is silenced+aborted before an in-flight chunk can clobber the new panel via `setSession`.
+    // `arm()` on setup re-enables writes so this survives StrictMode's mount→unmount→remount.
     useLayoutEffect(() => {
         instance.arm();
         return instance.dispose;
     }, [instance]);
 
-    // Hydrate this instance's transcript after arm (a passive effect, so it never blocks paint),
-    // then open the `send` gate. `cancelled` keeps a superseded instance's read from flipping the
-    // gate for the current one; `hydrate` always resolves, so the gate always opens.
+    // Hydrate after arm (passive effect), then open the `send` gate. `cancelled` keeps a superseded
+    // instance's read from flipping the gate; `hydrate` always resolves, so the gate always opens.
     useEffect(() => {
         let cancelled = false;
         void instance.hydrate().finally(() => {
@@ -169,17 +136,12 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
     const send = useCallback(
         (text: string) => {
             const trimmed = text.trim();
-            // Block until the persisted transcript has been read (see `hydrated`), so an early
-            // send can't spawn a fresh session over an unread one. In practice the read resolves
-            // within a microtask of mount, so this is invisible to a human.
+            // Block until the transcript has been read, so an early send can't spawn a fresh session over an unread one.
             if (!trimmed || !hydrated) {
                 return;
             }
-            // Real run lifecycle through the environment's trace reporter. BaseAgent.send
-            // resolves after the whole turn — it converts failures into `session.error` rather
-            // than rejecting — so read the settled phase to tell a real completion from an
-            // errored run. Only `flowId` and the outcome are traced: never the prompt, the
-            // error text, tool args, or any secret.
+            // BaseAgent.send resolves after the whole turn (failures become session.error, not a reject),
+            // so read the settled phase to tell done from errored. Only flowId + outcome are traced — never secrets.
             const trace = environment.traceReporter;
             trace?.info('agent.run.start', { flowId });
             void instance.agent.send(trimmed).then(

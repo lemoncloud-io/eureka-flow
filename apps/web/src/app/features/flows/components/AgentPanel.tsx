@@ -19,11 +19,8 @@ const isVisible = (m: Message): boolean =>
     m.role === 'user' || (m.role === 'assistant' && !!m.content && m.content.trim().length > 0);
 
 /**
- * The always-present, right-docked assistant panel — a pure view over the agent session. It
- * renders the transcript and emits `onSend`; it owns no agent, ports, or wiring (a container such
- * as `FlowAgentPanel` supplies `session` + `onSend`). All editing goes through the agent, which is
- * the sole editor of the canvas. Docked as a fixed-width column that shrinks the canvas region — it
- * does not overlay it.
+ * The right-docked assistant panel — a pure view over the agent session: it renders the transcript
+ * and emits `onSend`, owning no agent or wiring (a container like `FlowAgentPanel` supplies both).
  */
 export const AgentPanel = ({ session, onSend }: AgentPanelProps) => {
     const { t } = useTranslation(['flows']);

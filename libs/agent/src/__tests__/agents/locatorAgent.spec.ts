@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { createLocatorAgent } from '../../agents/locatorAgent';
 import { createInMemoryCanvasBinding } from '../../canvas/inMemoryCanvasBinding';
 import { createFakeGateway } from '../../llm/fakeGateway';
-import { createInMemoryStorage } from '../../session/session';
+import { createInMemorySessionStore } from '../../session/session';
 
 import type { CanvasBinding } from '../../canvas/canvasBinding';
 import type { FakeScriptStep } from '../../llm/fakeGateway';
 import type { Chunk, LlmGateway } from '../../llm/llmGateway';
-import type { SessionState, Storage } from '../../session/session';
+import type { SessionState, SessionStore } from '../../session/session';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const makeNode = (id: string, x = 0, y = 0, extra: Partial<NodeData> = {}): NodeData => ({
@@ -26,7 +26,7 @@ const setup = (
 ) => {
     const binding: CanvasBinding = createInMemoryCanvasBinding({ nodes, edges: [] });
     const gateway = createFakeGateway(script);
-    const storage: Storage = createInMemoryStorage();
+    const storage: SessionStore = createInMemorySessionStore();
     const flowId = 'flow-1';
     const agent = createLocatorAgent({
         gateway,
@@ -255,7 +255,7 @@ describe('locator agent — robustness (post-review fixes)', () => {
 
     it('does not apply a move from a response that finished after abort', async () => {
         const binding = createInMemoryCanvasBinding({ nodes: [makeNode('n1', 200, 80)], edges: [] });
-        const storage = createInMemoryStorage();
+        const storage = createInMemorySessionStore();
         let doAbort: () => void = () => undefined;
         const gateway: LlmGateway = {
             async *chat(): AsyncIterable<Chunk> {
@@ -281,7 +281,7 @@ describe('locator agent — robustness (post-review fixes)', () => {
 
     it('leaves an already-applied move applied when aborted on a later iteration', async () => {
         const binding = createInMemoryCanvasBinding({ nodes: [makeNode('n1', 200, 80)], edges: [] });
-        const storage = createInMemoryStorage();
+        const storage = createInMemorySessionStore();
         let doAbort: () => void = () => undefined;
         let calls = 0;
         const gateway: LlmGateway = {
@@ -329,7 +329,7 @@ describe('locator agent — robustness (post-review fixes)', () => {
 
     it('ends in error when the gateway fails (non-abort)', async () => {
         const binding = createInMemoryCanvasBinding({ nodes: [makeNode('n1', 0, 0)], edges: [] });
-        const storage = createInMemoryStorage();
+        const storage = createInMemorySessionStore();
         const gateway: LlmGateway = {
             chat(): AsyncIterable<Chunk> {
                 throw new Error('network boom');

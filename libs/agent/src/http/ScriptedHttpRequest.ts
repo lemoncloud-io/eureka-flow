@@ -10,10 +10,7 @@ export interface ScriptedHttpResponseInit {
     text?: string;
 }
 
-/**
- * Test double for the HTTP port: replies with scripted responses in order and records
- * every request for assertions. Requesting past the end of the script fails loudly.
- */
+/** Test double for the HTTP port: replies with scripted responses in order, records every request, and throws past the end of the script. */
 export class ScriptedHttpRequest implements HttpRequestSupportable {
     readonly requests: HttpRequestInput[] = [];
     private readonly script: ScriptedHttpResponseInit[];

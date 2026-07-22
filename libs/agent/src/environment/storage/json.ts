@@ -1,7 +1,6 @@
-/**
- * Shared helpers for the storage implementations: string-only key guard and JSON
- * (de)serialization that fails loudly with the offending key in the message.
- */
+import { errorMessage } from '../../utils/errors';
+
+/** Shared storage helpers: key guard and JSON (de)serialization that fails loudly with the key. */
 
 export const assertStorageKey = (key: unknown): string => {
     if (typeof key !== 'string' || key.length === 0) {
@@ -15,8 +14,9 @@ export const parseStoredJson = <T>(key: string, raw: string): T => {
     try {
         return JSON.parse(raw) as T;
     } catch (err) {
-        const detail = err instanceof Error ? err.message : String(err);
-        throw new Error(`Stored value for key "${key}" is not valid JSON (storage may be corrupted): ${detail}`);
+        throw new Error(
+            `Stored value for key "${key}" is not valid JSON (storage may be corrupted): ${errorMessage(err)}`
+        );
     }
 };
 
@@ -27,8 +27,7 @@ export const serializeJson = (key: string, value: unknown): string => {
         raw = JSON.stringify(value);
     } catch (err) {
         // e.g. circular references
-        const detail = err instanceof Error ? err.message : String(err);
-        throw new Error(`Value for key "${key}" cannot be serialized to JSON: ${detail}`);
+        throw new Error(`Value for key "${key}" cannot be serialized to JSON: ${errorMessage(err)}`);
     }
 
     if (raw === undefined) {

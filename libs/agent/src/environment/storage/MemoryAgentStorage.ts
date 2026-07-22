@@ -7,12 +7,7 @@ export interface MemoryAgentStorageOptions {
     seed?: Record<string, string>;
 }
 
-/**
- * In-memory AgentStorageSupportable backed by a Map<string, string> — the storage for the
- * 'node-virtual' test runtime. Same semantics as the browser implementation (values are
- * serialized JSON strings), so the agent behaves identically in tests. Not for production
- * persistence.
- */
+/** In-memory AgentStorageSupportable (Map-backed) for the 'node-virtual' test runtime. Not for production persistence. */
 export const createMemoryAgentStorage = (options: MemoryAgentStorageOptions = {}): AgentStorageSupportable => {
     const values = new Map<string, string>(Object.entries(options.seed ?? {}));
 

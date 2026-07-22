@@ -4,7 +4,7 @@ import { createToolExecutor } from '../../tools/toolExecutor';
 
 import type { AgentConfig } from '../../agent';
 import type { ToolDef } from '../../llm/llmGateway';
-import type { ToolCall, ToolProvider, ToolResult } from '../../tools/toolTypes';
+import type { ToolCall, ToolProvider, ToolResult } from '../../tools/types';
 
 const echoDef: ToolDef = {
     name: 'echo',

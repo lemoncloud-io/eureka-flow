@@ -1,5 +1,5 @@
+import { createAgentEnvironment } from './createAgentEnvironment';
 import { createMemoryAgentStorage } from './storage/MemoryAgentStorage';
-import { AGENT_ENVIRONMENT_CAPABILITIES } from './types';
 
 import type { AgentEnvironmentSupportable, AgentStorageSupportable, AgentTraceReporterSupportable } from './types';
 
@@ -13,28 +13,15 @@ export interface VirtualAgentEnvironmentOptions {
 }
 
 /**
- * The virtual Node.js environment for tests: `runtime: 'node-virtual'`, memory storage,
- * injectable clock — and the same immutable forbidden capabilities as the browser. No
- * filesystem, eval, Function constructor, or arbitrary execution is exposed to the agent
- * here either: the sandbox rules are identical, only the backing implementations change.
+ * The virtual Node.js environment for tests: `runtime: 'node-virtual'`, memory storage, injectable
+ * clock — same frozen-false capabilities as the browser; only the backing implementations differ.
  */
 export const createVirtualAgentEnvironment = (
     options: VirtualAgentEnvironmentOptions = {}
-): AgentEnvironmentSupportable => {
-    const storage = options.storage ?? createMemoryAgentStorage();
-    const traceReporter = options.traceReporter;
-    const now = options.now ?? (() => Date.now());
-
-    return {
+): AgentEnvironmentSupportable =>
+    createAgentEnvironment({
         runtime: 'node-virtual',
-        storage,
-        ...(traceReporter ? { traceReporter } : {}),
-        capabilities: AGENT_ENVIRONMENT_CAPABILITIES,
-        now,
-        createAbortController: () => new AbortController(),
-        close: () => {
-            traceReporter?.flush();
-            traceReporter?.close();
-        },
-    };
-};
+        storage: options.storage ?? createMemoryAgentStorage(),
+        now: options.now ?? (() => Date.now()),
+        traceReporter: options.traceReporter,
+    });

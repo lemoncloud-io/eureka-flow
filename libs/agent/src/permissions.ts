@@ -1,17 +1,22 @@
+import type { FlowPermissions } from '@flows/flows';
+
+/** Resolves to `T`, but fails to compile unless every member of `T` is assignable to `U`. */
+type Subset<T extends U, U> = T;
+
 /**
- * The capabilities a tool can require and an agent can be granted.
- *
- * Deliberately a small, dependency-free mirror of the capability names in the flow editor's
- * `FlowPermissions` (`libs/flows`): the agent core stays standalone — it never imports `libs/flows`
- * — and needs only the names to gate its tools, not the flow lib's role-derivation. This is the
- * single source of these names for the agent; keep them in sync with `FlowPermissions` by hand.
+ * The capabilities a tool can require and an agent can be granted: the canvas-relevant subset of
+ * the flow editor's {@link FlowPermissions}. The `Subset` guard fails the build if any of these
+ * names drifts from `FlowPermissions`, so the two stay in sync without a hand-maintained mirror.
  */
-export type Capability = 'canModifyCanvas' | 'canEditConfig' | 'canEditStructure' | 'canRun';
+export type Capability = Subset<
+    'canModifyCanvas' | 'canEditConfig' | 'canEditStructure' | 'canRun',
+    keyof FlowPermissions
+>;
 
 /** What an agent is allowed to do. Absent/false capabilities are denied. */
 export type AgentGrant = Partial<Record<Capability, boolean>>;
 
-/** The set of capabilities that are actually enabled in a grant. */
+/** The set of capabilities actually enabled in a grant. */
 export const effectiveCapabilities = (grant: AgentGrant): Set<Capability> => {
     const set = new Set<Capability>();
     (Object.keys(grant) as Capability[]).forEach(key => {
