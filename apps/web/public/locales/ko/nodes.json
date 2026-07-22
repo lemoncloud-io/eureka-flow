@@ -52,6 +52,9 @@
         "doubleClickRename": "더블클릭하여 이름 변경"
     },
     "visualization": {
+        "product": {
+            "untitled": "이름 없는 앱"
+        },
         "waitingForData": "데이터 대기 중...",
         "noImage": "이미지 없음",
         "noImageSelected": "선택된 이미지 없음",

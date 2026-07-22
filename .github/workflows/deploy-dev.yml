@@ -228,9 +228,6 @@ jobs:
                   VITE_API_URL: ${{ secrets.VITE_DEV_API_URL }}
                   VITE_WS_ENDPOINT: ${{ secrets.VITE_DEV_WS_ENDPOINT }}
                   VITE_CODES_URL: ${{ secrets.VITE_DEV_CODES_URL }}
-                  VITE_I18N_BUCKET_URL: ${{ secrets.VITE_DEV_I18N_BUCKET_URL }}
-                  VITE_I18N_PRESIGN_URL: ${{ secrets.VITE_DEV_I18N_PRESIGN_URL }}
-                  VITE_I18N_PRESIGN_API_KEY: ${{ secrets.VITE_DEV_I18N_PRESIGN_API_KEY }}
                   VITE_OAUTH_ENDPOINT: ${{ secrets.VITE_DEV_OAUTH_ENDPOINT }}
                   VITE_SOCIAL_OAUTH_ENDPOINT: ${{ secrets.VITE_DEV_SOCIAL_OAUTH_ENDPOINT }}
                   VITE_OPENAPI_ENDPOINT: ${{ secrets.VITE_DEV_OPENAPI_ENDPOINT }}

@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { flowStorage } from '../utils/flowStorage';
 
 import type { BlockDefinitionWithFrontend, FlowView } from '../types';
+import type { FlowSnapshot } from '../workspace/snapshot';
 
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
@@ -34,6 +35,12 @@ interface FlowsState {
     hasOwned: boolean;
     /** Thumbnail URL (http or s3) */
     flowThumbnail: string;
+    /**
+     * The flow as the server last confirmed it — set on load, and again on a successful
+     * save. What the canvas holds is the working copy; the gap between the two is the
+     * unsaved work. `null` until a flow is loaded or created.
+     */
+    baseline: FlowSnapshot | null;
 
     setBlockRegistry: (blocks: BlockDefinitionWithFrontend[]) => void;
     setBlocksLoaded: (loaded: boolean) => void;
@@ -51,6 +58,7 @@ interface FlowsState {
     setIsEditable: (isEditable: boolean) => void;
     setHasOwned: (hasOwned: boolean) => void;
     setFlowThumbnail: (thumbnail: string) => void;
+    setBaseline: (baseline: FlowSnapshot | null) => void;
 }
 
 export const useFlowsStore = create<FlowsState>(set => ({
@@ -69,6 +77,7 @@ export const useFlowsStore = create<FlowsState>(set => ({
     isEditable: false,
     hasOwned: false,
     flowThumbnail: '',
+    baseline: null,
 
     setBlockRegistry: blocks => {
         const registry = blocks.reduce<Record<string, BlockDefinitionWithFrontend>>((acc, block) => {
@@ -121,6 +130,8 @@ export const useFlowsStore = create<FlowsState>(set => ({
     setHasOwned: hasOwned => set({ hasOwned }),
 
     setFlowThumbnail: thumbnail => set({ flowThumbnail: thumbnail }),
+
+    setBaseline: baseline => set({ baseline }),
 }));
 
 export const useBlockRegistry = () => useFlowsStore(state => state.blockRegistry);

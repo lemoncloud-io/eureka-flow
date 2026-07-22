@@ -189,7 +189,9 @@
         "fileAttached": "File attached",
         "takePhoto": "Camera",
         "textFile": "Text file",
-        "uploading": "Uploading..."
+        "uploading": "Uploading...",
+        "fileTooLarge": "File is too large. Maximum size is {{size}} MB.",
+        "uploadFailed": "Upload failed. Please try again."
     },
     "imageEditor": {
         "title": "Edit Image",
@@ -270,7 +272,13 @@
         "signInWithApiKey": "Sign in with API Key",
         "browsePublicFlows": "Browse public flows",
         "signInToEdit": "Sign in to edit this flow",
-        "failedToRunFlow": "Failed to run flow"
+        "failedToRunFlow": "Failed to run flow",
+        "runNeedsOwnerForStructure": "Added and deleted steps are not saved with editor access, so this flow cannot run. Ask the owner to make the change.",
+        "savedWithoutStructure": "Saved the step settings only. Added and deleted steps need owner access.",
+        "draftRecovered": "Restored your unsaved changes.",
+        "draftUndo": "Undo",
+        "draftDiscarded": "Discarded unsaved changes.",
+        "backOnlineRetrySave": "Back online. Save again to send your changes."
     },
     "publicFlows": {
         "title": "Public Flows",

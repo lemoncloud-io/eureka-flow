@@ -15,6 +15,11 @@ export const flowsKeys = {
     snapshot: (id: string) => [...flowsKeys.all, 'snapshot', id] as const,
 };
 
+export const appsKeys = {
+    all: ['apps'] as const,
+    list: () => [...appsKeys.all, 'list'] as const,
+};
+
 export const blocksKeys = {
     all: ['blocks'] as const,
     lists: () => [...blocksKeys.all, 'list'] as const,

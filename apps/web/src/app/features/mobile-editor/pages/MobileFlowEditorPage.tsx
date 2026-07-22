@@ -6,6 +6,7 @@ import { ArrowRight, Globe, KeyRound, Lock, Search, ShieldX, X } from 'lucide-re
 
 import {
     deriveRole,
+    diffAgainstBaseline,
     getPermissions,
     useBlockRegistry,
     useCanvasStore,
@@ -23,7 +24,10 @@ import { AiKeyDialog } from '../../flows/components/AiKeyDialog';
 import { ContentPreviewModal } from '../../flows/components/ContentPreviewModal';
 import { DevSocketPanel } from '../../flows/components/DevSocketPanel';
 import { FlowListDialog } from '../../flows/components/FlowListDialog';
+import { useDraftPersistence } from '../../flows/hooks/useDraftPersistence';
 import { useProductProgressToasts } from '../../flows/hooks/useProductProgressToasts';
+import { useReconnectNotice } from '../../flows/hooks/useReconnectNotice';
+import { useRunGate } from '../../flows/hooks/useRunGate';
 import { useSocketRecorder } from '../../flows/hooks/useSocketRecorder';
 import {
     MobileBlockLibrarySheet,
@@ -51,9 +55,6 @@ import { executeNodeWithToast } from '../utils';
 import type { FlowRole } from '@flows/flows';
 import type { WebSocketMessage } from '@flows/socket';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
-
-const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[] }): string =>
-    JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? [] });
 
 const isPortTypeCompatible = (sourceType: string, targetType: string | undefined): boolean => {
     const target = targetType ?? 'any';
@@ -87,7 +88,6 @@ export const MobileFlowEditorPage = () => {
     const permissions = getPermissions(role);
 
     // Shared refs for cross-hook communication
-    const lastSavedStateRef = useRef<string | null>(null);
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
 
     // UI state
@@ -114,15 +114,18 @@ export const MobileFlowEditorPage = () => {
         handleApiKeySubmit,
         reBoot,
         updateUrl,
-    } = useMobileEditorBoot({ serializeWorkflowState, lastSavedStateRef });
+    } = useMobileEditorBoot();
 
     useMobileAutoSave({
         isAppReady,
         canSave: permissions.canSave,
-        serializeWorkflowState,
-        lastSavedStateRef,
         lastLocalUpdateTimestampRef,
     });
+
+    // Auto-save is off by default, so this is what stands between an unsaved flow and a
+    // refresh. Only for users who could save it.
+    useDraftPersistence({ enabled: isAppReady && permissions.canSave });
+    useReconnectNotice();
 
     const socketRecorder = useSocketRecorder();
     const { record: recordSocketMessage } = socketRecorder;
@@ -141,8 +144,6 @@ export const MobileFlowEditorPage = () => {
     );
 
     const { isSocketConnected, socketConnectionId, replayMessage } = useMobileSocketSync({
-        serializeWorkflowState,
-        lastSavedStateRef,
         lastLocalUpdateTimestampRef,
         canEdit: permissions.canEditStructure,
         onMessage: handleSocketMessage,
@@ -160,16 +161,15 @@ export const MobileFlowEditorPage = () => {
         nodes.forEach(n => updateNodeData(n.id, { state: 'IDLE' } as Partial<NodeData>));
     }, []);
 
+    const runGate = useRunGate();
     const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ socketConnectionId });
 
     const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleCreateNewFlow } = useMobileFlowActions({
         updateUrl,
-        serializeWorkflowState,
-        lastSavedStateRef,
         lastLocalUpdateTimestampRef,
     });
 
-    const connectionMode = useConnectionMode(blockRegistry, currentFlowId);
+    const connectionMode = useConnectionMode(blockRegistry);
     const { recentIds, addRecent } = useRecentBlocks();
 
     // Pending auto-connect: when user adds a new block via "Add new block & connect"
@@ -196,32 +196,32 @@ export const MobileFlowEditorPage = () => {
         [stepNav]
     );
 
-    // Flush pending config edits before closing detail so refresh within the
-    // 500ms node-sync debounce (see useNodeConfig.syncNodeToServer) does not
-    // drop edits made in MobileStepDetail. Skipped when Auto Save is off —
-    // the flow reaches the server only through the header's save button.
+    // Save on close so a refresh before the autosave debounce fires does not drop
+    // edits made in MobileStepDetail. Skipped when Auto Save is off — the flow
+    // reaches the server only through the header's save button.
     const handleCloseStep = useCallback(async () => {
         if (useFlowsStore.getState().isAutoSaveEnabled) {
             const { nodes, connections } = useCanvasStore.getState();
-            const currentState = serializeWorkflowState({ nodes, connections });
-            if (currentState !== lastSavedStateRef.current) {
+            if (!diffAgainstBaseline({ nodes, connections }).isEmpty) {
                 lastLocalUpdateTimestampRef.current = Date.now();
-                const result = await saveCurrentFlow({ nodes, connections });
-                if (result.success) lastSavedStateRef.current = currentState;
+                await saveCurrentFlow({ nodes, connections });
             }
         }
         stepNav.closeStep();
     }, [stepNav, saveCurrentFlow]);
 
     const handleRunNode = useCallback(
-        (nodeId: string) => {
-            executeNodeWithToast(nodeId, {
-                flowId: currentFlowId,
+        async (nodeId: string, options?: { propagate?: boolean }) => {
+            const runFlowId = await runGate();
+            if (!runFlowId) return;
+            await executeNodeWithToast(nodeId, {
+                flowId: runFlowId,
                 socketConnectionId,
                 canEdit: permissions.canEditStructure,
+                propagate: options?.propagate,
             });
         },
-        [currentFlowId, socketConnectionId, permissions.canEditStructure]
+        [runGate, socketConnectionId, permissions.canEditStructure]
     );
 
     const handleAddBlockWithRecent = useCallback(
@@ -422,7 +422,6 @@ export const MobileFlowEditorPage = () => {
                         onAddStep={() => setIsBlockLibraryOpen(true)}
                         onAddBlockDirect={handleAddBlockWithRecent}
                         onRunNode={handleRunNode}
-                        flowId={currentFlowId}
                         searchQuery={searchQuery}
                         role={role}
                     />
@@ -432,9 +431,8 @@ export const MobileFlowEditorPage = () => {
             {/* Full-screen step detail */}
             <MobileStepDetail
                 nodeId={stepNav.activeNodeId}
-                flowId={currentFlowId}
-                socketConnectionId={socketConnectionId}
                 role={role}
+                onRun={handleRunNode}
                 onClose={handleCloseStep}
                 onOpenOutputConnection={connectionMode.openForPort}
                 onOpenInputConnection={connectionMode.openForInputPort}

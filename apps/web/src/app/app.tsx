@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-
 import { NotFoundPage, SITE_URL } from '@flows/shared';
 import { isOAuthEnabled } from '@flows/web-core';
 
+import { AppsPage } from './features/apps';
 import { KeyCreationPage, KeySuccessPage, LoginPage, OAuthResponsePage } from './features/auth';
 import { PublicFlowsPage } from './features/flows';
 import { AgentHarnessPage } from './features/flows/pages/AgentHarnessPage';
@@ -71,6 +72,11 @@ export const App = () => {
                 <Route path="/editor" element={<FlowEditorRouter />} />
                 <Route path="/flows/:id" element={<FlowEditorRouter />} />
 
+                {/* Apps: the public gallery list only. `/apps/:id` is served by CloudFront (the
+                    deployed App's own bundle), never by this SPA — see
+                    docs/adr/0003-apps-route-ownership.md. */}
+                <Route path="/apps" element={<AppsPage />} />
+
                 {/* Other routes */}
                 <Route path="/tutorial" element={<TutorialRouter />} />
                 <Route path="/policy/:type" element={<PolicyPage />} />
@@ -83,7 +89,8 @@ export const App = () => {
                     </>
                 )}
 
-                {/* Catch-all: unmatched paths (e.g. /apps/*) */}
+                {/* Catch-all: unmatched paths. `/apps/:id` lands here in local dev only —
+                    in production CloudFront serves it before the SPA is reached. */}
                 <Route path="*" element={<NotFoundPage />} />
             </Routes>
         </BrowserRouter>

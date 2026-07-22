@@ -1,11 +1,21 @@
+/**
+ * Every text field carries its language key in a sibling field suffixed `En`
+ * (`label` ↔ `labelEn`). The web app translates the key and falls back to the
+ * original text, so a blank key just means "not translated yet".
+ * @see docs/i18n-server-keys.md
+ */
 export interface Port {
     id: string;
     label: string;
+    labelEn?: string;
     type: string;
+    /** Not editable here, but carried so saving a block does not clear it. */
+    required?: boolean;
 }
 
 export interface ConfigOption {
     label: string;
+    labelEn?: string;
     value: string;
 }
 
@@ -13,7 +23,9 @@ export interface ConfigItem {
     key: string;
     type: 'text' | 'number' | 'boolean' | 'select' | 'file' | 'separator';
     label: string;
+    labelEn?: string;
     placeholder?: string;
+    placeholderEn?: string;
     defaultValue?: string;
     options?: ConfigOption[];
     short?: number | boolean;
@@ -28,9 +40,12 @@ export interface Block {
     deletedAt: number;
     stereo: BlockStereo;
     name: string;
+    nameEn?: string;
     label: string;
+    labelEn?: string;
     icon: string;
     description: string;
+    descriptionEn?: string;
     order: number;
     processType: string;
     input$: Port[];

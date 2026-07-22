@@ -3,10 +3,17 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { upsertFlow, useCanvasConnections, useCanvasNodes, useCanvasStore } from '@flows/flows';
+import {
+    newEdgeId,
+    resolveNodeName,
+    translateField,
+    useCanvasConnections,
+    useCanvasNodes,
+    useCanvasStore,
+} from '@flows/flows';
 
 import { markConnectionNew } from './useRecentConnections';
-import { arePortTypesCompatible, generateTempId, wouldCreateCycle } from '../../flows/utils';
+import { arePortTypesCompatible, wouldCreateCycle } from '../../flows/utils';
 
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
 import type { Connection } from '@lemoncloud/eureka-flows-api';
@@ -36,11 +43,8 @@ export interface CompatibleTarget {
     occupiedByNode?: string;
 }
 
-export const useConnectionMode = (
-    blockRegistry: Record<string, BlockDefinitionWithFrontend>,
-    flowId: string | null
-) => {
-    const { t } = useTranslation(['flows']);
+export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionWithFrontend>) => {
+    const { t } = useTranslation(['flows', 'blocks']);
     const [source, setSource] = useState<PortSelection | null>(null);
     const connections = useCanvasConnections();
     const nodes = useCanvasNodes();
@@ -62,7 +66,7 @@ export const useConnectionMode = (
                 const blockDef = blockRegistry[node.type];
                 if (!blockDef?.inputs) continue;
 
-                const nodeName = node.customLabel || blockDef.label || node.type;
+                const nodeName = resolveNodeName(node, blockDef, t);
 
                 for (const port of blockDef.inputs) {
                     if (!arePortTypesCompatible(source.portDataType, port.type)) continue;
@@ -84,7 +88,7 @@ export const useConnectionMode = (
                             ? (() => {
                                   const srcNode = nodes.find(n => n.id === existingConn.sourceNodeId);
                                   const srcDef = srcNode ? blockRegistry[srcNode.type] : undefined;
-                                  return srcNode?.customLabel || srcDef?.label || existingConn.sourceNodeId;
+                                  return resolveNodeName(srcNode, srcDef, t, existingConn.sourceNodeId);
                               })()
                             : undefined;
 
@@ -93,7 +97,7 @@ export const useConnectionMode = (
                         nodeName,
                         nodeIcon: blockDef.icon,
                         portId: port.id,
-                        portName: port.label || port.id,
+                        portName: translateField(t, port, 'label') || port.id,
                         portDataType: port.type ?? 'any',
                         alreadyConnected,
                         occupiedByNode,
@@ -109,7 +113,7 @@ export const useConnectionMode = (
                 const blockDef = blockRegistry[node.type];
                 if (!blockDef?.outputs) continue;
 
-                const nodeName = node.customLabel || blockDef.label || node.type;
+                const nodeName = resolveNodeName(node, blockDef, t);
 
                 for (const port of blockDef.outputs) {
                     if (!arePortTypesCompatible(port.type ?? 'any', source.portDataType)) continue;
@@ -127,7 +131,7 @@ export const useConnectionMode = (
                         nodeName,
                         nodeIcon: blockDef.icon,
                         portId: port.id,
-                        portName: port.label || port.id,
+                        portName: translateField(t, port, 'label') || port.id,
                         portDataType: port.type ?? 'any',
                         alreadyConnected,
                     });
@@ -136,7 +140,7 @@ export const useConnectionMode = (
         }
 
         return targets;
-    }, [source, nodes, connections, blockRegistry]);
+    }, [source, nodes, connections, blockRegistry, t]);
 
     const openForPort = useCallback(
         (nodeId: string, portId: string, portDataType: string, nodeName: string, portName: string) => {
@@ -163,7 +167,7 @@ export const useConnectionMode = (
             const tgtPortId = source.direction === 'output' ? targetPortId : source.portId;
 
             const storeState = useCanvasStore.getState();
-            const { connections: currentConnections, addConnection, updateConnection, deleteConnection } = storeState;
+            const { connections: currentConnections, addConnection, deleteConnection } = storeState;
 
             const existing = currentConnections.find(
                 c =>
@@ -183,18 +187,11 @@ export const useConnectionMode = (
             );
             if (existingInputConn) {
                 deleteConnection(existingInputConn.id);
-                try {
-                    if (flowId) {
-                        await upsertFlow(flowId, { nodes: [], edges: [{ id: `#${existingInputConn.id}` }] as never[] });
-                    }
-                } catch {
-                    // Best effort — continue with new connection
-                }
             }
 
-            const tempId = generateTempId('edge');
+            const edgeId = newEdgeId();
             const newConnection: Connection = {
-                id: tempId,
+                id: edgeId,
                 sourceNodeId: srcNodeId,
                 sourcePortId: srcPortId,
                 targetNodeId: tgtNodeId,
@@ -202,7 +199,7 @@ export const useConnectionMode = (
             };
 
             addConnection(newConnection);
-            markConnectionNew(tempId);
+            markConnectionNew(edgeId);
 
             // Copy source output data to target input data (same as desktop WorkflowCanvas)
             const srcNode = useCanvasStore.getState().nodes.find(n => n.id === srcNodeId);
@@ -217,39 +214,9 @@ export const useConnectionMode = (
                     );
             }
 
-            try {
-                if (!flowId) throw new Error('flowId is required');
-
-                const edgeData = {
-                    id: '',
-                    sourceNodeId: srcNodeId,
-                    sourcePortId: srcPortId,
-                    targetNodeId: tgtNodeId,
-                    targetPortId: tgtPortId,
-                };
-
-                const result = await upsertFlow(flowId, { nodes: [], edges: [edgeData] });
-                const createdEdge = result.edges?.find(
-                    e =>
-                        e.sourceNodeId === edgeData.sourceNodeId &&
-                        e.sourcePortId === edgeData.sourcePortId &&
-                        e.targetNodeId === edgeData.targetNodeId &&
-                        e.targetPortId === edgeData.targetPortId
-                );
-
-                if (createdEdge?.id && createdEdge.id !== tempId) {
-                    updateConnection(tempId, { id: createdEdge.id });
-                    // Re-mark with the server id so the badge survives the id swap.
-                    markConnectionNew(createdEdge.id);
-                }
-
-                toast.success(t('mobile.connection.connected', 'Connected'));
-            } catch {
-                useCanvasStore.getState().deleteConnection(tempId);
-                toast.error(t('mobile.connection.failedToConnect', 'Failed to create connection'));
-            }
+            toast.success(t('mobile.connection.connected', 'Connected'));
         },
-        [source, flowId]
+        [source]
     );
 
     const close = useCallback(() => {
@@ -260,7 +227,7 @@ export const useConnectionMode = (
     const connectPorts = useCallback(
         async (sourceNodeId: string, sourcePortId: string, targetNodeId: string, targetPortId: string) => {
             const storeState = useCanvasStore.getState();
-            const { connections: currentConnections, updateConnection } = storeState;
+            const { connections: currentConnections } = storeState;
 
             const existing = currentConnections.find(
                 c =>
@@ -277,18 +244,11 @@ export const useConnectionMode = (
             );
             if (existingInputConn) {
                 useCanvasStore.getState().deleteConnection(existingInputConn.id);
-                try {
-                    if (flowId) {
-                        await upsertFlow(flowId, { nodes: [], edges: [{ id: `#${existingInputConn.id}` }] as never[] });
-                    }
-                } catch {
-                    /* best effort */
-                }
             }
 
-            const tempId = generateTempId('edge');
+            const edgeId = newEdgeId();
             const newConnection: Connection = {
-                id: tempId,
+                id: edgeId,
                 sourceNodeId,
                 sourcePortId,
                 targetNodeId,
@@ -296,7 +256,7 @@ export const useConnectionMode = (
             };
 
             useCanvasStore.getState().addConnection(newConnection);
-            markConnectionNew(tempId);
+            markConnectionNew(edgeId);
 
             // Copy source output data to target input data (same as desktop WorkflowCanvas)
             const srcNode = useCanvasStore.getState().nodes.find(n => n.id === sourceNodeId);
@@ -311,45 +271,15 @@ export const useConnectionMode = (
                     );
             }
 
-            try {
-                if (!flowId) throw new Error('flowId is required');
-                const edgeData = { id: '', sourceNodeId, sourcePortId, targetNodeId, targetPortId };
-                const result = await upsertFlow(flowId, { nodes: [], edges: [edgeData] });
-                const createdEdge = result.edges?.find(
-                    e =>
-                        e.sourceNodeId === sourceNodeId &&
-                        e.sourcePortId === sourcePortId &&
-                        e.targetNodeId === targetNodeId &&
-                        e.targetPortId === targetPortId
-                );
-                if (createdEdge?.id && createdEdge.id !== tempId) {
-                    updateConnection(tempId, { id: createdEdge.id });
-                    // Re-mark with the server id so the badge survives the id swap.
-                    markConnectionNew(createdEdge.id);
-                }
-                toast.success(t('mobile.connection.connected', 'Connected'));
-            } catch {
-                useCanvasStore.getState().deleteConnection(tempId);
-                toast.error(t('mobile.connection.failedToConnect', 'Failed to create connection'));
-            }
+            toast.success(t('mobile.connection.connected', 'Connected'));
         },
-        [flowId]
+        []
     );
 
-    const disconnect = useCallback(
-        async (connectionId: string) => {
-            useCanvasStore.getState().deleteConnection(connectionId);
-            try {
-                if (!flowId) throw new Error('flowId is required');
-                const edgesToDelete = [{ id: `#${connectionId}` }];
-                await upsertFlow(flowId, { nodes: [], edges: edgesToDelete as never[] });
-                toast.success(t('mobile.connection.disconnected', 'Disconnected'));
-            } catch {
-                toast.error(t('mobile.connection.failedToDisconnect', 'Failed to disconnect'));
-            }
-        },
-        [flowId]
-    );
+    const disconnect = useCallback((connectionId: string) => {
+        useCanvasStore.getState().deleteConnection(connectionId);
+        toast.success(t('mobile.connection.disconnected', 'Disconnected'));
+    }, []);
 
     return {
         isOpen,

@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 
 import { JsonViewer, MarkdownViewer, isMarkdownContent } from '@flows/ui-kit';
 
-import { tryParseJson } from '../../utils';
+import { getUploadHtmlProduct, tryParseJson } from '../../utils';
+import { ProductLinkCard } from '../ProductLinkCard';
 import { S3Image } from '../S3Image';
 import { VISUALIZATION_COMPONENTS, getFirstOutputData } from './helpers';
 
@@ -50,6 +51,12 @@ export const OutputPreview: React.FC<VisualizationProps> = ({ node, definition, 
                 </div>
             </div>
         );
+    }
+
+    // upload-html product → link card instead of raw JSON
+    const product = getUploadHtmlProduct(packet);
+    if (product) {
+        return <ProductLinkCard product={product} />;
     }
 
     // JSON type or object value

@@ -20,6 +20,7 @@ import {
     X,
     Zap,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import {
     DEFAULT_TEXTAREA_HEIGHT,
@@ -31,6 +32,7 @@ import {
     isAiBlock,
     isMissingAiKey,
     processImageWithConfig,
+    translateField,
     useBlockRegistry,
     useS3Image,
 } from '@flows/flows';
@@ -44,10 +46,19 @@ import { FilePreviewDialog } from './FilePreviewDialog';
 import { FrontendBadge } from './FrontendBadge';
 import { ImageEditorDialog } from './ImageEditorDialog';
 import { ModelSelect } from './ModelSelect';
+import { ProductLinkCard } from './ProductLinkCard';
 import { RunHistoryPanel } from './RunHistoryPanel';
 import { S3Image } from './S3Image';
 import { TouchDialog } from './TouchDialog';
-import { INPUT_FILE_ACCEPT, clearFileConfig, processUploadedFile, tryParseJson } from '../utils';
+import {
+    INPUT_FILE_ACCEPT,
+    clearFileConfig,
+    getUploadErrorMessage,
+    getUploadHtmlProduct,
+    processUploadedFile,
+    readImageFile,
+    tryParseJson,
+} from '../utils';
 
 import type { BlockDefinition, ConfigField, Connection, DataPacket, FlowRole, NodeData } from '@flows/flows';
 
@@ -180,10 +191,15 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
         const file = e.target.files?.[0];
         if (!file) return;
 
-        await processUploadedFile(file, onConfigChange, dataUrl =>
-            processImageWithConfig(dataUrl, { aspectRatio, maxWidth, bypass })
-        );
-        e.target.value = '';
+        try {
+            await processUploadedFile(file, onConfigChange, dataUrl =>
+                processImageWithConfig(dataUrl, { aspectRatio, maxWidth, bypass })
+            );
+        } catch (error) {
+            toast.error(getUploadErrorMessage(error, t));
+        } finally {
+            e.target.value = '';
+        }
     };
 
     const handleDownload = (e: React.MouseEvent) => {
@@ -395,7 +411,7 @@ interface InputTextConfigProps {
 }
 
 const InputTextConfig: React.FC<InputTextConfigProps> = ({ node, onConfigChange }) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const [localHeight, setLocalHeight] = useState<number | undefined>(undefined);
     const heightRef = useRef<number>(0);
     const text = (node.config?.text as string) || '';
@@ -513,7 +529,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     onShowNotification,
     onOpenAiKeyDialog,
 }) => {
-    const { t } = useTranslation(['flows', 'common']);
+    const { t } = useTranslation(['flows', 'common', 'blocks']);
     const blockRegistry = useBlockRegistry();
     const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
     const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
@@ -548,6 +564,16 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     >
                         <Expand className="w-3 h-3" />
                     </button>
+                </div>
+            );
+        }
+
+        // upload-html product → link card instead of raw JSON
+        const product = getUploadHtmlProduct(packet);
+        if (product) {
+            return (
+                <div className="mt-1.5">
+                    <ProductLinkCard product={product} />
                 </div>
             );
         }
@@ -638,6 +664,19 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             onConfigChange(node.id, field.key, val);
         };
 
+        const handleFileFieldUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+
+            try {
+                handleChange(await readImageFile(file));
+            } catch (error) {
+                toast.error(getUploadErrorMessage(error, t));
+            } finally {
+                e.target.value = '';
+            }
+        };
+
         switch (field.type) {
             case 'text':
                 return field.short ? (
@@ -647,7 +686,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
-                        placeholder={field.placeholder}
+                        placeholder={translateField(t, field, 'placeholder')}
                         disabled={isDisabled}
                     />
                 ) : (
@@ -656,7 +695,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
-                        placeholder={field.placeholder}
+                        placeholder={translateField(t, field, 'placeholder')}
                         disabled={isDisabled}
                     />
                 );
@@ -668,7 +707,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
-                        placeholder={field.placeholder}
+                        placeholder={translateField(t, field, 'placeholder')}
                         disabled={isDisabled}
                     />
                 );
@@ -717,7 +756,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     >
                         {field.options?.map(opt => (
                             <option key={opt.value} value={opt.value}>
-                                {opt.label}
+                                {translateField(t, opt, 'label') || opt.value}
                             </option>
                         ))}
                     </select>
@@ -728,26 +767,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         {value && <FileImagePreview src={value} onRemove={() => handleChange('')} t={t} />}
                         <label className="cursor-pointer bg-muted/50 hover:bg-muted border border-border/60 text-foreground/80 text-xs py-2 px-3 rounded-md text-center transition-colors">
                             <span>{value ? t('flows:detailPanel.changeFile') : t('flows:detailPanel.uploadFile')}</span>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={async e => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                        const reader = new FileReader();
-                                        reader.onload = async evt => {
-                                            if (evt.target?.result) {
-                                                const { dataUrl } = await compressImageIfNeeded(
-                                                    evt.target.result as string
-                                                );
-                                                handleChange(dataUrl);
-                                            }
-                                        };
-                                        reader.readAsDataURL(file);
-                                    }
-                                }}
-                            />
+                            <input type="file" accept="image/*" className="hidden" onChange={handleFileFieldUpload} />
                         </label>
                     </div>
                 );
@@ -763,7 +783,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         <div className="flex-1 h-px bg-border/50" />
                         {field.label && (
                             <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">
-                                {field.label}
+                                {translateField(t, field, 'label')}
                             </span>
                         )}
                         <div className="flex-1 h-px bg-border/50" />
@@ -812,7 +832,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             </div>
                             <input
                                 type="text"
-                                value={selectedNode.customLabel || def.label}
+                                value={selectedNode.customLabel || translateField(t, def, 'label')}
                                 onChange={e => onLabelChange(selectedNode.id, e.target.value)}
                                 disabled={!canModifyCanvas}
                                 className="bg-transparent font-semibold text-sm text-foreground focus:bg-muted/30 outline-none rounded px-1.5 py-0.5 -ml-1 flex-1 min-w-0 border border-transparent focus:border-primary/40 transition-colors disabled:opacity-60 disabled:cursor-default"
@@ -975,7 +995,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                         ) : (
                                             <div key={field.key}>
                                                 <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
-                                                    {field.label}
+                                                    {translateField(t, field, 'label') || field.key}
                                                 </label>
                                                 {renderConfigInput(selectedNode, field, def)}
                                             </div>
@@ -1011,7 +1031,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                             <div className="flex justify-between items-center mb-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[11px] font-semibold text-foreground">
-                                                        {input.label}
+                                                        {translateField(t, input, 'label') || input.id}
                                                     </span>
                                                     {incomingConn && (
                                                         <button
@@ -1071,7 +1091,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                             <div className="flex justify-between items-center mb-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[11px] font-semibold text-foreground">
-                                                        {output.label}
+                                                        {translateField(t, output, 'label') || output.id}
                                                     </span>
                                                     {outgoingConns.length > 0 && (
                                                         <div className="flex gap-1">
@@ -1262,10 +1282,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 {t('flows:detailPanel.from')}
                             </div>
                             <div className="font-semibold text-sm text-primary group-hover:text-foreground transition-colors">
-                                {sourceDef?.label || t('flows:detailPanel.unknown')}
+                                {translateField(t, sourceDef, 'label') || t('flows:detailPanel.unknown')}
                             </div>
                             <div className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 bg-muted/50 px-2 py-0.5 rounded">
-                                {sourcePort?.label}
+                                {translateField(t, sourcePort, 'label')}
                             </div>
                         </div>
 
@@ -1291,10 +1311,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 {t('flows:detailPanel.to')}
                             </div>
                             <div className="font-semibold text-sm text-status-completed group-hover:text-foreground transition-colors">
-                                {targetDef?.label || t('flows:detailPanel.unknown')}
+                                {translateField(t, targetDef, 'label') || t('flows:detailPanel.unknown')}
                             </div>
                             <div className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 bg-muted/50 px-2 py-0.5 rounded">
-                                {targetPort?.label}
+                                {translateField(t, targetPort, 'label')}
                             </div>
                         </div>
                     </div>

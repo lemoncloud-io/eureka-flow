@@ -1,7 +1,7 @@
-import { TEMP_ID_PREFIXES, generateTempId, isTempId, isUnresolvedTempId, resolveTempId } from '@flows/flows';
+import { compressImageIfNeeded } from '@flows/flows';
 
-import type { Connection, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
-import type { Dispatch, SetStateAction } from 'react';
+import type { UploadHtmlProductView } from '@flows/flows';
+import type { Connection, DataPacket, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
 
 // ============================================================
 // Port Type Utilities
@@ -105,6 +105,13 @@ export const getVisiblePorts = (
 export const getConnectionKey = (conn: Connection): string =>
     `${conn.sourceNodeId}:${conn.sourcePortId}→${conn.targetNodeId}:${conn.targetPortId}`;
 
+/**
+ * Collapse edges that describe the same connection, keeping the first.
+ *
+ * Nothing creates duplicates any more — an edge gets one client-generated ID and keeps
+ * it — but flows saved before that can carry two edges for one connection, so loaded
+ * data still needs this.
+ */
 export const deduplicateEdges = (edges: Connection[]): Connection[] => {
     const edgeMap = new Map<string, Connection>();
     const seenIds = new Set<string>();
@@ -116,36 +123,16 @@ export const deduplicateEdges = (edges: Connection[]): Connection[] => {
         }
 
         const key = getConnectionKey(edge);
-        const existing = edgeMap.get(key);
-
-        if (!existing) {
-            edgeMap.set(key, edge);
-            if (edge.id) seenIds.add(edge.id);
-        } else {
-            const existingIsTemp = isTempId(existing.id);
-            const newIsTemp = isTempId(edge.id);
-
-            if (existingIsTemp && !newIsTemp) {
-                // Remove the old temp ID from seenIds before replacing
-                if (existing.id) seenIds.delete(existing.id);
-                edgeMap.set(key, edge);
-                if (edge.id) seenIds.add(edge.id);
-            }
+        if (edgeMap.has(key)) {
+            return;
         }
+
+        edgeMap.set(key, edge);
+        if (edge.id) seenIds.add(edge.id);
     });
 
     return Array.from(edgeMap.values());
 };
-
-/**
- * Generate a unique ID
- * @deprecated Use generateTempId for new node/edge creation (server assigns final ID)
- */
-export const generateId = (): string => Math.random().toString(36).slice(2, 11);
-
-// Temp-ID utilities now live in @flows/flows (single source of truth shared with the
-// lib sync hooks). Re-exported here so existing imports from this barrel keep working.
-export { generateTempId, isTempId, isUnresolvedTempId, resolveTempId, TEMP_ID_PREFIXES };
 
 /**
  * Calculate bezier curve path for connection lines
@@ -197,47 +184,6 @@ export const isValidConnection = (
     return arePortTypesCompatible(sourceType, targetType);
 };
 
-/**
- * Replace a temporary node ID with server-assigned ID in all state
- * Used after server assigns real ID to a node created with temp ID
- *
- * @param oldTempId - Temporary ID to replace
- * @param newServerId - Server-assigned ID
- * @param setNodes - React state setter for nodes
- * @param setConnections - React state setter for connections
- * @param setSelectedNodeIds - React state setter for selected node IDs
- */
-export const replaceNodeIdInState = (
-    oldTempId: string,
-    newServerId: string,
-    setNodes: Dispatch<SetStateAction<NodeData[]>>,
-    setConnections: Dispatch<SetStateAction<Connection[]>>,
-    setSelectedNodeIds: Dispatch<SetStateAction<Set<string>>>
-): void => {
-    // Replace temp node ID with server ID in nodes array
-    setNodes(prev => prev.map(n => (n.id === oldTempId ? { ...n, id: newServerId } : n)));
-
-    // Replace temp node ID in connections (sourceNodeId or targetNodeId)
-    setConnections(prev =>
-        prev.map(c => ({
-            ...c,
-            sourceNodeId: c.sourceNodeId === oldTempId ? newServerId : c.sourceNodeId,
-            targetNodeId: c.targetNodeId === oldTempId ? newServerId : c.targetNodeId,
-        }))
-    );
-
-    // Update selection if the temp ID was selected
-    setSelectedNodeIds(prev => {
-        if (prev.has(oldTempId)) {
-            const next = new Set(prev);
-            next.delete(oldTempId);
-            next.add(newServerId);
-            return next;
-        }
-        return prev;
-    });
-};
-
 export { wouldCreateCycle } from './graph';
 export { captureCanvasAsDataUrl, captureCanvasForThumbnail, exportCanvasAsPng } from './exportImage';
 export { createDesktopCanvasBinding } from './createDesktopCanvasBinding';
@@ -257,6 +203,33 @@ export type {
 // ============================================================
 // Input File Upload Utilities
 // ============================================================
+
+/** Maximum upload file size, in MB. Single source of truth — i18n copy interpolates this. */
+export const MAX_UPLOAD_SIZE_MB = 58;
+
+export const MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+
+/** Thrown when a picked file is at or over MAX_UPLOAD_SIZE, so callers can tell it apart from read failures */
+export class FileTooLargeError extends Error {
+    constructor() {
+        super(`File exceeds ${MAX_UPLOAD_SIZE_MB} MB`);
+        this.name = 'FileTooLargeError';
+    }
+}
+
+/** Reject an oversized file before it is read into memory */
+export const assertUploadSize = (file: File): void => {
+    if (file.size >= MAX_UPLOAD_SIZE) throw new FileTooLargeError();
+};
+
+/** Resolve an upload failure to user-facing copy — size rejections read differently from read failures */
+export const getUploadErrorMessage = (
+    error: unknown,
+    t: (key: string, options?: Record<string, unknown>) => string
+): string =>
+    error instanceof FileTooLargeError
+        ? t('flows:detailPanel.fileTooLarge', { size: MAX_UPLOAD_SIZE_MB })
+        : t('flows:detailPanel.uploadFailed');
 
 /** Accepted file types for the input-image block (images + text/json + zip files) */
 export const INPUT_FILE_ACCEPT =
@@ -279,6 +252,26 @@ export const extractBase64 = (dataUrl: string): string => {
     return idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
 };
 
+/** Read a file as a data URL */
+const readAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = evt => resolve(evt.target?.result as string);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+    });
+
+/**
+ * Read an image file and return it as a compressed data URL.
+ * Throws FileTooLargeError if the file is at or over MAX_UPLOAD_SIZE.
+ */
+export const readImageFile = async (file: File): Promise<string> => {
+    assertUploadSize(file);
+
+    const { dataUrl: compressed } = await compressImageIfNeeded(await readAsDataUrl(file));
+    return compressed;
+};
+
 /** Clear all file-related config keys */
 export const clearFileConfig = (onConfigChange: (key: string, value: unknown) => void): void => {
     onConfigChange('fileData', '');
@@ -289,42 +282,36 @@ export const clearFileConfig = (onConfigChange: (key: string, value: unknown) =>
 /**
  * Read uploaded file and update config via onConfigChange.
  * Text files (txt/html/json) → fileData (base64), image files → processImage callback.
+ * Throws FileTooLargeError if the file is at or over MAX_UPLOAD_SIZE.
  */
 export const processUploadedFile = async (
     file: File,
     onConfigChange: (key: string, value: unknown) => void,
     processImage: (dataUrl: string) => Promise<string>
 ): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = async evt => {
-            const dataUrl = evt.target?.result as string;
-            if (!dataUrl) {
-                resolve();
-                return;
-            }
+    assertUploadSize(file);
 
-            if (isZipFile(file)) {
-                const raw = extractBase64(dataUrl);
-                onConfigChange('imageData', raw);
-                onConfigChange('fileData', '');
-                onConfigChange('fileName', file.name);
-                onConfigChange('fileType', '');
-            } else if (isTextFile(file)) {
-                onConfigChange('fileData', dataUrl);
-                onConfigChange('fileName', file.name);
-                onConfigChange('fileType', file.type || 'text/plain');
-                onConfigChange('imageData', '');
-            } else {
-                const processed = await processImage(dataUrl);
-                onConfigChange('imageData', processed);
-                clearFileConfig(onConfigChange);
-            }
-            resolve();
-        };
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-    });
+    const dataUrl = await readAsDataUrl(file);
+    if (!dataUrl) return;
+
+    if (isZipFile(file)) {
+        onConfigChange('imageData', extractBase64(dataUrl));
+        onConfigChange('fileData', '');
+        onConfigChange('fileName', file.name);
+        onConfigChange('fileType', '');
+        return;
+    }
+
+    if (isTextFile(file)) {
+        onConfigChange('fileData', dataUrl);
+        onConfigChange('fileName', file.name);
+        onConfigChange('fileType', file.type || 'text/plain');
+        onConfigChange('imageData', '');
+        return;
+    }
+
+    onConfigChange('imageData', await processImage(dataUrl));
+    clearFileConfig(onConfigChange);
 };
 
 // ============================================================
@@ -344,6 +331,27 @@ export const tryParseJson = (value: unknown): object | null => {
     } catch {
         return null;
     }
+};
+
+// ============================================================
+// upload-html Product Utilities
+// ============================================================
+
+/**
+ * Recognize an `upload-html` product packet, so it can be shown as a link card instead of raw JSON.
+ *
+ * Keyed on `website` alone: a mock run emits `{ website }` with no id, name or progress$, and the
+ * spec requires it to render the same way. A JSON string is parsed first — a node can carry the
+ * product as text.
+ */
+export const getUploadHtmlProduct = (packet: DataPacket<unknown> | null | undefined): UploadHtmlProductView | null => {
+    if (!packet) return null;
+
+    const value = typeof packet.value === 'string' ? tryParseJson(packet.value) : packet.value;
+    if (!value || typeof value !== 'object') return null;
+
+    const product = value as UploadHtmlProductView;
+    return typeof product.website === 'string' && product.website ? product : null;
 };
 
 // ============================================================

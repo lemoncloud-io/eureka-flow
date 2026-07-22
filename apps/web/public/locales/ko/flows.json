@@ -189,7 +189,9 @@
         "fileAttached": "파일 첨부됨",
         "takePhoto": "카메라",
         "textFile": "텍스트 파일",
-        "uploading": "업로드 중..."
+        "uploading": "업로드 중...",
+        "fileTooLarge": "파일이 너무 큽니다. 최대 {{size}} MB까지 업로드할 수 있습니다.",
+        "uploadFailed": "업로드에 실패했습니다. 다시 시도해 주세요."
     },
     "imageEditor": {
         "title": "이미지 편집",
@@ -270,7 +272,13 @@
         "signInWithApiKey": "API 키로 로그인",
         "browsePublicFlows": "공개 플로우 둘러보기",
         "signInToEdit": "로그인하여 편집하기",
-        "failedToRunFlow": "플로우 실행 실패"
+        "failedToRunFlow": "플로우 실행 실패",
+        "runNeedsOwnerForStructure": "편집자 권한에서는 추가·삭제한 단계가 저장되지 않아 실행할 수 없습니다. 소유자에게 요청하세요.",
+        "savedWithoutStructure": "단계 설정만 저장했습니다. 추가·삭제한 단계는 소유자 권한이 필요합니다.",
+        "draftRecovered": "저장되지 않은 변경사항을 복구했습니다.",
+        "draftUndo": "되돌리기",
+        "draftDiscarded": "저장되지 않은 변경사항을 삭제했습니다.",
+        "backOnlineRetrySave": "다시 연결됐습니다. 저장을 눌러 변경사항을 보내세요."
     },
     "publicFlows": {
         "title": "공개 플로우",
