@@ -81,7 +81,7 @@ export interface WorkflowCanvasRef {
     selectNode: (nodeId: string | null) => void;
     /** Execute a specific node by ID */
     executeNode: (nodeId: string) => Promise<void>;
-    /** Update node data (used for socket status updates) */
+    /** Apply an agent-intent node edit: guards on canModifyCanvas and checkpoints for undo. */
     updateNode: (nodeId: string, updates: Partial<NodeData>) => void;
     /** Update node from server data (used for socket node update notifications) */
     updateNodeFromServer: (nodeId: string, serverData: Partial<NodeData>, options?: { force?: boolean }) => void;
@@ -928,6 +928,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     }
                 },
                 updateNode: (nodeId: string, updates: Partial<NodeData>) => {
+                    // The agent's mutation seam: guard + checkpoint so a move is undoable like a user drag.
+                    if (!permissions.canModifyCanvas) return;
+                    saveCheckpoint();
                     setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, ...updates } : n)));
                 },
                 updateNodeFromServer: (

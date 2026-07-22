@@ -5,7 +5,14 @@ import { createLocatorAgent } from '@flows/agent';
 import { useAgentSession } from './useAgentSession';
 
 import type { UseAgentSessionResult } from './useAgentSession';
-import type { AgentEnvironmentSupportable, CanvasBinding, LlmGateway, SessionStore, ToolExecutor } from '@flows/agent';
+import type {
+    AgentEnvironmentSupportable,
+    AgentGrant,
+    CanvasBinding,
+    LlmGateway,
+    SessionStore,
+    ToolExecutor,
+} from '@flows/agent';
 
 interface UseLocatorAgentArgs {
     binding: CanvasBinding;
@@ -15,6 +22,8 @@ interface UseLocatorAgentArgs {
     environment: AgentEnvironmentSupportable;
     /** Optional executor override (e.g. wrapped with tracing via withExecutorTracing). */
     executor?: ToolExecutor;
+    /** Capabilities the agent may use; defaults to the locator's own grant when omitted. */
+    grant?: AgentGrant;
 }
 
 /**
@@ -28,11 +37,19 @@ export const useLocatorAgent = ({
     gateway,
     environment,
     executor,
+    grant,
 }: UseLocatorAgentArgs): UseAgentSessionResult => {
     const createAgent = useCallback(
         (storage: SessionStore) =>
-            createLocatorAgent({ gateway, binding, storage, flowId, ...(executor ? { executor } : {}) }),
-        [gateway, binding, flowId, executor]
+            createLocatorAgent({
+                gateway,
+                binding,
+                storage,
+                flowId,
+                ...(executor ? { executor } : {}),
+                ...(grant ? { config: { grant } } : {}),
+            }),
+        [gateway, binding, flowId, executor, grant]
     );
     return useAgentSession({ flowId, environment, createAgent });
 };

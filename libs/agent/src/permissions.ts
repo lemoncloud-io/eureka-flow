@@ -26,3 +26,14 @@ export const effectiveCapabilities = (grant: AgentGrant): Set<Capability> => {
     });
     return set;
 };
+
+/** Project the flow editor's {@link FlowPermissions} onto the agent grant (the Capability subset). */
+export const toAgentGrant = (permissions: FlowPermissions): AgentGrant => {
+    const grant: Record<Capability, boolean> = {
+        canModifyCanvas: permissions.canModifyCanvas,
+        canEditConfig: permissions.canEditConfig,
+        canEditStructure: permissions.canEditStructure,
+        canRun: permissions.canRun,
+    };
+    return grant;
+};

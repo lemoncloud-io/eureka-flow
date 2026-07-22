@@ -1,12 +1,13 @@
+import { useCanvasStore } from '@flows/flows';
+
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { CanvasBinding } from '@flows/agent';
-import type { NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type { NodeData } from '@lemoncloud/eureka-flows-api';
 import type { RefObject } from 'react';
 
 /**
- * Desktop {@link CanvasBinding}: wraps the imperative `WorkflowCanvas` ref (the desktop canvas
- * renders from component-local state, not the store). Reads `ref.current` lazily so it stays
- * valid across canvas re-renders.
+ * Desktop {@link CanvasBinding} over the store-sourced canvas: reads node state from `useCanvasStore`
+ * and writes through the `WorkflowCanvas` ref (which checkpoints for undo).
  */
 export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | null>): CanvasBinding => {
     const canvas = (): WorkflowCanvasRef => {
@@ -17,9 +18,10 @@ export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | nu
     };
 
     return {
+        // Read the live store so a write is visible to the next read within a turn (getWorkflow lags).
         readGraph: () => {
-            const wf: WorkflowState = canvas().getWorkflow(); // WorkflowState is { nodes, edges }
-            return { nodes: wf.nodes ?? [], edges: wf.edges ?? [] };
+            const { nodes, connections } = useCanvasStore.getState();
+            return { nodes: nodes ?? [], edges: connections ?? [] };
         },
 
         updateNode: (id, patch) => {

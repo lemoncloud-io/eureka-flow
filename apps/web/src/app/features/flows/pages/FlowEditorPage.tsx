@@ -968,7 +968,7 @@ export const FlowEditorPage = () => {
                     />
                 )}
             </div>
-            <FlowAgentPanel canvasRef={canvasRef} flowId={currentFlowId ?? ''} />
+            {currentFlowId && <FlowAgentPanel canvasRef={canvasRef} flowId={currentFlowId} permissions={permissions} />}
         </div>
     );
 };
