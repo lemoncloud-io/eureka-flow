@@ -53,7 +53,7 @@ sequenceDiagram
     Agent->>Agent: accumulate deltas → parse ToolCall
     Agent->>EX: dispatch(agentConfig, toolCall)
     EX->>EX: route by name → validate args → check grant
-    EX->>CV: e.g. move_node → updateNode(position)
+    EX->>CV: e.g. move_node → canvas tool provider → updateNode(position)
     CV-->>EX: ToolResult
     EX-->>Agent: ToolResult (fed back as a tool message)
 ```

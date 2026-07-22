@@ -2,7 +2,7 @@
 
 The parts every in-browser flow agent is built from, described once. The concrete
 [locator agent](../agents/locator/SPEC.md) references this page instead of restating it; its own doc
-covers only what it *adds*.
+covers only what it _adds_.
 
 The DOM-free core is `@flows/agent` (`libs/agent`); the editor wiring lives in
 `apps/web/src/app/features/flows/`.
@@ -47,14 +47,14 @@ commands and renders what's in the store; it never touches the flow itself.
 
 ## Components
 
-| Component         | Role                                                                                                             |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **Agent Panel**   | Chat UI. Emits `send`; renders purely from the session store. No logic.                                          |
-| **Agent**         | Owns the turn and is the only writer: runs the think/act loop. Configured with a persona + tools + a grant.      |
+| Component         | Role                                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **Agent Panel**   | Chat UI. Emits `send`; renders purely from the session store. No logic.                                             |
+| **Agent**         | Owns the turn and is the only writer: runs the think/act loop. Configured with a persona + tools + a grant.         |
 | **LlmGateway**    | The one outbound LLM dependency, behind one interface so it can be swapped (offline command gateway, fake, Gemini). |
-| **ToolExecutor**  | One engine for the session: route a call by name → validate args → check the agent's grant → dispatch → result.  |
-| **CanvasBinding** | The single seam to the real, React-owned canvas: read it, edit a node.                                           |
-| **Storage**       | Loads/creates/saves the `SessionState` the Panel renders from, keyed by `flowId`.                                |
+| **ToolExecutor**  | One engine for the session: route a call by name → validate args → check the agent's grant → dispatch → result.     |
+| **CanvasBinding** | The single seam to the real, React-owned canvas: read it, edit a node.                                              |
+| **SessionStore**  | Loads/creates/saves the `SessionState` the Panel renders from, keyed by `flowId`.                                   |
 
 ### The pieces (UML)
 
@@ -91,7 +91,7 @@ classDiagram
         +readGraph() Graph
         +updateNode(id, patch)
     }
-    class Storage {
+    class SessionStore {
         +load(flowId)
         +create(flowId)
         +save(state)
@@ -99,7 +99,7 @@ classDiagram
     Agent --> AgentConfig : configured by
     Agent --> LlmGateway : think
     Agent --> ToolExecutor : act
-    Agent --> Storage : persist SessionState
+    Agent --> SessionStore : persist SessionState
     AgentConfig --> ToolProvider : tools
     ToolExecutor --> ToolProvider : routes to
     ToolProvider --> CanvasBinding : canvas tools wrap
@@ -159,8 +159,8 @@ interface AgentConfig {
 }
 
 // ── Permissions ──────────────────────────────────────────────────────────────
-type Capability = 'canModifyCanvas' | 'canEditConfig' | 'canEditStructure' | 'canRun';
-type AgentGrant = Partial<Record<Capability, boolean>>; // absent/false = denied
+type Capability = 'canModifyCanvas' | 'canEditConfig' | 'canEditStructure' | 'canRun'; // compile-guarded subset of keyof FlowPermissions
+type AgentGrant = Partial<Record<Capability, boolean>>; // absent/false = denied; derived from the flow's FlowPermissions via toAgentGrant()
 
 // ── LlmGateway — the one outbound LLM dependency ─────────────────────────────
 interface LlmGateway {
@@ -200,9 +200,7 @@ interface ToolCall {
     name: string;
     args: unknown; // already parsed from the model's raw JSON
 }
-type ToolResult =
-    | { toolCallId: string; ok: true; data?: unknown }
-    | { toolCallId: string; ok: false; error: string };
+type ToolResult = { toolCallId: string; ok: true; data?: unknown } | { toolCallId: string; ok: false; error: string };
 
 // A ToolProvider is one source of tools — it lists them and runs them. Maps 1:1
 // to an MCP server (listTools ↔ tools/list, dispatch ↔ tools/call).
@@ -232,7 +230,7 @@ interface SessionState {
     phase: AgentPhase;
     error?: string; // set when phase === 'error'
 }
-interface Storage {
+interface SessionStore {
     load(flowId: string): SessionState | null;
     create(flowId: string): SessionState;
     save(state: SessionState): void;
@@ -243,7 +241,7 @@ interface Storage {
 
 There is **one `ToolExecutor` for the session** — a single engine, not subclassed per agent. The acting
 agent is passed in (`dispatch(agent, call)`), and the executor reads that agent's `tools` (to route) and
-`grant` (to gate). Per-agent behavior is therefore *data the same code reads*, not new code.
+`grant` (to gate). Per-agent behavior is therefore _data the same code reads_, not new code.
 
 `dispatch(agent, call)` is the single choke-point per tool call: **route by name** → **validate** `args`
 against the tool's JSON Schema → **check permission** → return a `ToolResult`. It never throws; a denied
@@ -260,37 +258,39 @@ same tool can be callable for one agent and denied for another.
 
 ## CanvasBinding — the seam
 
-The single door between the (non-React) agent core and the React-owned live canvas. It exists because on
-desktop the canvas renders from component-local state in `WorkflowCanvas.tsx`, not a store, so the core
-can't reach it directly. Injected at mount.
+The single door between the (non-React) agent core and the React-owned live canvas, injected at mount.
+On desktop the canvas is store-sourced (`useCanvasStore`), so `readGraph` reads the store directly, while
+writes go through the `WorkflowCanvas` ref — which checkpoints for undo and guards on `canModifyCanvas`.
 
 - `readGraph()` — the live `{ nodes, edges }`.
-- `updateNode(id, patch)` — one node's label / position, applied immediately, frontend-only.
+- `updateNode(id, patch)` — one node's label / position, frontend-only; on desktop it is guarded on
+  `canModifyCanvas` and checkpointed, so the move is undoable like a user drag.
 
 The desktop implementation and the primitives it wraps are in [canvas-binding.md](canvas-binding.md).
 
 ## Session & storage
 
-`SessionState` is the whole persisted turn state; the Panel is a pure function of it. `Storage`
+`SessionState` is the whole persisted turn state; the Panel is a pure function of it. `SessionStore`
 loads/creates a session keyed by `flowId` and `save`s at each turn step — after the user message, after
 the fully-collected assistant reply, after each tool result, and on phase transitions. The gateway
 stream is drained in full before the reply is persisted; text is not saved token-by-token. The render
 loop is one-way: Panel emits commands → the Agent writes `SessionState` → store → Panel re-renders.
 
-`@flows/agent` ships an in-memory `Storage` (the default for tests and Node runs); the browser app
-wraps a localStorage-backed `Storage` so a transcript survives a page reload.
+`@flows/agent` ships an in-memory `SessionStore` via `createInMemorySessionStore` (the default for tests
+and Node runs); in the browser, `useAgentSession` builds a `SessionStore` whose writes and hydration
+persist through the Agent Environment's storage port (localStorage), so a transcript survives a reload.
 
 ## Grounding (what already exists)
 
 Every seam wraps a primitive already in the repo, which is what makes an agent implementable without new
 backend work.
 
-| Seam               | Wraps                                                                            | Where                                            |
-| ------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `readGraph` (live) | `WorkflowCanvasRef.getWorkflow()` → `{ nodes, edges }`                           | `apps/web/.../components/WorkflowCanvas.tsx`     |
-| `updateNode`       | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — local `setNodes`, immediate | `apps/web/.../components/WorkflowCanvas.tsx`     |
-| permissions        | `FlowPermissions` (7 flags; the agent's `Capability` mirrors `canModifyCanvas`, `canEditConfig`, `canEditStructure`, `canRun`) | `libs/flows/.../types/permissions.ts` |
-| node shape         | `NodeData` (`id`, `type`, `position`, `customLabel`)                              | `@lemoncloud/eureka-flows-api`                   |
+| Seam               | Wraps                                                                                                                                                           | Where                                              |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `readGraph` (live) | `useCanvasStore.getState()` → `{ nodes, edges: connections }` (reads the store directly; `getWorkflow` lags within a turn)                                      | `apps/web/.../utils/createDesktopCanvasBinding.ts` |
+| `updateNode`       | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — guards `canModifyCanvas`, `saveCheckpoint()`s for undo, then store `setNodes`                           | `apps/web/.../components/WorkflowCanvas.tsx`       |
+| permissions        | `FlowPermissions` (7 flags); the agent's `Capability` is a compile-guarded subset, and the live grant is derived from the flow's permissions via `toAgentGrant` | `libs/flows/.../types/permissions.ts`              |
+| node shape         | `NodeData` (`id`, `type`, `position`, `customLabel`)                                                                                                            | `@lemoncloud/eureka-flows-api`                     |
 
 New agent code lives in `libs/agent/src`, mirroring how `flows`/`socket` are structured.
 

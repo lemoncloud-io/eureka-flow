@@ -18,7 +18,7 @@ Spec: [`docs/browser-agent/agents/locator/SPEC.md`](../../docs/browser-agent/age
 | Move semantics                   | `src/canvas/moveSemantics.ts` | Pure position math: direction→delta, relative/absolute, 20px default.                                                                                                                                                                                               |
 | Base agent                       | `src/agents/baseAgent.ts`     | `BaseAgent` — the generic think/act turn loop shared by every agent. Subclasses supply an `AgentConfig` (persona + tools + grant) and an optional per-turn context hook.                                                                                            |
 | Locator agent                    | `src/agents/locatorAgent.ts`  | `LocatorAgent extends BaseAgent`: adds the canvas tool provider + persona and seeds the live node list. Applies moves live, ends on the model's confirmation.                                                                                                       |
-| Session                          | `src/session/session.ts`      | `SessionState` the panel renders from + in-memory `Storage`.                                                                                                                                                                                                        |
+| Session                          | `src/session/session.ts`      | `SessionState` the panel renders from + in-memory `SessionStore` (`createInMemorySessionStore`).                                                                                                                                                                    |
 
 The package also hosts two shared subsystems used across agents — the **HTTP port** (`src/http/`) and
 the **Agent Environment** (`src/environment/`: storage, trace, self-check). See
@@ -27,11 +27,11 @@ the **Agent Environment** (`src/environment/`: storage, trace, self-check). See
 
 ## Design notes
 
-- **No draft, no approval gate** (spec §2.2). `move_node` applies immediately via the
-  `CanvasBinding`; the agent is the sole editor of the canvas (spec §2.1).
+- **No draft, no approval gate.** `move_node` applies immediately via the `CanvasBinding`;
+  the move is checkpointed on the canvas undo stack, like a user drag.
 - **Permissions are enforced, not skipped.** The executor checks each tool's `requires`
-  against the agent's grant; the locator is granted `canModifyCanvas`, so its moves pass.
-  The session-role ceiling of the design spec is not wired yet.
+  against the agent's grant; in the editor the grant is derived from the flow's live
+  `FlowPermissions` (`toAgentGrant`), so a viewer's `move_node` is denied.
 - **Node environment.** The core is DOM-free — the whole turn runs headless against
   `createInMemoryCanvasBinding` + `createFakeGateway`.
 

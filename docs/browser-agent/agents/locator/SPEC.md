@@ -12,8 +12,8 @@ should go — relative ("right 10px", "up a bit") or absolute ("to x=200, y=120"
 that node and moves it. Position is a frontend-only property (§6), so a move is a single, synchronous
 canvas edit with no server write.
 
-The agent is the only thing that edits the canvas: every change goes through it, and moving a node by
-chat is the way to move a node.
+Moving a node by chat goes through the agent: it applies each move live through the single `CanvasBinding`
+seam — one writer alongside direct drags, and (like a drag) its move lands on the canvas undo stack.
 
 One turn: you send a message → the agent reads the flow to identify the target and compute its new
 position → it calls **`move_node`**, applied immediately via the `CanvasBinding` → it replies with a
@@ -21,15 +21,15 @@ one-line confirmation (or, if it couldn't resolve the request, asks / reports).
 
 ## 2. Principles
 
-1. **The agent is the sole editor.** All canvas mutations flow through the agent, so the graph it reads
-   at the start of a turn is still the graph it writes to (§3).
+1. **Live, consistent reads.** The agent re-reads the live canvas (the store) each turn and applies moves
+   synchronously, so the graph it reasons over always reflects its own prior moves in the turn.
 2. **Direct apply.** A `move_node` call takes effect on the live canvas at once.
 3. **Existing nodes only.** The agent only changes a node's `position`; it never creates, deletes,
    connects, or reconfigures. Anything else, it declines.
 4. **One node per move call.** A request that names several nodes becomes several `move_node` calls in
    the same turn; each call moves exactly one node.
-5. **Frontend-only.** A move is `CanvasBinding.updateNode(id, { position })` — no backend write, no
-   autosave trigger (§6).
+5. **Frontend-only.** A move is `CanvasBinding.updateNode(id, { position })` — no direct backend write. It
+   takes the same path as a user edit: checkpointed for undo, and persisted only when autosave is enabled.
 6. **Resolve or ask — never guess.** If the target is ambiguous (multiple matches) or missing (no
    match), the agent asks or reports, and moves nothing.
 
@@ -39,21 +39,23 @@ one-line confirmation (or, if it couldn't resolve the request, asks / reports).
   point**; reference the node by its label/name or block type; move several nodes in one turn (one call
   each); confirm what it did.
 - **Not in scope:** adding / deleting / reconfiguring / connecting nodes; multi-node relational layout
-  ("align these", "space them evenly"); undo. If the user asks for one, the agent declines.
+  ("align these", "space them evenly"). If the user asks for one, the agent declines. (Its own moves are
+  undoable — they land on the canvas undo stack — but the agent exposes no undo command.)
 - **Coordinates.** Origin top-left, `x` increases **right**, `y` increases **down** (§5.1) — the
   existing canvas convention (`NodeData.position`).
 
 ## 4. What it adds to the shared model
 
 Only two things sit on top of the [shared architecture](../../design/architecture.md); everything else
-(the Agent turn loop, `ToolExecutor`, permissions, Session/Storage) is inherited unchanged:
+(the Agent turn loop, `ToolExecutor`, permissions, Session/`SessionStore`) is inherited unchanged:
 
 - **A canvas tool provider** (`list_nodes` + `move_node`) and the locator persona, bundled as its
-  `AgentConfig` with `grant = { canModifyCanvas }` (enforced — §5.2).
+  `AgentConfig`. In the editor its `grant` is derived from the flow's live `FlowPermissions` (`toAgentGrant`),
+  so `move_node` (which requires `canModifyCanvas`) is denied for a viewer (§5.2).
 - **Per-turn node-list seeding** — before each model call the agent injects the current node list
   (id / type / label / position) so the model can match a name/type to an id and read current positions.
 
-The locator uses the base `AgentPhase` (`idle | thinking | done | error`); a `move_node` result *is* the
+The locator uses the base `AgentPhase` (`idle | thinking | done | error`); a `move_node` result _is_ the
 applied change.
 
 ```ts
@@ -107,8 +109,8 @@ is the per-tool `requires` the executor checks: `list_nodes` needs no capability
 
 ### 5.3 UI / layout
 
-The **Agent Panel is docked on the right and always present** whenever a flow is open — there is no
-open/close toggle. The canvas occupies the remaining width to its left (a fixed-width docked column, not
+The **Agent Panel is docked on the right** whenever a flow is open (it mounts once the flow has an id) —
+there is no open/close toggle. The canvas occupies the remaining width to its left (a fixed-width docked column, not
 an overlay). Opening a flow rehydrates its persisted session, so the conversation is there too.
 
 ## 6. Grounding (what already exists)
@@ -117,11 +119,11 @@ The move rides on primitives already in the repo — no new backend work. See th
 [shared grounding table](../../design/architecture.md#grounding-what-already-exists) for the Agent /
 LLM / tools / permissions seams; the locator-specific ones:
 
-| Seam                | Wraps                                                                          | Where                                              |
-| ------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------- |
-| `list_nodes` (read) | `CanvasBinding.readGraph()`, projected to `NodeLocation[]`                     | `apps/web/.../utils/createDesktopCanvasBinding.ts` |
-| `move_node` (apply) | `CanvasBinding.updateNode(id, { position })` → `WorkflowCanvasRef.updateNode`  | same file; `apps/web/.../components/WorkflowCanvas.tsx` |
-| node shape          | `NodeData` — `id`, `type`, `position`, `customLabel`                           | `@lemoncloud/eureka-flows-api`                     |
+| Seam                | Wraps                                                                         | Where                                                   |
+| ------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `list_nodes` (read) | `CanvasBinding.readGraph()`, projected to `NodeLocation[]`                    | `apps/web/.../utils/createDesktopCanvasBinding.ts`      |
+| `move_node` (apply) | `CanvasBinding.updateNode(id, { position })` → `WorkflowCanvasRef.updateNode` | same file; `apps/web/.../components/WorkflowCanvas.tsx` |
+| node shape          | `NodeData` — `id`, `type`, `position`, `customLabel`                          | `@lemoncloud/eureka-flows-api`                          |
 
 ## 7. What shipped
 
