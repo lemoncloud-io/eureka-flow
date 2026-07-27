@@ -329,7 +329,59 @@ yarn lint && npx nx build web
 - `libs/engine/src/**`에 `react`/`react-dom`/`zustand`/DOM 전역 참조 0건 유지
 - Repository 스펙이 불변식 1·2·3·7을 각각 잡는다
 
-## 6. 진행 체크리스트
+---
+
+## 6. Phase 3 — 소켓 + 실행 상태
+
+목표: 서버가 밀어주는 실행 상태를 엔진이 해석하게 만든다. DESIGN §3.3의 Phase 3 중 **이 레포에 속한 부분**.
+
+> **범위 밖 (별건).** agents 포크(`eureka-flow-agents`)의 `CanvasBinding` 재구현 + 툴 확장은 **다른 레포**다.
+> 엔진이 곧 인메모리 바인딩이므로 계약은 이미 준비됐지만, PR이 갈라지므로 여기서 건드리지 않는다.
+
+### P3-1. SocketPort
+
+| 파일                                        | 내용                                                                                                     |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `libs/engine/src/ports/socket.ts`           | `SocketPort` — `connect()` / `close()` / `subscribe(listener)` / `status()`. 메시지는 파싱 전 raw string |
+| `libs/engine/src/adapters/webSocketPort.ts` | 전역 `WebSocket` 어댑터 + 지수 백오프 재연결                                                             |
+
+Node 22는 `WebSocket`을 전역으로 갖는다 (`fetch`와 동일). DESIGN §3.4가 `ws` 패키지를 권했지만
+**의존성을 추가하지 않는 쪽**을 택한다 — 어댑터 하나가 브라우저·Node 양쪽을 덮고, 동기화할 분기가 없다.
+브라우저의 기존 Worker 구현(`useWebSocketWorker`)은 그대로 두고 Phase 4 이후 이 포트 뒤로 감싼다.
+
+### P3-2. 실행 상태 리듀서 (핵심)
+
+`libs/engine/src/runtime/executionReducer.ts` — **순수 함수**. 지금 `useSocketHandlers.ts`의 ref 5개
+(`nodeNoRef`/`nodeRunIdRef`/`portNoRef`/`portRunIdRef`/`progressSeqRef`)에 흩어져 있는 순서 판정을 한곳으로.
+
+`(state, event) → { state, effects }`. 엔진이 소유하는 것은 **무엇을 무시할지와 어떤 patch를 적용할지**뿐이고,
+토스트·`getNode` 조회·`executeNode` 예약 같은 부수효과는 `effects` 배열로 내보내 호출자가 해석한다.
+
+리듀서가 소유하는 규칙 (전부 현재 코드에서 이식, 각각 스펙으로 고정):
+
+1. **stale sequence 드랍** — 같은 노드에서 `no <= 이미 본 no`면 무시. 소켓은 순서를 보장하지 않는다.
+2. **runId 교체 = 새 실행** — 시퀀스와 progress seq를 리셋하고 노드를 IDLE로 강제.
+   이게 없으면 상태 우선순위(COMPLETED > RUNNING)가 재실행 업데이트를 막는다.
+3. **다른 flow의 메시지 무시** — `flowId`가 있고 현재 flow와 다르면 드랍.
+4. **상태 우선순위** — `shouldUpdateState` (ERROR가 최상위 terminal). 이식하되 시맨틱 불변.
+5. **port 이벤트는 부모 노드로** — `isPort && parentNodeId`면 부모 상태만 갱신하고 끝.
+
+### P3-3. 스트랭글러 — `useSocketHandlers` 전환
+
+기존 훅은 리듀서를 호출하고 effect를 해석하는 얇은 층이 된다. 호출부(`useInitFlowSocket` 콜백) 무변경.
+
+### Phase 3 완료 조건
+
+```bash
+npx nx test engine && npx nx test flows && npx nx test web
+yarn lint && npx nx build web && yarn engine:demo
+```
+
+- 리듀서 스펙이 위 규칙 1~5를 각각 잡는다 — **오늘 이 로직에는 테스트가 0개다**
+- `useSocketHandlers.ts`에 시퀀스 추적 ref 0건
+- 엔진 순수성 유지 (react/zustand/DOM 전역 0건)
+
+## 7. 진행 체크리스트
 
 - [x] P0-1 lib 스캐폴딩 (`@flows/engine`)
 - [x] P0-2 파일 이동 + shim
@@ -350,3 +402,10 @@ yarn lint && npx nx build web
       (load 2노드 → add 3노드 → undo 2노드 → redo 3노드 → save, dirty 추적 정상, save body = 전체 그래프).
       engine 스펙 101개, flows 18, web 174, lint 0 error, `nx build web` green.
       `tsc -b` 총 에러 **1127 — Phase 1 대비 증감 0**. 엔진 단독 typecheck는 선행 `Connection` 3건뿐.
+- [x] P3-1 SocketPort + 전역 `WebSocket` 어댑터 (재연결 백오프 포함)
+- [x] P3-2 실행 상태 리듀서 (node/port/progress) — 규칙 1~5 + `ts` 우선, 커서 롤백
+- [x] P3-3 `useSocketHandlers` 전환 — 시퀀스 추적 ref **5개 → 0개**
+- [x] **Phase 3 완료 조건 전부 green** — engine 155 (Phase 2의 101 → +54), flows 18, web 174,
+      lint 0 error, `nx build web`, `yarn engine:demo` 모두 green.
+      `tsc -b` 총 **1126 — Phase 2의 1127보다 1건 감소**. 엔진 순수성 유지.
+      **범위 밖**: agents 포크 `CanvasBinding` (다른 레포) — Phase 3의 남은 절반.
