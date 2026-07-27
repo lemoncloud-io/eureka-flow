@@ -55,7 +55,7 @@ export const useMobileSocketSync = ({
     const nodeNoRef = useRef<Map<string, number>>(new Map());
     const nodeRunIdRef = useRef<Map<string, string>>(new Map());
     const portNoRef = useRef<Map<string, number>>(new Map());
-    const connectionIdRef = useRef<string | undefined>();
+    const connectionIdRef = useRef<string | undefined>(undefined);
     const pendingAutoExecRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleFlowUpdate = useCallback(
@@ -189,7 +189,7 @@ export const useMobileSocketSync = ({
                 const node = useCanvasStore.getState().nodes.find(n => n.id === nodeId);
                 if (node?.type) {
                     const blockDef = useFlowsStore.getState().blockRegistry[node.type];
-                    if (blockDef?.output$ && blockDef.output$.length > 0) return;
+                    if (blockDef?.outputs && blockDef.outputs.length > 0) return;
                 }
             }
 

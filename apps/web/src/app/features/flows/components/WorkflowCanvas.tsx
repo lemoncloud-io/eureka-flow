@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { X } from 'lucide-react';
 
-import { createFlowEngine } from '@flows/engine';
+import { createFlowEngine, newNodeId } from '@flows/engine';
 import {
     COLLAPSED_PORT_Y,
     EXECUTE_FUNCTIONS,
@@ -22,6 +22,7 @@ import {
     runFlow,
     runNode,
     shouldUpdateState,
+    toDataPacket,
     toPortVariantData,
     translateField,
     upsertPortNode,
@@ -272,7 +273,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const clipboardRef = useRef<ClipboardPayload | null>(null);
         const [resizingNode, setResizingNode] = useState<{ nodeId: string; width: number } | null>(null);
 
-        const executeNodeRef = useRef<(nodeId: string) => Promise<void>>();
+        const executeNodeRef = useRef<(nodeId: string) => Promise<void> | undefined>(undefined);
 
         const nodesRef = useRef(nodes);
         const connectionsRef = useRef(connections);
@@ -288,8 +289,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const transformRef = useRef<HTMLDivElement>(null);
         const gridRef = useRef<HTMLDivElement>(null);
         const [displayViewport, setDisplayViewport] = useState({ x: 0, y: 0, zoom: 1 });
-        const displayTimerRef = useRef<ReturnType<typeof setTimeout>>();
-        const viewportSaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+        const displayTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+        const viewportSaveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
         const flowIdRef = useRef(flowId);
         flowIdRef.current = flowId;
 
@@ -666,8 +667,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     // Normalize nodes so config and position are never undefined
                     // (position is optional on the node type; a position-less node
                     // crashes desktop render at node.position.x — see NodeBlock/Minimap).
-                    const loadedNodes = (state.nodes ?? []).map(n => ({
+                    // The id is minted on the same rule the engine's loadGraph uses, because
+                    // the port and propagation passes below run before the graph is handed over.
+                    const loadedNodes: GraphNode[] = (state.nodes ?? []).map(n => ({
                         ...n,
+                        id: n.id || newNodeId(),
                         config: n.config ?? {},
                         position: n.position ?? { x: 0, y: 0 },
                     }));
@@ -769,8 +773,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                     engine.applyRuntime(
                                         p.nodeId,
                                         portId === 'out'
-                                            ? { outputData: { ...owner.outputData, [portId]: portData.data } }
-                                            : { inputData: { ...owner.inputData, [portId]: portData.data } }
+                                            ? {
+                                                  outputData: {
+                                                      ...owner.outputData,
+                                                      [portId]: toDataPacket(portData.data),
+                                                  },
+                                              }
+                                            : {
+                                                  inputData: {
+                                                      ...owner.inputData,
+                                                      [portId]: toDataPacket(portData.data),
+                                                  },
+                                              }
                                     );
 
                                     // Re-propagate after new data, touching only what moved.
@@ -1833,8 +1847,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     engine.applyRuntime(
                         nodeId,
                         direction === 'out'
-                            ? { outputData: { ...owner?.outputData, [portId]: portData.data } }
-                            : { inputData: { ...owner?.inputData, [portId]: portData.data } }
+                            ? { outputData: { ...owner?.outputData, [portId]: toDataPacket(portData.data) } }
+                            : { inputData: { ...owner?.inputData, [portId]: toDataPacket(portData.data) } }
                     );
                 }
             } catch (err) {

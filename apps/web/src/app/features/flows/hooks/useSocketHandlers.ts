@@ -212,7 +212,7 @@ export const useSocketHandlers = ({
                 const nodeInCanvas = workflow?.nodes?.find(n => n.id === nodeId);
                 if (nodeInCanvas?.type) {
                     const nodeDef = blockRegistry[nodeInCanvas.type];
-                    const isTerminalNode = !nodeDef?.output$ || nodeDef.output$.length === 0;
+                    const isTerminalNode = !nodeDef?.outputs || nodeDef.outputs.length === 0;
                     if (!isTerminalNode) return;
                 }
             }

@@ -43,9 +43,9 @@ export const App = () => {
                 <meta name="description" content="Build, run, and share AI workflows visually. No code required." />
                 <meta property="og:site_name" content="Eureka Flow" />
                 <meta name="twitter:card" content="summary_large_image" />
-                <link rel="alternate" hreflang="en" href={`${SITE_URL}/`} />
-                <link rel="alternate" hreflang="ko" href={`${SITE_URL}/`} />
-                <link rel="alternate" hreflang="x-default" href={`${SITE_URL}/`} />
+                <link rel="alternate" hrefLang="en" href={`${SITE_URL}/`} />
+                <link rel="alternate" hrefLang="ko" href={`${SITE_URL}/`} />
+                <link rel="alternate" hrefLang="x-default" href={`${SITE_URL}/`} />
             </Helmet>
             <Routes>
                 <Route path="/" element={<HomePage />} />

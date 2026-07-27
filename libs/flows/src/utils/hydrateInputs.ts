@@ -3,7 +3,7 @@
  * Fills gaps in existingInputs where a connection exists but inputData is stale
  * (e.g., connection was drawn after source node already executed).
  */
-export const hydrateInputsFromUpstream = <T extends { value: unknown; type: string }>(
+export const hydrateInputsFromUpstream = <T extends { value?: unknown; type?: string }>(
     nodeId: string,
     connections: ReadonlyArray<{
         sourceNodeId: string;

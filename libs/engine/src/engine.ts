@@ -28,7 +28,7 @@ export interface FlowEngine {
      * base64 image config on every read would cost more than the sharing saves. Read them;
      * do not write to them.
      */
-    getGraph: () => Readonly<WorkflowState>;
+    getGraph: () => Readonly<GraphSnapshot>;
     subscribe: (listener: EngineListener) => () => void;
 
     // ── editing: every structural change goes through one transaction
