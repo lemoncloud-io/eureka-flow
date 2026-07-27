@@ -1,6 +1,7 @@
-# PLAN — `@flows/engine` Phase 0–1 실행 계획
+# PLAN — `@flows/engine` Phase 0–2 실행 계획
 
 > 배경/아키텍처/근거는 [DESIGN.md](./DESIGN.md). 이 문서는 **실행 명세**다.
+> Phase 3(SocketPort + agents 포크의 `CanvasBinding` 재구현)은 아직 명세 없음 — DESIGN §3.3 참조.
 > Claude Code 사용법: "PLAN.md의 Phase 0을 실행해" → Phase 0의 완료 조건이 전부 통과하면 Phase 1로.
 > 각 Phase는 독립 PR 크기. Phase 내 스텝 순서는 지켜야 한다 (뒤 스텝이 앞 스텝 산출물에 의존).
 
