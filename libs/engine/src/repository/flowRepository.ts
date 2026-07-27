@@ -1,5 +1,5 @@
 import { captureBaseline, diffAgainstBaseline, rebaseline } from '../persistence/baseline';
-import { emptySnapshot, toSnapshot } from '../persistence/snapshot';
+import { toSnapshot } from '../persistence/snapshot';
 
 import type { FlowEngine } from '../engine';
 import type { WorkspaceContext } from '../persistence/baseline';
@@ -114,16 +114,19 @@ export const createFlowRepository = ({ engine, http }: FlowRepositoryOptions): F
         baseline: () => baseline,
 
         load: async flowId => {
-            // Blocks first, always. `toSnapshot` resolves each node's type through the
-            // registry, so a baseline taken while it is empty disagrees with the working
-            // copy on fields nobody touched — and the flow reads dirty from the moment it
-            // opens. Making this a call-order rule instead of a structure invites the bug.
-            await loadBlocks();
-
-            const { data } = await http.request<LoadFlowResponse>({
-                method: 'GET',
-                path: `/flows/${encodeURIComponent(flowId)}/load`,
-            });
+            // Both requests go out together — neither reads the other's answer. What does
+            // have an order is the baseline below: `toSnapshot` resolves each node's type
+            // through the registry, so a baseline taken while it is empty disagrees with
+            // the working copy on fields nobody touched, and the flow reads dirty from the
+            // moment it opens. Awaiting both here keeps that a structure, not a call-order
+            // rule to remember.
+            const [, { data }] = await Promise.all([
+                loadBlocks(),
+                http.request<LoadFlowResponse>({
+                    method: 'GET',
+                    path: `/flows/${encodeURIComponent(flowId)}/load`,
+                }),
+            ]);
 
             engine.loadGraph({ nodes: data.nodes ?? [], edges: data.edges ?? data.connections ?? [] });
             currentFlowId = data.id ?? flowId;
@@ -177,6 +180,3 @@ export const createFlowRepository = ({ engine, http }: FlowRepositoryOptions): F
         },
     };
 };
-
-/** An empty baseline, for a caller that wants to compare against "the server has nothing". */
-export const noBaseline = emptySnapshot;

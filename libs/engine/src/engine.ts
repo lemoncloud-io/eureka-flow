@@ -134,7 +134,9 @@ export const createFlowEngine = (options: FlowEngineOptions = {}): FlowEngine =>
             doc.emit({ type: 'graph:runtime', nodeId });
         },
 
-        copy: nodeIds => copyNodes(doc.snapshot(), nodeIds),
+        // Not `doc.snapshot()`: that deep-clones the whole flow so `copyNodes` can throw
+        // most of it away. `copyNodes` clones what it keeps.
+        copy: nodeIds => copyNodes({ nodes: doc.nodes(), edges: doc.edges() }, nodeIds),
 
         paste: (payload, offset) => {
             const before = doc.snapshot();

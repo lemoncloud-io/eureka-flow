@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createStubSocketPort } from '../cli/stubSocketPort';
 import { createFlowEngine } from '../engine';
@@ -223,5 +223,46 @@ describe('lifecycle', () => {
         session.handleFrame('{"type":"node","id":"n1","flowId":"f1","no":1,"state":"READY"}');
 
         expect(stateOf('n1')).toBe('READY');
+    });
+
+    it('rejects anyone still waiting when it closes, rather than leaving them hanging', async () => {
+        const { session } = harness();
+
+        const waiting = session.waitForNode('n1');
+        session.close();
+
+        // A dropped waiter is indistinguishable from a slow node, so this has to reject:
+        // the alternative is a caller awaiting a session that will never speak again.
+        await expect(waiting).rejects.toThrow('run session closed');
+    });
+
+    it('rejects every waiter, including several on one node', async () => {
+        const { session } = harness();
+
+        const first = session.waitForNode('n1');
+        const second = session.waitForNode('n1');
+        const other = session.waitForNode('n2');
+        session.close();
+
+        await expect(first).rejects.toThrow('run session closed');
+        await expect(second).rejects.toThrow('run session closed');
+        await expect(other).rejects.toThrow('run session closed');
+    });
+
+    it('cancels a waiter timeout on close, so it cannot fire into nothing', async () => {
+        vi.useFakeTimers();
+        try {
+            const { session } = harness();
+
+            const waiting = session.waitForNode('n1', { timeoutMs: 1000 });
+            session.close();
+            await expect(waiting).rejects.toThrow('run session closed');
+
+            // The timer is disarmed, so nothing is left to run — and the already-rejected
+            // promise cannot be rejected a second time.
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

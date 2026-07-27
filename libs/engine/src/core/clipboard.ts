@@ -27,7 +27,13 @@ const NO_OFFSET: Position = { x: 0, y: 0 };
 export const copyNodes = (graph: GraphSnapshot, nodeIds: string[]): ClipboardPayload => {
     const wanted = new Set(nodeIds);
     return structuredClone({
-        nodes: graph.nodes.filter(n => !!n.id && wanted.has(n.id)),
+        // Runtime data is left behind rather than copied and then discarded. `pasteNodes`
+        // resets both to `{}`, so it was never reaching a pasted node — but until it was
+        // dropped here the payload held the selection's last run output, base64 image
+        // bytes included, for as long as the caller kept the clipboard.
+        nodes: graph.nodes
+            .filter(n => !!n.id && wanted.has(n.id))
+            .map(({ inputData: _in, outputData: _out, ...node }) => node),
         edges: graph.edges.filter(e => wanted.has(e.sourceNodeId) && wanted.has(e.targetNodeId)),
     });
 };

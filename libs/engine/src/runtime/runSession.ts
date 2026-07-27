@@ -63,14 +63,23 @@ export const createRunSession = ({
     let execution = emptyExecutionState();
     let flowId = currentFlowId;
 
-    /** Everyone waiting on a node, by node id. A node may have more than one watcher. */
-    const waiters = new Map<string, Array<(outcome: NodeOutcome) => void>>();
+    /**
+     * Everyone waiting on a node, by node id. A node may have more than one watcher.
+     *
+     * A waiter owns its timeout timer, so closing the session can cancel it. Dropping the
+     * entry alone would leave the timer armed to reject a promise nobody is holding.
+     */
+    interface Waiter {
+        settle: (outcome: NodeOutcome) => void;
+        abandon: (reason: Error) => void;
+    }
+    const waiters = new Map<string, Waiter[]>();
 
     const settle = (outcome: NodeOutcome): void => {
         const pending = waiters.get(outcome.nodeId);
         if (!pending) return;
         waiters.delete(outcome.nodeId);
-        pending.forEach(resolve => resolve(outcome));
+        pending.forEach(waiter => waiter.settle(outcome));
     };
 
     const dispatch = (effects: ExecutionEffect[]): void => {
@@ -130,18 +139,27 @@ export const createRunSession = ({
             new Promise<NodeOutcome>((resolve, reject) => {
                 // Held indirectly so the resolver can cancel a timer that is armed after it.
                 const armed: { timer?: ReturnType<typeof setTimeout> } = {};
-
-                const done = (outcome: NodeOutcome): void => {
+                const disarm = (): void => {
                     if (armed.timer !== undefined) clearTimeout(armed.timer);
-                    resolve(outcome);
                 };
-                waiters.set(nodeId, [...(waiters.get(nodeId) ?? []), done]);
+
+                const waiter: Waiter = {
+                    settle: outcome => {
+                        disarm();
+                        resolve(outcome);
+                    },
+                    abandon: reason => {
+                        disarm();
+                        reject(reason);
+                    },
+                };
+                waiters.set(nodeId, [...(waiters.get(nodeId) ?? []), waiter]);
 
                 if (timeoutMs === undefined) return;
                 armed.timer = setTimeout(() => {
                     waiters.set(
                         nodeId,
-                        (waiters.get(nodeId) ?? []).filter(fn => fn !== done)
+                        (waiters.get(nodeId) ?? []).filter(entry => entry !== waiter)
                     );
                     reject(new Error(`timed out after ${timeoutMs}ms waiting for node ${nodeId}`));
                 }, timeoutMs);
@@ -156,7 +174,12 @@ export const createRunSession = ({
 
         close: () => {
             unsubscribe();
+            // Rejected, not dropped. Clearing the map alone leaves every pending
+            // `waitForNode` unsettled, and a caller awaiting one waits for a session that
+            // will never speak again — a CLI that closes on a signal hangs instead of exiting.
+            const abandoned = [...waiters.values()].flat();
             waiters.clear();
+            abandoned.forEach(waiter => waiter.abandon(new Error('run session closed')));
         },
     };
 };

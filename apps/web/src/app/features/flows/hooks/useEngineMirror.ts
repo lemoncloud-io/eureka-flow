@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { useCanvasStore } from '@flows/flows';
 
@@ -20,13 +20,13 @@ export const useEngineMirror = (engine: FlowEngine, { paused }: { paused: boolea
     pausedRef.current = paused;
     const missedUpdate = useRef(false);
 
-    useEffect(() => {
-        const publish = (): void => {
-            const { nodes, edges } = engine.getGraph();
-            // Fresh array identities every time — that is what tells the selectors to re-render.
-            useCanvasStore.setState({ nodes, connections: edges });
-        };
+    const publish = useCallback((): void => {
+        const { nodes, edges } = engine.getGraph();
+        // Fresh array identities every time — that is what tells the selectors to re-render.
+        useCanvasStore.setState({ nodes, connections: edges });
+    }, [engine]);
 
+    useEffect(() => {
         return engine.subscribe(() => {
             // While a drag is in flight the store is ahead of the engine, holding preview
             // positions that are not committed yet. Publishing over them — a socket
@@ -37,12 +37,11 @@ export const useEngineMirror = (engine: FlowEngine, { paused }: { paused: boolea
             }
             publish();
         });
-    }, [engine]);
+    }, [engine, publish]);
 
     useEffect(() => {
         if (paused || !missedUpdate.current) return;
         missedUpdate.current = false;
-        const { nodes, edges } = engine.getGraph();
-        useCanvasStore.setState({ nodes, connections: edges });
-    }, [paused, engine]);
+        publish();
+    }, [paused, publish]);
 };
