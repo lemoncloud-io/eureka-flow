@@ -656,10 +656,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             return {
                 addNode,
-                getWorkflow: () => ({
-                    nodes,
-                    edges: connections,
-                }),
+                // Straight from the engine, not from the render this handle closed over.
+                // `captureBaseline(getWorkflow())` runs immediately after `loadWorkflow`,
+                // before React has re-rendered with the loaded graph — reading the closure
+                // there hands back the previous flow, and a baseline taken from the wrong
+                // graph makes every flow read dirty from the moment it opens.
+                getWorkflow: () => engine.getGraph(),
                 loadWorkflow: async (state: WorkflowStateWithPorts) => {
                     // Normalize nodes so config and position are never undefined
                     // (position is optional on the node type; a position-less node
