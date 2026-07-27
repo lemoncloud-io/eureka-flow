@@ -24,6 +24,9 @@
             "path": "./libs/flows"
         },
         {
+            "path": "./libs/engine"
+        },
+        {
             "path": "./libs/socket"
         },
         {

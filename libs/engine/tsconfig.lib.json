@@ -1,0 +1,15 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "outDir": "./dist",
+        "declaration": true,
+        "declarationMap": true,
+        "types": ["node"],
+        // Headless by contract: no DOM lib, so a stray `document`/`window`/`HTMLElement`
+        // reference fails to compile instead of quietly pinning the engine to a browser.
+        "lib": ["ES2022"]
+    },
+    "include": ["src/**/*.ts"],
+    "exclude": ["**/*.spec.ts", "**/*.test.ts"],
+    "references": []
+}

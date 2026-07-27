@@ -38,11 +38,11 @@ import type { EdgeData, NodeData, Position, WorkflowState } from '@lemoncloud/eu
 
 export interface FlowEngine {
     // ── 읽기 / 구독
-    getGraph(): Readonly<WorkflowState>;                       // { nodes, edges } — 반환 배열은 복사본
+    getGraph(): Readonly<WorkflowState>; // { nodes, edges } — 반환 배열은 복사본
     subscribe(listener: (event: EngineEvent) => void): () => void;
 
     // ── 편집: 모든 구조 변이는 transact 안에서만 (밖에서 ops 호출 시 throw)
-    transact(label: string, fn: (ops: GraphOps) => void): void;   // 1 transact = 1 undo 단위
+    transact(label: string, fn: (ops: GraphOps) => void): void; // 1 transact = 1 undo 단위
     undo(): boolean;
     redo(): boolean;
     canUndo(): boolean;
@@ -52,31 +52,36 @@ export interface FlowEngine {
     applyRuntime(nodeId: string, patch: Partial<NodeData>): void;
 
     // ── 클립보드 (직렬화 가능 페이로드 — 프로세스 밖 클립보드 연동 대비)
-    copy(nodeIds: string[]): ClipboardPayload;                  // 선택 집합 내부 엣지 포함
+    copy(nodeIds: string[]): ClipboardPayload; // 선택 집합 내부 엣지 포함
     paste(payload: ClipboardPayload, offset?: Position): string[]; // 재-ID, 런타임 리셋, 새 노드 id 반환
 
     // ── 문서 수명주기 (Phase 1은 로컬만; 서버 load/save는 Phase 2의 Repository)
-    loadGraph(state: WorkflowState): void;                      // 정규화(config/position 기본값, 엣지 dedup) + 히스토리 리셋
+    loadGraph(state: WorkflowState): void; // 정규화(config/position 기본값, 엣지 dedup) + 히스토리 리셋
     reset(): void;
 }
 
 export interface GraphOps {
-    addNode(input: { type: string; position: Position; config?: Record<string, unknown>; customLabel?: string }): string;
+    addNode(input: {
+        type: string;
+        position: Position;
+        config?: Record<string, unknown>;
+        customLabel?: string;
+    }): string;
     updateNode(id: string, patch: Partial<NodeData>): void;
-    removeNodes(ids: string[]): void;                           // 부속 엣지 자동 제거
+    removeNodes(ids: string[]): void; // 부속 엣지 자동 제거
     connect(input: { sourceNodeId: string; sourcePortId: string; targetNodeId: string; targetPortId: string }): string;
     disconnect(edgeIds: string[]): void;
 }
 
 export type EngineEvent =
-    | { type: 'graph:changed'; label: string }                  // transact 커밋 / undo / redo / paste
-    | { type: 'graph:runtime'; nodeId: string }                 // applyRuntime
+    | { type: 'graph:changed'; label: string } // transact 커밋 / undo / redo / paste
+    | { type: 'graph:runtime'; nodeId: string } // applyRuntime
     | { type: 'graph:loaded' }
     | { type: 'history:changed'; canUndo: boolean; canRedo: boolean };
 
 export interface ClipboardPayload {
     nodes: NodeData[];
-    edges: EdgeData[];                                          // 복사 시점에 내부 엣지만 필터됨
+    edges: EdgeData[]; // 복사 시점에 내부 엣지만 필터됨
 }
 ```
 
@@ -96,25 +101,25 @@ export interface ClipboardPayload {
 ### P0-1. lib 스캐폴딩
 
 - `libs/engine/` 생성 — `libs/flows`의 `package.json` / `tsconfig.json` / `tsconfig.lib.json` 구성을 미러링하되:
-  - 패키지명 `@flows/engine`
-  - `tsconfig.lib.json`: `"lib": ["ES2022"]` (DOM 제외)
-  - vitest: `eureka-flow-agents`의 `libs/agent/vite.config.mts` 패턴 참고, `environment: 'node'`
+    - 패키지명 `@flows/engine`
+    - `tsconfig.lib.json`: `"lib": ["ES2022"]` (DOM 제외)
+    - vitest: `eureka-flow-agents`의 `libs/agent/vite.config.mts` 패턴 참고, `environment: 'node'`
 - `tsconfig.base.json` paths에 `@flows/engine` → `libs/engine/src/index.ts` 추가
 - `libs/flows`가 `@flows/engine`을 의존하도록 (역방향 금지 — engine은 flows를 import하지 않는다. 단 타입 패키지 `@lemoncloud/eureka-flows-api`는 공용)
 
 ### P0-2. 파일 이동 인벤토리
 
-| 원본 | 대상 | 처리 |
-|---|---|---|
-| `libs/flows/src/workspace/diff.ts` | `libs/engine/src/persistence/diff.ts` | 그대로 (pure) |
-| `libs/flows/src/workspace/snapshot.ts` | `libs/engine/src/persistence/snapshot.ts` | 그대로 (transformNodes 의존은 같이 이동) |
-| `libs/flows/src/workspace/flowJson.ts` | `libs/engine/src/persistence/flowJson.ts` | 그대로 (pure) |
-| `libs/flows/src/utils/transformNodes.ts` | `libs/engine/src/persistence/transformNodes.ts` | 그대로 |
-| `libs/flows/src/utils/nodeHeight.ts` | `libs/engine/src/persistence/nodeHeight.ts` | transformNodes 의존성 — DOM 미사용 확인 후 이동 |
-| `libs/flows/src/utils/graphId.ts` | `libs/engine/src/core/ids.ts` | 그대로 + **주석 전체 보존** (불변식 6). `crypto` → `globalThis.crypto` |
-| `apps/web/.../flows/utils/graph.ts` (`wouldCreateCycle`) | `libs/engine/src/core/cycle.ts` | 그대로 (pure) |
-| `apps/web/.../flows/utils/index.ts` 중 `deduplicateEdges`, `getConnectionKey`, `isValidConnection`, `arePortTypesCompatible`, `getPortStyleKey` | `libs/engine/src/core/edges.ts` | DOM 무관 함수만 추출 이동. 파일/이미지/업로드 관련 함수는 잔류 |
-| `libs/flows/src/types/index.ts` 중 `BlockDefinitionWithFrontend`, `NodeState`, `isNodeState` 등 그래프 코어 타입 | `libs/engine/src/types.ts` | 이동 후 flows에서 re-export |
+| 원본                                                                                                                                            | 대상                                            | 처리                                                                   |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
+| `libs/flows/src/workspace/diff.ts`                                                                                                              | `libs/engine/src/persistence/diff.ts`           | 그대로 (pure)                                                          |
+| `libs/flows/src/workspace/snapshot.ts`                                                                                                          | `libs/engine/src/persistence/snapshot.ts`       | 그대로 (transformNodes 의존은 같이 이동)                               |
+| `libs/flows/src/workspace/flowJson.ts`                                                                                                          | `libs/engine/src/persistence/flowJson.ts`       | 그대로 (pure)                                                          |
+| `libs/flows/src/utils/transformNodes.ts`                                                                                                        | `libs/engine/src/persistence/transformNodes.ts` | 그대로                                                                 |
+| `libs/flows/src/utils/nodeHeight.ts`                                                                                                            | `libs/engine/src/persistence/nodeHeight.ts`     | transformNodes 의존성 — DOM 미사용 확인 후 이동                        |
+| `libs/flows/src/utils/graphId.ts`                                                                                                               | `libs/engine/src/core/ids.ts`                   | 그대로 + **주석 전체 보존** (불변식 6). `crypto` → `globalThis.crypto` |
+| `apps/web/.../flows/utils/graph.ts` (`wouldCreateCycle`)                                                                                        | `libs/engine/src/core/cycle.ts`                 | 그대로 (pure)                                                          |
+| `apps/web/.../flows/utils/index.ts` 중 `deduplicateEdges`, `getConnectionKey`, `isValidConnection`, `arePortTypesCompatible`, `getPortStyleKey` | `libs/engine/src/core/edges.ts`                 | DOM 무관 함수만 추출 이동. 파일/이미지/업로드 관련 함수는 잔류         |
+| `libs/flows/src/types/index.ts` 중 `BlockDefinitionWithFrontend`, `NodeState`, `isNodeState` 등 그래프 코어 타입                                | `libs/engine/src/types.ts`                      | 이동 후 flows에서 re-export                                            |
 
 각 원위치에는 re-export shim (`export * from '@flows/engine/...'` 형태가 아니라 배럴 경유: `export { ... } from '@flows/engine';`) — 호출부 무변경.
 
@@ -146,7 +151,24 @@ yarn lint                                   # 클린
 ```
 
 - `libs/engine/src/**`에 `react`/`react-dom`/`zustand`/`@flows/flows` import 0건 (`grep -r` 확인)
-- 웹앱 수동 스모크: 로드 → 편집 → 저장 → dirty 표시 동작 동일
+- ~~웹앱 수동 스모크: 로드 → 편집 → 저장 → dirty 표시 동작 동일~~ — **미실행 (남은 항목)**.
+  `apps/web/.env`가 실 DEV 백엔드(`api.eureka.codes/flw-d1`)를 가리켜 로그인 자격이 필요하고,
+  save가 실제 flow를 건드린다. 대신 확인한 것: `nx build web` green (실 CI 게이트인 prod 빌드),
+  vite dev server에서 `@flows/engine` 및 소비 모듈 트랜스폼 200/에러 0, jsdom 174 스펙 green —
+  **모듈 해석은 3개 모드(prod·dev·test) 전부 검증됨**. 남은 건 UI 거동 육안 확인뿐.
+
+> **선행 결함 (Phase 0 밖).** `npx tsc -b apps/web/tsconfig.app.json`은 이 작업 **전부터** red다
+> (HEAD 기준 1200 errors). 두 원인 모두 engine과 무관:
+>
+> 1. `@lemoncloud/eureka-flows-api@0.26.609`에 `Connection` export가 없다 (패키지 dist 전체에 0건).
+>    `useCanvasStore`·`types/index.ts` 등 레포 전역이 이 타입을 쓴다 → TS2305 12건.
+> 2. `theme`/`ui-kit`/`web-core`/`shared`/`policy`의 `tsconfig.lib.json`이 `module: nodenext`인데
+>    `include`가 `src/**/*.ts`뿐이라 `.tsx`가 빠지고 확장자 없는 상대 import가 전부 에러 → TS2834/2835 135건.
+>
+> 두 결함 때문에 **모든 lib이 `.d.ts`를 emit하지 못하고**(`noEmitOnError: true`) 나머지 ~1050건은
+> 그 TS6305/implicit-any 캐스케이드다. Phase 0 전후 **코드별 에러 수 동일**(TS2305 12→12 등),
+> 늘어난 29줄은 전부 engine이 같은 이유로 emit 못 해서 생긴 캐스케이드다. 새 root-cause 0건.
+> 별건으로 처리할 것 — 고치면 1200건이 한 번에 사라진다.
 
 ---
 
@@ -188,20 +210,20 @@ libs/engine/src/
 
 ### P1-3. WorkflowCanvas 치환 매핑
 
-| 현재 (WorkflowCanvas.tsx) | 대체 |
-|---|---|
-| `saveCheckpoint()` + `setNodes`/`setConnections` 조합 | `engine.transact(label, ops => ...)` |
-| `undo`/`redo` (pastRef/futureRef) | `engine.undo()` / `engine.redo()` — ref는 삭제 |
-| ref `addNode(type, position)` | `transact('node:add', ...)` |
-| `duplicateNode` | `transact('node:duplicate', ...)` (내부적으로 copy/paste 재사용) |
-| keydown Ctrl+C / Ctrl+V (`clipboard` local state) | `engine.copy(selectedIds)` / `engine.paste(payload, {x:40,y:40})` — local state 삭제 |
-| Delete/Backspace (노드+부속엣지 / 엣지) | `transact('selection:delete', ops.removeNodes / ops.disconnect)` |
-| 연결 생성 (connectionDraft 완료 시) | `transact('edge:connect', ops.connect)` — 검증 실패 throw는 토스트로 |
-| ref `updateNode` (socket 상태 갱신용) | `engine.applyRuntime` |
-| ref `updateNodeFromServer` | `engine.applyRuntime` (force 옵션 로직은 호출부 유지) |
-| ref `loadWorkflow` / `clearWorkflow` / `newWorkflow` | `engine.loadGraph` / `engine.reset` (포트 데이터 fetch 등 부수 작업은 호출부 잔류) |
-| `onChange` → auto-save/draft 트리거 | `engine.subscribe(e => e.type === 'graph:changed' && onChange())` |
-| 드래그 종료 (위치 확정) | `transact('node:move', ops.updateNode)` — 드래그 **중** 프리뷰는 UI 로컬, 확정만 커밋 |
+| 현재 (WorkflowCanvas.tsx)                             | 대체                                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `saveCheckpoint()` + `setNodes`/`setConnections` 조합 | `engine.transact(label, ops => ...)`                                                  |
+| `undo`/`redo` (pastRef/futureRef)                     | `engine.undo()` / `engine.redo()` — ref는 삭제                                        |
+| ref `addNode(type, position)`                         | `transact('node:add', ...)`                                                           |
+| `duplicateNode`                                       | `transact('node:duplicate', ...)` (내부적으로 copy/paste 재사용)                      |
+| keydown Ctrl+C / Ctrl+V (`clipboard` local state)     | `engine.copy(selectedIds)` / `engine.paste(payload, {x:40,y:40})` — local state 삭제  |
+| Delete/Backspace (노드+부속엣지 / 엣지)               | `transact('selection:delete', ops.removeNodes / ops.disconnect)`                      |
+| 연결 생성 (connectionDraft 완료 시)                   | `transact('edge:connect', ops.connect)` — 검증 실패 throw는 토스트로                  |
+| ref `updateNode` (socket 상태 갱신용)                 | `engine.applyRuntime`                                                                 |
+| ref `updateNodeFromServer`                            | `engine.applyRuntime` (force 옵션 로직은 호출부 유지)                                 |
+| ref `loadWorkflow` / `clearWorkflow` / `newWorkflow`  | `engine.loadGraph` / `engine.reset` (포트 데이터 fetch 등 부수 작업은 호출부 잔류)    |
+| `onChange` → auto-save/draft 트리거                   | `engine.subscribe(e => e.type === 'graph:changed' && onChange())`                     |
+| 드래그 종료 (위치 확정)                               | `transact('node:move', ops.updateNode)` — 드래그 **중** 프리뷰는 UI 로컬, 확정만 커밋 |
 
 권한: 각 UI 콜백의 기존 `permissions.canModifyCanvas` 체크는 그 자리에 유지 (D3).
 
@@ -241,11 +263,12 @@ yarn lint
 
 ## 6. 진행 체크리스트
 
-- [ ] P0-1 lib 스캐폴딩 (`@flows/engine`)
-- [ ] P0-2 파일 이동 + shim
-- [ ] P0-3 스토어 결합 제거 (baseline/draft/runGate)
-- [ ] P0-4 이식 검증 테스트
-- [ ] Phase 0 완료 조건 전부 green
+- [x] P0-1 lib 스캐폴딩 (`@flows/engine`)
+- [x] P0-2 파일 이동 + shim
+- [x] P0-3 스토어 결합 제거 (baseline/draft/runGate)
+- [x] P0-4 이식 검증 테스트
+- [x] Phase 0 완료 조건 — `nx test engine` / `nx test flows` / `nx test web` / `yarn lint` / `nx build web` green.
+      `tsc -b`는 **HEAD에서 이미 red** (1200 errors, 새 root-cause 0건), 웹앱 수동 스모크는 미실행: §3 참조.
 - [ ] P1-1 코어 (document/ops/history/clipboard/engine)
 - [ ] P1-2 미러 모드 바인딩
 - [ ] P1-3 WorkflowCanvas 치환
