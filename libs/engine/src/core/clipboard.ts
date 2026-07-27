@@ -1,7 +1,7 @@
 import { newEdgeId, newNodeId } from './ids';
 
 import type { GraphSnapshot } from './document';
-import type { GraphNode } from '../types';
+import type { GraphEdge, GraphNode } from '../types';
 import type { EdgeData, NodeData, Position } from '@lemoncloud/eureka-flows-api';
 
 /**
@@ -69,7 +69,7 @@ export const pasteNodes = (payload: ClipboardPayload, offset: Position = NO_OFFS
             }) as GraphNode
     );
 
-    const edges = payload.edges.flatMap<EdgeData>(edge => {
+    const edges = payload.edges.flatMap<GraphEdge>(edge => {
         const sourceNodeId = idMap.get(edge.sourceNodeId);
         const targetNodeId = idMap.get(edge.targetNodeId);
         // Both ends were checked at copy time; this also holds a hand-built payload to it.

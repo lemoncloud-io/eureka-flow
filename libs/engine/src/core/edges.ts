@@ -1,3 +1,6 @@
+import { newEdgeId } from './ids';
+
+import type { GraphEdge } from '../types';
 import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
 /** Valid port style keys matching CSS variables (--port-type-*) */
@@ -35,8 +38,8 @@ export const getConnectionKey = (conn: EdgeData): string =>
  * it — but flows saved before that can carry two edges for one connection, so loaded
  * data still needs this.
  */
-export const deduplicateEdges = (edges: EdgeData[]): EdgeData[] => {
-    const edgeMap = new Map<string, EdgeData>();
+export const deduplicateEdges = (edges: EdgeData[]): GraphEdge[] => {
+    const edgeMap = new Map<string, GraphEdge>();
     const seenIds = new Set<string>();
 
     edges.forEach(edge => {
@@ -50,8 +53,12 @@ export const deduplicateEdges = (edges: EdgeData[]): EdgeData[] => {
             return;
         }
 
-        edgeMap.set(key, edge);
-        if (edge.id) seenIds.add(edge.id);
+        // An edge with no id cannot be selected or deleted. Minting one here — the pass
+        // every loaded edge goes through — is where the guarantee is established, matching
+        // what `normalize` does for nodes.
+        const identified: GraphEdge = edge.id ? (edge as GraphEdge) : { ...edge, id: newEdgeId() };
+        edgeMap.set(key, identified);
+        seenIds.add(identified.id);
     });
 
     return Array.from(edgeMap.values());

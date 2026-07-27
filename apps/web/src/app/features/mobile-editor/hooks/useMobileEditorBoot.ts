@@ -30,7 +30,7 @@ export const useMobileEditorBoot = (): UseMobileEditorBootReturn => {
     const { loadBlocks } = useBlocks();
     const { initializeFlow, loadFlowById } = useFlows();
     const recoverDraft = useDraftRecovery();
-    const { apiKey, setApiKey } = useWebCoreStore();
+    const { setApiKey } = useWebCoreStore();
 
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('');

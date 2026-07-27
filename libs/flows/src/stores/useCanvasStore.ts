@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
 import type { EdgeView, RunContext, RunPortUpdate, TraceEntry } from '../types';
-import type { GraphLike, GraphNode } from '@flows/engine';
+import type { GraphEdge, GraphLike, GraphNode } from '@flows/engine';
 import type { DataPacket, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 import type { StateCreator } from 'zustand';
 
@@ -56,7 +56,7 @@ export interface Tooltip {
 interface CanvasState {
     // Core Data
     nodes: GraphNode[];
-    connections: EdgeData[];
+    connections: GraphEdge[];
 
     // Flow Context
     flowId: string | null;
@@ -100,7 +100,7 @@ interface CanvasState {
 
     // Actions - Core Data
     setNodes: (nodes: GraphNode[] | ((prev: GraphNode[]) => GraphNode[])) => void;
-    setConnections: (connections: EdgeData[] | ((prev: EdgeData[]) => EdgeData[])) => void;
+    setConnections: (connections: GraphEdge[] | ((prev: GraphEdge[]) => GraphEdge[])) => void;
     setFlowId: (flowId: string | null) => void;
     setClipboard: (node: GraphNode | null) => void;
 
@@ -165,7 +165,7 @@ interface CanvasState {
     deleteNode: (nodeId: string) => void;
 
     // Connection Actions
-    addConnection: (connection: EdgeData) => void;
+    addConnection: (connection: GraphEdge) => void;
     updateConnection: (connectionId: string, updates: Partial<EdgeData>) => void;
     deleteConnection: (connectionId: string) => void;
 }
@@ -376,7 +376,7 @@ export const canvasStateCreator: StateCreator<CanvasState> = (set, _get) => ({
             // second id for something the engine may already have minted one for would
             // put the same node on screen twice.
             nodes: nodes.filter((node): node is GraphNode => !!node.id),
-            connections: connections as EdgeData[],
+            connections: connections.filter((edge): edge is GraphEdge => !!edge.id),
             flowId: flowId || null,
             selectedNodeId: null,
             selectedConnectionId: null,

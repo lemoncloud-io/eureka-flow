@@ -16,7 +16,7 @@ import {
     Switch,
 } from '@flows/ui-kit';
 
-import type { EdgeData, GraphNode, Position, TouchNodeBody } from '@flows/flows';
+import type { GraphEdge, GraphNode, Position, TouchNodeBody } from '@flows/flows';
 
 /** Server-model fields on a node that the wire type does not describe. */
 interface TouchNodeExtras {
@@ -38,7 +38,7 @@ interface TouchDialogProps {
      */
     initialNode?: (GraphNode & Partial<TouchNodeExtras>) | null;
     /** Initial connection/edge data. `position` is on the server's edge model, not the wire type. */
-    initialConnection?: (EdgeData & { position?: Position }) | null;
+    initialConnection?: (GraphEdge & { position?: Position }) | null;
     onSuccess: (message: string) => void;
     onError: (error: string) => void;
 }

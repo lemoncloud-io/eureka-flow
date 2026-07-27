@@ -15,8 +15,7 @@ import {
 import { markConnectionNew } from './useRecentConnections';
 import { arePortTypesCompatible, wouldCreateCycle } from '../../flows/utils';
 
-import type { BlockDefinitionWithFrontend } from '@flows/flows';
-import type { EdgeData } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinitionWithFrontend, GraphEdge } from '@flows/flows';
 
 /** 'output' = connecting FROM this port's output, 'input' = connecting TO this port's input */
 export type ConnectionDirection = 'output' | 'input';
@@ -190,7 +189,7 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
             }
 
             const edgeId = newEdgeId();
-            const newConnection: EdgeData = {
+            const newConnection: GraphEdge = {
                 id: edgeId,
                 sourceNodeId: srcNodeId,
                 sourcePortId: srcPortId,
@@ -247,7 +246,7 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
             }
 
             const edgeId = newEdgeId();
-            const newConnection: EdgeData = {
+            const newConnection: GraphEdge = {
                 id: edgeId,
                 sourceNodeId,
                 sourcePortId,

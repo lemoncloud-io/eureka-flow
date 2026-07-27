@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { FileText, LayoutGrid } from 'lucide-react';
 
 import { LottieConfetti } from '../components/tour-visuals/LottieConfetti';

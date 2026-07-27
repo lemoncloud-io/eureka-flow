@@ -6,30 +6,29 @@ import { cn } from '@flows/lib/utils';
 import { Button, Card, CardContent } from '@flows/ui-kit';
 
 import type { Item, NextAction, NextActionReason } from '@flows/flows';
+import type { LucideIcon } from 'lucide-react';
 
-const REASON_CONFIG: Record<
-    NextActionReason,
-    { icon: React.ElementType; labelKey: string; fallback: string; color: string }
-> = {
-    unresolved_notes: {
-        icon: AlertCircle,
-        labelKey: 'navigator.unresolvedNotes',
-        fallback: 'Unresolved request',
-        color: 'text-orange-500 dark:text-orange-400',
-    },
-    doing: {
-        icon: Play,
-        labelKey: 'navigator.inProgress',
-        fallback: 'In progress',
-        color: 'text-blue-500 dark:text-blue-400',
-    },
-    next_todo: {
-        icon: ArrowRight,
-        labelKey: 'navigator.nextAction',
-        fallback: 'Next action',
-        color: 'text-primary',
-    },
-};
+const REASON_CONFIG: Record<NextActionReason, { icon: LucideIcon; labelKey: string; fallback: string; color: string }> =
+    {
+        unresolved_notes: {
+            icon: AlertCircle,
+            labelKey: 'navigator.unresolvedNotes',
+            fallback: 'Unresolved request',
+            color: 'text-orange-500 dark:text-orange-400',
+        },
+        doing: {
+            icon: Play,
+            labelKey: 'navigator.inProgress',
+            fallback: 'In progress',
+            color: 'text-blue-500 dark:text-blue-400',
+        },
+        next_todo: {
+            icon: ArrowRight,
+            labelKey: 'navigator.nextAction',
+            fallback: 'Next action',
+            color: 'text-primary',
+        },
+    };
 
 interface NextActionCTAProps {
     item: Item;

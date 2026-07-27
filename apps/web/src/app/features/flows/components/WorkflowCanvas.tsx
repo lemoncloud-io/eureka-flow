@@ -55,7 +55,7 @@ import {
 } from '../utils';
 
 import type { ClipboardPayload, FlowEngine } from '@flows/engine';
-import type { FlowRole, GraphNode, LoadFlowPortData, NodeState } from '@flows/flows';
+import type { FlowRole, GraphNode, GraphSnapshot, LoadFlowPortData, NodeState } from '@flows/flows';
 import type { DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 const PORT_HIGHLIGHT_MS = 300;
@@ -80,7 +80,7 @@ interface WorkflowStateWithLegacyEdges extends WorkflowState {
 
 export interface WorkflowCanvasRef {
     addNode: (type: string, position?: { x: number; y: number }) => void;
-    getWorkflow: () => WorkflowState;
+    getWorkflow: () => GraphSnapshot;
     /** Load workflow from server data. Fetches missing port data (data: null) via API. */
     loadWorkflow: (state: WorkflowStateWithPorts) => Promise<void>;
     clearWorkflow: () => void;
@@ -171,7 +171,7 @@ const TOUCH_PORT_LAYOUT = {
 const findClosestInputPort = (
     worldPos: { x: number; y: number },
     nodes: GraphNode[],
-    blockRegistry: Record<string, { inputs: Array<{ id: string; type: string }> }>,
+    blockRegistry: Record<string, { inputs: Array<{ id: string; type?: string }> }>,
     sourceNodeId: string
 ): { nodeId: string; portId: string; portType: string; distance: number } | null => {
     let closestPort: { nodeId: string; portId: string; portType: string; distance: number } | null = null;
@@ -198,7 +198,7 @@ const findClosestInputPort = (
                 closestPort = {
                     nodeId: node.id,
                     portId: input.id,
-                    portType: input.type,
+                    portType: input.type ?? 'any',
                     distance,
                 };
             }
@@ -1155,7 +1155,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     .filter(c => c.targetNodeId === nodeId)
                     // Normalize: hydrateInputsFromUpstream re-filters by exact targetNodeId
                     .map(c => (c.targetNodeId === nodeId ? c : { ...c, targetNodeId: nodeId }));
-                const hydratedInputs = hydrateInputsFromUpstream(nodeId, incomingConnections, nodesRef.current, inputs);
+                const hydratedInputs = hydrateInputsFromUpstream(
+                    nodeId,
+                    incomingConnections,
+                    nodesRef.current,
+                    inputs ?? {}
+                );
 
                 const missingInputs = nodeDef.inputs.filter(inputPort => {
                     if (hydratedInputs[inputPort.id]) return false;
@@ -1401,7 +1406,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             const current = engine.getGraph().nodes.find(n => n.id === nodeId);
             engine.transact('node:config', ops =>
-                ops.updateNode(nodeId, { config: { ...(current?.config || {}), [key]: value } })
+                // `config` is typed Record<string, string> but holds whatever a control
+                // produces — booleans from switches, numbers from steppers. Coercing here
+                // would change what is stored and what every reader gets back, so the
+                // mismatch is named rather than papered over.
+                ops.updateNode(nodeId, {
+                    config: { ...(current?.config || {}), [key]: value } as NodeData['config'],
+                })
             );
         };
 

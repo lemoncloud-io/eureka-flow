@@ -143,9 +143,6 @@ const BlockDetail = ({ block }: BlockDetailProps) => {
                                         </span>
                                         <span className="text-xs text-muted-foreground">{config.type}</span>
                                     </div>
-                                    {config.description && (
-                                        <p className="text-xs text-muted-foreground mt-1">{config.description}</p>
-                                    )}
                                 </div>
                             )
                         )}

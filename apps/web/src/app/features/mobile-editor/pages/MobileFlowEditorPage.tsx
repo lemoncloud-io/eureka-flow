@@ -105,16 +105,8 @@ export const MobileFlowEditorPage = () => {
     const stepNav = useStepNavigation();
 
     // Hooks
-    const {
-        isAppReady,
-        loadingText,
-        bootError,
-        isApiKeyDialogOpen,
-        setIsApiKeyDialogOpen,
-        handleApiKeySubmit,
-        reBoot,
-        updateUrl,
-    } = useMobileEditorBoot();
+    const { isAppReady, bootError, isApiKeyDialogOpen, setIsApiKeyDialogOpen, handleApiKeySubmit, reBoot, updateUrl } =
+        useMobileEditorBoot();
 
     useMobileAutoSave({
         isAppReady,
@@ -555,7 +547,7 @@ export const MobileFlowEditorPage = () => {
                     replayState={socketRecorder.replayState}
                     onToggleRecording={socketRecorder.toggleRecording}
                     onClear={socketRecorder.clear}
-                    onReplay={msg => replayMessage(msg.raw)}
+                    onReplay={msg => replayMessage(msg)}
                     onReplayFromIndex={fromIndex => {
                         resetAllNodesToIdle();
                         socketRecorder.startReplayFromIndex(fromIndex, replayMessage);

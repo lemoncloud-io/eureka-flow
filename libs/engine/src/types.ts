@@ -1,4 +1,4 @@
-import type { BlockDefinition, DataPacket, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinition, DataPacket, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
 // ============================================================================
 // Node Execution State (state field - replacing status)
@@ -104,6 +104,14 @@ export interface BlockDefinitionWithFrontend extends BlockDefinition {
  * so the guarantee holds by construction rather than by hope.
  */
 export type GraphNode = NodeData & { id: string };
+
+/**
+ * An edge as the graph holds it.
+ *
+ * Same reasoning as `GraphNode`: an edge with no id cannot be selected or deleted, and
+ * `connect` mints one. `loadGraph` fills in any that are missing.
+ */
+export type GraphEdge = EdgeData & { id: string };
 
 declare module '@lemoncloud/eureka-flows-api' {
     interface NodeData {

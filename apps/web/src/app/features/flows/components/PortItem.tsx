@@ -12,9 +12,10 @@ import { arePortTypesCompatible, getPortStyleKey } from '../utils';
 
 import type { ConnectionDraftInfo } from '../utils';
 import type { DataPacket, PortDefinition } from '@flows/flows';
+import type { LucideIcon } from 'lucide-react';
 
 /** Get icon component for port type. An undeclared type is `any`, as elsewhere. */
-export const getPortTypeIcon = (portType = 'any'): React.ElementType | null => {
+export const getPortTypeIcon = (portType = 'any'): LucideIcon | null => {
     switch (portType.toLowerCase()) {
         case 'text':
         case 'string':
@@ -212,7 +213,6 @@ export const PortItem: React.FC<PortItemProps> = ({
     const hasRichContent =
         portData &&
         (portData.type === 'json' ||
-            portData.type === 'markdown' ||
             (portData.value !== null && typeof portData.value === 'object') ||
             isMarkdownContent(portData.value));
 

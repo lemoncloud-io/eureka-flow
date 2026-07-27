@@ -40,7 +40,6 @@ import {
 import { getVisiblePorts } from '../utils';
 
 import type { ConnectionDraftInfo } from '../utils';
-import type { ConfigValue } from './visualizations';
 import type { GraphNode, NodeState } from '@flows/flows';
 
 export interface NodePortHandlers {
@@ -63,7 +62,7 @@ export interface NodePortHandlers {
 }
 
 export interface NodeConfigHandlers {
-    onConfigChange: (key: string, value: ConfigValue) => void;
+    onConfigChange: (key: string, value: unknown) => void;
     onLabelChange: (label: string) => void;
     onToggleAuto: () => void;
 }
@@ -136,6 +135,9 @@ const getStatusStyles = (state: NodeState | undefined, isSelected: boolean, isFr
 };
 
 /** Duration badge auto-hide timing (ms) */
+/** Deploy phases after which there is no progress left to show. */
+const PRODUCT_TERMINAL_STATES = new Set(['done', 'error']);
+
 const DURATION_BADGE_VISIBLE_MS = 1000;
 const DURATION_BADGE_FADE_MS = 500;
 
@@ -238,11 +240,19 @@ export const NodeBlock = memo<NodeBlockProps>(
 
         // Memoize visible ports to avoid recalculating on every render
         const visibleInputPorts = useMemo(
-            () => getVisiblePorts(definition?.inputs ?? [], connectedPortIds, connectionDraft, node.id, 'input'),
+            () =>
+                getVisiblePorts(definition?.inputs ?? [], connectedPortIds, connectionDraft ?? null, node.id, 'input'),
             [definition?.inputs, connectedPortIds, connectionDraft, node.id]
         );
         const visibleOutputPorts = useMemo(
-            () => getVisiblePorts(definition?.outputs ?? [], connectedPortIds, connectionDraft, node.id, 'output'),
+            () =>
+                getVisiblePorts(
+                    definition?.outputs ?? [],
+                    connectedPortIds,
+                    connectionDraft ?? null,
+                    node.id,
+                    'output'
+                ),
             [definition?.outputs, connectedPortIds, connectionDraft, node.id]
         );
 
@@ -319,7 +329,7 @@ export const NodeBlock = memo<NodeBlockProps>(
         useEffect(() => {
             if (nodeState === 'RUNNING') {
                 setDurationBadgePhase('visible');
-                return;
+                return undefined;
             }
 
             if (nodeState === 'COMPLETED' || nodeState === 'ERROR') {
@@ -336,6 +346,7 @@ export const NodeBlock = memo<NodeBlockProps>(
             }
 
             setDurationBadgePhase('hidden');
+            return undefined;
         }, [nodeState]);
 
         // Resize state
@@ -505,7 +516,7 @@ export const NodeBlock = memo<NodeBlockProps>(
                                     <BlockIcon
                                         icon={definition?.icon}
                                         size={16}
-                                        fallback={<StatusIcon state={nodeState} />}
+                                        fallback={<StatusIcon state={nodeState ?? 'IDLE'} />}
                                     />
                                 )}
                             </button>
@@ -526,7 +537,7 @@ export const NodeBlock = memo<NodeBlockProps>(
 
                     {/* Compact Actions */}
                     <div className="flex items-center gap-0.5 shrink-0">
-                        {productProgress && !productProgress.isTerminal && (
+                        {productProgress && !PRODUCT_TERMINAL_STATES.has(productProgress.state) && (
                             <span
                                 className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-primary"
                                 title={`${productProgress.state} • ${productProgress.productId}`}

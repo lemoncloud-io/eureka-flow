@@ -1,5 +1,4 @@
-import type { GraphNode } from '../types';
-import type { EdgeData } from '@lemoncloud/eureka-flows-api';
+import type { GraphEdge, GraphNode } from '../types';
 
 /**
  * What the engine tells the outside world.
@@ -19,7 +18,7 @@ export type EngineListener = (event: EngineEvent) => void;
 /** The graph as history keeps it — a deep copy, detached from the live arrays. */
 export interface GraphSnapshot {
     nodes: GraphNode[];
-    edges: EdgeData[];
+    edges: GraphEdge[];
 }
 
 /**
@@ -31,7 +30,7 @@ export interface GraphSnapshot {
 export interface FlowDocument {
     /** The live arrays. Read them; never mutate them — `replace` is the only writer. */
     nodes: () => GraphNode[];
-    edges: () => EdgeData[];
+    edges: () => GraphEdge[];
     /** A detached deep copy — what history stores and what `getGraph` hands out. */
     snapshot: () => GraphSnapshot;
     replace: (next: GraphSnapshot) => void;
@@ -41,7 +40,7 @@ export interface FlowDocument {
 
 export const createDocument = (): FlowDocument => {
     let nodes: GraphNode[] = [];
-    let edges: EdgeData[] = [];
+    let edges: GraphEdge[] = [];
     const listeners = new Set<EngineListener>();
 
     return {

@@ -47,7 +47,7 @@ export const MobileBlockLibrarySheet = ({
     );
 
     const handleAddBlock = (block: BlockDefinitionWithFrontend) => {
-        onAddBlock(block.id);
+        onAddBlock(block.type);
         onOpenChange(false);
         setSearchQuery('');
     };

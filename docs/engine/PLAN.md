@@ -505,10 +505,27 @@ React lib 5개에 `jsx: "react-jsx"`와 `src/**/*.tsx` include를 추가했다
 
 결과: `tsc -b --force` **1073 → 863**. `policy`/`theme`/`web-core`/`engine`이 선언을 생성한다.
 
-**남은 것 (별건, 사용자 판단 필요).** `ui-kit` 4 · `flows` 13 · `socket` 17 · `shared` 19 =
-53건의 진짜 소스 타입 결함이 각 lib의 emit을 막고 있고, 그게 남은 TS6305 352건의 원인이다.
-그 외 implicit-any(TS7006) 341건은 **339건이 `apps/web`** — 앱 자체 부채로 별도 작업.
-엔진 마이그레이션과 무관하므로 여기서 멈춘다.
+**결과: `tsc -b --force` 0건.** 1073 → 863(설정) → 0.
+
+남아 있던 53건의 lib 결함과 앱 쪽 전부를 정리했다. 대부분은 한 가지 원인의 반복이었다 —
+**API 패키지의 타입이 서버가 실제로 보내는 것보다 좁거나 틀렸고, 앱은 캐스팅으로 우회해 왔다.**
+
+- `NodeData.id`/`EdgeData.id`가 wire에서는 optional(`''`이 "생성" 신호)이지만 문서 안에서는
+  아니다 — 선택도 연결도 삭제도 id로 한다. `GraphNode`/`GraphEdge`가 이걸 말하고,
+  `normalize`/`deduplicateEdges`가 들어오는 길목에서 보장을 세운다. 이 하나로 ~120건 해소.
+- `DataPacket.type`은 union인데 wire는 문자열을 보낸다 → `toDataPacket`으로 한 곳에서 narrow.
+- React 19 변경: `JSX` 전역 제거, `useRef` 0-arg 오버로드 제거, `ElementType`의 `className`이
+  `never`로 추론(→ `LucideIcon`).
+
+**이 과정에서 드러난 "항상 undefined였던" 버그 4건** (설정이 가려서 아무도 몰랐다):
+
+1. `blockDef.config$$` — 모바일 config 필드. 블럭에도 노드에도 없는 필드라 항상 undefined였고,
+   그래서 블럭의 **필드 정의** 대신 노드의 저장된 key/val이 렌더되고 있었다. → `configSchema`
+2. `blockDef.output$` — 데스크톱·모바일 양쪽의 "비terminal 노드의 input 포트는 스킵" 가드.
+   필드명이 `outputs`라 가드가 한 번도 발동한 적 없다.
+3. `productProgress.isTerminal` — 배포 진행 배지. 존재하지 않는 필드라 완료된 배포에도 계속 떴다.
+4. `packet.type === 'markdown'` 4곳 — `markdown`은 서버의 포트 타입 5종에 없다. 항상 false였고,
+   실제 판정은 `isMarkdownContent` 내용 검사가 하고 있었다.
 
 ## 9. 진행 체크리스트
 

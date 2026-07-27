@@ -11,5 +11,5 @@ export interface VisualizationProps {
 
 export interface EditableVisualizationProps {
     node: GraphNode;
-    onConfigChange: (key: string, value: ConfigValue) => void;
+    onConfigChange: (key: string, value: unknown) => void;
 }

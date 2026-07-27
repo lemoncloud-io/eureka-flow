@@ -11,7 +11,15 @@ import {
     rollbackNodeCursor,
     rollbackPortCursor,
 } from '@flows/engine';
-import { EXECUTE_FUNCTIONS, captureBaseline, getNode, getPortData, translateField, useCanvasStore } from '@flows/flows';
+import {
+    EXECUTE_FUNCTIONS,
+    captureBaseline,
+    getNode,
+    getPortData,
+    toDataPacket,
+    translateField,
+    useCanvasStore,
+} from '@flows/flows';
 
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { ExecutionState } from '@flows/engine';
@@ -222,11 +230,7 @@ export const useSocketHandlers = ({
             try {
                 const portData = await getPortData(portId, direction, { flowId, runId });
                 if (portData?.data) {
-                    const dataPacket = {
-                        value: portData.data.value,
-                        type: portData.data.type,
-                        timestamp: portData.data.timestamp,
-                    };
+                    const dataPacket = toDataPacket(portData.data);
                     const portKey = portData.portId || portName || direction;
                     const updates = isOutputPort
                         ? { outputData: { [portKey]: dataPacket } }

@@ -1,5 +1,4 @@
-import type { GraphNode } from '@flows/flows';
-import type { EdgeData } from '@lemoncloud/eureka-flows-api';
+import type { GraphEdge, GraphNode } from '@flows/flows';
 
 /**
  * Topological sort of nodes using Kahn's algorithm.
@@ -7,7 +6,7 @@ import type { EdgeData } from '@lemoncloud/eureka-flows-api';
  * Tiebreaker: position.y (preserves desktop vertical order).
  * Disconnected nodes are appended at the end.
  */
-export const topologicalSort = (nodes: GraphNode[], connections: EdgeData[]): string[] => {
+export const topologicalSort = (nodes: GraphNode[], connections: GraphEdge[]): string[] => {
     if (nodes.length === 0) return [];
 
     const nodeIds = new Set(nodes.map(n => n.id));

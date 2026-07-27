@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { Eye, FileInput, HelpCircle, Image, RefreshCw, Search, Type } from 'lucide-react';
 
 import { TourStepIcon } from '../components/tour-visuals/TourStepIcon';

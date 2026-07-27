@@ -121,8 +121,8 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ screenX, s
                             </div>
                             {blocks.map(block => (
                                 <button
-                                    key={block.id}
-                                    onClick={() => onSelect(block.id)}
+                                    key={block.type}
+                                    onClick={() => onSelect(block.type)}
                                     className={cn(
                                         'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left',
                                         'hover:bg-accent/50 transition-colors duration-100',

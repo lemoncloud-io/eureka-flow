@@ -86,9 +86,10 @@ export const PreviewVisualization: React.FC<VisualizationProps> = ({ node, defin
             );
         }
 
-        // Markdown type (explicit type OR auto-detected from content)
+        // Detected from content. `markdown` is not one of the port data types the server
+        // defines, so the explicit type check that used to sit here never held.
         const strValue = String(lastInput.value ?? '');
-        if (lastInput.type === 'markdown' || isMarkdownContent(strValue)) {
+        if (isMarkdownContent(strValue)) {
             return (
                 <div className="p-2" onWheel={e => e.stopPropagation()}>
                     <MarkdownViewer content={strValue} maxHeight={maxH} />

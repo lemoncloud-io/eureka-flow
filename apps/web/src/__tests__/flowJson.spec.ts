@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseFlowJson, serializeFlowJson } from '@flows/flows';
 
-import type { FlowJson, GraphNode } from '@flows/flows';
-import type { EdgeData } from '@lemoncloud/eureka-flows-api';
+import type { FlowJson, GraphEdge, GraphNode } from '@flows/flows';
 
 const node = (id: string, config: Record<string, unknown> = {}) =>
     ({ id, type: 'text-input', position: { x: 10, y: 20 }, config }) as unknown as GraphNode;
@@ -15,7 +14,7 @@ const edge = (id: string, source: string, target: string) =>
         targetNodeId: target,
         sourcePortId: 'out',
         targetPortId: 'in',
-    }) as unknown as EdgeData;
+    }) as unknown as GraphEdge;
 
 const graph: FlowJson = {
     nodes: [node('n' + 'a'.repeat(32), { text: 'hello' }), node('n' + 'b'.repeat(32))],

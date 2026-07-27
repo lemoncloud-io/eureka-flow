@@ -60,15 +60,15 @@ import {
     tryParseJson,
 } from '../utils';
 
-import type { BlockDefinition, ConfigField, DataPacket, EdgeData, FlowRole, GraphNode } from '@flows/flows';
+import type { BlockDefinition, ConfigField, DataPacket, FlowRole, GraphEdge, GraphNode } from '@flows/flows';
 
 interface DetailPanelProps {
     /** User role for permission-based UI controls */
     role?: FlowRole;
     selectedNode: GraphNode | null;
-    selectedConnection: EdgeData | null;
+    selectedConnection: GraphEdge | null;
     nodes: GraphNode[];
-    connections: EdgeData[];
+    connections: GraphEdge[];
     onConfigChange: (nodeId: string, key: string, value: unknown) => void;
     onDescriptionChange: (nodeId: string, description: string) => void;
     onLabelChange: (nodeId: string, label: string) => void;
@@ -533,7 +533,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     const blockRegistry = useBlockRegistry();
     const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
     const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
-    const { canEditConfig, canModifyCanvas, canEditStructure, canRun } = getPermissions(role);
+    const { canEditConfig, canModifyCanvas, canRun } = getPermissions(role);
     const [isTouchDialogOpen, setIsTouchDialogOpen] = useState(false);
     const [touchPortId, setTouchPortId] = useState<string | null>(null);
     const [previewContent, setPreviewContent] = useState<{ value: unknown; type?: string } | null>(null);
@@ -619,7 +619,9 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             );
         }
 
-        if (packet.type === 'markdown' || isMarkdownContent(packet.value)) {
+        // `markdown` is not one of the port data types the server defines, so the type
+        // check that used to sit here never held — content detection is what decides.
+        if (isMarkdownContent(packet.value)) {
             return (
                 <div
                     className="relative group bg-muted/10 p-2 rounded-md border border-border/30 mt-1.5"

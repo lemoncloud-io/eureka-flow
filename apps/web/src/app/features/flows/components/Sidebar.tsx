@@ -278,8 +278,8 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                         <div className="grid grid-cols-2 gap-1.5 pt-2.5">
                                                             {blocks.map(block => (
                                                                 <BlockCard
-                                                                    key={block.id}
-                                                                    type={block.id}
+                                                                    key={block.type}
+                                                                    type={block.type}
                                                                     label={
                                                                         translateField(t, block, 'label') || block.type
                                                                     }
@@ -289,7 +289,7 @@ export const Sidebar = forwardRef<SidebarRef, SidebarProps>(({ onAddNode, isLoad
                                                                         'description'
                                                                     )}
                                                                     icon={block.icon}
-                                                                    onAdd={() => handleAddNode(block.id)}
+                                                                    onAdd={() => handleAddNode(block.type)}
                                                                     disabled={isLoading || isReadOnly}
                                                                     inputCount={block.inputs?.length}
                                                                     outputCount={block.outputs?.length}

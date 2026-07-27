@@ -139,7 +139,15 @@ import type {
 // surface it had before the engine existed.
 export { isNodeState } from '@flows/engine';
 
-export type { BlockDefinitionWithFrontend, BlockStereo, GraphLike, GraphNode, NodeState } from '@flows/engine';
+export type {
+    BlockDefinitionWithFrontend,
+    BlockStereo,
+    GraphEdge,
+    GraphLike,
+    GraphNode,
+    GraphSnapshot,
+    NodeState,
+} from '@flows/engine';
 
 /**
  * TraceStage - agent block execution stages for trace messages

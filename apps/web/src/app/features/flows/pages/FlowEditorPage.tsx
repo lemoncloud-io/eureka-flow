@@ -84,7 +84,6 @@ export const FlowEditorPage = () => {
         flowName,
         flowDescription,
         isLoading,
-        isSaving,
         lastSavedAt,
         isAutoSaveEnabled,
         saveStatus,
@@ -182,7 +181,7 @@ export const FlowEditorPage = () => {
         onMessage: handleSocketMessage,
     });
 
-    const { startTourIfFirstVisit, startTour } = useTour();
+    const { startTourIfFirstVisit } = useTour();
 
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('');
@@ -659,6 +658,7 @@ export const FlowEditorPage = () => {
         if (isAppReady && !isPublicMode && !isLoading) {
             return startTourIfFirstVisit();
         }
+        return undefined;
     }, [isAppReady, isPublicMode, isLoading, startTourIfFirstVisit]);
 
     if (!isAppReady) {
@@ -800,7 +800,6 @@ export const FlowEditorPage = () => {
                     onExpandAll: () => canvasRef.current?.expandAll(),
                 }}
                 saveState={{
-                    isSaving,
                     lastSavedAt,
                     isAutoSaveEnabled,
                     onToggleAutoSave: toggleAutoSave,
