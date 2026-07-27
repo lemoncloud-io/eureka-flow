@@ -119,14 +119,25 @@ describe('history', () => {
         expect(engine.canRedo()).toBe(false);
     });
 
-    it('hands out copies, so an undo target cannot be edited from outside', () => {
+    it('hands out its own arrays, and a new one each time', () => {
         const engine = createFlowEngine();
         const id = addNode(engine);
 
         const graph = engine.getGraph();
-        graph.nodes[0].position = at(999, 999);
+        graph.nodes.push({ id: 'intruder' } as never);
+
+        expect(engine.getGraph().nodes.map(n => n.id)).toEqual([id]);
+        // A fresh identity per read is what lets a subscriber tell that something moved.
+        expect(engine.getGraph().nodes).not.toBe(engine.getGraph().nodes);
+    });
+
+    it('keeps history detached from the graph it was taken from', () => {
+        const engine = createFlowEngine();
+        const id = addNode(engine);
+        engine.transact('node:move', ops => ops.updateNode(id, { position: at(200, 200) }));
+
+        engine.undo();
 
         expect(engine.getGraph().nodes[0].position).toEqual(at(0, 0));
-        expect(engine.getGraph().nodes[0].id).toBe(id);
     });
 });

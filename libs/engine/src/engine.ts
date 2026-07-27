@@ -18,6 +18,15 @@ import type { NodeData, Position, WorkflowState } from '@lemoncloud/eureka-flows
  */
 export interface FlowEngine {
     // ── reading / subscribing
+    /**
+     * The graph, in fresh arrays holding the live nodes.
+     *
+     * The arrays are copies, so a caller may sort or filter what it gets and so a
+     * subscriber sees a new identity on every change. The nodes inside are not: every op
+     * builds new objects rather than editing existing ones, and cloning a graph carrying
+     * base64 image config on every read would cost more than the sharing saves. Read them;
+     * do not write to them.
+     */
     getGraph: () => Readonly<WorkflowState>;
     subscribe: (listener: EngineListener) => () => void;
 
@@ -78,7 +87,7 @@ export const createFlowEngine = (options: FlowEngineOptions = {}): FlowEngine =>
     };
 
     return {
-        getGraph: () => doc.snapshot(),
+        getGraph: () => ({ nodes: [...doc.nodes()], edges: [...doc.edges()] }),
 
         subscribe: listener => doc.subscribe(listener),
 

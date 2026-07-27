@@ -244,10 +244,26 @@ npx tsc -b apps/web/tsconfig.app.json
 yarn lint
 ```
 
-- `WorkflowCanvas.tsx`에서 `pastRef`/`futureRef`/`clipboard` useState **삭제됨**
-- 편집 경로에서 `setNodes`/`setConnections` 직접 호출 0건 (읽기/미러는 허용)
+- `WorkflowCanvas.tsx`에서 `pastRef`/`futureRef`/`clipboard` useState **삭제됨** (grep 0건). 복사 페이로드는
+  렌더에 안 쓰이므로 `useRef`로 보관 — state면 Ctrl+C마다 캔버스 전체가 리렌더된다.
+- `setConnections` 0건. `setNodes`는 **2건 잔존** — 드래그 중 프리뷰(마우스/터치) 뿐이고, 이는 PLAN이
+  명시한 "드래그 중 프리뷰는 UI 로컬, 확정만 커밋"이다. 확정은 `commitDrag` → `transact('node:move')`.
 - vitest `environment: 'node'`에서 engine 스펙 전체 green — **이것이 이식성의 조기 증명이다** (jsdom 아님)
-- 웹 수동 스모크: 추가/삭제/연결/드래그/undo/redo/복붙(엣지 포함 확인)/저장/소켓 실행 반영이 기존과 동등
+- ~~웹 수동 스모크~~ — **미실행 (남은 항목)**. Phase 0과 같은 이유(실 DEV 백엔드 + 로그인 자격).
+  대신: prod 빌드 green, vite dev server에서 migrate된 4개 모듈 트랜스폼 200/에러 0, jsdom 174 스펙 green.
+
+### 계약 보강 (구현 중 확정)
+
+- **`createFlowEngine(options)`** — `getBlockRegistry?: () => Record<string, BlockDefinitionWithFrontend>`.
+  §2가 무인자였지만 `INCOMPATIBLE_PORTS`(D5)를 판정하려면 포트 정의가 필요하다. 값이 아니라 **getter**인 이유:
+  registry는 네트워크로 늦게 오므로, 생성 시점 스냅샷으로 잡으면 세션 내내 타입 체크가 꺼진다. 생략 시 그 검사만 skip.
+- **`connect`의 점유된 입력 포트** — 같은 연결이 이미 있으면 `DUPLICATE_EDGE` throw, **다른** 소스가 점유된
+  입력 포트로 오면 기존 엣지를 **교체**(기존 캔버스 동작). 두 케이스를 D5의 한 코드로 뭉뚱그리지 않는다.
+- **`getGraph()`는 얕은 복사** — 배열은 매번 새 것(구독자가 변경을 감지하는 근거), 노드 객체는 공유.
+  엔진 내부가 전부 immutable이라 안전하고, base64 이미지를 든 그래프를 매 이벤트마다 deep clone하면
+  미러가 감당 못 한다. 히스토리 스냅샷만 `structuredClone`.
+- **`paste`는 오프셋을 그대로 더한다** — 그리드 스냅은 UI 정책이라 엔진 밖. 노드 위치는 이미 정렬돼 있으므로
+  그리드 배수 오프셋이면 정렬이 유지된다.
 
 ### 명시적 스펙 변경 (1건)
 
@@ -269,8 +285,9 @@ yarn lint
 - [x] P0-4 이식 검증 테스트
 - [x] Phase 0 완료 조건 — `nx test engine` / `nx test flows` / `nx test web` / `yarn lint` / `nx build web` green.
       `tsc -b`는 **HEAD에서 이미 red** (1200 errors, 새 root-cause 0건), 웹앱 수동 스모크는 미실행: §3 참조.
-- [ ] P1-1 코어 (document/ops/history/clipboard/engine)
-- [ ] P1-2 미러 모드 바인딩
-- [ ] P1-3 WorkflowCanvas 치환
-- [ ] P1-4 코어 테스트
-- [ ] Phase 1 완료 조건 전부 green
+- [x] P1-1 코어 (document/ops/history/clipboard/engine)
+- [x] P1-2 미러 모드 바인딩
+- [x] P1-3 WorkflowCanvas 치환
+- [x] P1-4 코어 테스트 (engine 스펙 83개, `environment: 'node'`)
+- [x] Phase 1 완료 조건 — `nx test engine/flows/web` · `yarn lint` · `nx build web` green.
+      `tsc -b`는 Phase 0과 같은 선행 결함으로 red (총 에러 1142 → **1127로 감소**), 수동 스모크는 미실행.

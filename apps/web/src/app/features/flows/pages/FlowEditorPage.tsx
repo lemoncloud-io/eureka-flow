@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { createFlowEngine } from '@flows/engine';
 import {
     FLOW_FORBIDDEN,
     captureBaseline,
@@ -67,6 +68,17 @@ export const FlowEditorPage = () => {
     const sidebarRef = useRef<SidebarRef>(null);
 
     const { loadBlocks, blockRegistry } = useBlocks();
+
+    /**
+     * The editor's graph, owned here so the page outlives any one canvas mount.
+     *
+     * The registry is read through a getter rather than captured: blocks arrive over the
+     * network, and an engine built with the empty map would skip port-type checks for the
+     * rest of the session.
+     */
+    const blockRegistryRef = useRef(blockRegistry);
+    blockRegistryRef.current = blockRegistry;
+    const engine = useMemo(() => createFlowEngine({ getBlockRegistry: () => blockRegistryRef.current }), []);
     const {
         currentFlowId,
         flowName,
@@ -747,6 +759,7 @@ export const FlowEditorPage = () => {
             <div data-tour="canvas" className="absolute inset-0 editor-grain">
                 <WorkflowCanvas
                     ref={canvasRef}
+                    engine={engine}
                     role={role}
                     flowId={currentFlowId}
                     connectionId={socketConnectionId ?? undefined}
