@@ -171,56 +171,6 @@ export interface SocketResponseTrace<T = unknown> extends SocketResponse<T> {
 
 export type RawSocketMessage = SocketResponseTrace<SocketDataMessage | unknown>;
 
-/**
- * Configuration for WebSocket worker
- */
-export interface WebSocketWorkerConfig {
-    endpoint: string;
-    token: string;
-    authQueryParam?: string;
-    sessionId?: string;
-    channels?: string;
-}
-
-/**
- * Callback function types
- */
-export type MessageCallback<T = BaseWebSocketMessage> = (message: T) => void;
-export type StatusCallback = (status: ConnectionStatus) => void;
-export type ConnectionIdCallback = (id: string, connectionId: string | null) => void;
-export type ErrorCallback = (error: Error) => void;
-
-/**
- * Hook configuration for useWebSocketWorker
- */
-export interface UseWebSocketWorkerConfig<TMessage extends BaseWebSocketMessage> {
-    endpoint: string;
-    tokenProvider?: () => Promise<string | null>;
-    messageParser?: (data: unknown) => TMessage | null;
-    enabled?: boolean;
-    authQueryParam?: string;
-    logPrefix?: string;
-    sessionId?: string;
-    channels?: string;
-}
-
-/**
- * Return type for useWebSocketWorker hook
- */
-export interface UseWebSocketWorkerReturn<TMessage extends BaseWebSocketMessage> {
-    id: string | null;
-    connectionId: string | null;
-    isConnected: boolean;
-    connectionStatus: ConnectionStatus;
-    lastMessage: TMessage | null;
-    reconnectAttempts: number;
-    maxReconnectReached: boolean;
-    connect: () => Promise<void>;
-    disconnect: () => void;
-    reconnect: () => void;
-    send: (data: unknown) => void;
-}
-
 // ============================================================================
 // Parsed frame payloads handed to subscribers
 // ============================================================================
@@ -355,4 +305,54 @@ export interface ProductProgressInfo {
     state: string;
     /** Last few ms-epoch timestamps for ETA computation */
     timestamps: number[];
+}
+
+/**
+ * Configuration for WebSocket worker
+ */
+export interface WebSocketWorkerConfig {
+    endpoint: string;
+    token: string;
+    authQueryParam?: string;
+    sessionId?: string;
+    channels?: string;
+}
+
+/**
+ * Callback function types
+ */
+export type MessageCallback<T = BaseWebSocketMessage> = (message: T) => void;
+export type StatusCallback = (status: ConnectionStatus) => void;
+export type ConnectionIdCallback = (id: string, connectionId: string | null) => void;
+export type ErrorCallback = (error: Error) => void;
+
+/**
+ * Hook configuration for useWebSocketWorker
+ */
+export interface UseWebSocketWorkerConfig<TMessage extends BaseWebSocketMessage> {
+    endpoint: string;
+    tokenProvider?: () => Promise<string | null>;
+    messageParser?: (data: unknown) => TMessage | null;
+    enabled?: boolean;
+    authQueryParam?: string;
+    logPrefix?: string;
+    sessionId?: string;
+    channels?: string;
+}
+
+/**
+ * Return type for useWebSocketWorker hook
+ */
+export interface UseWebSocketWorkerReturn<TMessage extends BaseWebSocketMessage> {
+    id: string | null;
+    connectionId: string | null;
+    isConnected: boolean;
+    connectionStatus: ConnectionStatus;
+    lastMessage: TMessage | null;
+    reconnectAttempts: number;
+    maxReconnectReached: boolean;
+    connect: () => Promise<void>;
+    disconnect: () => void;
+    reconnect: () => void;
+    send: (data: unknown) => void;
 }
