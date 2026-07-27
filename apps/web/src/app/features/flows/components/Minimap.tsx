@@ -5,7 +5,8 @@ import { Map as MapIcon, X } from 'lucide-react';
 import { getEffectiveState, getNodeWidth } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
-import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { GraphNode } from '@flows/flows';
+import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 const MINIMAP_SIZE = 160;
 const WORLD_PADDING = 80;
@@ -23,7 +24,7 @@ const VIEWPORT_STROKE = 'hsl(var(--primary) / 0.6)';
 const CONNECTION_STROKE = 'hsl(var(--muted-foreground) / 0.25)';
 
 interface MinimapProps {
-    nodes: NodeData[];
+    nodes: GraphNode[];
     connections: EdgeData[];
     viewport: { x: number; y: number; zoom: number };
     canvasWidth: number;
@@ -33,7 +34,7 @@ interface MinimapProps {
 
 /** Compute world bounds including both nodes and current viewport */
 const computeBounds = (
-    nodes: NodeData[],
+    nodes: GraphNode[],
     viewport: { x: number; y: number; zoom: number },
     canvasW: number,
     canvasH: number
@@ -170,7 +171,7 @@ export const Minimap = ({
 
     // Node lookup for connection centers
     const nodeMap = useMemo(() => {
-        const map = new Map<string, NodeData>();
+        const map = new Map<string, GraphNode>();
         for (const n of nodes) map.set(n.id, n);
         return map;
     }, [nodes]);

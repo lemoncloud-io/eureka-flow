@@ -11,8 +11,7 @@ import { useWebCoreStore } from '@flows/web-core';
 import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
 
-import type { FlowRole } from '@flows/flows';
-import type { NodeData, NodeState } from '@lemoncloud/eureka-flows-api';
+import type { FlowRole, GraphNode, NodeState } from '@flows/flows';
 
 interface ContentPreviewData {
     type: 'text' | 'image' | 'waiting';
@@ -65,7 +64,7 @@ const CardImagePreview = ({ src }: { src: string }) => {
 };
 
 interface MobileStepCardProps {
-    node: NodeData;
+    node: GraphNode;
     displayName: string;
     onTapCard: (nodeId: string) => void;
     onExpandContent?: (content: { value: unknown; type?: string }) => void;
@@ -151,8 +150,8 @@ export const MobileStepCard = React.memo(
         // Error message — check both error and errorMessage fields
         const errorMessage = useMemo(() => {
             const err =
-                (node as NodeData & { error?: string; errorMessage?: string }).error ||
-                (node as NodeData & { errorMessage?: string }).errorMessage;
+                (node as GraphNode & { error?: string; errorMessage?: string }).error ||
+                (node as GraphNode & { errorMessage?: string }).errorMessage;
             return typeof err === 'string' && err ? err : null;
         }, [node]);
 

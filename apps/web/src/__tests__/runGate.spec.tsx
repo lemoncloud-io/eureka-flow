@@ -6,8 +6,7 @@ import { captureBaseline, runRequirement, useCanvasStore, useFlowsStore } from '
 
 import { useRunGate } from '../app/features/flows/hooks/useRunGate';
 
-import type { BlockDefinitionWithFrontend } from '@flows/flows';
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinitionWithFrontend, GraphNode } from '@flows/flows';
 import type { ReactNode } from 'react';
 
 const postMock = vi.fn();
@@ -35,7 +34,7 @@ const registry = {
 } as unknown as Record<string, BlockDefinitionWithFrontend>;
 
 const node = (id: string, config: Record<string, string> = {}) =>
-    ({ id, type: 'text-input', position: { x: 0, y: 0 }, config }) as NodeData;
+    ({ id, type: 'text-input', position: { x: 0, y: 0 }, config }) as GraphNode;
 
 const asOwner = () => useFlowsStore.setState({ hasOwned: true, isEditable: true });
 const asEditor = () => useFlowsStore.setState({ hasOwned: false, isEditable: true });
@@ -74,7 +73,8 @@ describe('runRequirement', () => {
 
 describe('useRunGate', () => {
     /** The gate reads the live canvas, so put the graph where it will look. */
-    const onCanvas = (nodes: NodeData[]) => useCanvasStore.getState().loadWorkflow({ nodes, connections: [] } as never);
+    const onCanvas = (nodes: GraphNode[]) =>
+        useCanvasStore.getState().loadWorkflow({ nodes, connections: [] } as never);
 
     beforeEach(() => {
         postMock.mockReset();

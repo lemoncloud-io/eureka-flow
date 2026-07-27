@@ -5,8 +5,7 @@ import { toast } from 'sonner';
 
 import { captureBaseline, newNodeId, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 
-import type { NodeState } from '@flows/flows';
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { GraphNode, NodeState } from '@flows/flows';
 
 interface UseMobileFlowActionsParams {
     updateUrl: (flowId: string | null) => void;
@@ -85,7 +84,7 @@ export const useMobileFlowActions = ({
             const posX = nodes[0]?.position?.x ?? 100;
             const posY = nodes.length === 0 ? 100 : minY - 200;
 
-            const newNode: NodeData = {
+            const newNode: GraphNode = {
                 id: nodeId,
                 type,
                 position: { x: posX, y: posY },

@@ -16,14 +16,14 @@ import {
     Switch,
 } from '@flows/ui-kit';
 
-import type { EdgeData, NodeData, TouchNodeBody } from '@flows/flows';
+import type { EdgeData, GraphNode, TouchNodeBody } from '@flows/flows';
 
 interface TouchDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     nodeId: string;
     /** Initial node data to populate form defaults */
-    initialNode?: NodeData | null;
+    initialNode?: GraphNode | null;
     /** Initial connection/edge data to populate form defaults */
     initialConnection?: EdgeData | null;
     onSuccess: (message: string) => void;

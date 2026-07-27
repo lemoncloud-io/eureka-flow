@@ -2,21 +2,21 @@ import { describe, expect, it } from 'vitest';
 
 import { diffSnapshots, emptySnapshot, hasStructuralChange, toSnapshot } from '@flows/flows';
 
-import type { BlockDefinitionWithFrontend } from '@flows/flows';
+import type { BlockDefinitionWithFrontend, GraphNode } from '@flows/flows';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const registry = {
     'text-input': { type: 'text-input', inputs: [], outputs: [] },
 } as unknown as Record<string, BlockDefinitionWithFrontend>;
 
-const node = (id: string, over: Partial<NodeData> = {}): NodeData =>
+const node = (id: string, over: Partial<NodeData> = {}): GraphNode =>
     ({
         id,
         type: 'text-input',
         position: { x: 0, y: 0 },
         config: { value: 'hello' },
         ...over,
-    }) as NodeData;
+    }) as GraphNode;
 
 const edge = (id: string, source = 'a', target = 'b') => ({
     id,
@@ -26,7 +26,7 @@ const edge = (id: string, source = 'a', target = 'b') => ({
     targetPortId: 'in',
 });
 
-const snap = (nodes: NodeData[], edges: ReturnType<typeof edge>[] = []) =>
+const snap = (nodes: GraphNode[], edges: ReturnType<typeof edge>[] = []) =>
     toSnapshot({ nodes, edges } as never, registry);
 
 describe('diffSnapshots', () => {

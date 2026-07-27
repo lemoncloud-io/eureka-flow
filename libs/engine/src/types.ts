@@ -1,4 +1,4 @@
-import type { BlockDefinition, DataPacket } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinition, DataPacket, NodeData } from '@lemoncloud/eureka-flows-api';
 
 // ============================================================================
 // Node Execution State (state field - replacing status)
@@ -94,6 +94,17 @@ export interface BlockDefinitionWithFrontend extends BlockDefinition {
  *
  * Remove when the API package ships the field.
  */
+/**
+ * A node as the graph holds it.
+ *
+ * `NodeData.id` is optional on the wire — `''` is how the server is told to create one —
+ * but nothing inside the document is reachable without an id: it is how nodes are
+ * selected, connected and addressed. The client mints ids before a node enters the graph
+ * (invariant 6: client ids are canonical), and `loadGraph` fills in any that are missing,
+ * so the guarantee holds by construction rather than by hope.
+ */
+export type GraphNode = NodeData & { id: string };
+
 declare module '@lemoncloud/eureka-flows-api' {
     interface NodeData {
         /** IDLE → READY → RUNNING → COMPLETED/ERROR. Preferred over `status`. */

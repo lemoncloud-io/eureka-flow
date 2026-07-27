@@ -2,6 +2,7 @@ import { copyNodes, pasteNodes } from './core/clipboard';
 import { createDocument } from './core/document';
 import { deduplicateEdges } from './core/edges';
 import { createHistory } from './core/history';
+import { newNodeId } from './core/ids';
 import { createOps } from './core/ops';
 
 import type { ClipboardPayload } from './core/clipboard';
@@ -59,7 +60,15 @@ export type FlowEngineOptions = OpsDeps;
  * flows saved before edges carried client ids; nothing makes them any more.
  */
 const normalize = (state: WorkflowState): GraphSnapshot => ({
-    nodes: (state.nodes ?? []).map(n => ({ ...n, config: n.config ?? {}, position: n.position ?? { x: 0, y: 0 } })),
+    nodes: (state.nodes ?? []).map(n => ({
+        ...n,
+        // The one place the id guarantee is established. A node without an id cannot be
+        // selected, connected or addressed, and save treats it as new either way — so
+        // minting one here loses nothing and lets the rest of the graph stop asking.
+        id: n.id || newNodeId(),
+        config: n.config ?? {},
+        position: n.position ?? { x: 0, y: 0 },
+    })),
     edges: deduplicateEdges(state.edges ?? []),
 });
 

@@ -1,6 +1,7 @@
 import { newEdgeId, newNodeId } from './ids';
 
 import type { GraphSnapshot } from './document';
+import type { GraphNode } from '../types';
 import type { EdgeData, NodeData, Position } from '@lemoncloud/eureka-flows-api';
 
 /**
@@ -65,7 +66,7 @@ export const pasteNodes = (payload: ClipboardPayload, offset: Position = NO_OFFS
                 errorMessage: undefined,
                 config: node.config ? structuredClone(node.config) : {},
                 autoExecutionEnabled: node.autoExecutionEnabled ?? true,
-            }) as NodeData
+            }) as GraphNode
     );
 
     const edges = payload.edges.flatMap<EdgeData>(edge => {

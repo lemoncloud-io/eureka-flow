@@ -54,7 +54,7 @@ import {
 } from '../utils';
 
 import type { ClipboardPayload, FlowEngine } from '@flows/engine';
-import type { FlowRole, LoadFlowPortData, NodeState } from '@flows/flows';
+import type { FlowRole, GraphNode, LoadFlowPortData, NodeState } from '@flows/flows';
 import type { DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 const PORT_HIGHLIGHT_MS = 300;
@@ -169,7 +169,7 @@ const TOUCH_PORT_LAYOUT = {
  */
 const findClosestInputPort = (
     worldPos: { x: number; y: number },
-    nodes: NodeData[],
+    nodes: GraphNode[],
     blockRegistry: Record<string, { inputs: Array<{ id: string; type: string }> }>,
     sourceNodeId: string
 ): { nodeId: string; portId: string; portType: string; distance: number } | null => {
@@ -519,7 +519,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 const newDef = blockRegistry[type];
                 if (!newDef) return;
 
-                let sourceNode: NodeData | undefined;
+                let sourceNode: GraphNode | undefined;
                 let sourcePortId: string | undefined;
                 let targetPortId: string | undefined;
 
@@ -532,7 +532,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     const firstInput = newDef.inputs[0];
                     targetPortId = firstInput.id;
 
-                    const findCompatibleOutput = (n: NodeData) => {
+                    const findCompatibleOutput = (n: GraphNode) => {
                         const def = blockRegistry[n.type];
                         if (!def) return undefined;
                         return def.outputs.find(
@@ -584,7 +584,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                 const feedsNewNode = !!(sourceNode && sourcePortId && targetPortId);
 
-                let targetNode: NodeData | undefined;
+                let targetNode: GraphNode | undefined;
                 let targetInputPortId: string | undefined;
                 let sourceOutputPortId: string | undefined;
 
@@ -708,7 +708,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     // Helper: Propagate outputData to downstream nodes' inputData via edges.
                     // Returns each node unchanged by identity when nothing reached it, so a
                     // caller can tell which ones actually moved.
-                    const propagateData = (baseNodes: NodeData[], conns: typeof loadedConnections): NodeData[] => {
+                    const propagateData = (baseNodes: GraphNode[], conns: typeof loadedConnections): GraphNode[] => {
                         return baseNodes.map(node => {
                             const incomingConnections = conns.filter(c => c.targetNodeId === node.id);
                             if (incomingConnections.length === 0) return node;
@@ -864,7 +864,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         }
                     });
 
-                    const levelGroups: Record<number, NodeData[]> = {};
+                    const levelGroups: Record<number, GraphNode[]> = {};
                     nodes.forEach(n => {
                         const l = levels[n.id] || 0;
                         if (!levelGroups[l]) levelGroups[l] = [];

@@ -11,8 +11,7 @@ import {
     useFlowsStore,
 } from '@flows/flows';
 
-import type { BlockDefinitionWithFrontend } from '@flows/flows';
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinitionWithFrontend, GraphNode } from '@flows/flows';
 import type { ReactNode } from 'react';
 
 const postMock = vi.fn();
@@ -42,10 +41,10 @@ const registry = {
 } as unknown as Record<string, BlockDefinitionWithFrontend>;
 
 /** A node as the server sends it: no config, no position. */
-const rawNode = (id: string) => ({ id, type: 'text-input' }) as NodeData;
+const rawNode = (id: string) => ({ id, type: 'text-input' }) as GraphNode;
 
 /** The same node as the canvas holds it, once loadWorkflow has filled in the gaps. */
-const normalizedNode = (id: string) => ({ ...rawNode(id), config: {}, position: { x: 0, y: 0 } }) as NodeData;
+const normalizedNode = (id: string) => ({ ...rawNode(id), config: {}, position: { x: 0, y: 0 } }) as GraphNode;
 
 describe('baseline capture', () => {
     beforeEach(() => {

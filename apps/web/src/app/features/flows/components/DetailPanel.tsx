@@ -60,14 +60,14 @@ import {
     tryParseJson,
 } from '../utils';
 
-import type { BlockDefinition, ConfigField, DataPacket, EdgeData, FlowRole, NodeData } from '@flows/flows';
+import type { BlockDefinition, ConfigField, DataPacket, EdgeData, FlowRole, GraphNode } from '@flows/flows';
 
 interface DetailPanelProps {
     /** User role for permission-based UI controls */
     role?: FlowRole;
-    selectedNode: NodeData | null;
+    selectedNode: GraphNode | null;
     selectedConnection: EdgeData | null;
-    nodes: NodeData[];
+    nodes: GraphNode[];
     connections: EdgeData[];
     onConfigChange: (nodeId: string, key: string, value: unknown) => void;
     onDescriptionChange: (nodeId: string, description: string) => void;
@@ -167,7 +167,7 @@ const FileImagePreview = ({ src, onRemove, t }: { src: string; onRemove: () => v
 };
 
 interface InputImageConfigProps {
-    node: NodeData;
+    node: GraphNode;
     onConfigChange: (key: string, value: unknown) => void;
     t: (key: string) => string;
 }
@@ -406,7 +406,7 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
 };
 
 interface InputTextConfigProps {
-    node: NodeData;
+    node: GraphNode;
     onConfigChange: (key: string, value: unknown) => void;
 }
 
@@ -654,7 +654,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         );
     };
 
-    const renderConfigInput = (node: NodeData, field: ConfigField, definition: BlockDefinition) => {
+    const renderConfigInput = (node: GraphNode, field: ConfigField, definition: BlockDefinition) => {
         const value = node.config?.[field.key] ?? definition.defaultConfig[field.key];
         // Owner + Editor edit node config (Editor's change persists via session overlay)
         const isDisabled = !canEditConfig;

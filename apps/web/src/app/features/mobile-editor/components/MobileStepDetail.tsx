@@ -27,8 +27,7 @@ import { BlockIcon } from '../../flows/components/BlockIcon';
 import { getPortStyleKey } from '../../flows/utils';
 import { useNodeConfig } from '../hooks/useNodeConfig';
 
-import type { BlockDefinitionWithFrontend, FlowRole } from '@flows/flows';
-import type { NodeState } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinitionWithFrontend, FlowRole, NodeState } from '@flows/flows';
 import type { TFunction } from 'i18next';
 
 interface MobileStepDetailProps {

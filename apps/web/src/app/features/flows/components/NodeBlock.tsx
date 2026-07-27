@@ -41,7 +41,7 @@ import { getVisiblePorts } from '../utils';
 
 import type { ConnectionDraftInfo } from '../utils';
 import type { ConfigValue } from './visualizations';
-import type { NodeData, NodeState } from '@flows/flows';
+import type { GraphNode, NodeState } from '@flows/flows';
 
 export interface NodePortHandlers {
     onPortMouseDown: (
@@ -140,7 +140,7 @@ const DURATION_BADGE_VISIBLE_MS = 1000;
 const DURATION_BADGE_FADE_MS = 500;
 
 interface NodeBlockProps {
-    node: NodeData;
+    node: GraphNode;
     highlightState: NodeHighlightState;
     portHandlers: NodePortHandlers;
     configHandlers: NodeConfigHandlers;

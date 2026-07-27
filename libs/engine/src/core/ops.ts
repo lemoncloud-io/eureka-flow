@@ -3,7 +3,7 @@ import { arePortTypesCompatible } from './edges';
 import { newEdgeId, newNodeId } from './ids';
 
 import type { FlowDocument } from './document';
-import type { BlockDefinitionWithFrontend } from '../types';
+import type { BlockDefinitionWithFrontend, GraphNode } from '../types';
 import type { NodeData, Position } from '@lemoncloud/eureka-flows-api';
 
 export type EngineErrorCode = 'CYCLE' | 'DUPLICATE_EDGE' | 'INCOMPATIBLE_PORTS' | 'NODE_NOT_FOUND';
@@ -96,7 +96,7 @@ export const createOps = (doc: FlowDocument, deps: OpsDeps = {}): { ops: GraphOp
                 outputData: {},
                 autoExecutionEnabled: true,
                 ...(customLabel ? { customLabel } : {}),
-            } as NodeData;
+            } as GraphNode;
 
             doc.replace({ nodes: [...doc.nodes(), node], edges: doc.edges() });
             return id;

@@ -1,6 +1,7 @@
 import { topologicalSort } from './topologicalSort';
 
-import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { GraphNode } from '@flows/flows';
+import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 export interface NodeGroup {
     /** Unique key for the group (first node id) */
@@ -16,7 +17,7 @@ export interface NodeGroup {
  * Returns groups of connected nodes, each topologically sorted internally.
  * Groups are sorted by the min position.y of their root nodes.
  */
-export const findConnectedComponents = (nodes: NodeData[], connections: EdgeData[]): NodeGroup[] => {
+export const findConnectedComponents = (nodes: GraphNode[], connections: EdgeData[]): NodeGroup[] => {
     if (nodes.length === 0) return [];
 
     const nodeIds = new Set(nodes.map(n => n.id));

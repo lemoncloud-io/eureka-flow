@@ -2,10 +2,10 @@ import { useTranslation } from 'react-i18next';
 
 import { Label, Textarea } from '@flows/ui-kit';
 
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { GraphNode } from '@flows/flows';
 
 interface MobileTextInputProps {
-    node: NodeData;
+    node: GraphNode;
     onConfigChange: (key: string, value: unknown) => void;
 }
 

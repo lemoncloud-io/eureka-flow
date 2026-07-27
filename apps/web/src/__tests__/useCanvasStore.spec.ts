@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useCanvasStore } from '@flows/flows';
 
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { GraphNode } from '@flows/flows';
 
-const makeNode = (id: string, x = 0, y = 0): NodeData => ({ id, type: 'test', position: { x, y } }) as NodeData;
+const makeNode = (id: string, x = 0, y = 0): GraphNode => ({ id, type: 'test', position: { x, y } }) as GraphNode;
 
 describe('useCanvasStore - Node Collapse', () => {
     beforeEach(() => {

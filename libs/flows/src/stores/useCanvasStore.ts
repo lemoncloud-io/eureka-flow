@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
 import type { EdgeView, RunContext, RunPortUpdate, TraceEntry } from '../types';
-import type { GraphLike } from '@flows/engine';
+import type { GraphLike, GraphNode } from '@flows/engine';
 import type { DataPacket, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 import type { StateCreator } from 'zustand';
 
@@ -55,14 +55,14 @@ export interface Tooltip {
 
 interface CanvasState {
     // Core Data
-    nodes: NodeData[];
+    nodes: GraphNode[];
     connections: EdgeData[];
 
     // Flow Context
     flowId: string | null;
 
     // Clipboard
-    clipboard: NodeData | null;
+    clipboard: GraphNode | null;
 
     // Viewport
     viewport: Viewport;
@@ -99,10 +99,10 @@ interface CanvasState {
     tutorialHint: 'output-port' | 'run-button' | null;
 
     // Actions - Core Data
-    setNodes: (nodes: NodeData[] | ((prev: NodeData[]) => NodeData[])) => void;
+    setNodes: (nodes: GraphNode[] | ((prev: GraphNode[]) => GraphNode[])) => void;
     setConnections: (connections: EdgeData[] | ((prev: EdgeData[]) => EdgeData[])) => void;
     setFlowId: (flowId: string | null) => void;
-    setClipboard: (node: NodeData | null) => void;
+    setClipboard: (node: GraphNode | null) => void;
 
     // Actions - Viewport
     setViewport: (viewport: Viewport | ((prev: Viewport) => Viewport)) => void;
@@ -370,7 +370,12 @@ export const canvasStateCreator: StateCreator<CanvasState> = (set, _get) => ({
         const connections = workflowState?.connections || workflowState?.edges || [];
 
         set({
-            nodes: nodes as NodeData[],
+            // A node with no id cannot be selected, connected or addressed, so it is not a
+            // node this canvas can show. The engine mints one on the way in; this is the
+            // path that bypasses it, and dropping is the honest answer here — minting a
+            // second id for something the engine may already have minted one for would
+            // put the same node on screen twice.
+            nodes: nodes.filter((node): node is GraphNode => !!node.id),
             connections: connections as EdgeData[],
             flowId: flowId || null,
             selectedNodeId: null,

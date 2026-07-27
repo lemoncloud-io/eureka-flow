@@ -7,7 +7,8 @@ import { runFlow, useCanvasStore, useFlowsStore } from '@flows/flows';
 
 import { useRunGate } from '../../flows/hooks/useRunGate';
 
-import type { NodeData, NodeState } from '@lemoncloud/eureka-flows-api';
+import type { NodeState } from '@flows/flows';
+import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 interface UseMobileRunAllReturn {
     runProgress: { current: number; total: number; currentNodeId?: string } | null;

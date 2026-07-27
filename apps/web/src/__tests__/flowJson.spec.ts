@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { parseFlowJson, serializeFlowJson } from '@flows/flows';
 
-import type { FlowJson } from '@flows/flows';
-import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { FlowJson, GraphNode } from '@flows/flows';
+import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 const node = (id: string, config: Record<string, unknown> = {}) =>
-    ({ id, type: 'text-input', position: { x: 10, y: 20 }, config }) as unknown as NodeData;
+    ({ id, type: 'text-input', position: { x: 10, y: 20 }, config }) as unknown as GraphNode;
 
 const edge = (id: string, source: string, target: string) =>
     ({
