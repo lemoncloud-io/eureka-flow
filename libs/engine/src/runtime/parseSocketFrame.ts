@@ -240,7 +240,13 @@ export const parseSocketFrame = (raw: unknown): SocketFrame | null => {
         };
     }
 
-    if (type === 'flow') return { kind: 'flow', flowId: id };
+    // A frame that names a `nodeId` alongside its `type` is describing something *about* a
+    // node — a port row, a data response — not the node's own state. Letting those through
+    // as flow or node frames puts toasts on ids that are not canvas nodes.
+    const describesANode = 'nodeId' in payload;
+    const hasOwnId = str(payload['id']) !== undefined;
+
+    if (type === 'flow') return hasOwnId && !describesANode ? { kind: 'flow', flowId: id } : null;
 
     if (type === 'node/port') {
         const parts = parsePortId(id);
@@ -260,7 +266,7 @@ export const parseSocketFrame = (raw: unknown): SocketFrame | null => {
         };
     }
 
-    if (type === 'node') return parseNode(payload, id);
+    if (type === 'node') return hasOwnId && !describesANode ? parseNode(payload, id) : null;
 
     return null;
 };

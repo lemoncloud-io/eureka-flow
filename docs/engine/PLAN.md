@@ -442,15 +442,30 @@ id로 구독자에게 브로드캐스트한다). 단 봉투 벗기기는 `unwrap
 `useSocketRecorder`(리플레이 도구)도 같은 파서로 바꾼다. 기록과 실제 처리가 서로 다른
 분류를 쓰면, 리플레이가 재현한다고 주장하는 실행이 사실이 아니게 된다.
 
+### P4-5. `dispatchSocketFrame` 분리 + 소켓 lib 테스트 타깃
+
+훅의 `dispatchMessage` 본문을 `libs/socket/src/hooks/dispatchSocketFrame.ts`로 뺀다 —
+React도 소켓도 없는 순수 함수. 이유: **여기가 와이어와 캔버스 사이의 실전 경로인데
+테스트가 0개였다.** 파서 스펙은 "프레임이 무엇인가"만 잡고, "누가 통보받는가"는 못 잡는다.
+
+`libs/socket/vite.config.mts` 신설 (flows와 동일 패턴, `environment: 'node'`).
+
+**행위 보존 회귀 1건 발견·수정.** 스트랭글러 1차에서 옛 가드의 `!('nodeId' in msg)` 조건을
+빠뜨렸다. 이 조건은 _노드에 대한_ 프레임(포트 row, data response)이 _노드 자신의_ 상태
+프레임으로 오인되는 걸 막는 장치다 — 빠지면 캔버스에 없는 id로 토스트가 뜬다.
+파서에 복원하고 스펙으로 고정했다.
+
 ### Phase 4 완료 조건
 
 ```bash
-npx nx test engine && npx nx test flows && npx nx test web
+npx nx test engine && npx nx test socket && npx nx test flows && npx nx test web
 yarn lint && npx nx build web && yarn engine:demo
 ```
 
 - `yarn engine:demo`가 **실행까지** 완주: `load → runNode → 소켓 프레임 → COMPLETED → 출력 읽기`
 - 파서 스펙이 위 규칙 1~5를 각각 잡는다
+- **디스패처 스펙이 "누가 통보받는가"를 잡는다** — grep 결과가 아니라 행위로 판정할 것.
+  (1차 완료 조건이 "로컬 파싱 0건"이라는 grep이었던 탓에 위 회귀가 통과했다.)
 - `useInitFlowSocket.ts`에 프레임 판별/필드 추출 0건 (봉투 벗기기는 엔진과 공유)
 - 엔진 순수성 유지 (react/zustand/DOM 전역 0건)
 
@@ -494,10 +509,11 @@ yarn lint && npx nx build web && yarn engine:demo
 - [x] P4-2 RunSession (`waitForNode` 포함) — 소켓 → 리듀서 → `applyRuntime` 배선
 - [x] P4-3 `repository.runNode` (`async`/`propagate` 0/1 명시 전송)
 - [x] P4-4 `useInitFlowSocket` + `useSocketRecorder` 파싱 치환 (로컬 가드 6개 → 0개)
+- [x] P4-5 `dispatchSocketFrame` 분리 + `libs/socket` 테스트 타깃 신설 (스펙 0 → 22)
 - [x] **Phase 4 완료 조건 전부 green** — `yarn engine:demo`가 `load → add → undo → redo →
-    save → **run**`을 브라우저 없이 완주. 마지막 프레임은 일부러 stale이라, 노드가
+  save → **run**`을 브라우저 없이 완주. 마지막 프레임은 일부러 stale이라, 노드가
       COMPLETED로 남는 것 자체가 순서 규칙이 돌았다는 증거다.
-      engine 스펙 217개 (Phase 3의 155 → **+62**), flows 18, web 174,
+      engine 스펙 221개 (Phase 3의 155 → **+66**), **socket 22개 (신규 타깃)**, flows 18, web 174,
       lint 0 error, `nx build web`, `yarn engine:demo` 모두 green.
       `tsc -b --force` 총 **1061 — 같은 방식으로 잰 HEAD의 1073보다 12건 감소**.
       (이전 Phase의 숫자들은 측정 방식이 달라 직접 비교 불가 — `--force` 없이 재면

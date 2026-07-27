@@ -57,8 +57,28 @@ describe('envelopes', () => {
         expect(parseSocketFrame({ type: 'node', state: 'RUNNING' })).toBeNull();
     });
 
-    it('accepts nodeId in place of id', () => {
-        expect(parseSocketFrame({ type: 'node', nodeId: 'n9' })).toMatchObject({ event: { nodeId: 'n9' } });
+    it('accepts nodeId in place of id where the frame has no id of its own', () => {
+        expect(parseSocketFrame({ nodeId: 'n9', seq: 1, message: 'step' })).toMatchObject({ kind: 'trace' });
+    });
+});
+
+describe('frames that are about a node rather than from one', () => {
+    // A port row or a data response names the node it belongs to in `nodeId`, alongside a
+    // `type`. Reading those as node state puts a toast on an id that is not a canvas node.
+    it('refuses a node frame that also names a nodeId', () => {
+        expect(parseSocketFrame({ type: 'node', id: 'n1:out', nodeId: 'n1', state: 'COMPLETED' })).toBeNull();
+    });
+
+    it('refuses a flow frame that also names a nodeId', () => {
+        expect(parseSocketFrame({ type: 'flow', id: 'f1', nodeId: 'n1' })).toBeNull();
+    });
+
+    it('refuses a node frame that has only a nodeId to go on', () => {
+        expect(parseSocketFrame({ type: 'node', nodeId: 'n9', state: 'RUNNING' })).toBeNull();
+    });
+
+    it('still reads an ordinary node frame', () => {
+        expect(parseSocketFrame({ type: 'node', id: 'n1', state: 'RUNNING' })?.kind).toBe('node');
     });
 });
 

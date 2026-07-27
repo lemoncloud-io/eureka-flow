@@ -1,17 +1,25 @@
 import { useCallback, useEffect } from 'react';
 
-import { parseSocketFrame, unwrapSocketEnvelope } from '@flows/engine';
+import { unwrapSocketEnvelope } from '@flows/engine';
 import { useWebCoreStore } from '@flows/web-core';
 
+import { dispatchSocketFrame } from './dispatchSocketFrame';
 import { useWebSocketWorker } from './useWebSocketWorker';
 import { useWebSocketStore } from '../stores/useWebSocketStore';
 
-import type { NodeState, ProductProgressMessage, SocketTraceEvent, TraceStage, WebSocketMessage } from '../types';
+import type {
+    LogTraceEntryInfo,
+    NodeUpdateInfo,
+    PortUpdateInfo,
+    ProductProgressInfo,
+    ProductProgressMessage,
+    ProgressUpdateInfo,
+    SocketTraceEvent,
+    TraceUpdateInfo,
+    WebSocketMessage,
+} from '../types';
 
 const WS_ENDPOINT = import.meta.env.VITE_WS_ENDPOINT || '';
-
-/** A save made here comes back as a reload notice; reloading on it discards work. */
-const SELF_ECHO_MS = 3000;
 
 /**
  * Address a raw message, without deciding what it says.
@@ -59,137 +67,6 @@ export const isTraceMessage = (data: unknown): data is SocketTraceEvent => {
     const msg = data as Record<string, unknown>;
     return typeof msg['seq'] === 'number';
 };
-
-/**
- * Trace update info parsed from WebSocket message
- * Used by onTraceUpdate callback for agent block trace display
- */
-export interface TraceUpdateInfo {
-    /** Node ID of the agent block (from server `id` field) */
-    nodeId: string;
-    /** Flow ID */
-    flowId?: string;
-    /** Sequence number for ordering */
-    seq: number;
-    /** Timestamp */
-    ts: number;
-    /** Execution stage (from SocketTraceEvent.stage) */
-    stage?: TraceStage;
-    /** Log message (from SocketTraceEvent.message) */
-    message?: string;
-    /** Run state (from SocketTraceEvent.state) */
-    state?: string;
-    /** Run correlation ID */
-    runId?: string;
-    /** Structured event data */
-    data?: Record<string, unknown>;
-}
-
-export interface NodeUpdateInfo {
-    nodeId: string;
-    flowId?: string;
-    timestamp?: number;
-    /**
-     * Message sequence number (monotonically increasing)
-     * Higher values indicate more recent updates - used for ordering
-     */
-    no?: number;
-    /** Computed: true if id contains ':' (port update piggybacked on node event) */
-    isPort: boolean;
-    /** Computed: parent node ID extracted from port-format id */
-    parentNodeId?: string;
-    /** Node execution state */
-    state?: NodeState;
-    progress?: number;
-    /**
-     * Minor stage of node run (from SocketNodeEvent.stage)
-     * - 'enter': node execution started
-     * - 'final': node execution completed with full data in socket message
-     * - 'progress': intermediate progress update
-     */
-    stage?: string;
-    /** Run correlation ID */
-    runId?: string;
-    /** Server-side error message */
-    error?: string;
-}
-
-/**
- * Port update info parsed from WebSocket message
- * Used by onPortUpdate callback for port data synchronization
- */
-export interface PortUpdateInfo {
-    /** Port ID for API call: "nodeId:portName" (e.g., "1000637:in") */
-    portId: string;
-    /** Parent node ID (e.g., "1000637") */
-    nodeId: string;
-    /** Port name/key (e.g., "in", "out", "data") */
-    portName: string;
-    /** Port direction (from @suffix: "in" or "out") */
-    direction?: 'in' | 'out';
-    /** Flow ID */
-    flowId?: string;
-    /** Timestamp when port data changed */
-    ts?: number;
-    /**
-     * Message sequence number (monotonically increasing)
-     * Higher values indicate more recent updates - used for ordering
-     */
-    no?: number;
-    /** Run correlation ID — links port update to a specific execution run */
-    runId?: string;
-}
-
-/**
- * Progress snapshot info parsed from a lemon-model `progress:*` envelope.
- * Emitted by eureka-flows-api processors and codes-goods-api deploy steps.
- */
-export interface ProgressUpdateInfo {
-    /** Task ID — the node ID of the block being traced */
-    nodeId: string;
-    /** 'pending' | 'running' | 'done' | 'error' */
-    status?: string;
-    percent?: number;
-    step?: number;
-    totalSteps?: number;
-    label?: string;
-    error?: string;
-    /** Reporter sequence — last-write-wins dedup key (epoch-based across server invocations) */
-    seq: number;
-    ts?: number;
-    /** Live product view from codes-goods-api (merge into block out data) */
-    product$?: Record<string, unknown>;
-}
-
-/**
- * One log line parsed from a lemon-model `log:*` envelope batch.
- */
-export interface LogTraceEntryInfo {
-    /** Node ID of the traced block */
-    nodeId: string;
-    level?: string;
-    message?: string;
-    ts?: number;
-    seq?: number;
-    json?: Record<string, unknown>;
-    /** Reporter identity (per server invocation) */
-    source?: string;
-}
-
-/**
- * Product deployment progress info parsed from WebSocket message.
- * Emitted for `action: 'progress'` payloads from codes-goods-api.
- */
-export interface ProductProgressInfo {
-    /** Product ID from codes-goods-api */
-    productId: string;
-    /** Phase → percent map (e.g., { upload: 100, refactor: 60, build: 20, deploy: 0 }) */
-    progress$: Record<string, number>;
-    /** Current phase state (e.g., 'uploading', 'building', 'done', 'error') */
-    state: string;
-    /** Last few ms-epoch timestamps for ETA computation */
-    timestamps: number[];
-}
 
 export interface UseInitFlowSocketOptions {
     /** Channel ID to subscribe to (from flow load response) */
@@ -296,89 +173,17 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
 
     const dispatchMessage = useCallback(
         (message: WebSocketMessage) => {
-            const data = message.data;
-
-            // Handle product progress streaming (codes-goods-api → eureka-sockets-api).
-            // Emitted with action='progress' wrapping a product-progress payload.
-            if (message.action === 'progress' && isProductProgressMessage(data)) {
-                onProductProgress?.({
-                    productId: data.productId,
-                    progress$: data.progress$,
-                    state: data.state,
-                    timestamps: data.timestamps ?? [],
-                });
-                return;
-            }
-
-            // What a frame *is* — envelopes, the trace merge, port ids, history snapshots —
-            // is the engine's to decide, and is under test there. What is left here is what
-            // to do about it, which needs the callbacks this hook was given.
-            const frame = parseSocketFrame(data);
-            if (!frame) return;
-
-            // Messages for another flow are not this canvas's business. They may omit
-            // `flowId` — the channel subscription already filters by flow — so only a
-            // stated mismatch is a reason to drop.
-            const isOtherFlow = (flowId?: string): boolean => !!flowId && flowId !== currentFlowId;
-
-            switch (frame.kind) {
-                case 'trace':
-                    if (isOtherFlow(frame.trace.flowId)) return;
-                    onTraceUpdate?.({ ...frame.trace, ts: frame.trace.ts || Date.now() });
-                    return;
-
-                case 'progress':
-                    onProgressUpdate?.({
-                        nodeId: frame.event.nodeId,
-                        status: frame.event.status,
-                        percent: frame.event.percent,
-                        step: frame.event.step,
-                        totalSteps: frame.event.totalSteps,
-                        label: frame.label,
-                        error: frame.error,
-                        seq: frame.event.seq,
-                        ts: frame.ts,
-                        product$: frame.product$,
-                    });
-                    return;
-
-                case 'log':
-                    frame.log.entries.forEach(entry =>
-                        onLogTrace?.({ nodeId: frame.log.nodeId, source: frame.log.source, ...entry })
-                    );
-                    return;
-
-                case 'flow': {
-                    // Self-echo prevention: a save made here comes back as a reload notice,
-                    // and reloading on it would throw away whatever was typed since.
-                    const lastUpdate = getLastLocalUpdateTimestamp?.();
-                    if (lastUpdate && Date.now() - lastUpdate < SELF_ECHO_MS) return;
-                    if (currentFlowId && frame.flowId === currentFlowId) onFlowUpdate?.(frame.flowId);
-                    return;
-                }
-
-                case 'node':
-                    // No self-echo debounce here: run results arrive this way, and dropping
-                    // them for three seconds after a save loses the start of every run.
-                    if (isOtherFlow(frame.event.flowId)) return;
-                    console.log(`[WS] ${frame.event.nodeId}: ${frame.event.state}`, data);
-                    onNodeReload?.({
-                        ...frame.event,
-                        isPort: frame.event.isPort ?? false,
-                        timestamp: frame.ts,
-                    });
-                    return;
-
-                case 'port':
-                    if (isOtherFlow(frame.event.flowId)) return;
-                    console.log(`[WS] ${frame.event.nodeId}:${frame.event.portName} updated`, data);
-                    onPortUpdate?.({
-                        ...frame.event,
-                        portName: frame.event.portName ?? '',
-                        direction: frame.direction,
-                    });
-                    return;
-            }
+            dispatchSocketFrame(message, {
+                currentFlowId,
+                getLastLocalUpdateTimestamp,
+                onFlowUpdate,
+                onNodeReload,
+                onPortUpdate,
+                onTraceUpdate,
+                onProgressUpdate,
+                onLogTrace,
+                onProductProgress,
+            });
         },
         [
             currentFlowId,

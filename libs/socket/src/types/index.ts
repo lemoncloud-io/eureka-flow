@@ -18,7 +18,7 @@ export type {
 // Re-export from sockets API package
 export type { SocketActionType, SocketModelMeta, SocketPayload, SocketResponse } from '@lemoncloud/eureka-sockets-api';
 
-import type { SocketEvent, SocketNodeEvent, SocketTraceEvent } from '@flows/flows';
+import type { NodeState, SocketEvent, SocketNodeEvent, SocketTraceEvent, TraceStage } from '@flows/flows';
 import type { SocketResponse } from '@lemoncloud/eureka-sockets-api';
 
 /**
@@ -219,4 +219,140 @@ export interface UseWebSocketWorkerReturn<TMessage extends BaseWebSocketMessage>
     disconnect: () => void;
     reconnect: () => void;
     send: (data: unknown) => void;
+}
+
+// ============================================================================
+// Parsed frame payloads handed to subscribers
+// ============================================================================
+// Moved out of `useInitFlowSocket` so the dispatcher can be tested without React.
+
+/**
+ * Trace update info parsed from WebSocket message
+ * Used by onTraceUpdate callback for agent block trace display
+ */
+export interface TraceUpdateInfo {
+    /** Node ID of the agent block (from server `id` field) */
+    nodeId: string;
+    /** Flow ID */
+    flowId?: string;
+    /** Sequence number for ordering */
+    seq: number;
+    /** Timestamp */
+    ts: number;
+    /** Execution stage (from SocketTraceEvent.stage) */
+    stage?: TraceStage;
+    /** Log message (from SocketTraceEvent.message) */
+    message?: string;
+    /** Run state (from SocketTraceEvent.state) */
+    state?: string;
+    /** Run correlation ID */
+    runId?: string;
+    /** Structured event data */
+    data?: Record<string, unknown>;
+}
+
+export interface NodeUpdateInfo {
+    nodeId: string;
+    flowId?: string;
+    timestamp?: number;
+    /**
+     * Message sequence number (monotonically increasing)
+     * Higher values indicate more recent updates - used for ordering
+     */
+    no?: number;
+    /** Computed: true if id contains ':' (port update piggybacked on node event) */
+    isPort: boolean;
+    /** Computed: parent node ID extracted from port-format id */
+    parentNodeId?: string;
+    /** Node execution state */
+    state?: NodeState;
+    progress?: number;
+    /**
+     * Minor stage of node run (from SocketNodeEvent.stage)
+     * - 'enter': node execution started
+     * - 'final': node execution completed with full data in socket message
+     * - 'progress': intermediate progress update
+     */
+    stage?: string;
+    /** Run correlation ID */
+    runId?: string;
+    /** Server-side error message */
+    error?: string;
+}
+
+/**
+ * Port update info parsed from WebSocket message
+ * Used by onPortUpdate callback for port data synchronization
+ */
+export interface PortUpdateInfo {
+    /** Port ID for API call: "nodeId:portName" (e.g., "1000637:in") */
+    portId: string;
+    /** Parent node ID (e.g., "1000637") */
+    nodeId: string;
+    /** Port name/key (e.g., "in", "out", "data") */
+    portName: string;
+    /** Port direction (from @suffix: "in" or "out") */
+    direction?: 'in' | 'out';
+    /** Flow ID */
+    flowId?: string;
+    /** Timestamp when port data changed */
+    ts?: number;
+    /**
+     * Message sequence number (monotonically increasing)
+     * Higher values indicate more recent updates - used for ordering
+     */
+    no?: number;
+    /** Run correlation ID — links port update to a specific execution run */
+    runId?: string;
+}
+
+/**
+ * Progress snapshot info parsed from a lemon-model `progress:*` envelope.
+ * Emitted by eureka-flows-api processors and codes-goods-api deploy steps.
+ */
+export interface ProgressUpdateInfo {
+    /** Task ID — the node ID of the block being traced */
+    nodeId: string;
+    /** 'pending' | 'running' | 'done' | 'error' */
+    status?: string;
+    percent?: number;
+    step?: number;
+    totalSteps?: number;
+    label?: string;
+    error?: string;
+    /** Reporter sequence — last-write-wins dedup key (epoch-based across server invocations) */
+    seq: number;
+    ts?: number;
+    /** Live product view from codes-goods-api (merge into block out data) */
+    product$?: Record<string, unknown>;
+}
+
+/**
+ * One log line parsed from a lemon-model `log:*` envelope batch.
+ */
+export interface LogTraceEntryInfo {
+    /** Node ID of the traced block */
+    nodeId: string;
+    level?: string;
+    message?: string;
+    ts?: number;
+    seq?: number;
+    json?: Record<string, unknown>;
+    /** Reporter identity (per server invocation) */
+    source?: string;
+}
+
+/**
+ * Product deployment progress info parsed from WebSocket message.
+ * Emitted for `action: 'progress'` payloads from codes-goods-api.
+ */
+export interface ProductProgressInfo {
+    /** Product ID from codes-goods-api */
+    productId: string;
+    /** Phase → percent map (e.g., { upload: 100, refactor: 60, build: 20, deploy: 0 }) */
+    progress$: Record<string, number>;
+    /** Current phase state (e.g., 'uploading', 'building', 'done', 'error') */
+    state: string;
+    /** Last few ms-epoch timestamps for ETA computation */
+    timestamps: number[];
 }
