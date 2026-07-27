@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import { wouldCreateCycle } from '../core/cycle';
 
-import type { Connection } from '@lemoncloud/eureka-flows-api';
+import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
-const edge = (source: string, target: string): Connection =>
+const edge = (source: string, target: string): EdgeData =>
     ({
         id: `${source}->${target}`,
         sourceNodeId: source,
         sourcePortId: 'out',
         targetNodeId: target,
         targetPortId: 'in',
-    }) as unknown as Connection;
+    }) as unknown as EdgeData;
 
 describe('wouldCreateCycle', () => {
     it('rejects a self-loop', () => {

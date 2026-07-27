@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
 import type { EdgeView, RunContext, RunPortUpdate, TraceEntry } from '../types';
-import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type { DataPacket, EdgeData, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 import type { StateCreator } from 'zustand';
 
 const MAX_TRACE_ENTRIES = 500;
@@ -55,7 +55,7 @@ export interface Tooltip {
 interface CanvasState {
     // Core Data
     nodes: NodeData[];
-    connections: Connection[];
+    connections: EdgeData[];
 
     // Flow Context
     flowId: string | null;
@@ -99,7 +99,7 @@ interface CanvasState {
 
     // Actions - Core Data
     setNodes: (nodes: NodeData[] | ((prev: NodeData[]) => NodeData[])) => void;
-    setConnections: (connections: Connection[] | ((prev: Connection[]) => Connection[])) => void;
+    setConnections: (connections: EdgeData[] | ((prev: EdgeData[]) => EdgeData[])) => void;
     setFlowId: (flowId: string | null) => void;
     setClipboard: (node: NodeData | null) => void;
 
@@ -163,8 +163,8 @@ interface CanvasState {
     deleteNode: (nodeId: string) => void;
 
     // Connection Actions
-    addConnection: (connection: Connection) => void;
-    updateConnection: (connectionId: string, updates: Partial<Connection>) => void;
+    addConnection: (connection: EdgeData) => void;
+    updateConnection: (connectionId: string, updates: Partial<EdgeData>) => void;
     deleteConnection: (connectionId: string) => void;
 }
 
@@ -369,7 +369,7 @@ export const canvasStateCreator: StateCreator<CanvasState> = (set, _get) => ({
 
         set({
             nodes: nodes as NodeData[],
-            connections: connections as Connection[],
+            connections: connections as EdgeData[],
             flowId: flowId || null,
             selectedNodeId: null,
             selectedConnectionId: null,

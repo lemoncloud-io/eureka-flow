@@ -2,7 +2,8 @@
     "extends": "./tsconfig.json",
     "compilerOptions": {
         "declaration": true,
-        "declarationMap": true
+        "declarationMap": true,
+        "jsx": "react-jsx"
     },
     "include": ["src/**/*.ts", "src/**/*.tsx"],
     "exclude": ["**/*.spec.ts", "**/*.test.ts"],

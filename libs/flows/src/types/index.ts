@@ -12,7 +12,6 @@ export type {
     ConfigFieldModel,
     ConfigFieldWithDefault,
     ConfigOption,
-    Connection,
     DataPacket,
     DataType,
     doGetImageParam,

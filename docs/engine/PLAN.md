@@ -477,7 +477,40 @@ yarn lint && npx nx build web && yarn engine:demo
 의도한 타입은 `EdgeData`였다. 엔진 3파일만 고쳤고(`cycle`/`edges`/`snapshot`), `libs/flows`의
 동일 결함은 건드리지 않았다. 결과: 엔진이 처음으로 `.d.ts`를 생성한다.
 
-## 8. 진행 체크리스트
+## 8. 후속 — 타입체크 선행 결함 정리
+
+Phase 0부터 "HEAD에서 이미 red"라고 기록만 해온 두 root cause를 실제로 처리했다.
+엔진 자체는 Phase 4에서 이미 emit 가능해졌지만, 소비자 쪽이 막혀 있으면 의미가 없다.
+
+**root cause 1 — `Connection` (해소).** `@lemoncloud/eureka-flows-api`에 없는 타입.
+`libs/flows`의 re-export + 소비자 10파일을 `EdgeData`로 정정.
+
+**root cause 2 — lib tsconfig 오설정 (해소).** 5개 lib(`policy`/`shared`/`theme`/`ui-kit`/
+`web-core`)이 base의 `moduleResolution: "bundler"`를 `nodenext`로 덮어쓰고 있었다.
+Nx 제너레이터 기본값인데 이 워크스페이스는 Vite다 — `nodenext`는 상대 import에 `.js`
+확장자를 요구하고(TS2834/2835), Vite는 그런 걸 붙이지 않는다. 덮어쓰기를 걷어내고,
+React lib 5개에 `jsx: "react-jsx"`와 `src/**/*.tsx` include를 추가했다
+(`flows`/`socket`은 `.tsx`를 include하면서 `jsx`를 선언한 적이 없어 원래부터 TS17004였다).
+`import.meta.env`를 쓰는 lib에는 `vite/client` types 추가.
+
+이 과정에서 드러난 **실제 소스 결함 3건**도 고쳤다 (설정이 가리고 있던 것):
+
+- `EnhancedStorage.length`가 private 필드였다. 쓰기마다 갱신은 하지만 **아무도 읽지 않는**
+  값이었고(그래서 TS6133), `Storage`는 이걸 public으로 요구한다. 나머지를 다 구현해놓고도
+  `implements Storage`를 선언 못 한 이유이자 `as Storage` 캐스팅의 원인. 게터로 교체.
+- `WebCoreInstance`가 `ReturnType<typeof WebCoreFactory.create>` — 제네릭을 인자 없이 쓰면
+  지원하는 모든 cloud provider로 넓어져 AWS 전용 메서드가 사라진다. `<'aws'>`로 고정.
+- `ThemeProvider`의 사용되지 않는 `@ts-expect-error` 1건. 이거 하나가 `theme`의 emit을
+  막고 있었고, `ui-kit` 이하 전체가 TS6305로 연쇄했다.
+
+결과: `tsc -b --force` **1073 → 863**. `policy`/`theme`/`web-core`/`engine`이 선언을 생성한다.
+
+**남은 것 (별건, 사용자 판단 필요).** `ui-kit` 4 · `flows` 13 · `socket` 17 · `shared` 19 =
+53건의 진짜 소스 타입 결함이 각 lib의 emit을 막고 있고, 그게 남은 TS6305 352건의 원인이다.
+그 외 implicit-any(TS7006) 341건은 **339건이 `apps/web`** — 앱 자체 부채로 별도 작업.
+엔진 마이그레이션과 무관하므로 여기서 멈춘다.
+
+## 9. 진행 체크리스트
 
 - [x] P0-1 lib 스캐폴딩 (`@flows/engine`)
 - [x] P0-2 파일 이동 + shim
@@ -511,7 +544,7 @@ yarn lint && npx nx build web && yarn engine:demo
 - [x] P4-4 `useInitFlowSocket` + `useSocketRecorder` 파싱 치환 (로컬 가드 6개 → 0개)
 - [x] P4-5 `dispatchSocketFrame` 분리 + `libs/socket` 테스트 타깃 신설 (스펙 0 → 22)
 - [x] **Phase 4 완료 조건 전부 green** — `yarn engine:demo`가 `load → add → undo → redo →
-  save → **run**`을 브라우저 없이 완주. 마지막 프레임은 일부러 stale이라, 노드가
+save → **run**`을 브라우저 없이 완주. 마지막 프레임은 일부러 stale이라, 노드가
       COMPLETED로 남는 것 자체가 순서 규칙이 돌았다는 증거다.
       engine 스펙 221개 (Phase 3의 155 → **+66**), **socket 22개 (신규 타깃)**, flows 18, web 174,
       lint 0 error, `nx build web`, `yarn engine:demo` 모두 green.

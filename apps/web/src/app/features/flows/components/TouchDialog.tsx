@@ -16,7 +16,7 @@ import {
     Switch,
 } from '@flows/ui-kit';
 
-import type { Connection, NodeData, TouchNodeBody } from '@flows/flows';
+import type { EdgeData, NodeData, TouchNodeBody } from '@flows/flows';
 
 interface TouchDialogProps {
     open: boolean;
@@ -25,7 +25,7 @@ interface TouchDialogProps {
     /** Initial node data to populate form defaults */
     initialNode?: NodeData | null;
     /** Initial connection/edge data to populate form defaults */
-    initialConnection?: Connection | null;
+    initialConnection?: EdgeData | null;
     onSuccess: (message: string) => void;
     onError: (error: string) => void;
 }

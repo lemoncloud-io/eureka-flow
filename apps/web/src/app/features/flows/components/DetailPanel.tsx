@@ -60,15 +60,15 @@ import {
     tryParseJson,
 } from '../utils';
 
-import type { BlockDefinition, ConfigField, Connection, DataPacket, FlowRole, NodeData } from '@flows/flows';
+import type { BlockDefinition, ConfigField, DataPacket, EdgeData, FlowRole, NodeData } from '@flows/flows';
 
 interface DetailPanelProps {
     /** User role for permission-based UI controls */
     role?: FlowRole;
     selectedNode: NodeData | null;
-    selectedConnection: Connection | null;
+    selectedConnection: EdgeData | null;
     nodes: NodeData[];
-    connections: Connection[];
+    connections: EdgeData[];
     onConfigChange: (nodeId: string, key: string, value: unknown) => void;
     onDescriptionChange: (nodeId: string, description: string) => void;
     onLabelChange: (nodeId: string, label: string) => void;
