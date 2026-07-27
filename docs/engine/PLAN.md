@@ -568,3 +568,79 @@ save → **run**`을 브라우저 없이 완주. 마지막 프레임은 일부�
       `tsc -b --force` 총 **1061 — 같은 방식으로 잰 HEAD의 1073보다 12건 감소**.
       (이전 Phase의 숫자들은 측정 방식이 달라 직접 비교 불가 — `--force` 없이 재면
       증분 캐시 때문에 값이 흔들린다.)
+
+---
+
+## 9. 후속: 실행 시 stale 입력이 서버 포트에 기록되는 결함 (미수정)
+
+`/simplify` 리뷰에서 나온 지적을 코드로 확인한 결과 — **실제 결함**이며, 재현 경로가 UI에 있다.
+수정은 하지 않았다. 이 문서에 재현 절차와 한 줄 수정안을 남긴다.
+
+### 무엇이 문제인가
+
+`hydrateInputsFromUpstream` (`libs/flows/src/utils/hydrateInputs.ts:20`) 은
+`if (hydrated[conn.targetPortId]) continue;` 로 **이미 값이 있는 입력 포트를 건너뛴다.**
+의도는 사용자가 수동으로 지정한 입력을 상류 출력이 덮어쓰지 않게 보호하는 것이다.
+
+그런데 그 수동 입력 경로가 **존재하지 않는다.** `executeNode` 의 2번째 인자
+`manualOverrideInputs` (`WorkflowCanvas.tsx:1125`) 를 넘기는 호출자가 하나도 없다:
+
+- `WorkflowCanvas.tsx:1374` — `executeNode(nodeId, undefined, options)`
+- `WorkflowCanvas.tsx:935` — `executeNodeRef.current(nodeId)`
+- `useSocketHandlers.ts:174` — `canvasRef.current?.executeNode(effect.nodeId)`
+- 모바일 (`mobile-editor/utils/executeNode.ts:39`) — 오버라이드 슬롯 자체가 없음
+
+즉 `const inputs = manualOverrideInputs || currentNode.inputData` 는 **항상**
+`currentNode.inputData` 다. 가드가 지키는 것은 사용자의 의도가 아니라 **이전 실행이
+남긴 낡은 그래프 상태**뿐이다.
+
+### 왜 로컬 계산 문제로 끝나지 않는가
+
+`WorkflowCanvas.tsx:1268-1280` 이 실행 직전에 `hydratedInputs` 를 **서버에 upsert 한다**:
+
+```ts
+if (permissions.canModifyCanvas && flowId && Object.keys(hydratedInputs).length > 0) {
+    await Promise.all(Object.entries(hydratedInputs).map(([portName, packet]) =>
+        upsertPortNode(flowId, { ..., name: portName, data$: toPortVariantData(packet) })));
+}
+```
+
+낡은 패킷이 그대로 서버의 입력 포트 레코드에 기록된다. 이후 **서버가 실행하는**
+백엔드 노드는 그 레코드를 읽는다 — 화면만의 문제가 아니다.
+
+### 재현
+
+1. A → B 엣지. A는 백엔드 블록.
+2. B의 입력 포트에 A의 이전 실행 결과가 남아 있는 상태.
+3. A 선택 → DetailPanel 의 **"이 노드만 실행"** (`DetailPanel.tsx:1150`, `propagate: false`).
+   서버는 A만 실행하고 하류로 전파하지 않는다 (`WorkflowCanvas.tsx:1044-1047` 주석 참조:
+   전파는 서버의 `propagateDownstreamV2` 담당). 클라이언트 전파는 프론트엔드 블록 경로에만 있다.
+   → A의 `outputData` 는 갱신, B의 `inputData` 는 낡은 채로 남는다.
+4. B 실행 → `hydrateInputsFromUpstream` 이 "값이 있으니" 건너뛴다 → **낡은 값으로 실행되고,
+   그 낡은 값이 서버 포트에 기록된다.**
+
+**대조군**: 3번과 4번 사이에 플로우를 새로고침하면 `propagateData`
+(`WorkflowCanvas.tsx:715-736`) 가 로드 시점에 덮어쓰므로 B는 A의 최신 출력으로 실행된다.
+**같은 조작인데 중간에 새로고침을 했는지에 따라 결과가 갈린다.**
+
+### 수정안
+
+`hydrateInputsFromUpstream` 의 skip-occupied 가드를 제거하고 상류 출력이 이기게 한다
+(로드 시점의 `propagateData` 와 같은 답). 지금은 지켜야 할 수동 입력이 없으므로 한 줄이다.
+
+수동 입력 기능을 나중에 실제로 붙인다면, 그때는 "사용자가 지정함" 과 "이전 실행이 남김" 을
+**구분할 수 있어야** 한다 — 값의 존재 여부로는 영원히 구분되지 않는다. 그 시점에
+`manualOverrideInputs` 를 살리거나 패킷에 출처 표시를 넣는 것이 진짜 수정이다.
+
+### 범위 밖으로 둔 이유
+
+동작 변경이라 `/simplify` (정리 패스) 가 건드릴 일이 아니다. 두 구현을 `core/edges.ts` 로
+합치자는 원안도 채택하지 않았다 — `propagateData`(로드 시 조정)와
+`hydrateInputsFromUpstream`(실행 시 수집)은 **역할이 다르다.** 결함은 "두 구현이 다르다"가
+아니라 "한쪽이 사용자 의도와 잔여 상태를 구분하지 못한다" 쪽이다.
+
+### 부수 확인 (결함 아님)
+
+`propagateData` 만 `'value' in packet` 을 요구하고 나머지 전파 지점은 truthy 만 본다.
+그러나 `toDataPacket` 은 항상 `value` 키를 넣으므로(값이 `undefined` 여도 키는 존재)
+이 코드베이스에서 갈리는 입력은 생기지 않는다.
