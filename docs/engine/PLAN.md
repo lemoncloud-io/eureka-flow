@@ -271,11 +271,62 @@ yarn lint
 
 ---
 
-## 5. Phase 2+ (예고만 — 별도 PLAN으로)
+## 5. Phase 2 — 영속화 포트 + Node 증명
 
-- Repository(`load`/`save`/blocks) + HttpPort/AuthPort → **Node CLI 데모** (`load → edit → undo → save`)가 완료 조건
-- SocketPort (browser Worker 어댑터 / node `ws`)
-- agents 포크의 `CanvasBinding`을 엔진 기반으로 재구현 + 툴 확장 (add/connect/...)
+목표: 그래프를 서버와 주고받는 경로를 포트 뒤로 옮기고, **브라우저 없이** 도는 것을 실행 가능한 산출물로 증명한다.
+DESIGN §3.3의 완료 조건이 이 Phase의 유일한 판정 기준이다.
+
+### P2-1. 포트 (2개만)
+
+DESIGN §3.2.6은 포트 5개를 예고하지만 이번 Phase는 **HttpPort / AuthPort 둘 뿐**이다.
+`StoragePort`(draftStorage)·`SocketPort`·`LlmPort`는 각각 쓰이는 Phase에서 만든다 — 설계 문서에 이름이 있다는
+이유로 미리 만드는 건 CLAUDE.md가 금지하는 speculative abstraction이다.
+
+| 파일                                        | 내용                                                                                                                                 |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `libs/engine/src/ports/http.ts`             | `HttpPort` — `request<T>({ method, path, body, query })`                                                                             |
+| `libs/engine/src/ports/auth.ts`             | `AuthPort` — `getApiKey()` + `endpointPath()`. `apiEndpointPath()`는 web-core에서 이식 (`null → /public`, `'#' → ''`, else `/_api_`) |
+| `libs/engine/src/adapters/fetchHttpPort.ts` | 전역 `fetch` 어댑터. Node 22 내장 fetch = 브라우저와 같은 코드                                                                       |
+
+### P2-2. Repository
+
+`libs/engine/src/repository/flowRepository.ts` — P0-3에서 순수화해 둔 workspace 규칙의 **소유자**.
+`useFlowsStore`가 들고 있던 `WorkspaceContext`(baseline/blockRegistry/isEditable/hasOwned/currentFlowId)를
+Repository가 내부에 들고 load/save마다 갱신한다. 이것이 P0-3을 한 이유다.
+
+- `loadBlocks()` — 블록 정의 캐시. 엔진의 `getBlockRegistry`가 여기를 읽는다.
+- `load(flowId)` — GET `/flows/:id/load` → `engine.loadGraph` → **정규화된 그래프에서** baseline 캡처.
+  블록이 없으면 먼저 로드한다 — 불변식 7을 호출 순서 규약이 아니라 구조로 강제.
+- `isDirty()` — `diffAgainstBaseline`.
+- `save()` — `toSnapshot` 전체를 POST (불변식 1: 전체-교체, 부분 저장 최적화 금지) →
+  성공 시 **전송한 스냅샷으로** rebaseline (불변식 2) → `{ flowId, structureDropped }` 반환 (불변식 3).
+
+`createFlowWorkspace({ http, auth })` → `{ engine, repository }`. 엔진의 `getBlockRegistry`와 Repository가
+서로를 필요로 하는 매듭을 한 곳에서 묶는다. CLI/에이전트가 실제로 원하는 조립 단위.
+
+### P2-3. Node CLI 데모
+
+`libs/engine/src/cli/` — `demo.ts`(순수, 주입받은 워크스페이스로 시나리오 실행) + `main.ts`(Node 엔트리).
+배럴에서 export하지 않는다 — 브라우저 번들이 `process`를 끌어갈 이유가 없다.
+
+```bash
+yarn engine:demo          # 스텁 HttpPort (네트워크 없음, 결정적)
+FLOW_API_KEY=... FLOW_API_URL=... yarn engine:demo --real --flow <id>
+```
+
+esbuild로 번들 후 `node`로 실행. 엔진은 **런타임 의존성이 0개**라(API 패키지는 type-only) 번들이 자기충족적이다.
+
+### Phase 2 완료 조건
+
+```bash
+yarn engine:demo                            # load → add → undo → redo → save 가 실제로 돈다
+npx nx test engine && npx nx test flows && npx nx test web
+yarn lint && npx nx build web
+```
+
+- 데모가 브라우저 없이 완주하고 save body가 전체 스냅샷임을 출력으로 확인
+- `libs/engine/src/**`에 `react`/`react-dom`/`zustand`/DOM 전역 참조 0건 유지
+- Repository 스펙이 불변식 1·2·3·7을 각각 잡는다
 
 ## 6. 진행 체크리스트
 
@@ -291,3 +342,10 @@ yarn lint
 - [x] P1-4 코어 테스트 (engine 스펙 83개, `environment: 'node'`)
 - [x] Phase 1 완료 조건 — `nx test engine/flows/web` · `yarn lint` · `nx build web` green.
       `tsc -b`는 Phase 0과 같은 선행 결함으로 red (총 에러 1142 → **1127로 감소**), 수동 스모크는 미실행.
+- [x] P2-1 포트 (HttpPort / AuthPort + fetch 어댑터)
+- [x] P2-2 Repository (`load`/`save`/`loadBlocks`/`isDirty`) + `createFlowWorkspace`
+- [x] P2-3 Node CLI 데모 (`yarn engine:demo`)
+- [x] **Phase 2 완료 조건 전부 green** — `yarn engine:demo`가 브라우저 없이 완주
+      (load 2노드 → add 3노드 → undo 2노드 → redo 3노드 → save, dirty 추적 정상, save body = 전체 그래프).
+      engine 스펙 101개, flows 18, web 174, lint 0 error, `nx build web` green.
+      `tsc -b` 총 에러 **1127 — Phase 1 대비 증감 0**. 엔진 단독 typecheck는 선행 `Connection` 3건뿐.
