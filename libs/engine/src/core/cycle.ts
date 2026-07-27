@@ -1,4 +1,4 @@
-import type { Connection } from '@lemoncloud/eureka-flows-api';
+import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 /**
  * Check if adding a new connection would create a cycle in the workflow graph.
@@ -27,7 +27,7 @@ import type { Connection } from '@lemoncloud/eureka-flows-api';
  * ], 'C', 'A') // true
  */
 export const wouldCreateCycle = (
-    connections: Connection[],
+    connections: EdgeData[],
     newSourceNodeId: string,
     newTargetNodeId: string
 ): boolean => {

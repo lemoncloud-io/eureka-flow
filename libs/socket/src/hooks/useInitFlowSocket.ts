@@ -1,145 +1,37 @@
 import { useCallback, useEffect } from 'react';
 
-import { isNodeState } from '@flows/flows';
+import { parseSocketFrame, unwrapSocketEnvelope } from '@flows/engine';
 import { useWebCoreStore } from '@flows/web-core';
 
 import { useWebSocketWorker } from './useWebSocketWorker';
 import { useWebSocketStore } from '../stores/useWebSocketStore';
 
-import type {
-    FlowUpdateMessage,
-    LogEnvelopeMessage,
-    NodeState,
-    PortUpdateMessage,
-    ProductProgressMessage,
-    ProgressEnvelopeMessage,
-    SocketNodeEvent,
-    SocketTraceEvent,
-    TraceStage,
-    WebSocketMessage,
-} from '../types';
+import type { NodeState, ProductProgressMessage, SocketTraceEvent, TraceStage, WebSocketMessage } from '../types';
 
 const WS_ENDPOINT = import.meta.env.VITE_WS_ENDPOINT || '';
 
+/** A save made here comes back as a reload notice; reloading on it discards work. */
+const SELF_ECHO_MS = 3000;
+
 /**
- * Parse raw WebSocket message data into WebSocketMessage
- * Only extracts the ID for routing - feature-specific parsing happens in subscribers
+ * Address a raw message, without deciding what it says.
+ *
+ * This layer only needs an id, because the store broadcasts to subscribers by id. What
+ * the frame *means* is `parseSocketFrame`'s call, and unwrapping the envelope is shared
+ * with it so the two can never disagree about which payload they are looking at.
  */
 const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
-    if (typeof data !== 'object' || data === null) {
-        return null;
-    }
-    const msg = data as Record<string, unknown>;
+    if (typeof data !== 'object' || data === null) return null;
 
-    // Handle wrapped message format: { action: 'message'|'trace', data: {...} }
-    // Trace messages use SocketResponseTrace format where seq/ts/stage/message
-    // are at top level and data.id contains nodeId — merge for uniform access.
-    const action = 'action' in msg ? (msg['action'] as string) : undefined;
-    let payload: Record<string, unknown>;
-
-    if (action === 'trace' && 'data' in msg && msg['data']) {
-        const nestedData = msg['data'] as Record<string, unknown>;
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructuring to separate action/data from top-level fields
-        const { action: _a, data: _d, ...topLevelFields } = msg;
-        payload = { ...topLevelFields, ...nestedData };
-    } else if (action === 'message' && 'data' in msg && msg['data']) {
-        payload = msg['data'] as Record<string, unknown>;
-    } else {
-        payload = msg;
-    }
-
-    // Check for id field (node ID) or nodeId field
+    const { payload, action } = unwrapSocketEnvelope(data as Record<string, unknown>);
     const messageId = (payload['id'] as string) || (payload['nodeId'] as string);
 
-    if (messageId) {
-        return {
-            id: messageId,
-            data: payload,
-            action,
-        };
-    }
+    if (messageId) return { id: messageId, data: payload, action };
 
-    // Warn when trace message is dropped due to missing id (nodeId)
     if (action === 'trace') {
         console.warn('[WS] Trace message dropped: missing id (nodeId). Server must include id field.', payload);
     }
-
     return null;
-};
-
-/**
- * Type guard for FlowUpdateMessage (new format)
- */
-export const isFlowUpdateMessage = (data: unknown): data is FlowUpdateMessage => {
-    if (typeof data !== 'object' || data === null) return false;
-    const msg = data as Record<string, unknown>;
-    return msg['type'] === 'flow' && typeof msg['id'] === 'string' && !('nodeId' in msg);
-};
-
-export const isNodeUpdateMessage = (data: unknown): data is SocketNodeEvent => {
-    if (typeof data !== 'object' || data === null) return false;
-    const msg = data as Record<string, unknown>;
-    return msg['type'] === 'node' && typeof msg['id'] === 'string' && !('nodeId' in msg);
-};
-
-/**
- * Type guard for PortUpdateMessage
- * Matches: { type: 'node/port', id: 'nodeId:direction@portName', ... }
- */
-export const isPortUpdateMessage = (data: unknown): data is PortUpdateMessage => {
-    if (typeof data !== 'object' || data === null) return false;
-    const msg = data as Record<string, unknown>;
-    return msg['type'] === 'node/port' && typeof msg['id'] === 'string';
-};
-
-export const isProgressEnvelopeMessage = (data: unknown): data is ProgressEnvelopeMessage => {
-    if (typeof data !== 'object' || data === null) return false;
-    const msg = data as Record<string, unknown>;
-    return typeof msg['type'] === 'string' && msg['type'].startsWith('progress:') && typeof msg['id'] === 'string';
-};
-
-export const isLogEnvelopeMessage = (data: unknown): data is LogEnvelopeMessage => {
-    if (typeof data !== 'object' || data === null) return false;
-    const msg = data as Record<string, unknown>;
-    return typeof msg['type'] === 'string' && msg['type'].startsWith('log:') && typeof msg['id'] === 'string';
-};
-
-/**
- * Parse port ID into components
- * Format: "nodeId:portName@direction" (e.g., "1000637:in@in")
- *
- * - Full ID with @: "1000637:in@in" → nodeId=1000637, portName=in, direction=in
- * - ID without @: "1000637:in" → nodeId=1000637, portName=in, direction from API
- */
-const parsePortId = (
-    fullId: string
-): { nodeId: string; portId: string; portName: string; direction?: 'in' | 'out' } | null => {
-    // Check for @ which indicates direction suffix
-    const atIndex = fullId.indexOf('@');
-
-    let portId: string;
-    let direction: 'in' | 'out' | undefined;
-
-    if (atIndex !== -1) {
-        // Format: "nodeId:portName@direction"
-        portId = fullId.slice(0, atIndex); // "1000637:in"
-        const directionStr = fullId.slice(atIndex + 1); // "in" or "out"
-        if (directionStr === 'in' || directionStr === 'out') {
-            direction = directionStr;
-        }
-    } else {
-        // Format: "nodeId:portName" (no direction suffix)
-        portId = fullId;
-    }
-
-    // Parse portId to get nodeId and portName
-    const colonIndex = portId.indexOf(':');
-    if (colonIndex === -1) return null;
-
-    const nodeId = portId.slice(0, colonIndex); // "1000637"
-    const portName = portId.slice(colonIndex + 1); // "in"
-
-    return { nodeId, portId, portName, direction };
 };
 
 /**
@@ -418,169 +310,74 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
                 return;
             }
 
-            // Handle trace message FIRST (before node/flow handlers)
-            // Merged trace payload contains type: "node" from nested data,
-            // which would incorrectly match isNodeUpdateMessage if checked later.
-            if (message.action === 'trace' && isTraceMessage(data)) {
-                // Skip completion signals with no stage and no message
-                if (!data.stage && !data.message) {
+            // What a frame *is* — envelopes, the trace merge, port ids, history snapshots —
+            // is the engine's to decide, and is under test there. What is left here is what
+            // to do about it, which needs the callbacks this hook was given.
+            const frame = parseSocketFrame(data);
+            if (!frame) return;
+
+            // Messages for another flow are not this canvas's business. They may omit
+            // `flowId` — the channel subscription already filters by flow — so only a
+            // stated mismatch is a reason to drop.
+            const isOtherFlow = (flowId?: string): boolean => !!flowId && flowId !== currentFlowId;
+
+            switch (frame.kind) {
+                case 'trace':
+                    if (isOtherFlow(frame.trace.flowId)) return;
+                    onTraceUpdate?.({ ...frame.trace, ts: frame.trace.ts || Date.now() });
                     return;
-                }
 
-                // flowId comes from merged nested data, not from SocketTraceEvent directly
-                const tracePayload = data as Record<string, unknown>;
-                const traceFlowId = tracePayload.flowId as string | undefined;
-
-                // Skip if flowId is present and doesn't match current flow
-                if (traceFlowId && traceFlowId !== currentFlowId) {
-                    return;
-                }
-
-                if (onTraceUpdate) {
-                    onTraceUpdate({
-                        nodeId: message.id,
-                        flowId: traceFlowId,
-                        seq: data.seq,
-                        ts: data.ts ?? Date.now(),
-                        stage: data.stage,
-                        message: data.message,
-                        state: data.state,
-                        runId: data.runId,
-                        data: data.data,
-                    });
-                }
-                return;
-            }
-
-            // Handle lemon-model progress snapshot (progress:*) — live node state/data updates.
-            // Emitted by flows-api processors (runWithProcessTrace) and codes-goods-api deploy steps.
-            if (isProgressEnvelopeMessage(data)) {
-                const state = data.data;
-                if (state) {
+                case 'progress':
                     onProgressUpdate?.({
-                        nodeId: message.id,
-                        status: state.status,
-                        percent: state.percent,
-                        step: state.step,
-                        totalSteps: state.totalSteps,
-                        label: state.label,
-                        error: state.error,
-                        seq: state.seq ?? 0,
-                        ts: state.ts,
-                        product$: state.meta?.product$,
+                        nodeId: frame.event.nodeId,
+                        status: frame.event.status,
+                        percent: frame.event.percent,
+                        step: frame.event.step,
+                        totalSteps: frame.event.totalSteps,
+                        label: frame.label,
+                        error: frame.error,
+                        seq: frame.event.seq,
+                        ts: frame.ts,
+                        product$: frame.product$,
                     });
-                }
-                return;
-            }
-
-            // Handle lemon-model log batch (log:*) — unpack entries in batch order.
-            if (isLogEnvelopeMessage(data)) {
-                const batch = data.data;
-                (batch?.entries ?? []).forEach(entry =>
-                    onLogTrace?.({
-                        nodeId: message.id,
-                        level: entry.level,
-                        message: entry.message,
-                        ts: entry.ts,
-                        seq: entry.seq,
-                        json: entry.json,
-                        source: batch?.source,
-                    })
-                );
-                return;
-            }
-
-            // Self-echo prevention: ignore messages within 3 seconds of our last local change
-            const DEBOUNCE_MS = 3000;
-            const now = Date.now();
-            const lastUpdate = getLastLocalUpdateTimestamp?.();
-            const isRecentLocalUpdate = lastUpdate && now - lastUpdate < DEBOUNCE_MS;
-
-            // Handle new format: flow update notification
-            if (isFlowUpdateMessage(data)) {
-                // Skip if we just made local changes (self-echo prevention)
-                if (isRecentLocalUpdate) {
                     return;
-                }
-                // Only process if it's for the current flow
-                if (currentFlowId && data.id === currentFlowId && onFlowUpdate) {
-                    onFlowUpdate(data.id);
-                }
-                return;
-            }
 
-            // Handle node update notification (includes status changes and progress)
-            // Socket message is just a notification - actual data is fetched via API
-            // NOTE: Node updates do NOT use self-echo prevention because:
-            // - Node run results come via socket and must be processed
-            // - Self-echo prevention is only for flow save operations
-            if (isNodeUpdateMessage(data)) {
-                // Skip history nodes (format: nodeId@N like 'ywb8c99z3@2')
-                // History nodes are snapshots and don't need to trigger updates
-                const isHistoryNode = data.id.includes('@');
-                if (isHistoryNode) return;
+                case 'log':
+                    frame.log.entries.forEach(entry =>
+                        onLogTrace?.({ nodeId: frame.log.nodeId, source: frame.log.source, ...entry })
+                    );
+                    return;
 
-                // Check if this is a port update (id contains ':' like 'nodeId:5')
-                const isPort = data.id.includes(':');
-                const parentNodeId = isPort ? data.id.split(':')[0] : undefined;
-
-                // Skip if flowId is present but doesn't match current flow
-                // Node messages may omit flowId — channel subscription already filters by flow
-                if (data.flowId && data.flowId !== currentFlowId) {
+                case 'flow': {
+                    // Self-echo prevention: a save made here comes back as a reload notice,
+                    // and reloading on it would throw away whatever was typed since.
+                    const lastUpdate = getLastLocalUpdateTimestamp?.();
+                    if (lastUpdate && Date.now() - lastUpdate < SELF_ECHO_MS) return;
+                    if (currentFlowId && frame.flowId === currentFlowId) onFlowUpdate?.(frame.flowId);
                     return;
                 }
 
-                // Log state transitions with data (e.g., "1004310: IDLE→RUNNING {...}")
-                const stateChange = data.state;
-                console.log(`[WS] ${data.id}: ${stateChange}`, data);
-
-                if (onNodeReload) {
-                    onNodeReload({
-                        nodeId: data.id,
-                        flowId: data.flowId,
-                        timestamp: data.ts,
-                        no: data.no,
-                        isPort,
-                        parentNodeId,
-                        state: isNodeState(data.state) ? data.state : undefined,
-                        progress: data.progress,
-                        stage: data.stage,
-                        runId: data.runId,
-                        error: data.error,
+                case 'node':
+                    // No self-echo debounce here: run results arrive this way, and dropping
+                    // them for three seconds after a save loses the start of every run.
+                    if (isOtherFlow(frame.event.flowId)) return;
+                    console.log(`[WS] ${frame.event.nodeId}: ${frame.event.state}`, data);
+                    onNodeReload?.({
+                        ...frame.event,
+                        isPort: frame.event.isPort ?? false,
+                        timestamp: frame.ts,
                     });
-                }
-                return;
-            }
-
-            // Handle port update notification (type: 'node/port')
-            // Triggered when port data (input/output) changes
-            // Used for real-time data synchronization between browser tabs
-            if (isPortUpdateMessage(data)) {
-                // Skip if flowId is present but doesn't match current flow
-                // Port messages may omit flowId — channel subscription already filters by flow
-                if (data.flowId && data.flowId !== currentFlowId) {
                     return;
-                }
 
-                // Parse port ID to extract nodeId, direction, portName
-                const parsed = parsePortId(data.id);
-                if (!parsed) return;
-
-                // Log port updates with data (e.g., "1004310:out updated {...}")
-                console.log(`[WS] ${parsed.nodeId}:${parsed.portName} updated`, data);
-
-                if (onPortUpdate) {
-                    onPortUpdate({
-                        portId: parsed.portId, // "nodeId:portName" without @direction
-                        nodeId: parsed.nodeId,
-                        portName: parsed.portName,
-                        direction: parsed.direction, // from @suffix
-                        flowId: data.flowId,
-                        ts: data.ts,
-                        no: data.no,
-                        runId: data.runId,
+                case 'port':
+                    if (isOtherFlow(frame.event.flowId)) return;
+                    console.log(`[WS] ${frame.event.nodeId}:${frame.event.portName} updated`, data);
+                    onPortUpdate?.({
+                        ...frame.event,
+                        portName: frame.event.portName ?? '',
+                        direction: frame.direction,
                     });
-                }
+                    return;
             }
         },
         [

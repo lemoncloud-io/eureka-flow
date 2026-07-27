@@ -35,6 +35,27 @@ export interface SaveOutcome {
     structureDropped: boolean;
 }
 
+/** `POST /nodes/:id/run`. */
+export interface RunNodeOptions {
+    /** Queue the run and answer immediately. Results then arrive over the socket. */
+    async?: boolean;
+    /** Run it even if the node is busy, or is a frontend block the server would skip. */
+    force?: boolean;
+    /** Carry on into downstream nodes when this one finishes. */
+    propagate?: boolean;
+    /** Socket connection id, so the server streams this run back to the caller. */
+    connection?: string;
+    /** Load workspace settings — needed for stored API keys to take effect. */
+    setting?: boolean;
+}
+
+export interface RunNodeBody {
+    /** Config for this run only; not saved to the node. */
+    config?: Record<string, unknown>;
+    /** Output a frontend block produced, handed back for the server to store and propagate. */
+    output?: unknown;
+}
+
 export interface FlowRepository {
     /** Block definitions, fetched once and cached. */
     loadBlocks: () => Promise<Record<string, BlockDefinitionWithFrontend>>;
@@ -45,6 +66,8 @@ export interface FlowRepository {
     isDirty: () => boolean;
     /** Send the whole graph. Returns the flow id and whether the structure survived. */
     save: () => Promise<SaveOutcome>;
+    /** Ask the server to execute a node. Progress arrives over the socket, not from here. */
+    runNode: (nodeId: string, body?: RunNodeBody, options?: RunNodeOptions) => Promise<NodeData>;
     /** What the server last confirmed, for callers that want to inspect it. */
     baseline: () => FlowSnapshot | null;
 }
@@ -130,6 +153,27 @@ export const createFlowRepository = ({ engine, http }: FlowRepositoryOptions): F
 
             currentFlowId = data.id ?? currentFlowId ?? '0';
             return { flowId: currentFlowId, structureDropped: outcome.dropped };
+        },
+
+        runNode: async (nodeId, body, options) => {
+            // `async` and `propagate` go out as explicit 0/1. Omitting them lets the
+            // server's environment default decide, which quietly overrides what the caller
+            // asked for — the same reason the browser client sends them explicitly.
+            const query: Record<string, string | number | boolean | undefined> = {
+                async: options?.async === undefined ? undefined : options.async ? 1 : 0,
+                propagate: options?.propagate === undefined ? undefined : options.propagate ? 1 : 0,
+                force: options?.force ? 1 : undefined,
+                setting: options?.setting === undefined ? undefined : options.setting ? 1 : 0,
+                connection: options?.connection,
+            };
+
+            const { data } = await http.request<NodeData>({
+                method: 'POST',
+                path: `/nodes/${encodeURIComponent(nodeId)}/run`,
+                body: body ?? {},
+                query,
+            });
+            return data;
         },
     };
 };

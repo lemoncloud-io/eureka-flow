@@ -56,6 +56,7 @@ const harness = (
                 await hooks.onSave?.();
                 return { status: 200, data: (hooks.saveResponse ?? { id: fixture.id }) as T };
             }
+            if (req.path.endsWith('/run')) return { status: 200, data: { id: 'n1', state: 'RUNNING' } as T };
             throw new Error(`unexpected ${req.method} ${req.path}`);
         },
     };
@@ -247,5 +248,64 @@ describe('save by a non-owner editor', () => {
 
         expect(outcome.structureDropped).toBe(false);
         expect(repository.isDirty()).toBe(false);
+    });
+});
+
+describe('runNode', () => {
+    const run = async (
+        args: Parameters<ReturnType<typeof createFlowWorkspace>['repository']['runNode']>
+    ): Promise<HttpRequest> => {
+        const { http, calls } = harness();
+        const { repository } = createFlowWorkspace({ http });
+        await repository.load('f1');
+        await repository.runNode(...args);
+        return calls[calls.length - 1];
+    };
+
+    it('posts to the node run endpoint', async () => {
+        const req = await run(['n1']);
+
+        expect(req.method).toBe('POST');
+        expect(req.path).toBe('/nodes/n1/run');
+    });
+
+    it('escapes an id that would otherwise change the path', async () => {
+        const req = await run(['n1:out']);
+
+        expect(req.path).toBe('/nodes/n1%3Aout/run');
+    });
+
+    it('sends async and propagate as explicit 0/1', async () => {
+        // Omitting them lets the server environment default decide, which silently
+        // overrides what the caller asked for.
+        const req = await run(['n1', undefined, { async: false, propagate: false }]);
+
+        expect(req.query).toMatchObject({ async: 0, propagate: 0 });
+    });
+
+    it('leaves out what the caller did not state', async () => {
+        const req = await run(['n1', undefined, { async: true }]);
+
+        expect(req.query).toMatchObject({ async: 1 });
+        expect(req.query?.propagate).toBeUndefined();
+        expect(req.query?.force).toBeUndefined();
+    });
+
+    it('carries force, setting and the socket connection', async () => {
+        const req = await run(['n1', undefined, { force: true, setting: true, connection: 'c-1' }]);
+
+        expect(req.query).toMatchObject({ force: 1, setting: 1, connection: 'c-1' });
+    });
+
+    it('sends a frontend block output back for the server to store', async () => {
+        const req = await run(['n1', { output: { out: 'hello' } }]);
+
+        expect(req.body).toEqual({ output: { out: 'hello' } });
+    });
+
+    it('sends an empty body when there is nothing to hand over', async () => {
+        const req = await run(['n1']);
+
+        expect(req.body).toEqual({});
     });
 });

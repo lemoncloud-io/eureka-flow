@@ -1,4 +1,4 @@
-import type { Connection, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
 /** Valid port style keys matching CSS variables (--port-type-*) */
 export type PortStyleKey = 'text' | 'image' | 'number' | 'json' | 'any';
@@ -25,7 +25,7 @@ export const arePortTypesCompatible = (sourceType: string, targetType: string | 
     return sourceType.toLowerCase() === normalizedTarget.toLowerCase();
 };
 
-export const getConnectionKey = (conn: Connection): string =>
+export const getConnectionKey = (conn: EdgeData): string =>
     `${conn.sourceNodeId}:${conn.sourcePortId}→${conn.targetNodeId}:${conn.targetPortId}`;
 
 /**
@@ -35,8 +35,8 @@ export const getConnectionKey = (conn: Connection): string =>
  * it — but flows saved before that can carry two edges for one connection, so loaded
  * data still needs this.
  */
-export const deduplicateEdges = (edges: Connection[]): Connection[] => {
-    const edgeMap = new Map<string, Connection>();
+export const deduplicateEdges = (edges: EdgeData[]): EdgeData[] => {
+    const edgeMap = new Map<string, EdgeData>();
     const seenIds = new Set<string>();
 
     edges.forEach(edge => {

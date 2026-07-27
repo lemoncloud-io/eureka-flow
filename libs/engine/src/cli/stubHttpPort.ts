@@ -9,6 +9,14 @@ export interface StubHttpPort extends HttpPort {
     lastSaveBody: () => { nodes: NodeData[]; edges: EdgeData[] } | null;
 }
 
+export interface StubHttpPortOptions {
+    /**
+     * Called when a node is asked to run. A real server answers the request and then
+     * streams the run over the socket; this is where the demo does the streaming half.
+     */
+    onRun?: (nodeId: string, req: HttpRequest) => void;
+}
+
 const BLOCKS = [
     { type: 'input-text', name: 'Text Input', stereo: 'input', inputs: [], outputs: [{ id: 'out', type: 'text' }] },
     {
@@ -47,7 +55,7 @@ const FLOW = {
  * so the default run needs no key and no connectivity — and gives the same output every
  * time, which makes it a test as well as a demo.
  */
-export const createStubHttpPort = (): StubHttpPort => {
+export const createStubHttpPort = ({ onRun }: StubHttpPortOptions = {}): StubHttpPort => {
     const calls: HttpRequest[] = [];
     let saved: { nodes: NodeData[]; edges: EdgeData[] } | null = null;
 
@@ -62,6 +70,11 @@ export const createStubHttpPort = (): StubHttpPort => {
             if (req.path.endsWith('/save')) {
                 saved = req.body as { nodes: NodeData[]; edges: EdgeData[] };
                 return { status: 200, data: { id: FLOW.id } as T };
+            }
+            if (req.path.endsWith('/run')) {
+                const nodeId = decodeURIComponent(req.path.slice('/nodes/'.length, -'/run'.length));
+                onRun?.(nodeId, req);
+                return { status: 200, data: { id: nodeId, state: 'RUNNING' } as T };
             }
             throw new Error(`stub has no answer for ${req.method} ${req.path}`);
         },

@@ -1,7 +1,8 @@
-# PLAN — `@flows/engine` Phase 0–2 실행 계획
+# PLAN — `@flows/engine` Phase 0–4 실행 계획
 
 > 배경/아키텍처/근거는 [DESIGN.md](./DESIGN.md). 이 문서는 **실행 명세**다.
-> Phase 3(SocketPort + agents 포크의 `CanvasBinding` 재구현)은 아직 명세 없음 — DESIGN §3.3 참조.
+> Phase 4(헤드리스 실행)는 DESIGN §3.3 로드맵에는 없다 — Phase 2의 "블랙박스 증명"을
+> 편집에서 **실행**까지 밀어붙이는 후속으로, §7에서 명세한다.
 > Claude Code 사용법: "PLAN.md의 Phase 0을 실행해" → Phase 0의 완료 조건이 전부 통과하면 Phase 1로.
 > 각 Phase는 독립 PR 크기. Phase 내 스텝 순서는 지켜야 한다 (뒤 스텝이 앞 스텝 산출물에 의존).
 
@@ -381,7 +382,87 @@ yarn lint && npx nx build web && yarn engine:demo
 - `useSocketHandlers.ts`에 시퀀스 추적 ref 0건
 - 엔진 순수성 유지 (react/zustand/DOM 전역 0건)
 
-## 7. 진행 체크리스트
+## 7. Phase 4 — 헤드리스 실행
+
+목표: Phase 2가 증명한 것은 **편집**의 이식성이었다(load → add → undo → redo → save).
+아직 못 하는 것은 **실행**이다 — 엔진은 노드를 돌릴 수도, 서버가 밀어주는 실행 프레임을 혼자
+해석할 수도 없다. Phase 3이 리듀서를 만들었지만 그 입력(`NodeEvent`/`PortEvent`)을 만드는
+파서는 아직 React 훅 안에 있고, `SocketPort`와 리듀서를 잇는 배선도 없다.
+
+> **범위 밖 (이유 있음).**
+>
+> - agents 포크의 `CanvasBinding` — 포크에 `libs/engine`이 **없다**. 이 브랜치가 머지되고
+>   포크가 리베이스해야 시작 가능. 못 하는 게 아니라 아직 못 하는 상태다.
+> - `ExecutionPort`(DESIGN §3.2 #5의 프론트 블록 격리) — 헤드리스 구현체가 0개다.
+>   구현이 하나뿐인 인터페이스는 추상화가 아니라 우회로다. 두 번째 소비자가 생길 때 만든다.
+> - 브라우저 Worker를 `SocketPort` 뒤로 감싸기 — 어댑터만 두면 아무도 안 쓰는 죽은 코드고,
+>   `useInitFlowSocket`(639줄)의 워커 수명주기까지 갈아엎는 건 별도 슬라이스다. P4-4가
+>   **파싱만** 공유하게 만들어, 다음에 감쌀 때 남는 차이가 워커 수명주기뿐이도록 좁힌다.
+
+### P4-1. 프레임 파서
+
+`libs/engine/src/runtime/parseSocketFrame.ts` — **순수 함수**. raw 프레임(문자열 또는 객체) →
+판별 유니온. 지금 `useInitFlowSocket.ts`에 있는 `parseWebSocketMessage` + 타입 가드 5개 +
+`parsePortId`를 이식한다. 반환 페이로드는 리듀서가 이미 받는 타입 그대로다 (`NodeEvent` 등) —
+파서와 리듀서 사이에 변환 계층을 두지 않는다.
+
+이식되는 규칙 (각각 스펙으로 고정):
+
+1. **봉투 벗기기** — `{ action: 'message', data: {...} }`는 `data`가 진짜 프레임.
+2. **trace 병합** — `action: 'trace'`는 `seq`/`ts`/`stage`가 top-level, `id`는 `data` 안.
+   둘을 합쳐야 하나의 프레임이 된다.
+3. **포트 ID 해석** — `"1000637:in@in"` → `nodeId` / `portId` / `portName` / `direction`.
+   `@`가 없으면 방향은 서버가 정한다(undefined).
+4. **`:` 가 든 node 프레임은 포트 프레임** — 부모 노드(`parentNodeId`)의 상태를 말한다.
+5. **판별 순서** — `progress:*` / `log:*` 접두사 → `type` 정확 일치 → `seq` 보유(trace).
+
+### P4-2. RunSession
+
+`libs/engine/src/runtime/runSession.ts` — `SocketPort` + `FlowEngine` + 리듀서를 잇는 배선.
+프레임을 받아 파싱 → 리듀서 → `apply` effect는 `engine.applyRuntime`으로 직접 반영하고,
+브라우저가 필요한 나머지 effect(toast·fetch·autorun)는 그대로 호출자에게 넘긴다.
+
+`waitForNode(nodeId)`가 노드의 종료(`COMPLETED`/`ERROR`)를 기다리는 Promise를 준다 — CLI가
+실행 완료를 기다릴 수 있는 유일한 수단이고, 이게 Phase 4 완료 조건의 실행 축이다.
+
+### P4-3. `repository.runNode`
+
+`POST /nodes/:id/run`. 쿼리 파라미터 시맨틱은 `libs/flows/src/api/nodes.ts`에서 그대로 가져온다 —
+특히 **`async`/`propagate`는 0/1을 명시 전송**한다 (서버 환경 기본값이 호출자 의도를 덮지 않도록).
+
+### P4-4. 스트랭글러 — `useInitFlowSocket` 파싱 치환
+
+훅의 로컬 가드 5개 + `parsePortId`를 지우고 `parseSocketFrame` 한 번 호출로 바꾼다.
+구독자 콜백 시그니처 무변경. 워커 수명주기는 이번 슬라이스에서 건드리지 않는다.
+
+`parseWebSocketMessage`는 **남긴다** — 이건 프레임 해석이 아니라 *주소 판독*이다(스토어가
+id로 구독자에게 브로드캐스트한다). 단 봉투 벗기기는 `unwrapSocketEnvelope`로 공유해서,
+두 층이 "어떤 payload를 보고 있는지"에 대해 어긋날 수 없게 만든다.
+
+`useSocketRecorder`(리플레이 도구)도 같은 파서로 바꾼다. 기록과 실제 처리가 서로 다른
+분류를 쓰면, 리플레이가 재현한다고 주장하는 실행이 사실이 아니게 된다.
+
+### Phase 4 완료 조건
+
+```bash
+npx nx test engine && npx nx test flows && npx nx test web
+yarn lint && npx nx build web && yarn engine:demo
+```
+
+- `yarn engine:demo`가 **실행까지** 완주: `load → runNode → 소켓 프레임 → COMPLETED → 출력 읽기`
+- 파서 스펙이 위 규칙 1~5를 각각 잡는다
+- `useInitFlowSocket.ts`에 프레임 판별/필드 추출 0건 (봉투 벗기기는 엔진과 공유)
+- 엔진 순수성 유지 (react/zustand/DOM 전역 0건)
+
+### 선행 결함 1건 해소 (범위 밖이었으나 불가피)
+
+`libs/socket`이 `@flows/engine`을 참조하게 되면서 엔진의 `.d.ts` 생성이 **load-bearing**이 됐다.
+그런데 엔진은 Phase 0 이식 때 딸려온 `Connection` import 3건 때문에 선언을 내보내지 못했다 —
+`@lemoncloud/eureka-flows-api@0.26.609`에 그런 export는 **없다**(패키지 dist 전체에서 0건).
+의도한 타입은 `EdgeData`였다. 엔진 3파일만 고쳤고(`cycle`/`edges`/`snapshot`), `libs/flows`의
+동일 결함은 건드리지 않았다. 결과: 엔진이 처음으로 `.d.ts`를 생성한다.
+
+## 8. 진행 체크리스트
 
 - [x] P0-1 lib 스캐폴딩 (`@flows/engine`)
 - [x] P0-2 파일 이동 + shim
@@ -409,3 +490,15 @@ yarn lint && npx nx build web && yarn engine:demo
       lint 0 error, `nx build web`, `yarn engine:demo` 모두 green.
       `tsc -b` 총 **1126 — Phase 2의 1127보다 1건 감소**. 엔진 순수성 유지.
       **범위 밖**: agents 포크 `CanvasBinding` (다른 레포) — Phase 3의 남은 절반.
+- [x] P4-1 프레임 파서 (`parseSocketFrame` + `unwrapSocketEnvelope` + `parsePortId`)
+- [x] P4-2 RunSession (`waitForNode` 포함) — 소켓 → 리듀서 → `applyRuntime` 배선
+- [x] P4-3 `repository.runNode` (`async`/`propagate` 0/1 명시 전송)
+- [x] P4-4 `useInitFlowSocket` + `useSocketRecorder` 파싱 치환 (로컬 가드 6개 → 0개)
+- [x] **Phase 4 완료 조건 전부 green** — `yarn engine:demo`가 `load → add → undo → redo →
+    save → **run**`을 브라우저 없이 완주. 마지막 프레임은 일부러 stale이라, 노드가
+      COMPLETED로 남는 것 자체가 순서 규칙이 돌았다는 증거다.
+      engine 스펙 217개 (Phase 3의 155 → **+62**), flows 18, web 174,
+      lint 0 error, `nx build web`, `yarn engine:demo` 모두 green.
+      `tsc -b --force` 총 **1061 — 같은 방식으로 잰 HEAD의 1073보다 12건 감소**.
+      (이전 Phase의 숫자들은 측정 방식이 달라 직접 비교 불가 — `--force` 없이 재면
+      증분 캐시 때문에 값이 흔들린다.)
