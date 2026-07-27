@@ -3,7 +3,7 @@ import { api, withRetry } from '@flows/web-core';
 import { EXECUTE_FUNCTIONS } from './execute-functions';
 
 import type { BlockDefinitionWithFrontend, BlockStereo } from '../types';
-import type { BlockView, DataPacket, ListResult } from '@lemoncloud/eureka-flows-api';
+import type { BlockView, ListResult } from '@lemoncloud/eureka-flows-api';
 
 const _log = console.log.bind(console, '[blocks-api]');
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -28,15 +28,6 @@ const BLOCK_ICON_TYPES = new Set([
     'template-converter',
 ]);
 
-/**
- * Create a DataPacket
- */
-export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'): DataPacket => ({
-    value,
-    type,
-    timestamp: Date.now(),
-});
-
 /** @deprecated Fallback for servers without isFrontend flag. Remove when server is updated. */
 const LEGACY_BACKEND_PROCESSOR_TYPES = [
     'blog-title-generator',
@@ -54,8 +45,12 @@ const LEGACY_BACKEND_PROCESSOR_TYPES = [
  *
  * Note: Server returns `isFrontend` as BoolFlag (0 | 1), not boolean.
  * Conversion to boolean happens in listBlocks().
+ *
+ * That is why `isFrontend` is omitted and redeclared rather than narrowed: the API package
+ * types it as `boolean`, so extending it directly is a type error, and widening to
+ * `boolean` here would describe a response the server does not send.
  */
-interface BlockViewWithFrontend extends BlockView {
+interface BlockViewWithFrontend extends Omit<BlockView, 'isFrontend'> {
     /** Server-provided flag indicating frontend execution capability (0 or 1) */
     isFrontend?: 0 | 1;
     /** Block stereotype for categorization (input, process, output) */
@@ -82,7 +77,7 @@ export const requiresBackendProcessing = (blockDef: BlockDefinitionWithFrontend)
     }
 
     // Fallback: use legacy hardcoded list for backward compatibility
-    return LEGACY_BACKEND_PROCESSOR_TYPES.includes(blockDef.type);
+    return (LEGACY_BACKEND_PROCESSOR_TYPES as readonly string[]).includes(blockDef.type);
 };
 
 /**

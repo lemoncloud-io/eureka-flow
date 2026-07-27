@@ -83,3 +83,20 @@ export interface BlockDefinitionWithFrontend extends BlockDefinition {
         onProgress?: (progress: number) => void
     ) => Promise<Record<string, DataPacket>>;
 }
+
+/**
+ * `state` as the server actually sends it.
+ *
+ * `@lemoncloud/eureka-flows-api` still describes only the deprecated `status`, so every
+ * reader of the field that replaced it has had to cast — the execution reducer casts the
+ * patches it writes, and the layout code casts to read them back. Declaring it once keeps
+ * the two in agreement instead of each guessing separately.
+ *
+ * Remove when the API package ships the field.
+ */
+declare module '@lemoncloud/eureka-flows-api' {
+    interface NodeData {
+        /** IDLE → READY → RUNNING → COMPLETED/ERROR. Preferred over `status`. */
+        state?: NodeState;
+    }
+}

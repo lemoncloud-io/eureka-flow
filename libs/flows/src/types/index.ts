@@ -7,7 +7,6 @@ export * from './uploadHtml';
 export type {
     BlockDefinition,
     BlockView,
-    BoolFlag,
     ConfigField,
     ConfigFieldModel,
     ConfigFieldWithDefault,

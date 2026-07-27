@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
 import type { EdgeView, RunContext, RunPortUpdate, TraceEntry } from '../types';
-import type { DataPacket, EdgeData, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type { GraphLike } from '@flows/engine';
+import type { DataPacket, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 import type { StateCreator } from 'zustand';
 
 const MAX_TRACE_ENTRIES = 500;
@@ -153,7 +154,8 @@ interface CanvasState {
 
     // Compound Actions
     clearSelection: () => void;
-    loadWorkflow: (state: WorkflowState, flowId?: string) => void;
+    /** `GraphLike`, not `WorkflowState`: flows saved before the rename carry `connections`. */
+    loadWorkflow: (state: GraphLike, flowId?: string) => void;
     clearWorkflow: () => void;
     resetCanvas: () => void;
 

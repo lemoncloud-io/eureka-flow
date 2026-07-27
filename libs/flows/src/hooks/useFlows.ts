@@ -274,7 +274,7 @@ export const useFlows = () => {
                 if (!flowId) {
                     console.log('[useFlows] Creating new flow via POST /flows/0/save');
                     const result = await createFlowMutation.mutateAsync(saveBody);
-                    flowId = result.id;
+                    flowId = result.id ?? null;
 
                     if (flowId) {
                         setCurrentFlowId(flowId);
