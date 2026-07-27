@@ -1,7 +1,7 @@
 import { newEdgeId } from './ids';
 
 import type { GraphEdge } from '../types';
-import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 /** Valid port style keys matching CSS variables (--port-type-*) */
 export type PortStyleKey = 'text' | 'image' | 'number' | 'json' | 'any';
@@ -62,23 +62,4 @@ export const deduplicateEdges = (edges: EdgeData[]): GraphEdge[] => {
     });
 
     return Array.from(edgeMap.values());
-};
-
-/**
- * Check if a connection between two ports is valid.
- * Uses arePortTypesCompatible for consistent case-insensitive type matching.
- *
- * @deprecated sourceIdx/targetIdx are unused - kept for backward compatibility.
- * Consider using arePortTypesCompatible directly for new code.
- */
-export const isValidConnection = (
-    sourceNode: NodeData,
-    _sourceIdx: number,
-    targetNode: NodeData,
-    _targetIdx: number,
-    sourceType: string,
-    targetType: string
-): boolean => {
-    if (sourceNode.id === targetNode.id) return false;
-    return arePortTypesCompatible(sourceType, targetType);
 };

@@ -17,9 +17,13 @@ const API_PATH_PUBLIC = '/public' as const;
 
 /**
  * Determines the API endpoint path based on the API key.
- * - null (no key) uses '/public' (read-only public endpoint)
  * - '#' means talk to the root directly, for a server running locally
+ * - null (no key) uses '/public' (read-only public endpoint)
  * - Any other key uses '/_api_'
+ *
+ * `getApiEndpointPath` in `@flows/web-core` (`utils/apiEndpoint.ts`) is the same mapping
+ * for the browser client. Kept separate so this package can declare no dependencies —
+ * see the note there. Change both together.
  */
 export const apiEndpointPath = (apiKey: string | null): string => {
     if (apiKey === '#') return '';

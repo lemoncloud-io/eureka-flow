@@ -12,9 +12,7 @@ import type {
     NodeUpdateInfo,
     PortUpdateInfo,
     ProductProgressInfo,
-    ProductProgressMessage,
     ProgressUpdateInfo,
-    SocketTraceEvent,
     TraceUpdateInfo,
     WebSocketMessage,
 } from '../types';
@@ -40,32 +38,6 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
         console.warn('[WS] Trace message dropped: missing id (nodeId). Server must include id field.', payload);
     }
     return null;
-};
-
-/**
- * Type guard for ProductProgressMessage.
- * Matches: { type: 'product-progress', productId, progress$, state }.
- */
-export const isProductProgressMessage = (data: unknown): data is ProductProgressMessage => {
-    if (typeof data !== 'object' || data === null) return false;
-    const msg = data as Record<string, unknown>;
-    return (
-        msg['type'] === 'product-progress' &&
-        typeof msg['productId'] === 'string' &&
-        typeof msg['progress$'] === 'object' &&
-        msg['progress$'] !== null &&
-        typeof msg['state'] === 'string'
-    );
-};
-
-/**
- * Type guard for SocketTraceEvent
- * `seq` (required number) is the discriminant — unique to trace events
- */
-export const isTraceMessage = (data: unknown): data is SocketTraceEvent => {
-    if (typeof data !== 'object' || data === null) return false;
-    const msg = data as Record<string, unknown>;
-    return typeof msg['seq'] === 'number';
 };
 
 export interface UseInitFlowSocketOptions {

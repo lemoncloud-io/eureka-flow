@@ -16,7 +16,6 @@ export {
     deduplicateEdges,
     getConnectionKey,
     getPortStyleKey,
-    isValidConnection,
     wouldCreateCycle,
 } from '@flows/engine';
 

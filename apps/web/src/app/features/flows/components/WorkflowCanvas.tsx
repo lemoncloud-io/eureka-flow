@@ -46,12 +46,12 @@ import { NodeBlock } from './NodeBlock';
 import { ZoomControls } from './ZoomControls';
 import { TOUCH_GESTURE_THRESHOLD, useEngineMirror, useTouchCanvas } from '../hooks';
 import {
+    arePortTypesCompatible,
     captureCanvasAsDataUrl,
     captureCanvasForThumbnail,
     deduplicateEdges,
     exportCanvasAsPng,
     getVisiblePorts,
-    isValidConnection,
 } from '../utils';
 
 import type { ClipboardPayload, FlowEngine } from '@flows/engine';
@@ -1949,7 +1949,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 if (
                     sourceNode &&
                     targetNode &&
-                    isValidConnection(sourceNode, 0, targetNode, 0, connectionDraft.sourceType, targetType)
+                    sourceNode.id !== targetNode.id &&
+                    arePortTypesCompatible(connectionDraft.sourceType, targetType)
                 ) {
                     // The engine refuses a cycle, a duplicate and a type mismatch itself; the
                     // canvas turns the refusal into something the user can see. Connecting a

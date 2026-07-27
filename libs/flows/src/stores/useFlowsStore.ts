@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { flowStorage } from '../utils/flowStorage';
 
 import type { BlockDefinitionWithFrontend, FlowView } from '../types';
-import type { FlowSnapshot } from '../workspace/snapshot';
+import type { FlowSnapshot } from '@flows/engine';
 
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
