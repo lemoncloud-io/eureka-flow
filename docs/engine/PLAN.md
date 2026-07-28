@@ -605,6 +605,10 @@ save → **run**`을 브라우저 없이 완주. 마지막 프레임은 일부�
       편집 시 `dirty` 표시 전환.
       **저장·실행·소켓 갱신은 이번 스모크에서 별도로 확인하지 않았다** — 자동 게이트와
       실서버 헤드리스 런(§11)이 덮는 경로다.
+- [x] **npm 배포 패키지 — `@lemoncloud/flow-engine` (§14).** 소스 변경 0.
+      `libs/engine` 이 `private` 을 벗고 ESM/CJS 두 벌 + d.ts 를 `build/` 로 낸다.
+      **이 절 위쪽 Phase 들의 `nx test engine` 은 그 시점의 기록이다** — nx 프로젝트명이
+      패키지명을 따라가므로 지금 도는 명령은 `nx test flow-engine`.
 - [ ] agents 포크 `CanvasBinding` — 다른 레포. 이 브랜치 머지 후.
 
 ---
@@ -999,3 +1003,98 @@ DESIGN 은 `LlmPort(= LlmGateway)` 를 예고했지만, 실행 모델을 보면 
 
 `docs/engine/GUIDE.md` 의 "IndexedDB 는 엔진에 없다 — 어디에 넣을지는 호스트가 정한다" 는
 서술은 이제 근거가 있다. 이 절이 그 근거다 — 그 전까지는 **결정이 아니라 사후 정당화**였다.
+
+---
+
+## 14. npm 배포 — `@lemoncloud/flow-engine`
+
+엔진 소스는 **한 줄도 안 바뀐다.** `libs/engine` 이 `private` 을 벗고 빌드 산출물을 내는 것,
+그게 전부다. 목적은 하나: CommonJS 소비자(flow-mcp)가 `require()` 로 엔진 규칙을 쓰는 것.
+
+### 확인하고 시작한 것
+
+| 사실                                                          | 근거                                            |
+| ------------------------------------------------------------- | ----------------------------------------------- |
+| 런타임 의존성 0 — flows-api 참조는 **전부 `import type`**     | `grep -v "import type"` → 0건                   |
+| `import.meta` / `node:` builtin / `require(` 없음 → dual 안전 | 엔진 소스 grep 전부 0건                         |
+| `process.*` 는 `cli/main.ts` 하나, 배럴에서 export 안 함      | grep + `index.ts`                               |
+| `src/types.ts:116` 이 외부 모듈을 **augment** 한다            | `declare module '@lemoncloud/eureka-flows-api'` |
+
+마지막 줄이 빌드 방식을 정했다.
+
+### 왜 tsup 이 아니라 tsc + esbuild 인가
+
+d.ts 를 **평탄화(flatten)하는 것이 augmentation 을 떨어뜨리는 바로 그 연산**이다 —
+`declare module '<외부 패키지>'` 는 export 그래프에 없으므로 번들러가 도달하지 못한다.
+떨어지면 소비자 쪽에서 `NodeData.state` 가 조용히 사라진다.
+
+그래서 **선언은 `tsc` 가 파일별로** 낸다(구조상 유실 불가), **JS 두 벌은 `esbuild`** 가 낸다.
+esbuild 는 이미 `engine:demo` 가 직접 부르고 있어서 **새 의존성이 0개**다.
+tsup 을 넣었으면 의존성 하나와 "augmentation 이 살아남는가"라는 검증 항목이 같이 늘었다.
+
+> 대가: `esbuild` 는 루트 `devDependencies` 에 **선언돼 있지 않다**(vite 의 전이 의존성).
+> `engine:demo` 가 이미 같은 자세라 맞췄다. 깨지면 `command not found` 로 크게 깨진다.
+
+### 왜 `dist/` 가 아니라 `build/` 인가
+
+`libs/engine/dist` 는 이미 `tsc -b` 것이다 — 워크스페이스 `rootDir: "."` 때문에
+`dist/libs/engine/…` 로 중첩되고 tsbuildinfo 를 갖는다. 여기에 패키지 빌드를 얹으면
+① `clean` 이 tsbuildinfo 를 날려 `tsc -b` 가 매번 전체 재빌드
+② `files: ["dist"]` 가 tsc 산출물까지 타르볼에 담는다.
+
+`build/` 는 `.gitignore` 가 이미 덮고 있어 새 무시 규칙도 필요 없었다.
+대신 **eslint 는 `**/dist`만 무시**하고 있어서 생성된 번들을 린트했다 —`no-var`201 error.`eslint.config.mjs`의 ignores 에`\*\*/build` 추가로 해결.
+
+### 중첩 `build/package.json` — 이게 없으면 타입이 통째로 사라진다
+
+패키지 루트가 `"type": "module"` 이므로 `build/index.d.ts` 도 ESM 으로 읽힌다. 그러면
+`export * from './core'` 같은 **확장자 없는 상대 경로가 `moduleResolution: nodenext` 에서
+해석 불가**가 된다. 소스에 `.js` 확장자를 박는 것 말고는 tsc 로 고칠 방법이 없다.
+
+그래서 `prepack` 이 `build/package.json` = `{"type":"commonjs"}` 를 같이 낸다.
+`.mjs` 는 확장자가 이겨서 그대로 ESM 이고, d.ts 만 CJS 로 읽혀 확장자 없는 재export 가 합법이 된다.
+
+**되돌려서 확인했다** — 이 파일을 지우면 `nodenext` 소비자에서:
+
+```
+t.ts(1,10): error TS2305: Module '"@lemoncloud/flow-engine"' has no exported member 'mergeNodeView'.
+t.ts(2,15): error TS2305: Module '"@lemoncloud/flow-engine"' has no exported member 'GraphNode'.
+```
+
+멤버가 **하나도 안 보인다**. 복구하면 exit 0.
+
+### 게이트
+
+| 무엇                                                   | 결과                                                           |
+| ------------------------------------------------------ | -------------------------------------------------------------- |
+| `require('@lemoncloud/flow-engine')` (CJS)             | green — 59개 export                                            |
+| `import()` (ESM)                                       | green                                                          |
+| `tsc --noEmit -p .` · `module: commonjs` (node10 해석) | green                                                          |
+| `tsc --noEmit -p .` · `moduleResolution: nodenext`     | green                                                          |
+| `npm pack` 내용                                        | `build/**` + `package.json`, 39개. `cli/` 없음, `process.` 0건 |
+| 레포 게이트 (tsc·508 스펙·lint·demo·web build)         | 배포 전과 **전부 동일**                                        |
+
+타입 게이트는 **`skipLibCheck: true` 기준**이다. 끄면 에러가 나오는데 전부 `node_modules`
+안이다 — `@lemoncloud/eureka-flows-api` 의 `views.d.ts` 가 자기 의존성에 없는
+`@lemoncloud/eureka-agents-api` 를 참조하고, `lemon-model` 의 인덱스 시그니처가 TS2411 을 낸다.
+**우리 d.ts 에서 나온 에러는 0건**이고, 이 레포도 `skipLibCheck: true` 로 돈다.
+상류 패키지 문제라 여기서 고칠 수 없다.
+
+> 게이트 3 은 플랜 원문의 `tsc --noEmit t.ts` 를 **`-p .` 로 바꿔서** 돌렸다. 파일을
+> 커맨드라인에 주면 tsconfig 를 통째로 무시해서 검증하려던 node10 해석이 안 걸린다.
+> 그리고 `mergeNodeView({}, {})` 만으로는 augmentation 을 안 건드리므로
+> `GraphNode.state` 를 읽는 줄을 넣었다 — 체크 항목과 게이트가 같은 걸 보게.
+
+### 감수한 것
+
+- **`yarn install` 이 경고 2줄을 찍는다** — `Workspaces can only be enabled in private projects.`
+  `private` 을 되돌려 0줄임을 확인했으니 원인은 확실하다. yarn 1 은 워크스페이스 자식이
+  private 이길 바라지만, `npm publish` 는 private 을 거부한다. 심링크·`--frozen-lockfile`
+  둘 다 정상이라 경고만 남는다.
+- **레포 안 import 는 `@flows/engine` 그대로.** 별칭과 배포명이 달라도 문제 없고,
+  200곳 넘는 import 를 바꾸는 값이 이득보다 크다.
+- **nx 프로젝트명이 `@lemoncloud/flow-engine`** 으로 따라 바뀌었다 → 짧은 이름은
+  `engine` 이 아니라 `flow-engine`. 이름을 유지하려고 `project.json` 을 넣는 대신
+  이름 하나만 쓰기로 했다.
+- **`libs/engine/README.md` 없음** → npm 페이지가 빈 채로 뜬다.
+- `npm publish` 는 실행하지 않았다 — 계정 소유자 몫.

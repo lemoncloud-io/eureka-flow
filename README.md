@@ -125,6 +125,11 @@ graph TB
 imports are `import type` from the API package, erased at compile). The `lib: ["ES2022"]`
 target is what enforces that, and it is why the same code runs under plain Node.
 
+It is also the one library published outside this repo, as
+**[`@lemoncloud/flow-engine`](https://www.npmjs.com/package/@lemoncloud/flow-engine)** —
+ESM and CommonJS builds from one source. Inside the repo it stays `@flows/engine`
+(the path alias, resolved to source); the two names are the same code.
+
 ### Project Structure
 
 ```
@@ -251,7 +256,7 @@ yarn prettier               # Format code with Prettier
 
 # Testing
 yarn web:test               # Run tests
-npx nx test engine          # Headless engine specs (no DOM)
+npx nx test flow-engine     # Headless engine specs (no DOM)
 yarn engine:demo            # load → add → undo → redo → save → run, in Node, no browser
 
 # Utilities

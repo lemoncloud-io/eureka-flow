@@ -131,6 +131,10 @@ configureIds(uuidv4); // React Native (Hermes 에는 crypto 가 없다)
 주입한 값도 대시가 벗겨진다 — `-` 는 서버가 포트 구분자로 rewrite 하는 문자라, 그냥
 통과시키면 노드와 포트가 같은 행에 얹힌다.
 
+> **"프로세스 단위" 의 예외 하나** — 주입 상태는 모듈 변수라, npm 패키지를 `import` 와
+> `require` **양쪽으로** 들어가면 레지스트리가 둘 생기고 `configureIds` 는 한쪽만 바꾼다.
+> 한 소비자가 두 진입점을 동시에 쓸 일은 드물어서 고치지 않았다 — 알고만 있으면 된다.
+
 > **IndexedDB 는 엔진에 없다.** `draftStorage.ts` 는 `libs/flows`(브라우저) 소속이고,
 > 엔진의 `persistence/draft.ts` 는 `draftFor()` 로 **드래프트 객체를 만들어 돌려줄 뿐**이다.
 > 어디에 넣을지는 호스트가 정한다 — RN 이면 MMKV, Node 면 파일.
@@ -215,10 +219,26 @@ npx esbuild my-script.ts --bundle --platform=node --format=esm --target=node22 \
 
 한 파일짜리라면 상대 경로(`libs/engine/src/...`)로 임포트해서 `npx tsx` 로 바로 돌려도 된다.
 
+**레포 밖에서라면 번들이 필요 없다** — 엔진은 **`@lemoncloud/flow-engine`** 으로 배포된다.
+`import` 와 `require` 둘 다 되고(별도 빌드 2개), 런타임 의존성은 없다.
+
+```bash
+npm i @lemoncloud/flow-engine
+```
+
+```ts
+import { createFlowEngine } from '@lemoncloud/flow-engine'; // ESM
+const { createFlowEngine } = require('@lemoncloud/flow-engine'); // CJS
+```
+
+> 레포 안에서는 계속 `@flows/engine` 별칭을 쓴다(소스 직행). 두 이름은 같은 코드를 가리키고,
+> 200곳 넘는 import 를 배포명으로 바꾸는 비용이 이득보다 커서 그대로 뒀다.
+> 타르볼은 `libs/engine` 에서 `npm pack` — `prepack` 이 `build/` 에 d.ts + `.mjs`/`.cjs` 를 만든다.
+
 ### 3. 스펙으로 쓰기
 
 `libs/engine` 은 `environment: 'node'` 로 돈다. 새 스펙은 `libs/engine/src/__tests__/` 에 두고
-`npx nx test engine`. 포트를 다 스텁으로 바꿀 필요는 없다 — `HttpPort` 는 메서드 하나,
+`npx nx test flow-engine`. 포트를 다 스텁으로 바꿀 필요는 없다 — `HttpPort` 는 메서드 하나,
 `SocketPort` 는 다섯 개다 (`cli/stubHttpPort.ts`, `cli/stubSocketPort.ts` 참고).
 
 > **스텁을 짤 땐 서버 응답 모양을 베껴라, 클라이언트 코드 말고.** 결함 4개 중 하나가 정확히

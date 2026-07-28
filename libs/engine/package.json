@@ -1,17 +1,39 @@
 {
-    "name": "@flows/engine",
-    "version": "0.0.1",
-    "private": true,
+    "name": "@lemoncloud/flow-engine",
+    "version": "0.1.0",
+    "description": "Headless flow engine — graph editing, undo/redo, snapshot/diff, and the execution-state reducer, with no DOM and no framework",
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/lemoncloud-io/eureka-flow.git",
+        "directory": "libs/engine"
+    },
     "type": "module",
-    "main": "./src/index.ts",
-    "types": "./src/index.ts",
+    "sideEffects": false,
+    "main": "./build/index.cjs",
+    "module": "./build/index.mjs",
+    "types": "./build/index.d.ts",
     "exports": {
         ".": {
-            "types": "./src/index.ts",
-            "import": "./src/index.ts",
-            "default": "./src/index.ts"
+            "types": "./build/index.d.ts",
+            "import": "./build/index.mjs",
+            "require": "./build/index.cjs"
         },
         "./package.json": "./package.json"
     },
-    "dependencies": {}
+    "files": [
+        "build"
+    ],
+    "engines": {
+        "node": ">=20"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "prepack": "rm -rf build && tsc -p tsconfig.pkg.json && esbuild src/index.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=build/index.mjs && esbuild src/index.ts --bundle --format=cjs --platform=neutral --target=es2022 --outfile=build/index.cjs && echo '{\"type\":\"commonjs\"}' > build/package.json"
+    },
+    "dependencies": {
+        "@lemoncloud/eureka-flows-api": "^0.26.609"
+    }
 }

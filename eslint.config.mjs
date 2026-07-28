@@ -7,7 +7,10 @@ export default [
     ...nx.configs['flat/typescript'],
     ...nx.configs['flat/javascript'],
     {
-        ignores: ['**/dist', '**/out-tsc', '**/vite.config.*.timestamp*'],
+        // `**/build` is where `libs/engine` emits its published tarball (bundled .cjs/.mjs
+        // plus declarations) — generated output, same as `dist`, and linting it reports
+        // esbuild's `var` on our behalf.
+        ignores: ['**/dist', '**/build', '**/out-tsc', '**/vite.config.*.timestamp*'],
     },
     {
         plugins: {
