@@ -5,7 +5,9 @@ undo/redo, clipboard, snapshot/diff/baseline, the execution-state reducer — wi
 no framework**, so the same rules run in a browser, in Node, and (with one injected id source)
 in React Native.
 
-Zero runtime dependencies. Ships ESM and CommonJS from one source.
+The bundles import nothing at runtime — the single dependency
+(`@lemoncloud/eureka-flows-api`) exists because the published declarations reference its
+types. Ships ESM and CommonJS from one source.
 
 ```bash
 npm i @lemoncloud/flow-engine
@@ -26,6 +28,6 @@ The engine talks to a server through ports you supply — `HttpPort`, `AuthPort`
 a platform global except `crypto.randomUUID`, which `configureIds(fn)` replaces where it is
 missing.
 
-**Full guide:** [`docs/engine/GUIDE.md`](https://github.com/lemoncloud-io/eureka-flow/blob/main/docs/engine/GUIDE.md)
+**Full guide:** [`docs/engine/GUIDE.md`](https://github.com/lemoncloud-io/eureka-flow/blob/develop/docs/engine/GUIDE.md)
 — where the graph lives, the load → edit → save path, the platform table, and how to script it
 from Node.

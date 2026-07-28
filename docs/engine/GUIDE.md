@@ -220,7 +220,9 @@ npx esbuild my-script.ts --bundle --platform=node --format=esm --target=node22 \
 한 파일짜리라면 상대 경로(`libs/engine/src/...`)로 임포트해서 `npx tsx` 로 바로 돌려도 된다.
 
 **레포 밖에서라면 번들이 필요 없다** — 엔진은 **`@lemoncloud/flow-engine`** 으로 배포된다.
-`import` 와 `require` 둘 다 되고(별도 빌드 2개), 런타임 의존성은 없다.
+`import` 와 `require` 둘 다 된다(별도 빌드 2개). 번들은 런타임에 아무것도 import 하지
+않지만, **`dependencies` 는 비어 있지 않다** — 배포되는 d.ts 가 `@lemoncloud/eureka-flows-api`
+의 타입을 참조하므로 그 하나는 실제로 설치된다.
 
 ```bash
 npm i @lemoncloud/flow-engine
