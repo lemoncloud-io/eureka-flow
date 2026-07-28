@@ -156,6 +156,11 @@ The graph is **not** in a store. It lives in the engine document (`createFlowEng
 > **Write to the engine, read from the store.** Nothing reads the store and writes it back,
 > so the two cannot disagree. See [`docs/engine/GUIDE.md`](docs/engine/GUIDE.md).
 
+That describes the **desktop canvas**, which is where the engine is (`FlowEditorPage` creates
+it). The **mobile editor** (`apps/web/src/app/features/mobile-editor`) has no engine instance:
+it writes `useCanvasStore` directly, and takes both its baseline and its save body from the
+store. There the store _is_ the graph. Converting it was never part of this work.
+
 Four Zustand stores manage the rest:
 
 | Store               | Purpose                                                        |

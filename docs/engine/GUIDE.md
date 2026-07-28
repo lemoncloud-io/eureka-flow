@@ -30,7 +30,15 @@
 
 ### 엔진 인스턴스는 몇 개인가
 
-에디터에는 **하나**다. `FlowEditorPage.tsx:81` 이 만들고 `:760` 에서 `engine={engine}` 로 캔버스에 넘긴다.
+데스크톱 에디터에는 **하나**, 모바일에는 **0개**다.
+
+> **모바일 에디터는 엔진을 안 쓴다.** `apps/web/.../mobile-editor` 에는 `createFlowEngine`
+> 호출도 `useEngineMirror` 도 없다 — 스토어에 직접 쓰고(`useMobileFlowActions.ts:99,112`),
+> save body 도 baseline 도 스토어에서 뜬다(`useMobileAutoSave.ts:40`, `useMobileSocketSync.ts:70`).
+> 저 화면에서는 위 표의 "투영" 이 아니라 **스토어가 그래프 자체**다. 엔진 전환은 이 작업 범위가
+> 아니었다 — 고장이 아니라 미전환이다.
+
+`FlowEditorPage.tsx:81` 이 만들고 `:760` 에서 `engine={engine}` 로 캔버스에 넘긴다.
 `WorkflowCanvas.tsx:261` 의 `engineProp ?? fallbackEngine` 은 캔버스가 **단독으로 렌더될 때**
 (컴포넌트 뷰어 모달) 쓰는 폴백이지, 두 번째 에디터 엔진이 아니다.
 
