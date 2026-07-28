@@ -171,3 +171,54 @@ describe('subscribe', () => {
         expect(seen).toEqual([]);
     });
 });
+
+describe('connection id', () => {
+    it('is null until the server says what it is', () => {
+        const { port, sockets } = harness();
+
+        expect(port.connectionId()).toBeNull();
+        port.connect();
+        sockets[0].open();
+        expect(port.connectionId()).toBeNull();
+    });
+
+    it('takes the id out of the opening info frame', () => {
+        const { port, sockets } = harness();
+        port.connect();
+        sockets[0].open();
+
+        sockets[0].send(JSON.stringify({ action: 'info', data: { connectionId: 'abc123' } }));
+
+        expect(port.connectionId()).toBe('abc123');
+    });
+
+    it('ignores a connectionId that is not the server introducing itself', () => {
+        const { port, sockets } = harness();
+        port.connect();
+        sockets[0].open();
+
+        sockets[0].send(JSON.stringify({ action: 'node', data: { connectionId: 'not-mine' } }));
+
+        expect(port.connectionId()).toBeNull();
+    });
+
+    it('survives a frame that is not JSON', () => {
+        const { port, sockets } = harness();
+        port.connect();
+        sockets[0].open();
+
+        expect(() => sockets[0].send('connectionId but not json')).not.toThrow();
+        expect(port.connectionId()).toBeNull();
+    });
+
+    it('drops the id when the connection goes, since the next one gets a new id', () => {
+        const { port, sockets } = harness();
+        port.connect();
+        sockets[0].open();
+        sockets[0].send(JSON.stringify({ action: 'info', data: { connectionId: 'abc123' } }));
+
+        sockets[0].drop();
+
+        expect(port.connectionId()).toBeNull();
+    });
+});

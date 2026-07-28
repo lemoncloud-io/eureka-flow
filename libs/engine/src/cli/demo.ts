@@ -152,8 +152,14 @@ const runNodeStep = async (
 
     log(`\n[6] run ${nodeId} and follow it over the socket`);
 
-    const settled = session.waitForNode(nodeId, { timeoutMs: 5_000 });
-    await repository.runNode(nodeId, undefined, { async: true, propagate: true });
+    // The run has to name the connection the caller is listening on, or the server accepts
+    // it and streams the result to nobody — the node runs, the waiter times out, and the
+    // failure looks like a slow server rather than a missing argument.
+    const connection = session.connectionId() ?? undefined;
+    log(`    connection=${connection ?? 'none — the server has nowhere to stream this'}`);
+
+    const settled = session.waitForNode(nodeId, { timeoutMs: 15_000 });
+    await repository.runNode(nodeId, undefined, { async: true, propagate: true, connection });
     const outcome = await settled;
 
     const node = engine.getGraph().nodes.find(n => n.id === nodeId);

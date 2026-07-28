@@ -43,6 +43,13 @@ export interface RunSession {
     waitForNode: (nodeId: string, options?: { timeoutMs?: number }) => Promise<NodeOutcome>;
     /** Forget every cursor. Call when the flow changes; a new flow's sequences start over. */
     reset: (flowId?: string | null) => void;
+    /**
+     * The connection a run must be asked for with, straight from the socket.
+     *
+     * Forwarded rather than left to the caller because the caller has a session, not a
+     * port: `waitForNode` only means something if the run was told where to stream.
+     */
+    connectionId: () => string | null;
     state: () => ExecutionState;
     close: () => void;
 }
@@ -179,6 +186,8 @@ export const createRunSession = ({
             execution = emptyExecutionState();
             if (nextFlowId !== undefined) flowId = nextFlowId;
         },
+
+        connectionId: () => socket.connectionId(),
 
         state: () => execution,
 

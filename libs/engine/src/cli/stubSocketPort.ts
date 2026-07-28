@@ -25,6 +25,9 @@ export const createStubSocketPort = (): StubSocketPort => {
         connect: () => announce('connected'),
         close: () => announce('disconnected'),
         status: () => status,
+        // A fixed id, because the stub has one connection and never loses it. It is here so
+        // a caller that must pass a connection id can be exercised without a server.
+        connectionId: () => (status === 'connected' ? 'stub-connection' : null),
         subscribe: listener => {
             listeners.add(listener);
             return () => listeners.delete(listener);

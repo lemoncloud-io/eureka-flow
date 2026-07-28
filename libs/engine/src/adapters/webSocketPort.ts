@@ -54,6 +54,7 @@ export const createWebSocketPort = ({
     let attempts = 0;
     let retryTimer: unknown = null;
     let closedByCaller = false;
+    let connectionId: string | null = null;
 
     const emit = <K extends keyof SocketEventMap>(type: K, payload: SocketEventMap[K]): void => {
         [...listeners].forEach(listener => listener(type, payload));
@@ -65,6 +66,23 @@ export const createWebSocketPort = ({
         emit('status', next);
     };
 
+    /**
+     * The server opens with `{ action: 'info', data: { connectionId } }`, and that id is
+     * what a run has to be asked for with. Read here rather than in the reducer because it
+     * is a fact about this socket, not about the flow: a reconnect gets a new one, and the
+     * frame announcing it belongs to the transport.
+     */
+    const rememberConnectionId = (raw: string): void => {
+        if (!raw.includes('connectionId')) return;
+        try {
+            const frame = JSON.parse(raw) as { action?: string; data?: { connectionId?: unknown } };
+            const id = frame.data?.connectionId;
+            if (frame.action === 'info' && typeof id === 'string') connectionId = id;
+        } catch {
+            // Not JSON, or not the shape we hoped for. The socket carries other traffic.
+        }
+    };
+
     const open = (): void => {
         setStatus(attempts === 0 ? 'connecting' : 'reconnecting');
         const next = createSocket(url);
@@ -74,12 +92,18 @@ export const createWebSocketPort = ({
             attempts = 0;
             setStatus('connected');
         };
-        next.onmessage = event => emit('message', typeof event.data === 'string' ? event.data : String(event.data));
+        next.onmessage = event => {
+            const raw = typeof event.data === 'string' ? event.data : String(event.data);
+            rememberConnectionId(raw);
+            emit('message', raw);
+        };
         next.onerror = () => setStatus('error');
         // A close the caller did not ask for is a dropped connection, and a dropped
         // connection during a run means the client stops hearing about it — so retry.
         next.onclose = () => {
             socket = null;
+            // The id belonged to the connection that just went away.
+            connectionId = null;
             if (closedByCaller) return setStatus('disconnected');
             if (attempts >= maxAttempts) return setStatus('error');
             attempts += 1;
@@ -101,6 +125,7 @@ export const createWebSocketPort = ({
             retryTimer = null;
             socket?.close();
             socket = null;
+            connectionId = null;
             setStatus('disconnected');
         },
         subscribe: listener => {
@@ -108,5 +133,6 @@ export const createWebSocketPort = ({
             return () => listeners.delete(listener);
         },
         status: () => status,
+        connectionId: () => connectionId,
     };
 };

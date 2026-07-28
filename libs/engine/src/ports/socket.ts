@@ -21,4 +21,13 @@ export interface SocketPort {
     /** Returns an unsubscribe function. */
     subscribe: (listener: SocketListener) => () => void;
     status: () => SocketStatus;
+    /**
+     * The id the server gave this connection, once it has said so.
+     *
+     * A run has to be asked for with it (`POST /nodes/:id/run?connection=…`) or the server
+     * has nowhere to stream the run back to, and the caller waits on frames that are never
+     * sent. Null until the server's opening frame arrives, and again after a reconnect
+     * until the new one does — the id belongs to the socket, not to the session.
+     */
+    connectionId: () => string | null;
 }
