@@ -135,7 +135,10 @@ export const reduceNodeEvent = (
     // Without this reset, state priority refuses every update of the new run.
     if (runId) {
         if (cursor.runId && cursor.runId !== runId) {
-            effects.push({ type: 'reset-node', nodeId });
+            // The parent, not the port. Cursors are tracked per stream — `n1:out` has its
+            // own — but the thing whose state resets is the node, and `n1:out` is not one:
+            // every consumer looks the id up in the graph and quietly finds nothing.
+            effects.push({ type: 'reset-node', nodeId: parentNodeId ?? nodeId });
             // The progress clock restarts with the run's reporter, so a high seq from the
             // previous run would swallow the new one's first snapshots.
             const { [nodeId]: _dropped, ...progress } = next.progress;
@@ -199,8 +202,14 @@ export const reduceNodeEvent = (
     return { state: next, effects };
 };
 
-/** `status` is the deprecated twin of `state`; both are written until it is retired. */
-const statePatch = (state?: NodeState): Partial<NodeData> => ({ state, status: state }) as unknown as Partial<NodeData>;
+/**
+ * `status` is the deprecated twin of `state`; both are written until it is retired.
+ *
+ * Exported so a caller carrying out a `reset-node` writes the pair the same way the
+ * reducer does. Two spellings of "this node is IDLE" is how the twin outlives its retirement.
+ */
+export const statePatch = (state?: NodeState): Partial<NodeData> =>
+    ({ state, status: state }) as unknown as Partial<NodeData>;
 
 const executionStats = (event: NodeEvent, now: () => number): NodeData['executionStats'] => {
     const { state, progress } = event;

@@ -225,6 +225,33 @@ describe('lifecycle', () => {
         expect(stateOf('n1')).toBe('READY');
     });
 
+    it('clears the previous run when the new one opens with a stateless port frame', () => {
+        const { socket, stateOf } = harness();
+
+        // Cursors are per stream, so the run change has to be seen by this port's own
+        // stream — `n1` and `n1:out` are tracked separately.
+        socket.emit({ type: 'node', id: 'n1:out', flowId: 'f1', state: 'COMPLETED', runId: 'r1' });
+        expect(stateOf('n1')).toBe('COMPLETED');
+
+        // A port-shaped frame carrying no state of its own emits the reset and nothing
+        // else — there is no `apply` behind it to overwrite the stale COMPLETED. Carrying
+        // the reset out is the only thing that moves the node off the finished run, and it
+        // has to name `n1` rather than `n1:out`, which is not a node in the graph.
+        socket.emit({ type: 'node', id: 'n1:out', flowId: 'f1', runId: 'r2' });
+
+        expect(stateOf('n1')).toBe('IDLE');
+    });
+
+    it('leaves the node alone when the same run reports again', () => {
+        const { socket, effects, stateOf } = harness();
+
+        socket.emit({ type: 'node', id: 'n1', flowId: 'f1', no: 1, state: 'RUNNING', runId: 'r1' });
+        socket.emit({ type: 'node', id: 'n1', flowId: 'f1', no: 2, state: 'COMPLETED', runId: 'r1' });
+
+        expect(stateOf('n1')).toBe('COMPLETED');
+        expect(effects.filter(e => e.type === 'reset-node')).toHaveLength(0);
+    });
+
     it('rejects anyone still waiting when it closes, rather than leaving them hanging', async () => {
         const { session } = harness();
 

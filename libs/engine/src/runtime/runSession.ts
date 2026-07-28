@@ -1,4 +1,10 @@
-import { emptyExecutionState, reduceNodeEvent, reducePortEvent, reduceProgressEvent } from './executionReducer';
+import {
+    emptyExecutionState,
+    reduceNodeEvent,
+    reducePortEvent,
+    reduceProgressEvent,
+    statePatch,
+} from './executionReducer';
 import { parseSocketFrame } from './parseSocketFrame';
 
 import type { ExecutionEffect, ExecutionState } from './executionReducer';
@@ -84,8 +90,12 @@ export const createRunSession = ({
 
     const dispatch = (effects: ExecutionEffect[]): void => {
         for (const effect of effects) {
-            // The one effect the engine can carry out itself: the graph is right here.
+            // The two effects the engine can carry out itself: the graph is right here.
             if (effect.type === 'apply') engine.applyRuntime(effect.nodeId, effect.patch);
+            // A re-run has to put the node back to IDLE before the new run's frames land.
+            // The browser has always done this; leaving it to `onEffect` meant a CLI watched
+            // a second run without the node ever leaving the first run's COMPLETED.
+            if (effect.type === 'reset-node') engine.applyRuntime(effect.nodeId, statePatch('IDLE'));
             if (effect.type === 'run-end' && isTerminal(effect.state)) {
                 settle({ nodeId: effect.nodeId, state: effect.state, runId: effect.runId, error: effect.error });
             }
