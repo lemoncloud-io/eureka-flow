@@ -1,4 +1,4 @@
-# PLAN — `@flows/engine` Phase 0–5 실행 계획
+# PLAN — `@flows/engine` Phase 0–6 실행 계획
 
 > 배경/아키텍처/근거는 [DESIGN.md](./DESIGN.md). 이 문서는 **실행 명세**다.
 > Phase 4(헤드리스 실행)는 DESIGN §3.3 로드맵에는 없다 — Phase 2의 "블랙박스 증명"을
@@ -744,3 +744,74 @@ Phase 4 이후 엔진은 **절반만 채택된** 상태였다. 그래프 편집�
 | `useFlows` → repository 이관                                       | **DEV 자격증명** (스모크 없이는 stale-read 증명 불가) |
 | `createWebSocketPort` 미연결 (285줄, `--real` 이 실행 통째로 스킵) | 배선/삭제는 제품 판단                                 |
 | agents 포크 `CanvasBinding`                                        | 다른 레포. 이 브랜치 머지 후                          |
+
+---
+
+## 11. Phase 6: 실서버 스모크 — 스텁이 감추고 있던 것들
+
+DEV 자격증명을 받아 `libs/engine` 을 처음으로 **실제 서버**에 붙였다. 유닛 테스트 255개가
+green 인 채로 통과하던 코드에서 **세 가지 결함**이 드러났다. 셋 다 원인이 같다:
+**스텁이 서버가 아니라 클라이언트 코드에 맞춰 작성돼 있었다.**
+
+### 6-1. 블록 레지스트리가 존재하지 않는 필드로 키잉 (`c691d3b`)
+
+`byType` 이 `block.type` 을 읽었는데 `GET /blocks/0/list` 의 행에는 `type` 이 없다 —
+`id`(`0008`), `processType`, 그리고 `$definition`(여기에 노드가 부르는 `type: 'input-text'`).
+결과: **11개 블록 전부 `undefined` 키 하나로 붕괴.**
+
+요청도 틀렸다. 앱은 `?cores=1&limit=-1` 로 부른다 — `cores=1` 이 `$definition` 을 펼치고,
+limit 없으면 레지스트리가 잘려 일부 노드가 unknown type 이 된다. 엔진은 둘 다 안 보냈다.
+
+**증상은 내내 눈앞에 있었다**: 데모가 `add a **undefined** node` 를 출력하고 있었고,
+생성된 노드는 `type: '#undefined'` 로 저장됐다. 읽고도 지나쳤다.
+
+살아남은 이유: 스텁 fixture 가 top-level `type` 을 갖고 있었다 — **서버가 한 번도 보낸 적
+없는 shape**. 스텁이 망가진 코드에 동의하니 데모도 repository 스펙도 OK 를 냈다.
+스펙 4개 신설 (레지스트리 커버리지가 **0개**였다).
+
+### 6-2. `connection` 없이 run 을 요청 (`b78d291`)
+
+run 은 결과를 스트림 받을 소켓 연결을 지정해야 한다. 브라우저는 어디서든 넘긴다.
+헤드리스는 넘길 수 없었다 — `SocketPort` 에 연결 id 를 알릴 방법이 없었다.
+서버는 run 을 접수하고 **아무에게도 스트림하지 않았고**, `waitForNode` 가 타임아웃했다.
+느린 서버처럼 보이는 실패지만 실은 빠진 인자였다.
+
+서버는 `{ action: 'info', data: { connectionId } }` 로 자기소개를 한다. 어댑터가 거기서
+읽는다 — 플로우가 아니라 **소켓에 대한 사실**이고, 재연결하면 새 id 를 받으므로 close 시
+버린다. `RunSession` 이 forward (세션만 든 호출자는 port 가 없다).
+
+### 6-3. `--real` 이 기본으로 남의 플로우에 썼다 (`c6cc01c`)
+
+`--run` 은 막았는데 **데모의 step 5 = save** 가 `--real` 에 포함돼 있는 걸 놓쳤다.
+실행해보고 알았다 — 실제 DEV 플로우에 노드가 저장됐고, 되돌려야 했다.
+이제 `--real` 은 load 에서 멈춘다. `--write` 로 add/save, `--write --run` 으로 실행.
+read-only 런은 **자기가 한 것만 주장한다** — 아무것도 안 만든 숫자로 edit 불변식을
+검사하면 자동으로 통과한다(추가가 없으면 undo 후 개수가 같은 건 자명하다).
+
+### 실서버로 확인된 것
+
+- **6개 실플로우 헤드리스 로드** — 포트 병합·엣지 전파 완료(undelivered 0), `dirty=false`
+  (**불변식 7 이 실데이터에서 성립** — 틀렸으면 모든 플로우가 열자마자 dirty).
+- **`createWebSocketPort` 실연결** — 285줄 어댑터가 처음으로 실제로 돌았다.
+- **전 구간 완주**: `load → add → undo → redo → save → run`, 노드 COMPLETED,
+  run 후 graph clean, 브라우저 없음. (테스트 플로우 `1011132`)
+
+### 서버 계약 메모 (코드 아님, 관찰)
+
+- **`channelId` 를 서버가 안 보낸다.** 로드 응답 키 전체 확인. 앱은 `flowData.channelId` 를
+  읽으므로 `setChannelId` 가 한 번도 호출되지 않고 스토어 기본값 `'0000'` 이 그대로 쓰인다.
+  CLAUDE.md 의 "Channel ID from `GET /flows/:id/load` response" 는 현재 서버와 맞지 않는다.
+- **트레일링 슬래시가 응답을 가른다**: `/flows?view=mine` → 스키마 문자열,
+  `/flows/?view=mine` → 실제 데이터.
+
+### 게이트
+
+`tsc -b --force` 0 · engine **255** · socket 22 · flows 24 · web 174 = **475** ·
+lint 0 error · 스텁 데모 green · 실서버 전 구간 green.
+
+### 남은 것
+
+| 항목                         | 상태                                       |
+| ---------------------------- | ------------------------------------------ |
+| `useFlows` → repository 이관 | **이제 스모크로 검증 가능.** 다음 슬라이스 |
+| agents 포크 `CanvasBinding`  | 다른 레포. 이 브랜치 머지 후               |
