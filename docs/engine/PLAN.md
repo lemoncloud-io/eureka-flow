@@ -811,7 +811,38 @@ lint 0 error · 스텁 데모 green · 실서버 전 구간 green.
 
 ### 남은 것
 
-| 항목                         | 상태                                       |
-| ---------------------------- | ------------------------------------------ |
-| `useFlows` → repository 이관 | **이제 스모크로 검증 가능.** 다음 슬라이스 |
-| agents 포크 `CanvasBinding`  | 다른 레포. 이 브랜치 머지 후               |
+| 항목                         | 상태                         |
+| ---------------------------- | ---------------------------- |
+| `useFlows` → repository 이관 | **하지 않는다 — §12**        |
+| agents 포크 `CanvasBinding`  | 다른 레포. 이 브랜치 머지 후 |
+
+---
+
+## 12. `useFlows` 이관을 하지 않기로 한 이유 (§10 정정)
+
+§10 에서 "엔진이 절반만 채택됐다 — 저장·실행 오케스트레이션은 웹이 옛 경로를 탄다"고
+적었다. **틀린 진단이었다.** `useFlows` 를 실제로 읽으면:
+
+| `useFlows` 가 하는 일                                                        | 누가 소유                                          |
+| ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| `loadFlowById` — TanStack 캐시, canonical id 별칭, 메타데이터 쓰기, 403 처리 | 앱                                                 |
+| **그래프 로드**                                                              | `WorkflowCanvas.loadWorkflow` → `engine.loadGraph` |
+| **save body 생성**                                                           | `toSnapshot` (엔진)                                |
+| **rebaseline**                                                               | `rebaseline` (엔진)                                |
+| saveStatus 상태기계, 낙관적 캐시 mutation, draft, retry                      | 앱                                                 |
+
+**규칙은 이미 엔진이 소유하고 있다.** `repository`/`runSession` 은 "채택 안 된 절반"이
+아니라 **헤드리스 transport 바인딩** — `useFlows` 의 CLI 대응물이다. 규칙 하나에
+바인딩 둘은 의도된 구조이지 중복이 아니다.
+
+이관하면 잃는 것: CLAUDE.md 가 명시한 mutation 규칙(`setQueryData` 로 직접 갱신,
+`invalidateQueries` 금지 — 백엔드 eventual consistency)이 전부 `useFlows` 안에 있고
+`flowRepository` 에는 쿼리 캐시 개념이 없다. 트랜스포트를 통일해 얻는 것보다 크다.
+
+남아 있던 진짜 격차는 좁았고 그건 채웠다 — `repository.load` 가 받아놓고 버리던
+플로우 메타데이터 (`flowInfo()`, `1eb3e8a`).
+
+### 게이트 (Phase 6 최종)
+
+`tsc -b --force` 0 · engine **258** · socket 22 · flows 24 · web 174 = **478** ·
+lint 0 error · 스텁 데모 green · 실서버 전 구간 green.
