@@ -115,7 +115,7 @@ undo 스택은 그대로고 다음 save 가 보낼 것도 안 생긴다.
 `crypto.randomUUID` 가 없는 두 경우에만 부팅 시 한 번 호출한다:
 
 ```ts
-import { configureIds } from '@flows/engine';
+import { configureIds } from '@flows/engine'; // 레포 밖에서는 '@lemoncloud/flow-engine'
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
