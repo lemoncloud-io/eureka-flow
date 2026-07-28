@@ -1039,11 +1039,15 @@ tsup 을 넣었으면 의존성 하나와 "augmentation 이 살아남는가"라�
 
 `libs/engine/dist` 는 이미 `tsc -b` 것이다 — 워크스페이스 `rootDir: "."` 때문에
 `dist/libs/engine/…` 로 중첩되고 tsbuildinfo 를 갖는다. 여기에 패키지 빌드를 얹으면
-① `clean` 이 tsbuildinfo 를 날려 `tsc -b` 가 매번 전체 재빌드
+① `prepack` 의 clean 이 `tsc -b` 가 거기 두는 tsbuildinfo 를 지우고
 ② `files: ["dist"]` 가 tsc 산출물까지 타르볼에 담는다.
 
+②는 확인했다(`npm pack --dry-run` 파일 목록). ①은 메커니즘까지만 — 증분 캐시가 실제로
+얼마나 다시 도는지는 재보지 않았다. 어느 쪽이든 두 빌드가 한 디렉터리를 나눠 쓸 이유가 없다.
+
 `build/` 는 `.gitignore` 가 이미 덮고 있어 새 무시 규칙도 필요 없었다.
-대신 **eslint 는 `**/dist`만 무시**하고 있어서 생성된 번들을 린트했다 —`no-var`201 error.`eslint.config.mjs`의 ignores 에`\*\*/build` 추가로 해결.
+대신 eslint 의 ignores 에는 `dist` 만 있고 `build` 가 없어서 생성된 번들을 린트했다 —
+esbuild 가 낸 `var` 를 두고 `no-var` 201 error. `eslint.config.mjs` 에 한 항목 추가로 해결.
 
 ### 중첩 `build/package.json` — 이게 없으면 타입이 통째로 사라진다
 
@@ -1065,14 +1069,19 @@ t.ts(2,15): error TS2305: Module '"@lemoncloud/flow-engine"' has no exported mem
 
 ### 게이트
 
-| 무엇                                                   | 결과                                                           |
-| ------------------------------------------------------ | -------------------------------------------------------------- |
-| `require('@lemoncloud/flow-engine')` (CJS)             | green — 59개 export                                            |
-| `import()` (ESM)                                       | green                                                          |
-| `tsc --noEmit -p .` · `module: commonjs` (node10 해석) | green                                                          |
-| `tsc --noEmit -p .` · `moduleResolution: nodenext`     | green                                                          |
-| `npm pack` 내용                                        | `build/**` + `package.json`, 39개. `cli/` 없음, `process.` 0건 |
-| 레포 게이트 (tsc·508 스펙·lint·demo·web build)         | 배포 전과 **전부 동일**                                        |
+| 무엇                                                   | 결과                                                                        |
+| ------------------------------------------------------ | --------------------------------------------------------------------------- |
+| **CJS 진입점에서 실제 트랜잭션**                       | add → undo → redo 통과, 주입한 id 그대로 (`build/index.cjs` 로드 확인)      |
+| **ESM 진입점에서 같은 트랜잭션**                       | 동일 결과 (`build/index.mjs` 로드 확인)                                     |
+| `tsc --noEmit -p .` · `module: commonjs` (node10 해석) | green                                                                       |
+| `tsc --noEmit -p .` · `moduleResolution: nodenext`     | green                                                                       |
+| `npm pack` 내용                                        | `build/**` + package.json/README/LICENSE, 41개. `cli/` 없음, `process.` 0건 |
+| 레포 게이트 (tsc·508 스펙·lint·demo·web build)         | 배포 전과 **전부 동일**                                                     |
+
+첫 두 줄이 핵심이다. `typeof m.parseSocketFrame === 'function'` 은 **배럴이 이름을
+재export 했다**는 것밖에 증명하지 않는다 — 포장 경계를 넘어 엔진 코드가 실제로 도는지는
+트랜잭션을 하나 돌려봐야 안다. 주입한 uuid 가 `naaaaaaaabbbb…` 로 나오는 것이
+`configureIds` 와 대시 제거까지 번들 안에서 살아 있다는 증거다.
 
 타입 게이트는 **`skipLibCheck: true` 기준**이다. 끄면 에러가 나오는데 전부 `node_modules`
 안이다 — `@lemoncloud/eureka-flows-api` 의 `views.d.ts` 가 자기 의존성에 없는
@@ -1096,5 +1105,7 @@ t.ts(2,15): error TS2305: Module '"@lemoncloud/flow-engine"' has no exported mem
 - **nx 프로젝트명이 `@lemoncloud/flow-engine`** 으로 따라 바뀌었다 → 짧은 이름은
   `engine` 이 아니라 `flow-engine`. 이름을 유지하려고 `project.json` 을 넣는 대신
   이름 하나만 쓰기로 했다.
-- **`libs/engine/README.md` 없음** → npm 페이지가 빈 채로 뜬다.
+- **`sideEffects: false` 는 뺐다** (플랜 원문에는 있었다). 한 파일로 번들된 패키지라
+  얻는 게 거의 없는데, `core/ids.ts` 가 프로세스 단위 레지스트리를 모듈 변수로 들고 있다.
+  그 모듈이 든 패키지를 두고 "부작용 없음"이라고 선언할 이유가 없다.
 - `npm publish` 는 실행하지 않았다 — 계정 소유자 몫.

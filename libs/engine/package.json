@@ -9,7 +9,6 @@
         "directory": "libs/engine"
     },
     "type": "module",
-    "sideEffects": false,
     "main": "./build/index.cjs",
     "module": "./build/index.mjs",
     "types": "./build/index.d.ts",
