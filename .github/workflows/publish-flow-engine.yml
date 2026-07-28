@@ -1,23 +1,74 @@
 name: publish-flow-engine
 
-# Publishing is deliberately not on a branch push. `libs/engine/package.json` carries its own
-# hand-set version, independent of the root version that `version-update.js` bumps on develop —
-# so a push trigger would re-publish an already-published version and 409, or publish whatever
-# someone happened to leave in the file.
+# Publishes @lemoncloud/flow-engine when `libs/engine/package.json` names a version that is not
+# on the registry yet.
+#
+# The version is the trigger, not the merge. `libs/engine` carries its own hand-set version,
+# independent of the root version that `version-update.js` bumps on develop — so most merges
+# touching the engine are *not* releases. Publishing on every merge would 409 on the second one.
+# Instead every qualifying merge asks the registry, and only a new version goes out.
+#
+# To release: bump `version` in libs/engine/package.json, merge to develop. That's it.
 on:
+    push:
+        branches:
+            - develop
+        paths:
+            - 'libs/engine/**'
     workflow_dispatch:
         inputs:
             dry-run:
                 description: 'Build and validate, but do not publish'
                 type: boolean
                 default: true
-    push:
-        tags:
-            - 'flow-engine-v*'
 
 jobs:
+    check:
+        name: Check version
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.pkg.outputs.version }}
+            should-publish: ${{ steps.registry.outputs.should-publish }}
+
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v4
+
+            - name: Read package version
+              id: pkg
+              run: |
+                  VERSION=$(node -p "require('./libs/engine/package.json').version")
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+            - name: Ask the registry
+              id: registry
+              run: |
+                  VERSION="${{ steps.pkg.outputs.version }}"
+                  if npm view "@lemoncloud/flow-engine@$VERSION" version >/dev/null 2>&1; then
+                      echo "should-publish=false" >> "$GITHUB_OUTPUT"
+                      echo "@lemoncloud/flow-engine@$VERSION is already published — nothing to do."
+                      echo "### No release: \`$VERSION\` is already on npm" >> "$GITHUB_STEP_SUMMARY"
+                      echo "Bump \`version\` in \`libs/engine/package.json\` to publish." >> "$GITHUB_STEP_SUMMARY"
+                  else
+                      echo "should-publish=true" >> "$GITHUB_OUTPUT"
+                      echo "Version $VERSION is free — will build and publish."
+                  fi
+
+            # A manual run that was explicitly told to publish should say so rather than
+            # succeed having done nothing. The automatic develop path stays quiet.
+            - name: Fail an explicit manual publish of an existing version
+              if: >
+                  github.event_name == 'workflow_dispatch'
+                  && github.event.inputs.dry-run != 'true'
+                  && steps.registry.outputs.should-publish == 'false'
+              run: |
+                  echo "::error::@lemoncloud/flow-engine@${{ steps.pkg.outputs.version }} is already on the registry. Bump libs/engine/package.json."
+                  exit 1
+
     publish:
         name: Publish @lemoncloud/flow-engine
+        needs: check
+        if: needs.check.outputs.should-publish == 'true'
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -36,34 +87,6 @@ jobs:
             - name: Install dependencies
               run: yarn install --frozen-lockfile
 
-            - name: Read package version
-              id: pkg
-              run: |
-                  VERSION=$(node -p "require('./libs/engine/package.json').version")
-                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-                  echo "Version: $VERSION"
-
-            # A tag is a claim about which version is being released. If it disagrees with the
-            # manifest, one of the two is wrong and guessing which is worse than stopping.
-            - name: Check tag matches package version
-              if: startsWith(github.ref, 'refs/tags/flow-engine-v')
-              run: |
-                  TAG_VERSION="${GITHUB_REF#refs/tags/flow-engine-v}"
-                  if [ "$TAG_VERSION" != "${{ steps.pkg.outputs.version }}" ]; then
-                      echo "::error::Tag says $TAG_VERSION, libs/engine/package.json says ${{ steps.pkg.outputs.version }}"
-                      exit 1
-                  fi
-
-            # npm rejects a duplicate version with a 409 *after* the build. Failing here costs
-            # seconds and says why.
-            - name: Check version is not already published
-              run: |
-                  if npm view "@lemoncloud/flow-engine@${{ steps.pkg.outputs.version }}" version >/dev/null 2>&1; then
-                      echo "::error::@lemoncloud/flow-engine@${{ steps.pkg.outputs.version }} is already on the registry. Bump libs/engine/package.json."
-                      exit 1
-                  fi
-                  echo "Version ${{ steps.pkg.outputs.version }} is free."
-
             - name: Run engine tests
               run: node node_modules/nx/bin/nx.js test flow-engine --skip-nx-cache
 
@@ -72,7 +95,7 @@ jobs:
               working-directory: libs/engine
               run: |
                   npm pack --pack-destination /tmp
-                  TARBALL="/tmp/lemoncloud-flow-engine-${{ steps.pkg.outputs.version }}.tgz"
+                  TARBALL="/tmp/lemoncloud-flow-engine-${{ needs.check.outputs.version }}.tgz"
                   echo "--- tarball contents ---"
                   tar -tzf "$TARBALL"
                   # `files: ["build"]` should hold, but a stray dist/ or src/ in the published
@@ -88,7 +111,7 @@ jobs:
             # is not a package that works — this runs add -> undo -> redo through each.
             - name: Smoke the tarball (ESM + CJS)
               run: |
-                  TARBALL="/tmp/lemoncloud-flow-engine-${{ steps.pkg.outputs.version }}.tgz"
+                  TARBALL="/tmp/lemoncloud-flow-engine-${{ needs.check.outputs.version }}.tgz"
                   mkdir -p /tmp/smoke && cd /tmp/smoke
                   echo '{"name":"smoke","version":"1.0.0","private":true}' > package.json
                   npm install "$TARBALL" --silent
@@ -136,7 +159,7 @@ jobs:
             - name: Summary
               run: |
                   if [ "${{ github.event.inputs.dry-run }}" = "true" ]; then
-                      echo "### Dry run — not published" >> "$GITHUB_STEP_SUMMARY"
+                      echo "### Dry run — validated \`${{ needs.check.outputs.version }}\`, did not publish" >> "$GITHUB_STEP_SUMMARY"
                   else
-                      echo "### Published @lemoncloud/flow-engine@${{ steps.pkg.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+                      echo "### Published \`@lemoncloud/flow-engine@${{ needs.check.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
                   fi
