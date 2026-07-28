@@ -1,0 +1,142 @@
+name: publish-flow-engine
+
+# Publishing is deliberately not on a branch push. `libs/engine/package.json` carries its own
+# hand-set version, independent of the root version that `version-update.js` bumps on develop —
+# so a push trigger would re-publish an already-published version and 409, or publish whatever
+# someone happened to leave in the file.
+on:
+    workflow_dispatch:
+        inputs:
+            dry-run:
+                description: 'Build and validate, but do not publish'
+                type: boolean
+                default: true
+    push:
+        tags:
+            - 'flow-engine-v*'
+
+jobs:
+    publish:
+        name: Publish @lemoncloud/flow-engine
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            id-token: write # npm provenance
+
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  registry-url: 'https://registry.npmjs.org'
+
+            - name: Install dependencies
+              run: yarn install --frozen-lockfile
+
+            - name: Read package version
+              id: pkg
+              run: |
+                  VERSION=$(node -p "require('./libs/engine/package.json').version")
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+                  echo "Version: $VERSION"
+
+            # A tag is a claim about which version is being released. If it disagrees with the
+            # manifest, one of the two is wrong and guessing which is worse than stopping.
+            - name: Check tag matches package version
+              if: startsWith(github.ref, 'refs/tags/flow-engine-v')
+              run: |
+                  TAG_VERSION="${GITHUB_REF#refs/tags/flow-engine-v}"
+                  if [ "$TAG_VERSION" != "${{ steps.pkg.outputs.version }}" ]; then
+                      echo "::error::Tag says $TAG_VERSION, libs/engine/package.json says ${{ steps.pkg.outputs.version }}"
+                      exit 1
+                  fi
+
+            # npm rejects a duplicate version with a 409 *after* the build. Failing here costs
+            # seconds and says why.
+            - name: Check version is not already published
+              run: |
+                  if npm view "@lemoncloud/flow-engine@${{ steps.pkg.outputs.version }}" version >/dev/null 2>&1; then
+                      echo "::error::@lemoncloud/flow-engine@${{ steps.pkg.outputs.version }} is already on the registry. Bump libs/engine/package.json."
+                      exit 1
+                  fi
+                  echo "Version ${{ steps.pkg.outputs.version }} is free."
+
+            - name: Run engine tests
+              run: node node_modules/nx/bin/nx.js test flow-engine --skip-nx-cache
+
+            # `prepack` runs here too, so this is the real bundle — not a rehearsal of a different one.
+            - name: Pack and assert contents
+              working-directory: libs/engine
+              run: |
+                  npm pack --pack-destination /tmp
+                  TARBALL="/tmp/lemoncloud-flow-engine-${{ steps.pkg.outputs.version }}.tgz"
+                  echo "--- tarball contents ---"
+                  tar -tzf "$TARBALL"
+                  # `files: ["build"]` should hold, but a stray dist/ or src/ in the published
+                  # package is the kind of thing nobody notices until a consumer's bundle doubles.
+                  STRAY=$(tar -tzf "$TARBALL" | sed 's|^package/||' | grep -vE '^(build/|LICENSE$|README\.md$|package\.json$)' || true)
+                  if [ -n "$STRAY" ]; then
+                      echo "::error::Unexpected files in tarball:"
+                      echo "$STRAY"
+                      exit 1
+                  fi
+
+            # Both entry points, from the tarball as a consumer would get it. A name that resolves
+            # is not a package that works — this runs add -> undo -> redo through each.
+            - name: Smoke the tarball (ESM + CJS)
+              run: |
+                  TARBALL="/tmp/lemoncloud-flow-engine-${{ steps.pkg.outputs.version }}.tgz"
+                  mkdir -p /tmp/smoke && cd /tmp/smoke
+                  echo '{"name":"smoke","version":"1.0.0","private":true}' > package.json
+                  npm install "$TARBALL" --silent
+
+                  cat > check.mjs <<'EOF'
+                  import { createFlowEngine } from '@lemoncloud/flow-engine';
+                  const engine = createFlowEngine({ getBlockRegistry: () => ({}) });
+                  engine.transact('add', ops => ops.addNode({ type: 'input-text', position: { x: 0, y: 0 } }));
+                  const added = engine.getGraph().nodes.length;
+                  engine.undo();
+                  const undone = engine.getGraph().nodes.length;
+                  engine.redo();
+                  const redone = engine.getGraph().nodes.length;
+                  if (added !== 1 || undone !== 0 || redone !== 1) {
+                      throw new Error(`ESM: add=${added} undo=${undone} redo=${redone}`);
+                  }
+                  console.log('ESM ok');
+                  EOF
+
+                  cat > check.cjs <<'EOF'
+                  const { createFlowEngine } = require('@lemoncloud/flow-engine');
+                  const engine = createFlowEngine({ getBlockRegistry: () => ({}) });
+                  engine.transact('add', ops => ops.addNode({ type: 'input-text', position: { x: 0, y: 0 } }));
+                  const added = engine.getGraph().nodes.length;
+                  engine.undo();
+                  const undone = engine.getGraph().nodes.length;
+                  engine.redo();
+                  const redone = engine.getGraph().nodes.length;
+                  if (added !== 1 || undone !== 0 || redone !== 1) {
+                      throw new Error(`CJS: add=${added} undo=${undone} redo=${redone}`);
+                  }
+                  console.log('CJS ok');
+                  EOF
+
+                  node check.mjs
+                  node check.cjs
+
+            - name: Publish to npm
+              if: github.event.inputs.dry-run != 'true'
+              working-directory: libs/engine
+              run: npm publish --provenance
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+            - name: Summary
+              run: |
+                  if [ "${{ github.event.inputs.dry-run }}" = "true" ]; then
+                      echo "### Dry run — not published" >> "$GITHUB_STEP_SUMMARY"
+                  else
+                      echo "### Published @lemoncloud/flow-engine@${{ steps.pkg.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+                  fi

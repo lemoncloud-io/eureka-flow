@@ -34,5 +34,9 @@
     },
     "dependencies": {
         "@lemoncloud/eureka-flows-api": "^0.26.609"
+    },
+    "devDependencies": {
+        "esbuild": "0.27.2",
+        "typescript": "~5.9.2"
     }
 }
