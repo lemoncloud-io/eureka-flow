@@ -8,6 +8,11 @@ export interface DemoOptions {
     log?: (line: string) => void;
     /** Supply a session to also run a node and follow it to completion (step 6). */
     session?: RunSession;
+    /**
+     * Stop after the load. Every step past it writes — the save replaces the whole graph
+     * — which is fine against the stub and is somebody's flow against a real server.
+     */
+    readOnly?: boolean;
 }
 
 export interface DemoResult {
@@ -24,6 +29,8 @@ export interface DemoResult {
     dirtyAfterSave: boolean;
     /** Present only when a session was supplied. */
     run?: RunOutcome;
+    /** The run stopped after the load, so only the load's numbers mean anything. */
+    readOnly?: boolean;
 }
 
 export interface RunOutcome {
@@ -47,7 +54,7 @@ export interface RunOutcome {
  */
 export const runDemo = async (
     { engine, repository }: FlowWorkspace,
-    { flowId, blockType, log = () => undefined, session }: DemoOptions
+    { flowId, blockType, log = () => undefined, session, readOnly = false }: DemoOptions
 ): Promise<DemoResult> => {
     const step = (n: number, title: string): void => log(`\n[${n}] ${title}`);
 
@@ -59,6 +66,27 @@ export const runDemo = async (
     // A freshly loaded flow that reads dirty means the baseline was taken from the wrong
     // graph — the failure invariant 7 exists to catch.
     if (dirtyAfterLoad) log('    !! dirty right after load — baseline disagrees with the loaded graph');
+
+    if (readOnly) {
+        log('\n    stopping here — the rest of the demo writes');
+        return {
+            flowId,
+            nodeCountAfterLoad,
+            dirtyAfterLoad,
+            // Nothing ran, so the counts report the loaded graph and the dirty flags report
+            // what they were: a caller checking "undo returned to the loaded graph" against
+            // a run that never happened would be reading agreement into silence.
+            nodeCountAfterAdd: nodeCountAfterLoad,
+            nodeCountAfterUndo: nodeCountAfterLoad,
+            nodeCountAfterRedo: nodeCountAfterLoad,
+            dirtyAfterAdd: dirtyAfterLoad,
+            dirtyAfterUndo: dirtyAfterLoad,
+            savedFlowId: flowId,
+            structureDropped: false,
+            dirtyAfterSave: dirtyAfterLoad,
+            readOnly: true,
+        };
+    }
 
     const registry = repository.blockRegistry();
     const type = blockType ?? Object.keys(registry)[0] ?? 'input-text';
