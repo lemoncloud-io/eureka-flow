@@ -3,12 +3,14 @@ import { createDocument } from './core/document';
 import { deduplicateEdges } from './core/edges';
 import { createHistory } from './core/history';
 import { newNodeId } from './core/ids';
+import { applyPortRows, propagateAlongEdges } from './core/ingress';
 import { createOps } from './core/ops';
 
 import type { ClipboardPayload } from './core/clipboard';
 import type { EngineListener, GraphSnapshot } from './core/document';
+import type { PortRow } from './core/ingress';
 import type { GraphOps, OpsDeps } from './core/ops';
-import type { NodeData, Position, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type { EdgeData, NodeData, Position, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 /**
  * The graph, and every way it is allowed to change.
@@ -46,7 +48,12 @@ export interface FlowEngine {
     paste: (payload: ClipboardPayload, offset?: Position) => string[];
 
     // ── document lifecycle
-    loadGraph: (state: WorkflowState) => void;
+    /**
+     * Replace the document with a loaded flow. The single ingress: normalizing, minting
+     * missing ids, folding in port values and propagating along edges all happen here, so
+     * every runtime gets the same graph from the same response.
+     */
+    loadGraph: (state: WorkflowState, options?: { ports?: PortRow[] }) => void;
     reset: () => void;
 }
 
@@ -59,8 +66,8 @@ export type FlowEngineOptions = OpsDeps;
  * node crashes the first render that reads `node.position.x`. Duplicate edges come from
  * flows saved before edges carried client ids; nothing makes them any more.
  */
-const normalize = (state: WorkflowState): GraphSnapshot => ({
-    nodes: (state.nodes ?? []).map(n => ({
+const normalize = (state: WorkflowState, ports: PortRow[]): GraphSnapshot => {
+    const nodes = (state.nodes ?? []).map(n => ({
         ...n,
         // The one place the id guarantee is established. A node without an id cannot be
         // selected, connected or addressed, and save treats it as new either way — so
@@ -68,9 +75,17 @@ const normalize = (state: WorkflowState): GraphSnapshot => ({
         id: n.id || newNodeId(),
         config: n.config ?? {},
         position: n.position ?? { x: 0, y: 0 },
-    })),
-    edges: deduplicateEdges(state.edges ?? []),
-});
+    }));
+
+    // Older flows name the same field `connections`.
+    const edges = deduplicateEdges(state.edges ?? (state as { connections?: EdgeData[] }).connections ?? []);
+
+    // Port values arrive beside the nodes, and a node's output is its downstream's input.
+    // Both passes belong here rather than at a caller: they used to run in the canvas
+    // before it handed the graph over, so a headless load produced a different graph from
+    // the same response — no port values, nothing propagated.
+    return { nodes: propagateAlongEdges(applyPortRows(nodes, ports), edges), edges };
+};
 
 export const createFlowEngine = (options: FlowEngineOptions = {}): FlowEngine => {
     const doc = createDocument();
@@ -146,8 +161,8 @@ export const createFlowEngine = (options: FlowEngineOptions = {}): FlowEngine =>
             return nodeIds;
         },
 
-        loadGraph: state => {
-            doc.replace(normalize(state));
+        loadGraph: (state, { ports = [] } = {}) => {
+            doc.replace(normalize(state, ports));
             // A freshly loaded document has no past worth returning to — undoing into the
             // previous flow's graph would be a different flow on screen.
             history.reset();

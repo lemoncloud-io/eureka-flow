@@ -1,6 +1,7 @@
 import { captureBaseline, diffAgainstBaseline, rebaseline } from '../persistence/baseline';
 import { toSnapshot } from '../persistence/snapshot';
 
+import type { PortRow } from '../core/ingress';
 import type { FlowEngine } from '../engine';
 import type { WorkspaceContext } from '../persistence/baseline';
 import type { FlowSnapshot } from '../persistence/snapshot';
@@ -15,6 +16,8 @@ interface LoadFlowResponse {
     edges?: EdgeData[];
     /** Older flows name the same field `connections`. */
     connections?: EdgeData[];
+    /** Port values, carried beside the nodes rather than inside them. */
+    ports?: PortRow[];
     /** Owner, or same-workspace editor. Decides whether a structural save survives. */
     isEditable?: boolean;
     hasOwned?: boolean;
@@ -128,7 +131,13 @@ export const createFlowRepository = ({ engine, http }: FlowRepositoryOptions): F
                 }),
             ]);
 
-            engine.loadGraph({ nodes: data.nodes ?? [], edges: data.edges ?? data.connections ?? [] });
+            // The same ingress the canvas uses, ports included. It used to stop after
+            // normalize, so a headless load produced a graph with no port values and
+            // nothing propagated — the same response, two different graphs.
+            engine.loadGraph(
+                { nodes: data.nodes ?? [], edges: data.edges ?? data.connections ?? [] },
+                { ports: (data.ports ?? []).filter(p => p.data !== undefined) }
+            );
             currentFlowId = data.id ?? flowId;
             isEditable = data.isEditable ?? true;
             hasOwned = data.hasOwned ?? true;

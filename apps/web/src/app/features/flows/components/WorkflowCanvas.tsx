@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { X } from 'lucide-react';
 
-import { createFlowEngine, mergeNodeView, newNodeId } from '@flows/engine';
+import { createFlowEngine, mergeNodeView, propagateAlongEdges } from '@flows/engine';
 import {
     COLLAPSED_PORT_Y,
     EXECUTE_FUNCTIONS,
@@ -49,7 +49,6 @@ import {
     arePortTypesCompatible,
     captureCanvasAsDataUrl,
     captureCanvasForThumbnail,
-    deduplicateEdges,
     exportCanvasAsPng,
     getVisiblePorts,
 } from '../utils';
@@ -664,85 +663,14 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 // graph makes every flow read dirty from the moment it opens.
                 getWorkflow: () => engine.getGraph(),
                 loadWorkflow: async (state: WorkflowStateWithPorts) => {
-                    // Normalize nodes so config and position are never undefined
-                    // (position is optional on the node type; a position-less node
-                    // crashes desktop render at node.position.x — see NodeBlock/Minimap).
-                    // The id is minted on the same rule the engine's loadGraph uses, because
-                    // the port and propagation passes below run before the graph is handed over.
-                    const loadedNodes: GraphNode[] = (state.nodes ?? []).map(n => ({
-                        ...n,
-                        id: n.id || newNodeId(),
-                        config: n.config ?? {},
-                        position: n.position ?? { x: 0, y: 0 },
-                    }));
-
-                    const rawConnections = state.edges ?? state.connections ?? [];
-                    const loadedConnections = deduplicateEdges(rawConnections);
-
                     const ports = state.ports ?? [];
 
-                    // Helper: Apply port data to nodes
-                    const applyPortDataToNodes = (
-                        baseNodes: typeof loadedNodes,
-                        portsToApply: typeof ports
-                    ): typeof loadedNodes => {
-                        if (portsToApply.length === 0) return baseNodes;
-
-                        return baseNodes.map(node => {
-                            const nodePorts = portsToApply.filter(p => p.nodeId === node.id && p.portId && p.data);
-                            if (nodePorts.length === 0) return node;
-
-                            let inputData = { ...node.inputData };
-                            let outputData = { ...node.outputData };
-
-                            for (const port of nodePorts) {
-                                const { portId, data } = port;
-                                if (!portId || !data) continue;
-                                if (portId === 'out') {
-                                    outputData = { ...outputData, [portId]: data };
-                                } else {
-                                    inputData = { ...inputData, [portId]: data };
-                                }
-                            }
-
-                            return { ...node, inputData, outputData };
-                        });
-                    };
-
-                    // Helper: Propagate outputData to downstream nodes' inputData via edges.
-                    // Returns each node unchanged by identity when nothing reached it, so a
-                    // caller can tell which ones actually moved.
-                    const propagateData = (baseNodes: GraphNode[], conns: typeof loadedConnections): GraphNode[] => {
-                        return baseNodes.map(node => {
-                            const incomingConnections = conns.filter(c => c.targetNodeId === node.id);
-                            if (incomingConnections.length === 0) return node;
-
-                            const propagatedInputData = { ...node.inputData };
-                            let hasNewData = false;
-
-                            incomingConnections.forEach(conn => {
-                                const sourceNode = baseNodes.find(n => n.id === conn.sourceNodeId);
-                                if (sourceNode?.outputData) {
-                                    const packet = sourceNode.outputData[conn.sourcePortId];
-                                    if (packet && typeof packet === 'object' && 'value' in packet) {
-                                        propagatedInputData[conn.targetPortId] = packet;
-                                        hasNewData = true;
-                                    }
-                                }
-                            });
-
-                            return hasNewData ? { ...node, inputData: propagatedInputData } : node;
-                        });
-                    };
-
-                    // Apply ports with known state immediately; fetch undefined ones in background
-                    const portsWithData = ports.filter(p => p.data !== undefined);
-                    const nodesWithExistingPortData = applyPortDataToNodes(loadedNodes, portsWithData);
-                    const nodesWithPropagatedData = propagateData(nodesWithExistingPortData, loadedConnections);
-
+                    // Rows the server left undefined are fetched below; only what it
+                    // actually answered goes in now.
                     // loadGraph replaces the document and clears history: undoing into the
                     // flow that was open before this one would put a different flow on screen.
-                    engine.loadGraph({ nodes: nodesWithPropagatedData, edges: loadedConnections });
+                    engine.loadGraph(state, { ports: ports.filter(p => p.data !== undefined) });
+                    const loadedConnections = engine.getGraph().edges;
                     handleSelectionChange(null);
                     setSelectedConnectionId(null);
 
@@ -789,7 +717,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                                     // Re-propagate after new data, touching only what moved.
                                     const before = engine.getGraph().nodes;
-                                    propagateData(before, loadedConnections).forEach((node, i) => {
+                                    propagateAlongEdges(before, loadedConnections).forEach((node, i) => {
                                         if (node !== before[i] && node.id) {
                                             engine.applyRuntime(node.id, { inputData: node.inputData });
                                         }

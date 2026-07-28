@@ -4,4 +4,5 @@ export * from './document';
 export * from './edges';
 export * from './history';
 export * from './ids';
+export * from './ingress';
 export * from './ops';
