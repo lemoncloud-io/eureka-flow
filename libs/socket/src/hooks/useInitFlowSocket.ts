@@ -20,6 +20,17 @@ import type {
 const WS_ENDPOINT = import.meta.env.VITE_WS_ENDPOINT || '';
 
 /**
+ * The socket's default channel, as the server names it.
+ *
+ * This used to arrive as a `channelId` threaded down from the flow load response, but the
+ * server has never sent that field — so the value was always this literal. It is not a
+ * fallback: the server's opening frame reports `channel$$: [{ name: '#default', id: '0000' }]`,
+ * and this is that channel. Run frames do not travel by channel anyway; the server streams
+ * them to a `connectionId` (see `useWebSocketWorker`), which is what a run request carries.
+ */
+const DEFAULT_CHANNEL = '0000';
+
+/**
  * Address a raw message, without deciding what it says.
  *
  * This layer only needs an id, because the store broadcasts to subscribers by id. What
@@ -41,8 +52,6 @@ const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
 };
 
 export interface UseInitFlowSocketOptions {
-    /** Channel ID to subscribe to (from flow load response) */
-    channelId?: string | null;
     /** Current flow ID for filtering messages */
     currentFlowId?: string | null;
     /** Getter for last local update timestamp - messages within 3s of this are ignored (prevents self-echo) */
@@ -67,7 +76,7 @@ export interface UseInitFlowSocketOptions {
 
 /**
  * Flow-specific WebSocket initialization hook
- * - Connects to WebSocket with flow channel ID
+ * - Connects to WebSocket on the default channel
  * - Broadcasts all messages to subscribers via store
  * - Handles new message format: { type: 'flow'|'node', id, flowId?, timestamp }
  * - Provides callbacks for flow and node update notifications
@@ -77,7 +86,6 @@ export interface UseInitFlowSocketOptions {
  *
  * @example
  * const { connect, disconnect, isConnected } = useInitFlowSocket({
- *   channelId: '1000011',
  *   currentFlowId: '1000011',
  *   onFlowUpdate: (flowId) => {
  *     // Reload entire flow: GET /flows/:id/load
@@ -90,7 +98,6 @@ export interface UseInitFlowSocketOptions {
  */
 export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
     const {
-        channelId,
         currentFlowId,
         getLastLocalUpdateTimestamp,
         onFlowUpdate,
@@ -131,7 +138,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         messageParser: parseWebSocketMessage,
         enabled: !!apiKey,
         logPrefix: '[FlowSocket]',
-        channels: channelId || undefined,
+        channels: DEFAULT_CHANNEL,
     });
 
     // Sync WebSocket state to store
@@ -188,7 +195,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         };
     }, []);
 
-    // Reconnect when channelId changes
+    // Follow the key: connect once there is one, drop the socket when it goes away.
     // Note: connect/disconnect intentionally excluded to prevent infinite loops
     useEffect(() => {
         if (apiKey) {
@@ -196,7 +203,7 @@ export const useInitFlowSocket = (options: UseInitFlowSocketOptions = {}) => {
         } else {
             disconnect();
         }
-    }, [channelId, apiKey]);
+    }, [apiKey]);
 
     return {
         connectionId,

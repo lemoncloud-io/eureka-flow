@@ -40,7 +40,6 @@ export const useFlows = () => {
         lastSavedAt,
         saveStatus,
         saveError,
-        channelId,
         setCurrentFlowId,
         setFlowName,
         setFlowDescription,
@@ -48,7 +47,6 @@ export const useFlows = () => {
         toggleAutoSave,
         setSaveStatus,
         setSaveError,
-        setChannelId,
         isPublic,
         setIsPublic,
         isEditable,
@@ -105,9 +103,6 @@ export const useFlows = () => {
                     setFlowName(flowData.name);
                 }
                 setFlowDescription(flowData.description ?? '');
-                if (flowData.channelId) {
-                    setChannelId(flowData.channelId);
-                }
                 setIsPublic(!!flowData.isPublic);
                 setIsEditable(flowData.isEditable ?? false);
                 setHasOwned(flowData.hasOwned ?? false);
@@ -138,7 +133,6 @@ export const useFlows = () => {
         setCurrentFlowId,
         setFlowName,
         setFlowDescription,
-        setChannelId,
         setIsPublic,
         setIsEditable,
         setHasOwned,
@@ -179,9 +173,6 @@ export const useFlows = () => {
                     setFlowName(flowData.name);
                 }
                 setFlowDescription(flowData.description ?? '');
-                if (flowData.channelId) {
-                    setChannelId(flowData.channelId);
-                }
                 setIsPublic(!!flowData.isPublic);
                 setIsEditable(flowData.isEditable ?? false);
                 setHasOwned(flowData.hasOwned ?? false);
@@ -198,16 +189,7 @@ export const useFlows = () => {
                 return null;
             }
         },
-        [
-            queryClient,
-            setCurrentFlowId,
-            setFlowName,
-            setFlowDescription,
-            setChannelId,
-            setIsPublic,
-            setIsEditable,
-            setFlowThumbnail,
-        ]
+        [queryClient, setCurrentFlowId, setFlowName, setFlowDescription, setIsPublic, setIsEditable, setFlowThumbnail]
     );
 
     /**
@@ -328,7 +310,6 @@ export const useFlows = () => {
         setFlowName('Untitled Workflow');
         setFlowDescription('');
         setLastSavedAt(null);
-        setChannelId(null);
         setIsPublic(false);
         setIsEditable(true);
         setHasOwned(true);
@@ -340,7 +321,6 @@ export const useFlows = () => {
         setFlowName,
         setFlowDescription,
         setLastSavedAt,
-        setChannelId,
         setIsPublic,
         setIsEditable,
         setHasOwned,
@@ -457,8 +437,6 @@ export const useFlows = () => {
         isAutoSaveEnabled,
         saveStatus,
         saveError,
-        /** WebSocket channel ID for real-time node status updates */
-        channelId,
 
         // Query data
         flowSnapshot: loadFlowQuery.data,

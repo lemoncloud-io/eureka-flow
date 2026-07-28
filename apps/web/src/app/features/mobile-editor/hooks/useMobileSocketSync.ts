@@ -42,7 +42,7 @@ export const useMobileSocketSync = ({
     canEdit = false,
     onMessage,
 }: UseMobileSocketSyncParams): UseMobileSocketSyncReturn => {
-    const { currentFlowId, channelId, loadFlowById } = useFlows();
+    const { currentFlowId, loadFlowById } = useFlows();
 
     // RunContext store actions
     const beginRun = useCanvasStore(state => state.beginRun);
@@ -242,7 +242,6 @@ export const useMobileSocketSync = ({
     );
 
     const { isConnected, connectionId, replayMessage } = useInitFlowSocket({
-        channelId,
         currentFlowId,
         getLastLocalUpdateTimestamp,
         onFlowUpdate: handleFlowUpdate,

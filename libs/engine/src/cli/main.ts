@@ -52,8 +52,8 @@ const main = async (): Promise<void> => {
         http = createFetchHttpPort({ baseUrl, auth: createApiKeyAuth(apiKey) });
 
         // The same query the browser's worker builds: token, then the channel to listen on.
-        // `channels` is what the editor sends today — the load response carries no channel
-        // id despite what the client looks for, so both fall back to the same default.
+        // `0000` is the server's default channel, not a placeholder — both runtimes name it
+        // the same way. A run's own frames arrive by connection id, not by channel.
         const wsUrl = process.env.FLOW_WS_URL;
         if (wsUrl) {
             const url = new URL(wsUrl);

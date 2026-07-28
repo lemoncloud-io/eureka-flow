@@ -88,7 +88,6 @@ export const FlowEditorPage = () => {
         isAutoSaveEnabled,
         saveStatus,
         saveError,
-        channelId,
         initializeFlow,
         loadFlowById,
         saveCurrentFlow,
@@ -158,7 +157,7 @@ export const FlowEditorPage = () => {
         });
     }, []);
 
-    // Initialize WebSocket connection when channelId is available
+    // Initialize the WebSocket connection
     const {
         isConnected: isSocketConnected,
         connectionStatus: socketStatus,
@@ -168,7 +167,6 @@ export const FlowEditorPage = () => {
         connectionId: socketConnectionId,
         replayMessage,
     } = useInitFlowSocket({
-        channelId,
         currentFlowId,
         getLastLocalUpdateTimestamp,
         onFlowUpdate: handleFlowUpdate,
@@ -807,17 +805,13 @@ export const FlowEditorPage = () => {
                     saveError,
                     onRetrySave: retrySave,
                 }}
-                socketState={
-                    channelId
-                        ? {
-                              isConnected: isSocketConnected,
-                              connectionStatus: socketStatus,
-                              reconnectAttempts,
-                              maxReconnectReached,
-                              onReconnect: socketReconnect,
-                          }
-                        : undefined
-                }
+                socketState={{
+                    isConnected: isSocketConnected,
+                    connectionStatus: socketStatus,
+                    reconnectAttempts,
+                    maxReconnectReached,
+                    onReconnect: socketReconnect,
+                }}
                 isPublic={isPublic}
                 isPublicMode={isPublicMode}
                 role={role}
