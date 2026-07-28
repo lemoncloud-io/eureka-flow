@@ -382,3 +382,45 @@ describe('block registry', () => {
         expect(registry).not.toHaveProperty('undefined');
     });
 });
+
+describe('flowInfo', () => {
+    it('is empty before anything is loaded', () => {
+        const { http } = harness();
+        const { repository } = createFlowWorkspace({ http });
+
+        expect(repository.flowInfo()).toEqual({});
+    });
+
+    it('keeps what the load response said about the flow, not just about its graph', async () => {
+        const rich = {
+            ...flow(),
+            name: 'Attendance ETL',
+            description: 'nightly',
+            isPublic: true,
+            thumbnail: 'https://example.test/t.png',
+        } as unknown as FlowFixture;
+        const { http } = harness(rich);
+        const { repository } = createFlowWorkspace({ http });
+
+        await repository.load('f1');
+
+        expect(repository.flowInfo()).toEqual({
+            id: 'f1',
+            name: 'Attendance ETL',
+            description: 'nightly',
+            isPublic: true,
+            thumbnail: 'https://example.test/t.png',
+            isEditable: true,
+            hasOwned: true,
+        });
+    });
+
+    it('reports the permissions a non-owner editor was given', async () => {
+        const { http } = harness(flow({ isEditable: true, hasOwned: false }));
+        const { repository } = createFlowWorkspace({ http });
+
+        await repository.load('f1');
+
+        expect(repository.flowInfo()).toMatchObject({ isEditable: true, hasOwned: false });
+    });
+});

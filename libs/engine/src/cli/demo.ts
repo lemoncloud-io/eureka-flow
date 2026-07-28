@@ -62,6 +62,8 @@ export const runDemo = async (
     await repository.load(flowId);
     const nodeCountAfterLoad = engine.getGraph().nodes.length;
     const dirtyAfterLoad = repository.isDirty();
+    const info = repository.flowInfo();
+    log(`    "${info.name ?? '(unnamed)'}" · editable=${info.isEditable} owned=${info.hasOwned}`);
     log(`    nodes=${nodeCountAfterLoad} edges=${engine.getGraph().edges.length} dirty=${dirtyAfterLoad}`);
     // A freshly loaded flow that reads dirty means the baseline was taken from the wrong
     // graph — the failure invariant 7 exists to catch.

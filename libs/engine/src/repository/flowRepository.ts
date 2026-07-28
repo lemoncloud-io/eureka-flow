@@ -10,14 +10,29 @@ import type { BlockDefinitionWithFrontend } from '../types';
 import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
 /** `GET /flows/:id/load`, reduced to the parts the graph cares about. */
-interface LoadFlowResponse {
-    id?: string;
+interface LoadFlowResponse extends FlowInfo {
     nodes?: NodeData[];
     edges?: EdgeData[];
     /** Older flows name the same field `connections`. */
     connections?: EdgeData[];
     /** Port values, carried beside the nodes rather than inside them. */
     ports?: PortRow[];
+}
+
+/**
+ * What the load response says about the flow itself, as opposed to its graph.
+ *
+ * The response carries all of this and the repository used to keep only the two fields
+ * the save rules need, so a headless caller could load a flow and still not be able to
+ * say what it was called. The browser reads the same fields into its store; this is where
+ * a CLI or an agent reads them instead.
+ */
+export interface FlowInfo {
+    id?: string;
+    name?: string;
+    description?: string;
+    isPublic?: boolean;
+    thumbnail?: string;
     /** Owner, or same-workspace editor. Decides whether a structural save survives. */
     isEditable?: boolean;
     hasOwned?: boolean;
@@ -73,6 +88,8 @@ export interface FlowRepository {
     runNode: (nodeId: string, body?: RunNodeBody, options?: RunNodeOptions) => Promise<NodeData>;
     /** What the server last confirmed, for callers that want to inspect it. */
     baseline: () => FlowSnapshot | null;
+    /** Name, description, visibility and permissions of the loaded flow. Empty before a load. */
+    flowInfo: () => FlowInfo;
 }
 
 export interface FlowRepositoryOptions {
@@ -129,6 +146,7 @@ export const createFlowRepository = ({ engine, http }: FlowRepositoryOptions): F
     let currentFlowId: string | null = null;
     let isEditable = true;
     let hasOwned = true;
+    let info: FlowInfo = {};
 
     const context = (): WorkspaceContext => ({ blockRegistry: blocks, baseline, isEditable, hasOwned, currentFlowId });
 
@@ -151,6 +169,7 @@ export const createFlowRepository = ({ engine, http }: FlowRepositoryOptions): F
         loadBlocks,
         blockRegistry: () => blocks,
         baseline: () => baseline,
+        flowInfo: () => info,
 
         load: async flowId => {
             // Both requests go out together — neither reads the other's answer. What does
@@ -177,6 +196,15 @@ export const createFlowRepository = ({ engine, http }: FlowRepositoryOptions): F
             currentFlowId = data.id ?? flowId;
             isEditable = data.isEditable ?? true;
             hasOwned = data.hasOwned ?? true;
+            info = {
+                id: currentFlowId,
+                name: data.name,
+                description: data.description,
+                isPublic: data.isPublic,
+                thumbnail: data.thumbnail,
+                isEditable,
+                hasOwned,
+            };
             // From the engine's normalized graph, never the raw response (invariant 7).
             baseline = captureBaseline(engine.getGraph(), blocks);
         },
