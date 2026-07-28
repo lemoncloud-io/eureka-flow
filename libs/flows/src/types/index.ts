@@ -115,9 +115,8 @@ export type CodexRunStatus = 'idle' | 'running' | 'waiting_for_approval' | 'comp
 /** minor stage of node run */
 export type RunNodeStage = 'enter' | 'final' | 'progress' | (string & {});
 
-import type { NodeState } from '@flows/engine';
+import type { NodeState, PortRow } from '@flows/engine';
 import type {
-    DataPacket,
     EdgeData,
     EdgeStereo,
     FlowState,
@@ -523,17 +522,11 @@ export interface UpsertNodeResult {
  *   "data": { "value": "Hello Eureka", "type": "text", "timestamp": 1776746792954 }
  * }
  */
-export interface LoadFlowPortData {
+export interface LoadFlowPortData extends PortRow {
     /** Full port ID (e.g., "1008730:out") */
     id: string;
-    /** Parent node ID (e.g., "1008730") */
-    nodeId: string;
-    /** Port name/key (e.g., "in" or "out") */
-    portId: string;
     /** Port direction from server response */
     direction?: 'in' | 'out';
-    /** Port data — null when truly empty, undefined when not loaded, DataPacket when available */
-    data?: DataPacket | null;
 }
 
 /**
