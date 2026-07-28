@@ -815,18 +815,38 @@ read-only 런은 **자기가 한 것만 주장한다** — 아무것도 안 만�
 - **전 구간 완주**: `load → add → undo → redo → save → run`, 노드 COMPLETED,
   run 후 graph clean, 브라우저 없음. (테스트 플로우 `1011132`)
 
-### 서버 계약 메모 (코드 아님, 관찰)
+### 서버 관찰 (코드 아님)
 
-- **`channelId` 를 서버가 안 보낸다.** 로드 응답 키 전체 확인. 앱은 `flowData.channelId` 를
-  읽으므로 `setChannelId` 가 한 번도 호출되지 않고 스토어 기본값 `'0000'` 이 그대로 쓰인다.
-  CLAUDE.md 의 "Channel ID from `GET /flows/:id/load` response" 는 현재 서버와 맞지 않는다.
-- **트레일링 슬래시가 응답을 가른다**: `/flows?view=mine` → 스키마 문자열,
-  `/flows/?view=mine` → 실제 데이터.
 - **`DELETE /flows/:id` 를 서버가 거부한다** — `400 INVALID - not supported`.
-  `libs/flows/src/api/flows.ts:125` 의 `deleteFlow` 가 정확히 이 요청을 보내므로,
-  **앱의 플로우 삭제가 DEV 에서 동작하지 않는다.** 내가 만든 테스트 플로우 `1011132` 도
-  이 때문에 못 지웠다 (`hasOwned: true` 인데도) — 비우고 이름만 표시해뒀으니 콘솔에서 지워야 한다.
+  서버 `api-flows.ts:787` 의 `doDelete` 가 무조건 throw 한다 (flows 만이 아니라
+  blocks·nodes·runs 도 전부 동일 — `api-runs.ts:419` 주석이 "not supported for now" 라고
+  적어둔 미구현이다). `libs/flows/src/api/flows.ts:125` 의 `deleteFlow` 가 정확히 이 요청을
+  보내므로 **앱의 플로우 삭제가 동작하지 않는다.** 테스트 플로우 `1011132` 도 그래서 못 지웠다
+  (`hasOwned: true` 인데도) — 비우고 이름만 표시해뒀으니 콘솔에서 지워야 한다.
   `upsert` 로 `deletedAt` 을 쓰면 200 이 오지만 서버는 `deletedAt: 0` 을 유지한다.
+
+#### 정정 — `channelId` 를 "서버 계약 문제"로 적었던 것
+
+원래 이 자리에 "서버가 `channelId` 를 안 보내서 앱이 기본값 `'0000'` 으로 떨어진다,
+CLAUDE.md 와 서버가 불일치한다"고 적었다. **관찰은 맞고 결론이 틀렸다.**
+
+`'0000'` 은 폴백이 아니라 **소켓의 실제 기본 채널 id** 다 — 서버 opening frame 이
+`channel$$: [{ name: '#default', id: '0000' }]`, `channels: ['0000']` 을 함께 보낸다.
+그리고 실행 프레임은 채널 브로드캐스트가 아니라 **connectionId 로 1:1 전송**된다
+(서버: `proxy-graph.ts:275` → `wss-proxy.ts` `publishMessage(connId, …)`).
+브라우저는 그 id 를 `useWebSocketWorker.ts:54,166` → `useInitFlowSocket.ts:118` 로 이미
+받아 `POST …/run?connection=…` 에 싣고 있고, 헤드리스도 §11-2 이후 같은 경로다.
+**양쪽이 같은 메커니즘을 쓰고 있고, 그건 잘 돌아간다.**
+
+남는 사실은 훨씬 작다: `useFlows.ts:108,182` 의 `if (flowData.channelId)` 가 발화하지 않아
+`useFlowsStore.channelId` 가 상수라는 것 — **동작 결함이 아니라 죽은 배선**이다.
+지울지 살릴지는 이 브랜치와 무관한 판단이라 손대지 않았다.
+
+- **트레일링 슬래시 관찰은 내렸다.** `/flows?…` 와 `/flows/?…` 가 다른 응답을 준 걸 봤지만
+  이 레포에서도 서버 레포에서도 재현되지 않는다 — lemon-core
+  (`protocol-service.js:607`) 는 빈 id 를 falsy 로 보므로 둘 다 `LIST` → `doList` 여야 한다.
+  실제 base 가 `…/flw-d1/_api_/` 라 `_api_` 프리픽스 유무 쪽이었을 가능성이 크다.
+  **미확정 관찰을 계약 위반으로 적어둘 근거가 없다.**
 
 ### 게이트
 
