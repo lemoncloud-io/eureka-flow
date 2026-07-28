@@ -13,8 +13,9 @@ import {
 } from '@flows/flows';
 import { useInitFlowSocket } from '@flows/socket';
 
-import { executeNodeWithToast } from '../utils';
+import { executeNodeWithToast, loadFlowIntoEngine } from '../utils';
 
+import type { FlowEngine } from '@flows/engine';
 import type { NodeState } from '@flows/flows';
 import type {
     NodeUpdateInfo,
@@ -26,6 +27,7 @@ import type {
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 interface UseMobileSocketSyncParams {
+    engine: FlowEngine;
     lastLocalUpdateTimestampRef: React.MutableRefObject<number | null>;
     canEdit?: boolean;
     onMessage?: (message: WebSocketMessage) => void;
@@ -38,6 +40,7 @@ interface UseMobileSocketSyncReturn {
 }
 
 export const useMobileSocketSync = ({
+    engine,
     lastLocalUpdateTimestampRef,
     canEdit = false,
     onMessage,
@@ -63,17 +66,17 @@ export const useMobileSocketSync = ({
             try {
                 const flowData = await loadFlowById(flowId);
                 if (flowData) {
-                    useCanvasStore.getState().loadWorkflow(flowData);
-                    // Baseline off the store rather than flowData — the snapshot the
+                    loadFlowIntoEngine(engine, flowData);
+                    // Baseline off the engine rather than flowData — the snapshot the
                     // registry resolves is the one the working copy will be compared to.
-                    const { nodes, connections } = useCanvasStore.getState();
-                    captureBaseline({ nodes, connections });
+                    const { nodes, edges } = engine.getGraph();
+                    captureBaseline({ nodes, connections: edges });
                 }
             } catch (error) {
                 console.error('[MobileFlowEditor] Failed to reload flow:', error);
             }
         },
-        [loadFlowById]
+        [engine, loadFlowById]
     );
 
     const handleNodeUpdate = useCallback(

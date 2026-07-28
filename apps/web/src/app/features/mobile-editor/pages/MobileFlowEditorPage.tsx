@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { ArrowRight, Globe, KeyRound, Lock, Search, ShieldX, X } from 'lucide-react';
 
+import { createFlowEngine } from '@flows/engine';
 import {
     deriveRole,
     diffAgainstBaseline,
@@ -25,6 +26,7 @@ import { ContentPreviewModal } from '../../flows/components/ContentPreviewModal'
 import { DevSocketPanel } from '../../flows/components/DevSocketPanel';
 import { FlowListDialog } from '../../flows/components/FlowListDialog';
 import { useDraftPersistence } from '../../flows/hooks/useDraftPersistence';
+import { useEngineMirror } from '../../flows/hooks/useEngineMirror';
 import { useProductProgressToasts } from '../../flows/hooks/useProductProgressToasts';
 import { useReconnectNotice } from '../../flows/hooks/useReconnectNotice';
 import { useRunGate } from '../../flows/hooks/useRunGate';
@@ -90,6 +92,18 @@ export const MobileFlowEditorPage = () => {
     // Shared refs for cross-hook communication
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
 
+    /**
+     * The graph, same as the desktop editor holds it. The registry goes in behind a getter
+     * because blocks arrive over the network — an engine built with the empty map would
+     * skip port-type checks for the rest of the session.
+     */
+    const blockRegistryRef = useRef(blockRegistry);
+    blockRegistryRef.current = blockRegistry;
+    const engine = useMemo(() => createFlowEngine({ getBlockRegistry: () => blockRegistryRef.current }), []);
+    // No drag preview on mobile, so the store is never ahead of the engine and the mirror
+    // never has to hold off.
+    useEngineMirror(engine, { paused: false });
+
     // UI state
     const [isFlowListOpen, setIsFlowListOpen] = useState(false);
     const [isBlockLibraryOpen, setIsBlockLibraryOpen] = useState(false);
@@ -106,7 +120,7 @@ export const MobileFlowEditorPage = () => {
 
     // Hooks
     const { isAppReady, bootError, isApiKeyDialogOpen, setIsApiKeyDialogOpen, handleApiKeySubmit, reBoot, updateUrl } =
-        useMobileEditorBoot();
+        useMobileEditorBoot({ engine });
 
     useMobileAutoSave({
         isAppReady,
@@ -136,6 +150,7 @@ export const MobileFlowEditorPage = () => {
     );
 
     const { isSocketConnected, socketConnectionId, replayMessage } = useMobileSocketSync({
+        engine,
         lastLocalUpdateTimestampRef,
         canEdit: permissions.canEditStructure,
         onMessage: handleSocketMessage,
@@ -157,6 +172,7 @@ export const MobileFlowEditorPage = () => {
     const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ socketConnectionId });
 
     const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleCreateNewFlow } = useMobileFlowActions({
+        engine,
         updateUrl,
         lastLocalUpdateTimestampRef,
     });

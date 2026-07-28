@@ -5,9 +5,13 @@ import { toast } from 'sonner';
 
 import { captureBaseline, newNodeId, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 
+import { loadFlowIntoEngine } from '../utils';
+
+import type { FlowEngine } from '@flows/engine';
 import type { GraphNode, NodeState } from '@flows/flows';
 
 interface UseMobileFlowActionsParams {
+    engine: FlowEngine;
     updateUrl: (flowId: string | null) => void;
     lastLocalUpdateTimestampRef: React.MutableRefObject<number | null>;
 }
@@ -23,6 +27,7 @@ interface UseMobileFlowActionsReturn {
 }
 
 export const useMobileFlowActions = ({
+    engine,
     updateUrl,
     lastLocalUpdateTimestampRef,
 }: UseMobileFlowActionsParams): UseMobileFlowActionsReturn => {
@@ -59,17 +64,16 @@ export const useMobileFlowActions = ({
             try {
                 const flowData = await loadFlowById(flowId);
                 if (flowData) {
-                    const { loadWorkflow } = useCanvasStore.getState();
-                    loadWorkflow(flowData);
-                    const { nodes, connections } = useCanvasStore.getState();
-                    captureBaseline({ nodes, connections });
+                    loadFlowIntoEngine(engine, flowData);
+                    const { nodes, edges } = engine.getGraph();
+                    captureBaseline({ nodes, connections: edges });
                 }
                 updateUrl(flowId);
             } catch {
                 toast.error(t('flowEditor.failedToLoadFlow'));
             }
         },
-        [loadFlowById, updateUrl, t]
+        [engine, loadFlowById, updateUrl, t]
     );
 
     const handleAddBlock = useCallback(
@@ -134,13 +138,20 @@ export const useMobileFlowActions = ({
 
     /** Creates new flow without confirmation — for use by MobileNewFlowSheet */
     const handleCreateNewFlow = useCallback((): void => {
+        // Both halves, or they disagree: the engine holds the graph and `clearWorkflow`
+        // only empties the store's copy of it plus the selection and run state it owns.
+        // Leaving the previous flow in the document is invisible today — nothing reads it
+        // back until the next load, which replaces it anyway — but the first edit routed
+        // through `transact` would edit that stale flow and the mirror would put it on the
+        // new, supposedly empty canvas.
+        engine.reset();
         useCanvasStore.getState().clearWorkflow();
         // No server flow yet — the first save claims the ID, so the URL has nothing to
         // point at until then.
         createNewFlow();
         updateUrl(null);
         toast.success(t('flowEditor.newFlowCreated'));
-    }, [createNewFlow, updateUrl, t]);
+    }, [engine, createNewFlow, updateUrl, t]);
 
     return {
         handleSave,
