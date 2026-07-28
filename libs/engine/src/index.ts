@@ -1,5 +1,4 @@
-export * from './adapters/fetchHttpPort';
-export * from './adapters/webSocketPort';
+export * from './adapters';
 export * from './core';
 export * from './engine';
 export * from './persistence';

@@ -46,9 +46,13 @@ export const applyPortRows = (nodes: GraphNode[], ports: PortRow[]): GraphNode[]
 /**
  * Carry each node's output along its edges into whatever it feeds.
  *
- * A connected input takes what its source is producing — the same answer
- * `hydrateInputsFromUpstream` gives at run time. The two used to differ, and which one you
- * got depended on whether the flow had just been reloaded.
+ * A connected input takes what its source is producing — the same answer the run-time half
+ * of this rule gives. The two used to differ, and which one you got depended on whether the
+ * flow had just been reloaded.
+ *
+ * That other half is `hydrateInputsFromUpstream`, and it is **not in this package**: it
+ * lives in the web app's `libs/flows/src/utils/hydrateInputs.ts`. Nothing here calls it, so
+ * a headless caller that runs a node has to hydrate the inputs itself.
  *
  * Nodes nothing reached come back by identity, so a caller can tell which ones moved.
  */
