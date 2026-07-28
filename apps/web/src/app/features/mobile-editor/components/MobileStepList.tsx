@@ -4,7 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown } from 'lucide-react';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 
-import { getPermissions, translateField, useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
+import {
+    getPermissions,
+    translateField,
+    useBlockGroups,
+    useBlockRegistry,
+    useCanvasConnections,
+    useCanvasNodes,
+} from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { BlockIcon } from '../../flows/components/BlockIcon';
@@ -42,6 +49,16 @@ export const MobileStepList = ({
     const nodes = useCanvasNodes();
     const connections = useCanvasConnections();
     const blockRegistry = useBlockRegistry();
+
+    /**
+     * Empty-state quick-add, from the same source as the library picker.
+     *
+     * Not `Object.values(blockRegistry)`: the registry indexes every block twice, under both
+     * its `type` and its `id`, so the raw values list repeats each block and taking the first
+     * two yielded the *same* block twice. `useBlockGroups` holds the `key === block.type` guard.
+     * The empty string is deliberate — `searchQuery` filters nodes, not blocks.
+     */
+    const { inputs: quickAddBlocks } = useBlockGroups('');
 
     const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
     const displayNames = useMemo(() => buildNodeDisplayNames(nodes, blockRegistry, t), [nodes, blockRegistry, t]);
@@ -109,9 +126,7 @@ export const MobileStepList = ({
                     {canModifyCanvas &&
                         onAddBlockDirect &&
                         (() => {
-                            const quickBlocks = Object.values(blockRegistry)
-                                .filter(b => b.stereo === 'input')
-                                .slice(0, 2);
+                            const quickBlocks = quickAddBlocks.slice(0, 2);
                             if (quickBlocks.length === 0) return null;
                             return (
                                 <div className="flex justify-center gap-2">
