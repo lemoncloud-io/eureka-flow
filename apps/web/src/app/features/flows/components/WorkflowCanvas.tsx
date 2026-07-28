@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { X } from 'lucide-react';
 
-import { createFlowEngine, newNodeId } from '@flows/engine';
+import { createFlowEngine, mergeNodeView, newNodeId } from '@flows/engine';
 import {
     COLLAPSED_PORT_Y,
     EXECUTE_FUNCTIONS,
@@ -56,7 +56,7 @@ import {
 
 import type { ClipboardPayload, FlowEngine } from '@flows/engine';
 import type { FlowRole, GraphNode, GraphSnapshot, LoadFlowPortData, NodeState } from '@flows/flows';
-import type { DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type { NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
 const PORT_HIGHLIGHT_MS = 300;
 
@@ -942,65 +942,17 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     serverData: Partial<NodeData>,
                     options?: { force?: boolean }
                 ) => {
-                    // Merge server data with existing node, preserving UI-specific fields
-                    // Note: Server returns NodeView format from GET /nodes/:id
-                    // - config$: ConfigItem[] (array) -> config: Record<string, string> (object)
-                    // - inputData$$: DataPacketItem[] (array) -> inputData: Record<string, DataPacket> (object)
-                    // - outputData$$: DataPacketItem[] (array) -> outputData: Record<string, DataPacket> (object)
-                    // - position: { x, y } -> use directly
-
-                    const serverDataAny = serverData as unknown as Record<string, unknown>;
-
-                    // Pre-calculate transformed outputData
-                    let outputDataForPropagation: Record<string, DataPacket> | null = null;
-                    if (Array.isArray(serverDataAny['outputData$$'])) {
-                        outputDataForPropagation = {};
-                        for (const item of serverDataAny['outputData$$'] as Array<{
-                            portId: string;
-                            packet: { value: unknown; type: string; timestamp?: number };
-                        }>) {
-                            outputDataForPropagation[item.portId] = item.packet as DataPacket;
-                        }
-                    } else if (serverData.outputData && Object.keys(serverData.outputData).length > 0) {
-                        outputDataForPropagation = serverData.outputData;
-                    }
-
                     const n = engine.getGraph().nodes.find(node => node.id === nodeId);
                     if (n) {
                         {
-                            // Transform config$ (array) to config (object) if needed
-                            let transformedConfig = n.config;
-                            if (Array.isArray(serverDataAny['config$'])) {
-                                transformedConfig = {};
-                                for (const item of serverDataAny['config$'] as Array<{
-                                    key: string;
-                                    val: string;
-                                }>) {
-                                    transformedConfig[item.key] = item.val;
-                                }
-                            } else if (serverData.config) {
-                                transformedConfig = serverData.config;
-                            }
-
-                            // Transform inputData$$ (array) to inputData (object) if needed
-                            let transformedInputData = n.inputData;
-                            if (Array.isArray(serverDataAny['inputData$$'])) {
-                                transformedInputData = {};
-                                for (const item of serverDataAny['inputData$$'] as Array<{
-                                    portId: string;
-                                    packet: { value: unknown; type: string; timestamp?: number };
-                                }>) {
-                                    transformedInputData[item.portId] = item.packet as DataPacket;
-                                }
-                            } else if (serverData.inputData) {
-                                transformedInputData = { ...n.inputData, ...serverData.inputData };
-                            }
-
-                            // Transform outputData$$ (array) to outputData (object) if needed
-                            let transformedOutputData = n.outputData;
-                            if (outputDataForPropagation) {
-                                transformedOutputData = { ...n.outputData, ...outputDataForPropagation };
-                            }
+                            // What the server sends and what the graph holds disagree about
+                            // shape — see `mergeNodeView` in @flows/engine for which field
+                            // replaces and which merges, and why they differ.
+                            const {
+                                config: transformedConfig,
+                                inputData: transformedInputData,
+                                outputData: transformedOutputData,
+                            } = mergeNodeView(n, serverData);
 
                             // State priority: only update if server state is more "final"
                             // EXCEPTION: If RUNNING with progress AND not already terminal, force update
