@@ -57,3 +57,9 @@ tmp
 .playwright-mcp
 
 vite.config.*.timestamp*
+
+# Agent eval debug output (live-run traces — never committed)
+real_output.txt
+
+# Local-only design notes (kept on-disk for reference, out of the pushed repo)
+docs/browser-agent/design/harness-deferred.md

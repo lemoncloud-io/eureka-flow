@@ -19,11 +19,6 @@ export class ScriptedHttpRequest implements HttpRequestSupportable {
         this.script = [...script];
     }
 
-    /** Append one more scripted response. */
-    respondWith(init: ScriptedHttpResponseInit): void {
-        this.script.push(init);
-    }
-
     async request(input: HttpRequestInput): Promise<HttpResponse> {
         this.requests.push(input);
 

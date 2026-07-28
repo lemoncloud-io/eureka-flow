@@ -7,7 +7,7 @@ and the locator-agent design: `LlmGateway.chat()` — provider-neutral chat mess
 tool definitions in, an async stream of `Chunk`s (text deltas, tool-call arg deltas, a
 final `done`) out. `BaseAgent`/`LocatorAgent` and the `ToolExecutor` consume exactly this
 contract; the fake gateway proves the tool-call path deterministically; Gemini 2.5 Flash
-is the first HTTP provider behind it, text-only for now.
+is the first HTTP provider behind it, with function-calling.
 
 The former `LlmGatewaySupportable.complete()` interface is retired — one contract,
 no duplicate surface.
@@ -36,24 +36,25 @@ interface Chunk {
 ```
 
 Capability metadata answers "can this gateway/model emit tool calls?" before a request is
-built: the fake gateway declares `{ toolCalls: true }`, Gemini declares
-`{ toolCalls: false }` and rejects requests carrying tool definitions or tool messages.
+built: the fake gateway and the Gemini gateway both declare `{ toolCalls: true }`; the app's
+Generate API gateway declares `{ toolCalls: false }` and rejects requests carrying tool
+definitions or tool messages.
 
 ## 3. How a tool call flows
 
 ```mermaid
 sequenceDiagram
     participant Agent as BaseAgent / LocatorAgent
-    participant GW as LlmGateway (fake | command | gemini)
+    participant GW as LlmGateway (fake | gemini | generate-api)
     participant EX as ToolExecutor
     participant CV as CanvasBinding
 
     Agent->>GW: chat({ messages, tools }, { signal })
     GW-->>Agent: Chunks (text / toolCall argsDelta / done)
     Agent->>Agent: accumulate deltas → parse ToolCall
-    Agent->>EX: dispatch(agentConfig, toolCall)
-    EX->>EX: route by name → validate args → check grant
-    EX->>CV: e.g. move_node → canvas tool provider → updateNode(position)
+    Agent->>EX: dispatch(agentConfig, toolCall, userPermissions)
+    EX->>EX: route by name → validate args → check both gates (grant + user role)
+    EX->>CV: e.g. move_node → node move tool provider (`createNodeMoveToolProvider`) → updateNode(position)
     CV-->>EX: ToolResult
     EX-->>Agent: ToolResult (fed back as a tool message)
 ```
@@ -61,19 +62,20 @@ sequenceDiagram
 Verified deterministically (no real provider): a scripted fake-gateway response carrying
 `move_node { nodeId, by: { dx: 10, dy: 0 } }` flows through the executor and moves the
 text-input node 10px right — the meeting's verification case — and the same call is
-denied when the agent lacks the `canModifyCanvas` grant. The current canvas tool set is
-`list_nodes` + `move_node`; property/name/color tools are a later slice.
+denied when the agent lacks the `canModifyCanvas` grant. The shipped tool set now spans
+node read (`list_nodes` + `describe_node`), move (`move_node`), and config
+(`set_properties` + `rename`), plus the orchestrator's catalog, `list_agents`, and `spawn`
+tools; property/rename tools are no longer a later slice.
 
 ## 4. Implementations
 
-| Gateway                       | Where                            | Tool calls           | Notes                                                                      |
-| ----------------------------- | -------------------------------- | -------------------- | -------------------------------------------------------------------------- |
-| `createFakeGateway`           | `libs/agent/src/llm/fakeGateway` | yes (scripted)       | Deterministic test double; backs the agent/executor suites.                |
-| `createCommandLlmGateway`     | `apps/web` (Lucas)               | yes (parsed command) | Offline dev gateway — no network, no key; drives the panel today.          |
-| `createGeminiLlmGateway`      | `libs/agent/src/llm`             | **no** (text-only)   | First HTTP provider; see §5.                                               |
-| `createGenerateApiLlmGateway` | `apps/web` (Leon)                | **no** (text-only)   | eureka-flows-api adapter foundation; see §6. Not yet wired into the panel. |
+| Gateway                       | Where                            | Tool calls                 | Notes                                                                                           |
+| ----------------------------- | -------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------- |
+| `createFakeGateway`           | `libs/agent/src/llm/fakeGateway` | yes (scripted)             | Deterministic test double; backs the agent/executor suites.                                     |
+| `createGeminiLlmGateway`      | `libs/agent/src/llm`             | **yes** (function-calling) | First HTTP provider; see §5.                                                                    |
+| `createGenerateApiLlmGateway` | `apps/web` (Leon)                | **no** (text-only)         | eureka-flows-api adapter; see §6. The live panel/harness gateway — result over the flow socket. |
 
-## 5. Gemini provider (text-only)
+## 5. Gemini provider (function-calling)
 
 - Implements `chat()` over the **HttpRequest port** — never global `fetch`; a backend
   proxy becomes a `baseUrl` override or another port implementation, with no gateway change.
@@ -83,10 +85,12 @@ denied when the agent lacks the `canModifyCanvas` grant. The current canvas tool
 - Uses the Agent Environment for tracing and time; cancellation flows through the
   request's `AbortSignal`.
 - System messages map to `systemInstruction`; assistant turns to the `model` role.
-- The provider call is not streamed: the response is yielded as one text chunk, then a
-  `done` chunk carrying usage tokens.
-- `capabilities.toolCalls = false`; requests with tool definitions or tool messages are
-  rejected loudly. Gemini tool calling is not implemented and not claimed.
+- The provider call is not streamed: the buffered response is re-emitted as chunks — any text,
+  then each `functionCall` as a tool-call chunk, then a `done` chunk carrying usage tokens.
+- `capabilities.toolCalls = true`; it maps `ToolDef`s to Gemini `functionDeclarations`, sends
+  prior tool calls/results as `functionCall`/`functionResponse` parts, and streams each response
+  `functionCall` back as a tool-call `Chunk` — the same shape the fake gateway emits, so the agent
+  loop is unchanged.
 
 ## 6. Generate API gateway (eureka-flows-api adapter foundation, item 7)
 
@@ -128,9 +132,9 @@ run-acceptance metadata to callers. Instead:
 - **Tested with fakes only** — a scripted `GenerateReceiver` and a spied `post` function.
   No real backend call is made in tests, and none has been made through this gateway code
   path (only through the throwaway smoke-test hooks used to gather the facts above).
-- **Not wired into `FlowEditorPage`/`AgentPanel` yet** — it exists as a standalone,
-  fully-tested adapter, the same relationship `createCommandLlmGateway` has to the panel
-  before it's swapped in.
+- **Now wired into the panel and the dev harness** — `FlowAgentPanel`
+  (`FlowAgentPanel.tsx`) and `AgentHarnessPage` (`/dev/agent-harness`) both construct this
+  gateway to drive the orchestrator; its result arrives over the flow socket.
 
 **Do not claim this adapter is live end-to-end.** It is verified: (a) against the real
 Generate HTTP endpoint at the smoke-test level (ACK/environment/params), and (b) against
@@ -149,20 +153,21 @@ model answer, because no real receiver exists yet to prove that leg.
 - **Generate WebSocket receiver:** the real socket-layer receiver (`libs/socket`) that
   reassembles `json:manifest`/`json:chunk`/`json:complete` frames into a `GenerateResponse`
   does not exist yet — see §6. This is the actual blocker on a live Generate result.
-- **Capability backfill:** the app's `createCommandLlmGateway` does not declare
-  `capabilities` yet (the field is optional for compatibility); worth adding when touched.
 
 ## 8. Verification status (honest scope)
 
-- Unit + integration tests: **133 passing** in `libs/agent` (environment, storage
-  contract, http port, gemini gateway, self-check, canvas tools, executor, locator/base
-  agent, fake-gateway→executor) and **111 passing** in `apps/web` (includes the Generate
-  API gateway's fake-only suite and the real-browser Environment verification tests).
+- Unit + integration tests pass in `libs/agent` (environment, storage contract, http port,
+  gemini gateway incl. function-calling, self-check, canvas tools, executor, orchestrator /
+  locator / property, spawn + roster, and the scenario harness) and in `apps/web` (includes
+  the Generate API gateway's fake-only suite and the real-browser Environment verification tests).
 - Typecheck, `nx build agent`, and `nx build web` pass on this branch.
-- **No live provider call has been made** through gateway code — Gemini and the Generate
-  API gateway are both verified against scripted/fake responses only. The real-API smoke
-  testing that established §6's facts used throwaway dev-only hooks, not this gateway.
+- **The default suite makes no live provider call** — Gemini and the Generate API gateway are
+  exercised against scripted/fake responses. A **gated** live spec (`scenarios.live.spec.ts`,
+  skipped unless `GEMINI_API_KEY` is set) drives the real Gemini gateway end-to-end when run
+  manually; the Generate API gateway still has no live receiver (§6). The real-API smoke testing
+  that established §6's facts used throwaway dev-only hooks, not this gateway.
 - **No full editor E2E has been run.** The Environment self-check
   (`runAgentEnvironmentSelfCheck`) remains callable in the browser as a smoke check for
   localStorage and trace; `/dev/agent-harness` covers a manual real-browser Environment
-  verification (fake LLM, not Generate API); a real editor/E2E pass is a follow-up step.
+  verification driving the orchestrator through `createGenerateApiLlmGateway`; a real
+  editor/E2E pass is a follow-up step.

@@ -32,10 +32,10 @@ const drain = async (stream: AsyncIterable<Chunk>): Promise<Chunk[]> => {
 const userSays = (content: string) => ({ messages: [{ role: 'user' as const, content }], tools: [] });
 
 describe('createGeminiLlmGateway', () => {
-    it('declares itself as a text-only gemini-2.5-flash gateway', () => {
+    it('declares itself as a tool-capable gemini-2.5-flash gateway', () => {
         const gateway = createGateway(new ScriptedHttpRequest());
 
-        expect(gateway.capabilities).toEqual({ toolCalls: false });
+        expect(gateway.capabilities).toEqual({ toolCalls: true });
         expect(gateway.provider).toBe('gemini');
         expect(gateway.model).toBe('gemini-2.5-flash');
     });
@@ -115,21 +115,91 @@ describe('createGeminiLlmGateway', () => {
         expect(http.requests[0].signal).toBe(controller.signal);
     });
 
-    it('rejects tool definitions and tool messages while text-only', async () => {
-        const gateway = createGateway(new ScriptedHttpRequest());
+    it('advertises tools as Gemini functionDeclarations', async () => {
+        const http = new ScriptedHttpRequest([{ json: geminiReply('ok') }]);
 
-        await expect(
-            drain(
-                gateway.chat({
-                    messages: [{ role: 'user', content: 'q' }],
-                    tools: [{ name: 'move_node', description: 'move', parameters: { type: 'object' } }],
-                })
-            )
-        ).rejects.toThrow(/text-only.*tool definitions/);
+        await drain(
+            createGateway(http).chat({
+                messages: [{ role: 'user', content: 'move it' }],
+                tools: [
+                    {
+                        name: 'move_node',
+                        description: 'move a node',
+                        parameters: {
+                            type: 'object',
+                            properties: { nodeId: { type: 'string' } },
+                            required: ['nodeId'],
+                        },
+                    },
+                ],
+            })
+        );
 
-        await expect(
-            drain(gateway.chat({ messages: [{ role: 'tool', content: '{}', toolCallId: 'c1' }], tools: [] }))
-        ).rejects.toThrow(/text-only.*tool messages/);
+        expect((http.requests[0].body as Record<string, unknown>)['tools']).toEqual([
+            {
+                functionDeclarations: [
+                    {
+                        name: 'move_node',
+                        description: 'move a node',
+                        parameters: {
+                            type: 'object',
+                            properties: { nodeId: { type: 'string' } },
+                            required: ['nodeId'],
+                        },
+                    },
+                ],
+            },
+        ]);
+    });
+
+    it('maps prior tool calls/results to functionCall/functionResponse parts (name recovered by id)', async () => {
+        const http = new ScriptedHttpRequest([{ json: geminiReply('done') }]);
+
+        await drain(
+            createGateway(http).chat({
+                messages: [
+                    { role: 'user', content: 'move n1' },
+                    {
+                        role: 'assistant',
+                        content: null,
+                        toolCalls: [{ id: 'call-1', name: 'move_node', args: '{"nodeId":"n1"}' }],
+                    },
+                    // Tool messages carry only the call id; the function name is recovered from the assistant call.
+                    { role: 'tool', content: '{"ok":true}', toolCallId: 'call-1' },
+                ],
+                tools: [{ name: 'move_node', description: 'move', parameters: { type: 'object' } }],
+            })
+        );
+
+        expect((http.requests[0].body as Record<string, unknown>)['contents']).toEqual([
+            { role: 'user', parts: [{ text: 'move n1' }] },
+            { role: 'model', parts: [{ functionCall: { name: 'move_node', args: { nodeId: 'n1' } } }] },
+            { role: 'user', parts: [{ functionResponse: { name: 'move_node', response: { ok: true } } }] },
+        ]);
+    });
+
+    it('streams a response functionCall as a toolCall chunk (synthesized id), then done', async () => {
+        const args = { nodeId: 'n1', by: { dx: 20, dy: 0 } };
+        const http = new ScriptedHttpRequest([
+            {
+                json: {
+                    candidates: [{ content: { parts: [{ functionCall: { name: 'move_node', args } }] } }],
+                    usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 7 },
+                },
+            },
+        ]);
+
+        const chunks = await drain(
+            createGateway(http).chat({
+                messages: [{ role: 'user', content: 'nudge n1 right' }],
+                tools: [{ name: 'move_node', description: 'move', parameters: { type: 'object' } }],
+            })
+        );
+
+        expect(chunks).toEqual([
+            { toolCall: { id: 'gemini-call-1', name: 'move_node', argsDelta: JSON.stringify(args) } },
+            { done: true, usage: { inputTokens: 5, outputTokens: 7 } },
+        ]);
     });
 
     it('throws on non-ok responses with the status but never the API key', async () => {
@@ -153,10 +223,49 @@ describe('createGeminiLlmGateway', () => {
         await attempt.catch((error: Error) => expect(error.message).not.toContain(API_KEY));
     });
 
-    it('throws when the response has no candidates', async () => {
-        const http = new ScriptedHttpRequest([{ json: { candidates: [] } }]);
+    it('retries an empty response once, then recovers', async () => {
+        const http = new ScriptedHttpRequest([{ json: { candidates: [] } }, { json: geminiReply('recovered') }]);
 
-        await expect(drain(createGateway(http).chat(userSays('q')))).rejects.toThrow(/no candidates/);
+        const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+        expect(chunks).toEqual([{ text: 'recovered' }, { done: true, usage: { inputTokens: 12, outputTokens: 34 } }]);
+        expect(http.requests).toHaveLength(2); // one empty, one retry that recovered
+    });
+
+    it('throws when every attempt has no content parts (surfacing the reason)', async () => {
+        const http = new ScriptedHttpRequest([{ json: { candidates: [] } }, { json: { candidates: [] } }]);
+
+        await expect(drain(createGateway(http).chat(userSays('q')))).rejects.toThrow(/no content parts.*no candidates/);
+        expect(http.requests).toHaveLength(2); // retried once before giving up
+    });
+
+    it('treats an empty STOP candidate as a clean empty finish — no retry, no throw', async () => {
+        // gemini-2.5-flash sometimes ends a turn with a STOP candidate carrying no content parts: the model
+        // deliberately said nothing and made no tool call. That is a legitimate empty turn, not a failure —
+        // end it cleanly (the agent loop stops on a no-tool-call turn) instead of retrying (pointless at
+        // temperature 0) or throwing. A `blockReason` or MAX_TOKENS empty is still degenerate and retried.
+        const http = new ScriptedHttpRequest([{ json: { candidates: [{ finishReason: 'STOP' }] } }]);
+
+        const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+        expect(chunks).toEqual([{ done: true }]);
+        expect(http.requests).toHaveLength(1); // not retried
+    });
+
+    it('maps generation.thinkingBudget to generationConfig.thinkingConfig', async () => {
+        const http = new ScriptedHttpRequest([{ json: geminiReply('ok') }]);
+        const gateway = createGeminiLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: API_KEY,
+            generation: { thinkingBudget: 0 },
+        });
+
+        await drain(gateway.chat(userSays('q')));
+
+        expect((http.requests[0].body as Record<string, unknown>)['generationConfig']).toEqual({
+            thinkingConfig: { thinkingBudget: 0 },
+        });
     });
 
     it('traces request and response without leaking the key', async () => {

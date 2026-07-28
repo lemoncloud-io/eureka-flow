@@ -1,6 +1,8 @@
+import { isPlainObject } from '../../utils/json';
+
 import type { AgentTraceLevel, AgentTraceReporterSupportable } from '../types';
 
-/** Key names whose values must never appear in a trace. Deliberately broad: matching "key" also redacts "apiKey" etc. */
+/** Key-name substrings whose values are redacted from traces — deliberately broad: "key" also catches "apiKey". */
 const SECRET_KEY_PATTERN = /key|token|secret|password|credential|authorization/i;
 
 const REDACTED = '[redacted]';
@@ -13,8 +15,8 @@ export const redactSecrets = (json: Record<string, unknown>, depth = MAX_REDACT_
     for (const [key, value] of Object.entries(json)) {
         if (SECRET_KEY_PATTERN.test(key)) {
             result[key] = REDACTED;
-        } else if (depth > 1 && value !== null && typeof value === 'object' && !Array.isArray(value)) {
-            result[key] = redactSecrets(value as Record<string, unknown>, depth - 1);
+        } else if (depth > 1 && isPlainObject(value)) {
+            result[key] = redactSecrets(value, depth - 1);
         } else {
             result[key] = value;
         }

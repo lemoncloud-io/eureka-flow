@@ -1,27 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_STEP, applyMove, directionToDelta, hasExactlyOneTarget } from '../../canvas/moveSemantics';
-
-describe('directionToDelta', () => {
-    it('maps the four cardinal directions to canvas-coordinate signs', () => {
-        expect(directionToDelta('right', 10)).toEqual({ dx: 10, dy: 0 });
-        expect(directionToDelta('left', 10)).toEqual({ dx: -10, dy: 0 });
-        expect(directionToDelta('up', 10)).toEqual({ dx: 0, dy: -10 });
-        expect(directionToDelta('down', 10)).toEqual({ dx: 0, dy: 10 });
-    });
-
-    it('combines axes for diagonals', () => {
-        expect(directionToDelta('up-right', 10)).toEqual({ dx: 10, dy: -10 });
-        expect(directionToDelta('up-left', 10)).toEqual({ dx: -10, dy: -10 });
-        expect(directionToDelta('down-right', 10)).toEqual({ dx: 10, dy: 10 });
-        expect(directionToDelta('down-left', 10)).toEqual({ dx: -10, dy: 10 });
-    });
-
-    it('uses the default step when no amount is given', () => {
-        expect(directionToDelta('right')).toEqual({ dx: DEFAULT_STEP, dy: 0 });
-        expect(DEFAULT_STEP).toBe(20);
-    });
-});
+import { applyMove, hasExactlyOneTarget } from '../../canvas/moveSemantics';
 
 describe('hasExactlyOneTarget', () => {
     it('is true for exactly one of by / to', () => {

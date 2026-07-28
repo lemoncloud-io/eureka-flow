@@ -11,7 +11,7 @@ export interface AgentEnvironmentCapabilities {
     readonly allowArbitraryScriptExecution: false;
 }
 
-/** The agent's only sanctioned path to persistent state. Keys are strings, values are JSON; JSON errors reject loudly with the offending key. */
+/** The agent's only sanctioned path to persistent state (string keys, JSON values). */
 export interface AgentStorageSupportable {
     /** Read and parse a JSON value; resolves null when the key is absent. Rejects on corrupt JSON. */
     getJson<T>(key: string): Promise<T | null>;
@@ -27,7 +27,7 @@ export interface AgentStorageSupportable {
 
 export type AgentTraceLevel = 'debug' | 'info' | 'warn' | 'error';
 
-/** Debugging/observability sink. Reporters must never log secrets or API keys — see redactSecrets in traceReporters.ts. */
+/** Debugging/observability sink; never log secrets (see redactSecrets in traceReporters.ts). */
 export interface AgentTraceReporterSupportable {
     log(level: AgentTraceLevel, message: string, json?: Record<string, unknown>): void;
     debug(message: string, json?: Record<string, unknown>): void;

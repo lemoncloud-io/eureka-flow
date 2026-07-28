@@ -12,10 +12,7 @@ export interface VirtualAgentEnvironmentOptions {
     now?: () => number;
 }
 
-/**
- * The virtual Node.js environment for tests: `runtime: 'node-virtual'`, memory storage, injectable
- * clock — same frozen-false capabilities as the browser; only the backing implementations differ.
- */
+/** The virtual Node.js test environment: `runtime: 'node-virtual'`, memory storage, injectable clock. */
 export const createVirtualAgentEnvironment = (
     options: VirtualAgentEnvironmentOptions = {}
 ): AgentEnvironmentSupportable =>

@@ -6,8 +6,10 @@
 > only. Shipped implementation:
 > [`createDesktopCanvasBinding.ts`](../../../apps/web/src/app/features/flows/utils/createDesktopCanvasBinding.ts).
 
-`readGraph` + `updateNode` are what the [locator agent](../agents/locator/SPEC.md) uses (find a node,
-move it) — the whole contract.
+`readGraph` + `updateNode` are the whole contract, shared by the orchestrator and its specialists.
+The [locator agent](../agents/locator.md) uses it to find a node and move it (`position`); the
+property specialist uses the same `updateNode` to rename (`label`) and set config (`config`). So the
+contract is move + rename + config — `NodePatch` is `{ label?, position?, config? }`.
 
 ## Grounded primitives
 
@@ -35,10 +37,11 @@ that the source (linked above) makes concrete:
 
 ## Validation
 
-The seam is exercised by the shipped locator agent: once the flow has an id, `FlowEditorPage` mounts the
-`FlowAgentPanel` container, which builds this binding and drives the locator, handing the transcript to
-the pure right-docked `<AgentPanel>` view. A chat command like "move Fetch 10px right" flows agent →
-`updateNode` → the canvas re-renders immediately, with no server write. That proves the two things that
+The seam is exercised by the shipped agents: once the flow has an id, `FlowEditorPage` mounts the
+`FlowAgentPanel` container, which builds this binding and drives the orchestrator (which spawns the
+locator/property specialists), handing the transcript to the pure right-docked `<AgentPanel>` view. A
+chat command like "move Fetch 10px right" flows agent → `updateNode` → the canvas re-renders
+immediately, with no server write. That proves the two things that
 matter: external (non-React) code reaching the live canvas, and frontend-only label/position edits.
 
 ## Note on reads

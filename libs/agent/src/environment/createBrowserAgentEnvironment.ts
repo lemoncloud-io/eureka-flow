@@ -12,10 +12,7 @@ export interface BrowserAgentEnvironmentOptions {
     traceReporter?: AgentTraceReporterSupportable;
 }
 
-/**
- * The live-editor environment: `runtime: 'browser'`, persistent state via localStorage behind
- * the Storage interface, real clock and AbortController, forbidden capabilities frozen false.
- */
+/** The live-editor environment: `runtime: 'browser'` with localStorage-backed storage and real clock. */
 export const createBrowserAgentEnvironment = (
     options: BrowserAgentEnvironmentOptions = {}
 ): AgentEnvironmentSupportable =>
