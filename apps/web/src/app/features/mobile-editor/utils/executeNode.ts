@@ -4,9 +4,12 @@ import { EXECUTE_FUNCTIONS, hydrateInputsFromUpstream, runNode, useCanvasStore, 
 
 import { hydrateInputPorts } from './nodeServerSync';
 
+import type { FlowEngine } from '@flows/engine';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 export interface ExecuteNodeOptions {
+    /** Run state and output are runtime, so they land through the engine, outside history. */
+    engine: FlowEngine;
     flowId: string | null;
     socketConnectionId?: string;
     /** Whether the user can edit (owner). Affects hydration and run body. */
@@ -20,8 +23,8 @@ export interface ExecuteNodeOptions {
  * Mirrors desktop WorkflowCanvas executeNode logic.
  */
 export const executeNodeDirect = async (nodeId: string, options: ExecuteNodeOptions): Promise<void> => {
-    const { flowId, socketConnectionId, canEdit = true, propagate } = options;
-    const { nodes, connections, updateNodeData } = useCanvasStore.getState();
+    const { engine, flowId, socketConnectionId, canEdit = true, propagate } = options;
+    const { nodes, connections } = useCanvasStore.getState();
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return;
 
@@ -29,7 +32,7 @@ export const executeNodeDirect = async (nodeId: string, options: ExecuteNodeOpti
     const blockDef = blockRegistry[node.type];
     if (!blockDef) return;
 
-    updateNodeData(nodeId, { state: 'RUNNING' } as Partial<NodeData>);
+    engine.applyRuntime(nodeId, { state: 'RUNNING' } as Partial<NodeData>);
 
     try {
         const nodeConfig = (node.config ?? {}) as Record<string, string>;
@@ -38,7 +41,7 @@ export const executeNodeDirect = async (nodeId: string, options: ExecuteNodeOpti
             const executeFn = EXECUTE_FUNCTIONS[blockDef.type];
             const hydratedInputs = hydrateInputsFromUpstream(nodeId, connections, nodes, node.inputData ?? {});
             const result = await executeFn(hydratedInputs, node.config ?? {});
-            updateNodeData(nodeId, { outputData: result, state: 'COMPLETED' } as Partial<NodeData>);
+            engine.applyRuntime(nodeId, { outputData: result, state: 'COMPLETED' } as Partial<NodeData>);
             const runBody = canEdit ? { output: result } : { output: result, config: nodeConfig };
             await runNode(nodeId, runBody, { force: true, propagate, connection: socketConnectionId });
         } else {
@@ -49,7 +52,7 @@ export const executeNodeDirect = async (nodeId: string, options: ExecuteNodeOpti
             await runNode(nodeId, runBody, { propagate, connection: socketConnectionId });
         }
     } catch (e) {
-        updateNodeData(nodeId, { state: 'ERROR' } as Partial<NodeData>);
+        engine.applyRuntime(nodeId, { state: 'ERROR' } as Partial<NodeData>);
         throw e;
     }
 };

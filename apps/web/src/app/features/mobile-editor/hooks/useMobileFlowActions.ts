@@ -3,12 +3,11 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { captureBaseline, newNodeId, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { captureBaseline, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 
 import { loadFlowIntoEngine } from '../utils';
 
 import type { FlowEngine } from '@flows/engine';
-import type { GraphNode, NodeState } from '@flows/flows';
 
 interface UseMobileFlowActionsParams {
     engine: FlowEngine;
@@ -78,29 +77,21 @@ export const useMobileFlowActions = ({
 
     const handleAddBlock = useCallback(
         async (type: string): Promise<string | null> => {
-            const { nodes } = useCanvasStore.getState();
+            const { nodes } = engine.getGraph();
             const def = blockRegistry[type];
             if (!def) return null;
 
             // Place new node at the top: y less than current min so it sorts first.
-            const nodeId = newNodeId();
             const minY = nodes.reduce((m, n) => Math.min(m, n.position?.y ?? Infinity), Infinity);
             const posX = nodes[0]?.position?.x ?? 100;
             const posY = nodes.length === 0 ? 100 : minY - 200;
 
-            const newNode: GraphNode = {
-                id: nodeId,
-                type,
-                position: { x: posX, y: posY },
-                config: { ...def.defaultConfig },
-                state: 'IDLE' as NodeState,
-                status: 'IDLE',
-                inputData: {},
-                outputData: {},
-                autoExecutionEnabled: true,
-            };
-
-            useCanvasStore.getState().setNodes(prev => [...prev, newNode]);
+            // `addNode` mints the id and fills the rest — IDLE state, empty port data,
+            // auto-execution on — which is exactly the node this used to build by hand.
+            let nodeId = '';
+            engine.transact('node:add', ops => {
+                nodeId = ops.addNode({ type, position: { x: posX, y: posY }, config: def.defaultConfig });
+            });
 
             try {
                 // Persist immediately so refresh within autosave debounce keeps the node.
@@ -113,12 +104,12 @@ export const useMobileFlowActions = ({
 
                 return nodeId;
             } catch {
-                useCanvasStore.getState().setNodes(prev => prev.filter(n => n.id !== nodeId));
+                engine.transact('node:add:rollback', ops => ops.removeNodes([nodeId]));
                 toast.error(t('mobile.failedToCreateNode', 'Failed to create node'));
                 return null;
             }
         },
-        [blockRegistry, currentFlowId, saveCurrentFlow, updateUrl, lastLocalUpdateTimestampRef, t]
+        [engine, blockRegistry, currentFlowId, saveCurrentFlow, updateUrl, lastLocalUpdateTimestampRef, t]
     );
 
     const handleExport = useCallback(() => {

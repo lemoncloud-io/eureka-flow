@@ -115,20 +115,16 @@ export const useMobileSocketSync = ({
                 }
             }
 
-            const storeState = useCanvasStore.getState();
-            const { updateNodeData, nodes } = storeState;
+            const { nodes } = useCanvasStore.getState();
 
             if (state === 'ERROR') {
-                updateNodeData(nodeId, {
-                    state: state as NodeState,
-                    error,
-                } as Partial<NodeData>);
+                engine.applyRuntime(nodeId, { state: state as NodeState, error } as Partial<NodeData>);
                 toast.error(`Node ${nodeId} failed`);
                 return;
             }
 
             if (state) {
-                updateNodeData(nodeId, { state: state as NodeState } as Partial<NodeData>);
+                engine.applyRuntime(nodeId, { state: state as NodeState } as Partial<NodeData>);
             }
 
             if (state === 'COMPLETED') {
@@ -152,6 +148,7 @@ export const useMobileSocketSync = ({
                 pendingAutoExecRef.current = setTimeout(() => {
                     pendingAutoExecRef.current = null;
                     executeNodeWithToast(nodeId, {
+                        engine,
                         flowId: currentFlowId,
                         socketConnectionId: connectionIdRef.current,
                         canEdit,
@@ -159,7 +156,7 @@ export const useMobileSocketSync = ({
                 }, 0);
             }
         },
-        [currentFlowId, clearTraceLogs, beginRun, finalizeRun]
+        [engine, canEdit, currentFlowId, clearTraceLogs, beginRun, finalizeRun]
     );
 
     const handlePortUpdate = useCallback(
@@ -209,7 +206,7 @@ export const useMobileSocketSync = ({
                     const updates = isOutputPort
                         ? { outputData: { [portKey]: portData.data } }
                         : { inputData: { [portKey]: portData.data } };
-                    useCanvasStore.getState().updateNodeData(nodeId, updates as Partial<NodeData>);
+                    engine.applyRuntime(nodeId, updates as Partial<NodeData>);
                 }
             } catch (err) {
                 if (no !== undefined) {
@@ -219,7 +216,7 @@ export const useMobileSocketSync = ({
                 console.debug('[MobileSocketSync] Failed to fetch port data:', portId, err);
             }
         },
-        [currentFlowId, appendRunPortUpdate]
+        [engine, currentFlowId, appendRunPortUpdate]
     );
 
     const handleTraceUpdate = useCallback(

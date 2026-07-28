@@ -164,12 +164,12 @@ export const MobileFlowEditorPage = () => {
     }, [currentFlowId, clearProductProgress]);
 
     const resetAllNodesToIdle = useCallback(() => {
-        const { nodes, updateNodeData } = useCanvasStore.getState();
-        nodes.forEach(n => updateNodeData(n.id, { state: 'IDLE' } as Partial<NodeData>));
-    }, []);
+        // Clearing run state is not an edit — it leaves nothing for the next save to send.
+        engine.getGraph().nodes.forEach(n => engine.applyRuntime(n.id, { state: 'IDLE' } as Partial<NodeData>));
+    }, [engine]);
 
     const runGate = useRunGate();
-    const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ socketConnectionId });
+    const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ engine, socketConnectionId });
 
     const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleCreateNewFlow } = useMobileFlowActions({
         engine,
@@ -177,7 +177,7 @@ export const MobileFlowEditorPage = () => {
         lastLocalUpdateTimestampRef,
     });
 
-    const connectionMode = useConnectionMode(blockRegistry);
+    const connectionMode = useConnectionMode(blockRegistry, engine);
     const { recentIds, addRecent } = useRecentBlocks();
 
     // Pending auto-connect: when user adds a new block via "Add new block & connect"
@@ -223,6 +223,7 @@ export const MobileFlowEditorPage = () => {
             const runFlowId = await runGate();
             if (!runFlowId) return;
             await executeNodeWithToast(nodeId, {
+                engine,
                 flowId: runFlowId,
                 socketConnectionId,
                 canEdit: permissions.canEditStructure,
@@ -425,6 +426,7 @@ export const MobileFlowEditorPage = () => {
                 )}
                 <div className="pt-2">
                     <MobileStepList
+                        engine={engine}
                         onTapCard={handleTapCard}
                         onExpandContent={setPreviewContent}
                         onAddStep={() => setIsBlockLibraryOpen(true)}
@@ -439,6 +441,7 @@ export const MobileFlowEditorPage = () => {
             {/* Full-screen step detail */}
             <MobileStepDetail
                 nodeId={stepNav.activeNodeId}
+                engine={engine}
                 role={role}
                 onRun={handleRunNode}
                 onClose={handleCloseStep}

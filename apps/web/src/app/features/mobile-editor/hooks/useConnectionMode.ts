@@ -3,19 +3,13 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import {
-    newEdgeId,
-    resolveNodeName,
-    translateField,
-    useCanvasConnections,
-    useCanvasNodes,
-    useCanvasStore,
-} from '@flows/flows';
+import { resolveNodeName, translateField, useCanvasConnections, useCanvasNodes } from '@flows/flows';
 
 import { markConnectionNew } from './useRecentConnections';
 import { arePortTypesCompatible, wouldCreateCycle } from '../../flows/utils';
 
-import type { BlockDefinitionWithFrontend, GraphEdge } from '@flows/flows';
+import type { FlowEngine } from '@flows/engine';
+import type { BlockDefinitionWithFrontend } from '@flows/flows';
 
 /** 'output' = connecting FROM this port's output, 'input' = connecting TO this port's input */
 export type ConnectionDirection = 'output' | 'input';
@@ -42,7 +36,7 @@ export interface CompatibleTarget {
     occupiedByNode?: string;
 }
 
-export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionWithFrontend>) => {
+export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionWithFrontend>, engine: FlowEngine) => {
     const { t } = useTranslation(['flows', 'blocks']);
     const [source, setSource] = useState<PortSelection | null>(null);
     const connections = useCanvasConnections();
@@ -155,6 +149,61 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
         []
     );
 
+    /**
+     * Make one edge, the way both entry points need it.
+     *
+     * Replacing an input's existing edge is **one transaction**: an input port is 1:1, so
+     * the old edge has to go before the new one lands, and `connect` refuses cycles and
+     * mismatched port types by throwing. Two transactions would leave the port with
+     * neither edge when the second one is refused; `transact` rolls the whole thing back.
+     *
+     * Returns the new edge's id, or `null` when nothing was made.
+     */
+    const connectThroughEngine = useCallback(
+        (sourceNodeId: string, sourcePortId: string, targetNodeId: string, targetPortId: string): string | null => {
+            const { nodes, edges } = engine.getGraph();
+
+            const already = edges.some(
+                e =>
+                    e.sourceNodeId === sourceNodeId &&
+                    e.sourcePortId === sourcePortId &&
+                    e.targetNodeId === targetNodeId &&
+                    e.targetPortId === targetPortId
+            );
+            if (already) {
+                toast.info(t('mobile.connection.alreadyConnected', 'Already connected'));
+                return null;
+            }
+
+            const occupying = edges.find(e => e.targetNodeId === targetNodeId && e.targetPortId === targetPortId);
+
+            let edgeId = '';
+            try {
+                engine.transact('edge:connect', ops => {
+                    if (occupying) ops.disconnect([occupying.id]);
+                    edgeId = ops.connect({ sourceNodeId, sourcePortId, targetNodeId, targetPortId });
+                });
+            } catch {
+                toast.error(t('mobile.connection.failed', 'Could not connect these ports'));
+                return null;
+            }
+
+            // Whatever the upstream already produced flows straight in — run output, not an
+            // edit, so it lands outside the transaction and never reads as unsaved work.
+            // Merged rather than assigned: `applyRuntime` replaces the field it is given,
+            // and this target may already hold packets on its other input ports.
+            const packet = nodes.find(n => n.id === sourceNodeId)?.outputData?.[sourcePortId];
+            if (packet) {
+                const target = engine.getGraph().nodes.find(n => n.id === targetNodeId);
+                engine.applyRuntime(targetNodeId, { inputData: { ...target?.inputData, [targetPortId]: packet } });
+            }
+
+            toast.success(t('mobile.connection.connected', 'Connected'));
+            return edgeId;
+        },
+        [engine, t]
+    );
+
     const connectTo = useCallback(
         async (targetNodeId: string, targetPortId: string) => {
             if (!source) return;
@@ -165,57 +214,10 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
             const tgtNodeId = source.direction === 'output' ? targetNodeId : source.nodeId;
             const tgtPortId = source.direction === 'output' ? targetPortId : source.portId;
 
-            const storeState = useCanvasStore.getState();
-            const { connections: currentConnections, addConnection, deleteConnection } = storeState;
-
-            const existing = currentConnections.find(
-                c =>
-                    c.sourceNodeId === srcNodeId &&
-                    c.sourcePortId === srcPortId &&
-                    c.targetNodeId === tgtNodeId &&
-                    c.targetPortId === tgtPortId
-            );
-            if (existing) {
-                toast.info(t('mobile.connection.alreadyConnected', 'Already connected'));
-                return;
-            }
-
-            // Input ports are 1:1 — disconnect any existing connection to this input port
-            const existingInputConn = currentConnections.find(
-                c => c.targetNodeId === tgtNodeId && c.targetPortId === tgtPortId
-            );
-            if (existingInputConn) {
-                deleteConnection(existingInputConn.id);
-            }
-
-            const edgeId = newEdgeId();
-            const newConnection: GraphEdge = {
-                id: edgeId,
-                sourceNodeId: srcNodeId,
-                sourcePortId: srcPortId,
-                targetNodeId: tgtNodeId,
-                targetPortId: tgtPortId,
-            };
-
-            addConnection(newConnection);
-            markConnectionNew(edgeId);
-
-            // Copy source output data to target input data (same as desktop WorkflowCanvas)
-            const srcNode = useCanvasStore.getState().nodes.find(n => n.id === srcNodeId);
-            const packet = srcNode?.outputData?.[srcPortId];
-            if (packet) {
-                useCanvasStore
-                    .getState()
-                    .setNodes(prev =>
-                        prev.map(n =>
-                            n.id === tgtNodeId ? { ...n, inputData: { ...n.inputData, [tgtPortId]: packet } } : n
-                        )
-                    );
-            }
-
-            toast.success(t('mobile.connection.connected', 'Connected'));
+            const edgeId = connectThroughEngine(srcNodeId, srcPortId, tgtNodeId, tgtPortId);
+            if (edgeId) markConnectionNew(edgeId);
         },
-        [source]
+        [source, connectThroughEngine]
     );
 
     const close = useCallback(() => {
@@ -225,60 +227,19 @@ export const useConnectionMode = (blockRegistry: Record<string, BlockDefinitionW
     /** Direct connect between any two ports — does not require source state */
     const connectPorts = useCallback(
         async (sourceNodeId: string, sourcePortId: string, targetNodeId: string, targetPortId: string) => {
-            const storeState = useCanvasStore.getState();
-            const { connections: currentConnections } = storeState;
-
-            const existing = currentConnections.find(
-                c =>
-                    c.sourceNodeId === sourceNodeId &&
-                    c.sourcePortId === sourcePortId &&
-                    c.targetNodeId === targetNodeId &&
-                    c.targetPortId === targetPortId
-            );
-            if (existing) return;
-
-            // Input ports are 1:1 — replace existing connection (same as desktop WorkflowCanvas)
-            const existingInputConn = currentConnections.find(
-                c => c.targetNodeId === targetNodeId && c.targetPortId === targetPortId
-            );
-            if (existingInputConn) {
-                useCanvasStore.getState().deleteConnection(existingInputConn.id);
-            }
-
-            const edgeId = newEdgeId();
-            const newConnection: GraphEdge = {
-                id: edgeId,
-                sourceNodeId,
-                sourcePortId,
-                targetNodeId,
-                targetPortId,
-            };
-
-            useCanvasStore.getState().addConnection(newConnection);
-            markConnectionNew(edgeId);
-
-            // Copy source output data to target input data (same as desktop WorkflowCanvas)
-            const srcNode = useCanvasStore.getState().nodes.find(n => n.id === sourceNodeId);
-            const packet = srcNode?.outputData?.[sourcePortId];
-            if (packet) {
-                useCanvasStore
-                    .getState()
-                    .setNodes(prev =>
-                        prev.map(n =>
-                            n.id === targetNodeId ? { ...n, inputData: { ...n.inputData, [targetPortId]: packet } } : n
-                        )
-                    );
-            }
-
-            toast.success(t('mobile.connection.connected', 'Connected'));
+            const edgeId = connectThroughEngine(sourceNodeId, sourcePortId, targetNodeId, targetPortId);
+            if (edgeId) markConnectionNew(edgeId);
         },
-        []
+        [connectThroughEngine]
     );
 
-    const disconnect = useCallback((connectionId: string) => {
-        useCanvasStore.getState().deleteConnection(connectionId);
-        toast.success(t('mobile.connection.disconnected', 'Disconnected'));
-    }, []);
+    const disconnect = useCallback(
+        (connectionId: string) => {
+            engine.transact('edge:disconnect', ops => ops.disconnect([connectionId]));
+            toast.success(t('mobile.connection.disconnected', 'Disconnected'));
+        },
+        [engine, t]
+    );
 
     return {
         isOpen,

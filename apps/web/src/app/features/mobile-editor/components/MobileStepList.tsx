@@ -4,14 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronDown } from 'lucide-react';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 
-import {
-    getPermissions,
-    translateField,
-    useBlockRegistry,
-    useCanvasConnections,
-    useCanvasNodes,
-    useCanvasStore,
-} from '@flows/flows';
+import { getPermissions, translateField, useBlockRegistry, useCanvasConnections, useCanvasNodes } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { BlockIcon } from '../../flows/components/BlockIcon';
@@ -19,10 +12,13 @@ import { buildNodeDisplayNames, findConnectedComponents } from '../utils';
 import { STEREO_ICON_BG } from './consts';
 import { MobileStepCard } from './MobileStepCard';
 
+import type { FlowEngine } from '@flows/engine';
 import type { FlowRole } from '@flows/flows';
 
 interface MobileStepListProps {
     onTapCard: (nodeId: string) => void;
+    /** Deleting a step is a graph edit, so it goes through the engine. */
+    engine: FlowEngine;
     onExpandContent?: (content: { value: unknown; type?: string }) => void;
     onAddStep: () => void;
     onAddBlockDirect?: (type: string) => void;
@@ -33,6 +29,7 @@ interface MobileStepListProps {
 
 export const MobileStepList = ({
     onTapCard,
+    engine,
     onExpandContent,
     onAddStep,
     onAddBlockDirect,
@@ -86,7 +83,9 @@ export const MobileStepList = ({
             .filter(group => group.nodeIds.length > 0);
     }, [groups, searchQuery, displayNames, nodeMap]);
 
-    const handleDelete = canModifyCanvas ? (nodeId: string) => useCanvasStore.getState().deleteNode(nodeId) : undefined;
+    const handleDelete = canModifyCanvas
+        ? (nodeId: string) => engine.transact('node:remove', ops => ops.removeNodes([nodeId]))
+        : undefined;
 
     /** Check if nodeB follows nodeA via a direct connection (in topological order) */
     const isDirectlyConnected = (prevId: string, currId: string) =>
