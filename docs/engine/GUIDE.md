@@ -80,10 +80,50 @@ undo 스택은 그대로고 다음 save 가 보낼 것도 안 생긴다.
 
 ---
 
+## 어느 플랫폼에서 도나
+
+엔진이 만지는 플랫폼 API 는 이게 전부다. 나머지는 순수 계산이다.
+
+| 무엇                          | 어디                                               | 없으면                       |
+| ----------------------------- | -------------------------------------------------- | ---------------------------- |
+| `crypto.randomUUID()`         | `core/ids.ts`                                      | `configureIds(fn)` 로 주입   |
+| `fetch`                       | `fetchHttpPort`                                    | `fetchFn` 옵션으로 주입      |
+| `WebSocket`                   | `webSocketPort`                                    | `createSocket` 옵션으로 주입 |
+| `setTimeout` / `clearTimeout` | `runSession`, 어댑터                               | (모든 런타임에 있다)         |
+| `process.*`                   | **`cli/main.ts` 하나뿐** — 배럴에서 export 안 한다 | 해당 없음                    |
+
+`lib: ["ES2022"]` (DOM 없음) 컴파일이 **DOM API 를 안 쓴다**는 것까지 보증한다.
+다만 `globalThis.crypto` 는 DOM lib 밖이라 컴파일러가 안 잡아준다 — 그래서 위 표가 있다.
+
+**Node 22 / https·localhost 브라우저는 아무 설정도 필요 없다.**
+`crypto.randomUUID` 가 없는 두 경우에만 부팅 시 한 번 호출한다:
+
+```ts
+import { configureIds } from '@flows/engine';
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
+
+configureIds(uuidv4); // React Native (Hermes 에는 crypto 가 없다)
+```
+
+- **React Native / Hermes** — `crypto` 자체가 없다.
+- **plain http 브라우저** — `randomUUID` 는 **보안 컨텍스트(https·localhost)에만** 존재한다.
+  사내 LAN IP 로 띄우면 `crypto` 는 있는데 이 메서드가 없다.
+
+프로세스 단위다 — 엔진 인스턴스마다가 아니라. id 는 서버 키스페이스 하나로 들어가므로,
+한 프로세스의 두 엔진이 서로 다른 소스에서 뽑는 건 기능이 아니라 버그다.
+주입한 값도 대시가 벗겨진다 — `-` 는 서버가 포트 구분자로 rewrite 하는 문자라, 그냥
+통과시키면 노드와 포트가 같은 행에 얹힌다.
+
+> **IndexedDB 는 엔진에 없다.** `draftStorage.ts` 는 `libs/flows`(브라우저) 소속이고,
+> 엔진의 `persistence/draft.ts` 는 `draftFor()` 로 **드래프트 객체를 만들어 돌려줄 뿐**이다.
+> 어디에 넣을지는 호스트가 정한다 — RN 이면 MMKV, Node 면 파일.
+
+---
+
 ## Node 에서 직접 돌리기
 
-브라우저·React·store 없이 그래프를 만들고 저장하고 실행할 수 있다. 엔진이
-`lib: ["ES2022"]` (DOM 없음) 으로 컴파일되므로 **컴파일러가** 그걸 보증한다.
+브라우저·React·store 없이 그래프를 만들고 저장하고 실행할 수 있다.
 `fetch` 와 `WebSocket` 은 Node 22 의 전역을 그대로 쓴다 — 브라우저 분기가 없다.
 
 ### 1. 준비된 데모부터

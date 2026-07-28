@@ -17,6 +17,7 @@ export * from './process';
  */
 export {
     clampHeight,
+    configureIds,
     DEFAULT_TEXTAREA_HEIGHT,
     getNodeHeight,
     newEdgeId,
