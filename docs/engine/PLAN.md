@@ -527,7 +527,11 @@ React lib 5개에 `jsx: "react-jsx"`와 `src/**/*.tsx` include를 추가했다
 4. `packet.type === 'markdown'` 4곳 — `markdown`은 서버의 포트 타입 5종에 없다. 항상 false였고,
    실제 판정은 `isMarkdownContent` 내용 검사가 하고 있었다.
 
-## 9. 진행 체크리스트
+## 진행 체크리스트
+
+이 절만 번호가 없다. 계속 덧붙는 색인이지 장(章)이 아니다 — 한때 `## 9.` 였는데
+바로 아래 stale-input 절도 `## 9.` 로 붙는 바람에 §10~§12 상호참조가 한 칸씩 어긋나 있었고,
+번호를 뺀 쪽이 나머지를 전부 밀어내는 것보다 싸다.
 
 - [x] P0-1 lib 스캐폴딩 (`@flows/engine`)
 - [x] P0-2 파일 이동 + shim
@@ -568,6 +572,21 @@ save → **run**`을 브라우저 없이 완주. 마지막 프레임은 일부�
       `tsc -b --force` 총 **1061 — 같은 방식으로 잰 HEAD의 1073보다 12건 감소**.
       (이전 Phase의 숫자들은 측정 방식이 달라 직접 비교 불가 — `--force` 없이 재면
       증분 캐시 때문에 값이 흔들린다.)
+- [x] P5-1 `mergeNodeView` — HTTP wire 디코딩을 `parseSocketFrame` 옆으로 (§10)
+- [x] P5-2 `reset-node` — 한 번도 발화한 적 없던 effect, 양쪽 절반 수정 (§10)
+- [x] P5-3 `loadGraph` 단일 ingress — 포트 병합·엣지 전파를 엔진으로 (§10)
+- [x] **Phase 5 완료 조건 전부 green** — engine 246 (Phase 4의 221 → **+25**), socket 22,
+      flows 24, web 174 = 466. `tsc -b --force` **0**, lint 0 error, `nx build web`,
+      `yarn engine:demo` green.
+- [x] P6-1 블록 레지스트리 키잉 수정 (`$definition.type` + `cores=1&limit=-1`)
+- [x] P6-2 `SocketPort.connectionId()` — run 결과가 돌아올 연결을 지정
+- [x] P6-3 `--real` 기본 read-only (`--write` / `--run` 명시 필요)
+- [x] **Phase 6 완료 조건 전부 green** — 실서버에서 `load → add → undo → redo → save → run`
+      완주, 실플로우 6개 로드가 `dirty=false` (불변식 7 실데이터 확인).
+      engine 258, socket 22, flows 24, web 174 = **478**.
+      `tsc -b --force` **0**, lint 0 error / 53 warning (전부 선행), `nx build web` green.
+      측정은 `node node_modules/typescript/bin/tsc` 직접 호출 — `npx tsc` 는 이 환경에서
+      래퍼를 타서 `--version` 조차 버전을 안 찍는다.
 
 ---
 
@@ -803,6 +822,11 @@ read-only 런은 **자기가 한 것만 주장한다** — 아무것도 안 만�
   CLAUDE.md 의 "Channel ID from `GET /flows/:id/load` response" 는 현재 서버와 맞지 않는다.
 - **트레일링 슬래시가 응답을 가른다**: `/flows?view=mine` → 스키마 문자열,
   `/flows/?view=mine` → 실제 데이터.
+- **`DELETE /flows/:id` 를 서버가 거부한다** — `400 INVALID - not supported`.
+  `libs/flows/src/api/flows.ts:125` 의 `deleteFlow` 가 정확히 이 요청을 보내므로,
+  **앱의 플로우 삭제가 DEV 에서 동작하지 않는다.** 내가 만든 테스트 플로우 `1011132` 도
+  이 때문에 못 지웠다 (`hasOwned: true` 인데도) — 비우고 이름만 표시해뒀으니 콘솔에서 지워야 한다.
+  `upsert` 로 `deletedAt` 을 쓰면 200 이 오지만 서버는 `deletedAt: 0` 을 유지한다.
 
 ### 게이트
 
