@@ -1121,3 +1121,74 @@ t.ts(2,15): error TS2305: Module '"@lemoncloud/flow-engine"' has no exported mem
 | "정본 3개 유지, 새 문서 만들지 않음"           | `libs/engine/README.md` + `LICENSE` 추가   | 배포 산출물이지 4번째 설계 정본이 아니다. 없으면 npm 페이지가 빈 채로 나가고, Apache-2.0 §4(a) 는 사본 동봉을 요구한다 |
 
 세 번째는 `GUIDE.md` "더 볼 곳" 에도 한 줄 올려서 문서 지도가 4개를 다 가리키게 했다.
+
+---
+
+## 15. 모바일 에디터를 엔진으로 (별도 브랜치 `feature/mobile-engine`)
+
+§14 까지가 `docs/flow-engine` 이다. 이 절은 그 브랜치에서 분기한 **별도 PR** 의 기록이고,
+`docs/flow-engine` 이 먼저 머지되는 것을 전제한다.
+
+### 왜 — 조사에서 간극이 예상보다 좁았다
+
+모바일은 "엔진 이전 아키텍처" 가 아니었다. 규칙은 이미 공유하고 있었다: 사이클 차단·포트 타입
+호환(`wouldCreateCycle`·`arePortTypesCompatible`), id 민팅, 실행 입력 hydrate(§9 수정 포함),
+그리고 save 는 `useFlows.ts:248` 의 `toSnapshot` 을 탄다 — **런타임 상태가 save body 로 안 샌다.**
+
+> 처음에 "모바일 save 에 런타임 상태가 샌다" 를 의심했는데 **틀렸다.** `transformNodeForSave`
+> 가 slim 노드를 새로 조립하고 `inputData`/`outputData` 를 아예 안 복사한다.
+
+빠진 건 둘이었다.
+
+**① 로드 시 포트 병합·엣지 전파 부재 — 유일한 실기능 결함.** 포트 값은 노드 안이 아니라
+응답의 별도 `ports` 배열로 오고(`core/ingress.ts`), 모바일의 로드 4곳은 전부
+`useCanvasStore.loadWorkflow` — **`ports` 인자가 없는 함수**였다. 저장도 런타임을 안 실으므로
+어디서도 메워지지 않았다: 플로우를 열면 지난 실행 데이터가 **없었다**(문서 값만 나온 게 아니라).
+
+**② history 부재 + 런타임/편집 미구분.** 소켓 상태도 config 편집도 같은 `updateNodeData`.
+
+### 무엇을 했나
+
+| 슬라이스 | 무엇                                                                               |
+| -------- | ---------------------------------------------------------------------------------- |
+| 01       | 엔진 인스턴스 + `useEngineMirror` + 로드 4곳 → `loadFlowIntoEngine`. 스펙 5개 신설 |
+| 02       | write 14사이트 → 편집 `transact` / 런타임 `applyRuntime`. 순 −20줄                 |
+| 03       | 이 절 + README·GUIDE·CLAUDE 의 "모바일은 엔진 안 씀" 철회                          |
+
+**02 는 안 쪼갰다.** 미러가 알림마다 스토어를 통째로 덮으므로, 편집만 먼저 옮기면 편집 알림이
+아직 스토어에 직접 쓰이던 런타임 상태를 지우고, 런타임만 먼저 옮기면 추가된 노드·config 를
+지운다(후자가 더 나쁨 — 표시가 아니라 데이터).
+
+### 계획이 놓쳤던 것 3개
+
+1. **노드 삭제가 훅이 아니라 컴포넌트 2곳에 있었다** (`MobileStepList`, `MobileStepDetail`).
+2. **`MobileTutorialPage` 가 `useConnectionMode`·`MobileStepList` 를 공유한다.** 두 훅이 엔진을
+   요구하자 컴파일이 깨졌다. 튜토리얼에도 엔진을 줬다 — 레지스트리를 넘기는 것까지. 안 넘기면
+   `connect` 가 `INCOMPATIBLE_PORTS` 를 영원히 안 던지는데, 튜토리얼이야말로 잘못된 연결을
+   일부러 시도해 보는 화면이다.
+3. **`applyRuntime` 은 shallow 교체다.** 데스크톱이 연결 시
+   `{ inputData: { [port]: packet } }` 를 그냥 넘기는 건 **방금 만든 노드**라 안전한 것이고,
+   모바일은 기존 노드에 연결하므로 병합하지 않으면 **형제 입력 포트가 날아간다.**
+
+### 연결의 원자성
+
+입력 포트는 1:1 이라 기존 엣지를 끊고 새로 잇는데 `ops.connect` 는 사이클·중복·타입 불일치를
+**throw** 한다. 한 `transact` 안에 넣어 거절 시 끊기까지 롤백된다 — 둘로 나누면 포트가 아무
+엣지도 없는 상태로 남는다.
+
+### 확인한 것 / 안 한 것
+
+green: `tsc -b --force` 0 · engine 288 · socket 22 · flows 24 · web 179 = **513** ·
+lint 0 error / 51 warning · `nx build web`. 완료 판정은 grep — 모바일·튜토리얼 코드에
+`setNodes`/`updateNodeData`/`deleteNode`/`loadWorkflow` 등 **0건**.
+
+**안 한 것:**
+
+- **모바일 수동 스모크 미실행.** 특히 "실행 중 소켓 상태가 반영되면서 그 사이 편집이 안
+  지워지는가" — 슬라이스 02 의 리스크가 겨냥한 바로 그 경로가 자동 게이트 밖이다.
+- **undo/redo UI 없음.** 엔진이 생겨 _가능해졌을 뿐_, 버튼·제스처는 UX 결정이라 별건.
+- **데스크톱의 지연 fetch 는 모바일에 여전히 없다.** 데스크톱은 서버가 `undefined` 로 남긴
+  포트 행을 로드 뒤 따로 가져와 다시 전파한다(`WorkflowCanvas.tsx` ~690-730). 이 전환은
+  `loadGraph` 호출부만 맞췄고 그 후속은 안 옮겼다.
+- 신규 스펙은 슬라이스 01 의 5개뿐. 02 는 동작 보존이 목표인 재배선이라 red-green 신호가
+  없다고 보고 안 썼다 — **disconnect+connect 원자 롤백만은 실제로 안 덮인다.**

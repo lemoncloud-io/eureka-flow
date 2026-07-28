@@ -30,13 +30,12 @@
 
 ### 엔진 인스턴스는 몇 개인가
 
-데스크톱 에디터에는 **하나**, 모바일에는 **0개**다.
+**플로우를 편집하는 화면마다 하나씩.** 데스크톱 에디터, 모바일 에디터, 모바일 튜토리얼 —
+셋 다 자기 엔진을 만들고 `useEngineMirror` 로 스토어에 단방향 발행한다. 서로 공유하지 않는다.
 
-> **모바일 에디터는 엔진을 안 쓴다.** `apps/web/.../mobile-editor` 에는 `createFlowEngine`
-> 호출도 `useEngineMirror` 도 없다 — 스토어에 직접 쓰고(`useMobileFlowActions.ts:99,112`),
-> save body 도 baseline 도 스토어에서 뜬다(`useMobileAutoSave.ts:40`, `useMobileSocketSync.ts:70`).
-> 저 화면에서는 위 표의 "투영" 이 아니라 **스토어가 그래프 자체**다. 엔진 전환은 이 작업 범위가
-> 아니었다 — 고장이 아니라 미전환이다.
+> 모바일은 원래 엔진 없이 스토어에 직접 썼다. 그래서 **로드 시 서버 포트 값이 그래프에 안
+> 들어왔고**(`loadGraph` 에만 `ports` 인자가 있다) 미리보기에 지난 실행 데이터가 비어 있었다.
+> 지금은 `loadFlowIntoEngine` 하나로 들어온다. 자세한 건 `PLAN.md` §15.
 
 `FlowEditorPage.tsx:81` 이 만들고 `:760` 에서 `engine={engine}` 로 캔버스에 넘긴다.
 `WorkflowCanvas.tsx:261` 의 `engineProp ?? fallbackEngine` 은 캔버스가 **단독으로 렌더될 때**

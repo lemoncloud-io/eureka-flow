@@ -156,10 +156,11 @@ The graph is **not** in a store. It lives in the engine document (`createFlowEng
 > **Write to the engine, read from the store.** Nothing reads the store and writes it back,
 > so the two cannot disagree. See [`docs/engine/GUIDE.md`](docs/engine/GUIDE.md).
 
-That describes the **desktop canvas**, which is where the engine is (`FlowEditorPage` creates
-it). The **mobile editor** (`apps/web/src/app/features/mobile-editor`) has no engine instance:
-it writes `useCanvasStore` directly, and takes both its baseline and its save body from the
-store. There the store _is_ the graph. Converting it was never part of this work.
+That holds on every surface that edits a flow. Three of them own an engine —
+`FlowEditorPage` (desktop), `MobileFlowEditorPage`, and `MobileTutorialPage` — and
+`WorkflowCanvas` keeps a fourth as a fallback for when it is rendered on its own, which is
+what the desktop tutorial and the component viewer use. None of them writes the store's
+graph directly.
 
 Four Zustand stores manage the rest:
 
