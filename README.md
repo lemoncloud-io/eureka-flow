@@ -125,6 +125,7 @@ eureka-flow/
 ├── apps/
 │   └── web/                    # React web application
 ├── libs/
+│   ├── engine/                 # Headless flow engine — owns the graph, runs under plain Node
 │   ├── flows/                  # Flow editor core (API, hooks, stores, types)
 │   ├── socket/                 # WebSocket layer for real-time updates
 │   ├── web-core/               # HTTP client, auth state, error handling
@@ -137,19 +138,26 @@ eureka-flow/
 
 ### State Management
 
-Four Zustand stores manage different concerns:
+The graph is **not** in a store. It lives in the engine document (`createFlowEngine`,
+`@flows/engine`), and `useEngineMirror` pushes it into `useCanvasStore` one way.
 
-| Store               | Purpose                                            |
-| ------------------- | -------------------------------------------------- |
-| `useCanvasStore`    | Canvas UI: nodes, connections, viewport, selection |
-| `useFlowsStore`     | Flow metadata: blockRegistry, flowName, saveStatus |
-| `useWebSocketStore` | WebSocket: connectionStatus, subscribers           |
-| `useWebCoreStore`   | Auth: apiKey, isAuthenticated, profile             |
+> **Write to the engine, read from the store.** Nothing reads the store and writes it back,
+> so the two cannot disagree. See [`docs/engine/GUIDE.md`](docs/engine/GUIDE.md).
+
+Four Zustand stores manage the rest:
+
+| Store               | Purpose                                                        |
+| ------------------- | -------------------------------------------------------------- |
+| `useCanvasStore`    | Projection of the engine's graph, plus viewport/selection/drag |
+| `useFlowsStore`     | Flow metadata: blockRegistry, flowName, saveStatus, baseline   |
+| `useWebSocketStore` | WebSocket: connectionStatus, subscribers                       |
+| `useWebCoreStore`   | Auth: apiKey, isAuthenticated, profile                         |
 
 ### Data Flow
 
 ```
 FlowEditorPage (orchestrator)
+├── engine = createFlowEngine(...)   ← owns the graph
 ├── useFlows hook (flow CRUD operations)
 ├── useBlocks hook (block registry loading)
 ├── useInitFlowSocket hook (WebSocket callbacks)
@@ -157,11 +165,14 @@ FlowEditorPage (orchestrator)
 ├── Header (file operations, save status)
 ├── Sidebar (block library by category)
 ├── WorkflowCanvas (imperative canvas ref)
+│   ├── useEngineMirror(engine) → useCanvasStore   ← one way
 │   ├── NodeBlock (status: IDLE → READY → RUNNING → COMPLETED/ERROR)
-│   ├── ConnectionLine (SVG bezier curves)
-│   └── useCanvasStore (nodes, connections)
+│   └── ConnectionLine (SVG bezier curves)
 └── DetailPanel (selected node configuration)
 ```
+
+A run is not an edit: `engine.applyRuntime` lands outside history and `toSnapshot` drops it,
+so running a node leaves nothing for the next save to send.
 
 ### Node Execution
 
@@ -173,6 +184,7 @@ FlowEditorPage (orchestrator)
 ### Path Aliases
 
 ```typescript
+@flows/engine     // libs/engine/src/index.ts
 @flows/flows      // libs/flows/src/index.ts
 @flows/socket     // libs/socket/src/index.ts
 @flows/web-core   // libs/web-core/src/index.ts
@@ -232,6 +244,8 @@ yarn prettier               # Format code with Prettier
 
 # Testing
 yarn web:test               # Run tests
+npx nx test engine          # Headless engine specs (no DOM)
+yarn engine:demo            # load → add → undo → redo → save → run, in Node, no browser
 
 # Utilities
 yarn clean:cache            # Clear build caches

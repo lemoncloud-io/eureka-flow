@@ -80,13 +80,100 @@ undo 스택은 그대로고 다음 save 가 보낼 것도 안 생긴다.
 
 ---
 
-## 주의: `CLAUDE.md` 가 낡았다
+## Node 에서 직접 돌리기
 
-`CLAUDE.md` 의 State Architecture 가 `useCanvasStore` 를 "Canvas UI state: nodes, connections…" 라고,
-Data Flow Architecture 가 `WorkflowCanvas └── useCanvasStore (nodes, connections, viewport)` 라고 적고 있다.
-지금은 **스토어가 투영이고 그래프는 엔진 소유**다. 이 브랜치에서 고치지 않았다 — 별도 판단.
+브라우저·React·store 없이 그래프를 만들고 저장하고 실행할 수 있다. 엔진이
+`lib: ["ES2022"]` (DOM 없음) 으로 컴파일되므로 **컴파일러가** 그걸 보증한다.
+`fetch` 와 `WebSocket` 은 Node 22 의 전역을 그대로 쓴다 — 브라우저 분기가 없다.
 
-같은 파일의 "Channel ID from `GET /flows/:id/load` response" 도 부정확하다(서버가 그 필드를 보내지 않는다).
-관련 클라이언트 배선은 이 브랜치에서 제거했고, 실행 프레임은 채널이 아니라 connectionId 로 전달된다.
+### 1. 준비된 데모부터
 
-더 깊게: `docs/engine/PLAN.md` — Phase 0~6, 불변식, 결함 재현, 정정 이력.
+```bash
+yarn engine:demo                                   # 스텁 서버, 네트워크 0
+```
+
+`load → add → undo → redo → save → run` 을 완주하고 마지막에 `OK` 또는 `FAILED` 를 찍는다
+(실패면 exit 1 이라 CI 에 그대로 걸 수 있다).
+
+```bash
+FLOW_API_URL=https://…/_api_ FLOW_API_KEY=… \
+FLOW_WS_URL=wss://…            \
+  yarn engine:demo --real --flow 1007934
+```
+
+- **`--real` 은 기본 read-only** — load 에서 멈춘다. `--write` 로 add/save, `--write --run` 으로 실행.
+  save 는 그래프 통째 교체라, 남의 플로우에 쓰면 되돌리기 어렵다.
+- `FLOW_WS_URL` 이 없으면 소켓을 안 붙이고 run 단계도 건너뛴다.
+- read-only 런은 **자기가 한 것만 주장한다**. 아무것도 추가 안 한 채 "undo 후 개수가 같다" 를
+  검사하면 자동으로 통과하므로, 그 경우 edit 불변식은 아예 안 본다.
+
+### 2. 내 스크립트 짜기
+
+```ts
+import { createApiKeyAuth, createFetchHttpPort, createFlowWorkspace } from '@flows/engine';
+
+const http = createFetchHttpPort({
+    baseUrl: process.env.FLOW_API_URL!,
+    auth: createApiKeyAuth(process.env.FLOW_API_KEY ?? null),
+});
+
+const { engine, repository } = createFlowWorkspace({ http });
+
+await repository.load('1007934');
+console.log(engine.getGraph().nodes.length, repository.isDirty()); // → 4  false
+
+engine.transact('add', ops => ops.addNode({ type: 'input-text', position: { x: 0, y: 0 } }));
+console.log(repository.isDirty()); // → true
+engine.undo();
+console.log(repository.isDirty()); // → false  (로드된 그래프로 정확히 복귀)
+```
+
+실행까지 따라가려면 소켓과 세션을 붙인다. **waiter 를 run 요청보다 먼저** 등록해야 한다 —
+서버는 요청을 받자마자 스트리밍을 시작하므로, 나중에 기다리면 run 전체를 놓친다.
+
+```ts
+import { createWebSocketPort, createRunSession } from '@flows/engine';
+
+const socket = createWebSocketPort({ url: wsUrl }); // ?x-api-key=…&info=&channels=0000
+const session = createRunSession({ engine, socket, currentFlowId: flowId });
+socket.connect();
+
+const settled = session.waitForNode(nodeId, { timeoutMs: 15_000 });
+await repository.runNode(nodeId, undefined, {
+    async: true,
+    propagate: true,
+    connection: session.connectionId() ?? undefined, // ← 없으면 서버가 아무에게도 안 보낸다
+});
+console.log((await settled).state); // → 'COMPLETED'
+session.close();
+socket.close();
+```
+
+**실행 방법** — Vitest 밖에서는 `@flows/*` 별칭이 안 풀리므로 번들해서 돌린다
+(`engine:demo` 스크립트가 하는 것과 같다):
+
+```bash
+npx esbuild my-script.ts --bundle --platform=node --format=esm --target=node22 \
+  --outfile=dist/my-script.mjs && node dist/my-script.mjs
+```
+
+한 파일짜리라면 상대 경로(`libs/engine/src/...`)로 임포트해서 `npx tsx` 로 바로 돌려도 된다.
+
+### 3. 스펙으로 쓰기
+
+`libs/engine` 은 `environment: 'node'` 로 돈다. 새 스펙은 `libs/engine/src/__tests__/` 에 두고
+`npx nx test engine`. 포트를 다 스텁으로 바꿀 필요는 없다 — `HttpPort` 는 메서드 하나,
+`SocketPort` 는 다섯 개다 (`cli/stubHttpPort.ts`, `cli/stubSocketPort.ts` 참고).
+
+> **스텁을 짤 땐 서버 응답 모양을 베껴라, 클라이언트 코드 말고.** 결함 4개 중 하나가 정확히
+> 그것 때문에 유닛 테스트 255개가 green 인 채로 숨어 있었다 — 스텁 fixture 가 top-level `type` 을
+> 갖고 있었는데, 서버는 그걸 한 번도 보낸 적이 없다. 자세한 건 `PLAN.md` §11.
+
+---
+
+## 더 볼 곳
+
+|                       |                                                                                                    |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `CLAUDE.md`           | 레포 전체 관례. State/Data Flow 절이 이 브랜치에 맞게 갱신됐다 — 스토어는 투영, 그래프는 엔진 소유 |
+| `docs/engine/PLAN.md` | Phase 0~6 실행 계획, 불변식, 결함 재현 절차, 정정 이력                                             |
