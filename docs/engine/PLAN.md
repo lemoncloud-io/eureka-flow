@@ -662,3 +662,85 @@ skip-occupied 가드 한 줄 제거. 연결된 입력 포트는 항상 상류의
 `propagateData` 만 `'value' in packet` 을 요구하고 나머지 전파 지점은 truthy 만 본다.
 그러나 `toDataPacket` 은 항상 `value` 키를 넣으므로(값이 `undefined` 여도 키는 존재)
 이 코드베이스에서 갈리는 입력은 생기지 않는다.
+
+---
+
+## 10. Phase 5: 규칙은 엔진으로, 오케스트레이션은 남김
+
+Phase 4 이후 엔진은 **절반만 채택된** 상태였다. 그래프 편집은 엔진이 소유(브라우저가
+`createFlowEngine` 사용)하지만, 저장·로드·실행 오케스트레이션은 `repository`/`runSession` 에
+구현돼 있으면서 **웹은 여전히 `useFlows` 옛 경로**를 탄다 — 같은 규칙의 구현이 두 벌.
+
+이 Phase의 판별 기준: **`libs/engine` 유닛 테스트로 증명 가능한가.**
+
+- **규칙(rules)** → 이관. 아래 세 슬라이스.
+- **오케스트레이션** (TanStack 캐시·saveStatus 상태기계·autosave·retry) → **남김.**
+  `flowRepository` 에는 쿼리 캐시 개념이 없고, CLAUDE.md 의 mutation 규칙(`setQueryData`,
+  `invalidateQueries` 금지 — 백엔드 eventual consistency)은 전부 `useFlows` 안에 있다.
+  이관하면 stale-read 버그가 나는데 이 레포의 어떤 유닛 테스트도 그걸 못 잡고,
+  브라우저 스모크는 DEV 자격증명이 없어 못 돌린다. **자격증명 확보 전까지 보류.**
+
+### S1 `mergeNodeView` — HTTP wire 디코딩 (`37c56b6`)
+
+`GET /nodes/:id` 는 config/포트 데이터를 배열(`config$`/`inputData$$`/`outputData$$`)로,
+그래프는 객체로 들고 있다. `NodeData` 에는 배열 형태가 선언돼 있지 않아 디코딩이
+`useImperativeHandle` 안에서 `Record<string, unknown>` 캐스트로 이뤄지고 있었다 —
+테스트 불가, 헤드리스에서 도달 불가. `repository.runNode` 가 이 엔드포인트의 `NodeData` 를
+그대로 반환하므로 헤드리스 쪽도 같은 디코딩이 필요하다. 소켓 짝(`parseSocketFrame`) 옆으로 이동.
+
+**필드별 병합 규칙이 다르고, 그게 핵심이라 스펙으로 고정**: config는 치환(완전한 객체가
+매번 오므로 병합하면 방금 지운 키가 부활), inputData는 `inputData$$` 면 치환(노드의 전체
+입력 상태) / 객체 형태면 병합(포트 하나의 보고), outputData는 항상 병합. 부재 = "변경 없음".
+스펙 10개. WorkflowCanvas −58줄, `DataPacket` 임포트도 사라짐.
+
+### S2 `reset-node` — 한 번도 발화한 적 없던 effect (`285c890`)
+
+재실행 시 노드를 IDLE 로 되돌리는 effect. **양쪽 절반이 모두 고장나 있었다**:
+
+1. **리듀서가 잘못된 대상 지목.** 커서는 스트림별이라 포트 프레임은 `n1:out` 으로 키잉되는데,
+   상태가 리셋되는 건 **노드**고 `n1:out` 은 노드가 아니다. 두 소비자
+   (`updateNodeFromServer`, `applyRuntime`) 모두 그래프에서 id 를 찾다 조용히 실패 —
+   **브라우저에서도 no-op** 이었다. Rule 5 가 이미 "포트 이벤트는 부모의 상태를 기술한다"고
+   말하고 있었는데 effect 만 그러지 않았다.
+2. **`runSession` 이 effect 를 처리 안 함.** `onEffect` 로 넘기고 끝 → CLI 에선 아무도 안 받음.
+
+**왜 안 잡혔나**: 거의 모든 경로에서 `apply` 가 바로 뒤따라 stale 상태를 덮어써 최종 결과가
+같다. 유일하게 관측되는 건 **상태 없는 포트 프레임** — 리셋이 유일한 effect 인 경우.
+스펙이 그 경로를 치고, 두 절반을 **각각** 되돌려 실패를 확인했다.
+
+> **폐기한 접근**: 원안은 `applyRuntime` 에 monotonicity 게이트를 넣는 것이었다. 버렸다 —
+> `WorkflowCanvas.tsx:1080` 이 매 실행 시작에 RUNNING 을 쓰는데, COMPLETED 노드 재실행이면
+> RUNNING(2) < COMPLETED(3) 이라 게이트가 **재실행 자체를 막는다**. 호출자마다 `force` 를
+> 넘기면 게이트는 장식만 남는다. 실제 격차는 게이트가 아니라 누락된 effect 핸들러였다.
+
+### S3 `loadGraph` 단일 ingress (`718dde6`, `007e28c`)
+
+플로우 로드가 **누가 부르냐에 따라 다른 그래프**를 만들고 있었다. 캔버스는 id 민팅 →
+중복 엣지 제거 → 포트 값 병합 → 엣지 전파를 하고 `loadGraph` 에 넘겼고, `loadGraph` 는
+그걸 또 normalize 했다. repository 는 원본 응답으로 `loadGraph` 를 불러 **뒤의 두 패스를
+전혀 받지 못했다** — 헤드리스 로드는 포트 값도 없고 하류 입력도 비어 있었다.
+
+두 패스는 React 가 없는 순수 그래프 함수라 엔진으로 이동, `loadGraph(state, { ports })` 가
+유일한 입구가 됐다. 캔버스의 복사본과 함께 `newNodeId`/`deduplicateEdges` 의 마지막 사용처도
+사라졌다 — `normalize` 를 재구현하느라 있던 것들이다. `normalize` 는 레거시 `connections`
+필드도 읽는다(캔버스엔 있고 엔진엔 없던 같은 종류의 격차).
+
+**바꾸지 않고 보존한 것 2가지** (바꾸면 데이터가 이동한다): 포트 방향은 행의 `direction`
+필드가 아니라 **포트 이름(`out`)** 으로 판정 — 로드 경로가 늘 그래왔다. 전파는
+`'value' in packet` 을 요구 — 읽혔지만 아무것도 생산하지 않은 포트는 옮길 데이터가 아니다.
+
+후속: `LoadFlowPortData` 가 엔진 `PortRow` 를 extends. 같은 세 필드를 라이브러리 하나 건너
+다시 선언하고 있었다.
+
+### 게이트
+
+`tsc -b --force` 0 · engine 246 (Phase 4 의 221 → **+25**) · socket 22 · flows 24 · web 174
+= **466** · lint 0 error · `nx build web` · `yarn engine:demo` green.
+
+### 남은 것
+
+| 항목                                                               | 막힌 이유                                             |
+| ------------------------------------------------------------------ | ----------------------------------------------------- |
+| `useFlows` → repository 이관                                       | **DEV 자격증명** (스모크 없이는 stale-read 증명 불가) |
+| `createWebSocketPort` 미연결 (285줄, `--real` 이 실행 통째로 스킵) | 배선/삭제는 제품 판단                                 |
+| agents 포크 `CanvasBinding`                                        | 다른 레포. 이 브랜치 머지 후                          |
