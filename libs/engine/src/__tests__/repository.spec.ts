@@ -3,13 +3,36 @@ import { describe, expect, it } from 'vitest';
 import { createFlowWorkspace } from '../repository/workspace';
 
 import type { HttpPort, HttpRequest } from '../ports/http';
-import type { BlockDefinitionWithFrontend } from '../types';
 import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
+/**
+ * Blocks as the server sends them: the row carries the record, `$definition` carries what
+ * a node names. A fixture shaped like the client's idea of a block instead of the server's
+ * is how the registry came to be keyed on a field that is never present.
+ */
 const BLOCKS = [
-    { type: 'input-text', inputs: [], outputs: [{ id: 'out', type: 'text' }], defaultConfig: { value: '' } },
-    { type: 'process-llm', inputs: [{ id: 'in', type: 'text' }], outputs: [{ id: 'out', type: 'text' }] },
-] as unknown as BlockDefinitionWithFrontend[];
+    {
+        id: '0001',
+        stereo: 'input',
+        isFrontend: 1,
+        $definition: {
+            type: 'input-text',
+            inputs: [],
+            outputs: [{ id: 'out', type: 'text' }],
+            defaultConfig: { value: '' },
+        },
+    },
+    {
+        id: '0002',
+        stereo: 'process',
+        isFrontend: 0,
+        $definition: {
+            type: 'process-llm',
+            inputs: [{ id: 'in', type: 'text' }],
+            outputs: [{ id: 'out', type: 'text' }],
+        },
+    },
+];
 
 interface FlowFixture {
     id?: string;
@@ -49,7 +72,7 @@ const harness = (
     const http: HttpPort = {
         request: async <T>(req: HttpRequest) => {
             calls.push(req);
-            if (req.path === '/blocks/0/list') return { status: 200, data: BLOCKS as T };
+            if (req.path === '/blocks/0/list') return { status: 200, data: { list: BLOCKS } as T };
             if (req.path.endsWith('/load')) return { status: 200, data: structuredClone(fixture) as T };
             if (req.path.endsWith('/save')) {
                 saves.push(req.body as { nodes: NodeData[]; edges: EdgeData[] });
@@ -307,5 +330,55 @@ describe('runNode', () => {
         const req = await run(['n1']);
 
         expect(req.body).toEqual({});
+    });
+});
+
+describe('block registry', () => {
+    it('keys blocks by the type a node names, not by the row id', async () => {
+        // A node says `type: 'input-text'`. The row's own id is `0001` and the row has no
+        // `type` at all — only `$definition` does. Reading it off the row gave `undefined`
+        // for every block, so the registry held one entry no node could ever match.
+        const { http } = harness();
+        const { repository } = createFlowWorkspace({ http });
+
+        const registry = await repository.loadBlocks();
+
+        expect(Object.keys(registry).sort()).toEqual(['input-text', 'process-llm']);
+        expect(registry['input-text'].outputs).toEqual([{ id: 'out', type: 'text' }]);
+    });
+
+    it('asks for the expanded definitions, since a bare list has no types on it', async () => {
+        const { http, calls } = harness();
+        const { repository } = createFlowWorkspace({ http });
+
+        await repository.loadBlocks();
+
+        expect(calls[0].query).toMatchObject({ cores: 1, limit: -1 });
+    });
+
+    it('reads the server 0/1 flag as a boolean', async () => {
+        const { http } = harness();
+        const { repository } = createFlowWorkspace({ http });
+
+        const registry = await repository.loadBlocks();
+
+        expect(registry['input-text'].isFrontend).toBe(true);
+        expect(registry['process-llm'].isFrontend).toBe(false);
+    });
+
+    it('skips a row with no definition rather than keying it undefined', async () => {
+        const calls: HttpRequest[] = [];
+        const http: HttpPort = {
+            request: async <T>(req: HttpRequest) => {
+                calls.push(req);
+                return { status: 200, data: { list: [...BLOCKS, { id: '0009', stereo: 'input' }] } as T };
+            },
+        };
+        const { repository } = createFlowWorkspace({ http });
+
+        const registry = await repository.loadBlocks();
+
+        expect(Object.keys(registry)).toHaveLength(2);
+        expect(registry).not.toHaveProperty('undefined');
     });
 });

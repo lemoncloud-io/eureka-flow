@@ -80,8 +80,40 @@ export interface FlowRepositoryOptions {
     http: HttpPort;
 }
 
-const byType = (blocks: BlockDefinitionWithFrontend[]): Record<string, BlockDefinitionWithFrontend> =>
-    Object.fromEntries(blocks.map(block => [block.type, block]));
+/**
+ * One row of `GET /blocks/0/list?cores=1`.
+ *
+ * The row is the block *record* — id, stereo, timestamps, the `$$` array forms — and
+ * `$definition` is the block *definition* the graph actually needs: `type`, ports,
+ * config schema. Only the definition carries `type`, which is what a node names.
+ */
+interface BlockRow {
+    $definition?: BlockDefinitionWithFrontend;
+    /** Server sends a BoolFlag, not a boolean. */
+    isFrontend?: 0 | 1 | boolean;
+    stereo?: string;
+}
+
+/**
+ * Key the registry the way a node addresses it.
+ *
+ * A node's `type` is `input-text`; the row's own `id` is `0008` and it has no `type` at
+ * all. Reading `block.type` off the row gave `undefined` for every block, so the whole
+ * registry collapsed into one entry under that key — which no node ever matched.
+ */
+const byType = (rows: BlockRow[]): Record<string, BlockDefinitionWithFrontend> =>
+    Object.fromEntries(
+        rows
+            .filter((row): row is BlockRow & { $definition: BlockDefinitionWithFrontend } => !!row.$definition?.type)
+            .map(row => [
+                row.$definition.type,
+                {
+                    ...row.$definition,
+                    isFrontend: row.isFrontend === undefined ? undefined : Boolean(row.isFrontend),
+                    stereo: row.stereo,
+                } as BlockDefinitionWithFrontend,
+            ])
+    );
 
 /**
  * The graph's relationship with the server.
@@ -102,9 +134,13 @@ export const createFlowRepository = ({ engine, http }: FlowRepositoryOptions): F
 
     const loadBlocks = async (): Promise<Record<string, BlockDefinitionWithFrontend>> => {
         if (blocksLoaded) return blocks;
-        const { data } = await http.request<BlockDefinitionWithFrontend[] | { list?: BlockDefinitionWithFrontend[] }>({
+        // `cores=1` is what expands `$definition`; without it the rows come back as bare
+        // block records with no `type` on them. `limit=-1` because a truncated registry
+        // silently turns some nodes into unknown types.
+        const { data } = await http.request<BlockRow[] | { list?: BlockRow[] }>({
             method: 'GET',
             path: '/blocks/0/list',
+            query: { cores: 1, limit: -1 },
         });
         blocks = byType(Array.isArray(data) ? data : (data?.list ?? []));
         blocksLoaded = true;

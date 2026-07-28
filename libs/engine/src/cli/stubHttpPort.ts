@@ -1,5 +1,4 @@
 import type { HttpPort, HttpRequest } from '../ports/http';
-import type { BlockDefinitionWithFrontend } from '../types';
 import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
 export interface StubHttpPort extends HttpPort {
@@ -17,23 +16,50 @@ export interface StubHttpPortOptions {
     onRun?: (nodeId: string, req: HttpRequest) => void;
 }
 
+/**
+ * Blocks as `GET /blocks/0/list?cores=1` actually answers.
+ *
+ * The row is the block record — its own `id`, `stereo`, `isFrontend` as a 0/1 flag — and
+ * `$definition` is the definition a node names by `type`. This used to be a flat list with
+ * `type` at the top level, which is a shape the server has never sent: the stub had been
+ * written to match the client rather than the server, so the registry silently keyed every
+ * block under `undefined` and the demo still reported OK.
+ */
 const BLOCKS = [
-    { type: 'input-text', name: 'Text Input', stereo: 'input', inputs: [], outputs: [{ id: 'out', type: 'text' }] },
     {
-        type: 'process-llm',
-        name: 'LLM',
+        id: '0001',
+        stereo: 'input',
+        isFrontend: 1,
+        $definition: {
+            type: 'input-text',
+            label: 'Text Input',
+            inputs: [],
+            outputs: [{ id: 'out', type: 'text' }],
+        },
+    },
+    {
+        id: '0002',
         stereo: 'process',
-        inputs: [{ id: 'in', type: 'text' }],
-        outputs: [{ id: 'out', type: 'text' }],
+        isFrontend: 0,
+        $definition: {
+            type: 'process-llm',
+            label: 'LLM',
+            inputs: [{ id: 'in', type: 'text' }],
+            outputs: [{ id: 'out', type: 'text' }],
+        },
     },
     {
-        type: 'output-text',
-        name: 'Text Output',
+        id: '0003',
         stereo: 'output',
-        inputs: [{ id: 'in', type: 'text' }],
-        outputs: [],
+        isFrontend: 0,
+        $definition: {
+            type: 'output-text',
+            label: 'Text Output',
+            inputs: [{ id: 'in', type: 'text' }],
+            outputs: [],
+        },
     },
-] as unknown as BlockDefinitionWithFrontend[];
+];
 
 const FLOW = {
     id: 'demo-flow',
@@ -65,7 +91,8 @@ export const createStubHttpPort = ({ onRun }: StubHttpPortOptions = {}): StubHtt
         request: async <T>(req: HttpRequest) => {
             calls.push(req);
 
-            if (req.path === '/blocks/0/list') return { status: 200, data: BLOCKS as T };
+            // The server wraps its lists; so does the stub, or the wrapper goes untested.
+            if (req.path === '/blocks/0/list') return { status: 200, data: { list: BLOCKS } as T };
             if (req.path.endsWith('/load')) return { status: 200, data: structuredClone(FLOW) as T };
             if (req.path.endsWith('/save')) {
                 saved = req.body as { nodes: NodeData[]; edges: EdgeData[] };
