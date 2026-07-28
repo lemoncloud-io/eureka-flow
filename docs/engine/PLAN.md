@@ -155,11 +155,12 @@ yarn lint                                   # 클린
 ```
 
 - `libs/engine/src/**`에 `react`/`react-dom`/`zustand`/`@flows/flows` import 0건 (`grep -r` 확인)
-- ~~웹앱 수동 스모크: 로드 → 편집 → 저장 → dirty 표시 동작 동일~~ — **미실행 (남은 항목)**.
-  `apps/web/.env`가 실 DEV 백엔드(`api.eureka.codes/flw-d1`)를 가리켜 로그인 자격이 필요하고,
-  save가 실제 flow를 건드린다. 대신 확인한 것: `nx build web` green (실 CI 게이트인 prod 빌드),
-  vite dev server에서 `@flows/engine` 및 소비 모듈 트랜스폼 200/에러 0, jsdom 174 스펙 green —
-  **모듈 해석은 3개 모드(prod·dev·test) 전부 검증됨**. 남은 건 UI 거동 육안 확인뿐.
+- 웹앱 수동 스모크: 로드 → 편집 → dirty 표시 — **Phase 6 이후 실행함, 진행 체크리스트 참조.**
+  이 Phase 시점에는 미실행이었다: `apps/web/.env`가 실 DEV 백엔드(`api.eureka.codes/flw-d1`)를
+  가리켜 로그인 자격이 필요하고, save가 실제 flow를 건드린다. 대신 확인했던 것:
+  `nx build web` green (실 CI 게이트인 prod 빌드), vite dev server에서 `@flows/engine` 및
+  소비 모듈 트랜스폼 200/에러 0, jsdom 174 스펙 green —
+  **모듈 해석은 3개 모드(prod·dev·test) 전부 검증됨**.
 
 > **선행 결함 (Phase 0 밖).** `npx tsc -b apps/web/tsconfig.app.json`은 이 작업 **전부터** red다
 > (HEAD 기준 1200 errors). 두 원인 모두 engine과 무관:
@@ -253,7 +254,8 @@ yarn lint
 - `setConnections` 0건. `setNodes`는 **2건 잔존** — 드래그 중 프리뷰(마우스/터치) 뿐이고, 이는 PLAN이
   명시한 "드래그 중 프리뷰는 UI 로컬, 확정만 커밋"이다. 확정은 `commitDrag` → `transact('node:move')`.
 - vitest `environment: 'node'`에서 engine 스펙 전체 green — **이것이 이식성의 조기 증명이다** (jsdom 아님)
-- ~~웹 수동 스모크~~ — **미실행 (남은 항목)**. Phase 0과 같은 이유(실 DEV 백엔드 + 로그인 자격).
+- 웹 수동 스모크 — **Phase 6 이후 실행함, 진행 체크리스트 참조.** 이 시점엔 Phase 0과 같은
+  이유로 미실행이었다(실 DEV 백엔드 + 로그인 자격).
   대신: prod 빌드 green, vite dev server에서 migrate된 4개 모듈 트랜스폼 200/에러 0, jsdom 174 스펙 green.
 
 ### 계약 보강 (구현 중 확정)
@@ -595,9 +597,14 @@ save → **run**`을 브라우저 없이 완주. 마지막 프레임은 일부�
 - [x] `StoragePort` · `LlmPort` — **만들지 않기로 결정 (§13).** DESIGN 이 예고한 포트 5개 중
       둘. "쓰이는 Phase 에서 만든다"고 미뤄둔 채 그 Phase 가 오지 않았고, 엔진 안에 호출자가
       없다. 미완이 아니라 판단으로 닫았다.
-- [ ] **웹앱 수동 스모크** — Phase 0·2 에서 두 번 미실행으로 남았고, 이후 Phase 5·6 이
-      `WorkflowCanvas`/`FlowEditorPage` 를 더 건드렸다. 자동 게이트로는 대체되지 않는
-      유일한 항목.
+- [x] **웹앱 수동 스모크** — Phase 0·2 에서 두 번 미실행으로 남아 있던 유일한 항목.
+      실 DEV 플로우(`1007934`, 4노드/2엣지)를 브라우저에서 열어 확인:
+      **로드 후 `baseline: yes` / dirty 아님**(불변식 7), **포트 값 병합 + 엣지 전파가
+      화면에 도달**(상류 `텍스트 입력` 의 출력이 하류 `미리보기` 두 개에 다 찍힘 —
+      Phase 5 의 `loadGraph({ ports })` 단일 ingress 가 브라우저에서 도는 것을 처음 육안 확인),
+      편집 시 `dirty` 표시 전환.
+      **저장·실행·소켓 갱신은 이번 스모크에서 별도로 확인하지 않았다** — 자동 게이트와
+      실서버 헤드리스 런(§11)이 덮는 경로다.
 - [ ] agents 포크 `CanvasBinding` — 다른 레포. 이 브랜치 머지 후.
 
 ---
