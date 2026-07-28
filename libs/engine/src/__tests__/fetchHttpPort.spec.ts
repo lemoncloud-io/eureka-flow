@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createFetchHttpPort } from '../adapters/fetchHttpPort';
 import { createApiKeyAuth } from '../ports/auth';
@@ -160,5 +160,121 @@ describe('fetchHttpPort — responses', () => {
         const port = createFetchHttpPort({ baseUrl: BASE, auth: createApiKeyAuth('k'), fetchFn });
 
         await expect(port.request({ method: 'GET', path: '/x' })).resolves.toEqual({ status: 200, data: undefined });
+    });
+});
+
+/**
+ * `timeoutMs` is a promise the adapter makes to its caller, and it was making it untested.
+ * The mechanism is `AbortController` — the one remaining platform global here besides
+ * `fetch` itself. It is present on every target runtime (Node 16+, every modern browser,
+ * React Native since 0.60 via its own polyfill), so it needs no seam; what it needs is
+ * evidence that the wiring is right.
+ */
+describe('fetchHttpPort — timeout', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    /** A transport that never answers, so only the timeout can end the wait. */
+    const hanging = () => {
+        const seen: (AbortSignal | undefined)[] = [];
+        const fetchFn = ((_url: string, init?: RequestInit) => {
+            seen.push(init?.signal ?? undefined);
+            return new Promise<Response>((_resolve, reject) => {
+                init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+            });
+        }) as unknown as typeof fetch;
+        return { seen, fetchFn };
+    };
+
+    it('hands the transport a signal to abort on', async () => {
+        const { calls, fetchFn } = recorder();
+        await createFetchHttpPort({ baseUrl: BASE, auth: createApiKeyAuth('k'), fetchFn }).request({
+            method: 'GET',
+            path: '/x',
+        });
+        expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
+        expect(calls[0].init?.signal?.aborted).toBe(false);
+    });
+
+    it('aborts a request that outlives timeoutMs', async () => {
+        vi.useFakeTimers();
+        const { seen, fetchFn } = hanging();
+        const pending = createFetchHttpPort({
+            baseUrl: BASE,
+            auth: createApiKeyAuth('k'),
+            fetchFn,
+            timeoutMs: 5_000,
+        }).request({ method: 'GET', path: '/x' });
+
+        // The assertion is attached before the clock is advanced, for the same reason
+        // `demo.ts` registers its waiter before asking for a run: advancing is what makes
+        // this reject, and a rejection with no handler yet is an unhandled one — which
+        // vitest fails the whole run over, however green the assertion afterwards looks.
+        const rejected = expect(pending).rejects.toThrow(/aborted/);
+
+        expect(seen[0]?.aborted).toBe(false);
+        await vi.advanceTimersByTimeAsync(5_000);
+
+        expect(seen[0]?.aborted).toBe(true);
+        await rejected;
+    });
+
+    it('leaves a request alone until the timeout is actually reached', async () => {
+        vi.useFakeTimers();
+        const { seen, fetchFn } = hanging();
+        // This request is deliberately abandoned mid-flight, so its rejection is absorbed
+        // here: an armed timer outliving the test would abort into nobody's catch and
+        // surface as an unhandled rejection blamed on whichever spec ticked next.
+        const abandoned = createFetchHttpPort({
+            baseUrl: BASE,
+            auth: createApiKeyAuth('k'),
+            fetchFn,
+            timeoutMs: 5_000,
+        })
+            .request({ method: 'GET', path: '/x' })
+            .catch(() => undefined);
+
+        await vi.advanceTimersByTimeAsync(4_999);
+        expect(seen[0]?.aborted).toBe(false);
+
+        await vi.advanceTimersByTimeAsync(1);
+        await abandoned;
+    });
+
+    /**
+     * The timer is cleared in `finally`, so a fast request does not leave one armed to fire
+     * at a signal nobody is listening on — and, under a real event loop, does not hold a
+     * Node process open for the length of the timeout after the work is done.
+     */
+    it('disarms the timer once the response has arrived', async () => {
+        vi.useFakeTimers();
+        const { calls, fetchFn } = recorder();
+        await createFetchHttpPort({
+            baseUrl: BASE,
+            auth: createApiKeyAuth('k'),
+            fetchFn,
+            timeoutMs: 5_000,
+        }).request({ method: 'GET', path: '/x' });
+
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(calls[0].init?.signal?.aborted).toBe(false);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('disarms the timer when the request failed', async () => {
+        vi.useFakeTimers();
+        const fetchFn = (() => Promise.resolve(new Response('{}', { status: 500 }))) as unknown as typeof fetch;
+
+        await expect(
+            createFetchHttpPort({
+                baseUrl: BASE,
+                auth: createApiKeyAuth('k'),
+                fetchFn,
+                timeoutMs: 5_000,
+            }).request({ method: 'GET', path: '/x' })
+        ).rejects.toBeInstanceOf(HttpError);
+
+        expect(vi.getTimerCount()).toBe(0);
     });
 });

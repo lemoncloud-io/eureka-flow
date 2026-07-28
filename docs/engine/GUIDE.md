@@ -89,7 +89,7 @@ undo 스택은 그대로고 다음 save 가 보낼 것도 안 생긴다.
 | `crypto.randomUUID()`         | `core/ids.ts`                                      | `configureIds(fn)` 로 주입   |
 | `fetch`                       | `fetchHttpPort`                                    | `fetchFn` 옵션으로 주입      |
 | `WebSocket`                   | `webSocketPort`                                    | `createSocket` 옵션으로 주입 |
-| `AbortController`             | `fetchHttpPort` (타임아웃)                         | RN·Node·브라우저 전부 있다   |
+| `AbortController`             | `fetchHttpPort` (타임아웃)                         | 전부 있다 — 아래 단서 하나   |
 | `setTimeout` / `clearTimeout` | `runSession`, 어댑터                               | 전부 있다                    |
 | `process.*`                   | **`cli/main.ts` 하나뿐** — 배럴에서 export 안 한다 | 해당 없음                    |
 
@@ -100,6 +100,13 @@ undo 스택은 그대로고 다음 save 가 보낼 것도 안 생긴다.
 
 > 인코딩이 딱 한 글자에서 갈린다: **공백**. `URLSearchParams` 는 `+`, 지금은 `%20`.
 > 엔진이 보내는 쿼리에 공백은 없고, `%20` 이 URL 문맥에서 맞는 형태다. 스펙이 고정한다.
+
+**`AbortController` 는 그대로 쓴다** — Node 16+, 모든 모던 브라우저, RN 0.60+ 에 있다.
+`URL` 과 달리 부분 구현 문제가 없어서 씨앗(seam)을 만들 이유가 없다.
+
+> 단, 타임아웃은 **`fetchFn` 이 `signal` 을 존중할 때만** 동작한다. 진짜 `fetch` 는 어디서든
+> 존중하지만, `signal` 을 무시하는 커스텀 트랜스포트를 주입하면 30초 타임아웃이 조용히
+> 무효가 되고 `repository.load()` 가 영원히 안 끝난다. 직접 트랜스포트를 넣을 거면 확인할 것.
 
 `lib: ["ES2022"]` (DOM 없음) 컴파일이 **DOM API 를 안 쓴다**는 것까지 보증한다.
 다만 `globalThis.crypto` 는 DOM lib 밖이라 컴파일러가 안 잡아준다 — 그래서 위 표가 있다.
