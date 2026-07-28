@@ -647,6 +647,16 @@ skip-occupied 가드 한 줄 제거. 연결된 입력 포트는 항상 상류의
 `hydrateInputsFromUpstream`(실행 시 수집)은 **역할이 다르다.** 결함은 "두 구현이 다르다"가
 아니라 "한쪽이 사용자 의도와 잔여 상태를 구분하지 못한다" 쪽이었고, 고친 것도 그쪽이다.
 
+### 후속 정리 (같이 적용)
+
+- **`executeNode` 의 `manualOverrideInputs` 파라미터 삭제.** 호출자가 하나도 안 넘기던
+  죽은 인자였고, 이 결함의 원인이기도 하다. `triggerNode` 의
+  `executeNode(nodeId, undefined, options)` → `executeNode(nodeId, options)`.
+- **`hydrateInputPorts` (모바일 백엔드 경로) 가 `hydrateInputsFromUpstream` 를 호출하도록 변경.**
+  원래 엣지를 직접 순회했는데 — **애초에 skip-occupied 가드가 없어서 덮어쓰기였다.**
+  즉 모바일 백엔드 경로는 처음부터 옳았고, 어긋난 쪽은 데스크톱이었다. 두 답이 일치한
+  지금 합쳐서, 같은 종류의 드리프트가 다시 생길 자리를 없앤다.
+
 ### 부수 확인 (결함 아님)
 
 `propagateData` 만 `'value' in packet` 을 요구하고 나머지 전파 지점은 truthy 만 본다.

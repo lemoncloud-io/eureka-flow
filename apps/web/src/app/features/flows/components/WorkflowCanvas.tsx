@@ -1120,11 +1120,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         ]);
 
         const executeNode = useCallback(
-            async (
-                nodeId: string,
-                manualOverrideInputs?: Record<string, DataPacket>,
-                options?: { propagate?: boolean }
-            ) => {
+            async (nodeId: string, options?: { propagate?: boolean }) => {
                 if (!permissions.canRun) return;
 
                 const startTime = Date.now();
@@ -1139,7 +1135,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 const currentNode = nodesRef.current.find(n => n.id === nodeId);
                 if (!currentNode) return;
 
-                const inputs = manualOverrideInputs || currentNode.inputData;
+                const inputs = currentNode.inputData;
                 const nodeDef = blockRegistry[currentNode.type];
 
                 if (!nodeDef) {
@@ -1371,7 +1367,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const triggerNode = useCallback(
             async (nodeId: string, options?: { propagate?: boolean }) => {
                 if (onBeforeRun && !(await onBeforeRun())) return;
-                await executeNode(nodeId, undefined, options);
+                await executeNode(nodeId, options);
             },
             [executeNode, onBeforeRun]
         );

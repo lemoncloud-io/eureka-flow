@@ -2,15 +2,15 @@
  * Collect input data from upstream nodes' outputData.
  *
  * A connected input port takes whatever its source is producing now. This used to skip a
- * port that already held a value, to protect an input the user had set by hand — but
- * nothing ever set one (`executeNode`'s `manualOverrideInputs` was never passed by any
- * caller), so all the guard did was keep whatever an earlier run had left there. The run
- * then upserted that stale packet to the server's port record, which is what the backend
+ * port that already held a value, to protect an input the user had set by hand — but no
+ * such input existed: `executeNode` took an override argument nobody passed, since
+ * removed. All the guard did was keep whatever an earlier run had left there, and the run
+ * upserted that stale packet to the server's port record, which is what the backend
  * reads. Load-time propagation always overwrote, so the same actions gave a different
  * answer depending on whether the flow had been reloaded in between.
  *
- * If a manual override is ever added back, it has to be distinguishable from run
- * leftovers — the presence of a value cannot tell the two apart.
+ * If a manual override is ever added, it has to be distinguishable from run leftovers —
+ * the presence of a value cannot tell the two apart, which is how this happened.
  *
  * Ports with no incoming connection are untouched: the loop only visits connected ones.
  */
