@@ -89,8 +89,17 @@ undo 스택은 그대로고 다음 save 가 보낼 것도 안 생긴다.
 | `crypto.randomUUID()`         | `core/ids.ts`                                      | `configureIds(fn)` 로 주입   |
 | `fetch`                       | `fetchHttpPort`                                    | `fetchFn` 옵션으로 주입      |
 | `WebSocket`                   | `webSocketPort`                                    | `createSocket` 옵션으로 주입 |
-| `setTimeout` / `clearTimeout` | `runSession`, 어댑터                               | (모든 런타임에 있다)         |
+| `AbortController`             | `fetchHttpPort` (타임아웃)                         | RN·Node·브라우저 전부 있다   |
+| `setTimeout` / `clearTimeout` | `runSession`, 어댑터                               | 전부 있다                    |
 | `process.*`                   | **`cli/main.ts` 하나뿐** — 배럴에서 export 안 한다 | 해당 없음                    |
+
+**`URL` 은 안 쓴다.** 예전엔 `fetchHttpPort` 가 `new URL(...)` + `searchParams.set` 으로
+쿼리를 붙였는데, RN 의 `URL` shim 은 `searchParams` 가 없거나 불완전하다 — 하필 그게
+쓰이던 부분이었다. 주입으로는 안 풀린다(돌려받는 객체 자체를 못 믿으므로). 그래서
+`encodeURIComponent` 로 직접 조립한다 — ES 코어라 Hermes 포함 어디에나 있다.
+
+> 인코딩이 딱 한 글자에서 갈린다: **공백**. `URLSearchParams` 는 `+`, 지금은 `%20`.
+> 엔진이 보내는 쿼리에 공백은 없고, `%20` 이 URL 문맥에서 맞는 형태다. 스펙이 고정한다.
 
 `lib: ["ES2022"]` (DOM 없음) 컴파일이 **DOM API 를 안 쓴다**는 것까지 보증한다.
 다만 `globalThis.crypto` 는 DOM lib 밖이라 컴파일러가 안 잡아준다 — 그래서 위 표가 있다.
