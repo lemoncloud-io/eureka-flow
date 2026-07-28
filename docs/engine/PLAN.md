@@ -1,4 +1,4 @@
-# PLAN — `@flows/engine` Phase 0–4 실행 계획
+# PLAN — `@flows/engine` Phase 0–5 실행 계획
 
 > 배경/아키텍처/근거는 [DESIGN.md](./DESIGN.md). 이 문서는 **실행 명세**다.
 > Phase 4(헤드리스 실행)는 DESIGN §3.3 로드맵에는 없다 — Phase 2의 "블랙박스 증명"을
