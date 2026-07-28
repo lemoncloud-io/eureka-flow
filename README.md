@@ -108,15 +108,22 @@ graph TB
     end
 
     subgraph Features["Feature Libraries"]
+        ENGINE["engine<br/>Graph, History, Execution<br/><i>headless — no DOM</i>"]
         FLOWS["flows<br/>Editor Logic & Stores"]
         SOCKET["socket<br/>WebSocket Layer"]
     end
 
     WEB --> WEBCORE & UIKIT & SHARED & THEME
-    WEB --> FLOWS & SOCKET
+    WEB --> ENGINE & FLOWS & SOCKET
+    FLOWS --> ENGINE
+    SOCKET --> ENGINE
     FLOWS --> WEBCORE
     SOCKET --> WEBCORE
 ```
+
+`engine` has **no runtime dependencies** — no React, no store, no DOM (its only outside
+imports are `import type` from the API package, erased at compile). The `lib: ["ES2022"]`
+target is what enforces that, and it is why the same code runs under plain Node.
 
 ### Project Structure
 
