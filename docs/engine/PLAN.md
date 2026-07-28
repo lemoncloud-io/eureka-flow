@@ -132,7 +132,9 @@ export interface ClipboardPayload {
 - 순수 코어를 `libs/engine/src/persistence/baseline.ts`로: 상태를 **인자로 주입** —
   `captureBaseline(graph, blockRegistry)`, `rebaseline(sent, ctx: { baseline, isEditable, hasOwned })`, `diffAgainstBaseline(graph, ctx)`, `runRequirement(graph, ctx)` 등.
 - 기존 `libs/flows/src/workspace/*.ts`는 스토어에서 ctx를 읽어 순수 함수를 호출하는 **thin wrapper로 유지** (기존 시그니처 그대로 → 호출부 무변경).
-- `draftStorage.ts`(IndexedDB)는 **이동하지 않는다** — 브라우저 어댑터. Phase 2에서 StoragePort 뒤로 들어간다.
+- `draftStorage.ts`(IndexedDB)는 **이동하지 않는다** — 브라우저 어댑터. ~~Phase 2에서 StoragePort 뒤로 들어간다.~~
+  → **StoragePort 는 만들지 않기로 했다 (§13).** 엔진은 `draftFor()` 로 드래프트의 *모양*만
+  판단하고 저장은 호스트가 한다. 포트를 두면 엔진 안에 호출자가 없다.
 
 ### P0-4. 신규 테스트 (이식 검증)
 
@@ -283,6 +285,9 @@ DESIGN §3.3의 완료 조건이 이 Phase의 유일한 판정 기준이다.
 DESIGN §3.2.6은 포트 5개를 예고하지만 이번 Phase는 **HttpPort / AuthPort 둘 뿐**이다.
 `StoragePort`(draftStorage)·`SocketPort`·`LlmPort`는 각각 쓰이는 Phase에서 만든다 — 설계 문서에 이름이 있다는
 이유로 미리 만드는 건 CLAUDE.md가 금지하는 speculative abstraction이다.
+
+> **결과 (§13).** `SocketPort` 는 Phase 3 에서 만들었다. 나머지 둘은 **쓰이는 Phase 가 오지
+> 않았고, 만들지 않기로 했다** — 엔진 안에 그 포트를 부르는 코드가 없다. 근거는 §13.
 
 | 파일                                        | 내용                                                                                                                                 |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -587,6 +592,13 @@ save → **run**`을 브라우저 없이 완주. 마지막 프레임은 일부�
       `tsc -b --force` **0**, lint 0 error / 53 warning (전부 선행), `nx build web` green.
       측정은 `node node_modules/typescript/bin/tsc` 직접 호출 — `npx tsc` 는 이 환경에서
       래퍼를 타서 `--version` 조차 버전을 안 찍는다.
+- [x] `StoragePort` · `LlmPort` — **만들지 않기로 결정 (§13).** DESIGN 이 예고한 포트 5개 중
+      둘. "쓰이는 Phase 에서 만든다"고 미뤄둔 채 그 Phase 가 오지 않았고, 엔진 안에 호출자가
+      없다. 미완이 아니라 판단으로 닫았다.
+- [ ] **웹앱 수동 스모크** — Phase 0·2 에서 두 번 미실행으로 남았고, 이후 Phase 5·6 이
+      `WorkflowCanvas`/`FlowEditorPage` 를 더 건드렸다. 자동 게이트로는 대체되지 않는
+      유일한 항목.
+- [ ] agents 포크 `CanvasBinding` — 다른 레포. 이 브랜치 머지 후.
 
 ---
 
@@ -903,3 +915,80 @@ lint 0 error · 스텁 데모 green · 실서버 전 구간 green.
 
 `tsc -b --force` 0 · engine **258** · socket 22 · flows 24 · web 174 = **478** ·
 lint 0 error · 스텁 데모 green · 실서버 전 구간 green.
+
+---
+
+## 13. 만들지 않은 포트 2개 — `StoragePort` · `LlmPort` (P0-3 / P2-1 정정)
+
+DESIGN §3.2.6 은 포트 **5개**를 예고했다. 실제로 만든 건 셋이다:
+
+| 포트          | 상태                 | 엔진 안의 호출자                          |
+| ------------- | -------------------- | ----------------------------------------- |
+| `HttpPort`    | ✅                   | `repository.load/save/runNode`            |
+| `AuthPort`    | ✅                   | `fetchHttpPort` 가 엔드포인트 경로를 물음 |
+| `SocketPort`  | ✅                   | `runSession` 이 구독                      |
+| `StoragePort` | ❌ **만들지 않는다** | —                                         |
+| `LlmPort`     | ❌ **만들지 않는다** | —                                         |
+
+P2-1 은 "각각 쓰이는 Phase 에서 만든다" 고 적었는데, **쓰이는 Phase 가 오지 않았다.**
+그대로 두면 미완으로 읽히므로 판단으로 닫는다.
+
+### 판정 기준: 엔진이 그 포트로 손을 뻗는 코드가 있는가
+
+포트는 **엔진 안에 호출자가 있을 때만** 의미가 있다. 위 표의 오른쪽 칸이 비면 그것은
+추상화가 아니라 아무도 부르지 않는 인터페이스다 — CLAUDE.md 가 금지하는 speculative
+abstraction 이 뒤늦게 생기는 경로.
+
+### 13-1. `StoragePort` — 저장은 방향이 반대다
+
+§3 P0-3 이 이렇게 적어뒀다:
+
+> `draftStorage.ts`(IndexedDB)는 **이동하지 않는다** — 브라우저 어댑터. **Phase 2에서
+> StoragePort 뒤로 들어간다.**
+
+Phase 2 는 완료로 표시됐고, `grep StoragePort` 는 **0건**이다.
+
+저장은 HTTP·소켓과 방향이 반대다:
+
+```
+engine/persistence/draft.ts   draftFor(graph, ctx)   ← 순수. "드래프트가 어떤 모양이어야 하나"만 판단
+                                    │ 반환
+                                    ▼
+apps/web/…/useDraftPersistence.ts   draftFor() → writeDraft() / clearDraft()
+apps/web/…/useDraftRecovery.ts      readDraft() → draftHasUnsavedWork() → baselineForRecovery()
+```
+
+**엔진은 아무것도 저장하지 않는다** — `libs/engine/src/repository/` 와 `engine.ts` 에
+`draft` 문자열이 0건이다. 호스트가 판단만 꺼내 가서 자기 저장소에 넣는다.
+
+`StoragePort` 를 만들면 **엔진 안에 구현체를 부르는 코드가 한 줄도 없는 인터페이스**가 된다.
+그리고 그걸 부르게 하려면 엔진이 "언제 써야 하나" 를 알아야 한다 — 디바운스, 실행 중 제외,
+저장 성공 후 clear, 구조 드랍 시 유지. 그건 전부 앱의 수명주기 지식이고, §12 에서
+`useFlows` 를 이관하지 않기로 한 것과 **같은 이유로** 엔진에 두지 않는다.
+
+이식성도 이 모양이 더 낫다. 포트였다면 각 런타임이 구현체를 만들어야 한다. 지금은
+`draftFor()` 가 돌려주는 평범한 객체를 어디에 넣든 호스트 자유다 — 브라우저는
+IndexedDB(base64 이미지가 localStorage 5MB 쿼터를 넘기므로), RN 은 MMKV, Node 는 파일.
+**엔진이 저장소를 하나도 몰라도 된다는 게 제약이 아니라 결과물이다.**
+
+### 13-2. `LlmPort` — 엔진은 모델을 부르지 않는다
+
+DESIGN 은 `LlmPort(= LlmGateway)` 를 예고했지만, 실행 모델을 보면 엔진이 그 자리에 설 일이 없다:
+
+| 블록                | 누가 실행                                                                              |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `isFrontend: true`  | 앱의 `EXECUTE_FUNCTIONS` (`libs/flows/src/api/execute-functions.ts`) — 브라우저 안에서 |
+| `isFrontend: false` | **서버.** 클라는 `POST /nodes/:id/run` 만 치고 결과를 소켓으로 받는다                  |
+
+엔진의 `repository.runNode` 는 후자 하나뿐이고, 그건 이미 `HttpPort` 다.
+`grep -iE "openai|anthropic|gemini"` 는 엔진 소스에 **0건**(스텁 fixture 의 블록 타입 문자열
+`process-llm` 제외). 프론트엔드 실행 경로는 앱 소유이고 §12 에서 `useFlows` 를 남긴 것과
+같은 이유로 그대로 둔다 — 모델 키·요금·프로바이더 설정은 전부 앱·서버 관심사다.
+
+엔진이 직접 모델을 부를 일이 생긴다면 (예: 헤드리스 CLI 가 프론트엔드 블록까지 실행) 그때
+호출자와 함께 만든다. 지금 만들면 구현체를 아무도 안 부른다.
+
+### 남는 것
+
+`docs/engine/GUIDE.md` 의 "IndexedDB 는 엔진에 없다 — 어디에 넣을지는 호스트가 정한다" 는
+서술은 이제 근거가 있다. 이 절이 그 근거다 — 그 전까지는 **결정이 아니라 사후 정당화**였다.
