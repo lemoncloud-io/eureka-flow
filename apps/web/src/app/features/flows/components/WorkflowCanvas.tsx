@@ -55,6 +55,7 @@ import {
     wouldCreateCycle,
 } from '../utils';
 
+import type { EdgeSpec } from '@flows/agent';
 import type { FlowRole, LoadFlowPortData, NodeState } from '@flows/flows';
 import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
@@ -68,8 +69,32 @@ interface WorkflowStateWithPorts extends WorkflowState {
     ports?: LoadFlowPortData[];
 }
 
+// ── Shared connection predicates ──────────────────────────────────────────────────────────────────
+// One definition each, so the user-facing handlers and the agent structural seam obey identical rules
+// (the agent path is the same store as a user drag — see createDesktopCanvasBinding).
+
+/** Drop every connection that touches `nodeId` — the cascade a node-delete performs. */
+const cascadeConnectionsOnNodeDelete = (connections: Connection[], nodeId: string): Connection[] =>
+    connections.filter(c => c.sourceNodeId !== nodeId && c.targetNodeId !== nodeId);
+
+/** Append `newConn`, first dropping any existing edge on the same (targetNode, targetPort) — one edge per input port. */
+const withReplacedInputEdge = (connections: Connection[], newConn: Connection): Connection[] => [
+    ...connections.filter(c => !(c.targetNodeId === newConn.targetNodeId && c.targetPortId === newConn.targetPortId)),
+    newConn,
+];
+
 export interface WorkflowCanvasRef {
-    addNode: (type: string, position?: { x: number; y: number }) => void;
+    /**
+     * Add a node and return its new id. `options.autoConnect` (default `true`) keeps the interactive
+     * auto-wire; the agent path passes `false` for a predictable, unwired create.
+     */
+    addNode: (type: string, position?: { x: number; y: number }, options?: { autoConnect?: boolean }) => string;
+    /** Delete a node and cascade its edges (guards canModifyCanvas + checkpoints). Agent structural seam. */
+    deleteNode: (id: string) => void;
+    /** Add one edge (replacing any edge on an occupied input port) and return its new id. Agent structural seam. */
+    addEdge: (spec: EdgeSpec) => string;
+    /** Remove one edge by id (guards canModifyCanvas + checkpoints). Agent structural seam. */
+    deleteEdge: (id: string) => void;
     getWorkflow: () => WorkflowState;
     /** Load workflow from server data. Fetches missing port data (data: null) via API. */
     loadWorkflow: (state: WorkflowStateWithPorts) => Promise<void>;
@@ -507,21 +532,26 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const addNodeRef = useRef<(type: string, position?: { x: number; y: number }) => void>(() => {});
 
         useImperativeHandle(ref, () => {
-            const addNode = (type: string, position?: { x: number; y: number }) => {
-                if (!permissions.canModifyCanvas) return;
+            const addNode = (
+                type: string,
+                position?: { x: number; y: number },
+                options?: { autoConnect?: boolean }
+            ) => {
+                if (!permissions.canModifyCanvas) return '';
                 saveCheckpoint();
 
                 const newDef = blockRegistry[type];
-                if (!newDef) return;
+                if (!newDef) return '';
 
                 let sourceNode: NodeData | undefined;
                 let sourcePortId: string | undefined;
                 let targetPortId: string | undefined;
 
-                // Auto-connect only when intent is clear:
+                // Auto-connect only when intent is clear (and the caller allows it — the agent path opts out
+                // for a predictable, unwired create):
                 // - 0-1 nodes: always auto-connect (obvious target)
                 // - 2+ nodes: only if a node is selected (explicit intent)
-                const shouldAutoConnect = nodes.length <= 1 || !!selectedNodeId;
+                const shouldAutoConnect = options?.autoConnect !== false && (nodes.length <= 1 || !!selectedNodeId);
 
                 if (shouldAutoConnect && newDef.inputs.length > 0) {
                     const firstInput = newDef.inputs[0];
@@ -652,12 +682,42 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                 handleSelectionChange(nodeId);
                 setSelectedConnectionId(null);
+                return nodeId;
             };
 
             addNodeRef.current = addNode;
 
+            // Agent structural seams: mechanical writes (validation already ran in the tool), each guarding
+            // canModifyCanvas + checkpointing for undo, mirroring the addNode/updateNode handlers above.
+            const deleteNodeFromRef = (id: string) => {
+                if (!permissions.canModifyCanvas) return;
+                saveCheckpoint();
+                setNodes(prev => prev.filter(n => n.id !== id));
+                setConnections(prev => cascadeConnectionsOnNodeDelete(prev, id));
+                handleSelectionChange(null);
+            };
+
+            const addEdgeToRef = (spec: EdgeSpec): string => {
+                if (!permissions.canModifyCanvas) return '';
+                saveCheckpoint();
+                const id = newEdgeId();
+                const newConn: Connection = { id, ...spec };
+                setConnections(prev => withReplacedInputEdge(prev, newConn));
+                return id;
+            };
+
+            const deleteEdgeFromRef = (id: string) => {
+                if (!permissions.canModifyCanvas) return;
+                saveCheckpoint();
+                setConnections(prev => prev.filter(c => c.id !== id));
+                setSelectedConnectionId(null);
+            };
+
             return {
                 addNode,
+                deleteNode: deleteNodeFromRef,
+                addEdge: addEdgeToRef,
+                deleteEdge: deleteEdgeFromRef,
                 getWorkflow: () => ({
                     nodes,
                     edges: connections,
@@ -1494,7 +1554,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 // Deleting is local: save sends the whole graph, and what it leaves out is
                 // what the server drops.
                 setNodes(prev => prev.filter(n => n.id !== id));
-                setConnections(prev => prev.filter(c => c.sourceNodeId !== id && c.targetNodeId !== id));
+                setConnections(prev => cascadeConnectionsOnNodeDelete(prev, id));
                 handleSelectionChange(null);
             },
             [permissions.canModifyCanvas, saveCheckpoint, handleSelectionChange]
@@ -2052,12 +2112,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         targetPortId,
                     };
 
-                    setConnections(prev => {
-                        const filtered = prev.filter(
-                            c => !(c.targetNodeId === targetNodeId && c.targetPortId === targetPortId)
-                        );
-                        return [...filtered, newConn];
-                    });
+                    setConnections(prev => withReplacedInputEdge(prev, newConn));
 
                     const packet = sourceNode.outputData?.[connectionDraft.sourcePortId];
                     if (packet) {

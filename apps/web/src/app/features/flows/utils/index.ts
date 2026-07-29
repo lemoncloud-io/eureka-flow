@@ -1,3 +1,4 @@
+import { arePortTypesCompatible } from '@flows/agent';
 import { compressImageIfNeeded } from '@flows/flows';
 
 import type { UploadHtmlProductView } from '@flows/flows';
@@ -35,15 +36,10 @@ export interface ConnectionDraftInfo {
     sourceType: string;
 }
 
-/**
- * Check if two port types are compatible for connection.
- * Handles undefined target type by treating it as 'any'.
- */
-export const arePortTypesCompatible = (sourceType: string, targetType: string | undefined): boolean => {
-    const normalizedTarget = targetType ?? 'any';
-    if (sourceType === 'any' || normalizedTarget === 'any') return true;
-    return sourceType.toLowerCase() === normalizedTarget.toLowerCase();
-};
+// Port-type compatibility is defined once, DOM-free, in `@flows/agent` (`canvas/edgeSemantics.ts`) so the
+// headless `edge` tool and this interactive canvas share one implementation. Imported above for local use
+// (getVisiblePorts / isValidConnection) and re-exported here to keep existing import sites unchanged.
+export { arePortTypesCompatible };
 
 /**
  * Filter ports based on visibility rules:

@@ -6,20 +6,28 @@
 > only. Shipped implementation:
 > [`createDesktopCanvasBinding.ts`](../../../apps/web/src/app/features/flows/utils/createDesktopCanvasBinding.ts).
 
-`readGraph` + `updateNode` are the whole contract, shared by the orchestrator and its specialists.
-The [locator agent](../agents/locator.md) uses it to find a node and move it (`position`); the
-property specialist uses the same `updateNode` to rename (`label`) and set config (`config`). So the
-contract is move + rename + config — `NodePatch` is `{ label?, position?, config? }`.
+`readGraph` + `updateNode` + the structural primitives (`addNode` / `deleteNode` / `addEdge` / `deleteEdge`)
+are the whole contract, shared by the orchestrator and its specialists. The
+[locator agent](../agents/locator.md) uses `updateNode` to move a node (`position`); the
+[property agent](../agents/property.md) uses it to rename (`label`) and set config (`config`); the
+[node agent](../agents/node.md) uses `addNode` / `deleteNode`; the [edge agent](../agents/edge.md)
+uses `addEdge` / `deleteEdge`. So the contract is a node patch (`NodePatch` = `{ label?, position?, config? }`)
+plus four structural primitives — `addNode`/`addEdge` return the new id, `deleteNode` cascades the node's
+edges.
 
 ## Grounded primitives
 
-| Need                      | Primitive                                                                                                                              | Where                           |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| read nodes                | `useCanvasStore.getState()` (`nodes` + `connections`), returned as `{ nodes, edges }`                                                  | `createDesktopCanvasBinding.ts` |
-| edit one node (immediate) | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — guards `canModifyCanvas`, `saveCheckpoint()`s, then `setNodes`; no server call | `WorkflowCanvas.tsx`            |
-| the name field            | `NodeData.customLabel`, falling back to the block's definition label                                                                   | `NodeBlock.tsx`                 |
-| position                  | `NodeData.position` (`{ x, y }`)                                                                                                       | `@lemoncloud/eureka-flows-api`  |
-| the ref to reach          | `canvasRef` on the editor page; `<WorkflowCanvas>` mounted below it                                                                    | `FlowEditorPage.tsx`            |
+| Need                      | Primitive                                                                                                                                                                                    | Where                           |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| read nodes                | `useCanvasStore.getState()` (`nodes` + `connections`), returned as `{ nodes, edges }`                                                                                                        | `createDesktopCanvasBinding.ts` |
+| edit one node (immediate) | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — guards `canModifyCanvas`, `saveCheckpoint()`s, then `setNodes`; no server call                                                       | `WorkflowCanvas.tsx`            |
+| add a node                | `WorkflowCanvasRef.addNode(type, position)` — seeds `{ ...defaultConfig }`, generates the id, `saveCheckpoint()`s; agent path suppresses the interactive auto-connect and returns the new id | `WorkflowCanvas.tsx`            |
+| delete a node             | store `deleteNode(id)` — filters the node **and** every connection touching it (cascade) in one update                                                                                       | `useCanvasStore.ts`             |
+| add / delete an edge      | store `addConnection(conn)` (id via `newEdgeId()`; replace an occupied input port) / `deleteConnection(id)`                                                                                  | `useCanvasStore.ts`             |
+| connection validity       | `arePortTypesCompatible(sourceType, targetType)` + `wouldCreateCycle(connections, source, target)` (self-loops included)                                                                     | `apps/web/.../utils/graph.ts`   |
+| the name field            | `NodeData.customLabel`, falling back to the block's definition label                                                                                                                         | `NodeBlock.tsx`                 |
+| position                  | `NodeData.position` (`{ x, y }`)                                                                                                                                                             | `@lemoncloud/eureka-flows-api`  |
+| the ref to reach          | `canvasRef` on the editor page; `<WorkflowCanvas>` mounted below it                                                                                                                          | `FlowEditorPage.tsx`            |
 
 **Precedent:** `useSocketHandlers` already writes to the canvas through this ref
 (`loadWorkflow` / `updateNodeFromServer`), so the seam is proven — the agent is the same pattern with a
@@ -34,6 +42,13 @@ that the source (linked above) makes concrete:
   a clear error if the canvas isn't mounted). Reads go straight to `useCanvasStore` and don't need the ref.
 - **`updateNode` shallow-merges**, so `position` is passed whole (never a partial axis), and `label` maps
   to `customLabel` — an empty string clears the override.
+- **Structural writes are checkpointed and guarded on `canModifyCanvas`** (flows' "add/delete nodes, connect
+  edges" flag — the same one `updateNode`'s move path uses; _not_ flows' `canEditStructure`, which is
+  rename/publish metadata), so an add / delete is undoable like a user action. `deleteNode` leans on the
+  store's cascade (the node and its edges go in one update), so the binding never hand-removes edges first.
+  `addNode`/`addEdge` return the new id the agent references next; the agent-driven `addNode` passes an
+  explicit position and **suppresses** the interactive auto-connect heuristic (last-or-selected node, jittered
+  position), so an agent edit is predictable and oracle-able rather than implicitly wired.
 
 ## Validation
 

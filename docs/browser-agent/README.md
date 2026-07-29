@@ -10,12 +10,12 @@ You talk to the **Panel**, which drives the **orchestrator** — the main agent 
 orchestrator runs a think/act loop — ask the **LlmGateway**, run tool calls through the one
 **ToolExecutor** (which checks permissions), repeat until the model is done — but carries no write tools
 of its own: it delegates edits by spawning **specialist** sub-agents (locator = move, property =
-config/rename) that reach the live canvas through a single shared seam, the **CanvasBinding**. The
-persisted **SessionState** is what the Panel renders from.
+config/rename, node = add/delete, edge = connect/disconnect) that reach the live canvas through a single
+shared seam, the **CanvasBinding**. The persisted **SessionState** is what the Panel renders from.
 
 ```
 Panel → Orchestrator → LlmGateway (think)
-                     → spawn → Specialists (locator / property)
+                     → spawn → Specialists (locator / property / node / edge)
                                  → ToolExecutor → tools → CanvasBinding → live canvas (act)
                      → SessionState → Panel (render)
 ```
@@ -32,13 +32,17 @@ The full model — components, the turn loop, interfaces, permissions — is in
 
 **[agents/](agents/)** — the concrete agents.
 
-The **orchestrator** is the entry agent the Panel talks to; it delegates every edit to two specialists —
-the **locator** (move) and the **property** (config/rename) — which it spawns over the shared
-CanvasBinding. The orchestrator and property models are covered in the design docs (start with
-[architecture.md](design/architecture.md)); the locator has its own SPEC:
+The **orchestrator** is the entry agent the Panel talks to; it holds no write tools and delegates every edit
+to the specialists it spawns over the shared CanvasBinding. The orchestrator model is covered in the design
+docs (start with [architecture.md](design/architecture.md)); each specialist has a thin shipped-status SPEC,
+indexed with its coverage in **[agents/README.md](agents/README.md)**:
 
-- [locator.md](agents/locator.md) — the **locator specialist** (move): a thin shipped-status
-  page; its behavior is specified canonically in the harness docs (`design/harness-*`).
+- [locator.md](agents/locator.md) — **move** a node.
+- [property.md](agents/property.md) — **set config** values + **rename**.
+- [node.md](agents/node.md) — **add / delete** a node.
+- [edge.md](agents/edge.md) — **connect / disconnect** an edge.
+
+Each is a thin page; behavior is specified canonically in the harness docs (`design/harness-*`).
 
 **[foundations/](foundations/)** — shared infrastructure, both built.
 

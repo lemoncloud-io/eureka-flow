@@ -5,6 +5,7 @@ import {
     createNodeConfigToolProvider,
     createNodeMoveToolProvider,
     createNodeReadToolProvider,
+    createNodeStructureToolProvider,
     listNodeLocations,
 } from '../../tools/nodeTools';
 import { createFixtureCatalog } from '../harness/fixtures';
@@ -192,6 +193,71 @@ describe('node move provider — move_node over a CanvasBinding', () => {
         const both = await run(provider, 'move_node', { nodeId: 'n1', by: { dx: 1, dy: 1 }, to: { x: 1, y: 1 } });
         expect(both.ok === false && both.error).toMatch(/exactly one/);
         expect(binding.readGraph().nodes[0].position).toEqual({ x: 0, y: 0 });
+    });
+});
+
+// ── STRUCTURE (write: add/delete node) over a CanvasBinding ─────────────────────────────────────
+
+describe('node structure provider — add_node / delete_node', () => {
+    const catalog = createFixtureCatalog();
+
+    it('exposes add_node + delete_node, both gated by canModifyCanvas', async () => {
+        const defs = await createNodeStructureToolProvider(createInMemoryCanvasBinding(), catalog).listTools();
+        expect(defs.map(t => t.name)).toEqual(['add_node', 'delete_node']);
+        expect(defs.every(d => d.requires === 'canModifyCanvas')).toBe(true);
+    });
+
+    it('adds a node of the given type at the position and returns its new id', async () => {
+        const binding = createInMemoryCanvasBinding(makeInitialGraph());
+        const structure = createNodeStructureToolProvider(binding, catalog);
+        const res = await run(structure, 'add_node', { type: 'buffer', position: { x: 900, y: 120 } });
+        expect(res.ok).toBe(true);
+        if (res.ok) {
+            const { nodeId } = res.data as { nodeId: string };
+            const added = nodeById(binding.readGraph(), nodeId);
+            expect(added.type).toBe('buffer');
+            expect(added.position).toEqual({ x: 900, y: 120 });
+        }
+        expect(binding.readGraph().nodes).toHaveLength(5);
+    });
+
+    it('rejects an unknown block type and adds nothing', async () => {
+        const binding = createInMemoryCanvasBinding(makeInitialGraph());
+        const structure = createNodeStructureToolProvider(binding, catalog);
+        const res = await run(structure, 'add_node', { type: 'not-a-real-block', position: { x: 0, y: 0 } });
+        expect(res.ok).toBe(false);
+        if (!res.ok) {
+            expect(res.error).toContain('unknown block type');
+        }
+        expect(binding.readGraph().nodes).toHaveLength(4);
+    });
+
+    it('deletes a node and cascades every edge that touches it', async () => {
+        const binding = createInMemoryCanvasBinding(makeInitialGraph());
+        const structure = createNodeStructureToolProvider(binding, catalog);
+        const res = await run(structure, 'delete_node', { nodeId: IDS.buf });
+        expect(res.ok).toBe(true);
+        if (res.ok) {
+            // txt→buf and buf→gen both referenced the buffer and are reported as dropped (by id).
+            expect((res.data as { droppedEdges: string[] }).droppedEdges.sort()).toEqual(['e_buf_gen', 'e_txt_buf']);
+        }
+        const graph = binding.readGraph();
+        expect(graph.nodes.find(n => n.id === IDS.buf)).toBeUndefined();
+        expect(graph.edges.some(e => e.sourceNodeId === IDS.buf || e.targetNodeId === IDS.buf)).toBe(false);
+        // the untouched edge (gen→prev) survives
+        expect(graph.edges).toHaveLength(1);
+    });
+
+    it('rejects deleting a missing node and changes nothing', async () => {
+        const binding = createInMemoryCanvasBinding(makeInitialGraph());
+        const structure = createNodeStructureToolProvider(binding, catalog);
+        const res = await run(structure, 'delete_node', { nodeId: 'ghost' });
+        expect(res.ok).toBe(false);
+        if (!res.ok) {
+            expect(res.error).toMatch(/no node with id "ghost"/);
+        }
+        expect(binding.readGraph().nodes).toHaveLength(4);
+        expect(binding.readGraph().edges).toHaveLength(3);
     });
 });
 

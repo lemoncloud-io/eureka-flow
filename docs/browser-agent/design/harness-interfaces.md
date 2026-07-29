@@ -1,9 +1,10 @@
 # Flow-agent harness — interfaces
 
-> The **new** TypeScript surface for the harness (move / config / rename). Specialists edit the **live
-> `CanvasBinding` directly** via `updateNode`. Types in `code font` with no declaration here (`Graph`, `XY`,
-> `NodeData`, `EdgeData`, `ToolProvider`, `AgentGrant`, `BaseAgent`, `FakeScriptStep`, …) are **reused
-> as-is** from `@flows/agent` / `@flows/flows` / `@lemoncloud/eureka-flows-api`.
+> The **new** TypeScript surface for the harness (move / config / rename / add-delete node / connect-disconnect
+> edge). Specialists edit the **live `CanvasBinding` directly** — a node edit via `updateNode`, a structural
+> edit via `addNode` / `deleteNode` / `addEdge` / `deleteEdge`. Types in `code font` with no declaration here
+> (`Graph`, `XY`, `NodeData`, `EdgeData`, `ToolProvider`, `AgentGrant`, `BaseAgent`, `FakeScriptStep`, …) are
+> **reused as-is** from `@flows/agent` / `@flows/flows` / `@lemoncloud/eureka-flows-api`.
 >
 > Behavior & the loop: **[harness-spec.md](./harness-spec.md)**. How we verify: **[harness-scenarios.md](./harness-scenarios.md)**. Last updated 2026-07-28.
 
@@ -17,9 +18,13 @@ classDiagram
 
     %% ── live canvas · tools · catalog ─────────────────────────────
     class CanvasBinding {
-        <<reused · config-widened>>
+        <<reused · config- + structure-widened>>
         +readGraph() Graph
         +updateNode(id, NodePatch) void
+        +addNode(type, XY) NewNode
+        +deleteNode(id) void
+        +addEdge(EdgeSpec) NewEdge
+        +deleteEdge(id) void
     }
     class ToolProvider {
         <<reused>>
@@ -75,7 +80,7 @@ classDiagram
         refused
     }
 
-    ToolProvider ..> CanvasBinding : node read/move/config edit live
+    ToolProvider ..> CanvasBinding : node read/move/config/structure edit live
     ToolProvider ..> CatalogLookup : catalog_search · describe_block · describe_node
     ToolProvider ..> AgentRoster : list_agents reads
     ToolProvider ..> SubAgentRunner : spawn delegates to
@@ -93,20 +98,31 @@ classDiagram
 
 ## 1 · The edit space
 
-The harness emits three kinds of node edit, each applied **directly to the live canvas** via
-`CanvasBinding.updateNode` (§6):
+The harness emits two families of edit, each applied **directly to the live canvas** through the
+`CanvasBinding` (§6). **Node edits** patch one existing node via `updateNode`; **structural edits** change the
+set of nodes or edges via the id-returning `addNode` / `addEdge` and the void `deleteNode` / `deleteEdge`.
 
 - **move** `{ nodeId, position: XY }` — absolute result position (`updateNode({ position })`).
 - **set_properties** `{ nodeId, config }` — merged over the node's existing config (`updateNode({ config })`).
 - **rename** `{ nodeId, label }` — `''` clears the override (`updateNode({ label })`).
+- **add_node** `{ type, position }` — create with the block's default config (`addNode` → `{ id }`).
+- **delete_node** `{ nodeId }` — remove the node; its edges cascade (`deleteNode`).
+- **connect_nodes** `{ sourceNodeId, sourcePortId, targetNodeId, targetPortId }` — add a validated edge
+  (`addEdge` → `{ id }`).
+- **disconnect_edge** `{ edgeId }` — remove one edge (`deleteEdge`).
 
-Capability per edit: `set_properties` / `rename` → `canEditConfig`; `move` → `canModifyCanvas` — enforced by
-each tool's `requires` gate in the executor.
+Capability per edit: `set_properties` / `rename` → `canEditConfig`; `move` and the structural
+`add_node` / `delete_node` / `connect_nodes` / `disconnect_edge` → `canModifyCanvas` (flows defines it as
+"add/delete nodes, connect edges" — _not_ flows' `canEditStructure`, which is rename/publish metadata) —
+enforced by each tool's `requires` gate in the executor.
 
 ## 2 · Reads reflect the live canvas
 
-Specialists and the orchestrator edit the **live `CanvasBinding` directly** via `updateNode`, and reads
-(`list_nodes` / `describe_node`) reflect the live canvas including edits made this turn.
+Specialists and the orchestrator edit the **live `CanvasBinding` directly** (`updateNode` for a node patch;
+`addNode` / `deleteNode` / `addEdge` / `deleteEdge` for structure), and reads (`list_nodes` / `describe_node`
+/ `list_edges`) reflect the live canvas including edits made this turn — so a node created by the node agent
+is visible to the edge agent that wires it, and an id returned by `addNode` / `addEdge` names a node/edge the
+next read will show.
 
 ## 3 · Tools
 
@@ -145,6 +161,41 @@ declare function createNodeMoveToolProvider(binding: CanvasBinding): ToolProvide
 declare function createNodeConfigToolProvider(binding: CanvasBinding, catalog: CatalogLookup): ToolProvider;
 //   set_properties({ nodeId, config }) → binding.updateNode({ config }) // MERGED; rejects bad value/type/unknown key/missing node
 //   rename({ nodeId, label })          → binding.updateNode({ label })  // '' clears the label; rejects missing node
+
+// NODE STRUCTURE (write: add/delete node) — NODE agent carries this over the live binding (reads via node read + catalog).
+declare function createNodeStructureToolProvider(binding: CanvasBinding, catalog: CatalogLookup): ToolProvider;
+interface AddNodeInput {
+    type: string;
+    position: XY;
+}
+interface DeleteNodeInput {
+    nodeId: string;
+}
+//   add_node({ type, position }) → binding.addNode(type, position) → { nodeId } // DEFAULTS-ONLY; rejects unknown type; no config, no wiring
+//   delete_node({ nodeId })      → binding.deleteNode(nodeId)                    // edges CASCADE; rejects missing node
+
+// EDGE (read + write: connect/disconnect) — EDGE agent carries this; validation (ports · type-compat · cycle) lives HERE.
+declare function createEdgeToolProvider(binding: CanvasBinding, catalog: CatalogLookup): ToolProvider;
+interface ConnectNodesInput {
+    sourceNodeId: string;
+    sourcePortId: string; // an OUTPUT port on the source
+    targetNodeId: string;
+    targetPortId: string; // an INPUT port on the target
+}
+interface DisconnectEdgeInput {
+    edgeId: string;
+}
+interface EdgeSummary {
+    edgeId: string;
+    sourceNodeId: string;
+    sourcePortId: string;
+    targetNodeId: string;
+    targetPortId: string;
+}
+//   list_edges()                → { edges: EdgeSummary[] } // COMPACT edge list — the palette for disconnect
+//   connect_nodes({ … })        → validates ports exist · arePortTypesCompatible · !wouldCreateCycle, then
+//                                  binding.addEdge(spec) → { edgeId } // replaces an existing edge on an occupied input
+//   disconnect_edge({ edgeId }) → binding.deleteEdge(edgeId)         // rejects unknown edge
 
 // DISCOVER — orchestrator only. The roster is a registry (data), never enumerated in the persona.
 declare function createAgentDirectoryToolProvider(roster: AgentRoster): ToolProvider; // §4
@@ -229,6 +280,12 @@ declare function createAgentRoster(registrations: AgentRegistration[]): AgentRos
 {
     type: 'property';
 } // create → createPropertyAgent({ binding, catalog, … }) — carries set_properties + rename
+{
+    type: 'node';
+} // create → createNodeAgent({ binding, catalog, … })     — carries add_node + delete_node
+{
+    type: 'edge';
+} // create → createEdgeAgent({ binding, catalog, … })     — carries connect_nodes + disconnect_edge
 ```
 
 ## 5 · Catalog types
@@ -254,19 +311,37 @@ interface BlockSchema {
 ## 6 · The `CanvasBinding` seam
 
 ```ts
-// SHIPPED — the whole seam between (non-React) agent code and the React-owned live canvas.
-// `updateNode` is widened to carry config, so one method applies every edit the harness emits — move →
-// position · rename → label · set_properties → config — straight to the live canvas.
+// The whole seam between (non-React) agent code and the React-owned live canvas. `updateNode` patches ONE
+// existing node (move → position · rename → label · set_properties → config); the structural primitives
+// change the SET of nodes/edges. Each is SYNCHRONOUS, applied immediately (frontend-only), checkpointed for
+// undo, and gated on its capability. `addNode`/`addEdge` RETURN the new id so a compound turn can reference
+// what it just created; `deleteNode` cascades the node's edges.
 interface CanvasBinding {
     readGraph(): Graph; // live structural read of the current canvas graph
-    updateNode(id: string, patch: NodePatch): void; // SYNCHRONOUS, applied immediately (frontend-only)
+    updateNode(id: string, patch: NodePatch): void; // node patch — canModifyCanvas / canEditConfig per field
+    addNode(type: string, position: XY): { id: string }; // create with the block's defaultConfig — canModifyCanvas
+    deleteNode(id: string): void; // remove node + cascade its edges — canModifyCanvas
+    addEdge(spec: EdgeSpec): { id: string }; // link two ports; replaces an existing edge on an occupied input — canModifyCanvas
+    deleteEdge(id: string): void; // remove one edge by id — canModifyCanvas
 }
 interface NodePatch {
     label?: string; // '' / falsy clears a custom label
     position?: XY; // replaces the node's position whole
     config?: Record<string, string>; // MERGED over the node's existing config
 }
+interface EdgeSpec {
+    sourceNodeId: string;
+    sourcePortId: string;
+    targetNodeId: string;
+    targetPortId: string;
+}
 ```
+
+The binding is a **thin mechanical seam**: it applies the edit, checkpoints, and gates on the capability — it
+does **not** judge whether an edit is sensible. Semantic validation lives in the tools: config against the
+catalog in `createNodeConfigToolProvider`, and port-existence + type-compat + no-cycle in
+`createEdgeToolProvider` (§3). So `addEdge` trusts a spec the tool already validated, exactly as `updateNode`
+trusts a config the tool already merged and checked.
 
 ## 7 · `TurnOutcome` — the eval's parsed outcome shape
 
@@ -308,7 +383,7 @@ interface ScenarioInput {
 declare function runScenario(input: ScenarioInput): Promise<TurnResult>;
 
 // One fake gateway per agent (keyed by agentType) — see impl-notes for why.
-type FakeScript = Record<string, FakeScriptStep[]>; // 'orchestrator' | 'locator' | 'property' → scripted turns
+type FakeScript = Record<string, FakeScriptStep[]>; // 'orchestrator' | 'locator' | 'property' | 'node' | 'edge' → scripted turns
 ```
 
 **Test-only re-ask + honest errors.** The orchestrator ends its turn with a plain-text reply (production is

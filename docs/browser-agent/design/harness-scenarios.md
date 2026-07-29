@@ -17,8 +17,8 @@ independent and selectable (`vitest run <file> -t <name>`), so a representative 
 matrix.
 
 - **Per agent, no orchestrator** — `scenarios/<agent>.{spec,live.spec}.ts`: the agent driven **directly** with
-  a concrete task, asserting the live graph — its definition of done. Today `scenarios/locator.*` and
-  `scenarios/property.*`.
+  a concrete task, asserting the live graph — its definition of done. One pair per specialist:
+  `scenarios/locator.*`, `scenarios/property.*`, `scenarios/node.*`, `scenarios/edge.*`.
 - **Integration, orchestrator × agents** — `scenarios/integration.{spec,live.spec}.ts`: the orchestrator
   resolving a request and delegating across specialists (the applied/partial/refused/answered matrix). The
   live variant checks only the outcome + graph oracle.
@@ -66,9 +66,11 @@ the live `CanvasBinding` directly, so a real edit shows up there.
 - **A no-edit oracle** — `committed === false` **and** the post-turn graph deep-equals the scenario's own
   initial graph — for every `refused` / `answered` case (the integration suite's `expectUnchanged` helper is
   one instance of this, against the shared fixture).
-- **Coverage spans the outcome matrix:** `applied` (every intended edit landed), `partial` (some landed, some
-  had no capable specialist or were rejected — `failed` non-empty), `refused` (ambiguity / invalid value /
-  missing field / permission or capability gap → nothing lands), and `answered` (a pure question, no edit).
+- **Coverage spans the outcome matrix:** `applied` (every intended edit landed — including a compound
+  add → wire → configure), `partial` (some landed, some were rejected or had no capable specialist — e.g. the
+  node is added but the requested connection would cycle; `failed` non-empty), `refused` (ambiguity / invalid
+  value / missing field / an unroutable connection / permission or capability gap → nothing lands), and
+  `answered` (a pure question, no edit).
 
 ---
 

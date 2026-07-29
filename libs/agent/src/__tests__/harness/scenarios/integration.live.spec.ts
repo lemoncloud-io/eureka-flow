@@ -200,27 +200,22 @@ describe.skipIf(NO_KEY)('Harness scenarios — LIVE against a real Gemini key', 
         TIMEOUT_MS
     );
 
-    // ── partial ──────────────────────────────────────────────────────────────────────────────────
+    // ── applied (structural: node + edge composition) ─────────────────────────────────────────────
     it(
-        'P1 — move the input right AND delete the preview (delete unsupported → partial)',
+        'A5 — delete the buffer AND rewire input→generator (node + edge → applied)',
         async () => {
-            const before = nodeById(makeInitialGraph(), IDS.txt).position;
-            const result = await runLive('P1', {
-                objective: 'move the input right and delete the preview',
+            const result = await runLive('A5', {
+                objective: 'delete the buffer node and connect the input directly to the generator',
                 initialGraph: makeInitialGraph(),
             });
 
-            expect(result.outcome.status).toBe('partial');
+            expect(result.outcome.status).toBe('applied');
             expect(result.committed).toBe(true);
-            // only the move landed (relational, like A1)
-            const after = nodeById(result.graph, IDS.txt).position;
-            expect(after.x).toBeGreaterThan(before.x);
-            expect(after.y).toBe(before.y);
-            // the preview is still present and unchanged
-            expect(nodeById(result.graph, IDS.prev).position).toEqual({ x: 700, y: 400 });
-            if (result.outcome.status === 'partial') {
-                expect(result.outcome.failed.length).toBeGreaterThan(0);
-            }
+            // the buffer is gone and no edge references it
+            expect(result.graph.nodes.some(n => n.id === IDS.buf)).toBe(false);
+            expect(result.graph.edges.some(e => e.sourceNodeId === IDS.buf || e.targetNodeId === IDS.buf)).toBe(false);
+            // the input now feeds the generator directly
+            expect(result.graph.edges.some(e => e.sourceNodeId === IDS.txt && e.targetNodeId === IDS.gen)).toBe(true);
         },
         TIMEOUT_MS
     );
@@ -304,9 +299,14 @@ describe.skipIf(NO_KEY)('Harness scenarios — LIVE against a real Gemini key', 
 
     // ── refused ──────────────────────────────────────────────────────────────────────────────────
     it(
-        'R1 — delete the preview (only task; unsupported → refused)',
+        'R1 — run the generator (only task; no run specialist → refused)',
         async () => {
-            const result = await runLive('R1', { objective: 'delete the preview', initialGraph: makeInitialGraph() });
+            // Structural edits are covered now (node/edge); this keeps the capability-gap refusal on a
+            // genuinely-unsupported ask — no specialist executes nodes.
+            const result = await runLive('R1', {
+                objective: 'run the generator node',
+                initialGraph: makeInitialGraph(),
+            });
 
             expect(result.outcome.status).toBe('refused');
             expectUnchanged(result);

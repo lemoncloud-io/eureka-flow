@@ -10,10 +10,12 @@ import type { JsonSchema, ToolDef } from '../llm/llmGateway';
 /**
  * The node tool domain — everything an agent does to canvas nodes, split by operation so agents
  * take only what they need:
- *   • `createNodeReadToolProvider`   — `list_nodes` + `describe_node`   (read)
- *   • `createNodeMoveToolProvider`   — `move_node`                      (write: position)
- *   • `createNodeConfigToolProvider` — `set_properties` + `rename`      (write: config/label)
- * Also owns the node projection (`listNodeLocations`) and per-turn context block (`renderNodeContext`).
+ *   • `createNodeReadToolProvider`      — `list_nodes` + `describe_node`   (read)
+ *   • `createNodeMoveToolProvider`      — `move_node`                      (write: position)
+ *   • `createNodeConfigToolProvider`    — `set_properties` + `rename`      (write: config/label)
+ *   • `createNodeStructureToolProvider` — `add_node` + `delete_node`       (write: add/delete node)
+ * Also owns the node projection (`listNodeLocations`), the per-turn context block (`renderNodeContext`),
+ * and the shared `requireNode` lookup (reused by the edge tool).
  */
 
 // ── Projection + per-turn context ────────────────────────────────────────────────────────────────
@@ -71,8 +73,8 @@ export const renderNodeContext = (binding: CanvasBinding, headings: NodeContextH
 
 // ── Shared node lookup ───────────────────────────────────────────────────────────────────────────
 
-/** The live node behind an id, or the "no such node" error to return — one not-found wording for every node tool. */
-const requireNode = (
+/** The live node behind an id, or the "no such node" error to return — one not-found wording for every node/edge tool. */
+export const requireNode = (
     binding: CanvasBinding,
     call: ToolCall,
     nodeId: string
@@ -269,6 +271,74 @@ export const createNodeConfigToolProvider = (binding: CanvasBinding, catalog: Ca
             if ('error' in found) return found.error;
             binding.updateNode(nodeId, { label });
             return ok(call, { nodeId, label });
+        }
+        return toolUnknown(call);
+    },
+});
+
+// ── STRUCTURE — add_node + delete_node (write: add/delete node), over a CanvasBinding ────────────
+
+const ADD_NODE_DEF: ToolDef = {
+    name: 'add_node',
+    description:
+        "Add one new node of a block `type` at a canvas `position`. The node is created with the block's " +
+        'default config only — set non-default values afterwards with set_properties. Returns the new id. ' +
+        'It does NOT wire the node to anything.',
+    requires: 'canModifyCanvas',
+    parameters: {
+        type: 'object',
+        properties: {
+            type: {
+                type: 'string',
+                description: 'The block type to create (confirm with catalog_search / describe_block).',
+            },
+            position: {
+                type: 'object',
+                description: 'Absolute canvas position in px.',
+                properties: { x: { type: 'number' }, y: { type: 'number' } },
+                required: ['x', 'y'],
+            },
+        },
+        required: ['type', 'position'],
+    },
+};
+
+const DELETE_NODE_DEF: ToolDef = {
+    name: 'delete_node',
+    description:
+        'Delete one existing node. Every edge connected to it is removed with it (cascade). ' +
+        'The removed edges are reported in the result.',
+    requires: 'canModifyCanvas',
+    parameters: {
+        type: 'object',
+        properties: { nodeId: { type: 'string', description: 'The id of the node to delete (from list_nodes).' } },
+        required: ['nodeId'],
+    },
+};
+
+/** STRUCTURE provider (write: add/delete node) over a {@link CanvasBinding}: `add_node` (defaults-only, catalog-validated type) + `delete_node` (cascades edges). Carried by the `node` specialist. */
+export const createNodeStructureToolProvider = (binding: CanvasBinding, catalog: CatalogLookup): ToolProvider => ({
+    listTools: () => [ADD_NODE_DEF, DELETE_NODE_DEF],
+    dispatch: (call: ToolCall): ToolResult => {
+        if (call.name === 'add_node') {
+            const { type, position } = call.args as { type: string; position: XY };
+            if (!catalog.has(type)) {
+                return err(call, `unknown block type "${type}"`);
+            }
+            const { id } = binding.addNode(type, position);
+            return ok(call, { nodeId: id, type, position });
+        }
+        if (call.name === 'delete_node') {
+            const { nodeId } = call.args as { nodeId: string };
+            const found = requireNode(binding, call, nodeId);
+            if ('error' in found) return found.error;
+            const droppedEdges = binding
+                .readGraph()
+                .edges.filter(e => e.sourceNodeId === nodeId || e.targetNodeId === nodeId)
+                .map(e => e.id)
+                .filter((id): id is string => id !== undefined);
+            binding.deleteNode(nodeId);
+            return ok(call, { nodeId, droppedEdges });
         }
         return toolUnknown(call);
     },

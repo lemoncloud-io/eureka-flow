@@ -1,7 +1,7 @@
 import { useCanvasStore } from '@flows/flows';
 
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
-import type { CanvasBinding } from '@flows/agent';
+import type { CanvasBinding, EdgeSpec } from '@flows/agent';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 import type { RefObject } from 'react';
 
@@ -44,5 +44,13 @@ export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | nu
             }
             canvas().updateNode(id, updates);
         },
+
+        // Structural writes delegate to the ref (which guards `canModifyCanvas` + checkpoints for undo).
+        // Validation happened in the tool; these are mechanical. The agent path suppresses the interactive
+        // auto-connect so an edit is only what was asked for.
+        addNode: (type, position) => ({ id: canvas().addNode(type, position, { autoConnect: false }) }),
+        deleteNode: id => canvas().deleteNode(id),
+        addEdge: (spec: EdgeSpec) => ({ id: canvas().addEdge(spec) }),
+        deleteEdge: id => canvas().deleteEdge(id),
     };
 };

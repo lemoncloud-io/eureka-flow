@@ -5,6 +5,10 @@ export { createLocatorAgent, LocatorAgent, LOCATOR_SYSTEM_PROMPT } from './locat
 export type { LocatorAgentDeps } from './locatorAgent';
 export { createPropertyAgent, PropertyAgent, PROPERTY_SYSTEM_PROMPT } from './propertyAgent';
 export type { PropertyAgentDeps } from './propertyAgent';
+export { createNodeAgent, NodeAgent, NODE_SYSTEM_PROMPT } from './nodeAgent';
+export type { NodeAgentDeps } from './nodeAgent';
+export { createEdgeAgent, EdgeAgent, EDGE_SYSTEM_PROMPT } from './edgeAgent';
+export type { EdgeAgentDeps } from './edgeAgent';
 export { createOrchestratorAgent, OrchestratorAgent, ORCHESTRATOR_SYSTEM_PROMPT } from './orchestratorAgent';
 export type { OrchestratorAgentDeps } from './orchestratorAgent';
 

@@ -25,6 +25,12 @@ const setProps = (nodeId: string, config: Record<string, string>) => ({
     args: { nodeId, config },
 });
 const rename = (nodeId: string, label: string) => ({ name: 'rename', args: { nodeId, label } });
+const addNode = (type: string, x: number, y: number) => ({ name: 'add_node', args: { type, position: { x, y } } });
+const deleteNode = (nodeId: string) => ({ name: 'delete_node', args: { nodeId } });
+const connect = (sourceNodeId: string, sourcePortId: string, targetNodeId: string, targetPortId: string) => ({
+    name: 'connect_nodes',
+    args: { sourceNodeId, sourcePortId, targetNodeId, targetPortId },
+});
 
 /** A no-edit outcome: the graph deep-equals the snapshot and nothing committed. */
 const expectUnchanged = (result: TurnResult): void => {
@@ -147,40 +153,112 @@ describe('Harness scenarios — outcome coverage', () => {
     });
 
     // ── partial ──────────────────────────────────────────────────────────────────────────────────
-    it('P1 — move the input right AND delete the preview (delete unsupported → partial)', async () => {
+    it('P1 — move the preview down AND wire generator→buffer (cycle rejected → partial)', async () => {
+        // The move lands (locator); the edge is rejected by the edge tool (gen→buf would close the
+        // buf→gen→buf cycle), so nothing is wired — a genuine per-op partial.
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'locator', task: `move ${IDS.txt} right by 20px` }]),
-                text('Moved the input right; I can’t delete the preview (no specialist can delete nodes).'),
+                spawn([
+                    { agentType: 'locator', task: `move ${IDS.prev} down by 20px` },
+                    { agentType: 'edge', task: `connect ${IDS.gen} out to ${IDS.buf} in` },
+                ]),
+                text('Moved the preview; the generator→buffer connection was rejected (it would create a cycle).'),
                 report({
                     status: 'partial',
-                    summary: 'moved the input; cannot delete',
-                    applied: [`move ${IDS.txt}`],
-                    failed: [{ task: `delete ${IDS.prev}`, reason: 'no specialist can delete nodes' }],
+                    summary: 'moved the preview; connection rejected',
+                    applied: [`move ${IDS.prev}`],
+                    failed: [{ task: `connect ${IDS.gen}→${IDS.buf}`, reason: 'would create a cycle' }],
                 }),
             ],
-            locator: [step([moveBy(IDS.txt, 20, 0)]), text('moved')],
+            locator: [step([moveBy(IDS.prev, 0, 20)]), text('moved')],
+            edge: [step([connect(IDS.gen, 'out', IDS.buf, 'in')]), text('connect rejected: would create a cycle')],
         };
         const result = await runScenario({
-            objective: 'move the input right and delete the preview',
+            objective: 'move the preview down and connect the generator into the buffer',
             initialGraph: makeInitialGraph(),
             script,
         });
 
         expect(result.outcome.status).toBe('partial');
         expect(result.committed).toBe(true);
-        // only the move landed (relational, like A1 — never assert an exact x)
-        const after = nodeById(result.graph, IDS.txt).position;
-        expect(after.x).toBeGreaterThan(100);
-        expect(after.y).toBe(100);
-        // the other nodes are untouched (the preview is still present at its original spot)
-        for (const id of [IDS.buf, IDS.gen, IDS.prev]) {
-            expect(nodeById(result.graph, id).position).toEqual(nodeById(makeInitialGraph(), id).position);
-        }
+        // the move landed (relational — never assert an exact y)
+        const after = nodeById(result.graph, IDS.prev).position;
+        expect(after.y).toBeGreaterThan(400);
+        // the connection did NOT land: no gen→buf edge, and the original edge set is intact.
+        expect(result.graph.edges.some(e => e.sourceNodeId === IDS.gen && e.targetNodeId === IDS.buf)).toBe(false);
+        expect(result.graph.edges).toHaveLength(makeInitialGraph().edges.length);
         if (result.outcome.status === 'partial') {
             expect(result.outcome.failed).toHaveLength(1);
-            expect(result.outcome.failed[0].task).toContain(IDS.prev);
+            expect(result.outcome.failed[0].reason).toMatch(/cycle/);
         }
+    });
+
+    it('A5 — delete the buffer AND rewire input→generator (node + edge composition → applied)', async () => {
+        // A compound structural turn: the node agent deletes the buffer (its edges cascade) and the edge
+        // agent connects the input straight to the generator. Order-independent — the final graph is the
+        // same whichever child lands first.
+        const script: FakeScript = {
+            orchestrator: [
+                spawn([
+                    { agentType: 'node', task: `delete node ${IDS.buf}` },
+                    { agentType: 'edge', task: `connect ${IDS.txt} out to ${IDS.gen} in` },
+                ]),
+                text('Deleted the buffer and reconnected the input straight into the generator.'),
+                report({ status: 'applied', summary: 'deleted the buffer; rewired input→generator' }),
+            ],
+            node: [step([deleteNode(IDS.buf)]), text('deleted the buffer')],
+            edge: [step([connect(IDS.txt, 'out', IDS.gen, 'in')]), text('connected input to generator')],
+        };
+        const result = await runScenario({
+            objective: 'delete the buffer and connect the input directly to the generator',
+            initialGraph: makeInitialGraph(),
+            script,
+        });
+
+        expect(result.outcome.status).toBe('applied');
+        expect(result.committed).toBe(true);
+        // the buffer is gone and no edge references it
+        expect(result.graph.nodes.some(n => n.id === IDS.buf)).toBe(false);
+        expect(result.graph.edges.some(e => e.sourceNodeId === IDS.buf || e.targetNodeId === IDS.buf)).toBe(false);
+        // the input now feeds the generator directly, and gen→prev survives
+        expect(result.graph.edges.some(e => e.sourceNodeId === IDS.txt && e.targetNodeId === IDS.gen)).toBe(true);
+        expect(result.graph.edges.some(e => e.sourceNodeId === IDS.gen && e.targetNodeId === IDS.prev)).toBe(true);
+    });
+
+    it('A6 — add a generator, wire it after the existing generator, and set its model (node→edge→property → applied)', async () => {
+        // The flagship composition: node adds → orchestrator threads the new id into edge + property.
+        // The in-memory binding mints `n_1` for the first add (fixture ids are non-numeric), so the child
+        // briefings reference it; the ASSERTIONS find the new node by exclusion, so they don't couple to the
+        // id scheme.
+        const NEW = 'n_1';
+        const script: FakeScript = {
+            orchestrator: [
+                spawn([{ agentType: 'node', task: 'add a single-output-generator at (900, 300)' }]),
+                spawn([
+                    { agentType: 'edge', task: `connect ${IDS.gen} out to ${NEW} in` },
+                    { agentType: 'property', task: `set ${NEW} model to gemini-2.5-pro` },
+                ]),
+                text('Added a generator, wired it after the existing generator, and set its model.'),
+                report({ status: 'applied', summary: 'added + wired + configured a new generator' }),
+            ],
+            node: [step([addNode('single-output-generator', 900, 300)]), text(`added generator ${NEW}`)],
+            edge: [step([connect(IDS.gen, 'out', NEW, 'in')]), text('connected')],
+            property: [step([setProps(NEW, { model: 'gemini-2.5-pro' })]), text('set model')],
+        };
+        const result = await runScenario({
+            objective: 'add a generator after the existing generator and set its model to gemini-2.5-pro',
+            initialGraph: makeInitialGraph(),
+            mode: 'serial', // node must land before edge/property can reference its id
+            script,
+        });
+
+        expect(result.outcome.status).toBe('applied');
+        expect(result.committed).toBe(true);
+        const added = result.graph.nodes.find(n => n.type === 'single-output-generator' && n.id !== IDS.gen);
+        expect(added).toBeDefined();
+        // the new node is wired after the existing generator AND carries the configured model
+        expect(result.graph.edges.some(e => e.sourceNodeId === IDS.gen && e.targetNodeId === added?.id)).toBe(true);
+        expect(added?.config?.model).toBe('gemini-2.5-pro');
     });
 
     it('P2 — set model + bad topK (wrong type → partial)', async () => {
@@ -213,6 +291,43 @@ describe('Harness scenarios — outcome coverage', () => {
         if (result.outcome.status === 'partial') {
             expect(result.outcome.failed[0].task.toLowerCase()).toContain('topk');
         }
+    });
+
+    it('P3 — add a generator + set its model, but a self-connection is rejected (node+config land → partial)', async () => {
+        // node + property land on the new node; the edge (a self-loop) is rejected by the edge tool.
+        const NEW = 'n_1'; // deterministic first-add id (see A6)
+        const script: FakeScript = {
+            orchestrator: [
+                spawn([{ agentType: 'node', task: 'add a single-output-generator at (900, 300)' }]),
+                spawn([
+                    { agentType: 'property', task: `set ${NEW} model to gemini-2.5-pro` },
+                    { agentType: 'edge', task: `connect ${NEW} out to ${NEW} in` }, // self-loop → cycle
+                ]),
+                text('Added and configured the generator; the self-connection was rejected (it would cycle).'),
+                report({
+                    status: 'partial',
+                    summary: 'added + configured; self-connection rejected',
+                    applied: ['add generator', 'set model'],
+                    failed: [{ task: `connect ${NEW}→${NEW}`, reason: 'would create a cycle' }],
+                }),
+            ],
+            node: [step([addNode('single-output-generator', 900, 300)]), text(`added ${NEW}`)],
+            property: [step([setProps(NEW, { model: 'gemini-2.5-pro' })]), text('set model')],
+            edge: [step([connect(NEW, 'out', NEW, 'in')]), text('connect rejected: would create a cycle')],
+        };
+        const result = await runScenario({
+            objective: 'add a generator, set its model to gemini-2.5-pro, and connect it to itself',
+            initialGraph: makeInitialGraph(),
+            mode: 'serial',
+            script,
+        });
+
+        expect(result.outcome.status).toBe('partial');
+        const added = result.graph.nodes.find(n => n.type === 'single-output-generator' && n.id !== IDS.gen);
+        expect(added?.config?.model).toBe('gemini-2.5-pro'); // config landed
+        // the self-connection did NOT land: no edge touches the new node; only the original edges remain
+        expect(result.graph.edges.some(e => e.sourceNodeId === added?.id || e.targetNodeId === added?.id)).toBe(false);
+        expect(result.graph.edges).toHaveLength(makeInitialGraph().edges.length);
     });
 
     // ── refused — needs a decision from the user (ambiguity / invalid input) ────────────────────────
@@ -293,15 +408,17 @@ describe('Harness scenarios — outcome coverage', () => {
     });
 
     // ── refused — cannot act (capability gap / permission) ──────────────────────────────────────────
-    it('R1 — delete the preview (only task; unsupported → refused)', async () => {
-        const reason = 'no specialist can delete nodes';
+    it('R1 — run the generator (only task; no run specialist → refused)', async () => {
+        // Structural edits are covered now (node/edge). This keeps the capability-gap refusal on a
+        // genuinely-unsupported ask: no specialist executes nodes.
+        const reason = 'no specialist can run nodes';
         const script: FakeScript = {
             orchestrator: [
-                text('I can’t delete nodes yet — no specialist can do that.'),
+                text('I can’t run nodes — no specialist can do that.'),
                 report({ status: 'refused', reason }),
             ],
         };
-        const result = await runScenario({ objective: 'delete the preview', initialGraph: makeInitialGraph(), script });
+        const result = await runScenario({ objective: 'run the generator', initialGraph: makeInitialGraph(), script });
 
         expect(result.outcome.status).toBe('refused');
         expectUnchanged(result);

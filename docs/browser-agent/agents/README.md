@@ -6,10 +6,12 @@ tools, and definition of done) and its own scenario suite.
 
 ## Roster & coverage
 
-| Agent        | Capability                   | Grant             | SPEC                         | Deterministic                                                                                        | Live                                                                                                 |
-| ------------ | ---------------------------- | ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **locator**  | moves one existing node      | `canModifyCanvas` | [locator.md](./locator.md)   | [`scenarios/locator.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/locator.spec.ts)   | [`locator.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/locator.live.spec.ts)   |
-| **property** | sets config values + renames | `canEditConfig`   | [property.md](./property.md) | [`scenarios/property.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/property.spec.ts) | [`property.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/property.live.spec.ts) |
+| Agent        | Capability                        | Grant             | SPEC                         | Deterministic                                                                                        | Live                                                                                                 |
+| ------------ | --------------------------------- | ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **locator**  | moves one existing node           | `canModifyCanvas` | [locator.md](./locator.md)   | [`scenarios/locator.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/locator.spec.ts)   | [`locator.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/locator.live.spec.ts)   |
+| **property** | sets config values + renames      | `canEditConfig`   | [property.md](./property.md) | [`scenarios/property.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/property.spec.ts) | [`property.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/property.live.spec.ts) |
+| **node**     | adds a node or deletes one        | `canModifyCanvas` | [node.md](./node.md)         | [`scenarios/node.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/node.spec.ts)         | [`node.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/node.live.spec.ts)         |
+| **edge**     | connects two nodes or disconnects | `canModifyCanvas` | [edge.md](./edge.md)         | [`scenarios/edge.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/edge.spec.ts)         | [`edge.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/edge.live.spec.ts)         |
 
 Integration — the orchestrator coordinating multiple agents — is verified once, across the whole roster:
 

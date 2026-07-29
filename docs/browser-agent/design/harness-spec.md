@@ -7,7 +7,7 @@
 >
 > **Grounding.** Built only on what ships on **this branch**: the agent core in `@flows/agent`
 > (`libs/agent/src`) and the frontend toolkit in `@flows/flows` (`libs/flows/src`). No other branch is
-> referenced. Last updated 2026-07-27.
+> referenced. Last updated 2026-07-28.
 
 ---
 
@@ -49,9 +49,9 @@ sub-agent (§8), which keeps it a pure coordinator and forces the full multi-age
    caller.
 5. **Edits apply immediately.** Every edit that validates is written straight to the live canvas; a rejected
    edit is returned to its caller and never applied.
-6. **Partial is a per-outcome notion.** If one delegated task lands and another can't (e.g. move ok, delete
-   unsupported), the successful edits stay and the turn reports `partial` — good work is never undone because
-   a sibling failed.
+6. **Partial is a per-outcome notion.** If one delegated task lands and another can't (e.g. the node is added
+   but the requested connection would cycle and is rejected), the successful edits stay and the turn reports
+   `partial` — good work is never undone because a sibling failed.
 7. **No user approval gate.** Writes are validated **per-op by the tools** (an invalid config value or bad
    move is rejected before it applies). There is no click-to-accept.
 
@@ -117,18 +117,23 @@ flowchart TD
 - **Edits land live.** Every writer points its tools at the same live binding. A write is a single
   `updateNode`; the graph read via `readGraph()` reflects every edit applied so far — so a sub-agent sees
   what the main agent already did.
-- **Synchronous atomic writes.** `move_node`, `set_properties`, and `rename` each do one synchronous
-  `updateNode` on the live binding, so two concurrent edits can't cause a lost update or an out-of-order
-  result (no mutex). A rejected write never touches the graph — there is nothing to undo.
+- **Synchronous atomic writes.** Every write — `move_node`, `set_properties`, `rename`, `add_node`,
+  `delete_node`, `connect_nodes`, `disconnect_edge` — does one synchronous primitive on the live binding
+  (`updateNode` for a node patch; `addNode` / `deleteNode` / `addEdge` / `deleteEdge` for structure), so two
+  concurrent edits can't cause a lost update or an out-of-order result (no mutex). A rejected write never
+  touches the graph — there is nothing to undo.
 - **Two distinct sources of failure** — worth keeping straight because they arrive by different paths:
     1. **Write rejection** — a write tool ran, but the edit didn't apply and the reason went back to that
        sub-agent (graph untouched): missing node · invalid config value (not in the block's select / wrong
-       type) · unknown config key · bad move args (non-finite / not exactly one of `by`/`to`) · **permission**
-       (the executor's grant gate denies before `updateNode` runs).
-    2. **No capable agent** — the request needs a tool **no roster agent carries** (`delete`/`add`/`connect`).
-       Nothing is attempted; the **orchestrator recognizes the capability gap** from its own
-       system prompt (§8) and states it in its plain-text reply; the eval parses this as a `refused` outcome
-       whose `reason` names the gap. Not a write rejection — no edit reaches the canvas.
+       type) · unknown config key · bad move args (non-finite / not exactly one of `by`/`to`) · unknown block
+       `type` on create · unknown/incompatible port, or a would-be **cycle**, on connect · **permission** (the
+       executor's grant gate denies before the primitive runs).
+    2. **No capable agent** — the request needs a tool **no roster agent carries**. Nothing is attempted; the
+       **orchestrator recognizes the capability gap** from its own system prompt (§8) and states it in its
+       plain-text reply; the eval parses this as a `refused` outcome whose `reason` names the gap. Not a write
+       rejection — no edit reaches the canvas. (With the `node` + `edge` specialists in the roster, add / delete
+       / connect / disconnect are now **covered**; this path is for genuinely unsupported asks, not structural
+       edits.)
 - **How a failure resolves the turn follows what LANDS** — the eval reads the outcome out (§4): everything
   intended lands → `applied`; nothing lands (ambiguous target, an impossible whole request, or permission
   denied) → `refused` (the `reason` carries any question for the user); some lands, some doesn't → `partial`.
@@ -168,12 +173,16 @@ flowchart TD
 
 ## 7 · When the loop ends
 
-When the loop ends, the turn is already done: every edit landed on the live canvas via `updateNode` as it was
-made. All edits go through one primitive — `updateNode` (widened to carry config):
+When the loop ends, the turn is already done: every edit landed on the live canvas as it was made. Node edits
+go through `updateNode` (widened to carry config); structural edits go through the add/delete primitives:
 
 - `move` → `updateNode({ position })`;
 - `rename` → `updateNode({ label })`;
-- `set_properties` → `updateNode({ config })`.
+- `set_properties` → `updateNode({ config })`;
+- `add_node` → `addNode(type, position)` → `{ id }`;
+- `delete_node` → `deleteNode(id)` (edges cascade);
+- `connect_nodes` → `addEdge(spec)` → `{ id }`;
+- `disconnect_edge` → `deleteEdge(id)`.
 
 A pure question (no edits) simply answers. The turn ends with the orchestrator's plain-text message (the loop
 stops on no tool calls); the structured `TurnOutcome` is produced only by the eval's re-ask + parse (§8, §10).
@@ -185,26 +194,36 @@ a **compact-list + detail** convention: a `list_*` / `*_search` tool returns a c
 no config/schema), paired with a `describe_*` tool that returns one item's full detail on demand
 (`list_nodes` → `describe_node`, `catalog_search` → `describe_block`). The **node** tools are organised by
 operation: **read** is ONE provider (`list_nodes` + `describe_node`), carried by every node-reading agent
-(locator, property, orchestrator), so `list_nodes` is defined exactly once; **write** is split into
-`move_node` (`canModifyCanvas`) and `set_properties` / `rename` (`canEditConfig`), so an agent mixes in only
-the write its grant allows — the locator moves, the property specialist configures.
+(locator, property, node, edge, orchestrator), so `list_nodes` is defined exactly once; **write** is split by
+capability — `set_properties` / `rename` (`canEditConfig`), and the canvas-modifying writes `move_node` plus
+the structural `add_node` / `delete_node` / `connect_nodes` / `disconnect_edge` (all `canModifyCanvas`, the
+flow-role flag that literally covers "add/delete nodes, connect edges") — so an agent mixes in only the write
+its grant allows: the locator moves, the property specialist configures, the node specialist adds/deletes, the
+edge specialist connects/disconnects.
 
 | Tool                                      | Kind     | Target                | Notes                                                                                                                                                      |
 | ----------------------------------------- | -------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list_nodes`                              | read     | live canvas           | **compact** node list (reflects edits so far); reuses `listNodeLocations`.                                                                                 |
 | `describe_node`                           | read     | live canvas + catalog | **detail** for one node: block schema, current config, a select's allowed options.                                                                         |
+| `list_edges`                              | read     | live canvas           | **compact** edge list (`edgeId`, `source:port → target:port`); the palette the edge agent disconnects from.                                                |
 | `catalog_search`                          | read     | block catalog         | **compact** lexical shortlist over `blockRegistry`. Never dumps.                                                                                           |
 | `describe_block`                          | read     | block catalog         | **detail** for one block type: full schema (required fields + a select's enum).                                                                            |
-| `move_node` / `set_properties` / `rename` | write    | live canvas           | apply via `updateNode`; a bad edit is rejected and the graph is left untouched.                                                                            |
+| `move_node` / `set_properties` / `rename` | write    | live canvas           | patch one node via `updateNode`; a bad edit is rejected and the graph is left untouched.                                                                   |
+| `add_node` / `delete_node`                | write    | live canvas           | `addNode` (defaults-only, returns the new id) / `deleteNode` (edges cascade); rejects unknown type / missing node.                                         |
+| `connect_nodes` / `disconnect_edge`       | write    | live canvas           | `addEdge` (validated: ports · type-compat · no-cycle; returns the new id) / `deleteEdge`; a bad connection is rejected, graph untouched.                   |
 | `list_agents`                             | discover | agent registry        | **compact** directory of available specialists (type + one-line capability); the orchestrator discovers its roster here — none is hardcoded in the prompt. |
 | `spawn`                                   | delegate | sub-agents            | fan out bounded sub-turns that share the live canvas; barrier-join their summaries (§6).                                                                   |
 
-Permissions map op → capability: `set_properties`/`rename` need `canEditConfig`; `move` needs
-`canModifyCanvas`. Two layers gate a write: each specialist's OWN fixed grant (declared in its constructor —
-the locator grants itself `canModifyCanvas`, the property agent `canEditConfig`) and the user's flow-role
-permissions (derived in the **frontend** via `getPermissions` → `toAgentGrant`, `@flows/flows`, and threaded
-in as `userPermissions`). The executor gates each write on **both**, so a viewer (`userPermissions {}`) is
-denied even though the specialist grants itself the capability (interfaces §4).
+Permissions map op → capability: `set_properties`/`rename` need `canEditConfig`; `move` and the structural
+`add_node`/`delete_node`/`connect_nodes`/`disconnect_edge` all need `canModifyCanvas` (flows defines it as
+"add/delete/resize nodes, connect edges, undo/redo, layout" — Owner + Editor). Note the name trap: flows'
+`canEditStructure` is **flow metadata** (rename/publish, Owner only), **not** graph structure, so structural
+graph edits use `canModifyCanvas`, not `canEditStructure`. Two layers gate a write: each specialist's OWN
+fixed grant (declared in its constructor — the locator, node, and edge agents grant themselves
+`canModifyCanvas`, the property agent `canEditConfig`) and the user's flow-role permissions (derived in the
+**frontend** via `getPermissions` → `toAgentGrant`, `@flows/flows`, and threaded in as `userPermissions`). The
+executor gates each write on **both**, so a viewer (`userPermissions {}`) is denied even though the specialist
+grants itself the capability, while an editor — who has `canModifyCanvas` — is allowed (interfaces §4).
 
 ### Per-agent tool surface
 
@@ -217,6 +236,8 @@ permissions).
 | **orchestrator** (main) | `list_nodes`, `describe_node`, `catalog_search`, `describe_block` | **— none**                                                             | `list_agents`, `spawn` | `{}` (empty) — writes gated by each child's own fixed grant + the user's permissions |
 | **locator** (sub)       | `list_nodes`, `describe_node`                                     | `move_node` — the node **move** provider over the live `CanvasBinding` | —                      | `canModifyCanvas`                                                                    |
 | **property** (sub)      | `list_nodes`, `describe_node`                                     | `set_properties`, `rename`                                             | —                      | `canEditConfig`                                                                      |
+| **node** (sub)          | `list_nodes`, `describe_node`, `catalog_search`, `describe_block` | `add_node`, `delete_node`                                              | —                      | `canModifyCanvas`                                                                    |
+| **edge** (sub)          | `list_nodes`, `describe_node`, `list_edges`                       | `connect_nodes`, `disconnect_edge`                                     | —                      | `canModifyCanvas`                                                                    |
 
 - The **orchestrator has no write tools** — every edit goes through a sub-agent. This forces
   the full multi-agent path (best for evaluating the orchestrator) and keeps it a pure coordinator. It
@@ -232,9 +253,20 @@ permissions).
   value/type/unknown key), `rename` (`''` clears the label). Its provider is
   `createNodeConfigToolProvider(binding, catalog)` over the live binding. Exact shapes:
   **[interfaces §3](./harness-interfaces.md#3--tools)**.
-- Together they cover **move + config + rename**. **Structural edits** (add/connect/delete) have no agent,
-  so those requests are an "unsupported → no capable agent" failure, not a write
-  rejection (§5). Scenarios (locator + property only): **[harness-scenarios.md](./harness-scenarios.md)**.
+- **`node`** (add + delete) — node **read** + **catalog** (`catalog_search`/`describe_block`) to confirm the
+  block `type` the orchestrator named, then `add_node` (create at a given position with the block's
+  `defaultConfig`, returns the new id) / `delete_node` (removes the node; its edges cascade). Its provider is
+  `createNodeStructureToolProvider(binding, catalog)`. It sets **no** config and adds **no** edge — those are
+  the property and edge specialists (composition, below).
+- **`edge`** (connect + disconnect) — node **read** + `list_edges`, then `connect_nodes` (validates ports ·
+  type-compat · no-cycle, then adds one edge; replaces an existing edge on an occupied input) /
+  `disconnect_edge` (removes one edge by id). Its provider is `createEdgeToolProvider(binding, catalog)`; the
+  validation lives in the tool, not the binding. Exact shapes: **[interfaces §3](./harness-interfaces.md#3--tools)**.
+- Together the four specialists cover **move + config + rename + add/delete node + connect/disconnect edge** —
+  the whole edit space (§7). A **configured, wired new node** is a composition, not one agent: the orchestrator
+  spawns `node` (get the id back), then spawns `edge` and `property` **concurrently** against that id (disjoint
+  concerns, atomic writes, barrier-joined) — so config validation stays in the property agent and edge
+  validation in the edge agent, neither duplicated in the creator. Scenarios: **[harness-scenarios.md](./harness-scenarios.md)**.
 - Sub-agents do **not** carry `spawn` (no nesting; fan-out stays one level).
 
 ### System prompts — the behavioral contract
@@ -245,12 +277,15 @@ the tools don't encode (`partial` vs. `refused`, when to ask rather than guess, 
 this"). Each persona is an
 `AgentConfig.systemPrompt` string; per-turn state (the current node list, catalog hints) is injected via
 `BaseAgent.buildContextMessages()` — the seam the shipped `locator` already uses. Each shipped persona is the
-`systemPrompt` string in its agent module (`ORCHESTRATOR_SYSTEM_PROMPT`, `LOCATOR_SYSTEM_PROMPT`, `PROPERTY_SYSTEM_PROMPT`).
+`systemPrompt` string in its agent module (`ORCHESTRATOR_SYSTEM_PROMPT`, `LOCATOR_SYSTEM_PROMPT`,
+`PROPERTY_SYSTEM_PROMPT`, `NODE_SYSTEM_PROMPT`, `EDGE_SYSTEM_PROMPT`).
 
 ## 9 · What's new
 
-The little that is genuinely new over the reused surface: the `spawn` runner + roster, the write toolset,
-config-carrying `updateNode`, the orchestrator/`property` subclasses, and the eval harness.
+The little that is genuinely new over the reused surface: the `spawn` runner + roster, the write toolset
+(move / config / rename plus the structural `add_node` / `delete_node` / `connect_nodes` / `disconnect_edge`),
+config-carrying `updateNode` and the `addNode` / `deleteNode` / `addEdge` / `deleteEdge` binding primitives,
+the orchestrator / `property` / `node` / `edge` subclasses, and the eval harness.
 
 ## 10 · Verifying the design
 
@@ -267,12 +302,12 @@ a regression scorecard.
 
 Beyond the end-to-end scenarios, the unit/component targets:
 
-| Layer                  | What it pins down                                                                                                                               | How                                               |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| **Write tools**        | each write tool applies one synchronous `updateNode` on the live binding; a rejected write (bad args / missing node) leaves the graph untouched | plain unit tests over an in-memory binding        |
-| **Serial ≡ parallel**  | the same independent-edit batch under serial vs concurrent dispatch yields the **identical** final graph                                        | property test over the two dispatch modes         |
-| **Direct-edit oracle** | the post-turn live `graph` matches the expected patches; `committed` is true iff the graph changed                                              | headless `runScenario`; the real thing in-browser |
-| **Permissions**        | an agent missing a capability → the tool is denied, the edit not applied                                                                        | unit test on the executor gate per grant          |
+| Layer                  | What it pins down                                                                                                                                                                                                                                        | How                                               |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| **Write tools**        | each write tool applies one synchronous binding primitive (`updateNode` for a patch; `addNode`/`deleteNode`/`addEdge`/`deleteEdge` for structure); a rejected write (bad args / missing node / unknown type / bad connection) leaves the graph untouched | plain unit tests over an in-memory binding        |
+| **Serial ≡ parallel**  | the same independent-edit batch under serial vs concurrent dispatch yields the **identical** final graph                                                                                                                                                 | property test over the two dispatch modes         |
+| **Direct-edit oracle** | the post-turn live `graph` matches the expected patches; `committed` is true iff the graph changed                                                                                                                                                       | headless `runScenario`; the real thing in-browser |
+| **Permissions**        | an agent missing a capability → the tool is denied, the edit not applied                                                                                                                                                                                 | unit test on the executor gate per grant          |
 
 ---
 

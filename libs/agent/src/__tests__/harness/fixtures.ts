@@ -34,9 +34,9 @@ export const makeInitialGraph = (): Graph => ({
         node(IDS.prev, 'output-preview', 700, 400),
     ],
     edges: [
-        { sourceNodeId: IDS.txt, sourcePortId: 'out', targetNodeId: IDS.buf, targetPortId: 'in' },
-        { sourceNodeId: IDS.buf, sourcePortId: 'out', targetNodeId: IDS.gen, targetPortId: 'in' },
-        { sourceNodeId: IDS.gen, sourcePortId: 'out', targetNodeId: IDS.prev, targetPortId: 'in' },
+        { id: 'e_txt_buf', sourceNodeId: IDS.txt, sourcePortId: 'out', targetNodeId: IDS.buf, targetPortId: 'in' },
+        { id: 'e_buf_gen', sourceNodeId: IDS.buf, sourcePortId: 'out', targetNodeId: IDS.gen, targetPortId: 'in' },
+        { id: 'e_gen_prev', sourceNodeId: IDS.gen, sourcePortId: 'out', targetNodeId: IDS.prev, targetPortId: 'in' },
     ],
 });
 
