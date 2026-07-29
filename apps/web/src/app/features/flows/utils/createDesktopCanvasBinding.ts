@@ -1,13 +1,12 @@
-import { useCanvasStore } from '@flows/flows';
-
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
 import type { CanvasBinding } from '@flows/agent';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 import type { RefObject } from 'react';
 
 /**
- * Desktop {@link CanvasBinding} over the store-sourced canvas: reads node state from `useCanvasStore`
- * and writes through the `WorkflowCanvas` ref (which checkpoints for undo).
+ * Desktop {@link CanvasBinding} over the engine-owned canvas: reads the graph through the
+ * `WorkflowCanvas` ref (`getWorkflow()` is `engine.getGraph()`) and writes through the same
+ * ref, which routes the edit into `engine.transact` so it checkpoints for undo.
  */
 export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | null>): CanvasBinding => {
     const canvas = (): WorkflowCanvasRef => {
@@ -18,10 +17,13 @@ export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | nu
     };
 
     return {
-        // Read the live store so a write is visible to the next read within a turn (getWorkflow lags).
+        // Read the engine, not the store. The store is a one-way projection of the engine
+        // (`useEngineMirror`) and it stops receiving updates while a drag or resize is in
+        // flight, so it can be both behind on edits and ahead on uncommitted preview
+        // positions. `getWorkflow()` is `engine.getGraph()` — exact, and it cannot lag.
         readGraph: () => {
-            const { nodes, connections } = useCanvasStore.getState();
-            return { nodes: nodes ?? [], edges: connections ?? [] };
+            const { nodes, edges } = canvas().getWorkflow();
+            return { nodes: nodes ?? [], edges: edges ?? [] };
         },
 
         updateNode: (id, patch) => {
@@ -37,9 +39,13 @@ export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | nu
                 updates.position = patch.position;
             }
             if (patch.config) {
-                // Merge base from the live store (same source as readGraph) so a prior same-turn config
-                // write is honored; getWorkflow lags and would drop keys written earlier in the turn.
-                const current = useCanvasStore.getState().nodes?.find(n => n.id === id);
+                // Merge base from the engine (same source as readGraph). `ops.updateNode` replaces
+                // `config` wholesale, so this merge is the only thing preserving untouched keys —
+                // reading a projection that pauses mid-drag would silently drop a key written
+                // earlier in the same turn.
+                const current = canvas()
+                    .getWorkflow()
+                    .nodes?.find(n => n.id === id);
                 updates.config = { ...(current?.config ?? {}), ...patch.config };
             }
             canvas().updateNode(id, updates);
