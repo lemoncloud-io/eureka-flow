@@ -1,6 +1,6 @@
 # 그래프는 어디에 있나
 
-`docs/flow-engine` 브랜치 기준. 한 장짜리 지도.
+한 장짜리 지도.
 
 > **먼저**: 저장 위치는 **안 바뀌었다.** 서버 엔드포인트도, localStorage 키도, IndexedDB 도
 > 그대로다. 바뀐 건 **메모리에서 누가 그래프를 소유하느냐**와 **로드 응답을 누가 정규화하느냐** 다.
@@ -37,9 +37,13 @@
 > 들어왔고**(`loadGraph` 에만 `ports` 인자가 있다) 미리보기에 지난 실행 데이터가 비어 있었다.
 > 지금은 `loadFlowIntoEngine` 하나로 들어온다. 자세한 건 `PLAN.md` §15.
 
-`FlowEditorPage.tsx:81` 이 만들고 `:760` 에서 `engine={engine}` 로 캔버스에 넘긴다.
-`WorkflowCanvas.tsx:261` 의 `engineProp ?? fallbackEngine` 은 캔버스가 **단독으로 렌더될 때**
+`FlowEditorPage` 가 `createFlowEngine` 으로 만들어 `engine={engine}` 로 캔버스에 넘긴다.
+`WorkflowCanvas` 의 `engineProp ?? fallbackEngine` 은 캔버스가 **단독으로 렌더될 때**
 (컴포넌트 뷰어 모달) 쓰는 폴백이지, 두 번째 에디터 엔진이 아니다.
+
+> 이 문서는 **줄번호 대신 심볼 이름으로 가리킨다.** 줄번호는 무관한 머지 한 번에도
+> 밀린다 — 실제로 #120 이 들어오면서 여기 적혀 있던 `:760`·`:261` 이 `:762`·`:264` 가 됐다.
+> 심볼은 이름이 바뀌면 같이 틀리지만, 그때는 grep 이 0건을 돌려주므로 **틀린 걸 알 수 있다.**
 
 ---
 

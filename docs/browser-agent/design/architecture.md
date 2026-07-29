@@ -259,12 +259,14 @@ same tool can be callable for one agent and denied for another.
 ## CanvasBinding — the seam
 
 The single door between the (non-React) agent core and the React-owned live canvas, injected at mount.
-On desktop the canvas is store-sourced (`useCanvasStore`), so `readGraph` reads the store directly, while
-writes go through the `WorkflowCanvas` ref — which checkpoints for undo and guards on `canModifyCanvas`.
+On desktop `readGraph` reads `useCanvasStore` directly — the store is the one-way projection of the
+engine's graph, so it is still the freshest read — while writes go through the `WorkflowCanvas` ref,
+which guards on `canModifyCanvas` and hands the edit to the engine.
 
 - `readGraph()` — the live `{ nodes, edges }`.
-- `updateNode(id, patch)` — one node's label / position, frontend-only; on desktop it is guarded on
-  `canModifyCanvas` and checkpointed, so the move is undoable like a user drag.
+- `updateNode(id, patch)` — one node's label / position; on desktop it is guarded on `canModifyCanvas`
+  and applied through `engine.transact('agent:move', …)`, so the move is undoable like a user drag and
+  is part of what the next save sends. No server call at the moment of the edit.
 
 The desktop implementation and the primitives it wraps are in [canvas-binding.md](canvas-binding.md).
 
@@ -288,7 +290,7 @@ backend work.
 | Seam               | Wraps                                                                                                                                                           | Where                                              |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `readGraph` (live) | `useCanvasStore.getState()` → `{ nodes, edges: connections }` (reads the store directly; `getWorkflow` lags within a turn)                                      | `apps/web/.../utils/createDesktopCanvasBinding.ts` |
-| `updateNode`       | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — guards `canModifyCanvas`, `saveCheckpoint()`s for undo, then store `setNodes`                           | `apps/web/.../components/WorkflowCanvas.tsx`       |
+| `updateNode`       | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — guards `canModifyCanvas`, then `engine.transact('agent:move', …)`; history is the transaction           | `apps/web/.../components/WorkflowCanvas.tsx`       |
 | permissions        | `FlowPermissions` (7 flags); the agent's `Capability` is a compile-guarded subset, and the live grant is derived from the flow's permissions via `toAgentGrant` | `libs/flows/.../types/permissions.ts`              |
 | node shape         | `NodeData` (`id`, `type`, `position`, `customLabel`)                                                                                                            | `@lemoncloud/eureka-flows-api`                     |
 

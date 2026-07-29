@@ -1,10 +1,27 @@
-# Flow Engine — 설계 문서
+# Flow Engine — 설계 문서 (2026-07, 착수 전)
+
+> **이 문서는 착수 전에 쓴 설계 근거다. 현재 상태를 알고 싶으면 [GUIDE.md](./GUIDE.md) 를 봐라.**
+> 여기 남겨두는 이유는 _왜 그렇게 하기로 했는지_ 가 결과물에는 안 남기 때문이다.
+> 구현하면서 몇 가지는 다르게 갔고, 아래 "무엇이 달라졌나" 에 적었다.
 
 > 목표: flow graph(디자인 = 블럭 + 노드 + 엣지)가 **인메모리에서 돌아가는 헤드리스 엔진**(`@flows/engine`).
-> 브라우저/Node.js/셸 어디서든 동일하게 실행되고, React 캔버스와 에이전트(`eureka-flow-agents`의 `libs/agent`)는
+> 브라우저/Node.js/셸 어디서든 동일하게 실행되고, React 캔버스와 에이전트(`libs/agent`)는
 > 이 엔진의 구독자/조작자가 된다.
 >
-> 실행 계획은 [PLAN.md](./PLAN.md) — Claude Code는 그쪽을 따른다. 이 문서는 근거와 아키텍처.
+> 실행 기록은 [PLAN.md](./PLAN.md) — Phase 별 완료 조건과 정정 이력이 거기 있다.
+
+## 무엇이 달라졌나
+
+착수 전 판단과 실제 구현이 갈린 지점 넷. 아래 본문은 **고치지 않았다** — 당시 판단 그대로다.
+
+| 이 문서가 말한 것                                                         | 실제                                                                                                                       | 근거                                          |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| 포트 **5개** (Http·Storage·Llm·Socket·Auth)                               | **3개** — Storage·Llm 은 만들지 않았다                                                                                     | PLAN §13                                      |
+| `CanvasBinding` 을 엔진 위에 **재구현**하고 툴 확장(`addNode`/`connect`…) | **무변경.** 인터페이스도 구현체도 그대로 — `WorkflowCanvasRef.updateNode` 안쪽만 엔진으로 바뀌어서 바인딩이 손댈 게 없었다 | `docs/browser-agent/design/canvas-binding.md` |
+| 에이전트는 **다른 레포**(`eureka-flow-agents` 포크)에 있다                | PR #120 으로 **이 레포** `libs/agent` 에 들어왔다                                                                          | —                                             |
+| Phase **0–3**                                                             | 실제 **0–6** + npm 배포(§14) + 모바일 전환(§15)                                                                            | PLAN 목차                                     |
+
+`useFlows` → `repository` 이관도 "한다" 로 적혀 있었지만 하지 않기로 뒤집었다 — 근거는 PLAN §12.
 
 ---
 
@@ -14,16 +31,16 @@
 
 그래프 데이터 모델 자체는 이미 깔끔하다. `NodeData` / `EdgeData` / `WorkflowState`는 서버 패키지(`@lemoncloud/eureka-flows-api`)에서 오고, 블록 정의는 `BlockDefinitionWithFrontend`(isFrontend / stereo / execute)로 확장돼 있다. 문제는 데이터가 아니라 **로직의 위치**다.
 
-| 관심사 | 현재 위치 | 헤드리스(비-React) 재사용 |
-|---|---|---|
-| 그래프 상태 (nodes + connections) | `useCanvasStore` (zustand) — UI 상태(viewport, selection, tooltip, drag)와 혼재 | △ `createCanvasStore()` vanilla 팩토리가 이미 존재 |
-| 노드/엣지 추가·삭제·연결 편집 | `WorkflowCanvas.tsx` (121KB 컴포넌트) 내부 콜백들 | ✗ |
-| undo/redo 히스토리 | `WorkflowCanvas.tsx`의 `pastRef`/`futureRef` (React ref) + JSON 딥카피 스냅샷 | ✗ |
-| 복사/붙여넣기 | `WorkflowCanvas.tsx` 로컬 state (`useState<NodeData[]>`), 키보드 이벤트 핸들러 | ✗ |
-| 더티 판정 / 저장 스냅샷 / baseline | `libs/flows/src/workspace/*` (snapshot·diff·baseline·draft) — 거의 순수함수 | ◎ (단, `useFlowsStore.getState()` 싱글톤 결합) |
-| 로딩/저장 API | `loadFlow`/`saveFlow` 순수 함수 + `useFlows` 훅(TanStack Query) | △ API 함수는 분리돼 있으나 axios 클라이언트(web-core)가 localStorage 인증(x-api-key)에 결합 |
-| 실행 반영 (socket) | `useInitFlowSocket` — React 훅 + 브라우저 Worker 기반 WebSocket | ✗ |
-| 프론트 블록 실행 | `EXECUTE_FUNCTIONS` — 일부 DOM 의존 (`image-info`의 `new Image()`) | △ |
+| 관심사                             | 현재 위치                                                                       | 헤드리스(비-React) 재사용                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 그래프 상태 (nodes + connections)  | `useCanvasStore` (zustand) — UI 상태(viewport, selection, tooltip, drag)와 혼재 | △ `createCanvasStore()` vanilla 팩토리가 이미 존재                                          |
+| 노드/엣지 추가·삭제·연결 편집      | `WorkflowCanvas.tsx` (121KB 컴포넌트) 내부 콜백들                               | ✗                                                                                           |
+| undo/redo 히스토리                 | `WorkflowCanvas.tsx`의 `pastRef`/`futureRef` (React ref) + JSON 딥카피 스냅샷   | ✗                                                                                           |
+| 복사/붙여넣기                      | `WorkflowCanvas.tsx` 로컬 state (`useState<NodeData[]>`), 키보드 이벤트 핸들러  | ✗                                                                                           |
+| 더티 판정 / 저장 스냅샷 / baseline | `libs/flows/src/workspace/*` (snapshot·diff·baseline·draft) — 거의 순수함수     | ◎ (단, `useFlowsStore.getState()` 싱글톤 결합)                                              |
+| 로딩/저장 API                      | `loadFlow`/`saveFlow` 순수 함수 + `useFlows` 훅(TanStack Query)                 | △ API 함수는 분리돼 있으나 axios 클라이언트(web-core)가 localStorage 인증(x-api-key)에 결합 |
+| 실행 반영 (socket)                 | `useInitFlowSocket` — React 훅 + 브라우저 Worker 기반 WebSocket                 | ✗                                                                                           |
+| 프론트 블록 실행                   | `EXECUTE_FUNCTIONS` — 일부 DOM 의존 (`image-info`의 `new Image()`)              | △                                                                                           |
 
 핵심 관찰:
 
@@ -62,16 +79,16 @@
 
 ## 2. 요구사항 → 갭
 
-| # | 요구사항 | 현재 상태 | 갭 |
-|---|---|---|---|
-| 1 | **로딩** — 서버에서 block + 디자인 읽기 | `getBlocks`/`loadFlow` API 함수 존재, 단 axios+localStorage 인증에 결합, React Query 훅으로만 소비 | Http/Auth 포트 뒤로 옮기면 재사용 가능. 낮음 |
-| 2a | **편집** — 노드/엣지 추가·삭제·수정 | 로직 전부 `WorkflowCanvas.tsx` 안 | 엔진 코어로 이동 필요. **가장 큰 작업** |
-| 2b | **히스토리** (undo/redo) | React ref + 딥카피, UI에 갇힘 | 엔진의 commit 단위 히스토리로 재설계 |
-| 2c | **복사/붙여넣기** | 노드만, 엣지 미포함, UI 이벤트 핸들러에 인라인 | 서브그래프 복사로 엔진에서 구현 — 가능, 장애물 없음 |
-| 3 | **뷰어** — 변경마다 라이브 표시 | zustand 구독으로 이미 리액티브 | 엔진이 subscribe/이벤트만 내면 React 바인딩은 얇아짐. 낮음 |
-| 4 | **저장** — 서버에 저장 | `saveFlow` + workspace(snapshot/diff/baseline/rebaseline) 품질 좋음 | 싱글톤 결합 제거 후 엔진 이식. 낮음 |
-| 5 | **블랙박스 이식성** — 브라우저/node/셸 | agents 포크의 environment/http/storage 포트가 골격 절반 | 그래프 소유권 + Socket 포트 + Auth 포트 + AI Gen 어댑터 필요 |
-| 6 | **어댑터 패턴** — AI Gen, fetch(http/local), socket | LlmGateway ◎, HttpPort ◎, Socket ✗ (브라우저 Worker 훅), AI Gen은 백엔드 runNode 경유가 사실상의 경로 | SocketPort 신설이 핵심 신규 작업 |
+| #   | 요구사항                                            | 현재 상태                                                                                             | 갭                                                           |
+| --- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 1   | **로딩** — 서버에서 block + 디자인 읽기             | `getBlocks`/`loadFlow` API 함수 존재, 단 axios+localStorage 인증에 결합, React Query 훅으로만 소비    | Http/Auth 포트 뒤로 옮기면 재사용 가능. 낮음                 |
+| 2a  | **편집** — 노드/엣지 추가·삭제·수정                 | 로직 전부 `WorkflowCanvas.tsx` 안                                                                     | 엔진 코어로 이동 필요. **가장 큰 작업**                      |
+| 2b  | **히스토리** (undo/redo)                            | React ref + 딥카피, UI에 갇힘                                                                         | 엔진의 commit 단위 히스토리로 재설계                         |
+| 2c  | **복사/붙여넣기**                                   | 노드만, 엣지 미포함, UI 이벤트 핸들러에 인라인                                                        | 서브그래프 복사로 엔진에서 구현 — 가능, 장애물 없음          |
+| 3   | **뷰어** — 변경마다 라이브 표시                     | zustand 구독으로 이미 리액티브                                                                        | 엔진이 subscribe/이벤트만 내면 React 바인딩은 얇아짐. 낮음   |
+| 4   | **저장** — 서버에 저장                              | `saveFlow` + workspace(snapshot/diff/baseline/rebaseline) 품질 좋음                                   | 싱글톤 결합 제거 후 엔진 이식. 낮음                          |
+| 5   | **블랙박스 이식성** — 브라우저/node/셸              | agents 포크의 environment/http/storage 포트가 골격 절반                                               | 그래프 소유권 + Socket 포트 + Auth 포트 + AI Gen 어댑터 필요 |
+| 6   | **어댑터 패턴** — AI Gen, fetch(http/local), socket | LlmGateway ◎, HttpPort ◎, Socket ✗ (브라우저 Worker 훅), AI Gen은 백엔드 runNode 경유가 사실상의 경로 | SocketPort 신설이 핵심 신규 작업                             |
 
 ---
 
@@ -109,7 +126,7 @@
 
 ### 3.3 마이그레이션 로드맵
 
-- **Phase 0 — 순수 코드 이식 (리스크 없음).** `libs/engine` 신설, workspace/*·graphId·transformNodes·그래프 유틸 이식 + 스토어 결합 제거. 기존 코드는 re-export로 무중단.
+- **Phase 0 — 순수 코드 이식 (리스크 없음).** `libs/engine` 신설, workspace/\*·graphId·transformNodes·그래프 유틸 이식 + 스토어 결합 제거. 기존 코드는 re-export로 무중단.
 - **Phase 1 — 엔진 코어 + 브라우저 전환.** Document/GraphOps/History/Clipboard/Events 구현, `WorkflowCanvas`의 undo·redo·복붙·구조편집을 엔진 호출로 치환(스트랭글러). 복붙의 엣지 포함 문제도 함께 해결.
 - **Phase 2 — 영속화 포트 + Node 증명.** Repository(load/save/blocks) + HttpPort/AuthPort. **완료 조건: Node CLI에서 `load → 노드 추가 → undo → redo → save`가 도는 것.** 이게 되는 순간 블랙박스 모델은 증명된 것이다.
 - **Phase 3 — 소켓 + 에이전트 통합.** SocketPort(browser/node 어댑터), 실행 상태 리듀서, agents 포크의 CanvasBinding 교체 + 툴 확장. 이후 LLM 백엔드 프록시 게이트웨이를 붙이면 서버측 에이전트 실행까지 열린다.

@@ -11,13 +11,13 @@ move it) — the whole contract.
 
 ## Grounded primitives
 
-| Need                      | Primitive                                                                                                                              | Where                           |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| read nodes                | `useCanvasStore.getState()` (`nodes` + `connections`), returned as `{ nodes, edges }`                                                  | `createDesktopCanvasBinding.ts` |
-| edit one node (immediate) | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — guards `canModifyCanvas`, `saveCheckpoint()`s, then `setNodes`; no server call | `WorkflowCanvas.tsx`            |
-| the name field            | `NodeData.customLabel`, falling back to the block's definition label                                                                   | `NodeBlock.tsx`                 |
-| position                  | `NodeData.position` (`{ x, y }`)                                                                                                       | `@lemoncloud/eureka-flows-api`  |
-| the ref to reach          | `canvasRef` on the editor page; `<WorkflowCanvas>` mounted below it                                                                    | `FlowEditorPage.tsx`            |
+| Need                      | Primitive                                                                                                                                 | Where                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| read nodes                | `useCanvasStore.getState()` (`nodes` + `connections`), returned as `{ nodes, edges }`                                                     | `createDesktopCanvasBinding.ts` |
+| edit one node (immediate) | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — guards `canModifyCanvas`, then `engine.transact('agent:move', …)`; no server call | `WorkflowCanvas.tsx`            |
+| the name field            | `NodeData.customLabel`, falling back to the block's definition label                                                                      | `NodeBlock.tsx`                 |
+| position                  | `NodeData.position` (`{ x, y }`)                                                                                                          | `@lemoncloud/eureka-flows-api`  |
+| the ref to reach          | `canvasRef` on the editor page; `<WorkflowCanvas>` mounted below it                                                                       | `FlowEditorPage.tsx`            |
 
 **Precedent:** `useSocketHandlers` already writes to the canvas through this ref
 (`loadWorkflow` / `updateNodeFromServer`), so the seam is proven — the agent is the same pattern with a
@@ -32,14 +32,22 @@ that the source (linked above) makes concrete:
   a clear error if the canvas isn't mounted). Reads go straight to `useCanvasStore` and don't need the ref.
 - **`updateNode` shallow-merges**, so `position` is passed whole (never a partial axis), and `label` maps
   to `customLabel` — an empty string clears the override.
+- **The write lands in the engine, not the store.** `WorkflowCanvasRef.updateNode` calls
+  `engine.transact('agent:move', …)`, so an agent move checkpoints for undo exactly like a user drag and
+  travels in the next save body. Contrast `engine.applyRuntime`, which carries socket-borne run state
+  outside history and is dropped by `toSnapshot` — an agent edit must never take that path.
 
 ## Validation
 
-The seam is exercised by the shipped locator agent: once the flow has an id, `FlowEditorPage` mounts the
-`FlowAgentPanel` container, which builds this binding and drives the locator, handing the transcript to
-the pure right-docked `<AgentPanel>` view. A chat command like "move Fetch 10px right" flows agent →
-`updateNode` → the canvas re-renders immediately, with no server write. That proves the two things that
-matter: external (non-React) code reaching the live canvas, and frontend-only label/position edits.
+The seam is exercised by the shipped locator agent: in a DEV build, once the flow has an id,
+`FlowEditorPage` mounts the `FlowAgentPanel` container, which builds this binding and drives the locator,
+handing the transcript to the pure right-docked `<AgentPanel>` view. A chat command like "move Fetch 10px
+right" flows agent → `updateNode` → the canvas re-renders immediately, with no server write. That proves
+the two things that matter: external (non-React) code reaching the live canvas, and frontend-only
+label/position edits.
+
+The panel is `import.meta.env.DEV`-gated, matching the `/dev/agent-harness` route, because the shipped
+gateway is the offline command parser rather than a network-backed LLM.
 
 ## Note on reads
 
