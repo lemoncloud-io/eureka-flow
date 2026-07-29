@@ -1,4 +1,7 @@
-/** An agent turn's lifecycle phase; `error` is set when the turn throws. */
+/**
+ * An agent turn's lifecycle phase. The locator uses this subset because its moves apply
+ * live, with no approval gate; more phases join as approval-gated agents are added.
+ */
 export type AgentPhase = 'idle' | 'thinking' | 'done' | 'error';
 
 /** A single chat message the Panel renders from. */
@@ -31,7 +34,10 @@ export interface SessionStore {
 
 const emptySession = (flowId: string): SessionState => ({ flowId, messages: [], phase: 'idle' });
 
-/** A process-memory {@link SessionStore}, the default for tests and Node runs (the browser app persists via the Agent Environment's storage port; see `useAgentSession`). */
+/**
+ * A process-memory {@link SessionStore} — the default for tests and Node runs. The browser app
+ * persists its session through the Agent Environment's storage port instead (see `useAgentSession`).
+ */
 export const createInMemorySessionStore = (): SessionStore => {
     const sessions = new Map<string, SessionState>();
     return {

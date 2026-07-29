@@ -18,7 +18,6 @@ export interface FakeGateway extends LlmGateway {
     isExhausted(): boolean;
 }
 
-/** Build a {@link FakeGateway} that streams each scripted step's text and tool calls as {@link Chunk}s. */
 export const createFakeGateway = (script: FakeScriptStep[]): FakeGateway => {
     const calls: ChatRequest[] = [];
     let cursor = 0;
