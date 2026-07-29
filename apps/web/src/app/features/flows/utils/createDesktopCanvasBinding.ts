@@ -25,8 +25,9 @@ export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | nu
         },
 
         updateNode: (id, patch) => {
-            // `WorkflowCanvasRef.updateNode` shallow-merges, so nested objects must be
-            // passed whole — never a partial position.
+            // `WorkflowCanvasRef.updateNode` shallow-merges at node level, so nested objects must be
+            // passed whole — never a partial position, and `config` merged by us first (else it
+            // would replace the whole config object and drop untouched keys — e.g. A2's temperature).
             const updates: Partial<NodeData> = {};
             if (patch.label !== undefined) {
                 // '' clears the custom label → the node falls back to its definition label.
@@ -34,6 +35,12 @@ export const createDesktopCanvasBinding = (ref: RefObject<WorkflowCanvasRef | nu
             }
             if (patch.position) {
                 updates.position = patch.position;
+            }
+            if (patch.config) {
+                // Merge base from the live store (same source as readGraph) so a prior same-turn config
+                // write is honored; getWorkflow lags and would drop keys written earlier in the turn.
+                const current = useCanvasStore.getState().nodes?.find(n => n.id === id);
+                updates.config = { ...(current?.config ?? {}), ...patch.config };
             }
             canvas().updateNode(id, updates);
         },

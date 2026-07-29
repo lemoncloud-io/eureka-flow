@@ -70,7 +70,7 @@ export const AgentPanel = ({ session, onSend }: AgentPanelProps) => {
                 <div className="flex min-w-0 flex-col">
                     <span className="text-sm font-semibold text-foreground">{t('agentPanel.title', 'Assistant')}</span>
                     <span className="truncate text-[11px] text-muted-foreground">
-                        {t('agentPanel.subtitle', 'Move nodes with commands like move(Fetch, up, 10).')}
+                        {t('agentPanel.subtitle', 'Ask in plain language to move, align, rename, or configure nodes.')}
                     </span>
                 </div>
             </div>
@@ -81,7 +81,7 @@ export const AgentPanel = ({ session, onSend }: AgentPanelProps) => {
                     <div className="whitespace-pre-line pt-6 text-center text-xs text-muted-foreground/60">
                         {t(
                             'agentPanel.empty',
-                            'Type a command to move a node:\nmove(Fetch, up, 10)\nmove(Email, to, 100, 200)\nlist'
+                            'Ask in plain language, e.g.\n“nudge the input right a bit”\n“line the nodes up in one column”\n“rename the preview to Result”\n“set the generator model to Gemini 2.5 Pro”'
                         )}
                     </div>
                 ) : (
@@ -122,7 +122,7 @@ export const AgentPanel = ({ session, onSend }: AgentPanelProps) => {
                         onChange={e => setDraft(e.target.value)}
                         onKeyDown={onKeyDown}
                         rows={1}
-                        placeholder={t('agentPanel.placeholder', 'Move a node…')}
+                        placeholder={t('agentPanel.placeholder', 'Ask the assistant…')}
                         className="max-h-32 flex-1 resize-none bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
                     />
                     <button

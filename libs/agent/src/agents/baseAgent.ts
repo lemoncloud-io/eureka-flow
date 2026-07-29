@@ -2,27 +2,46 @@ import { createToolExecutor } from '../tools/toolExecutor';
 import { errorMessage } from '../utils/errors';
 
 import type { Agent, AgentConfig } from '../agent';
+import type { CanvasBinding } from '../canvas/canvasBinding';
+import type { CatalogLookup } from '../catalog';
 import type { ChatMessage, Chunk, LlmGateway } from '../llm/llmGateway';
-import type { Message, SessionStore } from '../session/session';
+import type { AgentGrant } from '../permissions';
+import type { Message, SessionState, SessionStore } from '../session/session';
 import type { ToolCall, ToolExecutor, ToolResult } from '../tools/types';
 
 /** Safety cap on think/act iterations per turn, if a subclass/caller doesn't set one. */
 export const DEFAULT_MAX_ITERATIONS = 8;
 
-/** Dependencies every agent needs to run a turn; a concrete agent extends this with its own seams. */
+/** Dependencies every agent needs to run a turn. */
 export interface BaseAgentDeps {
     gateway: LlmGateway;
     storage: SessionStore;
     flowId: string;
+    /** The live canvas seam every agent reads and (for writers) edits directly. */
+    binding: CanvasBinding;
+    /** The block catalog behind the read/config tools + validation. */
+    catalog: CatalogLookup;
+    /** The user's flow-role ceiling; the executor gates every capability tool against it, on top of each agent's own grant. */
+    userPermissions: AgentGrant;
     /** Defaults to a fresh {@link createToolExecutor}. */
     executor?: ToolExecutor;
     /** Safety cap on think/act iterations per turn. */
     maxIterations?: number;
+    /** Override the persona defaults (id/description/systemPrompt/grant). Tools are fixed by the agent. */
+    config?: Partial<Omit<AgentConfig, 'tools'>>;
+}
+
+/** One tool call drained from the stream: parsed `args` plus the `rawArgs` we persist. */
+export interface CollectedToolCall {
+    id: string;
+    name: string;
+    args: unknown;
+    rawArgs: string;
 }
 
 interface CollectedResponse {
     text: string;
-    toolCalls: { id: string; name: string; args: unknown; rawArgs: string }[];
+    toolCalls: CollectedToolCall[];
 }
 
 const safeJsonParse = (raw: string): unknown => {
@@ -86,36 +105,47 @@ const mapTranscript = (messages: Message[]): ChatMessage[] => {
 const resultToContent = (result: ToolResult): string =>
     result.ok ? JSON.stringify(result.data ?? { ok: true }) : JSON.stringify({ error: result.error });
 
-/**
- * Generic think/act turn engine shared by every agent: loop model → dispatch tool calls → feed
- * results back, until no more tool calls or the safety cap trips. A subclass supplies an
- * {@link AgentConfig} and optional per-turn {@link buildContextMessages}.
- */
+/** Generic think/act turn engine shared by every agent: loop model → dispatch tool calls → feed results back until no more calls or the safety cap trips. */
 export abstract class BaseAgent implements Agent {
     protected readonly gateway: LlmGateway;
     protected readonly storage: SessionStore;
     protected readonly flowId: string;
+    /** The live canvas seam — subclasses read it in {@link buildContextMessages} + wire it into tools. */
+    protected readonly binding: CanvasBinding;
+    /** The block catalog — behind the read/config tools + validation. */
+    protected readonly catalog: CatalogLookup;
+    /** The current user's flow-role ceiling; passed to the executor on every dispatch. */
+    protected readonly userPermissions: AgentGrant;
     protected readonly executor: ToolExecutor;
     protected readonly maxIterations: number;
-    /** Persona + tools + grant — what varies per agent. Supplied by the subclass. */
+    /** Persona + tools + grant — what varies per agent. The merge of the subclass `base` + `deps.config`. */
     protected readonly config: AgentConfig;
 
     /** Monotonic id counter for messages; seeded past the persisted transcript in {@link send}. */
     private seq = 0;
     private controller: AbortController | null = null;
 
-    constructor(deps: BaseAgentDeps, config: AgentConfig) {
+    /** @param base the subclass's persona defaults + fixed tools; `deps.config` overrides everything but `tools`. */
+    constructor(deps: BaseAgentDeps, base: AgentConfig) {
         this.gateway = deps.gateway;
         this.storage = deps.storage;
         this.flowId = deps.flowId;
+        this.binding = deps.binding;
+        this.catalog = deps.catalog;
+        this.userPermissions = deps.userPermissions;
         this.executor = deps.executor ?? createToolExecutor();
         this.maxIterations = deps.maxIterations ?? DEFAULT_MAX_ITERATIONS;
-        this.config = config;
+        this.config = { ...base, ...(deps.config ?? {}), tools: base.tools };
     }
 
     /** Per-turn dynamic context injected as system message(s) after the persona, recomputed each iteration. */
     protected buildContextMessages(): ChatMessage[] {
         return [];
+    }
+
+    /** Hook fired at each turn's start with its abort signal; a subclass that spawns children forwards it. */
+    protected onTurnSignal(_signal: AbortSignal): void {
+        // default: no children to forward to
     }
 
     private nextId(prefix: string): string {
@@ -126,7 +156,47 @@ export abstract class BaseAgent implements Agent {
         return Date.now();
     }
 
-    async send(text: string): Promise<void> {
+    /** Run one assistant message's tool calls and feed results back into the transcript. Serial by default; a subclass may override to run an independent batch concurrently. */
+    protected async runToolCalls(
+        calls: CollectedToolCall[],
+        assistantMsg: Message,
+        state: SessionState
+    ): Promise<void> {
+        for (const tc of calls) {
+            const result = await this.dispatchCall(tc);
+            this.recordToolResult(tc, result, assistantMsg, state);
+        }
+    }
+
+    /** Route one tool call through the executor (validate → grant + user-permission gate → provider). Never throws. */
+    protected dispatchCall(tc: CollectedToolCall): Promise<ToolResult> {
+        const call: ToolCall = { id: tc.id, name: tc.name, args: tc.args };
+        return this.executor.dispatch(this.config, call, this.userPermissions);
+    }
+
+    /** Patch the assistant tool-call status and append the tool-result message. */
+    protected recordToolResult(
+        tc: CollectedToolCall,
+        result: ToolResult,
+        assistantMsg: Message,
+        state: SessionState
+    ): void {
+        // Patch the recorded tool call's status on the assistant message (matched by id).
+        const recorded = assistantMsg.toolCalls?.find(c => c.id === tc.id);
+        if (recorded) {
+            recorded.status = result.ok ? 'ok' : 'error';
+        }
+        state.messages.push({
+            id: this.nextId('t'),
+            role: 'tool',
+            content: resultToContent(result),
+            toolCallId: tc.id,
+            ts: this.stamp(),
+        });
+        this.storage.save(state);
+    }
+
+    async send(text: string, opts?: { signal?: AbortSignal }): Promise<void> {
         const { storage, flowId, gateway, executor, config, maxIterations } = this;
 
         const existing = storage.load(flowId);
@@ -139,6 +209,13 @@ export abstract class BaseAgent implements Agent {
         this.seq = Math.max(this.seq, state.messages.length);
         this.controller = new AbortController();
         const { signal } = this.controller;
+        // Link a parent's signal (a spawned child) so the parent's abort() cancels this turn too.
+        const external = opts?.signal;
+        if (external) {
+            if (external.aborted) this.controller.abort();
+            else external.addEventListener('abort', () => this.controller?.abort(), { once: true });
+        }
+        this.onTurnSignal(signal);
 
         state.messages.push({ id: this.nextId('u'), role: 'user', content: text, ts: this.stamp() });
         state.phase = 'thinking';
@@ -184,23 +261,8 @@ export abstract class BaseAgent implements Agent {
                     state.messages.push(assistantMsg);
                     storage.save(state);
 
-                    for (const tc of res.toolCalls) {
-                        const call: ToolCall = { id: tc.id, name: tc.name, args: tc.args };
-                        const result = await executor.dispatch(config, call);
-                        // Patch the assistant message by stable reference (it is no longer the array's last element).
-                        const recorded = assistantMsg.toolCalls?.find(c => c.id === tc.id);
-                        if (recorded) {
-                            recorded.status = result.ok ? 'ok' : 'error';
-                        }
-                        state.messages.push({
-                            id: this.nextId('t'),
-                            role: 'tool',
-                            content: resultToContent(result),
-                            toolCallId: tc.id,
-                            ts: this.stamp(),
-                        });
-                        storage.save(state);
-                    }
+                    await this.runToolCalls(res.toolCalls, assistantMsg, state);
+                    // The turn ends only on a message with no tool calls; keep looping.
                     continue;
                 }
 

@@ -46,7 +46,7 @@ A single runtime contract addresses these issues by centralizing approved runtim
 frozen, all-`false` declaration of forbidden capabilities. It grants nothing at runtime; it
 records in the type system what the environment will not provide.
 
-**Out of scope for this slice** (not reachable through the environment):
+**Not reachable through the environment** (separate layers, or forbidden outright):
 
 Agent Panel · LlmGateway · ToolExecutor · Orchestrator · canvas mutation ·
 flow creation/switching · arbitrary JS execution · filesystem
@@ -137,7 +137,7 @@ The virtual environment is demonstrated through the test path rather than a UI s
 
 ```mermaid
 flowchart LR
-    FUTURE["Future agent components<br/>Orchestrator · ToolExecutor · gateways"]
+    FUTURE["Agent components<br/>Orchestrator · ToolExecutor · gateways"]
     ENV["Agent Environment<br/>(the only window)"]
     OK["Approved capabilities<br/>storage · tracing · time · cancellation"]
     NO["Not exposed ✗<br/>eval · Function constructor · filesystem<br/>arbitrary network · arbitrary script execution"]
@@ -160,12 +160,13 @@ interface. It does not sandbox all JavaScript running in the application.
       `flow_mosaic_agent_` (with `listKeys`/`clear` scoped to it), and memory storage passes the same
       shared contract spec.
 - [x] Trace reporter (noop + buffered) redacts secret-looking fields before any log sink.
-- [x] Typecheck clean and `npx nx test @flows/agent` passes (46 environment tests, within the lib's 133).
+- [x] Typecheck clean and `npx nx test @flows/agent` passes (the environment suite runs within the lib's full test run).
 
-## 9. Next step
+## 9. Status: connected
 
-Connect the Environment into the future Orchestrator/ToolExecutor execution context, so higher-level
-agent logic can use storage, tracing, time, and cancellation through the same runtime boundary.
+The Orchestrator/ToolExecutor stack now runs on this Environment: session state persists through its
+storage port and lifecycle events flow through its trace reporter, so higher-level agent logic uses
+storage, tracing, time, and cancellation through the same runtime boundary (see §11).
 
 ## 10. Build & compatibility
 
@@ -180,38 +181,45 @@ The Environment must be verified through the actual app flow — a real agent ru
 AgentPanel UI — **not** by the DevTools console and **not** by calling
 `runAgentEnvironmentSelfCheck()`. The app wires `createBrowserAgentEnvironment` into the agent
 session (`useAgentEnvironment`), persists session state through the Environment's storage port,
-and emits lifecycle/tool trace events via `withGatewayTracing` / `withExecutorTracing`. A
-dev-only harness route exercises this end-to-end with the fake LLM — no editor auth, no backend.
+and emits lifecycle trace events via `withGatewayTracing`. A dev-only harness route
+(`/dev/agent-harness`) exercises this by driving the **orchestrator** (via `useAgent`) over an
+in-memory canvas binding — no editor auth needed.
+
+The harness gateway is the backend-proxied `createGenerateApiLlmGateway` (its result arrives over
+the flow socket), the same gateway the real editor uses. Tool calls are still pending in the socket
+layer, so the run is **wired but not yet functional end-to-end** — the orchestrator turn is driven
+and the Environment ports (storage + tracing) are exercised, but the tool round-trip (e.g. an actual
+`move_node`) does not complete yet.
 
 Steps (real Chrome, dev server running):
 
 1. Open **`/dev/agent-harness`** (dev-only route; the observability panel is rendered by the app
    itself, not the console).
-2. In the AgentPanel, type any request and send. The fake LLM is scripted to emit a
-   `move_node` tool call (move the text-input node 10px right) regardless of the text.
-3. **Node moved:** the panel shows the text-input node go from **x=100 → x=110** (y unchanged).
-4. **Environment storage (real namespace):** in DevTools → Application → Local Storage →
+2. In the AgentPanel, type any request and send. The scenario asks the orchestrator to move the
+   text-input node right; the request drives an orchestrator turn through the Generate API gateway.
+3. **Environment storage (real namespace):** in DevTools → Application → Local Storage →
    the dev origin, confirm the key **`flow_mosaic_agent_session:agent-harness`** exists — written
    by the run itself, through `BrowserAgentStorage`. (Inspecting storage is passive observation,
    not console-triggering. The harness's own "storage keys" line shows it as `session:agent-harness`
    because the storage port strips the `flow_mosaic_agent_` prefix — same key.)
-5. **Trace events (real run):** the harness "trace events" list shows the actual lifecycle in
-   order: `agent.run.start → llm.chat.start → llm.chat.done → tool.dispatch → tool.result →
-llm.chat.start → llm.chat.done → agent.run.done`.
-6. **Persistence:** reload the page. The in-memory node resets to x=100 (the harness binding is
-   not persisted), but the **transcript reappears** — proof the session round-tripped through the
+4. **Trace events (real run):** the harness "trace events" list shows the run lifecycle emitted by
+   `withGatewayTracing` (`agent.run.start`, `llm.chat.start`, …) as the orchestrator turn is driven
+   through the Environment's trace reporter.
+5. **Persistence:** reload the page. The in-memory node resets (the harness binding is not
+   persisted), but the **transcript reappears** — proof the session round-tripped through the
    Environment storage.
 
 This verification does **not** call `runAgentEnvironmentSelfCheck()` and does **not** use the
-DevTools console to trigger behavior — the run is driven entirely from the AgentPanel UI. The
-same path runs in the real editor (`FlowEditorPage`), differing only in the canvas binding
-(desktop vs. in-memory) and the gateway (offline command gateway vs. fake).
+DevTools console to trigger behavior — the run is driven entirely from the AgentPanel UI. The same
+path runs in the real editor (`FlowEditorPage`, which mounts `FlowAgentPanel`), differing only in
+the canvas binding (desktop vs. in-memory); both drive the orchestrator over the same Generate API
+gateway.
 
 ### Follow-up (not in this PR)
 
 Automating this as a Playwright/Chromium test is a planned follow-up, not implemented here. The
 harness already exposes stable hooks for it — `data-testid` surfaces (`node-position`,
 `storage-keys`, `trace-events`) and a read-only `window.__flowAgentTrace()` snapshot (level +
-message + ts only, no payloads) — so the future spec can assert the three facts above
-(node x 100→110, the `flow_mosaic_agent_session:agent-harness` key, the ordered trace) without
-new app changes.
+message + ts only, no payloads) — so once the socket-layer tool round-trip lands, the future spec
+can assert the storage key (`flow_mosaic_agent_session:agent-harness`), the trace lifecycle, and
+the resulting node move without new app changes.

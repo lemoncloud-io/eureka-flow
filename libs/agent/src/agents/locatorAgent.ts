@@ -1,10 +1,8 @@
 import { BaseAgent } from './baseAgent';
-import { createCanvasToolProvider, listNodeLocations } from '../canvas/canvasTools';
-import { DEFAULT_STEP } from '../canvas/moveSemantics';
+import { createNodeMoveToolProvider, createNodeReadToolProvider, renderNodeContext } from '../tools/nodeTools';
 
 import type { BaseAgentDeps } from './baseAgent';
-import type { Agent, AgentConfig } from '../agent';
-import type { CanvasBinding } from '../canvas/canvasBinding';
+import type { Agent } from '../agent';
 import type { ChatMessage } from '../llm/llmGateway';
 
 /** The locator agent's persona. */
@@ -17,7 +15,7 @@ export const LOCATOR_SYSTEM_PROMPT = [
     '- To move a node, call `move_node` with the node id and EXACTLY ONE of `by` (relative delta) or `to` (absolute point).',
     '- Coordinates: origin is top-left; x increases to the right, y increases downward.',
     '  So right = +dx, left = -dx, up = -dy, down = +dy. Diagonals combine both axes.',
-    `- If the user gives no distance (e.g. "nudge it right", "move it up a bit"), use a default of ${DEFAULT_STEP}px and say so.`,
+    '- The distance is given to you: use the exact `by`/`to` in your instructions. Do NOT invent one — if no clear amount or destination is given, do not move; report the exact distance or target you need.',
     '- Match the node the user means by its label or type against the provided node list (case-insensitive).',
     '  If NO node matches, do not move anything — say you could not find it (you may list the nodes you can see).',
     '  If MORE THAN ONE node matches, do not guess — ask which one, listing the candidates.',
@@ -25,39 +23,19 @@ export const LOCATOR_SYSTEM_PROMPT = [
     '- After moving, confirm briefly what you moved and its new position.',
 ].join('\n');
 
-export interface LocatorAgentDeps extends BaseAgentDeps {
-    binding: CanvasBinding;
-    /** Override the agent config (id/description/systemPrompt/grant). Tools are always the locator provider. */
-    config?: Partial<Omit<AgentConfig, 'tools'>>;
-}
+/** The locator carries only the shared {@link BaseAgentDeps} (binding/catalog/config included); its tools are fixed. */
+export type LocatorAgentDeps = BaseAgentDeps;
 
-const renderNodeContext = (binding: CanvasBinding): string => {
-    const nodes = listNodeLocations(binding);
-    if (nodes.length === 0) {
-        return 'Current canvas: (no nodes).';
-    }
-    const lines = nodes.map(
-        n =>
-            `- id="${n.id}" type="${n.type}"${n.label ? ` label="${n.label}"` : ''} at (${n.position.x}, ${n.position.y})`
-    );
-    return `Current nodes on the canvas:\n${lines.join('\n')}`;
-};
-
-const buildLocatorConfig = (deps: LocatorAgentDeps): AgentConfig => ({
-    id: deps.config?.id ?? 'locator',
-    description: deps.config?.description ?? 'Moves existing nodes on the canvas.',
-    systemPrompt: deps.config?.systemPrompt ?? LOCATOR_SYSTEM_PROMPT,
-    grant: deps.config?.grant ?? { canModifyCanvas: true },
-    tools: [createCanvasToolProvider(deps.binding)],
-});
-
-/** Concrete agent that relocates canvas nodes: adds the canvas tools + persona and seeds the live node list each turn. */
+/** The move specialist: {@link BaseAgent} plus node read/move tools and per-turn node-list seeding. */
 export class LocatorAgent extends BaseAgent {
-    private readonly binding: CanvasBinding;
-
     constructor(deps: LocatorAgentDeps) {
-        super(deps, buildLocatorConfig(deps));
-        this.binding = deps.binding;
+        super(deps, {
+            id: 'locator',
+            description: 'Moves existing nodes on the canvas.',
+            systemPrompt: LOCATOR_SYSTEM_PROMPT,
+            grant: { canModifyCanvas: true },
+            tools: [createNodeReadToolProvider(deps.binding, deps.catalog), createNodeMoveToolProvider(deps.binding)],
+        });
     }
 
     /** Seed the model with the current node list before every model call. */

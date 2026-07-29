@@ -16,8 +16,8 @@ export interface AgentConfig {
 
 /** The turn surface the Panel drives. */
 export interface Agent {
-    /** Append the user message and run the whole turn to completion. */
-    send(text: string): Promise<void>;
+    /** Append the user message and run the whole turn; an optional signal cancels it (a spawned child inherits its parent's). */
+    send(text: string, opts?: { signal?: AbortSignal }): Promise<void>;
     /** Cancel the in-flight stream; moves already applied stay applied. */
     abort(): void;
 }

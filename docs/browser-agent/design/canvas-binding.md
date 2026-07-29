@@ -6,8 +6,10 @@
 > only. Shipped implementation:
 > [`createDesktopCanvasBinding.ts`](../../../apps/web/src/app/features/flows/utils/createDesktopCanvasBinding.ts).
 
-`readGraph` + `updateNode` are what the [locator agent](../agents/locator/SPEC.md) uses (find a node,
-move it) — the whole contract.
+`readGraph` + `updateNode` are the whole contract, shared by the orchestrator and its specialists.
+The [locator agent](../agents/locator.md) uses it to find a node and move it (`position`); the
+property specialist uses the same `updateNode` to rename (`label`) and set config (`config`). So the
+contract is move + rename + config — `NodePatch` is `{ label?, position?, config? }`.
 
 ## Grounded primitives
 
@@ -39,15 +41,17 @@ that the source (linked above) makes concrete:
 
 ## Validation
 
-The seam is exercised by the shipped locator agent: in a DEV build, once the flow has an id,
-`FlowEditorPage` mounts the `FlowAgentPanel` container, which builds this binding and drives the locator,
-handing the transcript to the pure right-docked `<AgentPanel>` view. A chat command like "move Fetch 10px
-right" flows agent → `updateNode` → the canvas re-renders immediately, with no server write. That proves
-the two things that matter: external (non-React) code reaching the live canvas, and frontend-only
-label/position edits.
+The seam is exercised by the shipped agents: in a DEV build, once the flow has an id, `FlowEditorPage`
+mounts the `FlowAgentPanel` container, which builds this binding and drives the orchestrator (which
+spawns the locator/property specialists), handing the transcript to the pure right-docked `<AgentPanel>`
+view. A chat command like "move Fetch 10px right" flows agent → `updateNode` → the canvas re-renders
+immediately, with no server write. That proves the two things that matter: external (non-React) code
+reaching the live canvas, and frontend-only label/position edits.
 
-The panel is `import.meta.env.DEV`-gated, matching the `/dev/agent-harness` route, because the shipped
-gateway is the offline command parser rather than a network-backed LLM.
+The panel is still `import.meta.env.DEV`-gated, matching the `/dev/agent-harness` route — no longer
+because the gateway is an offline parser (it is now the backend-proxied `createGenerateApiLlmGateway`),
+but because that gateway's generate receiver does not exist in the socket layer yet, so the panel is
+wired rather than functional end to end.
 
 ## Note on reads
 
