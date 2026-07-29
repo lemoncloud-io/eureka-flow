@@ -1,6 +1,9 @@
 # Where the graph lives
 
-A one-page map.
+A one-page map. · 한국어: [GUIDE.ko.md](GUIDE.ko.md)
+
+> Both versions say the same thing. When you change one, **change both** — otherwise the other
+> quietly becomes false. The published npm README links to this English one.
 
 > **First**: nothing moved on disk. Same server endpoints, same localStorage keys, same
 > IndexedDB. What changed is **who owns the graph in memory** and **who normalizes the load
