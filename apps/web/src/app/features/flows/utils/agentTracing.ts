@@ -1,18 +1,9 @@
-import type {
-    AgentConfig,
-    AgentTraceReporterSupportable,
-    ChatRequest,
-    Chunk,
-    LlmGateway,
-    ToolCall,
-    ToolExecutor,
-} from '@flows/agent';
+import type { AgentTraceReporterSupportable, ChatRequest, Chunk, LlmGateway } from '@flows/agent';
 
 /**
- * Trace decorators for the real agent run (environment wiring). The agent core stays
- * untouched: the gateway and executor are already injected seams, so lifecycle tracing is
- * layered on at wiring time. Payloads are never traced — only counts, names, and flags —
- * and the reporters additionally redact secret-looking fields on their side.
+ * Gateway trace decorator for the real agent run (environment wiring). The gateway is an injected seam,
+ * so lifecycle tracing is layered on at wiring time — payloads are never traced (only counts, names, and
+ * flags), and the reporters additionally redact secret-looking fields on their side.
  */
 
 /** Wrap a gateway so every chat turn emits llm.chat.start / llm.chat.done|error. */
@@ -37,16 +28,5 @@ export const withGatewayTracing = (gateway: LlmGateway, trace: AgentTraceReporte
             }
         }
         return traced();
-    },
-});
-
-/** Wrap an executor so every tool call emits tool.dispatch and tool.result (with ok/error). */
-export const withExecutorTracing = (executor: ToolExecutor, trace: AgentTraceReporterSupportable): ToolExecutor => ({
-    listTools: (agent: AgentConfig) => executor.listTools(agent),
-    dispatch: async (agent: AgentConfig, call: ToolCall) => {
-        trace.info('tool.dispatch', { name: call.name });
-        const result = await executor.dispatch(agent, call);
-        trace.info('tool.result', { name: call.name, ok: result.ok });
-        return result;
     },
 });

@@ -2,19 +2,22 @@
 
 In-browser flow agents for the Eureka Flow editor: chat agents that read your flow and edit it for you.
 The DOM-free core is `@flows/agent` (`libs/agent`); the editor wiring lives in
-`apps/web/src/app/features/flows/` (panel, hooks, desktop binding, command gateway).
+`apps/web/src/app/features/flows/` (panel, hooks, desktop binding, generate-API gateway).
 
 ## Architecture at a glance
 
-You talk to the **Panel**; one **Agent** owns the turn and is the only writer. It runs a think/act loop
-— ask the **LlmGateway**, run tool calls through the one **ToolExecutor** (which checks permissions),
-repeat until the model is done — and reaches the live canvas through a single seam, the
-**CanvasBinding**. The persisted **SessionState** is what the Panel renders from.
+You talk to the **Panel**, which drives the **orchestrator** — the main agent that owns the turn. The
+orchestrator runs a think/act loop — ask the **LlmGateway**, run tool calls through the one
+**ToolExecutor** (which checks permissions), repeat until the model is done — but carries no write tools
+of its own: it delegates edits by spawning **specialist** sub-agents (locator = move, property =
+config/rename) that reach the live canvas through a single shared seam, the **CanvasBinding**. The
+persisted **SessionState** is what the Panel renders from.
 
 ```
-Panel → Agent → LlmGateway (think)
-              → ToolExecutor → tools → CanvasBinding → live canvas (act)
-              → SessionState → Panel (render)
+Panel → Orchestrator → LlmGateway (think)
+                     → spawn → Specialists (locator / property)
+                                 → ToolExecutor → tools → CanvasBinding → live canvas (act)
+                     → SessionState → Panel (render)
 ```
 
 The full model — components, the turn loop, interfaces, permissions — is in
@@ -29,8 +32,13 @@ The full model — components, the turn loop, interfaces, permissions — is in
 
 **[agents/](agents/)** — the concrete agents.
 
-- [locator/SPEC.md](agents/locator/SPEC.md) — the **first shipped agent**: moves a node by chat, applied
-  live. One doc covering behavior and what shipped.
+The **orchestrator** is the entry agent the Panel talks to; it delegates every edit to two specialists —
+the **locator** (move) and the **property** (config/rename) — which it spawns over the shared
+CanvasBinding. The orchestrator and property models are covered in the design docs (start with
+[architecture.md](design/architecture.md)); the locator has its own SPEC:
+
+- [locator.md](agents/locator.md) — the **locator specialist** (move): a thin shipped-status
+  page; its behavior is specified canonically in the harness docs (`design/harness-*`).
 
 **[foundations/](foundations/)** — shared infrastructure, both built.
 
@@ -40,6 +48,7 @@ The full model — components, the turn loop, interfaces, permissions — is in
 
 ## Reading order
 
-New here? Read **[design/architecture.md](design/architecture.md)** (the shared model), then the shipped
-slice **[agents/locator/SPEC.md](agents/locator/SPEC.md)**; for the shared infra, the two
+New here? Read **[design/architecture.md](design/architecture.md)** (the shared model, including the
+orchestrator that owns the turn), then the locator specialist it spawns,
+**[agents/locator.md](agents/locator.md)**; for the shared infra, the two
 **[foundations/](foundations/)** docs. Package overview: [`libs/agent/README.md`](../../libs/agent/README.md).

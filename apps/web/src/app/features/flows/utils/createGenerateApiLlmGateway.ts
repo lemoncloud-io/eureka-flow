@@ -23,7 +23,7 @@ import type { ChatRequest, Chunk, LlmGateway } from '@flows/agent';
  *
  * This file lives in the app layer, not `libs/agent`, because it depends on the app's API
  * client (`@flows/web-core`) and on a socket/receiver concept the agent core knows nothing
- * about — same reasoning as `createCommandLlmGateway`.
+ * about.
  */
 
 /** Structural stand-in for the eventual real receiver (e.g. `ProxyTransportReceiver`). */

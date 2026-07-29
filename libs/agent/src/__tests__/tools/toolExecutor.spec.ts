@@ -35,6 +35,9 @@ const makeAgent = (tools: ToolProvider[], grant: AgentConfig['grant'] = {}): Age
 
 const call = (name: string, args: unknown): ToolCall => ({ id: 'c1', name, args });
 
+/** A permissive user ceiling for the cases that aren't about the user-permission gate (owner-level). */
+const anyPerms = { canModifyCanvas: true, canEditConfig: true };
+
 describe('createToolExecutor', () => {
     it('unions tool defs across an agent’s providers', async () => {
         const executor = createToolExecutor();
@@ -46,13 +49,13 @@ describe('createToolExecutor', () => {
     it('routes a call to the owning provider and returns its data', async () => {
         const executor = createToolExecutor();
         const agent = makeAgent([makeProvider([echoDef])]);
-        const result = await executor.dispatch(agent, call('echo', { msg: 'hi' }));
+        const result = await executor.dispatch(agent, call('echo', { msg: 'hi' }), anyPerms);
         expect(result).toEqual({ toolCallId: 'c1', ok: true, data: { echoed: 'hi' } });
     });
 
     it('errors on an unknown tool', async () => {
         const executor = createToolExecutor();
-        const result = await executor.dispatch(makeAgent([makeProvider([echoDef])]), call('nope', {}));
+        const result = await executor.dispatch(makeAgent([makeProvider([echoDef])]), call('nope', {}), anyPerms);
         expect(result.ok).toBe(false);
         expect(result.ok === false && result.error).toMatch(/unknown tool/);
     });
@@ -64,7 +67,7 @@ describe('createToolExecutor', () => {
             ran = true;
             return { toolCallId: c.id, ok: true };
         });
-        const result = await executor.dispatch(makeAgent([provider]), call('echo', { msg: 123 }));
+        const result = await executor.dispatch(makeAgent([provider]), call('echo', { msg: 123 }), anyPerms);
         expect(result.ok).toBe(false);
         expect(result.ok === false && result.error).toMatch(/invalid args/);
         expect(ran).toBe(false);
@@ -73,7 +76,7 @@ describe('createToolExecutor', () => {
     it('denies a tool whose required capability is not granted', async () => {
         const executor = createToolExecutor();
         const agent = makeAgent([makeProvider([mutateDef], c => ({ toolCallId: c.id, ok: true }))], {});
-        const result = await executor.dispatch(agent, call('do_mutate', {}));
+        const result = await executor.dispatch(agent, call('do_mutate', {}), anyPerms);
         expect(result.ok).toBe(false);
         expect(result.ok === false && result.error).toMatch(/permission denied/);
     });
@@ -83,7 +86,27 @@ describe('createToolExecutor', () => {
         const agent = makeAgent([makeProvider([mutateDef], c => ({ toolCallId: c.id, ok: true, data: 'done' }))], {
             canModifyCanvas: true,
         });
-        const result = await executor.dispatch(agent, call('do_mutate', {}));
+        const result = await executor.dispatch(agent, call('do_mutate', {}), anyPerms);
+        expect(result).toEqual({ toolCallId: 'c1', ok: true, data: 'done' });
+    });
+
+    it('denies a granted tool when the user is not permitted (the flow-role ceiling)', async () => {
+        const executor = createToolExecutor();
+        // The agent is BUILT to mutate (fixed grant), but the current user (a viewer) is not — R2.
+        const agent = makeAgent([makeProvider([mutateDef], c => ({ toolCallId: c.id, ok: true }))], {
+            canModifyCanvas: true,
+        });
+        const result = await executor.dispatch(agent, call('do_mutate', {}), {});
+        expect(result.ok).toBe(false);
+        expect(result.ok === false && result.error).toMatch(/permission denied/);
+    });
+
+    it('allows a granted tool only when BOTH the agent grant and the user permissions permit it', async () => {
+        const executor = createToolExecutor();
+        const agent = makeAgent([makeProvider([mutateDef], c => ({ toolCallId: c.id, ok: true, data: 'done' }))], {
+            canModifyCanvas: true,
+        });
+        const result = await executor.dispatch(agent, call('do_mutate', {}), { canModifyCanvas: true });
         expect(result).toEqual({ toolCallId: 'c1', ok: true, data: 'done' });
     });
 
@@ -92,7 +115,7 @@ describe('createToolExecutor', () => {
         const provider = makeProvider([echoDef], () => {
             throw new Error('boom');
         });
-        const result = await executor.dispatch(makeAgent([provider]), call('echo', { msg: 'x' }));
+        const result = await executor.dispatch(makeAgent([provider]), call('echo', { msg: 'x' }), anyPerms);
         expect(result).toEqual({ toolCallId: 'c1', ok: false, error: 'boom' });
     });
 });

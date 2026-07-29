@@ -1,15 +1,25 @@
+/**
+ * Locator agent-level scenarios (no orchestrator): drive the locator directly with a concrete task over a
+ * fake gateway and assert the live graph — the locator's definition of done
+ * (docs/browser-agent/agents/locator.md). Cross-agent behavior lives in integration.spec.ts; the
+ * real-model variant in locator.live.spec.ts.
+ */
 import { describe, expect, it } from 'vitest';
 
-import { createLocatorAgent } from '../../agents/locatorAgent';
-import { createInMemoryCanvasBinding } from '../../canvas/inMemoryCanvasBinding';
-import { createFakeGateway } from '../../llm/fakeGateway';
-import { createInMemorySessionStore } from '../../session/session';
+import { createLocatorAgent } from '../../../agents/locatorAgent';
+import { createInMemoryCanvasBinding } from '../../../canvas/inMemoryCanvasBinding';
+import { createFakeGateway } from '../../../llm/fakeGateway';
+import { createInMemorySessionStore } from '../../../session/session';
 
-import type { CanvasBinding } from '../../canvas/canvasBinding';
-import type { FakeScriptStep } from '../../llm/fakeGateway';
-import type { Chunk, LlmGateway } from '../../llm/llmGateway';
-import type { SessionState, SessionStore } from '../../session/session';
+import type { CanvasBinding } from '../../../canvas/canvasBinding';
+import type { CatalogLookup } from '../../../catalog';
+import type { FakeScriptStep } from '../../../llm/fakeGateway';
+import type { Chunk, LlmGateway } from '../../../llm/llmGateway';
+import type { SessionState, SessionStore } from '../../../session/session';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
+
+/** A no-op catalog — the locator only moves; describe_node is never exercised here. */
+const emptyCatalog: CatalogLookup = { has: () => false, schema: () => undefined, search: () => [] };
 
 const makeNode = (id: string, x = 0, y = 0, extra: Partial<NodeData> = {}): NodeData => ({
     id,
@@ -31,8 +41,11 @@ const setup = (
     const agent = createLocatorAgent({
         gateway,
         binding,
+        catalog: emptyCatalog,
         storage,
         flowId,
+        // Owner-level ceiling — so the `grant` arg (the agent's own grant) is what these tests gate on.
+        userPermissions: { canModifyCanvas: true, canEditConfig: true },
         config: grant ? { grant } : undefined,
         maxIterations: opts?.maxIterations,
     });
@@ -58,16 +71,6 @@ describe('locator agent — Story 1: relative nudge (headline)', () => {
         expect(state().phase).toBe('done');
         expect(lastAssistant()?.content).toMatch(/Fetch/);
         expect(gateway.isExhausted()).toBe(true);
-    });
-
-    it('does not move any other node', async () => {
-        const { agent, posOf } = setup(
-            [makeNode('n1', 200, 80, { customLabel: 'Fetch' }), makeNode('n2', 400, 400, { customLabel: 'Email' })],
-            [{ toolCalls: [{ name: 'move_node', args: { nodeId: 'n1', by: { dx: 10, dy: 0 } } }] }, { text: 'done' }]
-        );
-        await agent.send('move Fetch right 10');
-        expect(posOf('n1')).toEqual({ x: 210, y: 80 });
-        expect(posOf('n2')).toEqual({ x: 400, y: 400 });
     });
 });
 
@@ -107,25 +110,21 @@ describe('locator agent — Story 2: target not found', () => {
 });
 
 describe('locator agent — additional coverage', () => {
-    it('absolute move: put Email at (100, 100)', async () => {
-        const { agent, posOf } = setup(
-            [makeNode('e1', 300, 300, { customLabel: 'Email' })],
-            [{ toolCalls: [{ name: 'move_node', args: { nodeId: 'e1', to: { x: 100, y: 100 } } }] }, { text: 'ok' }]
-        );
-        await agent.send('put the Email node at x=100, y=100');
-        expect(posOf('e1')).toEqual({ x: 100, y: 100 });
-    });
-
-    it('vague amount uses the 20px default (model emits dy:-20)', async () => {
-        const { agent, posOf } = setup(
+    it('no distance given → moves nothing and asks for one (no default)', async () => {
+        // The locator no longer invents a distance (no DEFAULT_STEP). Given no amount it does not move — it
+        // replies asking for the exact distance. (Fake-scripted here; a real model is prompted to do this.)
+        const { agent, posOf, state, lastAssistant } = setup(
             [makeNode('n1', 50, 50, { customLabel: 'Fetch' })],
-            [
-                { toolCalls: [{ name: 'move_node', args: { nodeId: 'n1', by: { dx: 0, dy: -20 } } }] },
-                { text: 'nudged up 20px' },
-            ]
+            [{ text: 'How far should I nudge Fetch up? Give me an exact distance (e.g. 20px).' }]
         );
         await agent.send('nudge Fetch up');
-        expect(posOf('n1')).toEqual({ x: 50, y: 30 });
+        expect(posOf('n1')).toEqual({ x: 50, y: 50 }); // unchanged — no default applied
+        expect(state().phase).toBe('done');
+        const moves = state()
+            .messages.flatMap(m => m.toolCalls ?? [])
+            .filter(c => c.name === 'move_node');
+        expect(moves).toHaveLength(0); // never called move_node
+        expect(lastAssistant()?.content).toMatch(/distance|how far|exact/i);
     });
 
     it('ambiguous reference: model asks, nothing moves', async () => {
@@ -194,21 +193,6 @@ describe('locator agent — additional coverage', () => {
         expect(secondReqSystem).toMatch(/\(10, 0\)/);
     });
 
-    it('permission gate: without canModifyCanvas the move is denied and nothing changes', async () => {
-        const { agent, posOf, state } = setup(
-            [makeNode('n1', 200, 80, { customLabel: 'Fetch' })],
-            [
-                { toolCalls: [{ name: 'move_node', args: { nodeId: 'n1', by: { dx: 10, dy: 0 } } }] },
-                { text: 'I was not allowed to move it.' },
-            ],
-            { canModifyCanvas: false }
-        );
-        await agent.send('move Fetch right 10');
-        expect(posOf('n1')).toEqual({ x: 200, y: 80 });
-        const toolMsg = state().messages.find(m => m.role === 'tool');
-        expect(toolMsg?.content).toMatch(/permission denied/);
-    });
-
     it('persists the transcript to storage', async () => {
         const { agent, storage, flowId } = setup(
             [makeNode('n1', 0, 0, { customLabel: 'Fetch' })],
@@ -270,7 +254,14 @@ describe('locator agent — robustness (post-review fixes)', () => {
                 yield { done: true };
             },
         };
-        const agent = createLocatorAgent({ gateway, binding, storage, flowId: 'f' });
+        const agent = createLocatorAgent({
+            gateway,
+            binding,
+            catalog: emptyCatalog,
+            storage,
+            flowId: 'f',
+            userPermissions: { canModifyCanvas: true },
+        });
         doAbort = () => agent.abort();
 
         await agent.send('move it');
@@ -303,7 +294,14 @@ describe('locator agent — robustness (post-review fixes)', () => {
                 }
             },
         };
-        const agent = createLocatorAgent({ gateway, binding, storage, flowId: 'f' });
+        const agent = createLocatorAgent({
+            gateway,
+            binding,
+            catalog: emptyCatalog,
+            storage,
+            flowId: 'f',
+            userPermissions: { canModifyCanvas: true },
+        });
         doAbort = () => agent.abort();
 
         await agent.send('move it');
@@ -335,7 +333,14 @@ describe('locator agent — robustness (post-review fixes)', () => {
                 throw new Error('network boom');
             },
         };
-        const agent = createLocatorAgent({ gateway, binding, storage, flowId: 'f' });
+        const agent = createLocatorAgent({
+            gateway,
+            binding,
+            catalog: emptyCatalog,
+            storage,
+            flowId: 'f',
+            userPermissions: { canModifyCanvas: true },
+        });
         await agent.send('move it');
         const state = storage.load('f') as SessionState;
         expect(state.phase).toBe('error');

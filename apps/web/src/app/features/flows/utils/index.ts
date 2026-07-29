@@ -187,7 +187,6 @@ export const isValidConnection = (
 export { wouldCreateCycle } from './graph';
 export { captureCanvasAsDataUrl, captureCanvasForThumbnail, exportCanvasAsPng } from './exportImage';
 export { createDesktopCanvasBinding } from './createDesktopCanvasBinding';
-export { createCommandLlmGateway } from './createCommandLlmGateway';
 export { createGenerateApiLlmGateway } from './createGenerateApiLlmGateway';
 export type {
     CreateGenerateApiLlmGatewayOptions,
@@ -199,6 +198,7 @@ export type {
     GenerateRequestBody,
     GenerateResponse,
 } from './createGenerateApiLlmGateway';
+export { createBlockCatalogLookup } from './createBlockCatalogLookup';
 
 // ============================================================
 // Input File Upload Utilities
