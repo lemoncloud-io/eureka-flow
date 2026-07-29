@@ -203,9 +203,13 @@ export const useMobileSocketSync = ({
 
                 if (portData?.data) {
                     const portKey = portData.portId || portName || dir;
+                    // Merged, not assigned: `applyRuntime` replaces the field it is given, so a bare
+                    // `{ [portKey]: … }` would drop every sibling port. Read the owner from the engine
+                    // (the graph), not the store, which is only its projection.
+                    const owner = engine.getGraph().nodes.find(n => n.id === nodeId);
                     const updates = isOutputPort
-                        ? { outputData: { [portKey]: portData.data } }
-                        : { inputData: { [portKey]: portData.data } };
+                        ? { outputData: { ...owner?.outputData, [portKey]: portData.data } }
+                        : { inputData: { ...owner?.inputData, [portKey]: portData.data } };
                     engine.applyRuntime(nodeId, updates as Partial<NodeData>);
                 }
             } catch (err) {
