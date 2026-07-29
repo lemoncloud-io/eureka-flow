@@ -29,6 +29,7 @@ import { DesktopMobileSwitchCta } from '../components/DesktopMobileSwitchCta';
 import { DevGraphPanel } from '../components/DevGraphPanel';
 import { DevRoleChip } from '../components/DevRoleChip';
 import { DevSocketPanel } from '../components/DevSocketPanel';
+import { FlowAgentPanel } from '../components/FlowAgentPanel';
 import { FlowGraphView } from '../components/FlowGraphView';
 import { FlowListDialog } from '../components/FlowListDialog';
 import { Header } from '../components/Header';
@@ -742,228 +743,236 @@ export const FlowEditorPage = () => {
     }
 
     return (
-        <div className="relative h-screen bg-canvas text-foreground font-sans overflow-hidden animate-in fade-in duration-500">
-            {/* Full-screen Canvas */}
-            <div data-tour="canvas" className="absolute inset-0 editor-grain">
-                <WorkflowCanvas
-                    ref={canvasRef}
-                    role={role}
-                    flowId={currentFlowId}
-                    connectionId={socketConnectionId ?? undefined}
-                    onNodeSelect={handleSelectionChange}
-                    onChange={handleCanvasChange}
-                    onBeforeRun={handleBeforeRun}
-                    onOpenLibrary={handleOpenLibrary}
-                    onConnectionError={handleConnectionError}
-                    onShowNotification={showNotification}
-                    onAiKeyRequired={showDevTools ? () => setIsAiKeyDialogOpen(true) : undefined}
-                />
-            </div>
-
-            <ProductProgressBanner />
-
-            {/* Floating Header */}
-            <Header
-                flowInfo={{
-                    flowName,
-                    onNameChange: handleNameChange,
-                }}
-                fileActions={{
-                    onNew: handleNew,
-                    onSave: handleSave,
-                    onExport: handleExport,
-                    onExportPng: handleExportPng,
-                }}
-                editActions={{
-                    onUndo: () => canvasRef.current?.undo(),
-                    onRedo: () => canvasRef.current?.redo(),
-                    onAutoLayout: () => {
-                        canvasRef.current?.autoLayout();
-                        showNotification(t('flowEditor.autoLayoutApplied'), 'success');
-                    },
-                    onClear: handleClear,
-                    onSave: handleSave,
-                    onCollapseAll: () => canvasRef.current?.collapseAll(),
-                    onExpandAll: () => canvasRef.current?.expandAll(),
-                }}
-                saveState={{
-                    isSaving,
-                    lastSavedAt,
-                    isAutoSaveEnabled,
-                    onToggleAutoSave: toggleAutoSave,
-                    saveStatus,
-                    saveError,
-                    onRetrySave: retrySave,
-                }}
-                socketState={
-                    channelId
-                        ? {
-                              isConnected: isSocketConnected,
-                              connectionStatus: socketStatus,
-                              reconnectAttempts,
-                              maxReconnectReached,
-                              onReconnect: socketReconnect,
-                          }
-                        : undefined
-                }
-                isPublic={isPublic}
-                isPublicMode={isPublicMode}
-                role={role}
-                onTogglePublic={async () => {
-                    const success = await togglePublic();
-                    if (success) {
-                        showNotification(t('publish.unpublished', 'Flow unpublished'), 'success');
-                    }
-                }}
-                onPublish={handleOpenPublish}
-                onApiKeySettings={handleApiKeySettings}
-                onHelp={() => handleOpenHelp('gettingStarted')}
-                onTour={() => setTourPhase('guide')}
-                onOpenFlowList={handleOpenFlowList}
-                onRunAll={handleRunAll}
-                onGraphView={() => setIsGraphViewOpen(true)}
-                onVersionClick={handleVersionClick}
-                isDebugMode={isDebugMode}
-                onDisableDebugMode={isDebugMode ? disableDebugMode : undefined}
-            />
-
-            {/* Floating Sidebar */}
-            <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} role={role} />
-
-            <DesktopMobileSwitchCta />
-
-            {/* API Key Dialog */}
-            <ApiKeyDialog
-                open={isApiKeyDialogOpen}
-                onSubmit={handleApiKeySubmit}
-                onOpenChange={setIsApiKeyDialogOpen}
-                codesUrl={import.meta.env.VITE_CODES_URL}
-                initialValue={apiKey ?? undefined}
-            />
-
-            {/* Flow List Dialog */}
-            <FlowListDialog
-                open={isFlowListOpen}
-                onOpenChange={setIsFlowListOpen}
-                currentFlowId={currentFlowId}
-                onSelectFlow={handleSelectFlow}
-                onNewFlow={handleNew}
-            />
-
-            {/* Help Dialog */}
-            <HelpDialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen} defaultTab={helpDialogTab} />
-
-            {/* Publish Dialog */}
-            <PublishDialog
-                open={isPublishDialogOpen}
-                onOpenChange={setIsPublishDialogOpen}
-                flowName={flowName}
-                flowDescription={flowDescription}
-                flowThumbnail={flowThumbnail}
-                flowId={currentFlowId}
-                onPublish={publishFlow}
-                onCaptureCanvas={handleCaptureCanvas}
-            />
-
-            {/* AI Key Dialog (dev + debug mode) */}
-            {showDevTools && <AiKeyDialog open={isAiKeyDialogOpen} onOpenChange={setIsAiKeyDialogOpen} />}
-
-            {/* Graph View Overlay */}
-            {isGraphViewOpen && (
-                <div className="absolute inset-0 z-40 animate-in fade-in duration-200">
-                    <FlowGraphView
+        <div className="relative flex h-screen bg-canvas text-foreground font-sans overflow-hidden animate-in fade-in duration-500">
+            <div className="relative h-full min-w-0 flex-1 overflow-hidden">
+                {/* Full-screen Canvas */}
+                <div data-tour="canvas" className="absolute inset-0 editor-grain">
+                    <WorkflowCanvas
+                        ref={canvasRef}
+                        role={role}
                         flowId={currentFlowId}
-                        className="w-full h-full"
-                        onNavigateToNode={handleGraphNodeClick}
+                        connectionId={socketConnectionId ?? undefined}
+                        onNodeSelect={handleSelectionChange}
+                        onChange={handleCanvasChange}
+                        onBeforeRun={handleBeforeRun}
+                        onOpenLibrary={handleOpenLibrary}
+                        onConnectionError={handleConnectionError}
+                        onShowNotification={showNotification}
+                        onAiKeyRequired={showDevTools ? () => setIsAiKeyDialogOpen(true) : undefined}
                     />
-
-                    {/* Floating Close Button */}
-                    <div className="absolute top-3 right-3 z-10">
-                        <button
-                            onClick={() => setIsGraphViewOpen(false)}
-                            className="flex items-center gap-2 h-9 px-3 rounded-2xl bg-glass-bg backdrop-blur-2xl border border-border/40 shadow-floating text-muted-foreground hover:text-foreground transition-colors duration-150"
-                        >
-                            <X className="w-4 h-4" />
-                            <kbd className="text-[10px] font-mono border border-border/60 bg-muted/50 rounded px-1 py-0.5">
-                                ESC
-                            </kbd>
-                        </button>
-                    </div>
                 </div>
-            )}
 
-            {/* Dev Tools (hidden in production unless debug mode activated) */}
-            {showDevTools && (
-                <DevRoleChip
+                <ProductProgressBanner />
+
+                {/* Floating Header */}
+                <Header
+                    flowInfo={{
+                        flowName,
+                        onNameChange: handleNameChange,
+                    }}
+                    fileActions={{
+                        onNew: handleNew,
+                        onSave: handleSave,
+                        onExport: handleExport,
+                        onExportPng: handleExportPng,
+                    }}
+                    editActions={{
+                        onUndo: () => canvasRef.current?.undo(),
+                        onRedo: () => canvasRef.current?.redo(),
+                        onAutoLayout: () => {
+                            canvasRef.current?.autoLayout();
+                            showNotification(t('flowEditor.autoLayoutApplied'), 'success');
+                        },
+                        onClear: handleClear,
+                        onSave: handleSave,
+                        onCollapseAll: () => canvasRef.current?.collapseAll(),
+                        onExpandAll: () => canvasRef.current?.expandAll(),
+                    }}
+                    saveState={{
+                        isSaving,
+                        lastSavedAt,
+                        isAutoSaveEnabled,
+                        onToggleAutoSave: toggleAutoSave,
+                        saveStatus,
+                        saveError,
+                        onRetrySave: retrySave,
+                    }}
+                    socketState={
+                        channelId
+                            ? {
+                                  isConnected: isSocketConnected,
+                                  connectionStatus: socketStatus,
+                                  reconnectAttempts,
+                                  maxReconnectReached,
+                                  onReconnect: socketReconnect,
+                              }
+                            : undefined
+                    }
+                    isPublic={isPublic}
+                    isPublicMode={isPublicMode}
                     role={role}
-                    computedRole={computedRole}
-                    onOverride={setDevRoleOverride}
-                    onClose={isDebugMode ? disableDebugMode : undefined}
+                    onTogglePublic={async () => {
+                        const success = await togglePublic();
+                        if (success) {
+                            showNotification(t('publish.unpublished', 'Flow unpublished'), 'success');
+                        }
+                    }}
+                    onPublish={handleOpenPublish}
+                    onApiKeySettings={handleApiKeySettings}
+                    onHelp={() => handleOpenHelp('gettingStarted')}
+                    onTour={() => setTourPhase('guide')}
+                    onOpenFlowList={handleOpenFlowList}
+                    onRunAll={handleRunAll}
+                    onGraphView={() => setIsGraphViewOpen(true)}
+                    onVersionClick={handleVersionClick}
+                    isDebugMode={isDebugMode}
+                    onDisableDebugMode={isDebugMode ? disableDebugMode : undefined}
                 />
-            )}
-            {showDevTools && (
-                <DevSocketPanel
-                    messages={socketRecorder.messages}
-                    isRecording={socketRecorder.isRecording}
-                    replayState={socketRecorder.replayState}
-                    onToggleRecording={socketRecorder.toggleRecording}
-                    onClear={socketRecorder.clear}
-                    onReplay={msg => {
-                        resetSequenceTracking();
-                        const nodeId = msg.id.split(':')[0];
-                        canvasRef.current?.updateNodeFromServer(
-                            nodeId,
-                            { state: 'IDLE', status: 'IDLE' },
-                            { force: true }
-                        );
-                        replayMessage(msg);
-                    }}
-                    onReplayFromIndex={fromIndex => {
-                        resetSequenceTracking();
-                        resetAllNodesToIdle();
-                        socketRecorder.startReplayFromIndex(fromIndex, replayMessage);
-                    }}
-                    onStopReplay={() => {
-                        socketRecorder.stopReplaySequence();
-                        resetAllNodesToIdle();
-                    }}
-                    onResetNodes={() => {
-                        resetSequenceTracking();
-                        resetAllNodesToIdle();
-                    }}
-                    onMarkReplayed={socketRecorder.markReplayed}
+
+                {/* Floating Sidebar */}
+                <Sidebar ref={sidebarRef} onAddNode={handleAddNode} isLoading={isLoading} role={role} />
+
+                <DesktopMobileSwitchCta />
+
+                {/* API Key Dialog */}
+                <ApiKeyDialog
+                    open={isApiKeyDialogOpen}
+                    onSubmit={handleApiKeySubmit}
+                    onOpenChange={setIsApiKeyDialogOpen}
+                    codesUrl={import.meta.env.VITE_CODES_URL}
+                    initialValue={apiKey ?? undefined}
                 />
-            )}
 
-            {showDevTools && <DevGraphPanel onImport={handleDevImport} />}
+                {/* Flow List Dialog */}
+                <FlowListDialog
+                    open={isFlowListOpen}
+                    onOpenChange={setIsFlowListOpen}
+                    currentFlowId={currentFlowId}
+                    onSelectFlow={handleSelectFlow}
+                    onNewFlow={handleNew}
+                />
 
-            {/* Loading Overlay */}
-            {isLoading && (
-                <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-md animate-in fade-in duration-200">
-                    <div className="flex flex-col items-center bg-glass-bg backdrop-blur-2xl border border-border/40 rounded-2xl p-6 shadow-floating animate-in fade-in zoom-in-95 duration-200">
-                        <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin mb-3"></div>
-                        <span className="text-sm font-medium text-foreground">{t('flowEditor.processing')}</span>
+                {/* Help Dialog */}
+                <HelpDialog open={isHelpDialogOpen} onOpenChange={setIsHelpDialogOpen} defaultTab={helpDialogTab} />
+
+                {/* Publish Dialog */}
+                <PublishDialog
+                    open={isPublishDialogOpen}
+                    onOpenChange={setIsPublishDialogOpen}
+                    flowName={flowName}
+                    flowDescription={flowDescription}
+                    flowThumbnail={flowThumbnail}
+                    flowId={currentFlowId}
+                    onPublish={publishFlow}
+                    onCaptureCanvas={handleCaptureCanvas}
+                />
+
+                {/* AI Key Dialog (dev + debug mode) */}
+                {showDevTools && <AiKeyDialog open={isAiKeyDialogOpen} onOpenChange={setIsAiKeyDialogOpen} />}
+
+                {/* Graph View Overlay */}
+                {isGraphViewOpen && (
+                    <div className="absolute inset-0 z-40 animate-in fade-in duration-200">
+                        <FlowGraphView
+                            flowId={currentFlowId}
+                            className="w-full h-full"
+                            onNavigateToNode={handleGraphNodeClick}
+                        />
+
+                        {/* Floating Close Button */}
+                        <div className="absolute top-3 right-3 z-10">
+                            <button
+                                onClick={() => setIsGraphViewOpen(false)}
+                                className="flex items-center gap-2 h-9 px-3 rounded-2xl bg-glass-bg backdrop-blur-2xl border border-border/40 shadow-floating text-muted-foreground hover:text-foreground transition-colors duration-150"
+                            >
+                                <X className="w-4 h-4" />
+                                <kbd className="text-[10px] font-mono border border-border/60 bg-muted/50 rounded px-1 py-0.5">
+                                    ESC
+                                </kbd>
+                            </button>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Guided Tour: Guide → Block Tutorial */}
-            {tourPhase === 'guide' && (
-                <GuideTour
-                    onClose={() => {
-                        setTourPhase('block');
-                        sidebarRef.current?.open();
-                    }}
-                />
-            )}
-            {tourPhase === 'block' && (
-                <BlockTutorial
-                    onClose={() => {
-                        setTourPhase('none');
-                        sidebarRef.current?.close();
-                    }}
-                    onOpenHelp={() => handleOpenHelp('gettingStarted')}
-                />
+                {/* Dev Tools (hidden in production unless debug mode activated) */}
+                {showDevTools && (
+                    <DevRoleChip
+                        role={role}
+                        computedRole={computedRole}
+                        onOverride={setDevRoleOverride}
+                        onClose={isDebugMode ? disableDebugMode : undefined}
+                    />
+                )}
+                {showDevTools && (
+                    <DevSocketPanel
+                        messages={socketRecorder.messages}
+                        isRecording={socketRecorder.isRecording}
+                        replayState={socketRecorder.replayState}
+                        onToggleRecording={socketRecorder.toggleRecording}
+                        onClear={socketRecorder.clear}
+                        onReplay={msg => {
+                            resetSequenceTracking();
+                            const nodeId = msg.id.split(':')[0];
+                            canvasRef.current?.updateNodeFromServer(
+                                nodeId,
+                                { state: 'IDLE', status: 'IDLE' },
+                                { force: true }
+                            );
+                            replayMessage(msg);
+                        }}
+                        onReplayFromIndex={fromIndex => {
+                            resetSequenceTracking();
+                            resetAllNodesToIdle();
+                            socketRecorder.startReplayFromIndex(fromIndex, replayMessage);
+                        }}
+                        onStopReplay={() => {
+                            socketRecorder.stopReplaySequence();
+                            resetAllNodesToIdle();
+                        }}
+                        onResetNodes={() => {
+                            resetSequenceTracking();
+                            resetAllNodesToIdle();
+                        }}
+                        onMarkReplayed={socketRecorder.markReplayed}
+                    />
+                )}
+
+                {showDevTools && <DevGraphPanel onImport={handleDevImport} />}
+
+                {/* Loading Overlay */}
+                {isLoading && (
+                    <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center backdrop-blur-md animate-in fade-in duration-200">
+                        <div className="flex flex-col items-center bg-glass-bg backdrop-blur-2xl border border-border/40 rounded-2xl p-6 shadow-floating animate-in fade-in zoom-in-95 duration-200">
+                            <div className="w-8 h-8 border-2 border-border/40 border-t-primary rounded-full animate-spin mb-3"></div>
+                            <span className="text-sm font-medium text-foreground">{t('flowEditor.processing')}</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Guided Tour: Guide → Block Tutorial */}
+                {tourPhase === 'guide' && (
+                    <GuideTour
+                        onClose={() => {
+                            setTourPhase('block');
+                            sidebarRef.current?.open();
+                        }}
+                    />
+                )}
+                {tourPhase === 'block' && (
+                    <BlockTutorial
+                        onClose={() => {
+                            setTourPhase('none');
+                            sidebarRef.current?.close();
+                        }}
+                        onOpenHelp={() => handleOpenHelp('gettingStarted')}
+                    />
+                )}
+            </div>
+            {/* Dev-only: the shipped gateway is the offline command parser, not a real LLM — keep it
+                out of production bundles until a network-backed gateway lands. Same gate as the
+                /dev/agent-harness route in app.tsx. */}
+            {import.meta.env.DEV && currentFlowId && (
+                <FlowAgentPanel canvasRef={canvasRef} flowId={currentFlowId} permissions={permissions} />
             )}
         </div>
     );

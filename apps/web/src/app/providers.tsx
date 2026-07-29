@@ -65,7 +65,10 @@ const isPublicRoute = (): boolean => {
         pathname === '/tutorial' ||
         pathname.startsWith('/flows/') ||
         pathname.startsWith('/policy/') ||
-        pathname.startsWith('/auth/')
+        pathname.startsWith('/auth/') ||
+        // Dev-only: the agent environment harness needs no editor auth (fake LLM, in-memory
+        // canvas) — real app/editor routes are unaffected, and this never exists in a prod build.
+        (import.meta.env.DEV && pathname === '/dev/agent-harness')
     );
 };
 
