@@ -96,6 +96,6 @@ reverted-and-reproduced check: `docs/engine/PLAN.md` §14.
 Verified consumer matrix (packed tarball, v0.1.0): CJS + `node10`, CJS + `nodenext`, and
 ESM + `nodenext` all typecheck clean and load at runtime.
 
-**Full guide:** [`docs/engine/GUIDE.md`](https://github.com/lemoncloud-io/eureka-flow/blob/develop/docs/engine/GUIDE.md)
+**Full guide:** [`docs/engine/GUIDE.md`](https://github.com/lemoncloud-io/eureka-flow/blob/e2402f1/docs/engine/GUIDE.md)
 — where the graph lives, the load → edit → save path, the platform table, and how to script it
 from Node.
