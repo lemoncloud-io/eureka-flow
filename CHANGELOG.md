@@ -1,5 +1,94 @@
 # Changelog
 
+## [2026-07-29] - root@0.66.0, @flows/web@0.66.0, @flows/admin@0.40.0
+
+### Features
+
+- (mobile) route every mobile graph write through the engine
+- (mobile) load the mobile editor's graph through the engine, so port values arrive
+- (engine) publish the engine as @lemoncloud/flow-engine, ESM and CJS from one source
+- (engine) let the host supply the UUID source, so the engine reaches every runtime
+- (engine) the repository keeps what the load response says about the flow
+- (engine) carry the connection id, so a headless run can be streamed back
+- (engine) connect the socket adapter in --real, and stop it writing by default
+- (engine) headless execution — frame parser, run session, runNode (Phase 4)
+- (engine) socket port and the execution state reducer (Phase 3, in-repo half)
+- (engine) persistence ports and the headless Node proof (Phase 2)
+- (engine) implement the FlowEngine core (Phase 1, P1-1)
+
+### Bug Fixes
+
+- (engine) export the socket port, and read the agent's canvas from the engine
+- (engine) report a run against the node, and keep the status on a non-JSON error body
+- (mobile) merge the port map instead of replacing it on a socket port update
+- (mobile) stop the empty-state quick-add offering the same block twice
+- (engine) give adapters a barrel, and stop pointing at a function the package doesn't ship
+- (engine) run the published package before calling it published
+- (engine) build request URLs without URL, which React Native cannot be trusted for
+- (engine) the block registry was keyed on a field the server never sends
+- (engine) a run reset names the node, and the run session carries it out
+- (flows) a connected input takes what its source is producing now
+- (engine) settle the waiters a closing session drops, and stop copying the whole graph
+- (web) typecheck reaches zero
+- (web) carry the graph's guarantees into the components
+- (libs) every library now emits declarations
+- (build) align lib tsconfigs with the workspace, clearing two known defects
+- (flows) read getWorkflow from the engine, not the render closure
+
+### Documentation
+
+- (engine) point the README guide link back at develop
+- (engine) pin the README guide link to a resolvable commit
+- reconcile the engine and agent docs with what the merge actually did
+- (engine) document the edit/runtime split and the load ingress
+- retract the "mobile has no engine" notes — it does now
+- (engine) tell consumers the two things that will otherwise cost them an afternoon
+- say that the mobile editor is not on the engine
+- (engine) name the published specifier where a reader outside the repo will copy it
+- (engine) record the three places this landed differently from the plan
+- (engine) say what the package actually installs, and link a branch that has the guide
+- (engine) the browser smoke ran, and it showed the load ingress working
+- (engine) close the two ports that were deferred and then forgotten
+- (readme) put the engine on the dependency diagram
+- the store is a projection, not the graph's home
+- (engine) add a one-page map of where the graph lives
+- (engine) record that the channelId wire was removed, and what it was doing
+- (engine) correct the channelId finding — it was never a server contract issue
+- (engine) unbreak the section numbering, and record Phases 5-6 in the checklist
+- (engine) correct the half-adopted claim — the rules were already shared
+- (engine) record Phase 6 — what the real server found that the stub hid
+- (engine) retitle PLAN for Phase 0-5
+- (engine) record Phase 5 — three rule slices, and what stays gated
+- (engine) record the stale-input defect, with its reproduction
+- (engine) retitle PLAN for Phase 0-2 and note Phase 3 is unspecified
+- (engine) add flow engine design doc and phase 0-1 execution plan
+
+### Refactor
+
+- (flows) drop the channelId wire, and name the default channel where it is used
+- (flows) the load response port row is the engine's, plus what the client adds
+- (engine) loadGraph is the single ingress, ports and propagation included
+- (engine) decode the HTTP node view where the socket one is decoded
+- (flows) drop the override nobody passed, and share the hydrator
+- (engine) let the engine's types and rules have one home each
+- (graph) the graph guarantees its nodes have ids
+- (socket) test the dispatch path, and restore a guard the strangler dropped
+- (flows) hand the canvas graph to the engine (Phase 1, P1-2/P1-3)
+- (engine) extract headless graph core into @flows/engine (Phase 0)
+
+### Chores
+
+- (merge) develop into mobile-engine
+- (merge) develop into mobile-engine
+- ignore npm pack tarballs
+
+### Other
+
+- ci: (engine) publish on develop merge, gated on the version being new
+- ci: (engine) add a publish workflow, and declare the tools prepack was borrowing
+- test: (engine) cover the request timeout, the last untested platform global
+- style: (socket) group the parsed frame payloads with the messages they come from
+
 ## [2026-07-29] - root@0.65.0, @flows/web@0.65.0, @flows/admin@0.39.0
 
 ### Features
