@@ -2,11 +2,13 @@ import { createPortal } from 'react-dom';
 
 import { useLoaderStore } from '../hooks/useGlobalLoader';
 
+import type { ReactElement } from 'react';
+
 /**
  * Full-screen loading overlay rendered via portal
  * Uses the global loader store for visibility control
  */
-export const GlobalLoader = (): JSX.Element | null => {
+export const GlobalLoader = (): ReactElement | null => {
     const isLoading = useLoaderStore(state => state.isLoading);
 
     if (!isLoading) return null;

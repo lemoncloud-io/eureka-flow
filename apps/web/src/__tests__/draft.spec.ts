@@ -9,7 +9,7 @@ import {
     useFlowsStore,
 } from '@flows/flows';
 
-import type { BlockDefinitionWithFrontend, FlowDraft } from '@flows/flows';
+import type { BlockDefinitionWithFrontend, FlowDraft, GraphNode } from '@flows/flows';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 // Keyed by type, and also by id — the registry does both, because the load API hands back
@@ -20,9 +20,9 @@ const registry = {
 } as unknown as Record<string, BlockDefinitionWithFrontend>;
 
 const node = (id: string, over: Partial<NodeData> = {}) =>
-    ({ id, type: 'text-input', position: { x: 0, y: 0 }, config: {}, ...over }) as NodeData;
+    ({ id, type: 'text-input', position: { x: 0, y: 0 }, config: {}, ...over }) as GraphNode;
 
-const snap = (nodes: NodeData[]) => toSnapshot({ nodes, connections: [] }, registry);
+const snap = (nodes: GraphNode[]) => toSnapshot({ nodes, connections: [] }, registry);
 
 describe('draftFor', () => {
     beforeEach(() => {

@@ -71,7 +71,7 @@ export const useFlowExecution = (stageId: string) => {
                     try {
                         const updated = await loadFlow(flowId);
                         const nodes = updated.nodes ?? [];
-                         
+
                         const getStatus = (n: { status?: string; state?: string }) =>
                             (n.status ?? n.state ?? '') as string;
 
@@ -86,8 +86,14 @@ export const useFlowExecution = (stageId: string) => {
 
                         if (hasError) {
                             const errorNode = nodes.find(n => getStatus(n) === 'ERROR');
-                            setState({ status: 'error', error: `Node "${errorNode?.name ?? 'unknown'}" failed` });
-                            createNote(`Flow 실행 실패: ${errorNode?.name ?? 'unknown'} 노드에서 오류 발생`, 'issue');
+                            setState({
+                                status: 'error',
+                                error: `Node "${errorNode?.customLabel ?? errorNode?.type ?? 'unknown'}" failed`,
+                            });
+                            createNote(
+                                `Flow 실행 실패: ${errorNode?.customLabel ?? errorNode?.type ?? 'unknown'} 노드에서 오류 발생`,
+                                'issue'
+                            );
                             return;
                         }
 

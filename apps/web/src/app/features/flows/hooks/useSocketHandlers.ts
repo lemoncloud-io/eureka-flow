@@ -3,9 +3,26 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { EXECUTE_FUNCTIONS, captureBaseline, getNode, getPortData, translateField, useCanvasStore } from '@flows/flows';
+import {
+    emptyExecutionState,
+    reduceNodeEvent,
+    reducePortEvent,
+    reduceProgressEvent,
+    rollbackNodeCursor,
+    rollbackPortCursor,
+} from '@flows/engine';
+import {
+    EXECUTE_FUNCTIONS,
+    captureBaseline,
+    getNode,
+    getPortData,
+    toDataPacket,
+    translateField,
+    useCanvasStore,
+} from '@flows/flows';
 
 import type { WorkflowCanvasRef } from '../components/WorkflowCanvas';
+import type { ExecutionState } from '@flows/engine';
 import type { BlockDefinitionWithFrontend } from '@flows/flows';
 import type {
     LogTraceEntryInfo,
@@ -42,11 +59,9 @@ export const useSocketHandlers = ({
     loadFlowById,
 }: UseSocketHandlersParams) => {
     const { t } = useTranslation(['flows', 'blocks']);
-    const nodeNoRef = useRef<Map<string, number>>(new Map());
-    const nodeRunIdRef = useRef<Map<string, string>>(new Map());
-    const portNoRef = useRef<Map<string, number>>(new Map());
-    const portRunIdRef = useRef<Map<string, string>>(new Map());
-    const progressSeqRef = useRef<Map<string, number>>(new Map());
+    // Message ordering lives in the engine's reducer now — see `runtime/executionReducer`.
+    // It used to be five Maps in here, and none of it had a test.
+    const executionRef = useRef<ExecutionState>(emptyExecutionState());
     const highlightTimeoutsRef = useRef<Map<string, number>>(new Map());
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
 
@@ -79,122 +94,98 @@ export const useSocketHandlers = ({
 
     const handleNodeUpdate = useCallback(
         async (info: NodeUpdateInfo) => {
-            const { nodeId, flowId, isPort, parentNodeId, state, progress, no, stage, error } = info;
-
-            // Node messages may omit flowId — channel subscription already filters by flow
-            if (flowId && flowId !== currentFlowId) return;
-
-            // Reset sequence tracking and node state when runId changes (new execution run)
-            // Without this, state priority (COMPLETED > RUNNING) blocks re-execution updates
-            const { runId } = info;
-            if (runId) {
-                const prevRunId = nodeRunIdRef.current.get(nodeId);
-                if (prevRunId && prevRunId !== runId) {
-                    nodeNoRef.current.delete(nodeId);
-                    // progress seq is per-run: a new run's reporter restarts at low seq
-                    progressSeqRef.current.delete(nodeId);
-                    canvasRef.current?.updateNodeFromServer(nodeId, { state: 'IDLE', status: 'IDLE' }, { force: true });
-                }
-                nodeRunIdRef.current.set(nodeId, runId);
-            }
-
-            if (no !== undefined) {
-                const prevNo = nodeNoRef.current.get(nodeId);
-                if (prevNo !== undefined && prevNo >= no) return;
-                nodeNoRef.current.set(nodeId, no);
-            }
-
+            // The reducer owns ordering: stale sequences, run changes, cross-flow frames.
+            // What is left here is the part that needs a browser — toasts, a fetch, a canvas.
+            const { state: nextState, effects } = reduceNodeEvent(executionRef.current, info, { currentFlowId });
+            executionRef.current = nextState;
             if (!canvasRef.current) return;
 
-            // New execution starting: clear trace logs
-            if (state === 'RUNNING' && no !== undefined && no <= 1) {
-                clearTraceLogs(nodeId);
-            }
+            // Filled by the fetch effect, which the reducer emits before the patch it belongs to.
+            let fetchedError: string | undefined;
 
-            if (runId) {
-                if (stage === 'enter' || (state === 'RUNNING' && !stage)) {
-                    beginRun(runId, nodeId, Date.now());
-                }
-                if (state === 'COMPLETED' || state === 'ERROR') {
-                    finalizeRun(runId, nodeId, state, Date.now(), error);
-                }
-            }
+            for (const effect of effects) {
+                switch (effect.type) {
+                    case 'reset-node':
+                        canvasRef.current.updateNodeFromServer(
+                            effect.nodeId,
+                            { state: 'IDLE', status: 'IDLE' },
+                            { force: true }
+                        );
+                        break;
 
-            if (isPort && parentNodeId) {
-                if (state) {
-                    canvasRef.current.updateNodeFromServer(parentNodeId, { state, status: state });
-                }
-                return;
-            }
+                    case 'clear-traces':
+                        clearTraceLogs(effect.nodeId);
+                        break;
 
-            if (state === 'ERROR') {
-                let errMsg = error;
-                if (stage !== 'final') {
-                    try {
-                        const nodeData = await getNode(nodeId);
-                        errMsg = nodeData.error ?? nodeData.errorMessage;
-                    } catch {
-                        if (no !== undefined) {
-                            const prevNo = nodeNoRef.current.get(nodeId);
-                            if (prevNo === no) nodeNoRef.current.delete(nodeId);
+                    case 'run-begin':
+                        beginRun(effect.runId, effect.nodeId, Date.now());
+                        break;
+
+                    case 'run-end':
+                        finalizeRun(effect.runId, effect.nodeId, effect.state, Date.now(), effect.error);
+                        break;
+
+                    case 'fetch-error-detail':
+                        try {
+                            const nodeData = await getNode(effect.nodeId);
+                            fetchedError = nodeData.error ?? nodeData.errorMessage;
+                        } catch {
+                            // Give the sequence back so the server's next attempt is not
+                            // mistaken for a stale frame and dropped.
+                            if (info.no !== undefined) {
+                                executionRef.current = rollbackNodeCursor(executionRef.current, effect.nodeId, info.no);
+                            }
                         }
+                        break;
+
+                    case 'apply':
+                        canvasRef.current.updateNodeFromServer(effect.nodeId, {
+                            ...effect.patch,
+                            ...(fetchedError === undefined ? {} : { error: fetchedError, errorMessage: fetchedError }),
+                        });
+                        break;
+
+                    case 'notify': {
+                        const displayName = getNodeDisplayName(effect.nodeId, canvasRef, blockRegistry, t);
+                        const detail = fetchedError ?? effect.message;
+                        if (effect.level === 'error') {
+                            toast.error(`${displayName} failed`, {
+                                description: detail ? String(detail).slice(0, 80) : undefined,
+                                duration: 8000,
+                            });
+                        } else {
+                            toast.success(`${displayName} completed`, { duration: 4000 });
+                        }
+                        break;
                     }
+
+                    case 'maybe-autorun': {
+                        // Frontend blocks run in the browser, so only the browser can decide
+                        // whether this one is ready to.
+                        const node = canvasRef.current.getWorkflow()?.nodes?.find(n => n.id === effect.nodeId);
+                        if (!node?.type) break;
+                        const nodeDef = blockRegistry[node.type];
+                        if (!nodeDef?.isFrontend || !EXECUTE_FUNCTIONS[nodeDef.type]) break;
+                        if (nodeDef.stereo === 'input') break;
+                        const hasAllInputs = (nodeDef.inputs ?? []).every(
+                            input => node.inputData?.[input.id]?.value !== undefined
+                        );
+                        if (!hasAllInputs) break;
+                        setTimeout(() => canvasRef.current?.executeNode(effect.nodeId), 0);
+                        break;
+                    }
+
+                    default:
+                        break;
                 }
-                canvasRef.current.updateNodeFromServer(nodeId, {
-                    state,
-                    status: state,
-                    error: errMsg,
-                    errorMessage: errMsg,
-                });
-
-                const displayName = getNodeDisplayName(nodeId, canvasRef, blockRegistry, t);
-                toast.error(`${displayName} failed`, {
-                    description: errMsg ? String(errMsg).slice(0, 80) : undefined,
-                    duration: 8000,
-                });
-                return;
             }
-
-            const isTerminal = state === 'COMPLETED' || state === 'ERROR';
-            const executionStats =
-                state === 'RUNNING'
-                    ? { startTime: Date.now(), duration: 0, progress: progress ?? 0 }
-                    : isTerminal
-                      ? { progress: progress ?? 100 }
-                      : progress !== undefined
-                        ? { progress }
-                        : undefined;
-
-            canvasRef.current.updateNodeFromServer(nodeId, { state, status: state, executionStats });
-
-            if (state === 'COMPLETED') {
-                const displayName = getNodeDisplayName(nodeId, canvasRef, blockRegistry, t);
-                toast.success(`${displayName} completed`, { duration: 4000 });
-            }
-
-            if (state !== 'READY') return;
-
-            const workflow = canvasRef.current.getWorkflow();
-            const node = workflow?.nodes?.find(n => n.id === nodeId);
-            if (!node?.type) return;
-
-            const nodeDef = blockRegistry[node.type];
-            if (!nodeDef?.isFrontend || !EXECUTE_FUNCTIONS[nodeDef.type]) return;
-            if (nodeDef.stereo === 'input') return;
-
-            const hasAllInputs = (nodeDef.inputs ?? []).every(input => node.inputData?.[input.id]?.value !== undefined);
-            if (!hasAllInputs) return;
-
-            setTimeout(() => canvasRef.current?.executeNode(nodeId), 0);
         },
         [blockRegistry, currentFlowId, clearTraceLogs, beginRun, finalizeRun, canvasRef, t]
     );
 
     const handlePortUpdate = useCallback(
         async (info: PortUpdateInfo) => {
-            const { portId, nodeId, flowId, portName, no, runId, ts } = info;
-
-            if (flowId && flowId !== currentFlowId) return;
+            const { portId, nodeId, flowId, portName, no, runId } = info;
 
             if (runId && no !== undefined) {
                 appendRunPortUpdate(runId, nodeId, {
@@ -205,21 +196,11 @@ export const useSocketHandlers = ({
                 });
             }
 
-            // Reset port sequence tracking when runId changes (new execution run)
-            if (runId) {
-                const prevRunId = portRunIdRef.current.get(portId);
-                if (prevRunId !== runId) {
-                    portNoRef.current.delete(portId);
-                    portRunIdRef.current.set(portId, runId);
-                }
-            }
-
-            if (no !== undefined) {
-                const prevNo = portNoRef.current.get(portId);
-                // ts = server signals fresh data, skip dedup
-                if (!ts && prevNo !== undefined && prevNo >= no) return;
-                portNoRef.current.set(portId, no);
-            }
+            // Cross-flow frames, run changes and stale sequences — including the `ts`
+            // freshness override — are the reducer's call.
+            const { state: nextState, effects } = reducePortEvent(executionRef.current, info, { currentFlowId });
+            executionRef.current = nextState;
+            if (effects.length === 0) return;
 
             const existingTimeout = highlightTimeoutsRef.current.get(portId);
             if (existingTimeout) window.clearTimeout(existingTimeout);
@@ -239,7 +220,7 @@ export const useSocketHandlers = ({
                 const nodeInCanvas = workflow?.nodes?.find(n => n.id === nodeId);
                 if (nodeInCanvas?.type) {
                     const nodeDef = blockRegistry[nodeInCanvas.type];
-                    const isTerminalNode = !nodeDef?.output$ || nodeDef.output$.length === 0;
+                    const isTerminalNode = !nodeDef?.outputs || nodeDef.outputs.length === 0;
                     if (!isTerminalNode) return;
                 }
             }
@@ -249,11 +230,7 @@ export const useSocketHandlers = ({
             try {
                 const portData = await getPortData(portId, direction, { flowId, runId });
                 if (portData?.data) {
-                    const dataPacket = {
-                        value: portData.data.value,
-                        type: portData.data.type,
-                        timestamp: portData.data.timestamp,
-                    };
+                    const dataPacket = toDataPacket(portData.data);
                     const portKey = portData.portId || portName || direction;
                     const updates = isOutputPort
                         ? { outputData: { [portKey]: dataPacket } }
@@ -261,9 +238,10 @@ export const useSocketHandlers = ({
                     canvasRef.current.updateNodeFromServer(nodeId, updates);
                 }
             } catch (err) {
+                // Give the sequence back, or the server's resend reads as stale and the
+                // port never fills in.
                 if (no !== undefined) {
-                    const prevNo = portNoRef.current.get(portId);
-                    if (prevNo === no) portNoRef.current.delete(portId);
+                    executionRef.current = rollbackPortCursor(executionRef.current, portId, no);
                 }
                 console.debug('[handlePortUpdate] Failed to fetch port data:', portId, err);
             }
@@ -273,17 +251,16 @@ export const useSocketHandlers = ({
 
     const handleProgressUpdate = useCallback(
         (info: ProgressUpdateInfo) => {
-            const { nodeId, status, percent, step, totalSteps, label, error, seq, ts, product$ } = info;
+            const { nodeId, label, error, ts, product$ } = info;
 
-            // Last-write-wins: drop stale snapshots (seq is epoch-based across server invocations)
-            const prevSeq = progressSeqRef.current.get(nodeId);
-            if (prevSeq !== undefined && seq <= prevSeq) return;
-            progressSeqRef.current.set(nodeId, seq);
+            // Last-write-wins on an epoch-based seq — the reducer holds the watermark, and
+            // resets it when a new run starts so the next reporter is not swallowed.
+            const { state: nextState, effects } = reduceProgressEvent(executionRef.current, info);
+            executionRef.current = nextState;
+            const patch = effects.find(effect => effect.type === 'apply')?.patch;
+            if (!patch || !canvasRef.current) return;
 
-            if (!canvasRef.current) return;
-
-            const state = status === 'done' ? 'COMPLETED' : status === 'error' ? 'ERROR' : 'RUNNING';
-            const progress = percent ?? (step && totalSteps ? Math.round((step / totalSteps) * 100) : undefined);
+            const state = patch.state;
 
             // Merge streamed product view into the block's out data (live deploy state from codes-goods-api)
             const node = canvasRef.current.getWorkflow()?.nodes?.find(n => n.id === nodeId);
@@ -294,10 +271,8 @@ export const useSocketHandlers = ({
                     : product$;
 
             canvasRef.current.updateNodeFromServer(nodeId, {
-                state,
-                status: state,
+                ...patch,
                 ...(error ? { error, errorMessage: error } : {}),
-                ...(progress !== undefined ? { executionStats: { progress } } : {}),
                 ...(outValue
                     ? { outputData: { out: { value: outValue, type: 'json', timestamp: ts ?? Date.now() } } }
                     : {}),
@@ -351,11 +326,7 @@ export const useSocketHandlers = ({
 
     // Clear sequence tracking when flow changes
     useEffect(() => {
-        nodeNoRef.current.clear();
-        nodeRunIdRef.current.clear();
-        portNoRef.current.clear();
-        portRunIdRef.current.clear();
-        progressSeqRef.current.clear();
+        executionRef.current = emptyExecutionState();
         highlightTimeoutsRef.current.forEach(id => window.clearTimeout(id));
         highlightTimeoutsRef.current.clear();
     }, [currentFlowId]);
@@ -366,11 +337,7 @@ export const useSocketHandlers = ({
     );
 
     const resetSequenceTracking = useCallback(() => {
-        nodeNoRef.current.clear();
-        nodeRunIdRef.current.clear();
-        portNoRef.current.clear();
-        portRunIdRef.current.clear();
-        progressSeqRef.current.clear();
+        executionRef.current = emptyExecutionState();
     }, []);
 
     return {

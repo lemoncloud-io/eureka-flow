@@ -1,7 +1,6 @@
 import { translateField } from '@flows/flows';
 
-import type { BlockDefinitionWithFrontend } from '@flows/flows';
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { BlockDefinitionWithFrontend, GraphNode } from '@flows/flows';
 import type { TFunction } from 'i18next';
 
 /**
@@ -10,7 +9,7 @@ import type { TFunction } from 'i18next';
  * Nodes sharing the same block label get a suffix: "텍스트 입력 #1", "텍스트 입력 #2"
  */
 export const buildNodeDisplayNames = (
-    nodes: NodeData[],
+    nodes: GraphNode[],
     blockRegistry: Record<string, BlockDefinitionWithFrontend>,
     t: TFunction
 ): Map<string, string> => {

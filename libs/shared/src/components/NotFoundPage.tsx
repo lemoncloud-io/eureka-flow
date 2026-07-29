@@ -6,7 +6,7 @@ import { Button } from '@flows/ui-kit';
 
 import { ERROR_MESSAGE_KEYS } from '../consts';
 
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactElement } from 'react';
 
 const STAGGER_DELAY_MS = 80;
 const staggerStyle = (index: number): CSSProperties => ({
@@ -18,7 +18,7 @@ const staggerStyle = (index: number): CSSProperties => ({
  * Full-screen 404 page for unmatched routes
  * Rendered by the router's catch-all route
  */
-export const NotFoundPage = (): JSX.Element => {
+export const NotFoundPage = (): ReactElement => {
     const { t } = useTranslation(['common', 'flows']);
     const messageKeys = ERROR_MESSAGE_KEYS.notFound;
 

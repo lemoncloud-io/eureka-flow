@@ -12,8 +12,9 @@ import { ActorWorkload } from '../components/ActorWorkload';
 import { useCurrentActor } from '../hooks/useCurrentActor';
 
 import type { Actor } from '@flows/flows';
+import type { LucideIcon } from 'lucide-react';
 
-const STEREO_ICON: Record<Actor['stereo'], React.ElementType> = {
+const STEREO_ICON: Record<Actor['stereo'], LucideIcon> = {
     person: User,
     team: Users,
     vendor: Building2,

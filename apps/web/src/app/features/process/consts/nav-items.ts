@@ -1,10 +1,10 @@
 import { GitBranch, LayoutDashboard, Package, Users, Wrench } from 'lucide-react';
 
-import type { ElementType } from 'react';
+import type { LucideIcon } from 'lucide-react';
 
 export interface NavItem {
     to: string;
-    icon: ElementType;
+    icon: LucideIcon;
     labelKey: string;
     fallback: string;
 }

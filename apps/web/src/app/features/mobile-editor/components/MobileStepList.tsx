@@ -7,10 +7,10 @@ import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import {
     getPermissions,
     translateField,
+    useBlockGroups,
     useBlockRegistry,
     useCanvasConnections,
     useCanvasNodes,
-    useCanvasStore,
 } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
@@ -19,10 +19,13 @@ import { buildNodeDisplayNames, findConnectedComponents } from '../utils';
 import { STEREO_ICON_BG } from './consts';
 import { MobileStepCard } from './MobileStepCard';
 
+import type { FlowEngine } from '@flows/engine';
 import type { FlowRole } from '@flows/flows';
 
 interface MobileStepListProps {
     onTapCard: (nodeId: string) => void;
+    /** Deleting a step is a graph edit, so it goes through the engine. */
+    engine: FlowEngine;
     onExpandContent?: (content: { value: unknown; type?: string }) => void;
     onAddStep: () => void;
     onAddBlockDirect?: (type: string) => void;
@@ -33,6 +36,7 @@ interface MobileStepListProps {
 
 export const MobileStepList = ({
     onTapCard,
+    engine,
     onExpandContent,
     onAddStep,
     onAddBlockDirect,
@@ -45,6 +49,16 @@ export const MobileStepList = ({
     const nodes = useCanvasNodes();
     const connections = useCanvasConnections();
     const blockRegistry = useBlockRegistry();
+
+    /**
+     * Empty-state quick-add, from the same source as the library picker.
+     *
+     * Not `Object.values(blockRegistry)`: the registry indexes every block twice, under both
+     * its `type` and its `id`, so the raw values list repeats each block and taking the first
+     * two yielded the *same* block twice. `useBlockGroups` holds the `key === block.type` guard.
+     * The empty string is deliberate — `searchQuery` filters nodes, not blocks.
+     */
+    const { inputs: quickAddBlocks } = useBlockGroups('');
 
     const nodeMap = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
     const displayNames = useMemo(() => buildNodeDisplayNames(nodes, blockRegistry, t), [nodes, blockRegistry, t]);
@@ -86,7 +100,9 @@ export const MobileStepList = ({
             .filter(group => group.nodeIds.length > 0);
     }, [groups, searchQuery, displayNames, nodeMap]);
 
-    const handleDelete = canModifyCanvas ? (nodeId: string) => useCanvasStore.getState().deleteNode(nodeId) : undefined;
+    const handleDelete = canModifyCanvas
+        ? (nodeId: string) => engine.transact('node:remove', ops => ops.removeNodes([nodeId]))
+        : undefined;
 
     /** Check if nodeB follows nodeA via a direct connection (in topological order) */
     const isDirectlyConnected = (prevId: string, currId: string) =>
@@ -110,9 +126,7 @@ export const MobileStepList = ({
                     {canModifyCanvas &&
                         onAddBlockDirect &&
                         (() => {
-                            const quickBlocks = Object.values(blockRegistry)
-                                .filter(b => b.stereo === 'input')
-                                .slice(0, 2);
+                            const quickBlocks = quickAddBlocks.slice(0, 2);
                             if (quickBlocks.length === 0) return null;
                             return (
                                 <div className="flex justify-center gap-2">

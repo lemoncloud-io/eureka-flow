@@ -48,6 +48,9 @@
         },
         {
             "path": "../../libs/flows/tsconfig.lib.json"
+        },
+        {
+            "path": "../../libs/engine/tsconfig.lib.json"
         }
     ]
 }

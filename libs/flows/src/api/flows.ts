@@ -165,6 +165,22 @@ export const runFlow = async (
     return response.data;
 };
 
+/**
+ * Read a packet the server sent.
+ *
+ * `DataPacket.type` is a union, and the wire carries a plain string — the server is free
+ * to name a type this client does not know. Narrowing it here, in one place, keeps that
+ * from being decided again at every port that receives data. An unrecognised type is
+ * `any`, which is what the port compatibility rules already treat it as.
+ */
+export const toDataPacket = (data: { value: unknown; type?: string; timestamp?: number }): DataPacket => ({
+    value: data.value,
+    type: (DATA_TYPES.has(data.type ?? '') ? data.type : 'any') as DataPacket['type'],
+    timestamp: data.timestamp,
+});
+
+const DATA_TYPES = new Set(['text', 'image', 'number', 'json', 'any']);
+
 export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'): DataPacket => ({
     value,
     type,

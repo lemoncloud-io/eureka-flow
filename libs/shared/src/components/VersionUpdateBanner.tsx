@@ -4,6 +4,8 @@ import { RefreshCw, X } from 'lucide-react';
 
 import { Button, cn } from '@flows/ui-kit';
 
+import type { ReactElement } from 'react';
+
 export interface VersionUpdateBannerProps {
     isVisible: boolean;
     currentVersion: string;
@@ -18,7 +20,7 @@ export const VersionUpdateBanner = ({
     latestVersion,
     onDismiss,
     className,
-}: VersionUpdateBannerProps): JSX.Element | null => {
+}: VersionUpdateBannerProps): ReactElement | null => {
     const { t } = useTranslation(['common']);
 
     if (!isVisible) {

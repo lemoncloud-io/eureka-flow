@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
 import type { EdgeView, RunContext, RunPortUpdate, TraceEntry } from '../types';
-import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type { GraphEdge, GraphLike, GraphNode } from '@flows/engine';
+import type { DataPacket, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 import type { StateCreator } from 'zustand';
 
 const MAX_TRACE_ENTRIES = 500;
@@ -54,14 +55,14 @@ export interface Tooltip {
 
 interface CanvasState {
     // Core Data
-    nodes: NodeData[];
-    connections: Connection[];
+    nodes: GraphNode[];
+    connections: GraphEdge[];
 
     // Flow Context
     flowId: string | null;
 
     // Clipboard
-    clipboard: NodeData | null;
+    clipboard: GraphNode | null;
 
     // Viewport
     viewport: Viewport;
@@ -98,10 +99,10 @@ interface CanvasState {
     tutorialHint: 'output-port' | 'run-button' | null;
 
     // Actions - Core Data
-    setNodes: (nodes: NodeData[] | ((prev: NodeData[]) => NodeData[])) => void;
-    setConnections: (connections: Connection[] | ((prev: Connection[]) => Connection[])) => void;
+    setNodes: (nodes: GraphNode[] | ((prev: GraphNode[]) => GraphNode[])) => void;
+    setConnections: (connections: GraphEdge[] | ((prev: GraphEdge[]) => GraphEdge[])) => void;
     setFlowId: (flowId: string | null) => void;
-    setClipboard: (node: NodeData | null) => void;
+    setClipboard: (node: GraphNode | null) => void;
 
     // Actions - Viewport
     setViewport: (viewport: Viewport | ((prev: Viewport) => Viewport)) => void;
@@ -153,7 +154,8 @@ interface CanvasState {
 
     // Compound Actions
     clearSelection: () => void;
-    loadWorkflow: (state: WorkflowState, flowId?: string) => void;
+    /** `GraphLike`, not `WorkflowState`: flows saved before the rename carry `connections`. */
+    loadWorkflow: (state: GraphLike, flowId?: string) => void;
     clearWorkflow: () => void;
     resetCanvas: () => void;
 
@@ -163,8 +165,8 @@ interface CanvasState {
     deleteNode: (nodeId: string) => void;
 
     // Connection Actions
-    addConnection: (connection: Connection) => void;
-    updateConnection: (connectionId: string, updates: Partial<Connection>) => void;
+    addConnection: (connection: GraphEdge) => void;
+    updateConnection: (connectionId: string, updates: Partial<EdgeData>) => void;
     deleteConnection: (connectionId: string) => void;
 }
 
@@ -368,8 +370,13 @@ export const canvasStateCreator: StateCreator<CanvasState> = (set, _get) => ({
         const connections = workflowState?.connections || workflowState?.edges || [];
 
         set({
-            nodes: nodes as NodeData[],
-            connections: connections as Connection[],
+            // A node with no id cannot be selected, connected or addressed, so it is not a
+            // node this canvas can show. The engine mints one on the way in; this is the
+            // path that bypasses it, and dropping is the honest answer here — minting a
+            // second id for something the engine may already have minted one for would
+            // put the same node on screen twice.
+            nodes: nodes.filter((node): node is GraphNode => !!node.id),
+            connections: connections.filter((edge): edge is GraphEdge => !!edge.id),
             flowId: flowId || null,
             selectedNodeId: null,
             selectedConnectionId: null,

@@ -29,7 +29,7 @@ export const AgentTraceVisualization: React.FC<{ traceLogs: TraceEntry[]; conten
         >
             {traceLogs.map((entry, i) => {
                 const stage = entry.stage as TraceStage | undefined;
-                const style = (stage && STAGE_STYLES[stage]) ?? STAGE_STYLES.trace;
+                const style = (stage && STAGE_STYLES[stage as keyof typeof STAGE_STYLES]) ?? STAGE_STYLES.trace;
                 const detail = getTraceDetail(entry);
                 return (
                     <div key={`${entry.seq}-${i}`} className="flex gap-1.5 py-0.5">

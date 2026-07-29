@@ -16,10 +16,10 @@ export const OUTPUT_CONSOLE_TYPES = ['output-console', 'console-log', 'debug-log
 export const OUTPUT_BLOCK_TYPES = [...OUTPUT_PREVIEW_TYPES, ...OUTPUT_CONSOLE_TYPES] as const;
 
 /** Check if block type is output-preview (or legacy preview/result-preview) */
-export const isOutputPreview = (type: string): boolean => OUTPUT_PREVIEW_TYPES.includes(type);
+export const isOutputPreview = (type: string): boolean => (OUTPUT_PREVIEW_TYPES as readonly string[]).includes(type);
 
 /** Check if block type is output-console (or legacy console-log/debug-log) */
-export const isOutputConsole = (type: string): boolean => OUTPUT_CONSOLE_TYPES.includes(type);
+export const isOutputConsole = (type: string): boolean => (OUTPUT_CONSOLE_TYPES as readonly string[]).includes(type);
 
 /** Check if block type is any output block */
 export const isOutputBlock = (type: string): boolean => isOutputPreview(type) || isOutputConsole(type);

@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { getPermissions, useBlockRegistry, useCanvasStore } from '@flows/flows';
 
+import type { FlowEngine } from '@flows/engine';
 import type { FlowRole } from '@flows/flows';
-import type { NodeConfigItem, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { ConfigField, NodeData } from '@lemoncloud/eureka-flows-api';
 
-export const useNodeConfig = (nodeId: string | null, role: FlowRole) => {
+export const useNodeConfig = (nodeId: string | null, role: FlowRole, engine: FlowEngine) => {
     const node = useCanvasStore(state => (nodeId ? state.nodes.find(n => n.id === nodeId) : undefined));
     const blockRegistry = useBlockRegistry();
     const [customLabel, setCustomLabel] = useState('');
@@ -13,7 +14,11 @@ export const useNodeConfig = (nodeId: string | null, role: FlowRole) => {
     const blockDef = node ? blockRegistry[node.type] : undefined;
     const { canEditConfig, canEditStructure, canRun } = useMemo(() => getPermissions(role), [role]);
 
-    const configFields: NodeConfigItem[] = blockDef?.config$$ ?? node?.config$$ ?? [];
+    // Field *definitions*, which only the block carries — a node's stored config is
+    // key/val pairs, a shape this list cannot render. `configSchema` is where they live;
+    // the `config$$` this used to read exists on neither type, so it was always undefined
+    // and the node fallback behind it is what actually rendered.
+    const configFields: ConfigField[] = blockDef?.configSchema ?? [];
 
     useEffect(() => {
         setCustomLabel(node?.customLabel ?? '');
@@ -23,13 +28,15 @@ export const useNodeConfig = (nodeId: string | null, role: FlowRole) => {
         (key: string, value: unknown) => {
             // Owner + Editor edit any node config; Viewer/Anonymous are blocked.
             if (!canEditConfig || !nodeId) return;
-            const currentNode = useCanvasStore.getState().nodes.find(n => n.id === nodeId);
+            // Read from the engine, not the store: the store is its projection, and the
+            // merge below has to start from the copy the write lands on.
+            const currentNode = engine.getGraph().nodes.find(n => n.id === nodeId);
             if (!currentNode) return;
 
             const newConfig = { ...currentNode.config, [key]: value };
-            useCanvasStore.getState().updateNodeData(nodeId, { config: newConfig } as Partial<NodeData>);
+            engine.transact('config:set', ops => ops.updateNode(nodeId, { config: newConfig } as Partial<NodeData>));
         },
-        [canEditConfig, nodeId]
+        [canEditConfig, nodeId, engine]
     );
 
     const handleCustomLabelChange = useCallback(
@@ -37,25 +44,25 @@ export const useNodeConfig = (nodeId: string | null, role: FlowRole) => {
             if (!canEditStructure) return;
             setCustomLabel(value);
             if (!nodeId) return;
-            useCanvasStore.getState().updateNodeData(nodeId, { customLabel: value } as Partial<NodeData>);
+            engine.transact('node:label', ops => ops.updateNode(nodeId, { customLabel: value }));
         },
-        [canEditStructure, nodeId]
+        [canEditStructure, nodeId, engine]
     );
 
     const handleDescriptionChange = useCallback(
         (value: string) => {
             if (!canEditStructure || !nodeId) return;
-            useCanvasStore.getState().updateNodeData(nodeId, { description: value } as Partial<NodeData>);
+            engine.transact('node:description', ops => ops.updateNode(nodeId, { description: value }));
         },
-        [canEditStructure, nodeId]
+        [canEditStructure, nodeId, engine]
     );
 
     const handleToggleAuto = useCallback(
         (auto: boolean) => {
             if (!canEditStructure || !nodeId) return;
-            useCanvasStore.getState().updateNodeData(nodeId, { auto } as Partial<NodeData>);
+            engine.transact('node:auto', ops => ops.updateNode(nodeId, { auto } as Partial<NodeData>));
         },
-        [canEditStructure, nodeId]
+        [canEditStructure, nodeId, engine]
     );
 
     return {

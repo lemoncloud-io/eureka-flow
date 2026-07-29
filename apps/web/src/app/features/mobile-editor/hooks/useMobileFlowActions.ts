@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { captureBaseline, newNodeId, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { captureBaseline, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
 
-import type { NodeState } from '@flows/flows';
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import { loadFlowIntoEngine } from '../utils';
+
+import type { FlowEngine } from '@flows/engine';
 
 interface UseMobileFlowActionsParams {
+    engine: FlowEngine;
     updateUrl: (flowId: string | null) => void;
     lastLocalUpdateTimestampRef: React.MutableRefObject<number | null>;
 }
@@ -24,6 +26,7 @@ interface UseMobileFlowActionsReturn {
 }
 
 export const useMobileFlowActions = ({
+    engine,
     updateUrl,
     lastLocalUpdateTimestampRef,
 }: UseMobileFlowActionsParams): UseMobileFlowActionsReturn => {
@@ -60,44 +63,35 @@ export const useMobileFlowActions = ({
             try {
                 const flowData = await loadFlowById(flowId);
                 if (flowData) {
-                    const { loadWorkflow } = useCanvasStore.getState();
-                    loadWorkflow(flowData);
-                    const { nodes, connections } = useCanvasStore.getState();
-                    captureBaseline({ nodes, connections });
+                    loadFlowIntoEngine(engine, flowData);
+                    const { nodes, edges } = engine.getGraph();
+                    captureBaseline({ nodes, connections: edges });
                 }
                 updateUrl(flowId);
             } catch {
                 toast.error(t('flowEditor.failedToLoadFlow'));
             }
         },
-        [loadFlowById, updateUrl, t]
+        [engine, loadFlowById, updateUrl, t]
     );
 
     const handleAddBlock = useCallback(
         async (type: string): Promise<string | null> => {
-            const { nodes } = useCanvasStore.getState();
+            const { nodes } = engine.getGraph();
             const def = blockRegistry[type];
             if (!def) return null;
 
             // Place new node at the top: y less than current min so it sorts first.
-            const nodeId = newNodeId();
             const minY = nodes.reduce((m, n) => Math.min(m, n.position?.y ?? Infinity), Infinity);
             const posX = nodes[0]?.position?.x ?? 100;
             const posY = nodes.length === 0 ? 100 : minY - 200;
 
-            const newNode: NodeData = {
-                id: nodeId,
-                type,
-                position: { x: posX, y: posY },
-                config: { ...def.defaultConfig },
-                state: 'IDLE' as NodeState,
-                status: 'IDLE',
-                inputData: {},
-                outputData: {},
-                autoExecutionEnabled: true,
-            };
-
-            useCanvasStore.getState().setNodes(prev => [...prev, newNode]);
+            // `addNode` mints the id and fills the rest — IDLE state, empty port data,
+            // auto-execution on — which is exactly the node this used to build by hand.
+            let nodeId = '';
+            engine.transact('node:add', ops => {
+                nodeId = ops.addNode({ type, position: { x: posX, y: posY }, config: def.defaultConfig });
+            });
 
             try {
                 // Persist immediately so refresh within autosave debounce keeps the node.
@@ -110,12 +104,12 @@ export const useMobileFlowActions = ({
 
                 return nodeId;
             } catch {
-                useCanvasStore.getState().setNodes(prev => prev.filter(n => n.id !== nodeId));
+                engine.transact('node:add:rollback', ops => ops.removeNodes([nodeId]));
                 toast.error(t('mobile.failedToCreateNode', 'Failed to create node'));
                 return null;
             }
         },
-        [blockRegistry, currentFlowId, saveCurrentFlow, updateUrl, lastLocalUpdateTimestampRef, t]
+        [engine, blockRegistry, currentFlowId, saveCurrentFlow, updateUrl, lastLocalUpdateTimestampRef, t]
     );
 
     const handleExport = useCallback(() => {
@@ -135,13 +129,20 @@ export const useMobileFlowActions = ({
 
     /** Creates new flow without confirmation — for use by MobileNewFlowSheet */
     const handleCreateNewFlow = useCallback((): void => {
+        // Both halves, or they disagree: the engine holds the graph and `clearWorkflow`
+        // only empties the store's copy of it plus the selection and run state it owns.
+        // Leaving the previous flow in the document is invisible today — nothing reads it
+        // back until the next load, which replaces it anyway — but the first edit routed
+        // through `transact` would edit that stale flow and the mirror would put it on the
+        // new, supposedly empty canvas.
+        engine.reset();
         useCanvasStore.getState().clearWorkflow();
         // No server flow yet — the first save claims the ID, so the URL has nothing to
         // point at until then.
         createNewFlow();
         updateUrl(null);
         toast.success(t('flowEditor.newFlowCreated'));
-    }, [createNewFlow, updateUrl, t]);
+    }, [engine, createNewFlow, updateUrl, t]);
 
     return {
         handleSave,

@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { ArrowRight, Globe, KeyRound, Lock, ShieldX, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { createFlowEngine } from '@flows/engine';
 import {
     FLOW_FORBIDDEN,
     captureBaseline,
@@ -68,17 +69,26 @@ export const FlowEditorPage = () => {
     const sidebarRef = useRef<SidebarRef>(null);
 
     const { loadBlocks, blockRegistry } = useBlocks();
+
+    /**
+     * The editor's graph, owned here so the page outlives any one canvas mount.
+     *
+     * The registry is read through a getter rather than captured: blocks arrive over the
+     * network, and an engine built with the empty map would skip port-type checks for the
+     * rest of the session.
+     */
+    const blockRegistryRef = useRef(blockRegistry);
+    blockRegistryRef.current = blockRegistry;
+    const engine = useMemo(() => createFlowEngine({ getBlockRegistry: () => blockRegistryRef.current }), []);
     const {
         currentFlowId,
         flowName,
         flowDescription,
         isLoading,
-        isSaving,
         lastSavedAt,
         isAutoSaveEnabled,
         saveStatus,
         saveError,
-        channelId,
         initializeFlow,
         loadFlowById,
         saveCurrentFlow,
@@ -148,7 +158,7 @@ export const FlowEditorPage = () => {
         });
     }, []);
 
-    // Initialize WebSocket connection when channelId is available
+    // Initialize the WebSocket connection
     const {
         isConnected: isSocketConnected,
         connectionStatus: socketStatus,
@@ -158,7 +168,6 @@ export const FlowEditorPage = () => {
         connectionId: socketConnectionId,
         replayMessage,
     } = useInitFlowSocket({
-        channelId,
         currentFlowId,
         getLastLocalUpdateTimestamp,
         onFlowUpdate: handleFlowUpdate,
@@ -171,7 +180,7 @@ export const FlowEditorPage = () => {
         onMessage: handleSocketMessage,
     });
 
-    const { startTourIfFirstVisit, startTour } = useTour();
+    const { startTourIfFirstVisit } = useTour();
 
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('');
@@ -648,6 +657,7 @@ export const FlowEditorPage = () => {
         if (isAppReady && !isPublicMode && !isLoading) {
             return startTourIfFirstVisit();
         }
+        return undefined;
     }, [isAppReady, isPublicMode, isLoading, startTourIfFirstVisit]);
 
     if (!isAppReady) {
@@ -749,6 +759,7 @@ export const FlowEditorPage = () => {
                 <div data-tour="canvas" className="absolute inset-0 editor-grain">
                     <WorkflowCanvas
                         ref={canvasRef}
+                        engine={engine}
                         role={role}
                         flowId={currentFlowId}
                         connectionId={socketConnectionId ?? undefined}
@@ -789,7 +800,6 @@ export const FlowEditorPage = () => {
                         onExpandAll: () => canvasRef.current?.expandAll(),
                     }}
                     saveState={{
-                        isSaving,
                         lastSavedAt,
                         isAutoSaveEnabled,
                         onToggleAutoSave: toggleAutoSave,
@@ -797,17 +807,13 @@ export const FlowEditorPage = () => {
                         saveError,
                         onRetrySave: retrySave,
                     }}
-                    socketState={
-                        channelId
-                            ? {
-                                  isConnected: isSocketConnected,
-                                  connectionStatus: socketStatus,
-                                  reconnectAttempts,
-                                  maxReconnectReached,
-                                  onReconnect: socketReconnect,
-                              }
-                            : undefined
-                    }
+                    socketState={{
+                        isConnected: isSocketConnected,
+                        connectionStatus: socketStatus,
+                        reconnectAttempts,
+                        maxReconnectReached,
+                        onReconnect: socketReconnect,
+                    }}
                     isPublic={isPublic}
                     isPublicMode={isPublicMode}
                     role={role}

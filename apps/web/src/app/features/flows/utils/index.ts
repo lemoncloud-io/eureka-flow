@@ -1,26 +1,25 @@
+import { arePortTypesCompatible } from '@flows/engine';
 import { compressImageIfNeeded } from '@flows/flows';
 
 import type { UploadHtmlProductView } from '@flows/flows';
-import type { Connection, DataPacket, NodeData, PortDefinition } from '@lemoncloud/eureka-flows-api';
+import type { DataPacket, PortDefinition } from '@lemoncloud/eureka-flows-api';
 
 // ============================================================
-// Port Type Utilities
+// Graph Core Utilities (owned by @flows/engine)
 // ============================================================
 
-/** Valid port style keys matching CSS variables (--port-type-*) */
-export type PortStyleKey = 'text' | 'image' | 'number' | 'json' | 'any';
+// Port compatibility, connection keys and cycle detection are graph rules, not UI: they
+// have to hold wherever the graph is edited. Re-exported so call sites keep importing
+// them from here.
+export {
+    arePortTypesCompatible,
+    deduplicateEdges,
+    getConnectionKey,
+    getPortStyleKey,
+    wouldCreateCycle,
+} from '@flows/engine';
 
-const PORT_STYLE_KEYS: Record<string, PortStyleKey> = {
-    text: 'text',
-    string: 'text',
-    image: 'image',
-    number: 'number',
-    json: 'json',
-    any: 'any',
-};
-
-/** Normalize port type string to a valid style key (e.g., 'string' → 'text') */
-export const getPortStyleKey = (portType: string): PortStyleKey => PORT_STYLE_KEYS[portType.toLowerCase()] ?? 'any';
+export type { PortStyleKey } from '@flows/engine';
 
 // ============================================================
 // Port Visibility Utilities
@@ -34,16 +33,6 @@ export interface ConnectionDraftInfo {
     sourcePortId: string;
     sourceType: string;
 }
-
-/**
- * Check if two port types are compatible for connection.
- * Handles undefined target type by treating it as 'any'.
- */
-export const arePortTypesCompatible = (sourceType: string, targetType: string | undefined): boolean => {
-    const normalizedTarget = targetType ?? 'any';
-    if (sourceType === 'any' || normalizedTarget === 'any') return true;
-    return sourceType.toLowerCase() === normalizedTarget.toLowerCase();
-};
 
 /**
  * Filter ports based on visibility rules:
@@ -102,38 +91,6 @@ export const getVisiblePorts = (
 // Connection Utilities
 // ============================================================
 
-export const getConnectionKey = (conn: Connection): string =>
-    `${conn.sourceNodeId}:${conn.sourcePortId}→${conn.targetNodeId}:${conn.targetPortId}`;
-
-/**
- * Collapse edges that describe the same connection, keeping the first.
- *
- * Nothing creates duplicates any more — an edge gets one client-generated ID and keeps
- * it — but flows saved before that can carry two edges for one connection, so loaded
- * data still needs this.
- */
-export const deduplicateEdges = (edges: Connection[]): Connection[] => {
-    const edgeMap = new Map<string, Connection>();
-    const seenIds = new Set<string>();
-
-    edges.forEach(edge => {
-        // Skip if we've already seen this ID (prevents duplicate key errors in React)
-        if (edge.id && seenIds.has(edge.id)) {
-            return;
-        }
-
-        const key = getConnectionKey(edge);
-        if (edgeMap.has(key)) {
-            return;
-        }
-
-        edgeMap.set(key, edge);
-        if (edge.id) seenIds.add(edge.id);
-    });
-
-    return Array.from(edgeMap.values());
-};
-
 /**
  * Calculate bezier curve path for connection lines
  * Creates smooth, natural-looking curves similar to Sequencer.media
@@ -165,26 +122,6 @@ export const getBezierPath = (x1: number, y1: number, x2: number, y2: number): s
     return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
 };
 
-/**
- * Check if a connection between two ports is valid.
- * Uses arePortTypesCompatible for consistent case-insensitive type matching.
- *
- * @deprecated sourceIdx/targetIdx are unused - kept for backward compatibility.
- * Consider using arePortTypesCompatible directly for new code.
- */
-export const isValidConnection = (
-    sourceNode: NodeData,
-    _sourceIdx: number,
-    targetNode: NodeData,
-    _targetIdx: number,
-    sourceType: string,
-    targetType: string
-): boolean => {
-    if (sourceNode.id === targetNode.id) return false;
-    return arePortTypesCompatible(sourceType, targetType);
-};
-
-export { wouldCreateCycle } from './graph';
 export { captureCanvasAsDataUrl, captureCanvasForThumbnail, exportCanvasAsPng } from './exportImage';
 export { createDesktopCanvasBinding } from './createDesktopCanvasBinding';
 export { createGenerateApiLlmGateway } from './createGenerateApiLlmGateway';
