@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-07-29] - root@0.65.0, @flows/web@0.65.0, @flows/admin@0.39.0
+
+### Features
+
+- (agent) orchestrator harness — one main agent + spawned specialists over the live canvas
+
+### Refactor
+
+- (agent) scope branch to the feature — revert unrelated churn vs develop
+
 ## [2026-07-29] - root@0.64.0, @flows/web@0.64.0, @flows/admin@0.38.0
 
 ### Features
