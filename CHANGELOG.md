@@ -1,5 +1,69 @@
 # Changelog
 
+## [2026-07-29] - root@0.64.0, @flows/web@0.64.0, @flows/admin@0.38.0
+
+### Features
+
+- (agent) add Generate API LlmGateway adapter foundation
+- (agent) wire BrowserAgentEnvironment into AgentPanel flow
+- (agent) add capability metadata to llm gateway contract
+- (agent) locator agent — @flows/agent core + flow-editor panel
+- (agent) add environment self-check for storage and trace
+- (agent) add llm gateway with gemini 2.5 flash provider
+- (agent) add http request port with fetch and scripted implementations
+- (flows) add CanvasBinding + dev validation panel
+- (agent) add browser/virtual environment foundation
+
+### Bug Fixes
+
+- (agent) gate FlowAgentPanel behind import.meta.env.DEV
+- (agent) address PR review — checkpoint agent moves, store-sourced reads, role-derived grant
+- (agent) redact api key from provider error bodies
+
+### Documentation
+
+- (agent) reconcile browser-agent docs with the store-sourced code
+- (agent) drop stale spec/section/milestone citations from comments
+- (agent) clarify Capability is a deliberate standalone mirror
+- (agent) refine architecture diagrams and reconcile docs with code
+- (agent) reconcile llm gateway brief with shared contract
+- (agent) drop W04 tag from gemini model comment
+- (agent) trim locator IMPLEMENTATION, add at-a-glance diagram
+- (agent) move browser agent briefs to docs root
+- (agent) locator agent spec + implementation record
+- (agent) soften browser verification wording in W04 brief
+- (agent) add W04 llm gateway brief
+- (agent-chat) redesign around agent-owns-turn + single ToolExecutor
+- (agent-chat) reconcile diagrams and section numbering
+- (agent-chat) rewrite spec as SPEC.md + README.md, archive prior iterations
+- (agent-chat) reorganize component interfaces top-down and reconcile spec
+- (agent) clarify reactive useAgentStore vs StorageInterface persistence port
+- (agent) polish meeting brief for review
+- (agent) add spec-driven development specs for agent chat feature
+- (agent) add acceptance criteria to meeting brief
+
+### Refactor
+
+- (agent) align @flows/agent with repo conventions, dedupe types, trim comments
+- (flows) make AgentPanel presentational; containers own the agent
+- (flows) extract agent wiring into a FlowAgentPanel adaptor
+- (agent) refit gemini gateway onto shared chat contract
+- (agent) extract generic BaseAgent + useAgentSession for multi-agent reuse
+- (flows) rename makeDesktopCanvasBinding → createDesktopCanvasBinding
+
+### Chores
+
+- (agent) clean internal verification wording
+- (agent) prune redundant tests, relocate web specs, tighten docs
+- (agent) centralize lib tests + reorganize browser-agent docs
+- drop manual libs/agent reference from root tsconfig (nx sync)
+- (agent) verify environment build compatibility
+
+### Other
+
+- test: (agent) verify fake gateway tool call through tool executor
+- test: (agent) prove both storages share one contract
+
 ## [2026-07-21] - root@0.63.0, @flows/web@0.63.0, @flows/admin@0.37.0
 
 ### Features

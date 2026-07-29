@@ -1,3 +1,4 @@
+export * from './AgentPanel';
 export * from './BlockIcon';
 export * from './ComponentViewerModal';
 export * from './ConnectionLine';

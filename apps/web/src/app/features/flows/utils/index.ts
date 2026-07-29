@@ -123,6 +123,19 @@ export const getBezierPath = (x1: number, y1: number, x2: number, y2: number): s
 };
 
 export { captureCanvasAsDataUrl, captureCanvasForThumbnail, exportCanvasAsPng } from './exportImage';
+export { createDesktopCanvasBinding } from './createDesktopCanvasBinding';
+export { createCommandLlmGateway } from './createCommandLlmGateway';
+export { createGenerateApiLlmGateway } from './createGenerateApiLlmGateway';
+export type {
+    CreateGenerateApiLlmGatewayOptions,
+    GenerateConnectionSnapshot,
+    GenerateContent,
+    GeneratePostConfig,
+    GeneratePostFn,
+    GenerateReceiver,
+    GenerateRequestBody,
+    GenerateResponse,
+} from './createGenerateApiLlmGateway';
 
 // ============================================================
 // Input File Upload Utilities
