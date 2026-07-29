@@ -968,7 +968,12 @@ export const FlowEditorPage = () => {
                     />
                 )}
             </div>
-            {currentFlowId && <FlowAgentPanel canvasRef={canvasRef} flowId={currentFlowId} permissions={permissions} />}
+            {/* Dev-only: the shipped gateway is the offline command parser, not a real LLM — keep it
+                out of production bundles until a network-backed gateway lands. Same gate as the
+                /dev/agent-harness route in app.tsx. */}
+            {import.meta.env.DEV && currentFlowId && (
+                <FlowAgentPanel canvasRef={canvasRef} flowId={currentFlowId} permissions={permissions} />
+            )}
         </div>
     );
 };
