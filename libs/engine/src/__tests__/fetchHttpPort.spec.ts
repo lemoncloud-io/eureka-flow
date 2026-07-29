@@ -278,3 +278,35 @@ describe('fetchHttpPort — timeout', () => {
         expect(vi.getTimerCount()).toBe(0);
     });
 });
+
+describe('fetchHttpPort — a failure body that is not JSON', () => {
+    /**
+     * A gateway answers 502 with an HTML error page. Parsing the body before checking the
+     * status threw SyntaxError and lost the status code — the one thing callers branch on
+     * (`ports/http.ts` delegates the 403-clears-credentials policy to them).
+     */
+    it('keeps the status when the error body is not JSON', async () => {
+        const fetchFn = (() =>
+            Promise.resolve(new Response('<html>502 Bad Gateway</html>', { status: 502 }))) as unknown as typeof fetch;
+
+        const request = createFetchHttpPort({ baseUrl: BASE, auth: createApiKeyAuth('k'), fetchFn }).request({
+            method: 'GET',
+            path: '/x',
+        });
+
+        await expect(request).rejects.toBeInstanceOf(HttpError);
+        await expect(request).rejects.toMatchObject({ status: 502 });
+    });
+
+    /** A 2xx that is not JSON is a genuine surprise, so it still surfaces as a parse error. */
+    it('still throws the parse error on a 200 with a non-JSON body', async () => {
+        const fetchFn = (() => Promise.resolve(new Response('not json', { status: 200 }))) as unknown as typeof fetch;
+
+        await expect(
+            createFetchHttpPort({ baseUrl: BASE, auth: createApiKeyAuth('k'), fetchFn }).request({
+                method: 'GET',
+                path: '/x',
+            })
+        ).rejects.not.toBeInstanceOf(HttpError);
+    });
+});

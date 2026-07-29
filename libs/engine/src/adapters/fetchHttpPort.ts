@@ -87,7 +87,17 @@ export const createFetchHttpPort = ({
 
                 // Read the body either way: a failure's body is what says why.
                 const text = await response.text();
-                const data = text ? (JSON.parse(text) as T) : (undefined as T);
+                let data: T;
+                try {
+                    data = text ? (JSON.parse(text) as T) : (undefined as T);
+                } catch (parseError) {
+                    // A failure body is not always JSON — a gateway 502 is usually HTML. Parsing
+                    // it first would throw SyntaxError and lose the status code, which is the one
+                    // thing callers branch on (the 403-clears-credentials policy, for one).
+                    // A non-JSON body on a 2xx is a real surprise, so that still throws.
+                    if (response.ok) throw parseError;
+                    throw new HttpError(response.status, req.path, text as unknown as T);
+                }
 
                 if (!response.ok) throw new HttpError(response.status, req.path, data);
                 return { status: response.status, data };

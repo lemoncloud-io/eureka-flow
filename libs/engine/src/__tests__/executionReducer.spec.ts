@@ -385,3 +385,37 @@ describe('progress snapshots', () => {
         expect(reduceProgressEvent(state, { nodeId: 'n1', seq: 5, percent: 5 }).effects).toHaveLength(1);
     });
 });
+
+describe('a run belongs to the node, not the port', () => {
+    /**
+     * `run-begin`/`run-end` used to carry the raw `nodeId`, so a port-shaped terminal frame
+     * reported the run under `n1:out`. `runSession` settles waiters on that id, so
+     * `waitForNode('n1')` never matched and hung to its timeout while the graph already
+     * said COMPLETED. `reset-node` next to it already used the parent.
+     */
+    it('reports run-begin against the parent for a port-shaped frame', () => {
+        const { effects } = play([
+            { nodeId: 'n1:out', isPort: true, parentNodeId: 'n1', runId: 'r1', state: 'RUNNING', no: 1 },
+        ]);
+
+        expect(effects.filter(e => e.type === 'run-begin')).toEqual([{ type: 'run-begin', runId: 'r1', nodeId: 'n1' }]);
+    });
+
+    it('reports run-end against the parent for a port-shaped frame', () => {
+        const { effects } = play([
+            { nodeId: 'n1:out', isPort: true, parentNodeId: 'n1', runId: 'r1', state: 'COMPLETED', no: 2 },
+        ]);
+
+        expect(effects.filter(e => e.type === 'run-end')).toEqual([
+            { type: 'run-end', runId: 'r1', nodeId: 'n1', state: 'COMPLETED', error: undefined },
+        ]);
+    });
+
+    it('still uses the node id when the frame is not port-shaped', () => {
+        const { effects } = play([{ nodeId: 'n1', runId: 'r1', state: 'COMPLETED', no: 2 }]);
+
+        expect(effects.filter(e => e.type === 'run-end')).toEqual([
+            { type: 'run-end', runId: 'r1', nodeId: 'n1', state: 'COMPLETED', error: undefined },
+        ]);
+    });
+});

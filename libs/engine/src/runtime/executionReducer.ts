@@ -162,11 +162,15 @@ export const reduceNodeEvent = (
     }
 
     if (runId) {
+        // The parent, not the port — same rule as `reset-node` above. A run belongs to the
+        // node; `n1:out` is not one, and a consumer that keys on it (a `waitForNode` waiter,
+        // a run-duration record) silently never matches.
+        const runNodeId = parentNodeId ?? nodeId;
         if (stage === 'enter' || (event.state === 'RUNNING' && !stage)) {
-            effects.push({ type: 'run-begin', runId, nodeId });
+            effects.push({ type: 'run-begin', runId, nodeId: runNodeId });
         }
         if (event.state === 'COMPLETED' || event.state === 'ERROR') {
-            effects.push({ type: 'run-end', runId, nodeId, state: event.state, error });
+            effects.push({ type: 'run-end', runId, nodeId: runNodeId, state: event.state, error });
         }
     }
 
