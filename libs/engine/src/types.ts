@@ -14,8 +14,19 @@ import type { BlockDefinition, DataPacket, EdgeData, NodeData } from '@lemonclou
  * - COMPLETED: Execution finished successfully
  * - ERROR: Execution failed
  *
- * @note API package's NodeStatusType also includes WAITING and SKIPPED.
- * Frontend uses this narrower type for UI state management.
+ * The server's `NodeStatusType` declares three more — `''`, `WAITING`, `SKIPPED` — and this
+ * union deliberately stays at five, because that is what the wire actually carries: the only
+ * builder of a node frame derives state from the run stage, and its five branches produce
+ * exactly these (`''` needs a `stage` of `null`, and no caller passes one — the branch is
+ * written but unreached).
+ *
+ * `SKIPPED` is not a reserved word, though. It marked `disabled` nodes until a 2026-02-28
+ * refactor removed that feature and the state with it, so this union is short by a feature
+ * rather than by design — widening it is pre-work for that feature returning, not dead code.
+ * Background and the branch history: `docs/engine/node-state-model.md` §4.
+ *
+ * Anything outside this list is dropped by `parseSocketFrame` (the value, not the frame) and
+ * takes last-write in `shouldUpdateState` rather than being refused.
  */
 export type NodeState = 'IDLE' | 'READY' | 'RUNNING' | 'COMPLETED' | 'ERROR';
 

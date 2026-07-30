@@ -223,6 +223,30 @@ session.close();
 socket.close();
 ```
 
+**run 프레임은 순서대로 오지 않고, 그걸 안전하게 만드는 게 세션이다.** 세션은 모든 프레임을
+리듀서에 통과시킨다: 시퀀스 high-water mark 이하의 프레임은 버리고, 새 `runId` 는 노드를 먼저
+IDLE 로 되돌리고, 이미 쓰인 것보다 덜 최종적인 state 는 거부한다 — `ERROR` 가 `COMPLETED` 를
+이기므로 늦은 성공이 실패를 덮지 못한다.
+
+run state 를 그 밖에서 쓴다면 — `GET /nodes/:id` 폴링, 로그 재생, 직접 만든 소켓 핸들러 —
+위 규칙은 하나도 적용되지 않고 `applyRuntime` 은 주는 대로 받는다. 먼저 물어볼 것:
+
+```ts
+import { shouldUpdateState } from '@lemoncloud/flow-engine';
+
+if (shouldUpdateState(node.state, serverState)) {
+    engine.applyRuntime(node.id, { state: serverState, status: serverState });
+}
+```
+
+이 함수가 안 알려주는 것 둘:
+
+- 엔진이 모델링하지 않는 state 는 거부가 아니라 **last-write** 다. 서버의 `NodeStatusType` 은
+  `NodeState` 유니온에 없는 셋(`''`·`WAITING`·`SKIPPED`)을 선언하고, `parseSocketFrame` 은
+  프레임이 아니라 **값**을 떨군다.
+- `applyRuntime` 은 얕은 병합이라, 할 말이 없으면 **키를 빼야 한다.** `undefined` 를 담은
+  `state` 는 "의견 없음" 이 아니라 노드의 state 를 지운다.
+
 **실행 방법** — Vitest 밖에서는 `@flows/*` 별칭이 안 풀리므로 번들해서 돌린다
 (`engine:demo` 스크립트가 하는 것과 같다):
 

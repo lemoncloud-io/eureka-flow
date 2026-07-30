@@ -237,6 +237,30 @@ session.close();
 socket.close();
 ```
 
+**A run's frames do not arrive in order, and the session is what makes that safe.** It folds
+every frame through the reducer: one at or behind the sequence high-water mark is dropped, a new
+`runId` puts the node back to IDLE first, and a state less final than the one already written is
+refused — `ERROR` outranks `COMPLETED`, so a late success cannot bury a failure.
+
+If you write run state from anywhere else — polling `GET /nodes/:id`, replaying a log, your own
+socket handler — none of that applies and `applyRuntime` takes whatever you give it. Ask first:
+
+```ts
+import { shouldUpdateState } from '@lemoncloud/flow-engine';
+
+if (shouldUpdateState(node.state, serverState)) {
+    engine.applyRuntime(node.id, { state: serverState, status: serverState });
+}
+```
+
+Two things it will not tell you:
+
+- A state the engine does not model takes **last-write**, not a refusal. The server's
+  `NodeStatusType` declares three the `NodeState` union does not (`''`, `WAITING`, `SKIPPED`),
+  and `parseSocketFrame` drops the value rather than the frame.
+- `applyRuntime` merges shallowly, so **omit the key** when you have nothing to say. A `state`
+  held as `undefined` is not "no opinion" — it erases the node's own.
+
 **Running it** — outside Vitest the `@flows/*` aliases do not resolve, so bundle first (the same
 thing the `engine:demo` script does):
 

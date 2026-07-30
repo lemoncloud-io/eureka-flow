@@ -1,9 +1,6 @@
-import type { NodeState } from '../types';
+import { isNodeState } from '@flows/engine';
 
-/**
- * Valid node state values for runtime validation
- */
-const VALID_STATES: ReadonlySet<string> = new Set(['IDLE', 'READY', 'RUNNING', 'COMPLETED', 'ERROR']);
+import type { NodeState } from '../types';
 
 /**
  * Fallback timeout for polling node state when WebSocket doesn't deliver
@@ -22,6 +19,11 @@ export { shouldUpdateState } from '@flows/engine';
 /**
  * Get effective state from node (state preferred, status as fallback)
  * Use this during migration period for backward compatibility
+ *
+ * Which strings count is `@flows/engine`'s `isNodeState`, not a list kept here. This file
+ * used to hold a second copy of the same five values, which meant the load path and the
+ * socket path could disagree about whether a state exists the moment either list moved.
+ *
  * @param state - Node state field (preferred)
  * @param status - Node status field (deprecated fallback)
  * @returns Effective state value, or undefined if invalid
@@ -29,5 +31,5 @@ export { shouldUpdateState } from '@flows/engine';
 export const getEffectiveState = (state?: string, status?: string): NodeState | undefined => {
     const value = state ?? status;
     if (!value) return undefined;
-    return VALID_STATES.has(value) ? (value as NodeState) : undefined;
+    return isNodeState(value) ? value : undefined;
 };
