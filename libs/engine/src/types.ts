@@ -17,7 +17,8 @@ import type { BlockDefinition, DataPacket, EdgeData, NodeData } from '@lemonclou
  * The server's `NodeStatusType` declares three more — `''`, `WAITING`, `SKIPPED` — and this
  * union deliberately stays at five, because that is what the wire actually carries: the only
  * builder of a node frame derives state from the run stage, and its five branches produce
- * exactly these (`''` needs a `stage` of `null`, which the stage type cannot express).
+ * exactly these (`''` needs a `stage` of `null`, and no caller passes one — the branch is
+ * written but unreached).
  *
  * `SKIPPED` is not a reserved word, though. It marked `disabled` nodes until a 2026-02-28
  * refactor removed that feature and the state with it, so this union is short by a feature

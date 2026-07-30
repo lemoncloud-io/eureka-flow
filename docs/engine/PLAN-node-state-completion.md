@@ -226,7 +226,7 @@ Set을 지우고 `isNodeState`에 위임.
 
 **게이트**
 
-- [ ] 위 결정과 근거가 `PLAN.md` §15에 기록됨
+- [ ] 위 결정과 근거가 `PLAN.md` **§16**에 기록됨 (§15는 `feature/mobile-engine` 것)
 - [ ] (a)면: SKIPPED 프레임 하나로 `waitForNode`가 settle되는 테스트
 - [ ] (b)면: SKIPPED가 터미널이 아님을 고정하는 테스트 + flow-mcp가 왜 다른지 주석
 - [ ] `nx test flow-engine` green
