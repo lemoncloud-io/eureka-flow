@@ -29,7 +29,8 @@ The full model — components, the turn loop, interfaces, permissions — is in
 **[design/](design/)** — the shared architecture.
 
 - [architecture.md](design/architecture.md) — the shared model every agent is built from (read this first).
-- [canvas-binding.md](design/canvas-binding.md) — the desktop CanvasBinding implementation notes.
+- [canvas-binding.md](design/canvas-binding.md) — the CanvasBinding over the `FlowEngine`: what it reads,
+  how an edit is checkpointed, and why permissions are not enforced there.
 
 **[agents/](agents/)** — the concrete agents.
 
