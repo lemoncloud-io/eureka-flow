@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-07-30] - root@0.66.1, @flows/web@0.66.1, @flows/admin@0.40.1
+
+### Documentation
+
+- (agent) retitle the canvas-binding index entry to match the doc
+- (agent) drop the last two pre-engine claims from the browser-agent docs
+- (agent) point the in-memory binding's note at the engine binding
+
+### Refactor
+
+- (agent) bind the canvas seam to the engine, not the desktop canvas ref
+
 ## [2026-07-29] - root@0.66.0, @flows/web@0.66.0, @flows/admin@0.40.0
 
 ### Features
