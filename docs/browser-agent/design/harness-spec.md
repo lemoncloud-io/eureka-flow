@@ -243,6 +243,20 @@ permissions).
   the full multi-agent path (best for evaluating the orchestrator) and keeps it a pure coordinator. It
   **discovers its specialists via `list_agents`** — the roster is a registry, not hardcoded in the persona,
   so adding or swapping a specialist changes no prompt.
+- **The orchestrator decomposes + routes + coordinates; the specialist validates.** It breaks the request into
+  tasks each ONE specialist can carry out, routes each to the right specialist, and coordinates them (independent
+  tasks together, dependent ones in sequence). It resolves only what the coordinator must settle and a specialist
+  cannot see from its own briefing — the **target** id, a vague **amount** ("a bit" → ~20px), and **shared
+  values** several specialists must agree on (the one column to align to, a just-added node's id threaded into
+  the later connect/configure tasks) — and delegates each task at the level of the user's intent. It does **not**
+  pre-validate the block schema: whether a config field exists, how it is named (`temp` vs `temperature`), or
+  whether a value is allowed. That is the **specialist's** job — it reads the schema (`describe_node`), applies
+  or rejects the edit, and reports the rejection (the property agent surfaces a bad value/type/unknown key; the
+  edge agent a cycle/occupied input). The orchestrator keeps its read tools (`describe_node`, `catalog_search`,
+  `describe_block`) and **may** consult them to _plan_ — to understand the flow or settle a shared value — but
+  reading never substitutes for delegating, and it does not gate delegation on a field-level check. So a
+  single-task ask with a bad value (invalid model, unknown field) is a **specialist rejection that bubbles up**,
+  not an orchestrator pre-check: nothing lands and the turn is `refused`.
 - **`locator` carries node read + node move** — node **read** (`list_nodes` + `describe_node`) to find the
   node the user means, and **`move_node`** (its real name; the scenarios abbreviate it "move") bound to the
   live `CanvasBinding`. Its synchronous `move_node` dispatch self-validates (node exists · exactly one of

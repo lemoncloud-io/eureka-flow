@@ -12,7 +12,6 @@ import type { FakeScript, TurnResult } from '../runScenario';
 // ends with a `text(...)` turn-1 reply followed by `report({...})` (the turn-2 JSON the eval parses).
 const step = (toolCalls: { name: string; args: unknown }[]) => ({ toolCalls });
 const spawn = (children: { task: string; agentType: string }[]) => step([{ name: 'spawn', args: { children } }]);
-const describeBlock = (type: string) => step([{ name: 'describe_block', args: { type } }]);
 const describeNode = (nodeId: string) => step([{ name: 'describe_node', args: { nodeId } }]);
 const text = (t: string) => ({ text: t });
 /** The turn-2 (eval re-ask) reply: the outcome as a JSON object `runScenario` parses (`parseOutcome`). */
@@ -152,47 +151,7 @@ describe('Harness scenarios — outcome coverage', () => {
         expect(result.committed).toBe(true);
     });
 
-    // ── partial ──────────────────────────────────────────────────────────────────────────────────
-    it('P1 — move the preview down AND wire generator→buffer (cycle rejected → partial)', async () => {
-        // The move lands (locator); the edge is rejected by the edge tool (gen→buf would close the
-        // buf→gen→buf cycle), so nothing is wired — a genuine per-op partial.
-        const script: FakeScript = {
-            orchestrator: [
-                spawn([
-                    { agentType: 'locator', task: `move ${IDS.prev} down by 20px` },
-                    { agentType: 'edge', task: `connect ${IDS.gen} out to ${IDS.buf} in` },
-                ]),
-                text('Moved the preview; the generator→buffer connection was rejected (it would create a cycle).'),
-                report({
-                    status: 'partial',
-                    summary: 'moved the preview; connection rejected',
-                    applied: [`move ${IDS.prev}`],
-                    failed: [{ task: `connect ${IDS.gen}→${IDS.buf}`, reason: 'would create a cycle' }],
-                }),
-            ],
-            locator: [step([moveBy(IDS.prev, 0, 20)]), text('moved')],
-            edge: [step([connect(IDS.gen, 'out', IDS.buf, 'in')]), text('connect rejected: would create a cycle')],
-        };
-        const result = await runScenario({
-            objective: 'move the preview down and connect the generator into the buffer',
-            initialGraph: makeInitialGraph(),
-            script,
-        });
-
-        expect(result.outcome.status).toBe('partial');
-        expect(result.committed).toBe(true);
-        // the move landed (relational — never assert an exact y)
-        const after = nodeById(result.graph, IDS.prev).position;
-        expect(after.y).toBeGreaterThan(400);
-        // the connection did NOT land: no gen→buf edge, and the original edge set is intact.
-        expect(result.graph.edges.some(e => e.sourceNodeId === IDS.gen && e.targetNodeId === IDS.buf)).toBe(false);
-        expect(result.graph.edges).toHaveLength(makeInitialGraph().edges.length);
-        if (result.outcome.status === 'partial') {
-            expect(result.outcome.failed).toHaveLength(1);
-            expect(result.outcome.failed[0].reason).toMatch(/cycle/);
-        }
-    });
-
+    // ── applied (structural: node + edge composition) ──────────────────────────────────────────────
     it('A5 — delete the buffer AND rewire input→generator (node + edge composition → applied)', async () => {
         // A compound structural turn: the node agent deletes the buffer (its edges cascade, freeing the
         // generator's input), then the edge agent connects the input straight to the generator. Ordered, not
@@ -260,75 +219,6 @@ describe('Harness scenarios — outcome coverage', () => {
         expect(added?.config?.model).toBe('gemini-2.5-pro');
     });
 
-    it('P2 — set model + bad topK (wrong type → partial)', async () => {
-        const script: FakeScript = {
-            orchestrator: [
-                spawn([{ agentType: 'property', task: `set model=gemini-2.5-pro AND topK=abc on ${IDS.gen}` }]),
-                text('Set the model to gemini-2.5-pro; topK "abc" was rejected (not a number).'),
-                report({
-                    status: 'partial',
-                    summary: 'set the model; topK rejected',
-                    applied: ['set model'],
-                    failed: [{ task: 'set topK', reason: 'topK "abc" is not a number' }],
-                }),
-            ],
-            property: [
-                step([setProps(IDS.gen, { model: 'gemini-2.5-pro' })]),
-                step([setProps(IDS.gen, { topK: 'abc' })]), // rejected — not a number
-                text('set model=gemini-2.5-pro; topK=abc rejected (not a number)'),
-            ],
-        };
-        const result = await runScenario({
-            objective: "set the generator's model to Gemini 2.5 Pro and its topK to abc",
-            initialGraph: makeInitialGraph(),
-            script,
-        });
-
-        expect(result.outcome.status).toBe('partial');
-        expect(nodeById(result.graph, IDS.gen).config?.model).toBe('gemini-2.5-pro');
-        expect(nodeById(result.graph, IDS.gen).config?.topK).toBeUndefined(); // unchanged (never applied)
-        if (result.outcome.status === 'partial') {
-            expect(result.outcome.failed[0].task.toLowerCase()).toContain('topk');
-        }
-    });
-
-    it('P3 — add a generator + set its model, but a self-connection is rejected (node+config land → partial)', async () => {
-        // node + property land on the new node; the edge (a self-loop) is rejected by the edge tool.
-        const NEW = 'n_1'; // deterministic first-add id (see A6)
-        const script: FakeScript = {
-            orchestrator: [
-                spawn([{ agentType: 'node', task: 'add a single-output-generator at (900, 300)' }]),
-                spawn([
-                    { agentType: 'property', task: `set ${NEW} model to gemini-2.5-pro` },
-                    { agentType: 'edge', task: `connect ${NEW} out to ${NEW} in` }, // self-loop → cycle
-                ]),
-                text('Added and configured the generator; the self-connection was rejected (it would cycle).'),
-                report({
-                    status: 'partial',
-                    summary: 'added + configured; self-connection rejected',
-                    applied: ['add generator', 'set model'],
-                    failed: [{ task: `connect ${NEW}→${NEW}`, reason: 'would create a cycle' }],
-                }),
-            ],
-            node: [step([addNode('single-output-generator', 900, 300)]), text(`added ${NEW}`)],
-            property: [step([setProps(NEW, { model: 'gemini-2.5-pro' })]), text('set model')],
-            edge: [step([connect(NEW, 'out', NEW, 'in')]), text('connect rejected: would create a cycle')],
-        };
-        const result = await runScenario({
-            objective: 'add a generator, set its model to gemini-2.5-pro, and connect it to itself',
-            initialGraph: makeInitialGraph(),
-            mode: 'serial',
-            script,
-        });
-
-        expect(result.outcome.status).toBe('partial');
-        const added = result.graph.nodes.find(n => n.type === 'single-output-generator' && n.id !== IDS.gen);
-        expect(added?.config?.model).toBe('gemini-2.5-pro'); // config landed
-        // the self-connection did NOT land: no edge touches the new node; only the original edges remain
-        expect(result.graph.edges.some(e => e.sourceNodeId === added?.id || e.targetNodeId === added?.id)).toBe(false);
-        expect(result.graph.edges).toHaveLength(makeInitialGraph().edges.length);
-    });
-
     // ── refused — needs a decision from the user (ambiguity / invalid input) ────────────────────────
     it('Q1 — move "the node" right (ambiguous → refused, asks which)', async () => {
         const reason = `Which node? Candidates: ${IDS.txt}, ${IDS.buf}, ${IDS.gen}, ${IDS.prev}.`;
@@ -348,13 +238,21 @@ describe('Harness scenarios — outcome coverage', () => {
         expectUnchanged(result);
     });
 
-    it('Q2 — set model to gpt-4o (invalid value → refused, lists valid models)', async () => {
+    it('Q2 — set model to gpt-4o (invalid value → specialist rejects → refused, lists valid models)', async () => {
+        // The orchestrator delegates the intent high-level — it does NOT pre-check the value. The property
+        // specialist reads the schema, tries the edit, the tool rejects it (gpt-4o not in the enum), and it
+        // reports the rejection; the orchestrator surfaces it as refused. Nothing lands.
         const reason = `gpt-4o isn't available. Choose one of: ${GENERATOR_MODELS.join(', ')}.`;
         const script: FakeScript = {
             orchestrator: [
-                describeBlock('single-output-generator'),
+                spawn([{ agentType: 'property', task: `set ${IDS.gen} model to gpt-4o` }]),
                 text(reason),
                 report({ status: 'refused', reason }),
+            ],
+            property: [
+                describeNode(IDS.gen),
+                step([setProps(IDS.gen, { model: 'gpt-4o' })]), // rejected — not an allowed model
+                text('could not set model: gpt-4o is not an allowed option'),
             ],
         };
         const result = await runScenario({
@@ -385,15 +283,21 @@ describe('Harness scenarios — outcome coverage', () => {
         expectUnchanged(result);
     });
 
-    it("Q4 — set a config field the block doesn't have (unknown key → refused)", async () => {
-        // The generator's fields are model/temperature/topK — there is no `maxTokens`. The orchestrator
-        // checks the block, sees the field does not exist, invents nothing, and refuses.
+    it("Q4 — set a config field the block doesn't have (unknown key → specialist rejects → refused)", async () => {
+        // The generator's fields are model/temperature/topK — there is no `maxTokens`. The orchestrator does
+        // not pre-check the field; it delegates the intent. The property specialist reads the schema, tries the
+        // edit, the tool rejects the unknown key, and it reports it — the orchestrator refuses. Nothing lands.
         const reason = 'The generator has no "max tokens" field. Available fields: model, temperature, topK.';
         const script: FakeScript = {
             orchestrator: [
-                describeBlock('single-output-generator'),
+                spawn([{ agentType: 'property', task: `set ${IDS.gen} maxTokens to 500` }]),
                 text(reason),
                 report({ status: 'refused', reason }),
+            ],
+            property: [
+                describeNode(IDS.gen),
+                step([setProps(IDS.gen, { maxTokens: '500' })]), // rejected — unknown config key
+                text('could not set maxTokens: unknown config key for this block'),
             ],
         };
         const result = await runScenario({

@@ -20,8 +20,8 @@ matrix.
   a concrete task, asserting the live graph — its definition of done. One pair per specialist:
   `scenarios/locator.*`, `scenarios/property.*`, `scenarios/node.*`, `scenarios/edge.*`.
 - **Integration, orchestrator × agents** — `scenarios/integration.{spec,live.spec}.ts`: the orchestrator
-  resolving a request and delegating across specialists (the applied/partial/refused/answered matrix). The
-  live variant checks only the outcome + graph oracle.
+  resolving a request and delegating across specialists (the applied/refused/answered matrix — `partial` is a
+  production outcome but not a test target, see below). The live variant checks only the outcome + graph oracle.
 - **Support** — `runScenario.ts` (the orchestrator runner + the test-only outcome re-ask), `fixtures.ts` (the
   shared 4-node graph for the integration cases, plus the fixture catalog and `nodeById`), `turnOutcome.ts`
   (the eval-only `TurnOutcome` + `parseOutcome`), `verboseGateway.ts`.
@@ -44,8 +44,11 @@ enforces:
 | status                 | `committed` | final `graph`                                      |
 | ---------------------- | ----------- | -------------------------------------------------- |
 | `applied`              | `true`      | changed as intended                                |
-| `partial`              | `true`      | successful edits applied; `failed` non-empty       |
+| `partial`¹             | `true`      | successful edits applied; `failed` non-empty       |
 | `refused` / `answered` | `false`     | deep-equals the pre-turn graph (`expectUnchanged`) |
+
+¹ `partial` remains a valid production outcome (spec §2.6) but **no scenario asserts it** — on a mixed-validity
+ask the agent may refuse or partially apply, so the harness leaves that choice unpinned (see "Coverage" below).
 
 `committed` is a JSON diff of the post-turn live graph against the pre-turn snapshot — the specialists edit
 the live `CanvasBinding` directly, so a real edit shows up there.
@@ -66,11 +69,19 @@ the live `CanvasBinding` directly, so a real edit shows up there.
 - **A no-edit oracle** — `committed === false` **and** the post-turn graph deep-equals the scenario's own
   initial graph — for every `refused` / `answered` case (the integration suite's `expectUnchanged` helper is
   one instance of this, against the shared fixture).
-- **Coverage spans the outcome matrix:** `applied` (every intended edit landed — including a compound
-  add → wire → configure), `partial` (some landed, some were rejected or had no capable specialist — e.g. the
-  node is added but the requested connection would cycle; `failed` non-empty), `refused` (ambiguity / invalid
-  value / missing field / an unroutable connection / permission or capability gap → nothing lands), and
-  `answered` (a pure question, no edit).
+- **Coverage spans the _tested_ outcomes — `applied`, `refused`, `answered`.** `applied` (every intended edit
+  landed — including a compound add → wire → configure), `refused` (ambiguity / invalid value / missing field /
+  an unroutable connection / permission or capability gap → **nothing lands**), and `answered` (a pure
+  question, no edit).
+    - **`partial` stays a production outcome (spec §2.6) but is not a test target.** On a mixed-validity ask
+      (some parts valid, one bad), we do **not** pin the outcome: the agent may reasonably refuse the whole
+      request _or_ partially apply the good parts and report the bad one — both are acceptable. So the harness
+      ships **no scenario whose oracle asserts `partial`** (neither deterministic nor live), and the live
+      outcome set is exactly `applied | refused | answered`.
+    - **Deterministic `refused` cases are _fully_ refused — no mix.** Every deterministic refusal is a whole-turn
+      no-op (`expectUnchanged`: `committed === false` and the graph deep-equals its own initial graph). We do not
+      script a case where some parts apply and others refuse — that mixed shape is exactly the `partial` we leave
+      to the agent's judgement.
 
 ---
 

@@ -225,21 +225,6 @@ describe.skipIf(SKIP_LIVE)('Harness scenarios — LIVE against a real Gemini key
         TIMEOUT_MS
     );
 
-    it(
-        'P2 — set model + bad topK (wrong type → partial)',
-        async () => {
-            const result = await runLive('P2', {
-                objective: "set the generator's model to Gemini 2.5 Pro and its topK to abc",
-                initialGraph: makeInitialGraph(),
-            });
-
-            expect(result.outcome.status).toBe('partial');
-            expect(nodeById(result.graph, IDS.gen).config?.model).toBe('gemini-2.5-pro');
-            expect(nodeById(result.graph, IDS.gen).config?.topK).toBeUndefined(); // rejected, never applied
-        },
-        TIMEOUT_MS
-    );
-
     // ── refused — needs a decision from the user (ambiguity / invalid input) ────────────────────────
     it(
         'Q1 — move "the node" right (ambiguous → refused, asks which)',
