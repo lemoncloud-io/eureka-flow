@@ -124,33 +124,103 @@ const rawStateOf = (msg: unknown): string | undefined => {
 `TERMINAL_STATES = {COMPLETED, ERROR, SKIPPED}` (`src/types.ts:232`) 가 완료 판정에 쓰인다.
 **`WAITING`은 거기 없다** → flow-mcp에서 `WAITING`은 미랭크 last-write 경로로 흐른다.
 
-## 4. ⚠️ 확인 못 한 것 — 와이어가 실제로 이 둘을 싣는가
+## 4. 와이어가 실제로 이 둘을 싣는가 — 판정 완료
 
-**eureka-flows-api 런타임 코드에 `SKIPPED`/`WAITING` 할당이 없다.** `git grep`으로 확인한
-전체 출현:
+**안 싣는다. 단 "예약어"가 아니라 "제거된 기능"이다.** (2026-07-30, `eureka-flows-api`
+`develop @ 1efa791` = v0.26.621d 직독)
 
-- `SKIPPED` → `types-graph.ts:171` (LUT 선언) · `src/modules/flows/README.md:119` (설명 표). 끝.
-- `WAITING` → 런타임 0건.
+> **앞선 서술 정정.** 이 절은 원래 "노드 실행 state를 계산하는 코드가 eureka-flows-api에
+> 없어서 판정 불가"라고 적었다. **틀렸다** — 그 코드가 거기 있다. 설치된 npm 패키지
+> (`@lemoncloud/eureka-flows-api`)만 보면 `.d.ts`뿐이라 안 보이지만, 서버 소스 레포를 보면
+> 나온다. 아래는 소스 레포 기준.
 
-노드 실행 state를 계산하는 코드가 그 레포에 없다 (`api-flows.ts`/`proxy-graph.ts`는 저장·프록시,
-`wss-proxy.ts`는 소켓 중계). 실행 주체는 다른 서비스거나 브라우저다 — **eureka-flows-api와
-flow-mcp 두 레포만으로는 판정 불가.**
+### 오늘 와이어의 state 어휘 = `{READY, RUNNING, COMPLETED, ERROR}`
 
-> **선행 정정.** "서버가 `SKIPPED`를 보낸다"는 서술이 flow-mcp 쪽 판단 근거로 쓰였는데,
-> 그 근거는 flow-mcp의 `TERMINAL_STATES`에 그게 있다는 것이었다 — **방어적 가정이지 확인된
-> 서버 동작이 아니다.** 계약에 선언돼 있는 건 사실, 와이어에 실린다는 건 미확인.
-> PLAN의 슬라이스 0이 이걸 판정한다.
+소켓 노드 프레임을 만드는 곳은 **하나뿐**이다 — `transformer-graph.ts:1546`
+`asSocketNodeEvent`. state는 `:1566-1574`의 5분기 삼항이 전부:
 
-이게 왜 계획을 바꾸는가: 와이어가 절대 안 싣는다면 "유니온에 추가"는 죽은 코드를 늘리는
-것이고, 올바른 수정은 **선언에서 빼거나 reserved로 명시**하는 쪽이다.
+```ts
+const state: NodeStatus = node?.error
+    ? 'ERROR'
+    : stage === null
+      ? ''
+      : !stage
+        ? 'READY'
+        : stage == 'final'
+          ? 'COMPLETED'
+          : 'RUNNING';
+```
+
+- `options.state` override(`:1580`)가 열려 있지만 **호출부가 전 레포에 하나**
+  (`proxy-graph.ts:286` `_node()`)고 `{ no, stage, $run }`만 넘긴다
+- 발신 지점도 그 하나다. `wss-proxy.ts:275`가 손수 만드는 `type:'node'`는
+  `{ type:'node', ...$node, ...data }` 래퍼이고 `data`가 위 이벤트다 — 독립 어휘 소스 아님
+- **`''`는 도달 불가**: `stage === null`이 필요한데 `RunNodeStage`
+  (`types-graph.ts:243`)에 `null`이 없고 유일 호출부도 타입을 지킨다. `stage === ''`는
+  falsy라 `'READY'`로 간다
+- REST·영속 경로도 못 만든다: `asState`/`asStatus`(`:643,663`)는 `ERROR | READY | def`이고
+  `def` 실인자는 `'IDLE'`·`'READY'`·`undefined`뿐. `toNodeStatus`(`:944`)는 **호출부 0개**
+
+**→ 엔진 유니온 5개가 오늘 와이어와 정확히 일치한다.** §1의 "계약 8 vs 엔진 5"는
+정확히는 **선언 8 vs 도달가능 5**다.
+
+### 하지만 한때 실렸다 — `disabled` 노드가 SKIPPED였다
+
+전 ref를 훑으면 LUT 밖 `SKIPPED`/`WAITING` 할당을 가진 브랜치들
+(`origin/feat/graph-rag`, `origin/feat/opt-text-block`, `feat/refactoring`,
+`feat/add-flow-model`)이 전부 develop의 **조상**이다(`develop...graph-rag` = `735 0`).
+히스토리에 들어왔다가 지워졌다는 뜻이다.
+
+- 도입 `e28ee89` (2026-01-26) → 최대 5건 (`1a621ac`, 2026-02-13)
+- **삭제 `b2093a9` "v0.26.227a cleanup"** (2026-02-28) — `proxy.ts` −898줄 포함 총 −1740줄.
+  proxy → proxy-graph V2 이행의 일부
+
+지워진 코드가 하던 일은 LUT 주석이 말하는 "조건 분기"가 아니라 **`disabled` 노드**였다:
+
+```ts
+if ($current?.disabled) {
+    await this.setStatusAndFlush(nodeId, 'SKIPPED');
+    return $current;
+}
+```
+
+develop에는 `disabled` 노드 처리가 **통째로 없다**(`proxy.ts`·`proxy-graph.ts`·
+`service-graph.ts` 0건, 프론트 엔진도 0건). 기능이 빠지면서 state도 같이 나갔다.
+`GuardResult.nextState?: NodeStatusType`(`types-graph.ts:381-387`)은 선언만 남고 사용처 0 —
+같은 계열의 잔해다.
+
+> **flow-mcp 근거 정정은 유효하다.** "서버가 `SKIPPED`를 보낸다"의 근거가 자기
+> `TERMINAL_STATES`였던 건 맞고, 그건 관측이 아니라 방어적 가정이었다
+> (`TERMINAL_STATES` 도입 커밋 = `e95a33d "chore: temp commit"`, 테스트도 합성 fixture).
+> **다만 그 방어를 지우라는 결론으로 가면 안 된다** — 타입 계약이 여전히 예약하고 있고,
+> 제거된 기능이 돌아오면 필요하다.
+
+이게 왜 계획을 바꾸는가: 유니온 확장은 **죽은 코드가 아니라 회귀한 기능의 선작업**이다.
+그래서 **취소가 아니라 보류**다.
+
+**미검증 1건**: 배포된 프로덕션 버전이 이 소스와 같은지는 확인 못 했다(로컬 develop
+0.26.621d, 이 레포가 설치한 타입 패키지 0.26.609). 제거가 2026-02-28이고 이후 develop에
+재도입 흔적이 0이라 뒤집힐 가능성은 낮다.
 
 ## 5. 소비자별 노출도
 
-| 소비자                      | 미모델링 state를 만나면          | 지금                  |
-| --------------------------- | -------------------------------- | --------------------- |
-| **flow-mcp** (`ws-client`)  | `RANK_AS` + 미랭크 last-write    | 보정 있음, 국소       |
-| **브라우저 에디터**         | 미확인 — 같은 리듀서를 직접 쓴다 | 보정 없음 (확인 필요) |
-| **CLI** (`libs/engine/cli`) | 미확인 — 같은 리듀서             | 보정 없음 (확인 필요) |
+| 소비자                      | 미모델링 state를 만나면                                     | 지금            |
+| --------------------------- | ----------------------------------------------------------- | --------------- |
+| **flow-mcp** (`ws-client`)  | `RANK_AS` + 미랭크 last-write                               | 보정 있음, 국소 |
+| **브라우저 에디터**         | 소켓 경로도 로드 경로도 값을 버린다 — 노드가 안 움직인다    | 보정 없음       |
+| **CLI** (`libs/engine/cli`) | 같은 파서 + `isTerminal`이 둘뿐 → `waitForNode`가 안 깨어남 | 보정 없음       |
+
+**브라우저·CLI 행은 확인함** (2026-07-30, 1차 출처 직독):
+
+- 소켓 → `dispatchSocketFrame.ts:1`이 엔진의 `parseSocketFrame`을 쓴다. state가 지워진 채
+  오므로 `useSocketHandlers`/`useMobileSocketSync`(`:121-127`)의 `if (state)`가 통째로 건너뛴다.
+  둘 다 `state as NodeState` 캐스팅을 하지만 **이미 필터를 통과한 값**이라 raw가 새지는 않는다
+- 로드·폴링 → `WorkflowCanvas.tsx:884`의 `getEffectiveState`가 자기 화이트리스트
+  (`libs/flows/src/consts/status.ts:6` — 엔진과 별개인 두 번째 5개 목록)로 다시 버린다
+- 합치면: 미지 state를 받은 노드는 **직전 state로 남는다.** 실행 중이었다면 60초 폴백 폴링
+  (`EXECUTION_FALLBACK_TIMEOUT_MS`)이 가져온 값도 같은 자리에서 지워져 **RUNNING인 채로 계속 돈다**
+- CLI/`runSession`은 여기에 하나 더 — 터미널 판정이 `runSession.ts:58`·`executionReducer.ts:83`에
+  `COMPLETED | ERROR`로 박혀 있어, 설령 state가 살아 들어와도 `waitForNode`는 settle되지 않는다
 
 flow-mcp만 덧댔다. 같은 리듀서를 쓰는 다른 소비자는 **같은 갭을 그대로 맞는다** — 정본을
 엔진에서 고쳐야 하는 이유. 소비자마다 `RANK_AS`를 복제하면 손으로 짠 규칙이 셋이 된다.
