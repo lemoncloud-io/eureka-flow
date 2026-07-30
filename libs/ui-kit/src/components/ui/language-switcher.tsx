@@ -5,6 +5,8 @@ import { Globe } from 'lucide-react';
 import { Button } from './button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './dropdown-menu';
 
+import type { ReactElement } from 'react';
+
 const languages = ['en', 'ko'] as const;
 
 const languageFlags: Record<string, string> = {
@@ -12,7 +14,7 @@ const languageFlags: Record<string, string> = {
     ko: '🇰🇷',
 };
 
-export const LanguageSwitcher = (): JSX.Element => {
+export const LanguageSwitcher = (): ReactElement => {
     const { t, i18n } = useTranslation(['common']);
 
     const handleLanguageChange = (language: string) => {

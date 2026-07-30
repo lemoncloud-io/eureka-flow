@@ -78,7 +78,7 @@ export const OutputPreview: React.FC<VisualizationProps> = ({ node, definition, 
         );
     }
 
-    if (packet.type === 'markdown' || isMarkdownContent(packet.value)) {
+    if (isMarkdownContent(packet.value)) {
         return (
             <div className="p-2 bg-muted/10 rounded-lg border border-border/30" onWheel={e => e.stopPropagation()}>
                 <MarkdownViewer content={String(packet.value)} maxHeight={maxH} />

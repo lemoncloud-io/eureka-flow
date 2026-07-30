@@ -1,0 +1,165 @@
+name: publish-flow-engine
+
+# Publishes @lemoncloud/flow-engine when `libs/engine/package.json` names a version that is not
+# on the registry yet.
+#
+# The version is the trigger, not the merge. `libs/engine` carries its own hand-set version,
+# independent of the root version that `version-update.js` bumps on develop — so most merges
+# touching the engine are *not* releases. Publishing on every merge would 409 on the second one.
+# Instead every qualifying merge asks the registry, and only a new version goes out.
+#
+# To release: bump `version` in libs/engine/package.json, merge to develop. That's it.
+on:
+    push:
+        branches:
+            - develop
+        paths:
+            - 'libs/engine/**'
+    workflow_dispatch:
+        inputs:
+            dry-run:
+                description: 'Build and validate, but do not publish'
+                type: boolean
+                default: true
+
+jobs:
+    check:
+        name: Check version
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.pkg.outputs.version }}
+            should-publish: ${{ steps.registry.outputs.should-publish }}
+
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v4
+
+            - name: Read package version
+              id: pkg
+              run: |
+                  VERSION=$(node -p "require('./libs/engine/package.json').version")
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+            - name: Ask the registry
+              id: registry
+              run: |
+                  VERSION="${{ steps.pkg.outputs.version }}"
+                  if npm view "@lemoncloud/flow-engine@$VERSION" version >/dev/null 2>&1; then
+                      echo "should-publish=false" >> "$GITHUB_OUTPUT"
+                      echo "@lemoncloud/flow-engine@$VERSION is already published — nothing to do."
+                      echo "### No release: \`$VERSION\` is already on npm" >> "$GITHUB_STEP_SUMMARY"
+                      echo "Bump \`version\` in \`libs/engine/package.json\` to publish." >> "$GITHUB_STEP_SUMMARY"
+                  else
+                      echo "should-publish=true" >> "$GITHUB_OUTPUT"
+                      echo "Version $VERSION is free — will build and publish."
+                  fi
+
+            # A manual run that was explicitly told to publish should say so rather than
+            # succeed having done nothing. The automatic develop path stays quiet.
+            - name: Fail an explicit manual publish of an existing version
+              if: >
+                  github.event_name == 'workflow_dispatch'
+                  && github.event.inputs.dry-run != 'true'
+                  && steps.registry.outputs.should-publish == 'false'
+              run: |
+                  echo "::error::@lemoncloud/flow-engine@${{ steps.pkg.outputs.version }} is already on the registry. Bump libs/engine/package.json."
+                  exit 1
+
+    publish:
+        name: Publish @lemoncloud/flow-engine
+        needs: check
+        if: needs.check.outputs.should-publish == 'true'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            id-token: write # npm provenance
+
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  registry-url: 'https://registry.npmjs.org'
+
+            - name: Install dependencies
+              run: yarn install --frozen-lockfile
+
+            - name: Run engine tests
+              run: node node_modules/nx/bin/nx.js test flow-engine --skip-nx-cache
+
+            # `prepack` runs here too, so this is the real bundle — not a rehearsal of a different one.
+            - name: Pack and assert contents
+              working-directory: libs/engine
+              run: |
+                  npm pack --pack-destination /tmp
+                  TARBALL="/tmp/lemoncloud-flow-engine-${{ needs.check.outputs.version }}.tgz"
+                  echo "--- tarball contents ---"
+                  tar -tzf "$TARBALL"
+                  # `files: ["build"]` should hold, but a stray dist/ or src/ in the published
+                  # package is the kind of thing nobody notices until a consumer's bundle doubles.
+                  STRAY=$(tar -tzf "$TARBALL" | sed 's|^package/||' | grep -vE '^(build/|LICENSE$|README\.md$|package\.json$)' || true)
+                  if [ -n "$STRAY" ]; then
+                      echo "::error::Unexpected files in tarball:"
+                      echo "$STRAY"
+                      exit 1
+                  fi
+
+            # Both entry points, from the tarball as a consumer would get it. A name that resolves
+            # is not a package that works — this runs add -> undo -> redo through each.
+            - name: Smoke the tarball (ESM + CJS)
+              run: |
+                  TARBALL="/tmp/lemoncloud-flow-engine-${{ needs.check.outputs.version }}.tgz"
+                  mkdir -p /tmp/smoke && cd /tmp/smoke
+                  echo '{"name":"smoke","version":"1.0.0","private":true}' > package.json
+                  npm install "$TARBALL" --silent
+
+                  cat > check.mjs <<'EOF'
+                  import { createFlowEngine } from '@lemoncloud/flow-engine';
+                  const engine = createFlowEngine({ getBlockRegistry: () => ({}) });
+                  engine.transact('add', ops => ops.addNode({ type: 'input-text', position: { x: 0, y: 0 } }));
+                  const added = engine.getGraph().nodes.length;
+                  engine.undo();
+                  const undone = engine.getGraph().nodes.length;
+                  engine.redo();
+                  const redone = engine.getGraph().nodes.length;
+                  if (added !== 1 || undone !== 0 || redone !== 1) {
+                      throw new Error(`ESM: add=${added} undo=${undone} redo=${redone}`);
+                  }
+                  console.log('ESM ok');
+                  EOF
+
+                  cat > check.cjs <<'EOF'
+                  const { createFlowEngine } = require('@lemoncloud/flow-engine');
+                  const engine = createFlowEngine({ getBlockRegistry: () => ({}) });
+                  engine.transact('add', ops => ops.addNode({ type: 'input-text', position: { x: 0, y: 0 } }));
+                  const added = engine.getGraph().nodes.length;
+                  engine.undo();
+                  const undone = engine.getGraph().nodes.length;
+                  engine.redo();
+                  const redone = engine.getGraph().nodes.length;
+                  if (added !== 1 || undone !== 0 || redone !== 1) {
+                      throw new Error(`CJS: add=${added} undo=${undone} redo=${redone}`);
+                  }
+                  console.log('CJS ok');
+                  EOF
+
+                  node check.mjs
+                  node check.cjs
+
+            - name: Publish to npm
+              if: github.event.inputs.dry-run != 'true'
+              working-directory: libs/engine
+              run: npm publish --provenance
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+            - name: Summary
+              run: |
+                  if [ "${{ github.event.inputs.dry-run }}" = "true" ]; then
+                      echo "### Dry run — validated \`${{ needs.check.outputs.version }}\`, did not publish" >> "$GITHUB_STEP_SUMMARY"
+                  else
+                      echo "### Published \`@lemoncloud/flow-engine@${{ needs.check.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+                  fi

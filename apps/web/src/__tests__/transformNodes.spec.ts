@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import { transformNodeForSave, transformNodesForSave } from '@flows/flows';
 
-import type { BlockDefinitionWithFrontend } from '@flows/flows';
+import type { BlockDefinitionWithFrontend, GraphNode } from '@flows/flows';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
-const makeNode = (overrides: Partial<NodeData> = {}): NodeData =>
+const makeNode = (overrides: Partial<NodeData> = {}): GraphNode =>
     ({
         id: 'node-1',
         type: 'input-text',
         position: { x: 100, y: 200 },
         ...overrides,
-    }) as NodeData;
+    }) as GraphNode;
 
 const makeRegistry = (
     entries: Record<string, Partial<BlockDefinitionWithFrontend>> = {}
@@ -26,7 +26,7 @@ const makeRegistry = (
 describe('transformNodeForSave', () => {
     it('should keep only essential fields', () => {
         const node = makeNode({
-            status: 'COMPLETED' as NodeData['status'],
+            status: 'COMPLETED' as GraphNode['status'],
             inputData: { in: { value: 'hello' } },
             outputData: { out: { value: 'world' } },
         });

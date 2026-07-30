@@ -1,27 +1,14 @@
-import { diffAgainstBaseline, willDropStructure } from './baseline';
+import { runRequirement as requirementFor } from '@flows/engine';
 
-import type { GraphLike } from './snapshot';
+import { workspaceContext } from './context';
 
-/**
- * What has to happen before the server can run this graph.
- *
- * - `ready` — the server's copy already matches the canvas.
- * - `needs-save` — there is unsaved work the server cannot see. Save, then run.
- * - `editor-structure` — saving would not help; the run cannot succeed.
- */
-export type RunRequirement = 'ready' | 'needs-save' | 'editor-structure';
+import type { GraphLike, RunRequirement } from '@flows/engine';
+
+export type { RunRequirement } from '@flows/engine';
 
 /**
- * A run executes against the server's copy of the flow, not the canvas. Unsaved edits are
- * invisible to it, and a node added since the last save does not exist there at all — so
- * running that node asks the server for an ID it has never seen and gets a 404.
- *
- * The one case saving cannot rescue is a non-owner editor's structural change: the server
- * keeps their config overlay and drops the structure, so the save returns 200 and the run
- * still 404s. Saving first would only make the failure look handled.
+ * What has to happen before the server can run this graph — see `@flows/engine`
+ * (`persistence/runGate.ts`) for why a non-owner editor's structural change is the one
+ * case saving cannot rescue.
  */
-export const runRequirement = (graph: GraphLike): RunRequirement => {
-    const diff = diffAgainstBaseline(graph);
-    if (diff.isEmpty) return 'ready';
-    return willDropStructure(diff) ? 'editor-structure' : 'needs-save';
-};
+export const runRequirement = (graph: GraphLike): RunRequirement => requirementFor(graph, workspaceContext());

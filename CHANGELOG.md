@@ -1,5 +1,180 @@
 # Changelog
 
+## [2026-07-30] - root@0.66.1, @flows/web@0.66.1, @flows/admin@0.40.1
+
+### Documentation
+
+- (agent) retitle the canvas-binding index entry to match the doc
+- (agent) drop the last two pre-engine claims from the browser-agent docs
+- (agent) point the in-memory binding's note at the engine binding
+
+### Refactor
+
+- (agent) bind the canvas seam to the engine, not the desktop canvas ref
+
+## [2026-07-29] - root@0.66.0, @flows/web@0.66.0, @flows/admin@0.40.0
+
+### Features
+
+- (mobile) route every mobile graph write through the engine
+- (mobile) load the mobile editor's graph through the engine, so port values arrive
+- (engine) publish the engine as @lemoncloud/flow-engine, ESM and CJS from one source
+- (engine) let the host supply the UUID source, so the engine reaches every runtime
+- (engine) the repository keeps what the load response says about the flow
+- (engine) carry the connection id, so a headless run can be streamed back
+- (engine) connect the socket adapter in --real, and stop it writing by default
+- (engine) headless execution — frame parser, run session, runNode (Phase 4)
+- (engine) socket port and the execution state reducer (Phase 3, in-repo half)
+- (engine) persistence ports and the headless Node proof (Phase 2)
+- (engine) implement the FlowEngine core (Phase 1, P1-1)
+
+### Bug Fixes
+
+- (engine) export the socket port, and read the agent's canvas from the engine
+- (engine) report a run against the node, and keep the status on a non-JSON error body
+- (mobile) merge the port map instead of replacing it on a socket port update
+- (mobile) stop the empty-state quick-add offering the same block twice
+- (engine) give adapters a barrel, and stop pointing at a function the package doesn't ship
+- (engine) run the published package before calling it published
+- (engine) build request URLs without URL, which React Native cannot be trusted for
+- (engine) the block registry was keyed on a field the server never sends
+- (engine) a run reset names the node, and the run session carries it out
+- (flows) a connected input takes what its source is producing now
+- (engine) settle the waiters a closing session drops, and stop copying the whole graph
+- (web) typecheck reaches zero
+- (web) carry the graph's guarantees into the components
+- (libs) every library now emits declarations
+- (build) align lib tsconfigs with the workspace, clearing two known defects
+- (flows) read getWorkflow from the engine, not the render closure
+
+### Documentation
+
+- (engine) point the README guide link back at develop
+- (engine) pin the README guide link to a resolvable commit
+- reconcile the engine and agent docs with what the merge actually did
+- (engine) document the edit/runtime split and the load ingress
+- retract the "mobile has no engine" notes — it does now
+- (engine) tell consumers the two things that will otherwise cost them an afternoon
+- say that the mobile editor is not on the engine
+- (engine) name the published specifier where a reader outside the repo will copy it
+- (engine) record the three places this landed differently from the plan
+- (engine) say what the package actually installs, and link a branch that has the guide
+- (engine) the browser smoke ran, and it showed the load ingress working
+- (engine) close the two ports that were deferred and then forgotten
+- (readme) put the engine on the dependency diagram
+- the store is a projection, not the graph's home
+- (engine) add a one-page map of where the graph lives
+- (engine) record that the channelId wire was removed, and what it was doing
+- (engine) correct the channelId finding — it was never a server contract issue
+- (engine) unbreak the section numbering, and record Phases 5-6 in the checklist
+- (engine) correct the half-adopted claim — the rules were already shared
+- (engine) record Phase 6 — what the real server found that the stub hid
+- (engine) retitle PLAN for Phase 0-5
+- (engine) record Phase 5 — three rule slices, and what stays gated
+- (engine) record the stale-input defect, with its reproduction
+- (engine) retitle PLAN for Phase 0-2 and note Phase 3 is unspecified
+- (engine) add flow engine design doc and phase 0-1 execution plan
+
+### Refactor
+
+- (flows) drop the channelId wire, and name the default channel where it is used
+- (flows) the load response port row is the engine's, plus what the client adds
+- (engine) loadGraph is the single ingress, ports and propagation included
+- (engine) decode the HTTP node view where the socket one is decoded
+- (flows) drop the override nobody passed, and share the hydrator
+- (engine) let the engine's types and rules have one home each
+- (graph) the graph guarantees its nodes have ids
+- (socket) test the dispatch path, and restore a guard the strangler dropped
+- (flows) hand the canvas graph to the engine (Phase 1, P1-2/P1-3)
+- (engine) extract headless graph core into @flows/engine (Phase 0)
+
+### Chores
+
+- (merge) develop into mobile-engine
+- (merge) develop into mobile-engine
+- ignore npm pack tarballs
+
+### Other
+
+- ci: (engine) publish on develop merge, gated on the version being new
+- ci: (engine) add a publish workflow, and declare the tools prepack was borrowing
+- test: (engine) cover the request timeout, the last untested platform global
+- style: (socket) group the parsed frame payloads with the messages they come from
+
+## [2026-07-29] - root@0.65.0, @flows/web@0.65.0, @flows/admin@0.39.0
+
+### Features
+
+- (agent) orchestrator harness — one main agent + spawned specialists over the live canvas
+
+### Refactor
+
+- (agent) scope branch to the feature — revert unrelated churn vs develop
+
+## [2026-07-29] - root@0.64.0, @flows/web@0.64.0, @flows/admin@0.38.0
+
+### Features
+
+- (agent) add Generate API LlmGateway adapter foundation
+- (agent) wire BrowserAgentEnvironment into AgentPanel flow
+- (agent) add capability metadata to llm gateway contract
+- (agent) locator agent — @flows/agent core + flow-editor panel
+- (agent) add environment self-check for storage and trace
+- (agent) add llm gateway with gemini 2.5 flash provider
+- (agent) add http request port with fetch and scripted implementations
+- (flows) add CanvasBinding + dev validation panel
+- (agent) add browser/virtual environment foundation
+
+### Bug Fixes
+
+- (agent) gate FlowAgentPanel behind import.meta.env.DEV
+- (agent) address PR review — checkpoint agent moves, store-sourced reads, role-derived grant
+- (agent) redact api key from provider error bodies
+
+### Documentation
+
+- (agent) reconcile browser-agent docs with the store-sourced code
+- (agent) drop stale spec/section/milestone citations from comments
+- (agent) clarify Capability is a deliberate standalone mirror
+- (agent) refine architecture diagrams and reconcile docs with code
+- (agent) reconcile llm gateway brief with shared contract
+- (agent) drop W04 tag from gemini model comment
+- (agent) trim locator IMPLEMENTATION, add at-a-glance diagram
+- (agent) move browser agent briefs to docs root
+- (agent) locator agent spec + implementation record
+- (agent) soften browser verification wording in W04 brief
+- (agent) add W04 llm gateway brief
+- (agent-chat) redesign around agent-owns-turn + single ToolExecutor
+- (agent-chat) reconcile diagrams and section numbering
+- (agent-chat) rewrite spec as SPEC.md + README.md, archive prior iterations
+- (agent-chat) reorganize component interfaces top-down and reconcile spec
+- (agent) clarify reactive useAgentStore vs StorageInterface persistence port
+- (agent) polish meeting brief for review
+- (agent) add spec-driven development specs for agent chat feature
+- (agent) add acceptance criteria to meeting brief
+
+### Refactor
+
+- (agent) align @flows/agent with repo conventions, dedupe types, trim comments
+- (flows) make AgentPanel presentational; containers own the agent
+- (flows) extract agent wiring into a FlowAgentPanel adaptor
+- (agent) refit gemini gateway onto shared chat contract
+- (agent) extract generic BaseAgent + useAgentSession for multi-agent reuse
+- (flows) rename makeDesktopCanvasBinding → createDesktopCanvasBinding
+
+### Chores
+
+- (agent) clean internal verification wording
+- (agent) prune redundant tests, relocate web specs, tighten docs
+- (agent) centralize lib tests + reorganize browser-agent docs
+- drop manual libs/agent reference from root tsconfig (nx sync)
+- (agent) verify environment build compatibility
+
+### Other
+
+- test: (agent) verify fake gateway tool call through tool executor
+- test: (agent) prove both storages share one contract
+
 ## [2026-07-21] - root@0.63.0, @flows/web@0.63.0, @flows/admin@0.37.0
 
 ### Features
@@ -18,8 +193,8 @@
 - (admin) give name its own language key
 - (admin) edit select options and suggest existing keys
 - (admin) let the editor set the config placeholder and its key
-- (admin) carry and edit the *En language keys
-- (i18n) add translateField resolver for *En language-key fields
+- (admin) carry and edit the \*En language keys
+- (i18n) add translateField resolver for \*En language-key fields
 - (admin) redesign UI as a dataflow instrument panel
 - (admin) extend block migration to port/config labels
 - (i18n) seed port/config field keys in blocks.json
@@ -210,7 +385,7 @@
 ### Bug Fixes
 
 - (permissions) rename isOwner -> hasOwned to match server /load contract
-- (flows) detect node_/edge_ temp IDs to prevent 404 on node save
+- (flows) detect node*/edge* temp IDs to prevent 404 on node save
 
 ## [2026-06-17] - root@0.54.0, @flows/web@0.54.0, @flows/admin@0.30.0
 
@@ -370,7 +545,7 @@
 - share actor selection across components via Zustand store
 - cache update correctness in optimistic mutations
 - use sentinel value for empty SelectItem in stage editor
-- only call useItem on /items/* routes in header breadcrumb
+- only call useItem on /items/\* routes in header breadcrumb
 - use entity-specific proxy path (/:type/:id/proxy) instead of /flows/
 - default to mockApi, switch to realApi only with VITE_PROCESS_API=real
 - improve navigator UX with contextual header and stage navigation

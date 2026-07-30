@@ -1,15 +1,17 @@
 import type { FlowPermissions } from '@flows/flows';
 
-/** The canvas-relevant subset of {@link FlowPermissions}; `satisfies` fails the build if a name drifts. */
-const CAPABILITIES = [
-    'canModifyCanvas',
-    'canEditConfig',
-    'canEditStructure',
-    'canRun',
-] as const satisfies readonly (keyof FlowPermissions)[];
+/** Resolves to `T`, but fails to compile unless every member of `T` is assignable to `U`. */
+type Subset<T extends U, U> = T;
 
-/** The capabilities a tool can require and an agent can be granted. */
-export type Capability = (typeof CAPABILITIES)[number];
+/**
+ * The capabilities a tool can require and an agent can be granted: the canvas-relevant subset of
+ * the flow editor's {@link FlowPermissions}. The `Subset` guard fails the build if any of these
+ * names drifts from `FlowPermissions`, so the two stay in sync without a hand-maintained mirror.
+ */
+export type Capability = Subset<
+    'canModifyCanvas' | 'canEditConfig' | 'canEditStructure' | 'canRun',
+    keyof FlowPermissions
+>;
 
 /** What an agent is allowed to do. Absent/false capabilities are denied. */
 export type AgentGrant = Partial<Record<Capability, boolean>>;
@@ -26,5 +28,12 @@ export const effectiveCapabilities = (grant: AgentGrant): Set<Capability> => {
 };
 
 /** Project the flow editor's {@link FlowPermissions} onto the agent grant (the Capability subset). */
-export const toAgentGrant = (permissions: FlowPermissions): AgentGrant =>
-    Object.fromEntries(CAPABILITIES.map(key => [key, permissions[key]])) as AgentGrant;
+export const toAgentGrant = (permissions: FlowPermissions): AgentGrant => {
+    const grant: Record<Capability, boolean> = {
+        canModifyCanvas: permissions.canModifyCanvas,
+        canEditConfig: permissions.canEditConfig,
+        canEditStructure: permissions.canEditStructure,
+        canRun: permissions.canRun,
+    };
+    return grant;
+};

@@ -6,10 +6,10 @@ import { Input, Label, Switch, Textarea } from '@flows/ui-kit';
 import { MobileFileField } from './MobileFileField';
 import { ModelSelect } from '../../flows/components/ModelSelect';
 
-import type { NodeConfigItem } from '@lemoncloud/eureka-flows-api';
+import type { ConfigField } from '@lemoncloud/eureka-flows-api';
 
 interface ConfigFieldListProps {
-    fields: NodeConfigItem[];
+    fields: ConfigField[];
     config: Record<string, unknown>;
     onConfigChange: (key: string, value: unknown) => void;
     /** Block type — used to filter redundant fields for input-image/input-text */

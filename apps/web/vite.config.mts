@@ -93,6 +93,7 @@ export default defineConfig(({ mode }) => {
         resolve: {
             alias: {
                 '@flows/web-core': resolve(import.meta.dirname, '../../libs/web-core/src/index.ts'),
+                '@flows/engine': resolve(import.meta.dirname, '../../libs/engine/src/index.ts'),
                 '@flows/flows': resolve(import.meta.dirname, '../../libs/flows/src/index.ts'),
                 '@flows/shared': resolve(import.meta.dirname, '../../libs/shared/src/index.ts'),
                 '@flows/theme': resolve(import.meta.dirname, '../../libs/theme/src/index.ts'),

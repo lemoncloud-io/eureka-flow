@@ -10,7 +10,7 @@ import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
 import { useIsConnectionNew } from '../hooks';
 
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { GraphNode } from '@flows/flows';
 
 interface MobileConnectionCardProps {
     nodeId: string;
@@ -37,7 +37,7 @@ export const MobileConnectionCard = ({
 
     const contentPreview = useMemo(() => {
         if (!node) return null;
-        const outputData = (node as NodeData & { outputData?: Record<string, { value?: unknown }> }).outputData;
+        const outputData = (node as GraphNode & { outputData?: Record<string, { value?: unknown }> }).outputData;
         if (!outputData) return null;
         const entries = Object.entries(outputData);
         if (entries.length === 0) return null;
@@ -54,8 +54,8 @@ export const MobileConnectionCard = ({
     const nodeState = (node.state ?? 'IDLE') as string;
     const isError = nodeState === 'ERROR';
     const errorMessage =
-        (node as NodeData & { error?: string; errorMessage?: string }).error ||
-        (node as NodeData & { errorMessage?: string }).errorMessage ||
+        (node as GraphNode & { error?: string; errorMessage?: string }).error ||
+        (node as GraphNode & { errorMessage?: string }).errorMessage ||
         null;
 
     return (

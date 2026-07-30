@@ -13,40 +13,11 @@ const VALID_STATES: ReadonlySet<string> = new Set(['IDLE', 'READY', 'RUNNING', '
 export const EXECUTION_FALLBACK_TIMEOUT_MS = 60 * 1000; // 1 minute
 
 /**
- * Node state priority for comparing state updates
- * Higher number = more "final" state
- * Used to prevent race conditions between frontend/socket/API updates
- *
- * ERROR has highest priority (4) because it's a terminal failure state
- * that should not be overwritten by COMPLETED or other states.
+ * Which state updates may overwrite which — a graph rule, so `@flows/engine` owns it and
+ * the reducer and the canvas guards read the same table. ERROR outranks COMPLETED, so a
+ * late success cannot bury a failure.
  */
-export const STATE_PRIORITY: Record<string, number> = {
-    IDLE: 0,
-    READY: 1,
-    RUNNING: 2,
-    COMPLETED: 3,
-    ERROR: 4, // Terminal failure - highest priority
-};
-
-/**
- * Get priority value for a state string
- * @param state - Node state string
- * @returns Priority number (-1 if unknown)
- */
-export const getStatePriority = (state?: string): number => {
-    return STATE_PRIORITY[state ?? ''] ?? -1;
-};
-
-/**
- * Check if server state should update current state
- * Only updates if server state is equal or higher priority
- * @param current - Current node state
- * @param server - Server-provided state
- * @returns true if should update to server state
- */
-export const shouldUpdateState = (current?: string, server?: string): boolean => {
-    return getStatePriority(server) >= getStatePriority(current);
-};
+export { shouldUpdateState } from '@flows/engine';
 
 /**
  * Get effective state from node (state preferred, status as fallback)

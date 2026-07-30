@@ -27,6 +27,7 @@ describe('ROLE_PERMISSIONS', () => {
     it('owner can do everything', () => {
         expect(ROLE_PERMISSIONS.owner).toEqual({
             canEditConfig: true,
+            canModifyCanvas: true,
             canEditStructure: true,
             canRun: true,
             canSave: true,

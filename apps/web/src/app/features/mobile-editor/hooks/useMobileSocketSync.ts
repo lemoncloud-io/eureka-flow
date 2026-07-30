@@ -13,8 +13,9 @@ import {
 } from '@flows/flows';
 import { useInitFlowSocket } from '@flows/socket';
 
-import { executeNodeWithToast } from '../utils';
+import { executeNodeWithToast, loadFlowIntoEngine } from '../utils';
 
+import type { FlowEngine } from '@flows/engine';
 import type { NodeState } from '@flows/flows';
 import type {
     NodeUpdateInfo,
@@ -26,6 +27,7 @@ import type {
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 interface UseMobileSocketSyncParams {
+    engine: FlowEngine;
     lastLocalUpdateTimestampRef: React.MutableRefObject<number | null>;
     canEdit?: boolean;
     onMessage?: (message: WebSocketMessage) => void;
@@ -38,11 +40,12 @@ interface UseMobileSocketSyncReturn {
 }
 
 export const useMobileSocketSync = ({
+    engine,
     lastLocalUpdateTimestampRef,
     canEdit = false,
     onMessage,
 }: UseMobileSocketSyncParams): UseMobileSocketSyncReturn => {
-    const { currentFlowId, channelId, loadFlowById } = useFlows();
+    const { currentFlowId, loadFlowById } = useFlows();
 
     // RunContext store actions
     const beginRun = useCanvasStore(state => state.beginRun);
@@ -55,7 +58,7 @@ export const useMobileSocketSync = ({
     const nodeNoRef = useRef<Map<string, number>>(new Map());
     const nodeRunIdRef = useRef<Map<string, string>>(new Map());
     const portNoRef = useRef<Map<string, number>>(new Map());
-    const connectionIdRef = useRef<string | undefined>();
+    const connectionIdRef = useRef<string | undefined>(undefined);
     const pendingAutoExecRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleFlowUpdate = useCallback(
@@ -63,17 +66,17 @@ export const useMobileSocketSync = ({
             try {
                 const flowData = await loadFlowById(flowId);
                 if (flowData) {
-                    useCanvasStore.getState().loadWorkflow(flowData);
-                    // Baseline off the store rather than flowData — the snapshot the
+                    loadFlowIntoEngine(engine, flowData);
+                    // Baseline off the engine rather than flowData — the snapshot the
                     // registry resolves is the one the working copy will be compared to.
-                    const { nodes, connections } = useCanvasStore.getState();
-                    captureBaseline({ nodes, connections });
+                    const { nodes, edges } = engine.getGraph();
+                    captureBaseline({ nodes, connections: edges });
                 }
             } catch (error) {
                 console.error('[MobileFlowEditor] Failed to reload flow:', error);
             }
         },
-        [loadFlowById]
+        [engine, loadFlowById]
     );
 
     const handleNodeUpdate = useCallback(
@@ -112,20 +115,16 @@ export const useMobileSocketSync = ({
                 }
             }
 
-            const storeState = useCanvasStore.getState();
-            const { updateNodeData, nodes } = storeState;
+            const { nodes } = useCanvasStore.getState();
 
             if (state === 'ERROR') {
-                updateNodeData(nodeId, {
-                    state: state as NodeState,
-                    error,
-                } as Partial<NodeData>);
+                engine.applyRuntime(nodeId, { state: state as NodeState, error } as Partial<NodeData>);
                 toast.error(`Node ${nodeId} failed`);
                 return;
             }
 
             if (state) {
-                updateNodeData(nodeId, { state: state as NodeState } as Partial<NodeData>);
+                engine.applyRuntime(nodeId, { state: state as NodeState } as Partial<NodeData>);
             }
 
             if (state === 'COMPLETED') {
@@ -149,6 +148,7 @@ export const useMobileSocketSync = ({
                 pendingAutoExecRef.current = setTimeout(() => {
                     pendingAutoExecRef.current = null;
                     executeNodeWithToast(nodeId, {
+                        engine,
                         flowId: currentFlowId,
                         socketConnectionId: connectionIdRef.current,
                         canEdit,
@@ -156,7 +156,7 @@ export const useMobileSocketSync = ({
                 }, 0);
             }
         },
-        [currentFlowId, clearTraceLogs, beginRun, finalizeRun]
+        [engine, canEdit, currentFlowId, clearTraceLogs, beginRun, finalizeRun]
     );
 
     const handlePortUpdate = useCallback(
@@ -189,7 +189,7 @@ export const useMobileSocketSync = ({
                 const node = useCanvasStore.getState().nodes.find(n => n.id === nodeId);
                 if (node?.type) {
                     const blockDef = useFlowsStore.getState().blockRegistry[node.type];
-                    if (blockDef?.output$ && blockDef.output$.length > 0) return;
+                    if (blockDef?.outputs && blockDef.outputs.length > 0) return;
                 }
             }
 
@@ -203,10 +203,14 @@ export const useMobileSocketSync = ({
 
                 if (portData?.data) {
                     const portKey = portData.portId || portName || dir;
+                    // Merged, not assigned: `applyRuntime` replaces the field it is given, so a bare
+                    // `{ [portKey]: … }` would drop every sibling port. Read the owner from the engine
+                    // (the graph), not the store, which is only its projection.
+                    const owner = engine.getGraph().nodes.find(n => n.id === nodeId);
                     const updates = isOutputPort
-                        ? { outputData: { [portKey]: portData.data } }
-                        : { inputData: { [portKey]: portData.data } };
-                    useCanvasStore.getState().updateNodeData(nodeId, updates as Partial<NodeData>);
+                        ? { outputData: { ...owner?.outputData, [portKey]: portData.data } }
+                        : { inputData: { ...owner?.inputData, [portKey]: portData.data } };
+                    engine.applyRuntime(nodeId, updates as Partial<NodeData>);
                 }
             } catch (err) {
                 if (no !== undefined) {
@@ -216,7 +220,7 @@ export const useMobileSocketSync = ({
                 console.debug('[MobileSocketSync] Failed to fetch port data:', portId, err);
             }
         },
-        [currentFlowId, appendRunPortUpdate]
+        [engine, currentFlowId, appendRunPortUpdate]
     );
 
     const handleTraceUpdate = useCallback(
@@ -242,7 +246,6 @@ export const useMobileSocketSync = ({
     );
 
     const { isConnected, connectionId, replayMessage } = useInitFlowSocket({
-        channelId,
         currentFlowId,
         getLastLocalUpdateTimestamp,
         onFlowUpdate: handleFlowUpdate,

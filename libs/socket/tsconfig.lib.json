@@ -2,7 +2,9 @@
     "extends": "./tsconfig.json",
     "compilerOptions": {
         "declaration": true,
-        "declarationMap": true
+        "declarationMap": true,
+        "jsx": "react-jsx",
+        "types": ["node", "vite/client"]
     },
     "include": ["src/**/*.ts", "src/**/*.tsx"],
     "exclude": ["**/*.spec.ts", "**/*.test.ts"],
@@ -12,6 +14,9 @@
         },
         {
             "path": "../web-core/tsconfig.lib.json"
+        },
+        {
+            "path": "../engine/tsconfig.lib.json"
         }
     ]
 }

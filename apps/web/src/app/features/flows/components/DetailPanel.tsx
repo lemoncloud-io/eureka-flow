@@ -60,15 +60,15 @@ import {
     tryParseJson,
 } from '../utils';
 
-import type { BlockDefinition, ConfigField, Connection, DataPacket, FlowRole, NodeData } from '@flows/flows';
+import type { BlockDefinition, ConfigField, DataPacket, FlowRole, GraphEdge, GraphNode } from '@flows/flows';
 
 interface DetailPanelProps {
     /** User role for permission-based UI controls */
     role?: FlowRole;
-    selectedNode: NodeData | null;
-    selectedConnection: Connection | null;
-    nodes: NodeData[];
-    connections: Connection[];
+    selectedNode: GraphNode | null;
+    selectedConnection: GraphEdge | null;
+    nodes: GraphNode[];
+    connections: GraphEdge[];
     onConfigChange: (nodeId: string, key: string, value: unknown) => void;
     onDescriptionChange: (nodeId: string, description: string) => void;
     onLabelChange: (nodeId: string, label: string) => void;
@@ -167,7 +167,7 @@ const FileImagePreview = ({ src, onRemove, t }: { src: string; onRemove: () => v
 };
 
 interface InputImageConfigProps {
-    node: NodeData;
+    node: GraphNode;
     onConfigChange: (key: string, value: unknown) => void;
     t: (key: string) => string;
 }
@@ -406,7 +406,7 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
 };
 
 interface InputTextConfigProps {
-    node: NodeData;
+    node: GraphNode;
     onConfigChange: (key: string, value: unknown) => void;
 }
 
@@ -533,7 +533,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     const blockRegistry = useBlockRegistry();
     const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
     const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
-    const { canEditConfig, canModifyCanvas, canEditStructure, canRun } = getPermissions(role);
+    const { canEditConfig, canModifyCanvas, canRun } = getPermissions(role);
     const [isTouchDialogOpen, setIsTouchDialogOpen] = useState(false);
     const [touchPortId, setTouchPortId] = useState<string | null>(null);
     const [previewContent, setPreviewContent] = useState<{ value: unknown; type?: string } | null>(null);
@@ -619,7 +619,9 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             );
         }
 
-        if (packet.type === 'markdown' || isMarkdownContent(packet.value)) {
+        // `markdown` is not one of the port data types the server defines, so the type
+        // check that used to sit here never held — content detection is what decides.
+        if (isMarkdownContent(packet.value)) {
             return (
                 <div
                     className="relative group bg-muted/10 p-2 rounded-md border border-border/30 mt-1.5"
@@ -654,7 +656,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         );
     };
 
-    const renderConfigInput = (node: NodeData, field: ConfigField, definition: BlockDefinition) => {
+    const renderConfigInput = (node: GraphNode, field: ConfigField, definition: BlockDefinition) => {
         const value = node.config?.[field.key] ?? definition.defaultConfig[field.key];
         // Owner + Editor edit node config (Editor's change persists via session overlay)
         const isDisabled = !canEditConfig;

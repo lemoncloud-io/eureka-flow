@@ -64,7 +64,7 @@ commands and renders what's in the store; it never touches the flow itself.
 | **Agent**         | Runs the think/act loop, configured with a persona + tools + a grant. The orchestrator owns the turn and delegates edits to specialists (the writers) it spawns. |
 | **LlmGateway**    | The one outbound LLM dependency, behind one interface so it can be swapped (Generate API, fake, Gemini).                                                         |
 | **ToolExecutor**  | One engine for the session: route a call by name → validate args → gate on BOTH the agent's grant and the user's flow-role → dispatch → result.                  |
-| **CanvasBinding** | The single seam to the real, React-owned canvas: read it, patch a node, add/delete nodes and edges.                                                              |
+| **CanvasBinding** | The single seam to the real graph, over the `FlowEngine` that owns it: read it, patch a node, add/delete nodes and edges.                                        |
 | **SessionStore**  | Loads/creates/saves the `SessionState` the Panel renders from, keyed by `flowId`.                                                                                |
 
 ### The pieces (UML)
@@ -286,20 +286,26 @@ the capability. The same tool can thus be callable for one agent/user and denied
 
 ## CanvasBinding — the seam
 
-The single door between the (non-React) agent core and the React-owned live canvas, injected at mount.
-On desktop the canvas is store-sourced (`useCanvasStore`), so `readGraph` reads the store directly, while
-writes go through the `WorkflowCanvas` ref — which checkpoints for undo and guards on `canModifyCanvas`.
+The single door between the agent core and the graph on screen, injected at mount. It wraps the
+**`FlowEngine`** that owns the graph, so one binding serves every runtime — the desktop editor, the
+mobile editor, the tutorial and a headless Node run — and nothing in it is React-aware.
 
-- `readGraph()` — the live `{ nodes, edges }`.
-- `updateNode(id, patch)` — one node's label / position / config, frontend-only; on desktop it is guarded
-  on `canModifyCanvas` / `canEditConfig` and checkpointed, so the edit is undoable like a user drag.
-- `addNode` / `deleteNode` / `addEdge` / `deleteEdge` — the structural edits, each frontend-only, guarded on
-  `canModifyCanvas` (flows' "add/delete nodes, connect edges" flag — the same one the move path uses) and
-  checkpointed. `addNode`/`addEdge` return the new id; `deleteNode` cascades the node's edges. Semantic
-  validation (block type exists; ports exist, are type-compatible, and won't cycle) lives in the tools, so the
-  binding just applies.
+- `readGraph()` — the live `{ nodes, edges }`, straight from `engine.getGraph()`. Not from
+  `useCanvasStore`: that projection pauses mid-drag, leaving it behind on committed edits and ahead
+  on uncommitted preview coordinates at once.
+- `updateNode(id, patch)` — one node's label / position / config, frontend-only, applied through
+  `engine.transact`, so the edit is undoable like a user drag and is part of what the next save
+  sends. No server call at the moment of the edit. `config` is merged; `position` replaces whole.
+- `addNode` / `deleteNode` / `addEdge` / `deleteEdge` — the structural edits, each one `engine.transact`
+  call (one undo step, part of the next save). `addNode`/`addEdge` return the new id; `deleteNode`
+  cascades the node's edges (`ops.removeNodes`). Semantic validation (block type exists; ports exist,
+  are type-compatible, won't cycle; the target input is free) lives in the tools, so the binding just
+  applies — `ops.connect` never has an existing edge to displace.
 
-The desktop implementation and the primitives it wraps are in [canvas-binding.md](canvas-binding.md).
+It does **not** check permissions — the `ToolExecutor` above it already gates each tool on the
+capability that tool requires, and a second coarser gate here could only fail silently.
+
+The implementation and the primitives it wraps are in [canvas-binding.md](canvas-binding.md).
 
 ## Session & storage
 
@@ -318,14 +324,14 @@ persist through the Agent Environment's storage port (localStorage), so a transc
 Every seam wraps a primitive already in the repo, which is what makes an agent implementable without new
 backend work.
 
-| Seam                     | Wraps                                                                                                                                                                                                                                                      | Where                                               |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `readGraph` (live)       | `useCanvasStore.getState()` → `{ nodes, edges: connections }` (reads the store directly; `getWorkflow` lags within a turn)                                                                                                                                 | `apps/web/.../utils/createDesktopCanvasBinding.ts`  |
-| `updateNode`             | `WorkflowCanvasRef.updateNode(id, Partial<NodeData>)` — guards `canModifyCanvas`, `saveCheckpoint()`s for undo, then store `setNodes`                                                                                                                      | `apps/web/.../components/WorkflowCanvas.tsx`        |
-| `addNode` / `deleteNode` | `WorkflowCanvasRef.addNode(type, position)` (seeds `defaultConfig`, generates the id) / store `deleteNode(id)` (drops the node **and** cascades its connections)                                                                                           | `WorkflowCanvas.tsx` · `useCanvasStore.ts`          |
-| `addEdge` / `deleteEdge` | store `addConnection(conn)` / `deleteConnection(id)`; validity via `arePortTypesCompatible` + `wouldCreateCycle`; new-edge id via `newEdgeId()`                                                                                                            | `useCanvasStore.ts` · `apps/web/.../utils/graph.ts` |
-| permissions              | `FlowPermissions` (7 flags; structural edits use `canModifyCanvas` = "add/delete nodes, connect edges"); the agent's `Capability` is a compile-guarded subset, and the user's `userPermissions` are derived from the flow's permissions via `toAgentGrant` | `libs/flows/.../types/permissions.ts`               |
-| node shape               | `NodeData` (`id`, `type`, `position`, `customLabel`)                                                                                                                                                                                                       | `@lemoncloud/eureka-flows-api`                      |
+| Seam                     | Wraps                                                                                                                                                                                                                                                      | Where                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `readGraph` (live)       | `engine.getGraph()` → `{ nodes, edges }` (the engine, not the store — the store's projection pauses mid-drag)                                                                                                                                              | `libs/agent/src/canvas/engineCanvasBinding.ts` |
+| `updateNode`             | `engine.transact(label, ops => ops.updateNode(id, patch))` — one call, one undo step; history is the transaction                                                                                                                                           | `libs/agent/src/canvas/engineCanvasBinding.ts` |
+| `addNode` / `deleteNode` | `engine.transact(label, ops => ops.addNode(...))` (engine seeds defaults, returns the id) / `ops.removeNodes([id])` (drops the node **and** cascades its edges)                                                                                            | `libs/agent/src/canvas/engineCanvasBinding.ts` |
+| `addEdge` / `deleteEdge` | `engine.transact(label, ops => ops.connect(spec))` (returns the new edge id; refuses cycle / incompatible ports) / `ops.disconnect([id])`                                                                                                                  | `libs/agent/src/canvas/engineCanvasBinding.ts` |
+| permissions              | `FlowPermissions` (7 flags; structural edits use `canModifyCanvas` = "add/delete nodes, connect edges"); the agent's `Capability` is a compile-guarded subset, and the user's `userPermissions` are derived from the flow's permissions via `toAgentGrant` | `libs/flows/.../types/permissions.ts`          |
+| node shape               | `NodeData` (`id`, `type`, `position`, `customLabel`)                                                                                                                                                                                                       | `@lemoncloud/eureka-flows-api`                 |
 
 New agent code lives in `libs/agent/src`, mirroring how `flows`/`socket` are structured.
 

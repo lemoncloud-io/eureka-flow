@@ -12,6 +12,9 @@ dist/
 build/
 *.local
 
+# `npm pack` in libs/engine drops the tarball next to package.json
+*.tgz
+
 # Environment variables
 .env
 .env.local
@@ -57,9 +60,3 @@ tmp
 .playwright-mcp
 
 vite.config.*.timestamp*
-
-# Agent eval debug output (live-run traces — never committed)
-real_output.txt
-
-# Local-only design notes (kept on-disk for reference, out of the pushed repo)
-docs/browser-agent/design/harness-deferred.md

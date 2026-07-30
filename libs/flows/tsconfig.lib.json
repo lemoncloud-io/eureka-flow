@@ -4,11 +4,15 @@
         "outDir": "./dist",
         "declaration": true,
         "declarationMap": true,
-        "types": ["node"]
+        "types": ["node", "vite/client"],
+        "jsx": "react-jsx"
     },
     "include": ["src/**/*.ts", "src/**/*.tsx"],
     "exclude": ["**/*.spec.ts", "**/*.test.ts"],
     "references": [
+        {
+            "path": "../engine/tsconfig.lib.json"
+        },
         {
             "path": "../web-core/tsconfig.lib.json"
         }

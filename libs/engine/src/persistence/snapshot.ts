@@ -1,7 +1,7 @@
-import { transformNodesForSave } from '../utils/transformNodes';
+import { transformNodesForSave } from './transformNodes';
 
 import type { BlockDefinitionWithFrontend } from '../types';
-import type { Connection, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
 /**
  * A flow reduced to what the server stores — the same shape `/flows/:id/save` receives.
@@ -18,7 +18,7 @@ export interface FlowSnapshot {
 export interface GraphLike {
     nodes?: NodeData[];
     edges?: EdgeData[];
-    connections?: Connection[];
+    connections?: EdgeData[];
 }
 
 /**

@@ -1,6 +1,6 @@
 {
-  "name": "@flows/admin",
-  "version": "0.37.0",
-  "private": true,
-  "type": "module"
+    "name": "@flows/admin",
+    "version": "0.40.1",
+    "private": true,
+    "type": "module"
 }

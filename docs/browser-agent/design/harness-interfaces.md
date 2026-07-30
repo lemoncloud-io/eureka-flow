@@ -311,11 +311,11 @@ interface BlockSchema {
 ## 6 · The `CanvasBinding` seam
 
 ```ts
-// The whole seam between (non-React) agent code and the React-owned live canvas. `updateNode` patches ONE
-// existing node (move → position · rename → label · set_properties → config); the structural primitives
-// change the SET of nodes/edges. Each is SYNCHRONOUS, applied immediately (frontend-only), checkpointed for
-// undo, and gated on its capability. `addNode`/`addEdge` RETURN the new id so a compound turn can reference
-// what it just created; `deleteNode` cascades the node's edges.
+// SHIPPED — the whole seam between agent code and the graph on screen, over the FlowEngine that owns it.
+// `updateNode` patches ONE existing node (move → position · rename → label · set_properties → config); the
+// structural primitives change the SET of nodes/edges. Each is one `engine.transact` — applied immediately,
+// checkpointed for undo, part of the next save — and gated on its capability. `addNode`/`addEdge` RETURN the
+// new id so a compound turn can reference what it just created; `deleteNode` cascades the node's edges.
 interface CanvasBinding {
     readGraph(): Graph; // live structural read of the current canvas graph
     updateNode(id: string, patch: NodePatch): void; // node patch — canModifyCanvas / canEditConfig per field

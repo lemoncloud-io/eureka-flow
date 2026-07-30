@@ -4,14 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle, ArrowLeft, ArrowRight, FileText, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-import {
-    isAiBlock,
-    isMissingAiKey,
-    resolveNodeName,
-    translateField,
-    useCanvasConnections,
-    useCanvasStore,
-} from '@flows/flows';
+import { isAiBlock, isMissingAiKey, resolveNodeName, translateField, useCanvasConnections } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Input, Label, Switch } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -27,12 +20,14 @@ import { BlockIcon } from '../../flows/components/BlockIcon';
 import { getPortStyleKey } from '../../flows/utils';
 import { useNodeConfig } from '../hooks/useNodeConfig';
 
-import type { BlockDefinitionWithFrontend, FlowRole } from '@flows/flows';
-import type { NodeState } from '@lemoncloud/eureka-flows-api';
+import type { FlowEngine } from '@flows/engine';
+import type { BlockDefinitionWithFrontend, FlowRole, NodeState } from '@flows/flows';
 import type { TFunction } from 'i18next';
 
 interface MobileStepDetailProps {
     nodeId: string | null;
+    /** Config edits are graph edits, so they go through the engine like every other one. */
+    engine: FlowEngine;
     role?: FlowRole;
     /** Runs the node, once the page has cleared it with the server. */
     onRun?: (nodeId: string, options?: { propagate?: boolean }) => Promise<void>;
@@ -56,6 +51,7 @@ interface MobileStepDetailProps {
 
 export const MobileStepDetail = ({
     nodeId,
+    engine,
     role = 'owner',
     onRun,
     onClose,
@@ -74,7 +70,7 @@ export const MobileStepDetail = ({
         handleConfigChange,
         handleCustomLabelChange,
         handleToggleAuto,
-    } = useNodeConfig(nodeId, role);
+    } = useNodeConfig(nodeId, role, engine);
 
     const handleRun = useCallback(
         async (options?: { propagate?: boolean }) => {
@@ -113,7 +109,7 @@ export const MobileStepDetail = ({
             setConfirmingDelete(true);
             return;
         }
-        useCanvasStore.getState().deleteNode(nodeId);
+        engine.transact('node:remove', ops => ops.removeNodes([nodeId]));
         onClose();
     };
 

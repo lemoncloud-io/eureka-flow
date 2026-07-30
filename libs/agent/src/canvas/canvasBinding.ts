@@ -10,7 +10,7 @@ export interface NodePatch {
     config?: Record<string, string>;
 }
 
-/** The live canvas graph: the canvas's own `WorkflowState` (`{ nodes, edges }`), aliased to track the canonical shape. */
+/** The live canvas graph: the canonical `WorkflowState` (`{ nodes, edges }`), aliased to track that shape. */
 export type Graph = WorkflowState;
 
 /** The four endpoint fields of an edge — `EdgeData` minus its binding-assigned `id`. */
@@ -22,11 +22,12 @@ export interface EdgeSpec {
 }
 
 /**
- * The single seam between (non-React) agent code and the React-owned live canvas.
+ * The single seam between agent code and the graph on screen: `createEngineCanvasBinding` over the owning
+ * `FlowEngine`, or `createInMemoryCanvasBinding` for tests and Node runs. Nothing here is React-aware.
  *
- * Every write is synchronous, frontend-only, and **mechanical** — the binding applies what it is given and
- * never judges whether an edit is sensible. All validation (a config value, a port's existence/type, a
- * would-be cycle) lives in the tools, so a write that reaches the binding has already been validated.
+ * Every write is mechanical — the binding applies what it is given and never judges whether an edit is
+ * sensible. All validation (a config value, a port's existence/type, a would-be cycle, an occupied input)
+ * lives in the tools, so a write that reaches the binding has already been validated.
  */
 export interface CanvasBinding {
     /** Live structural read of the current canvas graph. */

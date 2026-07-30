@@ -164,7 +164,10 @@ export const FlowGraphView = ({ flowId, className, onNavigateToNode }: FlowGraph
     const [layout, setLayout] = useState<LayoutTypes>('forceDirected2d');
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-    const roles = useMemo(() => (data ? classifyNodeRoles(data.nodes, data.edges) : new Map()), [data]);
+    const roles = useMemo(
+        () => (data ? classifyNodeRoles(data.nodes, data.edges) : new Map<string, keyof typeof ROLE_FILLS>()),
+        [data]
+    );
     const nodes = useMemo(() => (data ? toGraphNodes(data.nodes, roles) : []), [data, roles]);
     const edges = useMemo(() => (data ? toGraphEdges(data.edges) : []), [data]);
 
@@ -188,7 +191,7 @@ export const FlowGraphView = ({ flowId, className, onNavigateToNode }: FlowGraph
 
     const handleNodeClick = useCallback(
         (node: InternalGraphNode) => {
-            selectionNodeClick(node);
+            selectionNodeClick?.(node);
             setSelectedNodeId(node.id);
         },
         [selectionNodeClick]
@@ -196,7 +199,7 @@ export const FlowGraphView = ({ flowId, className, onNavigateToNode }: FlowGraph
 
     const handleCanvasClick = useCallback(
         (event: MouseEvent) => {
-            selectionCanvasClick(event);
+            selectionCanvasClick?.(event);
             setSelectedNodeId(null);
         },
         [selectionCanvasClick]

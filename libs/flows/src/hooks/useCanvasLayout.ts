@@ -1,5 +1,6 @@
+import { DEFAULT_TEXTAREA_HEIGHT, getNodeHeight } from '@flows/engine';
+
 import { getEffectiveState, isOutputConsole, isOutputPreview } from '../consts';
-import { DEFAULT_TEXTAREA_HEIGHT, getNodeHeight } from '../utils/nodeHeight';
 
 import type { BlockDefinition, NodeData } from '@lemoncloud/eureka-flows-api';
 

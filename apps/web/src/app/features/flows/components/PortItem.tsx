@@ -12,9 +12,10 @@ import { arePortTypesCompatible, getPortStyleKey } from '../utils';
 
 import type { ConnectionDraftInfo } from '../utils';
 import type { DataPacket, PortDefinition } from '@flows/flows';
+import type { LucideIcon } from 'lucide-react';
 
-/** Get icon component for port type */
-export const getPortTypeIcon = (portType: string): React.ElementType | null => {
+/** Get icon component for port type. An undeclared type is `any`, as elsewhere. */
+export const getPortTypeIcon = (portType = 'any'): LucideIcon | null => {
     switch (portType.toLowerCase()) {
         case 'text':
         case 'string':
@@ -71,13 +72,13 @@ export const PORT_TYPE_STYLES = {
 } as const;
 
 /** Get Tailwind classes for port type coloring - filled when connected, outline when disconnected */
-export const getPortTypeColor = (portType: string, isConnected: boolean): string => {
+export const getPortTypeColor = (portType = 'any', isConnected: boolean): string => {
     const style = PORT_TYPE_STYLES[getPortStyleKey(portType)];
     return isConnected ? style.connected : style.disconnected;
 };
 
 /** Get Tailwind classes for valid drop target highlighting - matches source port's dataType color */
-export const getDropTargetColor = (sourceType: string): string => {
+export const getDropTargetColor = (sourceType = 'any'): string => {
     return PORT_TYPE_STYLES[getPortStyleKey(sourceType)].drop;
 };
 
@@ -158,7 +159,11 @@ export const PortItem: React.FC<PortItemProps> = ({
         !isHighlighted && !isValidDropTarget && getPortTypeColor(port.type, isConnected)
     );
 
-    const PortIcon = getPortTypeIcon(port.type);
+    // A port that declares no type accepts anything, which is the same convention the
+    // engine's compatibility check uses. Resolved once here so the handlers below take a
+    // concrete type rather than each deciding what a missing one means.
+    const portType = port.type ?? 'any';
+    const PortIcon = getPortTypeIcon(portType);
 
     const portCircle = (
         <div
@@ -169,19 +174,19 @@ export const PortItem: React.FC<PortItemProps> = ({
             data-port-data-type={port.type}
             onMouseDown={e => {
                 e.stopPropagation();
-                onMouseDown(nodeId, port.id, type, port.type, e);
+                onMouseDown(nodeId, port.id, type, portType, e);
             }}
             onMouseUp={e => {
                 e.stopPropagation();
-                onMouseUp(nodeId, port.id, type, port.type);
+                onMouseUp(nodeId, port.id, type, portType);
             }}
             onTouchStart={e => {
                 e.stopPropagation();
-                onTouchStart?.(nodeId, port.id, type, port.type, e);
+                onTouchStart?.(nodeId, port.id, type, portType, e);
             }}
             onDoubleClick={e => {
                 e.stopPropagation();
-                onDoubleClick?.(nodeId, port.id, type, port.type);
+                onDoubleClick?.(nodeId, port.id, type, portType);
             }}
             onTouchEnd={e => {
                 // For output ports, let the event bubble to canvas for connection drop handling
@@ -191,7 +196,7 @@ export const PortItem: React.FC<PortItemProps> = ({
                     return;
                 }
                 e.stopPropagation();
-                onMouseUp(nodeId, port.id, type, port.type);
+                onMouseUp(nodeId, port.id, type, portType);
             }}
         >
             {/* Extended hit area - transparent 24x24px */}
@@ -208,7 +213,6 @@ export const PortItem: React.FC<PortItemProps> = ({
     const hasRichContent =
         portData &&
         (portData.type === 'json' ||
-            portData.type === 'markdown' ||
             (portData.value !== null && typeof portData.value === 'object') ||
             isMarkdownContent(portData.value));
 

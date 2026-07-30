@@ -1,13 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 
-import {
-    isFlowUpdateMessage,
-    isLogEnvelopeMessage,
-    isNodeUpdateMessage,
-    isPortUpdateMessage,
-    isProgressEnvelopeMessage,
-    isTraceMessage,
-} from '@flows/socket';
+import { parseSocketFrame } from '@flows/engine';
 
 import type { WebSocketMessage } from '@flows/socket';
 
@@ -23,46 +16,59 @@ export interface RecordedMessage {
 
 const MAX_MESSAGES = 500;
 
+/**
+ * Describe a frame for the recorder panel.
+ *
+ * Reads the same parse the live path does, so what is recorded and what was acted on can
+ * never disagree — a replay tool that classified messages its own way would be lying about
+ * the run it claims to be replaying.
+ */
 const summarize = (message: WebSocketMessage): Pick<RecordedMessage, 'type' | 'targetId' | 'summary'> => {
-    const data = message.data;
+    const frame = parseSocketFrame(message.data);
+    const unknown = { type: 'unknown', targetId: message.id, summary: 'unknown' } as const;
+    if (!frame) return unknown;
 
-    if (message.action === 'trace' && isTraceMessage(data)) {
-        const stage = data.stage ? `[${data.stage}]` : '';
-        const msg = data.message ? ` ${String(data.message).slice(0, 40)}` : '';
-        return { type: 'trace', targetId: message.id, summary: `${stage}${msg}`.trim() || 'trace' };
+    switch (frame.kind) {
+        case 'trace': {
+            const stage = frame.trace.stage ? `[${frame.trace.stage}]` : '';
+            const msg = frame.trace.message ? ` ${frame.trace.message.slice(0, 40)}` : '';
+            return { type: 'trace', targetId: frame.trace.nodeId, summary: `${stage}${msg}`.trim() || 'trace' };
+        }
+
+        case 'flow':
+            return { type: 'flow', targetId: frame.flowId, summary: 'flow updated' };
+
+        case 'node': {
+            const { nodeId, state = '', stage, progress } = frame.event;
+            const suffix = `${stage ? ` ${stage}` : ''}${progress === undefined ? '' : ` ${progress}%`}`;
+            return { type: 'node', targetId: nodeId, summary: `${state}${suffix}`.trim() || 'node' };
+        }
+
+        case 'port':
+            return {
+                type: 'port',
+                targetId: frame.event.portId,
+                summary: `port${frame.event.ts ? ` ts=${frame.event.ts}` : ''}`,
+            };
+
+        case 'progress': {
+            const percent = frame.event.percent === undefined ? '' : ` ${frame.event.percent}%`;
+            return {
+                type: 'progress',
+                targetId: frame.event.nodeId,
+                summary: `${frame.event.status ?? 'progress'}${percent}`,
+            };
+        }
+
+        case 'log': {
+            const [first] = frame.log.entries;
+            const head = first ? ` · ${first.level} ${(first.message ?? '').slice(0, 30)}` : '';
+            return { type: 'log', targetId: frame.log.nodeId, summary: `${frame.log.entries.length} entries${head}` };
+        }
+
+        default:
+            return unknown;
     }
-
-    if (isFlowUpdateMessage(data)) {
-        return { type: 'flow', targetId: data.id, summary: 'flow updated' };
-    }
-
-    if (isNodeUpdateMessage(data)) {
-        const state = data.state ?? '';
-        const progress = data.progress !== undefined ? ` ${data.progress}%` : '';
-        const stage = data.stage ? ` ${data.stage}` : '';
-        return { type: 'node', targetId: data.id, summary: `${state}${stage}${progress}`.trim() || 'node' };
-    }
-
-    if (isPortUpdateMessage(data)) {
-        const ts = data.ts ? ` ts=${data.ts}` : '';
-        return { type: 'port', targetId: data.id, summary: `port${ts}`.trim() };
-    }
-
-    if (isProgressEnvelopeMessage(data)) {
-        const state = data.data;
-        const percent = state?.percent !== undefined ? ` ${state.percent}%` : '';
-        return { type: 'progress', targetId: message.id, summary: `${state?.status ?? 'progress'}${percent}` };
-    }
-
-    if (isLogEnvelopeMessage(data)) {
-        const batch = data.data;
-        const count = batch?.entries?.length ?? 0;
-        const first = batch?.entries?.[0];
-        const head = first ? ` · ${first.level} ${String(first.message ?? '').slice(0, 30)}` : '';
-        return { type: 'log', targetId: message.id, summary: `${count} entries${head}` };
-    }
-
-    return { type: 'unknown', targetId: message.id, summary: 'unknown' };
 };
 
 export interface ReplayState {

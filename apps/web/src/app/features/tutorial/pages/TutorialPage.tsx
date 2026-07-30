@@ -73,13 +73,14 @@ export const TutorialPage = () => {
     // Load pre-built workflow once canvas mounts, then auto-start guide tour
     const workflowLoadedRef = useRef(false);
     useEffect(() => {
-        if (!isReady || workflowLoadedRef.current) return;
+        if (!isReady || workflowLoadedRef.current) return undefined;
         if (canvasRef.current) {
             workflowLoadedRef.current = true;
             canvasRef.current.loadWorkflow(TUTORIAL_WORKFLOW);
             const timer = setTimeout(() => setTourPhase('guide'), 500);
             return () => clearTimeout(timer);
         }
+        return undefined;
     }, [isReady]);
 
     // When block tutorial starts, open the sidebar so block categories are visible

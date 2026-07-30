@@ -172,7 +172,7 @@ export const ModelSelect = ({ blockType, value, onChange, disabled, dense, fallb
                             onChange(m.name);
                             setOpen(false);
                         }}
-                        t={t}
+                        t={t as (key: string, defaultValue?: string) => string}
                     />
                 ))}
             </PopoverContent>

@@ -3,9 +3,9 @@ import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
 /**
  * In-memory {@link CanvasBinding} over a plain {@link Graph} — the reference binding for tests and Node runs.
- * Mirrors the desktop binding's mechanics: `updateNode` merges config; `deleteNode` cascades edges;
+ * Mirrors the engine binding's mechanics: `updateNode` merges config; `deleteNode` cascades edges;
  * `addEdge` appends one edge. Ids are minted from monotonic counters (deterministic
- * for tests); the desktop binding uses the real `newNodeId`/`newEdgeId`. Structural writes seed no default
+ * for tests); the engine binding uses the engine's own `ops`. Structural writes seed no default
  * config here (the block registry is a desktop concern) — a created node starts with `config: {}`.
  */
 export const createInMemoryCanvasBinding = (initial?: Graph): CanvasBinding => {

@@ -1,8 +1,9 @@
 # Browser Agent — docs
 
 In-browser flow agents for the Eureka Flow editor: chat agents that read your flow and edit it for you.
-The DOM-free core is `@flows/agent` (`libs/agent`); the editor wiring lives in
-`apps/web/src/app/features/flows/` (panel, hooks, desktop binding, generate-API gateway).
+The DOM-free core is `@flows/agent` (`libs/agent`), including the `CanvasBinding` over the `FlowEngine`
+that owns the graph; the editor wiring lives in `apps/web/src/app/features/flows/` (panel, hooks,
+generate-API gateway).
 
 ## Architecture at a glance
 
@@ -28,7 +29,8 @@ The full model — components, the turn loop, interfaces, permissions — is in
 **[design/](design/)** — the shared architecture.
 
 - [architecture.md](design/architecture.md) — the shared model every agent is built from (read this first).
-- [canvas-binding.md](design/canvas-binding.md) — the desktop CanvasBinding implementation notes.
+- [canvas-binding.md](design/canvas-binding.md) — the CanvasBinding over the `FlowEngine`: what it reads,
+  how an edit is checkpointed, and why permissions are not enforced there.
 
 **[agents/](agents/)** — the concrete agents.
 

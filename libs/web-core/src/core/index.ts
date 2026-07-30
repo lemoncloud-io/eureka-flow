@@ -56,20 +56,22 @@ export const setLanguage = (lang: string): void => {
     localStorage.setItem(LANGUAGE_KEY, lang);
 };
 
-// WebCore instance — only created when OAuth is enabled
-type WebCoreInstance = ReturnType<typeof WebCoreFactory.create>;
+// WebCore instance — only created when OAuth is enabled.
+// Pinned to 'aws': `create` is generic over the cloud provider, so the unparameterized
+// ReturnType widens to every provider it supports and loses the AWS-only methods
+// (`buildCredentialsByToken`, `getTokenSignature`) that this app calls.
+type WebCoreInstance = ReturnType<typeof WebCoreFactory.create<'aws'>>;
 let _webCore: WebCoreInstance | null = null;
 
 const createWebCore = (): WebCoreInstance | null => {
     if (!isOAuthEnabled) return null;
 
-    const enhancedStorage = new EnhancedStorage();
     return WebCoreFactory.create({
         cloud: 'aws',
         project: `${PROJECT}_${ENV}`,
         oAuthEndpoint: OAUTH_ENDPOINT,
         region: REGION,
-        storage: enhancedStorage as Storage,
+        storage: new EnhancedStorage(),
     });
 };
 

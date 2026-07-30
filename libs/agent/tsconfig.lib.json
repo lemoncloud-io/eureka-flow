@@ -10,6 +10,9 @@
     "exclude": ["**/*.spec.ts", "**/*.test.ts", "**/__tests__/**"],
     "references": [
         {
+            "path": "../engine/tsconfig.lib.json"
+        },
+        {
             "path": "../flows/tsconfig.lib.json"
         }
     ]
