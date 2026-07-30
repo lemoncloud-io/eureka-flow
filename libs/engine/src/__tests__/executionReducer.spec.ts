@@ -192,6 +192,24 @@ describe('a patch says nothing by omitting keys, not by holding undefined', () =
         expect('executionStats' in patch).toBe(false);
         expect(patch).toEqual({ state: 'IDLE', status: 'IDLE' });
     });
+
+    // An ERROR before the final frame has no text yet — that is what `fetch-error-detail`
+    // is for. Sending `error: undefined` would erase whatever the fetch just filled in.
+    it('leaves the error keys out of an ERROR frame that carries no text', () => {
+        const { effects } = play([{ nodeId: 'n1', no: 1, state: 'ERROR' }]);
+        const [patch] = applied(effects).map(e => (e as { patch: object }).patch);
+
+        expect('error' in patch).toBe(false);
+        expect('errorMessage' in patch).toBe(false);
+        expect(patch).toEqual({ state: 'ERROR', status: 'ERROR' });
+    });
+
+    it('still carries the text when the ERROR frame has it', () => {
+        const { effects } = play([{ nodeId: 'n1', no: 1, state: 'ERROR', error: 'boom' }]);
+        const [patch] = applied(effects).map(e => (e as { patch: object }).patch);
+
+        expect(patch).toMatchObject({ error: 'boom', errorMessage: 'boom' });
+    });
 });
 
 describe('rule 5 — a port-shaped event describes its parent', () => {

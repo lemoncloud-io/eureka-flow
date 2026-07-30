@@ -204,7 +204,12 @@ export const reduceNodeEvent = (
         effects.push({
             type: 'apply',
             nodeId,
-            patch: { ...statePatch('ERROR'), error, errorMessage: error } as Partial<NodeData>,
+            // Same omit rule as `statePatch`: an ERROR frame before `final` carries no text,
+            // and sending `error: undefined` would erase whatever the fetch just filled in.
+            patch: {
+                ...statePatch('ERROR'),
+                ...(error === undefined ? {} : { error, errorMessage: error }),
+            } as Partial<NodeData>,
         });
         effects.push({ type: 'notify', level: 'error', nodeId, message: error });
         return { state: next, effects };

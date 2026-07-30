@@ -7,6 +7,7 @@ import {
     statePatch,
 } from './executionReducer';
 import { parseSocketFrame } from './parseSocketFrame';
+import { isNodeState } from '../types';
 
 import type { ExecutionEffect, ExecutionState } from './executionReducer';
 import type { SocketFrame } from './parseSocketFrame';
@@ -108,21 +109,37 @@ export const createRunSession = ({
      * how a late port frame walked a COMPLETED node back for every CLI and npm consumer.
      *
      * Not read off the graph: a `reset` means the previous run's states are no longer
-     * authoritative, and the graph still holds them.
+     * authoritative, and the graph still holds them. The flip side is that this map has to
+     * be told when the graph is replaced under it — see the `graph:loaded` subscription.
      */
     const written = new Map<string, NodeState>();
 
+    /** The patch's own state, if it is one this engine models. */
+    const stateOf = (patch: Partial<NodeData>): NodeState | undefined => {
+        const value: unknown = patch.state;
+        return typeof value === 'string' && isNodeState(value) ? value : undefined;
+    };
+
     const accepts = (nodeId: string, patch: Partial<NodeData>): boolean => {
-        const incoming = patch.state as NodeState | undefined;
         // No state in the patch is nothing to order — stats and error text still land.
+        const incoming = stateOf(patch);
         return incoming === undefined || shouldUpdateState(written.get(nodeId), incoming);
     };
 
     const write = (nodeId: string, patch: Partial<NodeData>): void => {
         engine.applyRuntime(nodeId, patch);
-        const state = patch.state as NodeState | undefined;
+        const state = stateOf(patch);
         if (state !== undefined) written.set(nodeId, state);
     };
+
+    /**
+     * A load replaces every node's state with whatever the server says, so what this session
+     * wrote before it stops describing the graph. Keeping the old values would let a finished
+     * run refuse the next one's first frame — the node would sit at the loaded state forever.
+     */
+    const unwatchGraph = engine.subscribe(event => {
+        if (event.type === 'graph:loaded') written.clear();
+    });
 
     const dispatch = (effects: ExecutionEffect[]): void => {
         for (const effect of effects) {
@@ -226,6 +243,7 @@ export const createRunSession = ({
 
         close: () => {
             unsubscribe();
+            unwatchGraph();
             // Rejected, not dropped. Clearing the map alone leaves every pending
             // `waitForNode` unsettled, and a caller awaiting one waits for a session that
             // will never speak again — a CLI that closes on a signal hangs instead of exiting.

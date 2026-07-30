@@ -106,6 +106,19 @@ describe('applying a run to the graph', () => {
         expect(stateOf('n1')).toBe('COMPLETED');
     });
 
+    // The priority guard remembers what the session wrote. A load replaces every state with
+    // the server's, so those memories stop describing the graph — keeping them would let a
+    // finished run refuse the next one's first frame.
+    it('forgets what it wrote when the graph is loaded under it', () => {
+        const { engine, socket, stateOf } = harness();
+
+        socket.emit({ type: 'node', id: 'n1', flowId: 'f1', no: 1, state: 'COMPLETED' });
+        engine.loadGraph(GRAPH);
+        socket.emit({ type: 'node', id: 'n1', flowId: 'f1', no: 2, state: 'RUNNING' });
+
+        expect(stateOf('n1')).toBe('RUNNING');
+    });
+
     it('follows a progress envelope', () => {
         const { socket, stateOf } = harness();
 

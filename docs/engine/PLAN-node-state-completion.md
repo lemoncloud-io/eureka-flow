@@ -333,4 +333,35 @@ grep해서 확인"은 **거짓 안심**을 준다. 이 레포의 state 소비자
 
 ## Outcome
 
-(구현 후 채움 — status / commits / verify / scope-diff)
+**status**: S0 판정 · S1 구현 · S3 기록 완료. S2 · S2b · S4 보류(조건은 각 절).
+
+**commits** (`docs/engine-node-state`, base `develop`)
+
+|           |                                                              |
+| --------- | ------------------------------------------------------------ |
+| `f5f6dbb` | S0 판정 — 와이어는 SKIPPED를 안 싣는다, 다만 지워진 기능이다 |
+| `ef04806` | S1 수정 4개 + 스펙 14                                        |
+| `5a5f681` | §5 모바일 행 분리                                            |
+| `1e12b7e` | S3 결정 기록 — `PLAN.md` §16 · `types.ts` · GUIDE 양쪽       |
+| `18e0f68` | §15 참조 오타, 과한 단정 하나                                |
+| (아래)    | 03-review 게이트 FAIL → 04-fix 라운드 1                      |
+
+**verify**: engine **305** · flows 26 · socket 22 · web 199 · `tsc -b --force` exit 0 ·
+lint 0 error / 55 warning · `nx build web` green. 수정 6개 전부 revert-red 확인.
+
+**03-review** (fixed-point `develop` — S1·S3 둘 다 정식 게이트 없이 커밋됐던 걸 한 번에 봄)
+
+- 라운드 1: Axis A **6/10 FAIL** (Critical 0 · Important 2 · Nice 3) · Axis B PASS
+    - [Important] `written` 맵이 `graph:loaded`를 몰라 **가드가 새 실패 경로를 도입**했다 —
+      run → 재로드 → 새 run 의 첫 프레임이 거부돼 노드가 로드된 state 에 멈춘다.
+      `cli/main.ts:83`이 세션을 만들고 `runDemo`가 그 안에서 load 를 부르므로 도달 가능
+    - [Important] ERROR 분기(`executionReducer.ts`)가 방금 고친 undefined-key 삭제 버그를
+      그대로 갖고 있었다 — `error`가 없는 ERROR 프레임이 노드의 error 텍스트를 지운다
+- 04-fix: 위 둘 + [Nice] `as NodeState` 캐스팅 2개(고치는 줄과 같은 자리라 함께).
+  `stateOf` 헬퍼가 `isNodeState`로 좁히고, 세션이 `graph:loaded`를 구독해 `written`을 비운다
+- 라운드 2: Axis A **8/10 PASS** · Axis B PASS. 남은 Nice 2 = 빈 패치 `{}`가 여전히
+  `graph:runtime`을 emit 하는 것 · `status.ts`의 임포트 출처가 갈리는 것 (둘 다 advisory)
+
+**scope-diff**: 플랜에 없던 수정 2개(`statePatch` 삭제 버그, `runSession` 가드)가 S1 에 들어왔다.
+가드는 사용자 승인, `statePatch`는 Destination 의 문자 그대로라 scope creep 아님. 반대 방향
+(플랜에 있는데 안 한 것)은 없다 — S2 계열은 취소가 아니라 조건부 보류로 명시.
