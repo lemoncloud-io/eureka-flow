@@ -204,11 +204,12 @@ develop에는 `disabled` 노드 처리가 **통째로 없다**(`proxy.ts`·`prox
 
 ## 5. 소비자별 노출도
 
-| 소비자                      | 미모델링 state를 만나면                                     | 지금            |
-| --------------------------- | ----------------------------------------------------------- | --------------- |
-| **flow-mcp** (`ws-client`)  | `RANK_AS` + 미랭크 last-write                               | 보정 있음, 국소 |
-| **브라우저 에디터**         | 소켓 경로도 로드 경로도 값을 버린다 — 노드가 안 움직인다    | 보정 없음       |
-| **CLI** (`libs/engine/cli`) | 같은 파서 + `isTerminal`이 둘뿐 → `waitForNode`가 안 깨어남 | 보정 없음       |
+| 소비자                     | 미모델링 state를 만나면                                     | 지금            |
+| -------------------------- | ----------------------------------------------------------- | --------------- |
+| **flow-mcp** (`ws-client`) | `RANK_AS` + 미랭크 last-write                               | 보정 있음, 국소 |
+| **데스크톱 에디터**        | 소켓 경로도 로드 경로도 값을 버린다 — 노드가 안 움직인다    | 보정 없음       |
+| **모바일 에디터**          | 같음 — 다만 **리듀서를 아예 안 탄다** (아래)                | 보정 없음       |
+| **CLI/npm** (`runSession`) | 같은 파서 + `isTerminal`이 둘뿐 → `waitForNode`가 안 깨어남 | 보정 없음       |
 
 **브라우저·CLI 행은 확인함** (2026-07-30, 1차 출처 직독):
 
@@ -229,6 +230,16 @@ develop에는 `disabled` 노드 처리가 **통째로 없다**(`proxy.ts`·`prox
 - CLI/`runSession`에는 하나 더 — 터미널 판정이 `runSession.ts`·`executionReducer.ts`에
   `COMPLETED | ERROR`로 박혀 있어, 설령 state가 살아 들어와도 `waitForNode`는 settle되지
   않는다 (이건 S2b, 아직 보류)
+
+**모바일 행은 미모델링 state 이야기가 아니라 더 큰 것이다 (2026-07-30 확인, S1 범위 밖).**
+`useMobileSocketSync`에는 `reduceNodeEvent`도, 시퀀스 커서도, `shouldUpdateState`도
+**없다** — `if (state) engine.applyRuntime(nodeId, { state })` 손코딩이 전부다. 미모델링
+state는 `dispatchSocketFrame`이 엔진 `parseSocketFrame`을 쓰는 덕에 데스크톱과 똑같이
+걸러지지만(그래서 위 행이 같다), **순서 규칙은 하나도 없다**: Rule 1(시퀀스 high-water),
+Rule 2(재실행 리셋), 우선순위 비교 전부 미적용. 늦게 도착한 프레임이 그냥 덮는다.
+
+S1이 `runSession`에 넣은 가드가 모바일에는 안 닿는다 — 붙일 자리가 없어서다. 모바일을
+리듀서 위로 올리는 게 맞는 수정이고, 그건 별 슬라이스다. 후속 티켓.
 
 flow-mcp만 덧댔다. 같은 리듀서를 쓰는 다른 소비자는 **같은 갭을 그대로 맞는다** — 정본을
 엔진에서 고쳐야 하는 이유. 소비자마다 `RANK_AS`를 복제하면 손으로 짠 규칙이 셋이 된다.
