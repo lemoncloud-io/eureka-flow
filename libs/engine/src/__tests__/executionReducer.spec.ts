@@ -143,6 +143,55 @@ describe('rule 4 — state priority', () => {
     it('treats an equal state as writable, for progress updates within RUNNING', () => {
         expect(shouldUpdateState('RUNNING', 'RUNNING')).toBe(true);
     });
+
+    // The server's NodeStatusType declares members this union does not model. Ranking them
+    // `-1` made one state both unacceptable and undefendable; last-write is the honest answer.
+    it('lets a state the table cannot rank through, rather than refusing it forever', () => {
+        expect(shouldUpdateState('RUNNING', 'SKIPPED')).toBe(true);
+        expect(shouldUpdateState('COMPLETED', 'SKIPPED')).toBe(true);
+    });
+
+    it('does not treat an unranked current state as a free-for-all either', () => {
+        // Still last-write — but by the same stated rule, not because `-1` lost every compare.
+        expect(shouldUpdateState('SKIPPED', 'RUNNING')).toBe(true);
+        expect(shouldUpdateState('SKIPPED', 'SKIPPED')).toBe(true);
+    });
+
+    it('refuses to write when the server said nothing', () => {
+        expect(shouldUpdateState('RUNNING', undefined)).toBe(false);
+        expect(shouldUpdateState('RUNNING', '')).toBe(false);
+    });
+
+    it('accepts anything onto a node that has no state yet', () => {
+        expect(shouldUpdateState(undefined, 'RUNNING')).toBe(true);
+        expect(shouldUpdateState('', 'RUNNING')).toBe(true);
+    });
+
+    // The rank table is an object; `'toString' in STATE_PRIORITY` is true on the prototype
+    // chain and would have compared a function against a number.
+    it('does not mistake an inherited property for a ranked state', () => {
+        expect(shouldUpdateState('RUNNING', 'toString')).toBe(true);
+        expect(shouldUpdateState('toString', 'RUNNING')).toBe(true);
+    });
+});
+
+describe('a patch says nothing by omitting keys, not by holding undefined', () => {
+    it('emits no state keys when the parser dropped the state', () => {
+        // What a frame carrying an unmodelled state looks like by the time it reaches here.
+        const { effects } = play([{ nodeId: 'n1', no: 1 }]);
+        const [patch] = applied(effects).map(e => (e as { patch: object }).patch);
+
+        expect('state' in patch).toBe(false);
+        expect('status' in patch).toBe(false);
+    });
+
+    it('leaves executionStats out when the event carries none', () => {
+        const { effects } = play([{ nodeId: 'n1', no: 1, state: 'IDLE' }]);
+        const [patch] = applied(effects).map(e => (e as { patch: object }).patch);
+
+        expect('executionStats' in patch).toBe(false);
+        expect(patch).toEqual({ state: 'IDLE', status: 'IDLE' });
+    });
 });
 
 describe('rule 5 — a port-shaped event describes its parent', () => {

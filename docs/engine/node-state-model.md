@@ -215,12 +215,20 @@ develop에는 `disabled` 노드 처리가 **통째로 없다**(`proxy.ts`·`prox
 - 소켓 → `dispatchSocketFrame.ts:1`이 엔진의 `parseSocketFrame`을 쓴다. state가 지워진 채
   오므로 `useSocketHandlers`/`useMobileSocketSync`(`:121-127`)의 `if (state)`가 통째로 건너뛴다.
   둘 다 `state as NodeState` 캐스팅을 하지만 **이미 필터를 통과한 값**이라 raw가 새지는 않는다
-- 로드·폴링 → `WorkflowCanvas.tsx:884`의 `getEffectiveState`가 자기 화이트리스트
-  (`libs/flows/src/consts/status.ts:6` — 엔진과 별개인 두 번째 5개 목록)로 다시 버린다
-- 합치면: 미지 state를 받은 노드는 **직전 state로 남는다.** 실행 중이었다면 60초 폴백 폴링
-  (`EXECUTION_FALLBACK_TIMEOUT_MS`)이 가져온 값도 같은 자리에서 지워져 **RUNNING인 채로 계속 돈다**
-- CLI/`runSession`은 여기에 하나 더 — 터미널 판정이 `runSession.ts:58`·`executionReducer.ts:83`에
-  `COMPLETED | ERROR`로 박혀 있어, 설령 state가 살아 들어와도 `waitForNode`는 settle되지 않는다
+- 로드·폴링 → `WorkflowCanvas.tsx:884`의 `getEffectiveState`가 자기 화이트리스트로 다시
+  버린다 (S1 전까지는 `libs/flows/src/consts/status.ts`의 두 번째 5개 목록이었다)
+- 합치면 브라우저에서는: 미지 state를 받은 노드가 **직전 state로 남는다.** 실행 중이었다면
+  60초 폴백 폴링(`EXECUTION_FALLBACK_TIMEOUT_MS`)이 가져온 값도 같은 자리에서 지워져
+  **RUNNING인 채로 계속 돈다**
+- **CLI·npm 소비자는 달랐다 (S1에서 고침).** "직전 state로 남는다"는 브라우저에만 맞는
+  서술이었다 — `updateNodeFromServer`가 `finalState ?? n.state`로 필드별로 다시 짜맞추기
+  때문이다. 엔진의 `runSession`은 리듀서 패치를 그대로 `applyRuntime`에 넘겼고,
+  `statePatch(undefined)`가 `{ state: undefined, status: undefined }`로 **키를 만들었기**
+  때문에 얕은 병합이 노드의 state를 **지웠다**. 미지 state는 무시되는 게 아니라 노드를
+  비웠다. `executionStats`도 같은 구조였다
+- CLI/`runSession`에는 하나 더 — 터미널 판정이 `runSession.ts`·`executionReducer.ts`에
+  `COMPLETED | ERROR`로 박혀 있어, 설령 state가 살아 들어와도 `waitForNode`는 settle되지
+  않는다 (이건 S2b, 아직 보류)
 
 flow-mcp만 덧댔다. 같은 리듀서를 쓰는 다른 소비자는 **같은 갭을 그대로 맞는다** — 정본을
 엔진에서 고쳐야 하는 이유. 소비자마다 `RANK_AS`를 복제하면 손으로 짠 규칙이 셋이 된다.

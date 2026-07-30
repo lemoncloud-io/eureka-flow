@@ -3,6 +3,7 @@ import {
     reduceNodeEvent,
     reducePortEvent,
     reduceProgressEvent,
+    shouldUpdateState,
     statePatch,
 } from './executionReducer';
 import { parseSocketFrame } from './parseSocketFrame';
@@ -12,6 +13,7 @@ import type { SocketFrame } from './parseSocketFrame';
 import type { FlowEngine } from '../engine';
 import type { SocketPort, SocketStatus } from '../ports/socket';
 import type { NodeState } from '../types';
+import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 /** A node reaching the end of a run, either way. */
 export interface NodeOutcome {
@@ -95,14 +97,44 @@ export const createRunSession = ({
         pending.forEach(waiter => waiter.settle(outcome));
     };
 
+    /**
+     * What this session has written to each node.
+     *
+     * The reducer's sequence check (Rule 1) keys its high-water mark on the frame's own id,
+     * but a port-shaped frame writes its state to the **parent** node — so `n1:out` and
+     * `n1` are two streams with two cursors and one target, and neither cursor can order
+     * them against the other. State priority is the second defence, and the browser has
+     * always had it at `updateNodeFromServer`; the engine's own session did not, which is
+     * how a late port frame walked a COMPLETED node back for every CLI and npm consumer.
+     *
+     * Not read off the graph: a `reset` means the previous run's states are no longer
+     * authoritative, and the graph still holds them.
+     */
+    const written = new Map<string, NodeState>();
+
+    const accepts = (nodeId: string, patch: Partial<NodeData>): boolean => {
+        const incoming = patch.state as NodeState | undefined;
+        // No state in the patch is nothing to order — stats and error text still land.
+        return incoming === undefined || shouldUpdateState(written.get(nodeId), incoming);
+    };
+
+    const write = (nodeId: string, patch: Partial<NodeData>): void => {
+        engine.applyRuntime(nodeId, patch);
+        const state = patch.state as NodeState | undefined;
+        if (state !== undefined) written.set(nodeId, state);
+    };
+
     const dispatch = (effects: ExecutionEffect[]): void => {
         for (const effect of effects) {
             // The two effects the engine can carry out itself: the graph is right here.
-            if (effect.type === 'apply') engine.applyRuntime(effect.nodeId, effect.patch);
+            if (effect.type === 'apply' && accepts(effect.nodeId, effect.patch)) {
+                write(effect.nodeId, effect.patch);
+            }
             // A re-run has to put the node back to IDLE before the new run's frames land.
             // The browser has always done this; leaving it to `onEffect` meant a CLI watched
             // a second run without the node ever leaving the first run's COMPLETED.
-            if (effect.type === 'reset-node') engine.applyRuntime(effect.nodeId, statePatch('IDLE'));
+            // Deliberately unguarded — walking the state back is the whole point.
+            if (effect.type === 'reset-node') write(effect.nodeId, statePatch('IDLE'));
             if (effect.type === 'run-end' && isTerminal(effect.state)) {
                 settle({ nodeId: effect.nodeId, state: effect.state, runId: effect.runId, error: effect.error });
             }
@@ -184,6 +216,7 @@ export const createRunSession = ({
 
         reset: nextFlowId => {
             execution = emptyExecutionState();
+            written.clear();
             if (nextFlowId !== undefined) flowId = nextFlowId;
         },
 

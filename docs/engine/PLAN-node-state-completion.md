@@ -95,12 +95,55 @@ S1을 하려면 `getEffectiveState`가 자기 Set 대신 `isNodeState`에 위임
 새 state가 실제로 흘러 들어오는 건 S2 이후고, 그때 두 경로가 갈라지지 않게 하려고 미리
 한 곳으로 모으는 것이다(S2 게이트의 `VALID_STATES` 제거 항목이 그 결과를 확인한다).
 
+**착수하면서 발견한 것 두 개** — 둘 다 같은 원인의 다른 얼굴이라 이 슬라이스에 들어왔다.
+
+1. **`statePatch(undefined)`가 노드 state를 지운다.** `{ state, status: state }`는 값이
+   `undefined`여도 **키를 만든다**. `applyRuntime`은 `{ ...node, ...patch }` 얕은 병합이라
+   그 키가 노드의 것을 덮는다. 그리고 파서가 state를 떨어뜨린 프레임이 정확히 그 모양으로
+   도착한다 — 즉 미지 state는 "무시"되는 게 아니라 **노드의 state를 날린다.** 브라우저는
+   `updateNodeFromServer`가 `finalState ?? n.state`로 필드별로 다시 짜맞춰서 안 맞았고,
+   CLI·npm 소비자는 그대로 맞았다. `executionStats`도 같은 구조로 지워지고 있었다.
+   → `node-state-model.md` §5의 "미지 state를 받은 노드는 직전 state로 남는다"는 브라우저에만
+   맞는 서술이었다.
+2. **`runSession`에 우선순위 가드가 없었다.** 리듀서의 Rule 1은 high-water mark를 **프레임
+   자신의 id**에 걸지만, 포트 프레임은 state를 **부모**에 쓴다. `n1:out`과 `n1`은 커서 둘에
+   타깃 하나라 서로를 정렬하지 못한다. 브라우저는 `updateNodeFromServer`에서 2차 방어를
+   해왔고 엔진 세션은 안 했다 → 늦은 포트 프레임이 COMPLETED 노드를 되돌렸다.
+
+**한 일** (2026-07-30):
+
+- `shouldUpdateState` — (a) 채택. `-1` 센티넬 제거, `isNodeState`로 랭크 판정
+  (`in` 연산자 대신 — 프로토타입 체인 때문에 `'toString'`이 랭크로 통과했다).
+  `server`가 비면 `false`(쓸 게 없음), `current`가 비면 `true`, 어느 쪽이든 랭크 불가면
+  last-write
+- `statePatch(undefined)` → `{}`. `executionStats`도 없으면 키를 안 만든다
+- `runSession` — `apply` 이펙트에 우선순위 가드. 권위는 **그래프가 아니라 세션이 쓴 것**
+  (`written` 맵). `reset()`이 그걸 비우므로 "리셋하면 이전 run의 state는 더는 기준이 아니다"가
+  유지된다 (그래프에서 읽으면 리셋 후 첫 프레임이 막힌다 — 실제로 기존 테스트가 잡았다).
+  `reset-node`는 의도적으로 가드 밖 — 되돌리는 게 목적이다
+- `getEffectiveState` → `isNodeState` 위임, `VALID_STATES` 삭제
+
 **게이트**
 
-- [ ] `nx test flow-engine` green
-- [ ] 새 테스트: 미지 state가 `next`일 때 / `current`일 때 각각 어떻게 되는지 고정
-- [ ] `parseSocketFrame`이 state를 지우는 것과의 상호작용 테스트 — 리듀서가 `undefined`
-      state 이벤트를 받았을 때 노드를 건드리지 않는지
+- [x] `nx test flow-engine` green — **302** (baseline 288 + 14)
+- [x] 새 테스트: 미지 state가 `server`일 때 / `current`일 때 / 프로토타입 체인 / 빈 값
+- [x] `parseSocketFrame`이 state를 지우는 것과의 상호작용 — 리듀서가 state 없는 이벤트에서
+      `state`/`status` 키를 **안 만드는지**, 그리고 `runSession`에서 노드가 안 지워지는지
+- [x] 늦은 포트 프레임이 부모를 COMPLETED에서 되돌리지 못하는지
+- [x] `tsc -b apps/web/tsconfig.app.json --force` exit 0 · lint 0 error / 55 warning
+      (develop 기준선 그대로) · `nx build web` green · flows 26 · socket 22 · web 199
+- [x] **revert 해서 red 확인** — 4개 수정 각각 되돌려 해당 스펙이 실패하는 것 확인
+      (센티넬 2 fail · statePatch 1 · executionStats 1 · runSession 가드 1)
+
+**정직하게 적어둘 것 하나**: `getEffectiveState` 위임은 **오늘 기준 완전한 no-op**이다.
+옛 하드코딩 Set으로 되돌려도 새 스펙이 green이다(확인함) — 두 목록이 같은 다섯 개라서다.
+그 테스트는 동작을 지키는 게 아니라 **두 목록이 갈라지는 것**을 잡는 드리프트 가드다.
+플랜이 원래 적었던 `getEffectiveState('SKIPPED') → 'SKIPPED'` 게이트는 S2 것이고 지금 쓰면 실패한다.
+
+**semver**: S1은 배포된 `shouldUpdateState`의 관찰 가능한 동작을 바꾼다(랭크 불가 state에서
+false → true). S4가 보류라 배포 판단이 붕 뜨는데, 이건 S1 자체의 minor bump 사안이다.
+**flow-mcp는 영향 없다** — `acceptsState`가 `RANKED_STATES` 검사에서 먼저 `true`로 빠져나가
+랭크 불가 state에 대해 엔진 함수를 아예 안 부른다. 랭크 가능한 값에 대해서는 두 구현이 동일하다.
 
 ### S2 — 유니온·Set·우선순위 확장 (⏸ **보류** — S0 판정에 따라)
 

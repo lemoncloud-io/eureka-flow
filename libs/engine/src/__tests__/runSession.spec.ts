@@ -82,6 +82,30 @@ describe('applying a run to the graph', () => {
         expect(stateOf('n1')).toBe('COMPLETED');
     });
 
+    // The sequence check above keys on the frame's own id, and a port frame writes to its
+    // parent — two cursors, one target, so the high-water mark cannot order them. State
+    // priority is the only thing standing between a late port frame and a finished node.
+    it('does not let a late port frame walk its parent back from COMPLETED', () => {
+        const { socket, stateOf } = harness();
+
+        socket.emit({ type: 'node', id: 'n1:out', flowId: 'f1', no: 1, state: 'RUNNING' });
+        socket.emit({ type: 'node', id: 'n1', flowId: 'f1', no: 2, state: 'COMPLETED' });
+        socket.emit({ type: 'node', id: 'n1:out', flowId: 'f1', no: 2, state: 'RUNNING' });
+
+        expect(stateOf('n1')).toBe('COMPLETED');
+    });
+
+    // The parser drops any state this union does not model, and the frame arrives with the
+    // key gone. Writing that through as `state: undefined` erased the node's own.
+    it('leaves the state alone when the frame carries one the engine does not model', () => {
+        const { socket, stateOf } = harness();
+
+        socket.emit({ type: 'node', id: 'n1', flowId: 'f1', no: 1, state: 'COMPLETED' });
+        socket.emit({ type: 'node', id: 'n1', flowId: 'f1', no: 2, state: 'SKIPPED' });
+
+        expect(stateOf('n1')).toBe('COMPLETED');
+    });
+
     it('follows a progress envelope', () => {
         const { socket, stateOf } = harness();
 
