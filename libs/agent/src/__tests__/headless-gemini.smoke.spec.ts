@@ -2,9 +2,11 @@
  * Headless (Node, no DOM) smoke test for the flow agent against a REAL Gemini key.
  *
  * Repo vitest env is `environment: 'node'` (libs/agent/vite.config.mts:13), so this is a
- * plain spec — no new tooling. Run the whole thing with:
+ * plain spec — no new tooling. The two REAL-KEY cases are OPT-IN: they run only when RUN_LIVE is set (a
+ * key in .env.local is not enough), so `nx test` and CI skip them. The offline CONTROL (case 3) always
+ * runs. Exercise the real-key path with:
  *
- *     GEMINI_API_KEY=... npx vitest run libs/agent/src/__tests__/headless-gemini.smoke.spec.ts
+ *     RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/headless-gemini.smoke.spec.ts
  *
  * The Gemini gateway supports FUNCTION-CALLING (`capabilities.toolCalls === true`): it maps our
  * tools to Gemini `functionDeclarations` and streams response `functionCall`s back as tool-call
@@ -35,6 +37,10 @@ import type { SessionState } from '../session/session';
 const MODEL = 'gemini-2.5-flash';
 const FLOW_ID = 'flow-headless';
 
+// Opt-in gate for the real-key cases: they hit the real API, so they run only when RUN_LIVE is set — a
+// key in .env.local is not enough (else `nx test` would run them). The offline CONTROL case is unguarded.
+const SKIP_LIVE = !process.env.GEMINI_API_KEY || !process.env.RUN_LIVE;
+
 /** A no-op catalog — this spec never reaches `describe_node`, so schema lookups don't matter. */
 const emptyCatalog: CatalogLookup = { has: () => false, schema: () => undefined, search: () => [] };
 
@@ -61,9 +67,8 @@ const collectText = async (stream: AsyncIterable<Chunk>): Promise<string> => {
 
 describe('flow agent headless (Node, no DOM) with a real Gemini key', () => {
     // ── 1. REAL KEY — proves the key/model/HTTP/Node path works headlessly ────────────────
-    // A plain text chat (no tools) is the simplest real-key check. Skipped when GEMINI_API_KEY is
-    // absent (e.g. CI).
-    it.skipIf(!process.env.GEMINI_API_KEY)('reaches Gemini over the network (plain text chat)', async () => {
+    // A plain text chat (no tools) is the simplest real-key check. Opt-in via RUN_LIVE (see SKIP_LIVE).
+    it.skipIf(SKIP_LIVE)('reaches Gemini over the network (plain text chat)', async () => {
         const environment = createVirtualAgentEnvironment(); // (b) Node env — REQUIRED by the gateway
         const http = createFetchHttpRequest(); // Node 18+ global fetch; no DOM
         const gateway = createGeminiLlmGateway({
@@ -87,44 +92,41 @@ describe('flow agent headless (Node, no DOM) with a real Gemini key', () => {
     });
 
     // ── 2. REAL KEY — real Gemini gateway drives the locator end-to-end (a–f) → node moves ──
-    // A real function-calling round-trip, so this needs a key; skipped in CI without one.
-    it.skipIf(!process.env.GEMINI_API_KEY)(
-        'drives the locator with the real Gemini gateway (a–f) → node moves, phase done',
-        async () => {
-            const environment = createVirtualAgentEnvironment(); // (b)
-            const http = createFetchHttpRequest();
-            const gateway = createGeminiLlmGateway({
-                environment,
-                http,
-                apiKey: process.env.GEMINI_API_KEY as string, // (a) key from env
-                model: MODEL, // real model id
-            });
-            expect(gateway.capabilities.toolCalls).toBe(true);
+    // A real function-calling round-trip, so this is opt-in via RUN_LIVE (see SKIP_LIVE).
+    it.skipIf(SKIP_LIVE)('drives the locator with the real Gemini gateway (a–f) → node moves, phase done', async () => {
+        const environment = createVirtualAgentEnvironment(); // (b)
+        const http = createFetchHttpRequest();
+        const gateway = createGeminiLlmGateway({
+            environment,
+            http,
+            apiKey: process.env.GEMINI_API_KEY as string, // (a) key from env
+            model: MODEL, // real model id
+        });
+        expect(gateway.capabilities.toolCalls).toBe(true);
 
-            const binding = createInMemoryCanvasBinding(seedGraph()); // (c) two real nodes
-            const storage = createInMemorySessionStore(); // (d) in-memory session
-            const agent = createLocatorAgent({
-                gateway,
-                binding,
-                storage,
-                flowId: FLOW_ID,
-                catalog: emptyCatalog,
-                userPermissions: { canModifyCanvas: true },
-            });
+        const binding = createInMemoryCanvasBinding(seedGraph()); // (c) two real nodes
+        const storage = createInMemorySessionStore(); // (d) in-memory session
+        const agent = createLocatorAgent({
+            gateway,
+            binding,
+            storage,
+            flowId: FLOW_ID,
+            catalog: emptyCatalog,
+            userPermissions: { canModifyCanvas: true },
+        });
 
-            const before = posOf(binding, 'n1');
-            await agent.send('move the input-text node right by 40px'); // (e)
-            const after = posOf(binding, 'n1'); // (f)
+        const before = posOf(binding, 'n1');
+        await agent.send('move the input-text node right by 40px'); // (e)
+        const after = posOf(binding, 'n1'); // (f)
 
-            const state = storage.load(FLOW_ID) as SessionState;
-            console.log('[2] real-gateway locator: before', before, '→ after', after, '| phase', state.phase);
+        const state = storage.load(FLOW_ID) as SessionState;
+        console.log('[2] real-gateway locator: before', before, '→ after', after, '| phase', state.phase);
 
-            // The tool-capable gateway lets the locator actually issue move_node:
-            expect(state.phase).toBe('done');
-            expect(after?.x ?? 0).toBeGreaterThan(before?.x ?? 0); // moved right
-            expect(after?.y).toBe(before?.y); // y kept
-        }
-    );
+        // The tool-capable gateway lets the locator actually issue move_node:
+        expect(state.phase).toBe('done');
+        expect(after?.x ?? 0).toBeGreaterThan(before?.x ?? 0); // moved right
+        expect(after?.y).toBe(before?.y); // y kept
+    });
 
     // ── 3. CONTROL — same pipeline, fake tool-capable gateway → the node actually moves ───
     // Proves the locator → binding → executor → storage pipeline is sound headlessly; the only

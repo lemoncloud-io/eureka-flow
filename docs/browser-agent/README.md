@@ -52,6 +52,52 @@ Each is a thin page; behavior is specified canonically in the harness docs (`des
   cancellation).
 - [llm-gateway.md](foundations/llm-gateway.md) — the `LlmGateway` contract + Gemini provider + HTTP port.
 
+## Running the live evals
+
+The `@flows/agent` suite is deterministic and offline by default — `yarn nx test @flows/agent` scripts
+every tool call through a fake gateway and makes no network calls. The **live evals** hand the
+orchestrator and its specialists a real function-calling Gemini gateway and check only the outcome + the
+graph oracle, so the model itself decides the tool calls (a case can legitimately fail when the model
+misbehaves — that is the signal).
+
+Live specs are **opt-in**: they run only when `RUN_LIVE` is set. A key in `.env.local` is _not_ enough on
+its own, so `nx test` and CI never trigger them.
+
+1. Put your key in the repo-root `.env.local` (gitignored) — the specs load it on import, so no inline
+   prefix is needed:
+
+    ```
+    GEMINI_API_KEY=...
+    # optional: GEMINI_MODEL=gemini-2.5-pro   (defaults to gemini-2.5-flash)
+    ```
+
+2. Run with `RUN_LIVE=1`:
+
+    ```bash
+    # orchestrator + specialists, end-to-end (the harness scenarios)
+    RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts
+
+    # one scenario by name
+    RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts -t A1
+
+    # a single specialist's eval
+    RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/locator.live.spec.ts
+    RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/property.live.spec.ts
+
+    # headless smoke test (real key/HTTP/Node path); the offline control case runs without RUN_LIVE
+    RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/headless-gemini.smoke.spec.ts
+    ```
+
+    A bigger model or the per-turn chat log:
+
+    ```bash
+    RUN_LIVE=1 GEMINI_MODEL=gemini-2.5-pro npx vitest run .../integration.live.spec.ts
+    RUN_LIVE=1 LIVE_VERBOSE=1 npx vitest run .../integration.live.spec.ts -t A1     # truncated turns
+    RUN_LIVE=1 LIVE_VERBOSE=full npx vitest run .../integration.live.spec.ts -t A1  # verbatim
+    ```
+
+Without `RUN_LIVE` (or without a key), every live spec skips and the suite stays offline.
+
 ## Reading order
 
 New here? Read **[design/architecture.md](design/architecture.md)** (the shared model, including the

@@ -1,11 +1,14 @@
 /**
  * Property agent-level LIVE eval (real Gemini): hands the property agent a real function-calling gateway and
  * checks the graph oracle when the MODEL chooses the tool calls. Deterministic counterpart: property.spec.ts;
- * the orchestrator-level live eval is integration.live.spec.ts. Auto-skips without GEMINI_API_KEY.
+ * the orchestrator-level live eval is integration.live.spec.ts.
+ *
+ * OPT-IN: hits the real Gemini API, so it runs ONLY when RUN_LIVE is set — a key in .env.local is not
+ * enough. `nx test` and CI leave RUN_LIVE unset, so the suite stays offline.
  *
  * Each case builds the MINIMAL graph it needs — the node list is seeded into the prompt every turn, so a
  * small graph keeps the live token cost down. Cases are independent; run one:
- *   npx vitest run libs/agent/src/__tests__/harness/scenarios/property.live.spec.ts -t merge
+ *   RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/property.live.spec.ts -t merge
  * Key: put GEMINI_API_KEY (and optional GEMINI_MODEL) in the repo-root .env.local — loaded on import.
  */
 import '../../loadEnvLocal'; // FIRST: load repo-root .env.local so GEMINI_API_KEY is set before the gate below
@@ -25,7 +28,9 @@ import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const apiKey = process.env.GEMINI_API_KEY;
 const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
-const NO_KEY = !apiKey;
+// Opt-in gate: live specs hit the real API, so they run only when RUN_LIVE is set — a key in .env.local
+// is not enough (else `nx test` would run them). Run live with `RUN_LIVE=1 npx vitest run <file>`.
+const SKIP_LIVE = !apiKey || !process.env.RUN_LIVE;
 const TIMEOUT_MS = 120_000;
 
 const gateway = apiKey
@@ -65,7 +70,7 @@ const runProperty = async (task: string, graph: Graph): Promise<Graph> => {
     return binding.readGraph();
 };
 
-describe.skipIf(NO_KEY)('Property — LIVE against a real Gemini key', () => {
+describe.skipIf(SKIP_LIVE)('Property — LIVE against a real Gemini key', () => {
     it(
         'merge: sets the model and KEEPS the existing temperature',
         async () => {

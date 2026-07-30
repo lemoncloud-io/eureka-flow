@@ -8,14 +8,17 @@
  *   - THIS file is an EVAL — it hands the orchestrator + specialists a real function-calling Gemini
  *     gateway (createGeminiLlmGateway, capabilities.toolCalls === true) and only checks the OUTCOME +
  *     the graph oracle from the doc. The model decides the tool calls, so a case can legitimately fail
- *     if the model misbehaves — that is the signal. Auto-skips when GEMINI_API_KEY is absent.
+ *     if the model misbehaves — that is the signal.
+ *
+ * OPT-IN: this eval hits the real Gemini API, so it runs ONLY when RUN_LIVE is set — a key in .env.local
+ * is not enough. `nx test` and CI leave RUN_LIVE unset, so the whole suite stays offline and deterministic.
  *
  * Key: put GEMINI_API_KEY (and optionally GEMINI_MODEL) in the repo-root .env.local — this spec loads it
  * on import (../../loadEnvLocal), so no command prefix is needed. Inline `GEMINI_API_KEY=... ` still works too.
  *
- * Run all:      npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts
- * One case:     npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts -t A1
- * Bigger model: GEMINI_MODEL=gemini-2.5-pro npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts
+ * Run all:      RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts
+ * One case:     RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts -t A1
+ * Bigger model: RUN_LIVE=1 GEMINI_MODEL=gemini-2.5-pro npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts
  * Chat log:     LIVE_VERBOSE=1 npx vitest run .../scenarios/integration.live.spec.ts -t A1      # each agent's turn (truncated)
  * Full text:    LIVE_VERBOSE=full npx vitest run .../scenarios/integration.live.spec.ts -t A1   # same, nothing truncated
  *
@@ -38,7 +41,9 @@ import type { ScenarioInput, TurnResult } from '../runScenario';
 
 const apiKey = process.env.GEMINI_API_KEY;
 const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
-const NO_KEY = !apiKey;
+// Opt-in gate: live specs hit the real API, so they run only when RUN_LIVE is set — a key in .env.local
+// is not enough (else `nx test` would run them). Run live with `RUN_LIVE=1 npx vitest run <file>`.
+const SKIP_LIVE = !apiKey || !process.env.RUN_LIVE;
 
 // A single tool-capable gateway shared by the orchestrator + every spawned specialist. Each chat() is
 // an independent generateContent call, so one instance is fine. Built only when a key is present.
@@ -109,7 +114,7 @@ const expectUnchanged = (result: TurnResult): void => {
     expect(result.graph).toEqual(makeInitialGraph());
 };
 
-describe.skipIf(NO_KEY)('Harness scenarios — LIVE against a real Gemini key', () => {
+describe.skipIf(SKIP_LIVE)('Harness scenarios — LIVE against a real Gemini key', () => {
     // Print ONE scorecard after the whole matrix has run — the model's outcome for every scenario, so the
     // final results are unmistakable regardless of how many cases failed their oracle (✓/× above is the
     // pass/fail vs the oracle; this is WHAT the model did, incl. the reason a case missed).
