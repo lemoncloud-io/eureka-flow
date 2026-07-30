@@ -6,6 +6,10 @@
 > [architecture.md](./architecture.md), [canvas-binding.md](./canvas-binding.md), and the per-agent
 > [node.md](../agents/node.md) / [edge.md](../agents/edge.md) SPECs). This page is the a→b how-to for making
 > the code conform; delete it once the change has landed. Written 2026-07-28.
+>
+> **Superseded in part:** the "replace an existing edge on an occupied target input" behavior below was later
+> changed — `connect_nodes` now **rejects** an occupied input and reports the occupying edge (the binding
+> just appends). See [change-note-edge-reject-occupied-input.md](./change-note-edge-reject-occupied-input.md).
 
 ## Why, and what changed from the parked plan
 

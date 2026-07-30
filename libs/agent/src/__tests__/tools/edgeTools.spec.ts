@@ -20,22 +20,28 @@ const block = (type: string, inputs: BlockSchema['inputs'], outputs: BlockSchema
     outputs,
 });
 
-/** A bespoke catalog with typed ports (the shared fixture is text/untyped only, so incompatible-type is unexpressible there). */
+/**
+ * A bespoke catalog with typed ports + a two-input block (the shared fixture is single-input, text/untyped
+ * only, so cross-type and multi-input cases are unexpressible there). `image` is a real shipped port type, so
+ * text→image is a realistic incompatible pair — no synthetic `number` input (no shipped block exposes one).
+ */
 const catalog: CatalogLookup = createCatalogLookup([
     block('text-src', [], [{ portId: 'out', type: 'text' }]),
     block('text-sink', [{ portId: 'in', type: 'text' }], []),
-    block('num-sink', [{ portId: 'in', type: 'number' }], []),
+    block('img-sink', [{ portId: 'in', type: 'image' }], []), // real cross-type: a text output can't feed it
     block('pass', [{ portId: 'in' }], [{ portId: 'out' }]), // untyped ports → any-compatible
+    block('combine', [{ portId: 'a' }, { portId: 'b' }], [{ portId: 'out' }]), // TWO input ports
 ]);
 
-/** Nodes: a=text-src, b=text-sink, c=num-sink, d/e=pass. No edges unless a test adds them. */
+/** Nodes: a=text-src, b=text-sink, c=img-sink, d/e=pass, m=combine (two inputs a,b). No edges unless a test adds them. */
 const makeGraph = (edges: Graph['edges'] = []): Graph => ({
     nodes: [
         { id: 'a', type: 'text-src', position: { x: 0, y: 0 } },
         { id: 'b', type: 'text-sink', position: { x: 100, y: 0 } },
-        { id: 'c', type: 'num-sink', position: { x: 200, y: 0 } },
+        { id: 'c', type: 'img-sink', position: { x: 200, y: 0 } },
         { id: 'd', type: 'pass', position: { x: 300, y: 0 } },
         { id: 'e', type: 'pass', position: { x: 400, y: 0 } },
+        { id: 'm', type: 'combine', position: { x: 500, y: 0 } },
     ],
     edges,
 });
@@ -68,12 +74,12 @@ describe('edge provider — connect_nodes', () => {
         }
     });
 
-    it('rejects incompatible port types and adds nothing (text → number)', async () => {
+    it('rejects incompatible port types and adds nothing (text → image)', async () => {
         const binding = createInMemoryCanvasBinding(makeGraph());
         const res = await run(createEdgeToolProvider(binding, catalog), 'connect_nodes', {
-            sourceNodeId: 'a',
+            sourceNodeId: 'a', // text-src.out (text)
             sourcePortId: 'out',
-            targetNodeId: 'c',
+            targetNodeId: 'c', // img-sink.in (image)
             targetPortId: 'in',
         });
         expect(res.ok).toBe(false);
@@ -152,25 +158,66 @@ describe('edge provider — connect_nodes', () => {
         expect(binding.readGraph().edges).toHaveLength(0); // rejected → graph untouched
     });
 
-    it('replaces an existing edge on an occupied input port (one edge in, not two)', async () => {
+    it('rejects a connect to an occupied input port, names the occupying edge, and leaves it intact', async () => {
         const binding = createInMemoryCanvasBinding(makeGraph());
         const edge = createEdgeToolProvider(binding, catalog);
-        // First: d(pass).out → b.in ; then a(text-src).out → b.in should REPLACE it.
-        await run(edge, 'connect_nodes', {
+        // First: d(pass).out → b.in occupies b's single input.
+        const first = await run(edge, 'connect_nodes', {
             sourceNodeId: 'd',
             sourcePortId: 'out',
             targetNodeId: 'b',
             targetPortId: 'in',
         });
-        await run(edge, 'connect_nodes', {
+        const firstId = first.ok ? (first.data as { edgeId: string }).edgeId : '';
+        // Then: a(text-src).out → b.in is REJECTED (b.in occupied) and names the occupying edge + its source.
+        const res = await run(edge, 'connect_nodes', {
             sourceNodeId: 'a',
             sourcePortId: 'out',
             targetNodeId: 'b',
             targetPortId: 'in',
         });
+        expect(res.ok).toBe(false);
+        if (!res.ok) {
+            expect(res.error).toContain('already connected');
+            expect(res.error).toContain(firstId); // the occupying edge id, so the orchestrator can disconnect it
+            expect(res.error).toContain('d:out'); // and where it comes from
+        }
+        // The original edge survives; no replacement, no second edge.
         const into = binding.readGraph().edges.filter(e => e.targetNodeId === 'b' && e.targetPortId === 'in');
         expect(into).toHaveLength(1);
-        expect(into[0].sourceNodeId).toBe('a');
+        expect(into[0].id).toBe(firstId);
+        expect(into[0].sourceNodeId).toBe('d'); // still the ORIGINAL source — not replaced by 'a'
+    });
+
+    it('treats input ports independently — a sibling input port accepts an edge and only the same port rejects', async () => {
+        const binding = createInMemoryCanvasBinding(makeGraph());
+        const edge = createEdgeToolProvider(binding, catalog);
+        // m(combine) has two input ports: a, b. Wire d.out → m.a, then e.out → m.b.
+        await run(edge, 'connect_nodes', {
+            sourceNodeId: 'd',
+            sourcePortId: 'out',
+            targetNodeId: 'm',
+            targetPortId: 'a',
+        });
+        const second = await run(edge, 'connect_nodes', {
+            sourceNodeId: 'e',
+            sourcePortId: 'out',
+            targetNodeId: 'm',
+            targetPortId: 'b',
+        });
+        expect(second.ok).toBe(true); // the second input port is free — NOT a replacement of port 'a'
+        const into = binding.readGraph().edges.filter(e => e.targetNodeId === 'm');
+        expect(into).toHaveLength(2); // two edges into ONE node, on different ports
+        expect(into.map(e => e.targetPortId).sort()).toEqual(['a', 'b']);
+        // Reconnecting to the OCCUPIED port 'a' rejects; port 'b' is untouched.
+        const clash = await run(edge, 'connect_nodes', {
+            sourceNodeId: 'e',
+            sourcePortId: 'out',
+            targetNodeId: 'm',
+            targetPortId: 'a',
+        });
+        expect(clash.ok).toBe(false);
+        expect(binding.readGraph().edges.filter(e => e.targetNodeId === 'm')).toHaveLength(2);
     });
 });
 
@@ -195,7 +242,7 @@ describe('edge provider — disconnect_edge + list_edges', () => {
         const res = await run(createEdgeToolProvider(binding, catalog), 'disconnect_edge', { edgeId: 'x' });
         expect(res.ok).toBe(true);
         expect(binding.readGraph().edges).toHaveLength(0);
-        expect(binding.readGraph().nodes).toHaveLength(5);
+        expect(binding.readGraph().nodes).toHaveLength(6);
     });
 
     it('rejects disconnecting an unknown edge and leaves existing edges intact', async () => {

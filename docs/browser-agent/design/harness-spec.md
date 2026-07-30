@@ -259,7 +259,8 @@ permissions).
   `createNodeStructureToolProvider(binding, catalog)`. It sets **no** config and adds **no** edge — those are
   the property and edge specialists (composition, below).
 - **`edge`** (connect + disconnect) — node **read** + `list_edges`, then `connect_nodes` (validates ports ·
-  type-compat · no-cycle, then adds one edge; replaces an existing edge on an occupied input) /
+  type-compat · no-cycle · target input not occupied, then appends one edge; an occupied target input is
+  **rejected and reported**, naming the occupying edge, never replaced) /
   `disconnect_edge` (removes one edge by id). Its provider is `createEdgeToolProvider(binding, catalog)`; the
   validation lives in the tool, not the binding. Exact shapes: **[interfaces §3](./harness-interfaces.md#3--tools)**.
 - Together the four specialists cover **move + config + rename + add/delete node + connect/disconnect edge** —

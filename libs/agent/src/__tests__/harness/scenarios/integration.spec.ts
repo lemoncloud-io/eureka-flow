@@ -194,15 +194,14 @@ describe('Harness scenarios — outcome coverage', () => {
     });
 
     it('A5 — delete the buffer AND rewire input→generator (node + edge composition → applied)', async () => {
-        // A compound structural turn: the node agent deletes the buffer (its edges cascade) and the edge
-        // agent connects the input straight to the generator. Order-independent — the final graph is the
-        // same whichever child lands first.
+        // A compound structural turn: the node agent deletes the buffer (its edges cascade, freeing the
+        // generator's input), then the edge agent connects the input straight to the generator. Ordered, not
+        // concurrent: connect_nodes now REJECTS an occupied input, so the delete must free gen.in BEFORE the
+        // rewire lands — the orchestrator sequences the two spawns (delete → connect).
         const script: FakeScript = {
             orchestrator: [
-                spawn([
-                    { agentType: 'node', task: `delete node ${IDS.buf}` },
-                    { agentType: 'edge', task: `connect ${IDS.txt} out to ${IDS.gen} in` },
-                ]),
+                spawn([{ agentType: 'node', task: `delete node ${IDS.buf}` }]),
+                spawn([{ agentType: 'edge', task: `connect ${IDS.txt} out to ${IDS.gen} in` }]),
                 text('Deleted the buffer and reconnected the input straight into the generator.'),
                 report({ status: 'applied', summary: 'deleted the buffer; rewired input→generator' }),
             ],

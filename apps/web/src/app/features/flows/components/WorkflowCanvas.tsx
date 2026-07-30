@@ -91,7 +91,7 @@ export interface WorkflowCanvasRef {
     addNode: (type: string, position?: { x: number; y: number }, options?: { autoConnect?: boolean }) => string;
     /** Delete a node and cascade its edges (guards canModifyCanvas + checkpoints). Agent structural seam. */
     deleteNode: (id: string) => void;
-    /** Add one edge (replacing any edge on an occupied input port) and return its new id. Agent structural seam. */
+    /** Append one edge and return its new id. Agent structural seam — the connect tool rejects an occupied input up front, so this never displaces an existing edge. */
     addEdge: (spec: EdgeSpec) => string;
     /** Remove one edge by id (guards canModifyCanvas + checkpoints). Agent structural seam. */
     deleteEdge: (id: string) => void;
@@ -702,7 +702,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 saveCheckpoint();
                 const id = newEdgeId();
                 const newConn: Connection = { id, ...spec };
-                setConnections(prev => withReplacedInputEdge(prev, newConn));
+                // Append: the edge tool validated the target input is free (an occupied input is rejected
+                // there). The interactive drag path keeps its own replace-on-occupied UX (handlePortMouseUp).
+                setConnections(prev => [...prev, newConn]);
                 return id;
             };
 

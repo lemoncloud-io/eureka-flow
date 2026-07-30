@@ -4,7 +4,7 @@ import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 /**
  * In-memory {@link CanvasBinding} over a plain {@link Graph} — the reference binding for tests and Node runs.
  * Mirrors the desktop binding's mechanics: `updateNode` merges config; `deleteNode` cascades edges;
- * `addEdge` replaces an edge on an occupied input port. Ids are minted from monotonic counters (deterministic
+ * `addEdge` appends one edge. Ids are minted from monotonic counters (deterministic
  * for tests); the desktop binding uses the real `newNodeId`/`newEdgeId`. Structural writes seed no default
  * config here (the block registry is a desktop concern) — a created node starts with `config: {}`.
  */
@@ -66,13 +66,11 @@ export const createInMemoryCanvasBinding = (initial?: Graph): CanvasBinding => {
         },
 
         addEdge: (spec: EdgeSpec): { id: string } => {
+            // Append only: the caller (edge tool) has already validated the target input is free — the binding
+            // never displaces an existing edge (a would-be occupied-input connect is rejected in the tool).
             const id = `e_${(edgeSeq += 1)}`;
             const edge: EdgeData = { id, ...spec };
-            // Replace-on-occupied-input: one edge per (targetNode, targetPort), like a user drag.
-            const kept = graph.edges.filter(
-                e => !(e.targetNodeId === spec.targetNodeId && e.targetPortId === spec.targetPortId)
-            );
-            graph = { ...graph, edges: [...kept, edge] };
+            graph = { ...graph, edges: [...graph.edges, edge] };
             return { id };
         },
 

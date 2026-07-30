@@ -193,8 +193,8 @@ interface EdgeSummary {
     targetPortId: string;
 }
 //   list_edges()                → { edges: EdgeSummary[] } // COMPACT edge list — the palette for disconnect
-//   connect_nodes({ … })        → validates ports exist · arePortTypesCompatible · !wouldCreateCycle, then
-//                                  binding.addEdge(spec) → { edgeId } // replaces an existing edge on an occupied input
+//   connect_nodes({ … })        → validates ports exist · arePortTypesCompatible · !wouldCreateCycle · target input free,
+//                                  then binding.addEdge(spec) → { edgeId } // rejects (names the occupying edge) if the input is occupied
 //   disconnect_edge({ edgeId }) → binding.deleteEdge(edgeId)         // rejects unknown edge
 
 // DISCOVER — orchestrator only. The roster is a registry (data), never enumerated in the persona.
@@ -321,7 +321,7 @@ interface CanvasBinding {
     updateNode(id: string, patch: NodePatch): void; // node patch — canModifyCanvas / canEditConfig per field
     addNode(type: string, position: XY): { id: string }; // create with the block's defaultConfig — canModifyCanvas
     deleteNode(id: string): void; // remove node + cascade its edges — canModifyCanvas
-    addEdge(spec: EdgeSpec): { id: string }; // link two ports; replaces an existing edge on an occupied input — canModifyCanvas
+    addEdge(spec: EdgeSpec): { id: string }; // append one (pre-validated) edge, returning its id — canModifyCanvas
     deleteEdge(id: string): void; // remove one edge by id — canModifyCanvas
 }
 interface NodePatch {

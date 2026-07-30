@@ -34,7 +34,8 @@ const CONNECT_NODES_DEF: ToolDef = {
     description:
         "Connect a source node's OUTPUT port to a target node's INPUT port. Rejects an unknown node or " +
         'port, incompatible port types, or a connection that would create a cycle. If the target input ' +
-        'port is already occupied, the existing edge is replaced. Returns the new edge id.',
+        'port is already occupied, the connection is REJECTED and names the existing edge (it is not ' +
+        'replaced) — disconnect that edge first, then reconnect. Returns the new edge id.',
     requires: 'canModifyCanvas',
     parameters: {
         type: 'object',
@@ -107,6 +108,21 @@ export const createEdgeToolProvider = (binding: CanvasBinding, catalog: CatalogL
             }
             if (wouldCreateCycle(binding.readGraph().edges, spec.sourceNodeId, spec.targetNodeId)) {
                 return err(call, `connecting "${spec.sourceNodeId}" → "${spec.targetNodeId}" would create a cycle`);
+            }
+
+            // An input port holds one edge. Displacing an existing connection is the orchestrator's call,
+            // not a silent overwrite — reject and name the occupying edge so it can disconnect, then reconnect.
+            // (Sibling input ports are unaffected: the match keys on BOTH targetNodeId AND targetPortId.)
+            const occupying = binding
+                .readGraph()
+                .edges.find(e => e.targetNodeId === spec.targetNodeId && e.targetPortId === spec.targetPortId);
+            if (occupying) {
+                return err(
+                    call,
+                    `input port "${spec.targetPortId}" on node "${spec.targetNodeId}" (${target.node.type}) is ` +
+                        `already connected by edge "${occupying.id}" from ` +
+                        `"${occupying.sourceNodeId}:${occupying.sourcePortId}"; disconnect it first, then reconnect`
+                );
             }
 
             const { id } = binding.addEdge({

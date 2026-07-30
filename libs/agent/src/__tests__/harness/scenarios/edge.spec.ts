@@ -27,14 +27,15 @@ const block = (type: string, inputs: BlockSchema['inputs'], outputs: BlockSchema
 const catalog = createCatalogLookup([
     block('text-src', [], [{ portId: 'out', type: 'text' }]),
     block('text-sink', [{ portId: 'in', type: 'text' }], []),
-    block('num-sink', [{ portId: 'in', type: 'number' }], []),
+    block('img-sink', [{ portId: 'in', type: 'image' }], []), // real cross-type: a text output can't feed it
 ]);
 
 const makeGraph = (edges: Graph['edges'] = []): Graph => ({
     nodes: [
         { id: 'a', type: 'text-src', position: { x: 0, y: 0 } },
         { id: 'b', type: 'text-sink', position: { x: 100, y: 0 } },
-        { id: 'c', type: 'num-sink', position: { x: 200, y: 0 } },
+        { id: 'c', type: 'img-sink', position: { x: 200, y: 0 } },
+        { id: 'd', type: 'text-src', position: { x: 300, y: 0 } }, // a second source, to occupy an input
     ],
     edges,
 });
@@ -94,7 +95,7 @@ describe('edge agent — connect_nodes', () => {
                     },
                 ],
             },
-            { text: "text output can't feed a number input; I did not reroute." },
+            { text: "text output can't feed an image input; I did not reroute." },
         ]);
 
         await agent.send('connect a to c');
@@ -118,7 +119,36 @@ describe('edge agent — disconnect_edge', () => {
         await agent.send('disconnect a from b');
 
         expect(binding.readGraph().edges).toHaveLength(0);
-        expect(binding.readGraph().nodes).toHaveLength(3);
+        expect(binding.readGraph().nodes).toHaveLength(4);
+    });
+});
+
+describe('edge agent — occupied input', () => {
+    it('reports a rejected connect to an occupied input and does NOT replace the existing edge', async () => {
+        // b.in is already fed by d → b; asking to connect a → b.in must be rejected, not a silent replace.
+        const { agent, binding, toolMsg } = setup(
+            [
+                {
+                    toolCalls: [
+                        {
+                            name: 'connect_nodes',
+                            args: { sourceNodeId: 'a', sourcePortId: 'out', targetNodeId: 'b', targetPortId: 'in' },
+                        },
+                    ],
+                },
+                { text: 'b.in is already connected (edge x from d:out); I did not replace it.' },
+            ],
+            makeGraph([{ id: 'x', sourceNodeId: 'd', sourcePortId: 'out', targetNodeId: 'b', targetPortId: 'in' }])
+        );
+
+        await agent.send('connect a to b');
+
+        // the occupying edge is untouched; no second edge was added
+        const into = binding.readGraph().edges.filter(e => e.targetNodeId === 'b' && e.targetPortId === 'in');
+        expect(into).toHaveLength(1);
+        expect(into[0].id).toBe('x');
+        expect(into[0].sourceNodeId).toBe('d'); // still the original source, not replaced by 'a'
+        expect(toolMsg()?.content).toMatch(/already connected/);
     });
 });
 

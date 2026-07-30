@@ -37,7 +37,7 @@ export interface CanvasBinding {
     addNode(type: string, position: XY): { id: string };
     /** Remove a node and cascade every edge that touches it. */
     deleteNode(id: string): void;
-    /** Add one edge; if its target input port is already occupied, that edge is replaced. Returns the new id. */
+    /** Append one edge and return its new id. The caller validates first (the edge tool rejects an occupied input), so the binding never displaces an existing edge. */
     addEdge(spec: EdgeSpec): { id: string };
     /** Remove one edge by id. */
     deleteEdge(id: string): void;

@@ -51,7 +51,7 @@ export interface CanvasBinding {
     addNode(type: string, position: XY): { id: string };
     /** Remove a node and cascade every edge that touches it. */
     deleteNode(id: string): void;
-    /** Add one edge; if its target input port is already occupied, replace that edge. Returns the new id. */
+    /** Append one (already-validated) edge and return its new id. */
     addEdge(spec: EdgeSpec): { id: string };
     /** Remove one edge by id. */
     deleteEdge(id: string): void;
@@ -73,8 +73,11 @@ export interface CanvasBinding {
 - **`deleteNode` cascades in the binding, not the tool.** The store's `deleteNode` already drops incident
   edges atomically; the in-memory binding mirrors it. Keeping cascade in the seam means every writer gets a
   consistent graph and no tool can forget it (DRY: one cascade, not one-per-tool).
-- **`addEdge` does the occupied-input replace, not the tool.** Single-input-port replacement is a mechanical
-  property of the canvas (a user drag does it too), so it lives with the write, not the judgement.
+- **`addEdge` appends; the tool judges an occupied input.** Whether to displace an existing edge on an
+  occupied input is a judgement, not a mechanical write, so `connect_nodes` **rejects** an occupied target
+  input (naming the occupying edge for the orchestrator to `disconnect_edge`) and `addEdge` just appends the
+  validated edge. The interactive canvas keeps its own drag-to-replace UX in `WorkflowCanvas`, unrelated to
+  the agent seam.
 - **`addNode(type, position)` takes no config.** Default config is a **binding** concern (desktop seeds from
   `blockRegistry[type].defaultConfig`; in-memory seeds `{}`), because the agent's `CatalogLookup`/`BlockSchema`
   does not carry `defaultConfig`. The tool passes only what it knows. Non-default config is a **separate**
@@ -213,7 +216,7 @@ they close over `saveCheckpoint`/`setNodes`/`setConnections`/`permissions`/`newE
 // WorkflowCanvasRef — BEFORE → AFTER
 addNode: (type: string, position?: XY) => void;            // →  (type, position?, options?: { autoConnect?: boolean }) => string   (returns the new id; autoConnect defaults true)
 deleteNode: (id: string) => void;                          // NEW on the ref (guard + checkpoint + cascade)
-addEdge: (spec: EdgeSpec) => string;                       // NEW (guard + checkpoint + replace-on-occupied + newEdgeId)
+addEdge: (spec: EdgeSpec) => string;                       // NEW (guard + checkpoint + append + newEdgeId)
 deleteEdge: (id: string) => void;                          // NEW (guard + checkpoint)
 ```
 
@@ -299,7 +302,7 @@ classDiagram
   changes, no orchestrator prompt edit. The `addNode` ref signature is widened additively (optional arg,
   now-returned id) so existing callers are untouched.
 - **LSP** — both `CanvasBinding` impls (in-memory, desktop) honor the same contract, including the
-  cascade-on-delete and replace-on-occupied-input post-conditions, so tests over the in-memory binding
+  cascade-on-delete and append-on-`addEdge` post-conditions, so tests over the in-memory binding
   predict desktop behavior. (The one honest gap: default-config _values_ differ — desktop seeds from the
   registry, in-memory seeds `{}` — documented in §2 as a binding concern, asserted structurally in tests.)
 - **ISP** — no god interface: reads, node-structure, and edge are three providers an agent composes; a
@@ -307,15 +310,16 @@ classDiagram
 - **DIP** — tools depend on the `CanvasBinding`/`CatalogLookup` abstractions, never on the desktop or store;
   that is what makes them headless-testable.
 - **DRY** — one port-compat + cycle implementation (`edgeSemantics`), shared app↔lib; one cascade (binding);
-  one replace-on-occupied (binding); agents/tools reuse `requireNode`, `toolOk/toolErr`, `renderNodeContext`,
-  and the `BaseAgent` loop verbatim.
+  one occupied-input rejection (edge tool); agents/tools reuse `requireNode`, `toolOk/toolErr`,
+  `renderNodeContext`, and the `BaseAgent` loop verbatim.
 
 ## 9 · Test surface (what proves the above)
 
 - **Tool unit** (`__tests__/tools/nodeTools.spec.ts` extend, `edgeTools.spec.ts` new) over an in-memory
   binding + a small typed catalog: add/delete happy-path + cascade; connect happy-path; reject unknown type,
-  missing node, unknown port, incompatible type (needs a non-`text` typed block), cycle, and
-  replace-on-occupied-input; a rejected call leaves `readGraph()` unchanged; `def.requires === 'canModifyCanvas'`.
+  missing node, unknown port, incompatible type (a real cross-type pair, e.g. `text`→`image`), cycle, and
+  occupied-input (naming the occupying edge, sibling ports untouched); a rejected call leaves `readGraph()`
+  unchanged; `def.requires === 'canModifyCanvas'`.
 - **Agent scenario** (`scenarios/node.spec.ts`, `scenarios/edge.spec.ts` new) driving each agent directly
   over a fake gateway (bespoke graphs, `locator.spec` style) — the DoD lines in [node.md](../agents/node.md)
   / [edge.md](../agents/edge.md).
