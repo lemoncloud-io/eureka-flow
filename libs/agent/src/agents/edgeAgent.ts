@@ -1,6 +1,6 @@
 import { BaseAgent } from './baseAgent';
-import { createEdgeToolProvider } from '../tools/edgeTools';
-import { createNodeReadToolProvider, renderNodeContext } from '../tools/nodeTools';
+import { edgeSkill, inspectSkill, toolsFromSkills } from '../skills';
+import { renderNodeContext } from '../tools/nodeTools';
 
 import type { BaseAgentDeps } from './baseAgent';
 import type { Agent } from '../agent';
@@ -36,10 +36,7 @@ export class EdgeAgent extends BaseAgent {
             description: 'Connects two nodes or disconnects an edge.',
             systemPrompt: EDGE_SYSTEM_PROMPT,
             grant: { canModifyCanvas: true },
-            tools: [
-                createNodeReadToolProvider(deps.binding, deps.catalog),
-                createEdgeToolProvider(deps.binding, deps.catalog),
-            ],
+            tools: toolsFromSkills([inspectSkill, edgeSkill], { binding: deps.binding, catalog: deps.catalog }),
         });
     }
 

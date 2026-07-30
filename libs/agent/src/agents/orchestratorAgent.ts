@@ -60,7 +60,7 @@ export interface OrchestratorAgentDeps extends BaseAgentDeps {
     mode?: 'parallel' | 'serial';
 }
 
-/** The orchestrator's per-turn context: the live-canvas node list + the discovered roster. */
+/** The orchestrator's per-turn context: the live-canvas node list + the discovered roster + the block-agent rule. */
 const renderContext = (binding: CanvasBinding, roster: AgentRoster): string => {
     const nodes = renderNodeContext(binding, {
         heading: 'Current nodes on the canvas:',
@@ -70,7 +70,14 @@ const renderContext = (binding: CanvasBinding, roster: AgentRoster): string => {
         .list()
         .map(a => `- ${a.type}: ${a.summary}`)
         .join('\n');
-    return `${nodes}\n\nAvailable specialists (also via list_agents):\n${agentLines}`;
+    const blockRule = [
+        'To add, configure, rename, or delete a node, spawn a BLOCK agent whose agentType is the block’s TYPE',
+        '(the node’s `type` in the list above, or a catalog block type from catalog_search). A block agent owns',
+        'that one block: it creates and configures it in a single delegation. The specialists listed above with a',
+        'block type (e.g. single-output-generator) are richer block agents; any OTHER catalog block type is served',
+        'by a generic block agent automatically. Use locator to move and edge to connect/disconnect.',
+    ].join(' ');
+    return `${nodes}\n\nAvailable specialists (also via list_agents):\n${agentLines}\n\n${blockRule}`;
 };
 
 /**

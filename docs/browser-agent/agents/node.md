@@ -1,5 +1,10 @@
 # Node agent
 
+> **⚠️ RETIRED (unregistered).** Superseded by the [block agent](./blockAgent.md), which owns a block's whole
+> lifecycle (add · configure · rename · delete). The `node` agent is no longer in `DEFAULT_REGISTRATIONS`, so the
+> orchestrator cannot spawn it; its module + `node.*` scenario suites stay in the tree (driven directly) until a
+> later cleanup. This page is kept for reference. **`add_node` / `delete_node` now belong to the block agent.**
+
 > **The add/delete specialist.** The node agent **adds a node to the canvas or deletes one** —
 > `add_node({ type, position })` (create with the block's default config) or `delete_node({ nodeId })` (remove
 > the node; its edges cascade away) — applied straight to the live canvas. It is **spawned by the

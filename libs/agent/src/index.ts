@@ -9,6 +9,7 @@ export * from './llm';
 export * from './catalog';
 export * from './canvas';
 export * from './tools';
+export * from './skills';
 export * from './session';
 export * from './agents';
 export * from './agent';

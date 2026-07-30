@@ -48,6 +48,10 @@ export const listNodeLocations = (binding: CanvasBinding): NodeLocation[] => {
     return locations;
 };
 
+/** The trimmed node list filtered to ONE block type — what a type-scoped block agent sees (via `search_nodes`). */
+export const listNodeLocationsOfType = (binding: CanvasBinding, type: string): NodeLocation[] =>
+    listNodeLocations(binding).filter(n => n.type === type);
+
 /** Headings for {@link renderNodeContext} — lets one renderer serve every agent's context block. */
 export interface NodeContextHeadings {
     /** Heading printed above a non-empty node list. */
@@ -56,11 +60,14 @@ export interface NodeContextHeadings {
     empty?: string;
 }
 
-/** Render the node list as the compact per-turn context block (one line per node: id · type · label · position). */
-export const renderNodeContext = (binding: CanvasBinding, headings: NodeContextHeadings = {}): string => {
+/** Render the node list as the compact per-turn context block (one line per node: id · type · label · position). Pass `nodes` to render a pre-filtered list (e.g. a block agent's own type). */
+export const renderNodeContext = (
+    binding: CanvasBinding,
+    headings: NodeContextHeadings = {},
+    nodes: NodeLocation[] = listNodeLocations(binding)
+): string => {
     const heading = headings.heading ?? 'Current nodes on the canvas:';
     const empty = headings.empty ?? 'Current canvas: (no nodes).';
-    const nodes = listNodeLocations(binding);
     if (nodes.length === 0) {
         return empty;
     }
@@ -100,12 +107,33 @@ const DESCRIBE_NODE_DEF: ToolDef = {
         "(including a select field's allowed options). Use before set_properties to see valid values.",
     parameters: {
         type: 'object',
-        properties: { nodeId: { type: 'string', description: 'The id of the node (from list_nodes).' } },
+        properties: { nodeId: { type: 'string', description: 'The id of the node to describe.' } },
         required: ['nodeId'],
     },
 };
 
-/** READ provider over any {@link CanvasBinding}: `list_nodes` (compact) + `describe_node` (detail; needs the catalog for the block schema). Carried by the locator, `property` specialist, and orchestrator. */
+const SEARCH_NODES_DEF: ToolDef = {
+    name: 'search_nodes',
+    description:
+        'List the nodes YOU manage — only nodes of your own block type — with their id, type, label and ' +
+        'position (reflects edits made this turn). Optionally pass a `query` to narrow by label. Use it to ' +
+        'find the node id to configure, rename, or delete.',
+    parameters: {
+        type: 'object',
+        properties: { query: { type: 'string', description: 'Optional label substring to narrow the results.' } },
+    },
+};
+
+/** describe_node result (type + current config + block schema) — shared by the full read + the scoped search providers. */
+const describeNodeResult = (binding: CanvasBinding, catalog: CatalogLookup, call: ToolCall): ToolResult => {
+    const { nodeId } = call.args as { nodeId: string };
+    const found = requireNode(binding, call, nodeId);
+    if ('error' in found) return found.error;
+    const { node } = found;
+    return ok(call, { type: node.type, currentConfig: node.config ?? {}, schema: catalog.schema(node.type) });
+};
+
+/** READ provider over any {@link CanvasBinding}: `list_nodes` (compact, ALL nodes) + `describe_node` (detail). Carried by the orchestrator + operation agents (locator, edge). */
 export const createNodeReadToolProvider = (binding: CanvasBinding, catalog: CatalogLookup): ToolProvider => ({
     listTools: () => [LIST_NODES_DEF, DESCRIBE_NODE_DEF],
     dispatch: (call: ToolCall): ToolResult => {
@@ -113,15 +141,31 @@ export const createNodeReadToolProvider = (binding: CanvasBinding, catalog: Cata
             return ok(call, { nodes: listNodeLocations(binding) });
         }
         if (call.name === 'describe_node') {
-            const { nodeId } = call.args as { nodeId: string };
-            const found = requireNode(binding, call, nodeId);
-            if ('error' in found) return found.error;
-            const { node } = found;
-            return ok(call, {
-                type: node.type,
-                currentConfig: node.config ?? {},
-                schema: catalog.schema(node.type),
-            });
+            return describeNodeResult(binding, catalog, call);
+        }
+        return toolUnknown(call);
+    },
+});
+
+/** SCOPED READ provider for a block agent: `search_nodes` (compact, ONLY `opts.type` nodes) + `describe_node` (detail). The type filter keeps a per-block agent from seeing the whole canvas. */
+export const createNodeSearchToolProvider = (
+    binding: CanvasBinding,
+    catalog: CatalogLookup,
+    opts: { type: string }
+): ToolProvider => ({
+    listTools: () => [SEARCH_NODES_DEF, DESCRIBE_NODE_DEF],
+    dispatch: (call: ToolCall): ToolResult => {
+        if (call.name === 'search_nodes') {
+            const { query } = (call.args ?? {}) as { query?: string };
+            let nodes = listNodeLocationsOfType(binding, opts.type);
+            const q = query?.trim().toLowerCase();
+            if (q) {
+                nodes = nodes.filter(n => (n.label ?? '').toLowerCase().includes(q));
+            }
+            return ok(call, { nodes });
+        }
+        if (call.name === 'describe_node') {
+            return describeNodeResult(binding, catalog, call);
         }
         return toolUnknown(call);
     },

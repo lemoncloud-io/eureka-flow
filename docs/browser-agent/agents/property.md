@@ -1,5 +1,11 @@
 # Property agent
 
+> **⚠️ RETIRED (unregistered).** Superseded by the [block agent](./blockAgent.md), which owns a block's whole
+> lifecycle (add · configure · rename · delete). The `property` agent is no longer in `DEFAULT_REGISTRATIONS`, so
+> the orchestrator cannot spawn it; its module + `property.*` scenario suites stay in the tree (driven directly)
+> until a later cleanup. This page is kept for reference. **`set_properties` / `rename` now belong to the block
+> agent**, and its reject-and-report contract is inherited verbatim.
+
 > **The config + rename specialist.** The property agent **sets config values on existing nodes and renames
 > them** — `set_properties({ nodeId, config })` (only the changed keys, merged over the current config) or
 > `rename({ nodeId, label })` (`''` clears the label) — applied straight to the live canvas. It is **spawned

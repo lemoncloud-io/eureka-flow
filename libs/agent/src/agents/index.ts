@@ -3,12 +3,17 @@ export { BaseAgent, DEFAULT_MAX_ITERATIONS } from './baseAgent';
 export type { BaseAgentDeps, CollectedToolCall } from './baseAgent';
 export { createLocatorAgent, LocatorAgent, LOCATOR_SYSTEM_PROMPT } from './locatorAgent';
 export type { LocatorAgentDeps } from './locatorAgent';
+export { createEdgeAgent, EdgeAgent, EDGE_SYSTEM_PROMPT } from './edgeAgent';
+export type { EdgeAgentDeps } from './edgeAgent';
+// Block agents (per block type): the generic BlockAgent + the named generator specialist.
+export { createBlockAgent, BlockAgent, blockAgentSystemPrompt } from './blockAgent';
+export type { BlockAgentDeps } from './blockAgent';
+export { createGeneratorAgent, GENERATOR_SYSTEM_PROMPT } from './generatorAgent';
+// Retired (unregistered) operation agents — kept in the tree until a later cleanup.
 export { createPropertyAgent, PropertyAgent, PROPERTY_SYSTEM_PROMPT } from './propertyAgent';
 export type { PropertyAgentDeps } from './propertyAgent';
 export { createNodeAgent, NodeAgent, NODE_SYSTEM_PROMPT } from './nodeAgent';
 export type { NodeAgentDeps } from './nodeAgent';
-export { createEdgeAgent, EdgeAgent, EDGE_SYSTEM_PROMPT } from './edgeAgent';
-export type { EdgeAgentDeps } from './edgeAgent';
 export { createOrchestratorAgent, OrchestratorAgent, ORCHESTRATOR_SYSTEM_PROMPT } from './orchestratorAgent';
 export type { OrchestratorAgentDeps } from './orchestratorAgent';
 

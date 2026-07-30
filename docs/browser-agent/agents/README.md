@@ -1,23 +1,34 @@
 # Agents
 
-The specialist roster the orchestrator discovers at runtime (via `list_agents`) and delegates to. The
-orchestrator itself is not a specialist — it coordinates these. Each specialist has one SPEC (its persona,
-tools, and definition of done) and its own scenario suite.
+The roster the orchestrator discovers at runtime (via `list_agents`) and delegates to. The orchestrator itself
+is not a specialist — it coordinates these; its own model (loop, spawn, addressing) is in the
+[harness docs](../design/harness-spec.md). Agents come in two kinds:
+
+- **Block agents — one per block type**, owning that block's whole lifecycle (add · configure · rename · delete).
+  The orchestrator addresses one by putting the **block's type** in `spawn`'s `agentType`. A named specialist
+  (registered) wins; otherwise the sub-agent runner synthesizes a **generic `BlockAgent(type)`** from the
+  catalog — so any block type is covered without a new registration or prompt edit.
+- **Operation agents — cross-block**, owning an operation that isn't about a single block: `locator` (move),
+  `edge` (connect/disconnect).
 
 ## Roster & coverage
 
-| Agent        | Capability                        | Grant             | SPEC                         | Deterministic                                                                                        | Live                                                                                                 |
-| ------------ | --------------------------------- | ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **locator**  | moves one existing node           | `canModifyCanvas` | [locator.md](./locator.md)   | [`scenarios/locator.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/locator.spec.ts)   | [`locator.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/locator.live.spec.ts)   |
-| **property** | sets config values + renames      | `canEditConfig`   | [property.md](./property.md) | [`scenarios/property.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/property.spec.ts) | [`property.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/property.live.spec.ts) |
-| **node**     | adds a node or deletes one        | `canModifyCanvas` | [node.md](./node.md)         | [`scenarios/node.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/node.spec.ts)         | [`node.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/node.live.spec.ts)         |
-| **edge**     | connects two nodes or disconnects | `canModifyCanvas` | [edge.md](./edge.md)         | [`scenarios/edge.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/edge.spec.ts)         | [`edge.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/edge.live.spec.ts)         |
+| Agent                       | Kind            | Capability                                                    | Grant                               | SPEC                                                | Deterministic                                                                                            | Live                                                                                               |
+| --------------------------- | --------------- | ------------------------------------------------------------- | ----------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **block agent** (per type)  | block (generic) | add · configure · rename · delete a node of its type          | `canModifyCanvas` + `canEditConfig` | [blockAgent.md](./blockAgent.md)                    | [`scenarios/blockAgent.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/blockAgent.spec.ts) | —                                                                                                  |
+| **single-output-generator** | block (named)   | AI text generator — full lifecycle + model/provider knowledge | `canModifyCanvas` + `canEditConfig` | [generator.md](./generator.md)                      | [`scenarios/generator.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/generator.spec.ts)   | —                                                                                                  |
+| **locator**                 | operation       | moves one existing node                                       | `canModifyCanvas`                   | [locator.md](./locator.md)                          | [`scenarios/locator.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/locator.spec.ts)       | [`locator.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/locator.live.spec.ts) |
+| **edge**                    | operation       | connects two nodes or disconnects                             | `canModifyCanvas`                   | [edge.md](./edge.md)                                | [`scenarios/edge.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/edge.spec.ts)             | [`edge.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/edge.live.spec.ts)       |
+| ~~node~~ · ~~property~~     | retired         | superseded by the block agent (unregistered — kept in tree)   | —                                   | [node.md](./node.md) · [property.md](./property.md) | `scenarios/node.spec.ts` · `scenarios/property.spec.ts` (still run, direct-drive)                        | —                                                                                                  |
+
+Block-agent live coverage is exercised through the integration live suite (the model spawns block agents by
+type); a dedicated `blockAgent.live`/`generator.live` can be added when it earns its keep.
 
 Integration — the orchestrator coordinating multiple agents — is verified once, across the whole roster:
 
-| Suite           | Covers                                                                                       | Deterministic                                                                                              | Live                                                                                                       |
-| --------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **integration** | orchestrator resolves → delegates → aggregates (the applied/partial/refused/answered matrix) | [`scenarios/integration.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/integration.spec.ts) | [`integration.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts) |
+| Suite           | Covers                                                                                                                               | Deterministic                                                                                              | Live                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **integration** | orchestrator resolves → delegates → aggregates (the applied/refused/answered matrix; `partial` is a production outcome but untested) | [`scenarios/integration.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/integration.spec.ts) | [`integration.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts) |
 
 ## Adding an agent — the coverage checklist
 
@@ -35,6 +46,11 @@ Its cross-agent behavior (how the orchestrator delegates to it alongside others)
 `scenarios/integration.spec.ts`, not the per-agent files. A missing row, SPEC, or DoD section is a visible
 gap. The runtime roster is [`registrations.ts`](../../../libs/agent/src/agents/registrations.ts) — keep this
 table in step with it.
+
+**A new BLOCK type usually needs NO new agent** — the generic [block agent](./blockAgent.md) covers it from the
+catalog (only add a named specialist, like [generator.md](./generator.md), when a block earns block-specific
+prompt knowledge). The checklist above is for a genuinely new agent (a named block specialist or a new operation
+agent).
 
 ## How verification works
 

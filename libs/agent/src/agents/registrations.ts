@@ -1,12 +1,19 @@
 import { createEdgeAgent } from './edgeAgent';
+import { createGeneratorAgent } from './generatorAgent';
 import { createLocatorAgent } from './locatorAgent';
-import { createNodeAgent } from './nodeAgent';
-import { createPropertyAgent } from './propertyAgent';
 import { createAgentRoster } from './roster';
 
 import type { AgentRegistration, AgentRoster } from './roster';
 
-/** This-phase roster: the four concrete specialists. The orchestrator discovers them via `list_agents`; adding one is a single entry. */
+/**
+ * The explicit roster: the two cross-block OPERATION agents (locator, edge) + the named BLOCK specialists
+ * (the AI generator). Every OTHER block type is handled by a generic `BlockAgent`, synthesized on demand by
+ * the sub-agent runner from the catalog — so it is NOT listed here (and needs no prompt edit).
+ *
+ * NOTE: the old operation-split `node` + `property` agents are intentionally NOT registered — the orchestrator
+ * can no longer spawn them. Their modules stay in the tree (deleted in a later cleanup); block agents own
+ * add/configure/rename/delete now.
+ */
 export const DEFAULT_REGISTRATIONS: AgentRegistration[] = [
     {
         type: 'locator',
@@ -14,21 +21,17 @@ export const DEFAULT_REGISTRATIONS: AgentRegistration[] = [
         create: deps => createLocatorAgent(deps),
     },
     {
-        type: 'property',
-        summary: "sets a node's config values and renames it",
-        create: deps => createPropertyAgent(deps),
-    },
-    {
-        type: 'node',
-        summary: 'adds a node to the canvas or deletes one',
-        create: deps => createNodeAgent(deps),
-    },
-    {
         type: 'edge',
         summary: 'connects two nodes or disconnects an edge',
         create: deps => createEdgeAgent(deps),
     },
+    {
+        type: 'single-output-generator',
+        summary:
+            'AI text generator: create, configure, rename, or delete a generator node (knows models, provider keys, temperature/topK/topP)',
+        create: deps => createGeneratorAgent(deps),
+    },
 ];
 
-/** The default this-phase roster (`locator` + `property`). */
+/** The default roster: operation agents + named block specialists (generic block agents resolve on demand). */
 export const createDefaultRoster = (): AgentRoster => createAgentRoster(DEFAULT_REGISTRATIONS);

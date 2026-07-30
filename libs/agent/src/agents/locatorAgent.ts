@@ -1,5 +1,6 @@
 import { BaseAgent } from './baseAgent';
-import { createNodeMoveToolProvider, createNodeReadToolProvider, renderNodeContext } from '../tools/nodeTools';
+import { inspectSkill, moveSkill, toolsFromSkills } from '../skills';
+import { renderNodeContext } from '../tools/nodeTools';
 
 import type { BaseAgentDeps } from './baseAgent';
 import type { Agent } from '../agent';
@@ -34,7 +35,7 @@ export class LocatorAgent extends BaseAgent {
             description: 'Moves existing nodes on the canvas.',
             systemPrompt: LOCATOR_SYSTEM_PROMPT,
             grant: { canModifyCanvas: true },
-            tools: [createNodeReadToolProvider(deps.binding, deps.catalog), createNodeMoveToolProvider(deps.binding)],
+            tools: toolsFromSkills([inspectSkill, moveSkill], { binding: deps.binding, catalog: deps.catalog }),
         });
     }
 

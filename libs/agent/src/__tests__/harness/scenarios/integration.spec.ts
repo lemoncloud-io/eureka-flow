@@ -69,11 +69,11 @@ describe('Harness scenarios — outcome coverage', () => {
     it('A2 — set the generator’s model to Gemini 2.5 Pro (merge keeps temperature, no extra keys)', async () => {
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'property', task: `set model to gemini-2.5-pro on ${IDS.gen}` }]),
+                spawn([{ agentType: 'single-output-generator', task: `set model to gemini-2.5-pro on ${IDS.gen}` }]),
                 text('Set the generator’s model to gemini-2.5-pro.'),
                 report({ status: 'applied', summary: 'set the model' }),
             ],
-            property: [
+            'single-output-generator': [
                 describeNode(IDS.gen),
                 step([setProps(IDS.gen, { model: 'gemini-2.5-pro' })]),
                 text('set model'),
@@ -89,14 +89,16 @@ describe('Harness scenarios — outcome coverage', () => {
         expect(nodeById(result.graph, IDS.gen).config).toEqual({ model: 'gemini-2.5-pro', temperature: '0.7' });
     });
 
-    it("A3 — rename the preview to 'Result'", async () => {
+    it("A3 — rename the preview to 'Result' (generic block agent by type)", async () => {
+        // The preview has no named specialist, so the orchestrator addresses it by its block type
+        // (`output-preview`) → a generic BlockAgent resolved via the runner's catalog fallback.
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'property', task: `rename ${IDS.prev} to "Result"` }]),
+                spawn([{ agentType: 'output-preview', task: `rename ${IDS.prev} to "Result"` }]),
                 text('Renamed the preview to Result.'),
                 report({ status: 'applied', summary: 'renamed the preview' }),
             ],
-            property: [step([rename(IDS.prev, 'Result')]), text('renamed')],
+            'output-preview': [step([rename(IDS.prev, 'Result')]), text('renamed')],
         };
         const result = await runScenario({
             objective: "rename the preview to 'Result'",
@@ -151,20 +153,20 @@ describe('Harness scenarios — outcome coverage', () => {
         expect(result.committed).toBe(true);
     });
 
-    // ── applied (structural: node + edge composition) ──────────────────────────────────────────────
-    it('A5 — delete the buffer AND rewire input→generator (node + edge composition → applied)', async () => {
-        // A compound structural turn: the node agent deletes the buffer (its edges cascade, freeing the
+    // ── applied (structural: block + edge composition) ──────────────────────────────────────────────
+    it('A5 — delete the buffer AND rewire input→generator (block + edge composition → applied)', async () => {
+        // A compound structural turn: the BUFFER block agent deletes the buffer (its edges cascade, freeing the
         // generator's input), then the edge agent connects the input straight to the generator. Ordered, not
         // concurrent: connect_nodes now REJECTS an occupied input, so the delete must free gen.in BEFORE the
         // rewire lands — the orchestrator sequences the two spawns (delete → connect).
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'node', task: `delete node ${IDS.buf}` }]),
+                spawn([{ agentType: 'buffer', task: `delete node ${IDS.buf}` }]),
                 spawn([{ agentType: 'edge', task: `connect ${IDS.txt} out to ${IDS.gen} in` }]),
                 text('Deleted the buffer and reconnected the input straight into the generator.'),
                 report({ status: 'applied', summary: 'deleted the buffer; rewired input→generator' }),
             ],
-            node: [step([deleteNode(IDS.buf)]), text('deleted the buffer')],
+            buffer: [step([deleteNode(IDS.buf)]), text('deleted the buffer')],
             edge: [step([connect(IDS.txt, 'out', IDS.gen, 'in')]), text('connected input to generator')],
         };
         const result = await runScenario({
@@ -183,30 +185,35 @@ describe('Harness scenarios — outcome coverage', () => {
         expect(result.graph.edges.some(e => e.sourceNodeId === IDS.gen && e.targetNodeId === IDS.prev)).toBe(true);
     });
 
-    it('A6 — add a generator, wire it after the existing generator, and set its model (node→edge→property → applied)', async () => {
-        // The flagship composition: node adds → orchestrator threads the new id into edge + property.
-        // The in-memory binding mints `n_1` for the first add (fixture ids are non-numeric), so the child
-        // briefings reference it; the ASSERTIONS find the new node by exclusion, so they don't couple to the
-        // id scheme.
+    it('A6 — add a generator (add + set model in ONE block sub-turn), then wire it (block→edge → applied)', async () => {
+        // The block-ownership payoff: the single-output-generator block agent ADDS and CONFIGURES the new node
+        // in ONE sub-turn (no node+property split), then the orchestrator threads the new id into the edge
+        // spawn. The in-memory binding mints `n_1` for the first add (fixture ids are non-numeric), so the
+        // briefings reference it; the ASSERTIONS find the new node by exclusion, so they don't couple to the id.
         const NEW = 'n_1';
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'node', task: 'add a single-output-generator at (900, 300)' }]),
                 spawn([
-                    { agentType: 'edge', task: `connect ${IDS.gen} out to ${NEW} in` },
-                    { agentType: 'property', task: `set ${NEW} model to gemini-2.5-pro` },
+                    {
+                        agentType: 'single-output-generator',
+                        task: 'add a single-output-generator at (900, 300) and set its model to gemini-2.5-pro',
+                    },
                 ]),
-                text('Added a generator, wired it after the existing generator, and set its model.'),
-                report({ status: 'applied', summary: 'added + wired + configured a new generator' }),
+                spawn([{ agentType: 'edge', task: `connect ${IDS.gen} out to ${NEW} in` }]),
+                text('Added a generator, set its model, and wired it after the existing generator.'),
+                report({ status: 'applied', summary: 'added + configured a new generator; wired it' }),
             ],
-            node: [step([addNode('single-output-generator', 900, 300)]), text(`added generator ${NEW}`)],
+            'single-output-generator': [
+                step([addNode('single-output-generator', 900, 300)]),
+                step([setProps(NEW, { model: 'gemini-2.5-pro' })]),
+                text(`added generator ${NEW} and set its model`),
+            ],
             edge: [step([connect(IDS.gen, 'out', NEW, 'in')]), text('connected')],
-            property: [step([setProps(NEW, { model: 'gemini-2.5-pro' })]), text('set model')],
         };
         const result = await runScenario({
             objective: 'add a generator after the existing generator and set its model to gemini-2.5-pro',
             initialGraph: makeInitialGraph(),
-            mode: 'serial', // node must land before edge/property can reference its id
+            mode: 'serial', // the block agent must add+configure before the edge can reference the new id
             script,
         });
 
@@ -238,18 +245,18 @@ describe('Harness scenarios — outcome coverage', () => {
         expectUnchanged(result);
     });
 
-    it('Q2 — set model to gpt-4o (invalid value → specialist rejects → refused, lists valid models)', async () => {
-        // The orchestrator delegates the intent high-level — it does NOT pre-check the value. The property
-        // specialist reads the schema, tries the edit, the tool rejects it (gpt-4o not in the enum), and it
+    it('Q2 — set model to gpt-4o (invalid value → block agent rejects → refused, lists valid models)', async () => {
+        // The orchestrator delegates the intent high-level — it does NOT pre-check the value. The generator
+        // block agent reads the schema, tries the edit, the tool rejects it (gpt-4o not in the enum), and it
         // reports the rejection; the orchestrator surfaces it as refused. Nothing lands.
         const reason = `gpt-4o isn't available. Choose one of: ${GENERATOR_MODELS.join(', ')}.`;
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'property', task: `set ${IDS.gen} model to gpt-4o` }]),
+                spawn([{ agentType: 'single-output-generator', task: `set ${IDS.gen} model to gpt-4o` }]),
                 text(reason),
                 report({ status: 'refused', reason }),
             ],
-            property: [
+            'single-output-generator': [
                 describeNode(IDS.gen),
                 step([setProps(IDS.gen, { model: 'gpt-4o' })]), // rejected — not an allowed model
                 text('could not set model: gpt-4o is not an allowed option'),
@@ -283,18 +290,18 @@ describe('Harness scenarios — outcome coverage', () => {
         expectUnchanged(result);
     });
 
-    it("Q4 — set a config field the block doesn't have (unknown key → specialist rejects → refused)", async () => {
+    it("Q4 — set a config field the block doesn't have (unknown key → block agent rejects → refused)", async () => {
         // The generator's fields are model/temperature/topK — there is no `maxTokens`. The orchestrator does
-        // not pre-check the field; it delegates the intent. The property specialist reads the schema, tries the
-        // edit, the tool rejects the unknown key, and it reports it — the orchestrator refuses. Nothing lands.
+        // not pre-check the field; it delegates the intent. The generator block agent reads the schema, tries
+        // the edit, the tool rejects the unknown key, and it reports it — the orchestrator refuses. Nothing lands.
         const reason = 'The generator has no "max tokens" field. Available fields: model, temperature, topK.';
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'property', task: `set ${IDS.gen} maxTokens to 500` }]),
+                spawn([{ agentType: 'single-output-generator', task: `set ${IDS.gen} maxTokens to 500` }]),
                 text(reason),
                 report({ status: 'refused', reason }),
             ],
-            property: [
+            'single-output-generator': [
                 describeNode(IDS.gen),
                 step([setProps(IDS.gen, { maxTokens: '500' })]), // rejected — unknown config key
                 text('could not set maxTokens: unknown config key for this block'),
@@ -330,14 +337,14 @@ describe('Harness scenarios — outcome coverage', () => {
     it('R2 — rename the preview as a viewer (permission denied → refused)', async () => {
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'property', task: `rename ${IDS.prev} to "Result"` }]),
+                spawn([{ agentType: 'output-preview', task: `rename ${IDS.prev} to "Result"` }]),
                 text('I couldn’t rename the preview — permission denied.'),
                 report({ status: 'refused', reason: 'permission denied: viewers cannot edit nodes' }),
             ],
-            property: [step([rename(IDS.prev, 'Result')]), text('could not rename: permission denied')],
+            'output-preview': [step([rename(IDS.prev, 'Result')]), text('could not rename: permission denied')],
         };
         // viewer ⇒ empty userPermissions ⇒ rename denied at the executor's requires-gate, even though
-        // the property agent grants itself canEditConfig
+        // the block agent grants itself canEditConfig
         const result = await runScenario({
             objective: "rename the preview to 'Result'",
             initialGraph: makeInitialGraph(),
