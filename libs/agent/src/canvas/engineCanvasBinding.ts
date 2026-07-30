@@ -2,7 +2,11 @@ import type { CanvasBinding, EdgeSpec, NodePatch, XY } from './canvasBinding';
 import type { FlowEngine } from '@flows/engine';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
-/** The history label an agent edit is checkpointed under, by what the patch touches. */
+/**
+ * The history label an agent edit is checkpointed under, by what the patch touches. Each tool sends a
+ * single-shape patch (move → position · set_properties → config · rename → label), so exactly one branch
+ * applies in practice; on a hypothetical mixed patch the precedence is position → config → label.
+ */
 const labelFor = (patch: NodePatch): string => {
     if (patch.position) return 'agent:move';
     if (patch.config) return 'agent:config';
@@ -42,6 +46,10 @@ export const createEngineCanvasBinding = (engine: FlowEngine): CanvasBinding => 
                 // keys the patch omits.
                 updates.config = { ...(nodeById(id)?.config ?? {}), ...patch.config };
             }
+
+            // An empty patch changes nothing — return before opening a transaction, so we never push a
+            // history entry that undoes to nothing. (Unreachable through the tools; each sends a field.)
+            if (Object.keys(updates).length === 0) return;
 
             // One call, one transaction, so one undo takes it back — like a user drag, and it
             // travels in the next save. Not `applyRuntime`: that skips history, for run state.

@@ -27,6 +27,12 @@ export const createInMemoryCanvasBinding = (initial?: Graph): CanvasBinding => {
         readGraph: () => ({ nodes: [...graph.nodes], edges: [...graph.edges] }),
 
         updateNode: (id: string, patch: NodePatch) => {
+            // Mirror the engine binding: an empty patch is a no-op (it opens no transaction there), and an
+            // unknown id fails loudly rather than silently doing nothing — the engine throws NODE_NOT_FOUND,
+            // so a spec written against this reference binding sees the same failure instead of a false pass.
+            if (patch.label === undefined && !patch.position && !patch.config) return;
+            if (!graph.nodes.some(n => n.id === id)) throw new Error(`No node with id ${id}`);
+
             graph = {
                 ...graph,
                 nodes: graph.nodes.map(node => {
