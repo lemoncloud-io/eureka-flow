@@ -254,7 +254,7 @@ interface BlockSchema {
 ## 6 · The `CanvasBinding` seam
 
 ```ts
-// SHIPPED — the whole seam between (non-React) agent code and the React-owned live canvas.
+// SHIPPED — the whole seam between agent code and the graph on screen, over the FlowEngine that owns it.
 // `updateNode` is widened to carry config, so one method applies every edit the harness emits — move →
 // position · rename → label · set_properties → config — straight to the live canvas.
 interface CanvasBinding {

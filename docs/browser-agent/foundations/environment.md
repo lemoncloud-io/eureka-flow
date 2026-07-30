@@ -212,8 +212,8 @@ Steps (real Chrome, dev server running):
 This verification does **not** call `runAgentEnvironmentSelfCheck()` and does **not** use the
 DevTools console to trigger behavior — the run is driven entirely from the AgentPanel UI. The same
 path runs in the real editor (`FlowEditorPage`, which mounts `FlowAgentPanel`), differing only in
-the canvas binding (desktop vs. in-memory); both drive the orchestrator over the same Generate API
-gateway.
+the canvas binding (engine-backed vs. in-memory); both drive the orchestrator over the same Generate
+API gateway.
 
 ### Follow-up (not in this PR)
 

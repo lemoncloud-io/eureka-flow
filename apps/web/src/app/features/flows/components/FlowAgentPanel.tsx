@@ -1,22 +1,21 @@
 import { useMemo } from 'react';
 
-import { toAgentGrant } from '@flows/agent';
+import { createEngineCanvasBinding, toAgentGrant } from '@flows/agent';
 import { useBlockRegistry } from '@flows/flows';
 import { useWebSocketStore } from '@flows/socket';
 
 import { AgentPanel } from './AgentPanel';
 import { useAgent } from '../hooks/useAgent';
 import { useAgentEnvironment } from '../hooks/useAgentEnvironment';
-import { createBlockCatalogLookup, createDesktopCanvasBinding, createGenerateApiLlmGateway } from '../utils';
+import { createBlockCatalogLookup, createGenerateApiLlmGateway } from '../utils';
 import { withGatewayTracing } from '../utils/agentTracing';
 
-import type { WorkflowCanvasRef } from './WorkflowCanvas';
+import type { FlowEngine } from '@flows/engine';
 import type { FlowPermissions } from '@flows/flows';
-import type { RefObject } from 'react';
 
 interface FlowAgentPanelProps {
-    /** The live canvas ref the desktop CanvasBinding is built over. */
-    canvasRef: RefObject<WorkflowCanvasRef | null>;
+    /** The engine that owns this screen's graph. Not a canvas ref, so any screen holding an engine can mount this. */
+    engine: FlowEngine;
     flowId: string;
     /** The flow's live permissions; projected onto the user-permission ceiling the executor enforces. */
     permissions: FlowPermissions;
@@ -31,8 +30,10 @@ interface FlowAgentPanelProps {
  * live flow socket (state read fresh from {@link useWebSocketStore}). The generate receiver + tool
  * calls are pending in the socket layer, so the panel is wired but not yet functional end-to-end.
  */
-export const FlowAgentPanel = ({ canvasRef, flowId, permissions }: FlowAgentPanelProps) => {
-    const binding = useMemo(() => createDesktopCanvasBinding(canvasRef), [canvasRef]);
+export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelProps) => {
+    // Reads cannot lag a projection that pauses mid-drag; edits land in `transact`, so they
+    // checkpoint for undo like a user drag.
+    const binding = useMemo(() => createEngineCanvasBinding(engine), [engine]);
     const { environment, traceReporter } = useAgentEnvironment();
     // Backend Generate API gateway; the model's answer returns over the flow socket. Connection state
     // is read fresh on every chat() call (a reconnect issues a new id), never cached.

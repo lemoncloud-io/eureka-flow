@@ -1,7 +1,7 @@
 import type { CanvasBinding, Graph, NodePatch } from './canvasBinding';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
-/** In-memory {@link CanvasBinding} over a plain {@link Graph} — the reference binding for tests and Node runs; `updateNode` mirrors the desktop binding. */
+/** In-memory {@link CanvasBinding} over a plain {@link Graph} — the reference binding for tests and Node runs; `updateNode` mirrors the engine binding. */
 export const createInMemoryCanvasBinding = (initial?: Graph): CanvasBinding => {
     let graph: Graph = initial ?? { nodes: [], edges: [] };
 
