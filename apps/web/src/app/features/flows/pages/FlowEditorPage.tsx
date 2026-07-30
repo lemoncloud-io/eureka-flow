@@ -978,7 +978,7 @@ export const FlowEditorPage = () => {
                 out of production bundles until a network-backed gateway lands. Same gate as the
                 /dev/agent-harness route in app.tsx. */}
             {import.meta.env.DEV && currentFlowId && (
-                <FlowAgentPanel canvasRef={canvasRef} flowId={currentFlowId} permissions={permissions} />
+                <FlowAgentPanel engine={engine} flowId={currentFlowId} permissions={permissions} />
             )}
         </div>
     );

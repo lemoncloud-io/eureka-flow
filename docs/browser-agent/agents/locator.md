@@ -73,7 +73,6 @@ flowchart TD
         Panel["FlowAgentPanel → AgentPanel<br/>renders SessionState"]
         Hook["useAgent → useAgentSession<br/>session store + lifecycle"]
         Gateway["createGenerateApiLlmGateway<br/>(backend Generate API)"]
-        DBinding["createDesktopCanvasBinding"]
     end
 
     subgraph lib["@flows/agent — DOM-free core"]
@@ -81,9 +80,10 @@ flowchart TD
         Locator["LocatorAgent · extends BaseAgent<br/>node read + move"]
         Executor["ToolExecutor<br/>route → validate → permission"]
         Tools["Node tools<br/>list_nodes · describe_node · move_node"]
+        Binding["createEngineCanvasBinding"]
     end
 
-    Canvas[("Flow canvas")]
+    Canvas[("FlowEngine · owns the graph")]
 
     User -->|message| Panel
     Panel -->|"send()"| Hook
@@ -92,16 +92,17 @@ flowchart TD
     Orchestrator -.->|spawns| Locator
     Locator -->|each tool call| Executor
     Executor --> Tools
-    Tools -->|"updateNode()"| DBinding
-    DBinding -->|live move| Canvas
+    Tools -->|"updateNode()"| Binding
+    Binding -->|"transact() · live move"| Canvas
     Orchestrator -.->|save SessionState| Hook
     Hook -.->|"localStorage + re-render"| Panel
 ```
 
 The user talks to the **orchestrator** (via `useAgent`), which spawns the locator on demand — the
-locator itself lives only in the lib. The app implements the lib's two seams — `LlmGateway`
-(`createGenerateApiLlmGateway`, the backend Generate API) and `CanvasBinding` (the desktop binding);
-the turn loop itself never touches the DOM.
+locator itself lives only in the lib. The app supplies the one seam the lib cannot build for itself,
+`LlmGateway` (`createGenerateApiLlmGateway`, the backend Generate API), and hands over the `FlowEngine`
+its screen owns; the `CanvasBinding` over that engine ships in the lib. The turn loop itself never
+touches the DOM.
 
 ### Definition of done — verified behavior
 

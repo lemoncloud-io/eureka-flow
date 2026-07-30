@@ -10,10 +10,10 @@ export interface NodePatch {
     config?: Record<string, string>;
 }
 
-/** The live canvas graph: the canvas's own `WorkflowState` (`{ nodes, edges }`), aliased to track the canonical shape. */
+/** The live canvas graph: the canonical `WorkflowState` (`{ nodes, edges }`), aliased to track that shape. */
 export type Graph = WorkflowState;
 
-/** The single seam between (non-React) agent code and the React-owned live canvas. */
+/** The single seam between agent code and the graph on screen: `createEngineCanvasBinding` over the owning `FlowEngine`, or `createInMemoryCanvasBinding` for tests and Node runs. Nothing here is React-aware. */
 export interface CanvasBinding {
     /** Live structural read of the current canvas graph. */
     readGraph(): Graph;
