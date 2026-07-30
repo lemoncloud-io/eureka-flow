@@ -59,14 +59,20 @@ shouldUpdateState = (current, server) => priority(server) >= priority(current);
 
 **5개.** 빠진 것 3개: `''`, `WAITING`, `SKIPPED`.
 
-소스에 인지 흔적 한 줄 있다 — 모델링은 안 됨:
+소스에 인지 흔적 한 줄 있었다 — 모델링은 안 됨:
 
 ```ts
-// libs/engine/src/types.ts:17
+// libs/engine/src/types.ts:17 (S1 이전)
 * @note API package's NodeStatusType also includes WAITING and SKIPPED.
 ```
 
-`docs/engine/` 정본 3개에는 언급 **0건**. 결정으로 기록된 게 아니라 주석으로만 남았다.
+`docs/engine/` 정본 3개에는 언급 **0건**이었다. 결정으로 기록된 게 아니라 주석으로만 남았다.
+
+> **이 절은 배포물(0.1.0) 기준이고, 그게 요점이다** — 소비자가 보는 건 이것이다. 소스는
+> 그 뒤 S1에서 달라졌다: `priority()`의 `-1` 센티넬이 없어지고 랭크 판정이 `isNodeState`로
+> 옮겨졌다(§3-2의 표는 **0.1.0에서 일어나는 일**로 읽을 것). 유니온 5개와 `NODE_STATES`는
+> 그대로다. `types.ts`의 위 주석도 S1에서 결정 기록으로 바뀌었고, `GUIDE`가 소비자에게
+> `shouldUpdateState`를 안내하게 됐다 — 그전까지 언급 0건이었다.
 
 ## 3. 미모델링 state가 파이프라인을 지날 때
 

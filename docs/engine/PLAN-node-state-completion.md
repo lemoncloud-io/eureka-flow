@@ -231,14 +231,20 @@ Set을 지우고 `isNodeState`에 위임.
 - [ ] (b)면: SKIPPED가 터미널이 아님을 고정하는 테스트 + flow-mcp가 왜 다른지 주석
 - [ ] `nx test flow-engine` green
 
-### S3 — 결정 기록 (문서, 모든 갈래 공통)
+### S3 — 결정 기록 (문서, 모든 갈래 공통) — ✅ 완료 2026-07-30
 
-- [ ] `PLAN.md` §15 신설 — S0의 답, S1 선택지와 근거, S2 배치 근거
-- [ ] `libs/engine/src/types.ts:17` 주석 갱신 — "also includes"에서 실제 상태로
-      (추가했으면 무엇을 왜 뺐는지 = `''`, 안 했으면 왜 예약어로 남기는지)
-- [x] `node-state-model.md` §4 갱신 — 미확인 표시 제거, 판정 결과 반영 (2026-07-30)
-- [ ] `node-state-model.md` §2 갱신 — §4의 결론과 어긋나는 서술 없는지 훑기
-- [ ] `GUIDE.md`에 state 표 있으면 동기 (있는지 확인 필요)
+- [x] `PLAN.md` **§16** 신설 — S0의 답, S1이 고친 것 넷, S2 보류 근거, 남은 것.
+      §15는 `feature/mobile-engine`이 이미 썼다 (플랜이 §15로 적었던 건 그 브랜치 머지 전 기준)
+- [x] `libs/engine/src/types.ts` 주석 갱신 — `@note ... also includes` 한 줄이 결정 기록으로:
+      왜 5개인지(와이어가 그 다섯만 싣는다), `SKIPPED`가 왜 예약어가 아닌지(지워진 기능),
+      모르는 state가 어떻게 처리되는지(파서가 값을 떨구고 last-write)
+- [x] `node-state-model.md` §4 갱신 — 미확인 표시 제거, 판정 결과 반영
+- [x] `node-state-model.md` §2 갱신 — "이 절은 배포물 0.1.0 기준" 단서 추가.
+      §3-2의 `-1` 센티넬 표는 **0.1.0에서 일어나는 일**이고 소스는 S1에서 달라졌다
+- [x] `node-state-model.md` §5 — 데스크톱/모바일 행 분리 (모바일은 리듀서를 안 탄다)
+- [x] `GUIDE.md` + `GUIDE.ko.md` — state 표는 없었고, **진짜 갭은 `shouldUpdateState` 언급이
+      0건이었다는 것.** 세션이 뭘 보장하는지(시퀀스·리셋·우선순위)와 소켓 밖에서 state를
+      쓸 때 소비자가 직접 해야 하는 것(가드 호출 + `undefined` 대신 키 생략)을 양쪽에 적었다
 
 ### S4 — 배포 (⏸ **S2에 종속 → 보류**)
 
