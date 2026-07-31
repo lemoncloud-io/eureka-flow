@@ -1,8 +1,9 @@
 import { BaseAgent } from './baseAgent';
 import { createDefaultRoster } from './registrations';
 import { createSubAgentRunner } from './subAgentRunner';
+import { inspectSkill, toolsFromSkills } from '../skills';
 import { createCatalogToolProvider } from '../tools/catalogTools';
-import { createNodeReadToolProvider, renderNodeContext } from '../tools/nodeTools';
+import { renderNodeContext } from '../tools/nodeTools';
 import { createAgentDirectoryToolProvider, createSpawnToolProvider } from '../tools/spawnTools';
 
 import type { BaseAgentDeps, CollectedToolCall } from './baseAgent';
@@ -52,7 +53,7 @@ export const ORCHESTRATOR_SYSTEM_PROMPT = [
 
 /** Orchestrator deps: the shared {@link BaseAgentDeps} plus an optional roster, per-child gateway, and dispatch mode. */
 export interface OrchestratorAgentDeps extends BaseAgentDeps {
-    /** The specialist registry; defaults to the this-phase roster (locator + property). */
+    /** The specialist registry; defaults to {@link createDefaultRoster}. */
     roster?: AgentRoster;
     /** Per-child gateway; defaults to the orchestrator's own gateway (fine for a stateless real model). */
     gatewayFor?: (agentType: string) => LlmGateway;
@@ -109,7 +110,9 @@ export class OrchestratorAgent extends BaseAgent {
             // and each spawned child is gated by its own grant + the user's permissions at the executor.
             grant: {},
             tools: [
-                createNodeReadToolProvider(deps.binding, deps.catalog),
+                // Canvas read is the `inspect` skill (same capability the operation agents compose); the
+                // coordination providers (catalog / list_agents / spawn) are wired directly — they are not skills.
+                ...toolsFromSkills([inspectSkill], { binding: deps.binding, catalog: deps.catalog }),
                 createCatalogToolProvider(deps.catalog),
                 createAgentDirectoryToolProvider(roster),
                 createSpawnToolProvider(runner, deps.binding, () => signalHolder.current),

@@ -2,7 +2,7 @@
 
 > How the harness's correctness is checked, and what makes a scenario well-formed. The scenarios
 > themselves are **code, not prose** — this page explains the discipline they follow and points to where
-> they live. Last updated 2026-07-28.
+> they live. Last updated 2026-07-30.
 
 ---
 

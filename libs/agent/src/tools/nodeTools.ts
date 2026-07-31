@@ -124,7 +124,7 @@ const SEARCH_NODES_DEF: ToolDef = {
     },
 };
 
-/** describe_node result (type + current config + block schema) — shared by the full read + the scoped search providers. */
+/** describe_node result (type + current config + block schema) — shared by the full read + the scoped search providers. Looks a node up by id: describe is always by a known id, so it is never type-scoped (only the node LIST is). */
 const describeNodeResult = (binding: CanvasBinding, catalog: CatalogLookup, call: ToolCall): ToolResult => {
     const { nodeId } = call.args as { nodeId: string };
     const found = requireNode(binding, call, nodeId);
@@ -285,7 +285,7 @@ const validateConfigEntries = (schema: BlockSchema, config: Record<string, unkno
     return errors;
 };
 
-/** CONFIG provider (write: config/label) over a {@link CanvasBinding}: `set_properties` (merged, catalog-validated) + `rename` (`''` clears the label). A rejected value is never applied. Carried by the `property` specialist. */
+/** CONFIG provider (write: config/label) over a {@link CanvasBinding}: `set_properties` (merged, catalog-validated) + `rename` (`''` clears the label). A rejected value is never applied. Composed into every block agent via the `lifecycle` skill. */
 export const createNodeConfigToolProvider = (binding: CanvasBinding, catalog: CatalogLookup): ToolProvider => ({
     listTools: () => [SET_PROPERTIES_DEF, RENAME_DEF],
     dispatch: (call: ToolCall): ToolResult => {
@@ -334,7 +334,7 @@ const ADD_NODE_DEF: ToolDef = {
         properties: {
             type: {
                 type: 'string',
-                description: 'The block type to create (confirm with catalog_search / describe_block).',
+                description: 'The block type to create.',
             },
             position: {
                 type: 'object',
@@ -355,12 +355,12 @@ const DELETE_NODE_DEF: ToolDef = {
     requires: 'canModifyCanvas',
     parameters: {
         type: 'object',
-        properties: { nodeId: { type: 'string', description: 'The id of the node to delete (from list_nodes).' } },
+        properties: { nodeId: { type: 'string', description: 'The id of the node to delete.' } },
         required: ['nodeId'],
     },
 };
 
-/** STRUCTURE provider (write: add/delete node) over a {@link CanvasBinding}: `add_node` (defaults-only, catalog-validated type) + `delete_node` (cascades edges). Carried by the `node` specialist. */
+/** STRUCTURE provider (write: add/delete node) over a {@link CanvasBinding}: `add_node` (defaults-only, catalog-validated type) + `delete_node` (cascades edges). Composed into every block agent via the `lifecycle` skill. */
 export const createNodeStructureToolProvider = (binding: CanvasBinding, catalog: CatalogLookup): ToolProvider => ({
     listTools: () => [ADD_NODE_DEF, DELETE_NODE_DEF],
     dispatch: (call: ToolCall): ToolResult => {

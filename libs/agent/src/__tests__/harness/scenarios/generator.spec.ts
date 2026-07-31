@@ -83,6 +83,24 @@ describe('generator agent — configure existing', () => {
     });
 });
 
+describe('generator agent — specialist persona', () => {
+    it('drives GENERATOR_SYSTEM_PROMPT, not the generic block prompt (the override rides through)', async () => {
+        const { agent, gateway } = setup([{ text: 'ok' }]);
+
+        await agent.send('what can you do?');
+
+        const systemContent = gateway.calls[0].messages
+            .filter(m => m.role === 'system')
+            .map(m => m.content)
+            .join('\n');
+        // Domain knowledge ONLY the generator persona carries — the generic blockAgentSystemPrompt (label
+        // "Generator") never mentions the AI-block name or provider keys, so this proves createGeneratorAgent's
+        // persona override actually reached the model rather than the generic block prompt.
+        expect(systemContent).toMatch(/AI Text Generator/);
+        expect(systemContent).toMatch(/OpenAI key/);
+    });
+});
+
 describe('generator agent — type-scoped reads', () => {
     it('search_nodes returns only generator nodes', async () => {
         const { agent, toolMsg } = setup([

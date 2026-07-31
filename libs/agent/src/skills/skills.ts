@@ -36,9 +36,11 @@ export const edgeSkill: Skill = {
 };
 
 /**
- * A block's whole node lifecycle, scoped to ONE block type: find it (type-scoped `search_nodes` + `describe_node`),
- * add/delete it (structure), configure/rename it (config). This is the single cohesive capability a block agent
- * is built from — several tools bundled into one job, parameterized by the block type the agent owns.
+ * A block's whole node lifecycle for ONE block type: find its nodes (`search_nodes`, type-scoped so the agent
+ * only ever LISTS its own type) and inspect one (`describe_node`, by id), add/delete it (structure), and
+ * configure/rename it (config). The type scope is a DISCOVERY boundary — it narrows what the agent can find and
+ * see; the by-id tools act on whatever concrete node the orchestrator briefed. One cohesive capability,
+ * parameterized by the block type the agent owns.
  */
 export const lifecycleSkill = (blockType: string): Skill => ({
     name: `lifecycle:${blockType}`,

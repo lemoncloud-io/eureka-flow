@@ -7,7 +7,7 @@
 >
 > **Grounding.** Built only on what ships on **this branch**: the agent core in `@flows/agent`
 > (`libs/agent/src`) and the frontend toolkit in `@flows/flows` (`libs/flows/src`). No other branch is
-> referenced. Last updated 2026-07-28.
+> referenced. Last updated 2026-07-30.
 
 ---
 
@@ -296,11 +296,13 @@ permissions).
 
 ### Skills — how an agent's tool surface is composed
 
-An agent doesn't hand-wire its providers; it composes **skills** — named, reusable capabilities that each wrap
-the shipped provider(s): `inspect` (full read), `move`, `edge`, and `lifecycle:<type>` (a block's whole
-lifecycle — type-scoped `search_nodes` + structure + config). A block agent is one `lifecycle` skill; `locator`
-is `inspect + move`; `edge` is `inspect + edge`. A skill is just the capability — the **persona and grant stay
-on the agent**, gated at the executor as above. Type + the skill↔agent map:
+An agent composes its canvas capabilities from **skills** — named, reusable capabilities that each wrap the
+shipped provider(s): `inspect` (full read), `move`, `edge`, and `lifecycle:<type>` (a block's whole lifecycle —
+the type-scoped `search_nodes` plus `describe_node` / structure / config). A block agent is one `lifecycle`
+skill; `locator` is `inspect + move`; `edge` is `inspect + edge`; the orchestrator's own read is `inspect`. A
+skill is just the capability — the **persona and grant stay on the agent**, gated at the executor as above. The
+orchestrator's coordination providers (`catalog_search` / `describe_block`, `list_agents`, `spawn`) are not
+skills and are wired directly. Type + the skill↔agent map:
 **[interfaces §3](./harness-interfaces.md#3--tools)**.
 
 ### System prompts — the behavioral contract
@@ -311,8 +313,8 @@ the tools don't encode (`partial` vs. `refused`, when to ask rather than guess, 
 this"). Each persona is an
 `AgentConfig.systemPrompt` string; per-turn state (the current node list, catalog hints) is injected via
 `BaseAgent.buildContextMessages()` — the seam the shipped `locator` already uses. Each shipped persona is the
-`systemPrompt` string in its agent module (`ORCHESTRATOR_SYSTEM_PROMPT`, `LOCATOR_SYSTEM_PROMPT`,
-`PROPERTY_SYSTEM_PROMPT`, `NODE_SYSTEM_PROMPT`, `EDGE_SYSTEM_PROMPT`).
+`systemPrompt` string (or, for a block agent, the prompt builder) in its agent module — one per registered
+agent, discovered through the roster rather than enumerated here.
 
 ## 9 · What's new
 

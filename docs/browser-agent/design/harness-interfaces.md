@@ -6,7 +6,7 @@
 > (`Graph`, `XY`, `NodeData`, `EdgeData`, `ToolProvider`, `AgentGrant`, `BaseAgent`, `FakeScriptStep`, …) are
 > **reused as-is** from `@flows/agent` / `@flows/flows` / `@lemoncloud/eureka-flows-api`.
 >
-> Behavior & the loop: **[harness-spec.md](./harness-spec.md)**. How we verify: **[harness-scenarios.md](./harness-scenarios.md)**. Last updated 2026-07-28.
+> Behavior & the loop: **[harness-spec.md](./harness-spec.md)**. How we verify: **[harness-scenarios.md](./harness-scenarios.md)**. Last updated 2026-07-30.
 
 ---
 
@@ -278,7 +278,7 @@ interface SpawnInput {
 type SpawnResult = { children: SpawnChildResult[] };
 
 // Grants are TWO layers and neither is set at spawn: (1) each agent's OWN fixed grant, declared by the
-// developer in its constructor (locator {canModifyCanvas}, property {canEditConfig}); (2) `userPermissions`,
+// developer in its constructor; (2) `userPermissions`,
 // the flow-role ceiling the FRONTEND derives (@flows/flows `getPermissions(role)` → `toAgentGrant`) and
 // threads in. The executor gates each required-capability tool on BOTH. No `clampGrant`, no `roleGrant`.
 ```
@@ -433,7 +433,7 @@ interface ScenarioInput {
 declare function runScenario(input: ScenarioInput): Promise<TurnResult>;
 
 // One fake gateway per agent (keyed by agentType) — see impl-notes for why.
-type FakeScript = Record<string, FakeScriptStep[]>; // 'orchestrator' | 'locator' | 'property' | 'node' | 'edge' → scripted turns
+type FakeScript = Record<string, FakeScriptStep[]>; // keyed by agentType → one scripted gateway per agent
 ```
 
 **Test-only re-ask + honest errors.** The orchestrator ends its turn with a plain-text reply (production is

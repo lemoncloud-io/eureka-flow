@@ -136,3 +136,34 @@ describe('block agent — type-scoped reads', () => {
         expect(systemContent).not.toMatch(new RegExp(`id="${IDS.gen}"`));
     });
 });
+
+describe('block agent — search_nodes query filter', () => {
+    it('narrows its own-type list to nodes whose label matches the query (case-insensitive)', async () => {
+        const { agent, binding, toolMsg } = setup('buffer', [
+            { toolCalls: [{ name: 'search_nodes', args: { query: 'delta' } }] },
+            { text: 'Found the delta buffer.' },
+        ]);
+        // two same-type buffers with distinct labels; only the label-matching one should come back
+        binding.updateNode(IDS.buf, { label: 'Alpha buffer' });
+        const { id: deltaId } = binding.addNode('buffer', { x: 10, y: 10 });
+        binding.updateNode(deltaId, { label: 'Delta Buffer' }); // capital D pins the case-insensitivity
+
+        await agent.send('find the delta buffer');
+
+        const result = JSON.parse(toolMsg()?.content ?? '{}') as { nodes?: { id: string }[] };
+        expect(result.nodes?.map(n => n.id)).toEqual([deltaId]);
+    });
+
+    it('returns an empty list when no own-type label matches the query', async () => {
+        const { agent, binding, toolMsg } = setup('buffer', [
+            { toolCalls: [{ name: 'search_nodes', args: { query: 'nope' } }] },
+            { text: 'No buffer matches.' },
+        ]);
+        binding.updateNode(IDS.buf, { label: 'Alpha buffer' });
+
+        await agent.send('find the nope buffer');
+
+        const result = JSON.parse(toolMsg()?.content ?? '{}') as { nodes?: { id: string }[] };
+        expect(result.nodes).toEqual([]);
+    });
+});

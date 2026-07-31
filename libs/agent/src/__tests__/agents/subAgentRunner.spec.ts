@@ -4,6 +4,7 @@ import { createAgentRoster } from '../../agents/roster';
 import { createSubAgentRunner } from '../../agents/subAgentRunner';
 import { createInMemoryCanvasBinding } from '../../canvas/inMemoryCanvasBinding';
 import { createFakeGateway } from '../../llm/fakeGateway';
+import { createFixtureCatalog, makeInitialGraph } from '../harness/fixtures';
 
 import type { Agent } from '../../agent';
 import type { AgentRegistration } from '../../agents/roster';
@@ -70,5 +71,55 @@ describe('createSubAgentRunner — fanOut failure paths', () => {
         );
 
         expect(childSawAborted).toBe(true);
+    });
+});
+
+describe('createSubAgentRunner — generic block-agent fallback (hybrid roster)', () => {
+    const catalog = createFixtureCatalog();
+    const makeCatalogRunner = (registrations: AgentRegistration[], gateway: ReturnType<typeof createFakeGateway>) =>
+        createSubAgentRunner({
+            roster: createAgentRoster(registrations),
+            catalog,
+            gatewayFor: () => gateway,
+            flowId: 'flow-test',
+            userPermissions: { canModifyCanvas: true, canEditConfig: true },
+        });
+
+    it('synthesizes a generic BlockAgent for an unregistered but catalog-valid block type', async () => {
+        const binding = createInMemoryCanvasBinding(makeInitialGraph());
+        const gateway = createFakeGateway([
+            { toolCalls: [{ name: 'add_node', args: { type: 'buffer', position: { x: 900, y: 120 } } }] },
+            { text: 'added a buffer' },
+        ]);
+
+        // 'buffer' is NOT registered, but IS a catalog block → the runner builds BlockAgent('buffer') on the fly.
+        const [result] = await makeCatalogRunner([], gateway).fanOut(
+            [{ task: 'add a buffer at (900, 120)', agentType: 'buffer' }],
+            binding
+        );
+
+        expect(result.ok).toBe(true);
+        expect(binding.readGraph().nodes.filter(n => n.type === 'buffer')).toHaveLength(2); // fixture + the new one
+    });
+
+    it('lets an explicit registration win over the generic block fallback', async () => {
+        let explicitRan = false;
+        const explicit: Agent = {
+            send: async () => {
+                explicitRan = true;
+            },
+            abort: () => {
+                /* no-op */
+            },
+        };
+
+        // 'buffer' is BOTH registered AND a catalog type → the explicit registration must win over the generic.
+        const [result] = await makeCatalogRunner([reg('buffer', () => explicit)], createFakeGateway([])).fanOut(
+            [{ task: 'x', agentType: 'buffer' }],
+            createInMemoryCanvasBinding(makeInitialGraph())
+        );
+
+        expect(explicitRan).toBe(true);
+        expect(result.ok).toBe(true);
     });
 });
