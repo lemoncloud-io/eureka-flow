@@ -35,13 +35,6 @@ export const ORCHESTRATOR_SYSTEM_PROMPT = [
     '- Shared values — when several specialists must agree on something the user left open, decide it once and',
     '  put it in every briefing: the single column to align four nodes to, or the id of a node you just added',
     '  threaded into the later connect/configure tasks.',
-    '- Rerouting an input — when the request points an input at a NEW source ("make the preview show the buffer’s',
-    '  output instead of the generator’s", "read from B instead of A"), that input already holds an edge and',
-    '  replacing it IS the request. Plan it as two steps: disconnect the existing edge into that input first,',
-    '  then connect the new source. Each input holds ONE edge, so if a connect is rejected because the target',
-    '  input is already occupied, that rejection is your cue to disconnect the occupying edge and retry — NOT to',
-    '  stop or to ask permission. The reroute already authorized removing the old edge; never reply "shall I',
-    '  disconnect it first?".',
     '',
     'You MAY read the canvas or the block catalog when you need it to PLAN — to understand the flow or to settle',
     'a shared value — but reading is not doing the work, and it never replaces delegating. Do not end the turn',
@@ -49,9 +42,15 @@ export const ORCHESTRATOR_SYSTEM_PROMPT = [
     '',
     'Apply every part you can, and do it WITHOUT asking permission first: if a task is unambiguous, just delegate',
     'it — never reply "I can do X if you like". Act before you report: when a request has several parts, delegate',
-    'them FIRST, then summarise. A part that fails is isolated — one bad part never blocks the others. For a part',
-    'that cannot be done — no capable specialist, or a specialist reports a rejection (invalid value or field, a',
-    'rejected edit, permission denied) — do not force it and do not guess a way around it.',
+    'them FIRST, then summarise. A part that fails is isolated — one bad part never blocks the others.',
+    'As the planner you own the DESTRUCTIVE steps: a specialist removes an existing edge or node only when your',
+    'briefing names it. When the intent needs something cleared first — an input holds ONE edge, so aiming it at',
+    'a new source means the old edge must be removed before the new one is added — brief that removal and sequence',
+    'it as its OWN step ahead of the edit that reuses the freed slot (never both in one parallel batch); do it',
+    'without asking, since the intent called for it. Judge any other rejection on its merits — an invalid value or',
+    'field, no capable specialist, or permission denied is a dead-end you report and leave, never forced or faked',
+    '— but a specialist reporting it is blocked by state your intent means to change is that removal surfacing',
+    'late: brief the removal, do not retry the identical task, and finish.',
     '',
     'Once everything you can do is done, stop: make no further tool calls, and never repeat or keep adjusting an',
     'edit that already succeeded.',
@@ -88,6 +87,14 @@ const renderContext = (binding: CanvasBinding, roster: AgentRoster): string => {
 };
 
 /**
+ * The orchestrator's think/act budget. It DELEGATES (each spawn is one iteration) and also reads to plan, so a
+ * multi-step job — a refactor like disconnect → add → connect → connect, or a branching build — can need more
+ * than the default budget of 8 (observed: it brushed the cap on a reroute-and-insert). A larger cap keeps
+ * complex coordination reliable. Hardcoded for now; an explicit deps.maxIterations still overrides it.
+ */
+export const ORCHESTRATOR_MAX_ITERATIONS = 16;
+
+/**
  * The main agent: a `BaseAgent` subclass with no write tools of its own, wiring read + catalog + list_agents
  * + spawn. Overrides `runToolCalls` (concurrent dispatch) and `buildContextMessages` (seed nodes + roster).
  */
@@ -108,20 +115,26 @@ export class OrchestratorAgent extends BaseAgent {
             userPermissions: deps.userPermissions,
         });
         const signalHolder: { current?: AbortSignal } = {};
-        super(deps, {
-            id: 'orchestrator',
-            description: 'Coordinates specialists to edit the flow; makes no edits itself.',
-            systemPrompt: ORCHESTRATOR_SYSTEM_PROMPT,
-            // Empty grant on purpose (least privilege): the orchestrator's own tools require no capability,
-            // and each spawned child is gated by its own grant + the user's permissions at the executor.
-            grant: {},
-            tools: [
-                createNodeReadToolProvider(deps.binding, deps.catalog),
-                createCatalogToolProvider(deps.catalog),
-                createAgentDirectoryToolProvider(roster),
-                createSpawnToolProvider(runner, deps.binding, () => signalHolder.current),
-            ],
-        });
+        // The orchestrator coordinates multi-step jobs, so it defaults to a larger budget than a narrow
+        // specialist; an explicit deps.maxIterations still wins. Children keep their OWN caps (the runner above
+        // is passed deps.maxIterations, undefined by default → each child uses its own: builder 20, others 8).
+        super(
+            { ...deps, maxIterations: deps.maxIterations ?? ORCHESTRATOR_MAX_ITERATIONS },
+            {
+                id: 'orchestrator',
+                description: 'Coordinates specialists to edit the flow; makes no edits itself.',
+                systemPrompt: ORCHESTRATOR_SYSTEM_PROMPT,
+                // Empty grant on purpose (least privilege): the orchestrator's own tools require no capability,
+                // and each spawned child is gated by its own grant + the user's permissions at the executor.
+                grant: {},
+                tools: [
+                    createNodeReadToolProvider(deps.binding, deps.catalog),
+                    createCatalogToolProvider(deps.catalog),
+                    createAgentDirectoryToolProvider(roster),
+                    createSpawnToolProvider(runner, deps.binding, () => signalHolder.current),
+                ],
+            }
+        );
         this.roster = roster;
         this.signalHolder = signalHolder;
     }

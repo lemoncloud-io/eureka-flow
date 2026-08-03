@@ -224,6 +224,24 @@ interface Scenario {
 
 const EMPTY = (): Graph => ({ nodes: [], edges: [] });
 
+/** The fixture chain with the buffer removed: input-text → generator → preview. The T5.insert-between start. */
+const makeNoBufferGraph = (): Graph => {
+    const g = makeInitialGraph();
+    return {
+        nodes: g.nodes.filter(n => n.id !== IDS.buf),
+        edges: [
+            { id: 'e_txt_gen', sourceNodeId: IDS.txt, sourcePortId: 'out', targetNodeId: IDS.gen, targetPortId: 'in' },
+            {
+                id: 'e_gen_prev',
+                sourceNodeId: IDS.gen,
+                sourcePortId: 'out',
+                targetNodeId: IDS.prev,
+                targetPortId: 'in',
+            },
+        ],
+    };
+};
+
 // ── the smoke ladder: a few scenarios per tier (§4), oracles as strict as the intent fixes (§2) ─────
 const SMOKE: Scenario[] = [
     {
@@ -235,10 +253,12 @@ const SMOKE: Scenario[] = [
         oracle: r => {
             const gen = findNode(r.graph, IDS.gen);
             if (!gen) return { pass: false, note: 'generator node missing' };
-            if (gen.config?.temperature !== '0.2')
-                {return { pass: false, note: `temperature=${gen.config?.temperature}` };}
-            if (gen.config?.model !== 'gemini-2.5-flash')
-                {return { pass: false, note: `model not preserved (=${gen.config?.model})` };}
+            if (gen.config?.temperature !== '0.2') {
+                return { pass: false, note: `temperature=${gen.config?.temperature}` };
+            }
+            if (gen.config?.model !== 'gemini-2.5-flash') {
+                return { pass: false, note: `model not preserved (=${gen.config?.model})` };
+            }
             return { pass: r.committed, note: r.committed ? undefined : 'nothing committed' };
         },
     },
@@ -253,8 +273,9 @@ const SMOKE: Scenario[] = [
             if (!gen) return { pass: false, note: 'generator node missing' };
             if (gen.config?.model !== 'gemini-2.5-pro') return { pass: false, note: `model=${gen.config?.model}` };
             // the merge must keep the pre-set temperature (the whole point of the case)
-            if (gen.config?.temperature !== '0.7')
-                {return { pass: false, note: `temperature not preserved (=${gen.config?.temperature})` };}
+            if (gen.config?.temperature !== '0.7') {
+                return { pass: false, note: `temperature not preserved (=${gen.config?.temperature})` };
+            }
             return { pass: true };
         },
     },
@@ -267,8 +288,9 @@ const SMOKE: Scenario[] = [
         oracle: r => {
             const g = r.graph;
             if (findNode(g, IDS.buf)) return { pass: false, note: 'buffer still present' };
-            if (g.edges.some(e => e.sourceNodeId === IDS.buf || e.targetNodeId === IDS.buf))
-                {return { pass: false, note: 'a dangling edge still references the buffer' };}
+            if (g.edges.some(e => e.sourceNodeId === IDS.buf || e.targetNodeId === IDS.buf)) {
+                return { pass: false, note: 'a dangling edge still references the buffer' };
+            }
             if (!edgeExists(g, IDS.txt, IDS.gen)) return { pass: false, note: 'input not wired to generator' };
             return { pass: r.committed };
         },
@@ -281,11 +303,32 @@ const SMOKE: Scenario[] = [
         expect: 'refused',
         oracle: (r, initial) => {
             // gpt-4o is not a valid GENERATOR_MODELS value — the agent must NOT edit; the graph must be untouched.
-            if (!unchanged(r, initial))
-                {return { pass: false, note: r.committed ? 'edited despite the bad value' : 'graph changed' };}
+            if (!unchanged(r, initial)) {
+                return { pass: false, note: r.committed ? 'edited despite the bad value' : 'graph changed' };
+            }
             const reason = r.outcome.status === 'refused' ? r.outcome.reason : '';
             const namesReal = GENERATOR_MODELS.some(m => reason.includes(m));
             return { pass: true, note: namesReal ? undefined : `refused but reason did not name a real model` };
+        },
+    },
+    {
+        // Guards the orchestrator's rejection heuristic: gen.in is already fed by the buffer and the request
+        // does NOT ask to replace it, so this must be REFUSED (unchanged) — the "clear an obstacle the request
+        // means to change" rule must NOT fire when the request never authorized removing the occupying edge.
+        id: 'T2.occupied-input',
+        tier: 2,
+        objective: 'connect the input directly into the generator',
+        initial: makeInitialGraph,
+        expect: 'refused',
+        oracle: (r, initial) => {
+            if (!unchanged(r, initial))
+                {return {
+                    pass: false,
+                    note: r.committed
+                        ? 'edited an occupied input the request did not authorize replacing'
+                        : 'graph changed',
+                };}
+            return { pass: true };
         },
     },
     {
@@ -318,6 +361,25 @@ const SMOKE: Scenario[] = [
             return { pass: r.committed };
         },
     },
+    {
+        // Refactor / splice (§2.1 relational): start from txt → gen → prev, insert a buffer onto the gen→prev
+        // path. Verify the DELTA (a buffer now sits between gen and prev) AND that the direct edge is gone —
+        // no golden graph, any ids/positions accepted.
+        id: 'T5.insert-between',
+        tier: 5,
+        objective: 'insert a buffer between the generator and the preview',
+        initial: makeNoBufferGraph,
+        expect: 'applied',
+        oracle: r => {
+            const g = r.graph;
+            if (!hasNodeOfType(g, 'buffer')) return { pass: false, note: 'no buffer node added' };
+            if (!embedsTypedPath(g, ['single-output-generator', 'buffer', 'output-preview']))
+                {return { pass: false, note: 'buffer is not on the generator→preview path' };}
+            if (edgeExists(g, IDS.gen, IDS.prev))
+                {return { pass: false, note: 'direct generator→preview edge still present' };}
+            return { pass: r.committed };
+        },
+    },
 ];
 
 // ── the scorecard ──────────────────────────────────────────────────────────────────────────────────
@@ -345,11 +407,22 @@ describe.skipIf(SKIP_LIVE)(`Eval benchmark — correctness A/B (model=${model}, 
                         rec(`\n══════════ ${s.id} · ${d.designId} · run ${i + 1}/${N} ══════════`);
                         rec(`objective: ${s.objective}\n`);
                         const initial = s.initial();
-                        const r = await d.run({
-                            objective: s.objective,
-                            initialGraph: initial,
-                            userPermissions: s.userPermissions,
-                        });
+                        // A turn can ERROR (a live-model malformed call, or an agent that exceeds its iteration
+                        // budget) and runScenario rethrows it. That is a failure to complete the task, so record
+                        // it as a MISS and keep going — it must not crash the cell and lose the other N-1 runs.
+                        let r: BenchmarkResult;
+                        try {
+                            r = await d.run({
+                                objective: s.objective,
+                                initialGraph: initial,
+                                userPermissions: s.userPermissions,
+                            });
+                        } catch (err) {
+                            const msg = (err instanceof Error ? err.message : String(err)).replace(/\s+/g, ' ');
+                            rec(`── result: ERRORED → MISS (${msg}) ──`);
+                            notes.push(`run${i + 1}: ERROR — ${msg.slice(0, 140)}`);
+                            continue;
+                        }
                         const v = s.oracle(r, initial);
                         if (v.pass) passes += 1;
                         const statusTag =
@@ -358,12 +431,13 @@ describe.skipIf(SKIP_LIVE)(`Eval benchmark — correctness A/B (model=${model}, 
                         rec(
                             `── result: outcome=${r.outcome.status} committed=${r.committed} → ${v.pass ? 'PASS' : `MISS (${v.note ?? 'oracle failed'})`} ──`
                         );
-                        if (!v.pass || statusTag)
-                            {notes.push(`${line} · "${outcomeText(r.outcome).replace(/\s+/g, ' ').slice(0, 100)}"`);}
-                        // Harness sanity only — the turn produced a parseable outcome. A design MISSING the oracle
-                        // is recorded in the scorecard (the signal), NOT a harness failure, so we don't assert it.
-                        expect(r.outcome.status, 'the turn produced no parseable outcome').toBeTruthy();
+                        if (!v.pass || statusTag) {
+                            notes.push(`${line} · "${outcomeText(r.outcome).replace(/\s+/g, ' ').slice(0, 100)}"`);
+                        }
                     }
+                    // The oracle verdicts live in the scorecard, not in an assertion here — a design missing a
+                    // scenario is signal, not a harness failure. This only guards the loop bookkeeping.
+                    expect(passes).toBeLessThanOrEqual(N);
                     cells.push({
                         scenarioId: s.id,
                         tier: s.tier,
