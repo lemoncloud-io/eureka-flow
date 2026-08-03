@@ -312,23 +312,22 @@ const SMOKE: Scenario[] = [
         },
     },
     {
-        // Guards the orchestrator's rejection heuristic: gen.in is already fed by the buffer and the request
-        // does NOT ask to replace it, so this must be REFUSED (unchanged) — the "clear an obstacle the request
-        // means to change" rule must NOT fire when the request never authorized removing the occupying edge.
+        // The generator's input is already fed by the buffer, but connecting the input to the generator is
+        // COMPLETABLE: the agent frees the occupied input (disconnects the buffer's edge into it) and connects.
+        // APPLIED is correct — the agent doesn't need permission to change the canvas; it refuses only the
+        // genuinely impossible (see T2.bad-value). No golden graph: just assert the input now drives the generator.
         id: 'T2.occupied-input',
         tier: 2,
         objective: 'connect the input directly into the generator',
         initial: makeInitialGraph,
-        expect: 'refused',
-        oracle: (r, initial) => {
-            if (!unchanged(r, initial))
-                {return {
-                    pass: false,
-                    note: r.committed
-                        ? 'edited an occupied input the request did not authorize replacing'
-                        : 'graph changed',
-                };}
-            return { pass: true };
+        expect: 'applied',
+        oracle: r => {
+            const g = r.graph;
+            if (!edgeExists(g, IDS.txt, IDS.gen)) return { pass: false, note: 'input not wired to the generator' };
+            if (edgeExists(g, IDS.buf, IDS.gen)) {
+                return { pass: false, note: 'buffer still occupies the generator input' };
+            }
+            return { pass: r.committed };
         },
     },
     {
@@ -373,10 +372,12 @@ const SMOKE: Scenario[] = [
         oracle: r => {
             const g = r.graph;
             if (!hasNodeOfType(g, 'buffer')) return { pass: false, note: 'no buffer node added' };
-            if (!embedsTypedPath(g, ['single-output-generator', 'buffer', 'output-preview']))
-                {return { pass: false, note: 'buffer is not on the generator→preview path' };}
-            if (edgeExists(g, IDS.gen, IDS.prev))
-                {return { pass: false, note: 'direct generator→preview edge still present' };}
+            if (!embedsTypedPath(g, ['single-output-generator', 'buffer', 'output-preview'])) {
+                return { pass: false, note: 'buffer is not on the generator→preview path' };
+            }
+            if (edgeExists(g, IDS.gen, IDS.prev)) {
+                return { pass: false, note: 'direct generator→preview edge still present' };
+            }
             return { pass: r.committed };
         },
     },
