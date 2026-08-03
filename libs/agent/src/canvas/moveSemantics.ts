@@ -15,6 +15,21 @@ export interface MoveNodeArgs {
     to?: XY;
 }
 
+/** The eight relocation directions the model may name. */
+export type Direction = 'right' | 'left' | 'up' | 'down' | 'up-right' | 'up-left' | 'down-right' | 'down-left';
+
+/** The default step (px) for a vague amount ("nudge it right"). */
+export const DEFAULT_STEP = 20;
+
+/** Canonical direction → delta in canvas coords: right = +x, left = −x, up = −y, down = +y; diagonals combine axes. */
+export const directionToDelta = (direction: Direction, amount: number = DEFAULT_STEP): Delta => {
+    const right = direction.includes('right') ? amount : 0;
+    const left = direction.includes('left') ? amount : 0;
+    const up = direction.includes('up') ? amount : 0;
+    const down = direction.includes('down') ? amount : 0;
+    return { dx: right - left, dy: down - up };
+};
+
 /** Whether `args` carries exactly one of `by` / `to`. */
 export const hasExactlyOneTarget = (args: Pick<MoveNodeArgs, 'by' | 'to'>): boolean =>
     (args.by !== undefined) !== (args.to !== undefined);

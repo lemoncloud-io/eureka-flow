@@ -254,7 +254,11 @@ export abstract class BaseAgent implements Agent {
                     ...this.buildContextMessages(),
                     ...mapTranscript(state.messages),
                 ];
-                const tools = await executor.listTools(config);
+                // Only send tool definitions to gateways that can act on them; a gateway that
+                // declares toolCalls: false would otherwise error on every turn just for
+                // receiving tools it can't use. Undeclared capabilities (undefined) keep the
+                // prior behavior — tools are sent — for backward compatibility.
+                const tools = gateway.capabilities?.toolCalls === false ? [] : await executor.listTools(config);
                 const res = await collect(gateway.chat({ messages: chatMessages, tools, stream: true }, { signal }));
 
                 // If the turn was aborted while draining, stop before applying any of its moves.

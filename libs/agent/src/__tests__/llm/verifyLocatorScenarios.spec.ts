@@ -1,0 +1,309 @@
+import { describe, expect, it } from 'vitest';
+
+import { LOCATOR_SCENARIOS, runAllLocatorScenarios, runLocatorScenario } from '../../llm/verifyLocatorScenarios';
+
+import type { ChatRequest, Chunk, LlmGateway } from '../../llm/llmGateway';
+import type { LocatorScenarioResult } from '../../llm/verifyLocatorScenarios';
+
+/** A minimal fake gateway that ignores the request and streams a scripted response. */
+const fakeGateway = (chunks: Chunk[]): LlmGateway => ({
+    capabilities: { toolCalls: true },
+    async *chat(_req: ChatRequest): AsyncIterable<Chunk> {
+        for (const chunk of chunks) yield chunk;
+    },
+});
+
+const baseResult: LocatorScenarioResult = {
+    scenarioId: 'list-nodes-read-only',
+    pass: false,
+    toolCallName: null,
+    textPresent: false,
+    positionsBefore: {},
+    positionsAfter: {},
+};
+
+describe('LOCATOR_SCENARIOS knownVariance predicates', () => {
+    it('list-nodes-read-only: matches only "no tool call, non-empty text" — not a bare no-tool-call', () => {
+        const scenario = LOCATOR_SCENARIOS.find(s => s.id === 'list-nodes-read-only');
+        expect(scenario?.knownVariance).toBeDefined();
+        expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: null, textPresent: true })).toBe(true);
+        expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: null, textPresent: false })).toBe(false);
+        expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: 'move_node', textPresent: true })).toBe(
+            false
+        );
+    });
+
+    const TARGET_RESOLUTION_SCENARIO_IDS = [
+        'move-node-right',
+        'move-node-left',
+        'move-node-up',
+        'move-node-down',
+        'move-node-absolute',
+        'selective-multi-node',
+        'ambiguous-instruction',
+        'unknown-target',
+    ] as const;
+
+    describe.each(TARGET_RESOLUTION_SCENARIO_IDS)(
+        '%s: shares the Gemini lookup-first target-resolution variance',
+        scenarioId => {
+            it('matches only "called list_nodes instead" — not any other wrong tool', () => {
+                const scenario = LOCATOR_SCENARIOS.find(s => s.id === scenarioId);
+                expect(scenario?.knownVariance).toBeDefined();
+                expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: 'list_nodes' })).toBe(true);
+                expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: null })).toBe(false);
+                expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: 'some_other_tool' })).toBe(
+                    false
+                );
+            });
+        }
+    );
+
+    it('all eight target-resolution scenarios share the exact same variance object (one general allowance, not per-scenario copies)', () => {
+        const variances = TARGET_RESOLUTION_SCENARIO_IDS.map(
+            id => LOCATOR_SCENARIOS.find(s => s.id === id)?.knownVariance
+        );
+        expect(variances.every(v => v === variances[0])).toBe(true);
+    });
+
+    it('list-nodes-read-only keeps its own distinct variance object, not the shared target-resolution one', () => {
+        const listNodes = LOCATOR_SCENARIOS.find(s => s.id === 'list-nodes-read-only');
+        const moveRight = LOCATOR_SCENARIOS.find(s => s.id === 'move-node-right');
+        expect(listNodes?.knownVariance).toBeDefined();
+        expect(listNodes?.knownVariance).not.toBe(moveRight?.knownVariance);
+    });
+
+    it('the only scenarios with no knownVariance allowance are no-tool-refusal and no-op-instruction (no target to resolve)', () => {
+        const withoutVariance = LOCATOR_SCENARIOS.filter(s => !s.knownVariance);
+        expect(withoutVariance.map(s => s.id)).toEqual(['no-tool-refusal', 'no-op-instruction']);
+    });
+});
+
+describe('LOCATOR_SCENARIOS catalog', () => {
+    it('lists exactly the eleven single-turn scenarios', () => {
+        expect(LOCATOR_SCENARIOS.map(s => s.id)).toEqual([
+            'list-nodes-read-only',
+            'move-node-right',
+            'move-node-left',
+            'move-node-up',
+            'move-node-down',
+            'move-node-absolute',
+            'selective-multi-node',
+            'ambiguous-instruction',
+            'no-tool-refusal',
+            'no-op-instruction',
+            'unknown-target',
+        ]);
+    });
+});
+
+describe('runLocatorScenario: list-nodes-read-only', () => {
+    it('passes when the model calls list_nodes and nothing mutates', async () => {
+        const gateway = fakeGateway([{ toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } }, { done: true }]);
+        const result = await runLocatorScenario(gateway, 'list-nodes-read-only');
+        expect(result.pass).toBe(true);
+        expect(result.toolCallName).toBe('list_nodes');
+        expect(result.positionsBefore).toEqual(result.positionsAfter);
+    });
+
+    it('fails when the model answers from context instead of calling the tool', async () => {
+        const gateway = fakeGateway([{ text: 'There are 2 nodes: text-1 and note-1.' }, { done: true }]);
+        const result = await runLocatorScenario(gateway, 'list-nodes-read-only');
+        expect(result.pass).toBe(false);
+        expect(result.toolCallName).toBeNull();
+        expect(result.error).toMatch(/did not call list_nodes/);
+    });
+
+    it('fails when the model calls move_node instead (wrong tool, and it mutates)', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":10,"dy":0}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'list-nodes-read-only');
+        expect(result.pass).toBe(false);
+        expect(result.toolCallName).toBe('move_node');
+        expect(result.error).toMatch(/unexpected tool call: move_node/);
+    });
+});
+
+describe.each([
+    ['move-node-right', '{"nodeId":"text-1","by":{"dx":100,"dy":0}}', { x: 300, y: 200 }],
+    ['move-node-left', '{"nodeId":"text-1","by":{"dx":-100,"dy":0}}', { x: 100, y: 200 }],
+    ['move-node-up', '{"nodeId":"text-1","by":{"dx":0,"dy":-100}}', { x: 200, y: 100 }],
+    ['move-node-down', '{"nodeId":"text-1","by":{"dx":0,"dy":100}}', { x: 200, y: 300 }],
+] as const)('runLocatorScenario: %s', (scenarioId, argsDelta, expectedPosition) => {
+    it(`passes with the correct relative delta -> ${JSON.stringify(expectedPosition)}`, async () => {
+        const gateway = fakeGateway([{ toolCall: { id: 'c1', name: 'move_node', argsDelta } }, { done: true }]);
+        const result = await runLocatorScenario(gateway, scenarioId);
+        expect(result.pass).toBe(true);
+        expect(result.positionsAfter['text-1']).toEqual(expectedPosition);
+    });
+});
+
+describe('runLocatorScenario: move-node-absolute', () => {
+    it('passes when the model calls move_node with the exact `to` position', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","to":{"x":400,"y":350}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'move-node-absolute');
+        expect(result.pass).toBe(true);
+        expect(result.positionsAfter['text-1']).toEqual({ x: 400, y: 350 });
+    });
+
+    it('fails with no partial credit when the position is off', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","to":{"x":400,"y":300}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'move-node-absolute');
+        expect(result.pass).toBe(false);
+        expect(result.error).toMatch(/expected \(400,350\)/);
+    });
+});
+
+describe('runLocatorScenario: selective-multi-node', () => {
+    it('passes when only the named node moves and the other two stay put', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"http-1","by":{"dx":0,"dy":50}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'selective-multi-node');
+        expect(result.pass).toBe(true);
+        expect(result.positionsAfter['http-1']).toEqual({ x: 300, y: 150 });
+        expect(result.positionsAfter['text-1']).toEqual(result.positionsBefore['text-1']);
+        expect(result.positionsAfter['note-1']).toEqual(result.positionsBefore['note-1']);
+    });
+
+    it('fails when the model also moves an untargeted node', async () => {
+        const gateway = fakeGateway([
+            {
+                toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":10,"dy":0}}' },
+            },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'selective-multi-node');
+        expect(result.pass).toBe(false);
+    });
+});
+
+describe('runLocatorScenario: ambiguous-instruction', () => {
+    it('passes when the model asks for clarification with no tool call', async () => {
+        const gateway = fakeGateway([
+            { text: 'There are two text input nodes — which one did you mean?' },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'ambiguous-instruction');
+        expect(result.pass).toBe(true);
+        expect(result.toolCallName).toBeNull();
+    });
+
+    it('fails when the model guesses and moves one of the ambiguous nodes', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-a","by":{"dx":50,"dy":0}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'ambiguous-instruction');
+        expect(result.pass).toBe(false);
+        expect(result.error).toMatch(/unexpected tool call: move_node/);
+    });
+});
+
+describe('runLocatorScenario: no-op-instruction', () => {
+    it('passes when the model confirms in text with no tool call', async () => {
+        const gateway = fakeGateway([{ text: 'Sure, nothing moved.' }, { done: true }]);
+        const result = await runLocatorScenario(gateway, 'no-op-instruction');
+        expect(result.pass).toBe(true);
+        expect(result.positionsBefore).toEqual(result.positionsAfter);
+    });
+
+    it('fails when the model moves the node anyway', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":10,"dy":0}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'no-op-instruction');
+        expect(result.pass).toBe(false);
+        expect(result.error).toMatch(/unexpected tool call: move_node/);
+    });
+});
+
+describe('runLocatorScenario: no-tool-refusal', () => {
+    it('passes when the model refuses in text with no tool call', async () => {
+        const gateway = fakeGateway([{ text: 'I can only move nodes, not delete them.' }, { done: true }]);
+        const result = await runLocatorScenario(gateway, 'no-tool-refusal');
+        expect(result.pass).toBe(true);
+        expect(result.toolCallName).toBeNull();
+    });
+
+    it('fails when the model calls a tool anyway', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":0,"dy":0}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'no-tool-refusal');
+        expect(result.pass).toBe(false);
+        expect(result.error).toMatch(/unexpected tool call: move_node/);
+    });
+
+    it('fails when the model produces neither a tool call nor any text', async () => {
+        const gateway = fakeGateway([{ done: true }]);
+        const result = await runLocatorScenario(gateway, 'no-tool-refusal');
+        expect(result.pass).toBe(false);
+        expect(result.error).toMatch(/neither a tool call nor any text/);
+    });
+});
+
+describe('runLocatorScenario: unknown-target', () => {
+    it('passes via the refusal path when the model declines in text', async () => {
+        const gateway = fakeGateway([{ text: "I couldn't find a node called Header." }, { done: true }]);
+        const result = await runLocatorScenario(gateway, 'unknown-target');
+        expect(result.pass).toBe(true);
+        expect(result.path).toBe('refusal');
+    });
+
+    it('passes via the executor-error path when ToolExecutor rejects the unknown id', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"header-1","by":{"dx":100,"dy":0}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'unknown-target');
+        expect(result.pass).toBe(true);
+        expect(result.path).toBe('executor-error');
+    });
+
+    it('fails, and is distinguishable from a pass, when the model moves an unrelated real node', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'unknown-target');
+        expect(result.pass).toBe(false);
+        expect(result.path).toBeUndefined();
+        expect(result.error).toMatch(/moved a real node/);
+    });
+});
+
+describe('runLocatorScenario: error handling', () => {
+    it('catches a thrown gateway error and returns a short, truncated message', async () => {
+        const gateway: LlmGateway = {
+            capabilities: { toolCalls: true },
+            // eslint-disable-next-line require-yield -- intentionally throws before any yield
+            async *chat(): AsyncIterable<Chunk> {
+                throw new Error('OpenAI request failed with status 401: invalid key [redacted]'.repeat(5));
+            },
+        };
+        const result = await runLocatorScenario(gateway, 'move-node-right');
+        expect(result.pass).toBe(false);
+        expect(result.error).toBeDefined();
+        expect(result.error!.length).toBeLessThanOrEqual(200);
+    });
+});
+
+describe('runAllLocatorScenarios', () => {
+    it('runs every catalog scenario, in order', async () => {
+        const gateway = fakeGateway([{ text: 'ok' }, { done: true }]);
+        const results = await runAllLocatorScenarios(gateway);
+        expect(results.map(r => r.scenarioId)).toEqual(LOCATOR_SCENARIOS.map(s => s.id));
+    });
+});
