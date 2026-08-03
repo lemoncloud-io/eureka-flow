@@ -5,22 +5,32 @@ The parts every in-browser flow agent is built from, described once. The concret
 covers only what it _adds_.
 
 The DOM-free core is `@flows/agent` (`libs/agent`); the editor wiring lives in
-`apps/web/src/app/features/flows/`.
+`apps/web/src/app/features/flows/`. Last updated 2026-08-02.
 
 ## At a glance
 
 You talk to the **Panel**; the **orchestrator Agent** owns the turn. It coordinates rather than edits —
-it carries no write tools of its own, and delegates every edit to **specialist agents** it spawns
-(locator = move, property = config/rename, node = add/delete, edge = connect/disconnect), which are the
-actual writers. Every agent — orchestrator
-and specialist alike — runs the same think/act loop: ask the **LlmGateway**, run tool calls through the
-one **ToolExecutor** (which checks permissions), repeat until the model is done. All of them reach the
-live canvas through a single shared seam, the **CanvasBinding**, editing it directly. The persisted
-**SessionState** is what the Panel renders from.
+it carries no write tools of its own, and delegates every edit to **specialist agents** it spawns, which
+are the actual writers. Every agent — orchestrator and specialist alike — runs the same think/act loop:
+ask the **LlmGateway**, run tool calls through the one **ToolExecutor** (which checks permissions), repeat
+until the model is done. All of them reach the live canvas through a single shared seam, the
+**CanvasBinding**, editing it directly. The persisted **SessionState** is what the Panel renders from.
 
-This page describes the shared primitives every agent is built from. The orchestrator-plus-specialists
-topology (spawn, the agent roster, the sub-agent runner) is covered in the harness design docs —
-[harness-spec.md](harness-spec.md) and [harness-interfaces.md](harness-interfaces.md) §4.
+**One foundation, two strategies for the writer layer.** The orchestrator and every primitive on this page
+are identical however the editing gets done; what varies is the **roster of specialists** the orchestrator
+can `spawn` into. The two rosters are the comparable designs the [eval-benchmark](eval-benchmark.md) scores
+head-to-head (see [Two strategies](#two-strategies-over-the-shared-foundation) below and
+[harness-spec.md §6](harness-spec.md)):
+
+- **Strategy 1 — fan-out to simple specialists.** The orchestrator decomposes the request and spawns
+  narrow, single-purpose agents (one **block agent** per block type; the **locator** and **edge** operation
+  agents). No skills.
+- **Strategy 2 — one capable builder.** The orchestrator plans and hands the whole plan to a single
+  **builder** that carries the full editing toolset **plus on-demand `use_skill` playbooks** and builds the
+  flow itself, spawning nothing.
+
+This page describes the shared primitives both strategies are built from; the spawn / roster / runner
+topology is in [harness-spec.md](harness-spec.md) and [harness-interfaces.md](harness-interfaces.md) §4.
 
 ```
 Panel → Agent → LlmGateway (think)
@@ -42,6 +52,71 @@ flowchart TD
 
 The little loop on the left — **Panel → Agent → store → Panel** — is one-way. The Panel only sends
 commands and renders what's in the store; it never touches the flow itself.
+
+## Two strategies over the shared foundation
+
+Everything else on this page is **identical whichever editing strategy is in play** — the same
+orchestrator persona and tools, the same `BaseAgent` loop, the same `ToolExecutor` and two-gate
+permissions, the same `CanvasBinding`. A strategy is selected entirely by **which specialists the
+`AgentRoster` exposes** for the orchestrator to `spawn` into; nothing about the orchestrator itself
+changes. In practice you flip between them by what you register — expose the **builder** to run Strategy 2,
+or leave it out and register the **block + operation** agents to run Strategy 1. They are the two designs
+the [eval-benchmark](eval-benchmark.md) compares on tokens · correctness · latency.
+
+### Strategy 1 — fan-out to simple specialists (no skills)
+
+The orchestrator decomposes the request into per-target tasks and spawns a **narrow specialist** for each:
+one **block agent per block type** (owns add · configure · rename · delete of its own type, reads
+type-scoped) plus the **locator** (move) and **edge** (connect / disconnect) operation agents. Independent
+tasks fan out concurrently and barrier-join; dependent ones are sequenced. No agent loads a skill.
+
+```mermaid
+flowchart TD
+    Panel[Agent Panel] --> Orch["Orchestrator — plan · route · coordinate<br/>(no write tools)"]
+    Orch -->|"spawn · fan-out · barrier-join"| R1
+    subgraph R1["Roster · Strategy 1 — narrow specialists"]
+        direction LR
+        BA["BlockAgent(type) ×N<br/>add · configure · rename · delete"]
+        LOC["locator<br/>move"]
+        EDG["edge<br/>connect · disconnect"]
+    end
+    BA -->|"add_node · set_properties · rename · delete_node"| Bind
+    LOC -->|move_node| Bind
+    EDG -->|"connect_nodes · disconnect_edge"| Bind
+    Bind[("CanvasBinding<br/>live canvas")]
+    Orch -. "reads · list_nodes / describe_node" .-> Bind
+```
+
+### Strategy 2 — one capable builder with skills (no fan-out)
+
+The orchestrator **plans the whole build and hands it to a single `builder`** as one complete briefing. The
+builder carries the **full editing toolset** (read · catalog · add / delete · config · connect / disconnect
+· move) **plus `use_skill`**, and realizes the flow itself — add · wire · configure · lay out — pulling an
+on-demand **playbook** ([`SEED_SKILLS`](skills.md)) for the how-to. It is a **leaf**: it spawns nothing.
+
+```mermaid
+flowchart TD
+    Panel[Agent Panel] --> Orch["Orchestrator — plan · hand off<br/>(no write tools)"]
+    Orch -->|"spawn one · the plan is the briefing"| B["builder — full editing toolset<br/>(leaf · no spawn)"]
+    B <-->|"use_skill · index always in context, body on demand"| SK[["SEED_SKILLS · playbooks<br/>build-linear-pipeline · configure-generator · validate-and-repair"]]
+    B -->|"add_node · connect_nodes · set_properties · move_node …"| Bind[("CanvasBinding<br/>live canvas")]
+    Orch -. reads .-> Bind
+```
+
+### Same foundation, different writer layer
+
+|                          | Strategy 1 · fan-out                                | Strategy 2 · builder                                  |
+| ------------------------ | --------------------------------------------------- | ----------------------------------------------------- |
+| **Orchestrator**         | plan · route · coordinate — no write tools          | plan · hand off — no write tools (**the same agent**) |
+| **Writers**              | many narrow specialists (block ×N · locator · edge) | one builder                                           |
+| **Skills**               | none                                                | `use_skill` over `SEED_SKILLS` (builder only)         |
+| **Spawns per turn**      | one per task (fan-out, barrier-join)                | one (the builder)                                     |
+| **Composition lives in** | the **orchestrator** (decompose + coordinate)       | the **builder** (it composes the whole flow)          |
+| **Selected by**          | roster exposes the block + operation agents         | roster exposes the builder                            |
+
+Both write the **same live `CanvasBinding`** through the **same tools** under the **same two-gate
+permission model**, so the foundation below is unchanged and only the roster differs. Which design wins is
+an empirical question the [eval-benchmark](eval-benchmark.md) answers, not a fixed choice.
 
 ## Principles
 
@@ -68,6 +143,11 @@ commands and renders what's in the store; it never touches the flow itself.
 | **SessionStore**  | Loads/creates/saves the `SessionState` the Panel renders from, keyed by `flowId`.                                                                                |
 
 ### The pieces (UML)
+
+These primitives are the **reused foundation** — identical under both strategies, and (relative to
+`develop`, where `@flows/agent` does not exist) the layer everything else is built on. The strategy-specific
+pieces (`spawn` / roster / the specialists / the builder / skills) sit _above_ this and are detailed in
+[harness-interfaces.md §4](harness-interfaces.md#4--spawn--sub-agents-over-the-live-binding).
 
 ```mermaid
 classDiagram

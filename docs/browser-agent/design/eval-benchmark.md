@@ -11,7 +11,7 @@
 > `Chunk.usage` (`libs/agent/src/llm/llmGateway.ts`), and the fixture graph + catalog
 > (`libs/agent/src/__tests__/harness/fixtures.ts`). Behavior & the loop: **[harness-spec.md](./harness-spec.md)**;
 > how we verify a single design: **[harness-scenarios.md](./harness-scenarios.md)**; types:
-> **[harness-interfaces.md](./harness-interfaces.md)**. Last updated 2026-07-30.
+> **[harness-interfaces.md](./harness-interfaces.md)**. Last updated 2026-08-02.
 
 ---
 
@@ -28,15 +28,33 @@ scenario  ─────────────►  RunAdapter (design A | des
 (objective, graph)                                                           └── oracle reads these ──► pass / fail
 ```
 
+Concretely, the two adapters are the two strategies — the same scenario and the same oracle, one roster apart:
+
+```mermaid
+flowchart LR
+    SC["Scenario<br/>(objective, initialGraph, oracle)"]
+    SC --> A1["Adapter · Strategy 1<br/>orchestrator + fan-out roster"]
+    SC --> A2["Adapter · Strategy 2<br/>orchestrator + builder roster"]
+    A1 --> OB1["outcome · graph · committed<br/>+ CostReport"]
+    A2 --> OB2["outcome · graph · committed<br/>+ CostReport"]
+    OB1 --> OR["shared oracle · shared metering"]
+    OB2 --> OR
+    OR --> V["pass/fail · tokens · time"]
+```
+
 This is the whole discipline: **correctness lives in the oracle (shared), cost lives in the instrumentation
 (shared), and only the adapter differs.** If a metric could only be produced by peeking inside one design,
 it is not a fair metric and does not belong here.
 
-> **The two designs.** This spec is written so it does not care _what_ the two designs are — Design A is the
-> shipped orchestrator-plus-specialists multi-agent harness (`runScenario`), Design B is whatever alternative
-> we are evaluating (e.g. a single code-writing agent in the n8n "BUILD" shape). Each is wrapped once in a
-> `RunAdapter`; everything below is identical for both. The **sub-agent count** metric is simply `0` for a
-> single-agent design — it is not a special case, just a number that happens to be zero.
+> **The two designs.** The concrete A/B here is the pair of strategies the harness can run
+> ([architecture.md · Two strategies](./architecture.md#two-strategies-over-the-shared-foundation)): **Design
+> A = Strategy 1** (the orchestrator fans out to narrow block + operation specialists; no skills) and **Design
+> B = Strategy 2** (the orchestrator hands the whole plan to one `builder` that carries tools + `use_skill`
+> and spawns nothing). Both run through the **same** `runScenario` orchestrator harness — they differ only in
+> the **roster** exposed — so the comparison is unusually clean: `subAgents` is many for Strategy 1 and one for
+> Strategy 2, falling straight out of the shared metering. The spec still does not care _what_ the two designs
+> are, so a genuinely different Design B (e.g. a single code-writing agent in the n8n "BUILD" shape,
+> `subAgents = 0`) drops in the same way — it is just another `RunAdapter`.
 
 ---
 
@@ -46,7 +64,7 @@ it is not a fair metric and does not belong here.
 // The ONLY per-design code. Both designs implement this. It must be a black box: given an objective over a
 // graph, produce the three observables the oracle reads, plus the cost record the instrumentation gathered.
 interface RunAdapter {
-    readonly designId: string; // 'multi-agent' | 'single-agent' — labels the scorecard
+    readonly designId: string; // 'strategy-1-fanout' | 'strategy-2-builder' (or any A/B) — labels the scorecard
     run(input: BenchmarkInput): Promise<BenchmarkResult>;
 }
 
@@ -65,13 +83,13 @@ interface BenchmarkResult {
 }
 ```
 
-**Design A's adapter is a one-liner over the shipped harness** — `runScenario` already returns
-`{ outcome, graph, committed }`; the adapter only adds the metering wrapper (§4) around `makeGateway` and
-attaches the `CostReport`:
+**Both strategies' adapters are one-liners over the shipped harness** — `runScenario` already returns
+`{ outcome, graph, committed }`; each adapter only adds the metering wrapper (§4) around `makeGateway`,
+registers the strategy's **roster**, and attaches the `CostReport`:
 
 ```ts
-const multiAgentAdapter: RunAdapter = {
-    designId: 'multi-agent',
+const strategy1Adapter: RunAdapter = {
+    designId: 'strategy-1-fanout',
     async run({ objective, initialGraph, userPermissions, catalog }) {
         const meter = createMeteringHarness(agentType => baseGateway()); // §4
         const started = clock.now();
@@ -80,17 +98,21 @@ const multiAgentAdapter: RunAdapter = {
             initialGraph,
             userPermissions,
             catalog,
+            roster: fanoutRoster, // Strategy 1: block + operation agents (no builder)
             makeGateway: meter.makeGateway, // the seam runScenario already exposes
         });
         return { outcome, graph, committed, cost: meter.report(clock.now() - started) };
     },
 };
+// Strategy 2's adapter is identical but registers ONLY the builder: `roster: builderRoster`. Selecting the
+// roster is the one extra seam runScenario needs for the benchmark (test-only, alongside the §8 hooks).
 ```
 
-Design B implements the same interface over its own entry point. If Design B does not expose an
+A design that is **not** the orchestrator harness at all (e.g. a single code-writing agent in the n8n
+"BUILD" shape) implements the same interface over its own entry point. If it does not expose an
 `{ outcome, graph, committed }` surface, the adapter derives them the same way `runScenario` does — read the
 final graph from its binding, diff it against a clone of `initialGraph` for `committed`, and re-ask the model
-once for the `TurnOutcome` JSON (`parseOutcome`). **Both designs must derive `outcome` the identical way** so
+once for the `TurnOutcome` JSON (`parseOutcome`). **Every design must derive `outcome` the identical way** so
 the correctness comparison is not contaminated by two different outcome-extraction methods.
 
 ---
@@ -255,7 +277,7 @@ interface CostReport {
 
     // ── work done (why the tokens were spent) ───────────────────────────────
     llmCalls: number; // number of chat() invocations — the LLM "steps" / round-trips
-    subAgents: number; // specialist spawns (0 for a single-agent design — not special-cased)
+    subAgents: number; // specialist spawns (many for Strategy 1's fan-out, one for Strategy 2's builder, 0 for a single-agent design — not special-cased)
     toolCalls: number; // tool dispatches across all agents (from the transcript)
     retries: number; // chat() calls that errored and were retried (0 if the loop doesn't retry)
 
@@ -499,13 +521,13 @@ Print one table per tier and one aggregate, both designs side by side, mirroring
 ```
 ━━━━━ BENCHMARK · model=gemini-2.5-flash · N=5 ━━━━━
 scenario            design         pass   tok(p50)  tok(p90)  llm  sub   wall(p50)  model(p50)
-T4.build-pipeline   multi-agent    5/5      12_400    15_100   9    3       8_200ms     7_100ms
-T4.build-pipeline   single-agent   4/5       6_800     8_050   4    0       5_400ms     5_100ms
-                    ▶ winner: single-agent (both correct enough; 45% fewer tokens, 34% faster)
+T4.build-pipeline   strategy-1     5/5      12_400    15_100   9    3       8_200ms     7_100ms
+T4.build-pipeline   strategy-2     4/5       6_800     8_050   4    1       5_400ms     5_100ms
+                    ▶ winner: strategy-2 (both correct enough; 45% fewer tokens, 34% faster)
 ...
 ━━━━━ AGGREGATE (pass-weighted) ━━━━━
-multi-agent    correctness 46/55   tokens 187k   wall 214s
-single-agent   correctness 41/55   tokens  98k   wall 141s
+strategy-1     correctness 46/55   tokens 187k   wall 214s
+strategy-2     correctness 41/55   tokens  98k   wall 141s
 ```
 
 The winner line is computed by §5's ranking (correctness first). Persist the raw `ScorecardCell[]` to JSON so

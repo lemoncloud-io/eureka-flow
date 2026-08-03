@@ -9,6 +9,9 @@ export type { EdgeAgentDeps } from './edgeAgent';
 export { createBlockAgent, BlockAgent, blockAgentSystemPrompt } from './blockAgent';
 export type { BlockAgentDeps } from './blockAgent';
 export { createGeneratorAgent, GENERATOR_SYSTEM_PROMPT } from './generatorAgent';
+// Composition specialist: the Builder (full editing toolset + use_skill over SEED_SKILLS).
+export { createBuilderAgent, BuilderAgent, BUILDER_SYSTEM_PROMPT } from './builderAgent';
+export type { BuilderAgentDeps } from './builderAgent';
 // Retired (unregistered) operation agents — kept in the tree until a later cleanup.
 export { createPropertyAgent, PropertyAgent, PROPERTY_SYSTEM_PROMPT } from './propertyAgent';
 export type { PropertyAgentDeps } from './propertyAgent';

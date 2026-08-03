@@ -1,0 +1,74 @@
+# Builder agent (composition specialist)
+
+> **The composition specialist — the sole worker of [Strategy 2](../../../../docs/browser-agent/design/architecture.md#two-strategies-over-the-shared-foundation).** The orchestrator plans a multi-block build and **spawns** the Builder
+> (`agentType: 'builder'`) with the plan; the Builder **builds the whole (sub-)flow itself** on the live canvas —
+> add · wire · configure · lay out — using the full editing toolset and **`use_skill`** for the how-to. A **leaf**
+> sub-turn (no `spawn`, no nesting). It is co-located with its code ([builderAgent.ts](./builderAgent.ts)); the
+> harness model is canonical in [design/harness-spec.md §6/§8](../../../../docs/browser-agent/design/harness-spec.md)
+> and the proposal in [design/builder-agent-proposal.md](../../../../docs/browser-agent/design/builder-agent-proposal.md).
+
+## Canonical specs
+
+- **Persona** — `BUILDER_SYSTEM_PROMPT` in [builderAgent.ts](./builderAgent.ts): it receives a complete plan and
+  executes it (it does **not** plan or coordinate — that is the orchestrator's job); build in dependency order,
+  wire adjacent stages (one edge per input, no cycle), lay out left-to-right, configure against the real schema,
+  **reject + report** an invalid value/field/connection (never substitute or force), and read the graph back to
+  repair before finishing.
+- **Base** — `createBuilderAgent(deps)` builds a `BaseAgent` subclass over the shared per-turn deps
+  (`BuilderAgentDeps = BaseAgentDeps`); grant `canModifyCanvas` + `canEditConfig`, gated at the executor against
+  the user's flow-role too (a viewer is denied).
+- **Registration** — `type: 'builder'` in [registrations.ts](./registrations.ts); discovered via `list_agents`,
+  so the orchestrator routes to it with **no persona edit** (the card summary is the routing signal).
+
+## What it is
+
+The broadest specialist: it changes the flow as a _whole_ rather than one node or one operation. Given a plan it
+reads the canvas + catalog, composes the nodes, wires them, configures them, lays them out, then validates and
+repairs — all in one sub-turn — returning a summary to the orchestrator (its edits are already on the live
+canvas). Domain specifics (the linear-pipeline shape, the generator's model↔provider map, the well-formedness
+checklist) live in **playbooks** it loads on demand, not in the persona — so the persona stays lean while the
+Builder can build many kinds of flow.
+
+## Tools
+
+The full editing surface, wired directly over the live `binding` (no new tool code), plus `use_skill`:
+
+| Group     | Tools                                            | Provider                                  |
+| --------- | ------------------------------------------------ | ----------------------------------------- |
+| Read      | `list_nodes`, `describe_node`                    | `createNodeReadToolProvider`              |
+| Catalog   | `catalog_search`, `describe_block`               | `createCatalogToolProvider`               |
+| Structure | `add_node`, `delete_node`                        | `createNodeStructureToolProvider`         |
+| Config    | `set_properties`, `rename`                       | `createNodeConfigToolProvider`            |
+| Edge      | `list_edges`, `connect_nodes`, `disconnect_edge` | `createEdgeToolProvider`                  |
+| Layout    | `move_node`                                      | `createNodeMoveToolProvider`              |
+| Skills    | `use_skill`                                      | `createUseSkillToolProvider(SEED_SKILLS)` |
+
+Grant `canModifyCanvas` + `canEditConfig`. Per-turn context seeds the full live node list
+(`renderNodeContext`); the catalog is pulled on demand (`catalog_search` / `describe_block`), and a playbook's
+body only when the Builder loads it. Progressive disclosure needs no extra wiring — the `use_skill` index rides
+its tool description ([design/skills.md](../../../../docs/browser-agent/design/skills.md)).
+
+## Definition of done — verified behavior
+
+- **Builds a flow** — from a plan on an empty canvas, `add_node` (config inline where set) + `connect_nodes`
+  produce the right block types wired in dependency order; the post-turn graph matches the expected **shape**.
+- **Configures as it builds** — a generator added with its `model` carries that model (add + configure in one).
+- **Validate-and-repair** — given a flow with a dangling required input, it wires the input rather than leaving
+  it unconnected.
+- **Reject + report** — an invalid value / unknown field / rejected connection is reported, never substituted or
+  forced (the specialist-reject contract, shared with the block agent).
+- **Carries the full toolset + `use_skill`** — the offered tools include the read/config/structure/edge/move/
+  catalog set and `use_skill`; loading `build-linear-pipeline` brings its instructions into context.
+
+Where these live:
+
+- **Deterministic (always runs):**
+  [`scenarios/builder.spec.ts`](../__tests__/harness/scenarios/builder.spec.ts) — drives `createBuilderAgent`
+  directly over the shared `harness/fixtures`: build-a-pipeline / validate-and-repair / reject+report / tool
+  surface / persona / skill load.
+- **Live (real Gemini, `RUN_LIVE`-gated):**
+  [`scenarios/builder.live.spec.ts`](../__tests__/harness/scenarios/builder.live.spec.ts) — the model builds a
+  pipeline and its graph shape is checked (and skill selection observed).
+- **Integration (orchestrator → builder):**
+  [`scenarios/integration.spec.ts`](../__tests__/harness/scenarios/integration.spec.ts) (A7) — the orchestrator
+  plans a build and delegates the whole thing to one `builder` spawn.

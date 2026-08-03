@@ -30,13 +30,15 @@ its type_ — creating it, configuring it, renaming it, deleting it — and noth
 **type-scoped**: `search_nodes` returns only nodes of its own type, and its per-turn context seeds only those +
 the block's config schema, so it never reasons over the whole canvas.
 
-- **`add_node` creates with defaults.** It places one node of its type at a given `position`, seeded with the
-  block's `defaultConfig`; non-default values are set afterwards with `set_properties` — in the **same
-  sub-turn**, so a configured new node is one block-agent delegation (not a node+property compose).
+- **`add_node` creates the node, optionally configured.** It places one node of its type at a given `position`
+  with the block's `defaultConfig`, and takes an optional `config` to set non-default values in the **same
+  call** — so a configured new node is one tool call (not add-then-set), and still one block-agent sub-turn.
 - **`set_properties` merges.** It sends only the keys it changes; every other config key is preserved.
-- **A rejected write is reported, not worked around.** A value not in a select's enum, a wrong type, or an
-  unknown config key is surfaced with the valid options; it does **not** substitute a value of its own. The
-  orchestrator decides the fix (keeps the "ask, don't guess" judgement in the orchestrator).
+- **It maps the user's wording to the schema, then reports only a genuine reject.** Using the seeded schema it
+  resolves the user's terms onto the block's real fields and allowed values (a field the user calls
+  "temperature" may be named `temp` — set the one that matches; that mapping is the agent's job). Only a truly
+  unknown field, or a value not in a select's enum / wrong type, is a reject — surfaced with the valid options,
+  never substituted with a value of its own. The orchestrator decides the fix (keeps "ask, don't guess" there).
 - **`rename`** sets `customLabel` (`''` clears it); **`delete_node`** removes the node (its edges cascade).
 - **Type-scoped.** `search_nodes` and the seeded context show only its block type; a `buffer` agent never sees
   the generator or preview nodes.
@@ -52,14 +54,14 @@ interface BlockAgentDeps extends BaseAgentDeps {
 
 ## Tools
 
-| Tool             | Kind   | Notes                                                                                  |
-| ---------------- | ------ | -------------------------------------------------------------------------------------- |
-| `search_nodes`   | read   | node list **filtered to this agent's block type** (optional `query` narrows by label)  |
-| `describe_node`  | read   | one node's schema + current config + a select's allowed options — read before writing  |
-| `add_node`       | mutate | create one node of its type at a position (defaults-only); requires `canModifyCanvas`  |
-| `set_properties` | mutate | partial `config` **merged** over existing; catalog-validated; requires `canEditConfig` |
-| `rename`         | mutate | set/clear `customLabel`; requires `canEditConfig`                                      |
-| `delete_node`    | mutate | remove the node; its edges cascade; requires `canModifyCanvas`                         |
+| Tool             | Kind   | Notes                                                                                      |
+| ---------------- | ------ | ------------------------------------------------------------------------------------------ |
+| `search_nodes`   | read   | search over this agent's block type (`query` matches id / label / type)                    |
+| `describe_node`  | read   | one node's schema + current config + a select's allowed options — read before writing      |
+| `add_node`       | mutate | create one node of its type; optional initial `config` in the same call; `canModifyCanvas` |
+| `set_properties` | mutate | partial `config` **merged** over existing; catalog-validated; requires `canEditConfig`     |
+| `rename`         | mutate | set/clear `customLabel`; requires `canEditConfig`                                          |
+| `delete_node`    | mutate | remove the node; its edges cascade; requires `canModifyCanvas`                             |
 
 Reads come from the type-scoped search provider (`createNodeSearchToolProvider(binding, catalog, { type })`,
 `tools/nodeTools.ts`); the writes from the structure provider (`createNodeStructureToolProvider`, add/delete)
@@ -72,10 +74,11 @@ and the config provider (`createNodeConfigToolProvider`, catalog-validated). Its
 The generic block agent's contract, each a scenario in code (not restated here), driving the agent directly over
 the shared `harness/fixtures`:
 
-- **Add** — `add_node` creates a node of its type at the given position with default config.
+- **Add** — `add_node` creates a node of its type at the given position with default config; given `config`,
+  those values are set in the same call.
 - **Configure (merge)** — `set_properties` sets a key and keeps the others; no stray keys.
-- **Reject unknown key** — a config key the block does not define is refused; nothing invented; config
-  unchanged; the rejection is reported.
+- **Reject unknown key** — a config key the block does not define (and that maps to no real field) is refused;
+  nothing invented; config unchanged; the rejection is reported.
 - **Rename / delete** — `rename` sets/clears the label; `delete_node` removes the node and its edges cascade.
 - **Type-scoped reads** — `search_nodes` and the seeded context return ONLY the agent's block type; other types
   are invisible.

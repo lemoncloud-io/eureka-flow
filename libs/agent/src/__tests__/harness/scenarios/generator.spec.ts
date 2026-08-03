@@ -56,6 +56,26 @@ describe('generator agent — add + configure in ONE turn', () => {
         expect(added).toBeDefined();
         expect(added?.config?.model).toBe('gemini-2.5-pro');
     });
+
+    it('adds a generator with its model in ONE add_node call (config inline)', async () => {
+        const { agent, addedGenerator } = setup([
+            {
+                toolCalls: [
+                    {
+                        name: 'add_node',
+                        args: { type: GEN, position: { x: 900, y: 300 }, config: { model: 'gemini-2.5-pro' } },
+                    },
+                ],
+            },
+            { text: 'Added a generator configured with gemini-2.5-pro.' },
+        ]);
+
+        await agent.send('add a single-output-generator at (900, 300) with model gemini-2.5-pro');
+
+        const added = addedGenerator();
+        expect(added).toBeDefined();
+        expect(added?.config?.model).toBe('gemini-2.5-pro');
+    });
 });
 
 describe('generator agent — configure existing', () => {

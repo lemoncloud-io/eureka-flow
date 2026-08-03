@@ -226,6 +226,60 @@ describe('Harness scenarios — outcome coverage', () => {
         expect(added?.config?.model).toBe('gemini-2.5-pro');
     });
 
+    // ── applied (composition: a whole build delegated to the builder) ────────────────────────────────
+    it('A7 — build a pipeline (orchestrator plans → ONE builder spawn → builds it)', async () => {
+        // The orchestrator plans a multi-block build and hands the WHOLE thing to the composition builder as
+        // ONE spawn (not a per-block fan-out). The builder adds the three stages, configures the generator
+        // inline, and wires the chain. Empty canvas → the in-memory binding mints n_1, n_2, n_3 for the adds;
+        // the assertions find nodes by TYPE, so they never couple to the id scheme.
+        const [TXT, GEN, PREV] = ['n_1', 'n_2', 'n_3'];
+        const script: FakeScript = {
+            orchestrator: [
+                spawn([
+                    {
+                        agentType: 'builder',
+                        task: 'Build input-text → single-output-generator (model gemini-2.5-pro) → output-preview, wired in order.',
+                    },
+                ]),
+                text('Built a text → generator → preview pipeline.'),
+                report({ status: 'applied', summary: 'built a text → generator → preview pipeline' }),
+            ],
+            builder: [
+                step([addNode('input-text', 100, 100)]),
+                step([
+                    {
+                        name: 'add_node',
+                        args: {
+                            type: 'single-output-generator',
+                            position: { x: 300, y: 100 },
+                            config: { model: 'gemini-2.5-pro' },
+                        },
+                    },
+                ]),
+                step([addNode('output-preview', 500, 100)]),
+                step([connect(TXT, 'out', GEN, 'in'), connect(GEN, 'out', PREV, 'in')]),
+                text('built input → generator → preview'),
+            ],
+        };
+        const result = await runScenario({
+            objective: 'build a pipeline: a text input feeding a generator feeding a preview',
+            initialGraph: { nodes: [], edges: [] },
+            script,
+        });
+
+        expect(result.outcome.status).toBe('applied');
+        expect(result.committed).toBe(true);
+        const g = result.graph;
+        const typeOf = (t: string) => g.nodes.find(n => n.type === t);
+        const txt = typeOf('input-text');
+        const gen = typeOf('single-output-generator');
+        const prev = typeOf('output-preview');
+        expect(txt && gen && prev).toBeTruthy();
+        expect(gen?.config?.model).toBe('gemini-2.5-pro');
+        expect(g.edges.some(e => e.sourceNodeId === txt!.id && e.targetNodeId === gen!.id)).toBe(true);
+        expect(g.edges.some(e => e.sourceNodeId === gen!.id && e.targetNodeId === prev!.id)).toBe(true);
+    });
+
     // ── refused — needs a decision from the user (ambiguity / invalid input) ────────────────────────
     it('Q1 — move "the node" right (ambiguous → refused, asks which)', async () => {
         const reason = `Which node? Candidates: ${IDS.txt}, ${IDS.buf}, ${IDS.gen}, ${IDS.prev}.`;

@@ -1,9 +1,8 @@
 import { BaseAgent } from './baseAgent';
 import { createDefaultRoster } from './registrations';
 import { createSubAgentRunner } from './subAgentRunner';
-import { inspectSkill, toolsFromSkills } from '../skills';
 import { createCatalogToolProvider } from '../tools/catalogTools';
-import { renderNodeContext } from '../tools/nodeTools';
+import { createNodeReadToolProvider, renderNodeContext } from '../tools/nodeTools';
 import { createAgentDirectoryToolProvider, createSpawnToolProvider } from '../tools/spawnTools';
 
 import type { BaseAgentDeps, CollectedToolCall } from './baseAgent';
@@ -19,9 +18,9 @@ export const ORCHESTRATOR_SYSTEM_PROMPT = [
     'each task, and delegate it. You coordinate them — running independent tasks together, sequencing dependent',
     'ones — but you do not edit the canvas yourself; the specialists you direct do.',
     '',
-    'Discover your specialists with list_agents — it lists each available specialist and what it can do; do not',
-    'assume any beyond what it returns. Your specialists edit the live canvas directly, and every canvas read',
-    'reflects the current state, including edits already made this turn.',
+    'Work only with the specialists actually available to you — discover which exist rather than assuming any.',
+    'Your specialists edit the live canvas directly, and every canvas read reflects the current state, including',
+    'edits already made this turn.',
     '',
     'Delegate the intent; do not micro-manage. A specialist reads the block’s schema and validates its own work,',
     'so keep each briefing at the level of the user’s intent — do NOT check whether a config field exists, how it',
@@ -35,7 +34,6 @@ export const ORCHESTRATOR_SYSTEM_PROMPT = [
     '- Shared values — when several specialists must agree on something the user left open, decide it once and',
     '  put it in every briefing: the single column to align four nodes to, or the id of a node you just added',
     '  threaded into the later connect/configure tasks.',
-    '- Batch independent tasks into one spawn (they run in parallel); sequence dependent ones.',
     '',
     'You MAY read the canvas or catalog (describe_node, describe_block) when you need it to PLAN — to understand',
     'the flow or to settle a shared value — but reading is not doing the work, and it never replaces delegating.',
@@ -63,20 +61,17 @@ export interface OrchestratorAgentDeps extends BaseAgentDeps {
 
 /** The orchestrator's per-turn context: the live-canvas node list + the discovered roster + the block-agent rule. */
 const renderContext = (binding: CanvasBinding, roster: AgentRoster): string => {
-    const nodes = renderNodeContext(binding, {
-        heading: 'Current nodes on the canvas:',
-        empty: 'Current canvas: (no nodes).',
-    });
+    const nodes = renderNodeContext(binding); // headings default to exactly these strings
     const agentLines = roster
         .list()
         .map(a => `- ${a.type}: ${a.summary}`)
         .join('\n');
     const blockRule = [
-        'To add, configure, rename, or delete a node, spawn a BLOCK agent whose agentType is the block’s TYPE',
-        '(the node’s `type` in the list above, or a catalog block type from catalog_search). A block agent owns',
-        'that one block: it creates and configures it in a single delegation. The specialists listed above with a',
-        'block type (e.g. single-output-generator) are richer block agents; any OTHER catalog block type is served',
-        'by a generic block agent automatically. Use locator to move and edge to connect/disconnect.',
+        'To add, configure, rename, or delete a node, delegate to a BLOCK agent whose agentType is the block’s',
+        'TYPE (the node’s `type` in the list above, or any catalog block type). A block agent owns that one block:',
+        'it creates and configures it in a single delegation. The specialists listed above with a block type (e.g.',
+        'single-output-generator) are richer block agents; any OTHER catalog block type is served by a generic',
+        'block agent automatically.',
     ].join(' ');
     return `${nodes}\n\nAvailable specialists (also via list_agents):\n${agentLines}\n\n${blockRule}`;
 };
@@ -110,9 +105,7 @@ export class OrchestratorAgent extends BaseAgent {
             // and each spawned child is gated by its own grant + the user's permissions at the executor.
             grant: {},
             tools: [
-                // Canvas read is the `inspect` skill (same capability the operation agents compose); the
-                // coordination providers (catalog / list_agents / spawn) are wired directly — they are not skills.
-                ...toolsFromSkills([inspectSkill], { binding: deps.binding, catalog: deps.catalog }),
+                createNodeReadToolProvider(deps.binding, deps.catalog),
                 createCatalogToolProvider(deps.catalog),
                 createAgentDirectoryToolProvider(roster),
                 createSpawnToolProvider(runner, deps.binding, () => signalHolder.current),

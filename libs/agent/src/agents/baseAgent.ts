@@ -181,7 +181,6 @@ export abstract class BaseAgent implements Agent {
         assistantMsg: Message,
         state: SessionState
     ): void {
-        // Patch the recorded tool call's status on the assistant message (matched by id).
         const recorded = assistantMsg.toolCalls?.find(c => c.id === tc.id);
         if (recorded) {
             recorded.status = result.ok ? 'ok' : 'error';

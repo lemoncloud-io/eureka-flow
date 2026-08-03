@@ -1,6 +1,5 @@
 import { BaseAgent } from './baseAgent';
-import { inspectSkill, moveSkill, toolsFromSkills } from '../skills';
-import { renderNodeContext } from '../tools/nodeTools';
+import { createNodeMoveToolProvider, createNodeReadToolProvider, renderNodeContext } from '../tools/nodeTools';
 
 import type { BaseAgentDeps } from './baseAgent';
 import type { Agent } from '../agent';
@@ -8,20 +7,18 @@ import type { ChatMessage } from '../llm/llmGateway';
 
 /** The locator agent's persona. */
 export const LOCATOR_SYSTEM_PROMPT = [
-    'You are the Locator agent for a visual flow editor. Your ONLY job is to relocate existing nodes on the canvas.',
+    'You are the Locator agent for a visual flow editor. Your ONLY job is to relocate existing nodes — change',
+    'their position, nothing else. If asked for anything else (adding, deleting, renaming, connecting, or',
+    'reconfiguring a node), briefly say you can only move nodes.',
     '',
-    'Rules:',
-    '- You can ONLY move existing nodes (change their position). You cannot add, delete, rename, connect, or reconfigure nodes.',
-    '  If the user asks for anything other than moving a node, briefly say you can only move nodes.',
-    '- To move a node, call `move_node` with the node id and EXACTLY ONE of `by` (relative delta) or `to` (absolute point).',
-    '- Coordinates: origin is top-left; x increases to the right, y increases downward.',
-    '  So right = +dx, left = -dx, up = -dy, down = +dy. Diagonals combine both axes.',
-    '- The distance is given to you: use the exact `by`/`to` in your instructions. Do NOT invent one — if no clear amount or destination is given, do not move; report the exact distance or target you need.',
-    '- Match the node the user means by its label or type against the provided node list (case-insensitive).',
-    '  If NO node matches, do not move anything — say you could not find it (you may list the nodes you can see).',
-    '  If MORE THAN ONE node matches, do not guess — ask which one, listing the candidates.',
-    '- Move exactly one node per `move_node` call; for several nodes, make several calls.',
-    '- After moving, confirm briefly what you moved and its new position.',
+    'How to work:',
+    '- Move a node only by the exact amount, or to the exact destination, you were given. Never invent a distance',
+    '  or target: if the task gives no clear amount or destination, move nothing and report what you need.',
+    '- Identify the node the task means from the ones you can see, matching its label or type (case-insensitive).',
+    '  If none matches, move nothing and say you could not find it (you may list what you can see). If more than',
+    '  one matches, do not guess — ask which one, listing the candidates.',
+    '- Move one node at a time; for several, move each in turn.',
+    '- After moving, briefly confirm what you moved and its new position.',
 ].join('\n');
 
 /** The locator carries only the shared {@link BaseAgentDeps} (binding/catalog/config included); its tools are fixed. */
@@ -35,7 +32,7 @@ export class LocatorAgent extends BaseAgent {
             description: 'Moves existing nodes on the canvas.',
             systemPrompt: LOCATOR_SYSTEM_PROMPT,
             grant: { canModifyCanvas: true },
-            tools: toolsFromSkills([inspectSkill, moveSkill], { binding: deps.binding, catalog: deps.catalog }),
+            tools: [createNodeReadToolProvider(deps.binding, deps.catalog), createNodeMoveToolProvider(deps.binding)],
         });
     }
 

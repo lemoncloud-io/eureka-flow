@@ -1,6 +1,11 @@
 import { BaseAgent } from './baseAgent';
-import { lifecycleSkill, toolsFromSkills } from '../skills';
-import { listNodeLocationsOfType, renderNodeContext } from '../tools/nodeTools';
+import {
+    createNodeConfigToolProvider,
+    createNodeSearchToolProvider,
+    createNodeStructureToolProvider,
+    listNodeLocationsOfType,
+    renderNodeContext,
+} from '../tools/nodeTools';
 
 import type { BaseAgentDeps } from './baseAgent';
 import type { Agent } from '../agent';
@@ -14,20 +19,24 @@ import type { ChatMessage } from '../llm/llmGateway';
 export const blockAgentSystemPrompt = (type: string, label: string): string =>
     [
         `You are the ${label} agent for a visual flow-builder. You own the whole lifecycle of ${label} (\`${type}\`)`,
-        `nodes: you add them, configure them, rename them, and delete them. You handle ONLY \`${type}\` nodes — no`,
-        'other block type, and you cannot move or connect nodes (other specialists do those).',
+        `nodes — you create, configure, rename, and delete them, and nothing else: you handle only \`${type}\``,
+        'nodes, and you never move or connect nodes (other specialists do that).',
         '',
-        `- To add one, call add_node with type "${type}" and the given position. It is created with the block's`,
-        '  default config only; set non-default values afterwards with set_properties.',
-        '- To change config, call set_properties with the node id and ONLY the keys you want to change; other keys',
-        '  are preserved. Check the schema (seeded below, or via describe_node) for the allowed fields and values.',
-        '- If set_properties rejects a value (unknown key, not an allowed option, wrong type), DO NOT invent a',
-        '  different value — report the rejection and the valid options in your summary. Someone else decides the fix.',
-        "- To rename, call rename with the node id and the new label ('' clears a custom label).",
-        '- To delete, call delete_node with its id; its connected edges cascade — say which were dropped.',
-        '- search_nodes lists only YOUR block type; use it to find the node id when one is not given.',
-        '- You cannot ask the user anything; your instructions are complete. Do what you can and report the rest.',
-        '- Finish with a short summary of what you changed and anything you could not.',
+        'How to work:',
+        '- Take the fewest steps that satisfy the intent: when a new node needs non-default values, give it those',
+        '  values as you create it rather than creating it and then reconfiguring.',
+        `- Use the ${label} schema (seeded below, and you can inspect any node for its full detail) to MAP the`,
+        '  user\'s wording onto the block\'s real fields and allowed values — a field the user calls "temperature"',
+        '  may be named `temp`; a loose ask like "a bit more" onto the field and value that express it. Resolving',
+        '  intent to the schema is your job, not guesswork. Change only what the task asks for; leave the rest.',
+        '- If a field is genuinely not in the schema, or a value is not allowed, the edit is rejected. Do NOT',
+        '  invent or substitute a value — report what was rejected and the valid options, and leave the fix to',
+        '  whoever briefed you.',
+        '- When a task names a node by description rather than id, find the matching one among your own first.',
+        '- Deleting a node also removes its connected edges — say which were dropped.',
+        '',
+        'You cannot ask the user anything and cannot see the conversation; your briefing is complete. Do everything',
+        'you can, then finish with a short summary of what you changed and anything you could not.',
     ].join('\n');
 
 /** A block agent carries the shared deps plus the ONE block type it manages. */
@@ -52,7 +61,11 @@ export class BlockAgent extends BaseAgent {
             description: `Creates, configures, renames, and deletes ${label} (${deps.blockType}) nodes.`,
             systemPrompt: blockAgentSystemPrompt(deps.blockType, label),
             grant: { canModifyCanvas: true, canEditConfig: true },
-            tools: toolsFromSkills([lifecycleSkill(deps.blockType)], { binding: deps.binding, catalog: deps.catalog }),
+            tools: [
+                createNodeSearchToolProvider(deps.binding, deps.catalog, { type: deps.blockType }),
+                createNodeStructureToolProvider(deps.binding, deps.catalog),
+                createNodeConfigToolProvider(deps.binding, deps.catalog),
+            ],
         });
         this.blockType = deps.blockType;
         this.blockLabel = label;

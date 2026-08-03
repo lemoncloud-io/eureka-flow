@@ -6,7 +6,7 @@
 > (`Graph`, `XY`, `NodeData`, `EdgeData`, `ToolProvider`, `AgentGrant`, `BaseAgent`, `FakeScriptStep`, …) are
 > **reused as-is** from `@flows/agent` / `@flows/flows` / `@lemoncloud/eureka-flows-api`.
 >
-> Behavior & the loop: **[harness-spec.md](./harness-spec.md)**. How we verify: **[harness-scenarios.md](./harness-scenarios.md)**. Last updated 2026-07-30.
+> Behavior & the loop: **[harness-spec.md](./harness-spec.md)**. How we verify: **[harness-scenarios.md](./harness-scenarios.md)**. Last updated 2026-08-02.
 
 ---
 
@@ -105,7 +105,8 @@ set of nodes or edges via the id-returning `addNode` / `addEdge` and the void `d
 - **move** `{ nodeId, position: XY }` — absolute result position (`updateNode({ position })`).
 - **set_properties** `{ nodeId, config }` — merged over the node's existing config (`updateNode({ config })`).
 - **rename** `{ nodeId, label }` — `''` clears the override (`updateNode({ label })`).
-- **add_node** `{ type, position }` — create with the block's default config (`addNode` → `{ id }`).
+- **add_node** `{ type, position, config? }` — create with the block's default config, optionally merged with
+  `config` in one call (`addNode` → `{ id }`, then `updateNode({ config })` when `config` is given).
 - **delete_node** `{ nodeId }` — remove the node; its edges cascade (`deleteNode`).
 - **connect_nodes** `{ sourceNodeId, sourcePortId, targetNodeId, targetPortId }` — add a validated edge
   (`addEdge` → `{ id }`).
@@ -136,15 +137,17 @@ declare function createNodeReadToolProvider(binding: CanvasBinding, catalog: Cat
 //   list_nodes()              → { nodes: NodeLocation[] }        // COMPACT: id, type, label, position — reuses listNodeLocations
 //   describe_node({ nodeId }) → { type, currentConfig, schema }  // DETAIL: current config + block schema + a select's options
 
-// NODE READ (TYPE-SCOPED) — a BLOCK agent carries this instead of list_nodes: search_nodes returns ONLY
-// nodes of opts.type, so a per-block agent never sees the whole canvas. Pairs with the same describe_node.
+// NODE SEARCH (general, optional type scope) — a search over the CURRENT nodes: `query` is matched
+// case-insensitively against each node's id, label, AND block type. `opts.type` is OPTIONAL and structurally
+// scopes the search to ONE block type (a BLOCK agent passes its own type, so it only ever sees that type and
+// never the whole canvas); left unset it is a general search any agent may carry. Pairs with describe_node.
 declare function createNodeSearchToolProvider(
     binding: CanvasBinding,
     catalog: CatalogLookup,
-    opts: { type: string }
+    opts?: { type?: string }
 ): ToolProvider;
-//   search_nodes({ query? })  → { nodes: NodeLocation[] }        // COMPACT, filtered to opts.type; query narrows by label — reuses listNodeLocationsOfType
-//   describe_node({ nodeId }) → { type, currentConfig, schema }  // same detail tool
+//   search_nodes({ query? })  → { nodes: NodeLocation[] }        // COMPACT; query matches id/label/type; opts.type (if set) restricts to that type
+//   describe_node({ nodeId }) → { type, currentConfig, schema }  // same detail tool (by id — never type-scoped)
 
 // CATALOG — search (compact) + describe_block (detail). Never dumps the catalog.
 declare function createCatalogToolProvider(catalog: CatalogLookup): ToolProvider;
@@ -177,12 +180,13 @@ declare function createNodeStructureToolProvider(binding: CanvasBinding, catalog
 interface AddNodeInput {
     type: string;
     position: XY;
+    config?: Record<string, unknown>; // OPTIONAL initial config — merged over defaults, validated like set_properties
 }
 interface DeleteNodeInput {
     nodeId: string;
 }
-//   add_node({ type, position }) → binding.addNode(type, position) → { nodeId } // DEFAULTS-ONLY; rejects unknown type; no config, no wiring
-//   delete_node({ nodeId })      → binding.deleteNode(nodeId)                    // edges CASCADE; rejects missing node
+//   add_node({ type, position, config? }) → addNode + (if config) updateNode({config}) → { nodeId } // defaults, or defaults+config in ONE call; config validated FIRST (bad value ⇒ nothing added); rejects unknown type; no wiring
+//   delete_node({ nodeId })               → binding.deleteNode(nodeId)                                // edges CASCADE; rejects missing node
 
 // EDGE (read + write: connect/disconnect) — EDGE agent carries this; validation (ports · type-compat · cycle) lives HERE.
 declare function createEdgeToolProvider(binding: CanvasBinding, catalog: CatalogLookup): ToolProvider;
@@ -216,38 +220,25 @@ declare function createSpawnToolProvider(runner: SubAgentRunner, binding: Canvas
 // NO grant arg — each child runs under its OWN fixed grant; the user's permissions gate it at the executor.
 ```
 
-### Skills — composing tool providers into an agent's toolset
+### Skills — progressively-disclosed playbooks (a separate capability)
 
-An agent's tools are assembled from **skills**. A skill is one composable capability — a `name`, a one-line
-`description`, and the tool provider(s) that back it. It carries **no persona and no grant**: each `ToolDef`
-self-describes, and the agent owns the persona and declares its own grant. A skill may bundle several tools (a
-block's whole lifecycle), and an agent may compose several — so it is neither one-tool nor one-agent per skill.
+Skills are **not** how the shipped agents assemble their tools — the orchestrator and specialists wire their
+providers directly (above). A skill is a named, described **playbook** an agent loads **on demand**: the
+in-process port of Claude Code Agent Skills, carried by the composition `builder` (§4) — the shipped agent
+that loads them on demand — **not** the block/operation specialists, which wire their tools directly. Full
+design: **[design/skills.md](./skills.md)**.
 
 ```ts
-// libs/agent/src/skills — the capability layer over the §3 providers (wraps them verbatim; no new tool code).
-interface SkillToolDeps {
-    binding: CanvasBinding; // the live canvas the skill's tools read/edit
-    catalog: CatalogLookup; // block schemas behind read/config validation
-}
+// libs/agent/src/skills — inert playbook DATA + one tool that realizes progressive disclosure.
 interface Skill {
-    name: string; // 'inspect' | 'move' | 'edge' | 'lifecycle:<type>'
-    description: string; // one line — the capability (metadata, not a workflow)
-    createTools(deps: SkillToolDeps): ToolProvider[];
+    name: string; // selection key — the `use_skill` argument
+    description: string; // LEVEL 1 — always in context; WHAT + WHEN (the trigger the model matches)
+    instructions: string; // LEVEL 2 — the playbook body, loaded ON DEMAND (never in context until then)
 }
-declare function toolsFromSkills(skills: Skill[], deps: SkillToolDeps): ToolProvider[]; // flatten, order-preserving
+declare function createUseSkillToolProvider(skills: Skill[]): ToolProvider;
+//   use_skill's description embeds the name+description INDEX (always sent); its `name` param is an enum of the skill names.
+//   use_skill({ name }) → { name, instructions }   // the body enters the transcript on demand; unknown name → error
 ```
-
-Each skill wraps a §3 provider verbatim; the agents compose them (the grant stays on the agent — §4):
-
-| Skill                  | Wraps (§3)                                                                                                  | Composed by                                    |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `inspectSkill`         | `createNodeReadToolProvider` (full `list_nodes` + `describe_node`)                                          | `locator`, `edge`                              |
-| `moveSkill`            | `createNodeMoveToolProvider` (`move_node`)                                                                  | `locator`                                      |
-| `edgeSkill`            | `createEdgeToolProvider` (`list_edges` + `connect_nodes` + `disconnect_edge`)                               | `edge`                                         |
-| `lifecycleSkill(type)` | `createNodeSearchToolProvider({type})` + `createNodeStructureToolProvider` + `createNodeConfigToolProvider` | every block agent (generic + `GeneratorAgent`) |
-
-So `locator = [inspectSkill, moveSkill]`, `edge = [inspectSkill, edgeSkill]`, and `BlockAgent(type) =
-[lifecycleSkill(type)]` — a block agent's whole lifecycle is one skill.
 
 ## 4 · `spawn` — sub-agents over the live binding
 
@@ -326,6 +317,9 @@ declare function createAgentRoster(registrations: AgentRegistration[]): AgentRos
 {
     type: 'single-output-generator';
 } // create → createGeneratorAgent({ binding, catalog, … })     — named block specialist (BlockAgent + AI persona)
+{
+    type: 'builder';
+} // create → createBuilderAgent({ binding, catalog, … })       — COMPOSITION specialist: full toolset + use_skill(SEED_SKILLS)
 
 // GENERIC BLOCK FALLBACK — not a registration. The sub-agent runner resolves an agentType the roster does
 // not carry: if `catalog.has(agentType)`, it builds a generic BlockAgent(agentType) on the fly (add_node +
@@ -336,6 +330,54 @@ declare function createAgentRoster(registrations: AgentRegistration[]): AgentRos
 
 // NOTE: the old operation-split `node` + `property` agents are NOT registered (the orchestrator can't spawn
 // them). Their modules stay in the tree until a later cleanup; block agents own add/configure/rename/delete.
+```
+
+**The registration set _is_ the strategy.** The orchestrator, its tools and the loop never change; a
+deployment picks a design purely by which specialists it registers — the **block + operation** agents for
+**Strategy 1**, or the **builder** for **Strategy 2**
+([architecture.md · Two strategies](./architecture.md#two-strategies-over-the-shared-foundation)).
+`list_agents` returns exactly the exposed set, so the orchestrator never needs to know which strategy it is in.
+
+```mermaid
+flowchart LR
+    RA["AgentRoster<br/>registry behind list_agents + spawn"]
+    subgraph S1["Strategy 1 · narrow specialists"]
+        direction TB
+        L["locator → LocatorAgent"]
+        E["edge → EdgeAgent"]
+        G["single-output-generator → GeneratorAgent"]
+        F["«fallback» any catalog type → BlockAgent(type)"]
+    end
+    subgraph S2["Strategy 2 · one builder"]
+        B["builder → BuilderAgent<br/>+ use_skill(SEED_SKILLS)"]
+    end
+    RA --> S1 & S2
+    S1 -. "create(deps) → subclass of BaseAgent «reused»" .-> BASE["BaseAgent"]
+    S2 -. create .-> BASE
+```
+
+### The Builder — a composition specialist (consumer of skills)
+
+The **composition** specialist: the orchestrator plans a multi-block build and spawns it; it builds the whole
+(sub-)flow itself. It introduces **no new types** — it is a `BaseAgent` subclass that carries the FULL editing
+toolset (the §3 read / config / structure / edge / move + catalog providers) plus `use_skill`, under grant
+`{ canModifyCanvas, canEditConfig }`. A **leaf** sub-turn (no `spawn`, no nesting). Its deps are exactly the
+shared per-turn deps; the seed playbooks are wired internally from `SEED_SKILLS`, so the skill source can evolve
+([skills.md](./skills.md)) with **no change to this consumer**.
+
+```ts
+// libs/agent/src/agents/builderAgent.ts
+export type BuilderAgentDeps = BaseAgentDeps; // no extra fields — SEED_SKILLS wired internally
+export declare class BuilderAgent extends BaseAgent {
+    constructor(deps: BuilderAgentDeps);
+    // tools = [ read (list_nodes, describe_node), catalog (catalog_search, describe_block),
+    //           structure (add_node, delete_node), config (set_properties, rename),
+    //           edge (list_edges, connect_nodes, disconnect_edge), move (move_node),
+    //           createUseSkillToolProvider(SEED_SKILLS) (use_skill) ]
+    // grant = { canModifyCanvas, canEditConfig }; buildContextMessages seeds the live node list.
+}
+export declare const createBuilderAgent: (deps: BuilderAgentDeps) => Agent;
+export declare const BUILDER_SYSTEM_PROMPT: string;
 ```
 
 ## 5 · Catalog types

@@ -13,7 +13,7 @@ import type { LlmGateway } from '../../llm/llmGateway';
 import type { AgentGrant } from '../../permissions';
 import type { SessionState } from '../../session/session';
 
-/** Per-agent fake-gateway scripts, keyed by agentType (`orchestrator` | `locator` | `property`). */
+/** Per-agent fake-gateway scripts, keyed by agentType (e.g. `orchestrator`, `locator`, `edge`, `builder`, `single-output-generator`, or a generic block type). */
 export type FakeScript = Record<string, FakeScriptStep[]>;
 
 export interface ScenarioInput {
@@ -25,8 +25,8 @@ export interface ScenarioInput {
     /** Per-agent fake-gateway scripts; OMIT (and pass `makeGateway`) for a real-model run. */
     script?: FakeScript;
     /**
-     * Real-model override: build the {@link LlmGateway} for a given agentType (`orchestrator` |
-     * `locator` | `property`). When provided, it replaces the scripted fake gateway for every agent —
+     * Real-model override: build the {@link LlmGateway} for a given agentType. When provided, it replaces
+     * the scripted fake gateway for every agent —
      * this is how a live run (e.g. a tool-capable Gemini gateway) drives the whole turn. Returning the
      * same instance for all agents is fine; each `chat()` call is independent.
      */

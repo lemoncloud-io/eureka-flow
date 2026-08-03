@@ -2,7 +2,7 @@
 
 > How the harness's correctness is checked, and what makes a scenario well-formed. The scenarios
 > themselves are **code, not prose** — this page explains the discipline they follow and points to where
-> they live. Last updated 2026-07-30.
+> they live. Last updated 2026-08-02.
 
 ---
 
@@ -11,8 +11,9 @@
 All under `libs/agent/src/__tests__/harness/`, each scenario over the **smallest graph it needs** (or the
 shared `fixtures.ts` graph where a realistic multi-node canvas matters — see below). Every suite has a
 **deterministic** variant (`.spec.ts`, always runs — fake `LlmGateway`, exact oracle, no key/network) and a
-**live** variant (`.live.spec.ts` — real function-calling Gemini; `describe.skipIf` when `GEMINI_API_KEY` is
-absent; the model chooses the calls, so a miss is a real signal, not a broken test). Live cases are
+**live** variant (`.live.spec.ts` — real function-calling Gemini; opt-in via `describe.skipIf(SKIP_LIVE)`
+where `SKIP_LIVE = !GEMINI_API_KEY || !RUN_LIVE`, so a key alone is not enough — `RUN_LIVE` must be set too;
+the model chooses the calls, so a miss is a real signal, not a broken test). Live cases are
 independent and selectable (`vitest run <file> -t <name>`), so a representative subset runs without the whole
 matrix.
 
@@ -20,7 +21,9 @@ matrix.
   a concrete task, asserting the live graph — its definition of done. Block agents: `scenarios/blockAgent.*`
   (generic add/configure/rename/delete + type-scoped `search_nodes`), `scenarios/generator.*` (the
   `single-output-generator` specialist, incl. add+configure in one turn). Operation agents:
-  `scenarios/locator.*`, `scenarios/edge.*`. (`scenarios/node.*` + `scenarios/property.*` remain for the
+  `scenarios/locator.*`, `scenarios/edge.*`. Composition: `scenarios/builder.*` — the composition `builder`
+  driven directly (no orchestrator) to build a whole flow in one sub-turn (add → wire → configure → repair,
+  incl. `use_skill`). (`scenarios/node.*` + `scenarios/property.*` remain for the
   now-unregistered `node` / `property` modules, driven directly, until a later cleanup.)
 - **Integration, orchestrator × agents** — `scenarios/integration.{spec,live.spec}.ts`: the orchestrator
   resolving a request and delegating across specialists (the applied/refused/answered matrix — `partial` is a

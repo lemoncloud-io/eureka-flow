@@ -54,6 +54,46 @@ describe('block agent — add (create a node of its type)', () => {
     });
 });
 
+describe('block agent — add with initial config (one call)', () => {
+    it('creates a node of its type with the given config in a single add_node call', async () => {
+        const { agent, ofType } = setup('buffer', [
+            {
+                toolCalls: [
+                    {
+                        name: 'add_node',
+                        args: { type: 'buffer', position: { x: 500, y: 500 }, config: { delayMs: '250' } },
+                    },
+                ],
+            },
+            { text: 'Added a buffer with delayMs 250.' },
+        ]);
+
+        await agent.send('add a buffer at (500, 500) with delayMs 250');
+
+        const added = ofType('buffer').find(b => b.position.x === 500 && b.position.y === 500);
+        expect(added?.config?.delayMs).toBe('250');
+    });
+
+    it('rejects an invalid initial config and adds NOTHING (atomic)', async () => {
+        const { agent, ofType, toolMsg } = setup('buffer', [
+            {
+                toolCalls: [
+                    {
+                        name: 'add_node',
+                        args: { type: 'buffer', position: { x: 500, y: 500 }, config: { delayMs: 'abc' } },
+                    },
+                ],
+            },
+            { text: 'delayMs must be a number; nothing added.' },
+        ]);
+
+        await agent.send('add a buffer with delayMs abc');
+
+        expect(ofType('buffer')).toHaveLength(1); // only the fixture buffer — the bad add landed nothing
+        expect(toolMsg()?.content).toMatch(/not a number/);
+    });
+});
+
 describe('block agent — configure (merged, validated)', () => {
     it('sets a config value and keeps the others (merge)', async () => {
         const { agent, nodeOf } = setup('buffer', [

@@ -3,16 +3,16 @@
 > How the agent reaches the graph on screen. The **contract** lives in code
 > (`libs/agent/src/canvas/canvasBinding.ts`) and is summarized in
 > [architecture.md](architecture.md#canvasbinding--the-seam); this page is the _how_. Shipped
-> implementation: [`engineCanvasBinding.ts`](../../../libs/agent/src/canvas/engineCanvasBinding.ts).
+> implementation: [`engineCanvasBinding.ts`](../../../libs/agent/src/canvas/engineCanvasBinding.ts). Last updated 2026-08-02.
 
 `readGraph` + `updateNode` + the structural primitives (`addNode` / `deleteNode` / `addEdge` / `deleteEdge`)
 are the whole contract, shared by the orchestrator and its specialists. The
-[locator agent](../agents/locator.md) uses `updateNode` to move a node (`position`); the
-[property agent](../agents/property.md) uses it to rename (`label`) and set config (`config`); the
-[node agent](../agents/node.md) uses `addNode` / `deleteNode`; the [edge agent](../agents/edge.md)
-uses `addEdge` / `deleteEdge`. So the contract is a node patch (`NodePatch` = `{ label?, position?, config? }`)
-plus four structural primitives — `addNode`/`addEdge` return the new id, `deleteNode` cascades the node's
-edges.
+[locator agent](../agents/locator.md) uses `updateNode` to move a node (`position`); a
+[block agent](../agents/blockAgent.md) uses it to rename (`label`) and set config (`config`), and uses
+`addNode` / `deleteNode` to create or remove a node of its type; the [edge agent](../agents/edge.md) uses
+`addEdge` / `deleteEdge`; and the [builder](../../../libs/agent/src/agents/builder.md) uses all of them. So
+the contract is a node patch (`NodePatch` = `{ label?, position?, config? }`) plus four structural
+primitives — `addNode`/`addEdge` return the new id, `deleteNode` cascades the node's edges.
 
 ## One binding, every runtime
 
@@ -91,8 +91,8 @@ against a real `createFlowEngine()` — config merge, label clear, undo per edit
 history label, runtime fields surviving an edit, and the loud failure on a bad id.
 
 End to end: in a DEV build, once the flow has an id, `FlowEditorPage` mounts `FlowAgentPanel`, which
-builds this binding over the page's engine and drives the orchestrator (which spawns the
-locator/property specialists), handing the transcript to the pure right-docked `<AgentPanel>` view. A
+builds this binding over the page's engine and drives the orchestrator (which spawns its specialists),
+handing the transcript to the pure right-docked `<AgentPanel>` view. A
 chat command like "move Fetch 10px right" flows agent → `updateNode` → `engine.transact` → the mirror
 → the canvas re-renders, with no server write.
 

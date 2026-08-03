@@ -10,15 +10,32 @@ generate-API gateway).
 You talk to the **Panel**, which drives the **orchestrator** — the main agent that owns the turn. The
 orchestrator runs a think/act loop — ask the **LlmGateway**, run tool calls through the one
 **ToolExecutor** (which checks permissions), repeat until the model is done — but carries no write tools
-of its own: it delegates edits by spawning **specialist** sub-agents (locator = move, property =
-config/rename, node = add/delete, edge = connect/disconnect) that reach the live canvas through a single
-shared seam, the **CanvasBinding**. The persisted **SessionState** is what the Panel renders from.
+of its own: it delegates edits by spawning **specialist** sub-agents — **block agents** (one per block
+type, owning that block's whole lifecycle: add / configure / rename / delete), **operation agents**
+(locator = move, edge = connect/disconnect), and the composition **builder** (builds a whole multi-block flow
+from a plan) — that reach the live canvas through a single shared seam, the
+**CanvasBinding**. The persisted **SessionState** is what the Panel renders from.
 
 ```
 Panel → Orchestrator → LlmGateway (think)
-                     → spawn → Specialists (locator / property / node / edge)
+                     → spawn → Specialists (block agents · per type / locator / edge / builder)
                                  → ToolExecutor → tools → CanvasBinding → live canvas (act)
                      → SessionState → Panel (render)
+```
+
+**Two comparable strategies, one foundation.** The orchestrator, loop, tools and permission model are the
+same however the editing gets done; the **roster you expose** picks the design — **Strategy 1** fans work
+out to narrow specialists (block agents · locator · edge; no skills); **Strategy 2** hands the whole plan to
+one **builder** that carries the full toolset + `use_skill` playbooks and builds it alone. The
+[eval-benchmark](design/eval-benchmark.md) scores the two head-to-head.
+
+```mermaid
+flowchart LR
+    Panel[Panel] --> Orch["Orchestrator<br/>shared · no write tools"]
+    Orch -->|"Strategy 1 · fan-out"| R1["block agents ×N · locator · edge<br/>(no skills)"]
+    Orch -->|"Strategy 2 · one builder"| R2["builder<br/>full toolset + use_skill(SEED_SKILLS)"]
+    R1 --> CB[("CanvasBinding<br/>live canvas")]
+    R2 --> CB
 ```
 
 The full model — components, the turn loop, interfaces, permissions — is in
@@ -36,15 +53,21 @@ The full model — components, the turn loop, interfaces, permissions — is in
 
 The **orchestrator** is the entry agent the Panel talks to; it holds no write tools and delegates every edit
 to the specialists it spawns over the shared CanvasBinding. The orchestrator model is covered in the design
-docs (start with [architecture.md](design/architecture.md)); each specialist has a thin shipped-status SPEC,
-indexed with its coverage in **[agents/README.md](agents/README.md)**:
+docs (start with [architecture.md](design/architecture.md)); the specialists come in three kinds, and the full
+roster + coverage lives in **[agents/README.md](agents/README.md)**:
 
-- [locator.md](agents/locator.md) — **move** a node.
-- [property.md](agents/property.md) — **set config** values + **rename**.
-- [node.md](agents/node.md) — **add / delete** a node.
-- [edge.md](agents/edge.md) — **connect / disconnect** an edge.
+- **Block agents** — one per block type, owning that block's whole lifecycle (**add / configure / rename /
+  delete**). A block that earns domain knowledge gets a named specialist (e.g. [generator.md](agents/generator.md));
+  every other type is served by a generic [blockAgent.md](agents/blockAgent.md) synthesized from the catalog.
+- **Operation agents** — cross-block: [locator.md](agents/locator.md) (**move**) and [edge.md](agents/edge.md)
+  (**connect / disconnect**).
+- **The composition builder** — the orchestrator hands it a whole multi-block **plan** and it builds the
+  (sub-)flow itself (add · wire · configure · lay out), pulling on-demand playbooks via `use_skill`. Spec
+  co-located with its code: [`libs/agent/src/agents/builder.md`](../../libs/agent/src/agents/builder.md).
 
-Each is a thin page; behavior is specified canonically in the harness docs (`design/harness-*`).
+The operation-split [node.md](agents/node.md) (add/delete) and [property.md](agents/property.md) (config/rename)
+agents are **retired** — the block agent now owns their work. Each page is thin; behavior is specified
+canonically in the harness docs (`design/harness-*`).
 
 **[foundations/](foundations/)** — shared infrastructure, both built.
 

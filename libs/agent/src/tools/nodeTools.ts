@@ -10,7 +10,8 @@ import type { JsonSchema, ToolDef } from '../llm/llmGateway';
 /**
  * The node tool domain — everything an agent does to canvas nodes, split by operation so agents
  * take only what they need:
- *   • `createNodeReadToolProvider`      — `list_nodes` + `describe_node`   (read)
+ *   • `createNodeReadToolProvider`      — `list_nodes` + `describe_node`   (read: all nodes)
+ *   • `createNodeSearchToolProvider`    — `search_nodes` + `describe_node` (read: optionally type-scoped)
  *   • `createNodeMoveToolProvider`      — `move_node`                      (write: position)
  *   • `createNodeConfigToolProvider`    — `set_properties` + `rename`      (write: config/label)
  *   • `createNodeStructureToolProvider` — `add_node` + `delete_node`       (write: add/delete node)
@@ -115,12 +116,17 @@ const DESCRIBE_NODE_DEF: ToolDef = {
 const SEARCH_NODES_DEF: ToolDef = {
     name: 'search_nodes',
     description:
-        'List the nodes YOU manage — only nodes of your own block type — with their id, type, label and ' +
-        'position (reflects edits made this turn). Optionally pass a `query` to narrow by label. Use it to ' +
-        'find the node id to configure, rename, or delete.',
+        'Search the nodes you can see on the canvas (reflects edits made this turn). Pass a `query` to narrow ' +
+        "the results — it is matched case-insensitively against each node's id, label, and block type; omit it " +
+        'to list them all. Returns id, type, label and position. Use it to find the node id you need.',
     parameters: {
         type: 'object',
-        properties: { query: { type: 'string', description: 'Optional label substring to narrow the results.' } },
+        properties: {
+            query: {
+                type: 'string',
+                description: "Optional substring, matched against a node's id, label, or block type.",
+            },
+        },
     },
 };
 
@@ -133,7 +139,7 @@ const describeNodeResult = (binding: CanvasBinding, catalog: CatalogLookup, call
     return ok(call, { type: node.type, currentConfig: node.config ?? {}, schema: catalog.schema(node.type) });
 };
 
-/** READ provider over any {@link CanvasBinding}: `list_nodes` (compact, ALL nodes) + `describe_node` (detail). Carried by the orchestrator + operation agents (locator, edge). */
+/** READ provider over any {@link CanvasBinding}: `list_nodes` (compact, ALL nodes) + `describe_node` (detail). Carried by the orchestrator, the operation agents (locator, edge), and the builder. */
 export const createNodeReadToolProvider = (binding: CanvasBinding, catalog: CatalogLookup): ToolProvider => ({
     listTools: () => [LIST_NODES_DEF, DESCRIBE_NODE_DEF],
     dispatch: (call: ToolCall): ToolResult => {
@@ -147,20 +153,31 @@ export const createNodeReadToolProvider = (binding: CanvasBinding, catalog: Cata
     },
 });
 
-/** SCOPED READ provider for a block agent: `search_nodes` (compact, ONLY `opts.type` nodes) + `describe_node` (detail). The type filter keeps a per-block agent from seeing the whole canvas. */
+/**
+ * SEARCH provider: `search_nodes` (a search over the current nodes — `query` matched against id/label/type)
+ * + `describe_node` (detail). `opts.type` is OPTIONAL: when set it structurally scopes the search to that ONE
+ * block type (a block agent passes its own type, so it only ever sees that type and never the whole canvas);
+ * left unset it is a general node search any agent can carry.
+ */
 export const createNodeSearchToolProvider = (
     binding: CanvasBinding,
     catalog: CatalogLookup,
-    opts: { type: string }
+    opts: { type?: string } = {}
 ): ToolProvider => ({
     listTools: () => [SEARCH_NODES_DEF, DESCRIBE_NODE_DEF],
     dispatch: (call: ToolCall): ToolResult => {
         if (call.name === 'search_nodes') {
             const { query } = (call.args ?? {}) as { query?: string };
-            let nodes = listNodeLocationsOfType(binding, opts.type);
+            // Apply the optional structural scope first, then the query filter.
+            let nodes = opts.type ? listNodeLocationsOfType(binding, opts.type) : listNodeLocations(binding);
             const q = query?.trim().toLowerCase();
             if (q) {
-                nodes = nodes.filter(n => (n.label ?? '').toLowerCase().includes(q));
+                nodes = nodes.filter(
+                    n =>
+                        n.id.toLowerCase().includes(q) ||
+                        (n.label ?? '').toLowerCase().includes(q) ||
+                        n.type.toLowerCase().includes(q)
+                );
             }
             return ok(call, { nodes });
         }
@@ -285,7 +302,27 @@ const validateConfigEntries = (schema: BlockSchema, config: Record<string, unkno
     return errors;
 };
 
-/** CONFIG provider (write: config/label) over a {@link CanvasBinding}: `set_properties` (merged, catalog-validated) + `rename` (`''` clears the label). A rejected value is never applied. Composed into every block agent via the `lifecycle` skill. */
+/**
+ * Validate a config patch against a block schema and string-normalize it — the shared step behind
+ * `set_properties` and `add_node`'s optional initial config. Returns the normalized config, or the errors
+ * (a rejected patch is never applied, so both callers stay atomic).
+ */
+const prepareConfig = (
+    schema: BlockSchema,
+    config: Record<string, unknown>
+): { config: Record<string, string> } | { errors: string[] } => {
+    const errors = validateConfigEntries(schema, config);
+    if (errors.length > 0) {
+        return { errors };
+    }
+    const normalized: Record<string, string> = {};
+    for (const [key, value] of Object.entries(config)) {
+        normalized[key] = String(value);
+    }
+    return { config: normalized };
+};
+
+/** CONFIG provider (write: config/label) over a {@link CanvasBinding}: `set_properties` (merged, catalog-validated) + `rename` (`''` clears the label). A rejected value is never applied. Wired directly into every block agent (and the builder) via its constructor. */
 export const createNodeConfigToolProvider = (binding: CanvasBinding, catalog: CatalogLookup): ToolProvider => ({
     listTools: () => [SET_PROPERTIES_DEF, RENAME_DEF],
     dispatch: (call: ToolCall): ToolResult => {
@@ -298,16 +335,12 @@ export const createNodeConfigToolProvider = (binding: CanvasBinding, catalog: Ca
             if (!schema) {
                 return err(call, `no schema for block type "${node.type}"`);
             }
-            const errors = validateConfigEntries(schema, config);
-            if (errors.length > 0) {
-                return err(call, errors.join('; '));
+            const prepared = prepareConfig(schema, config);
+            if ('errors' in prepared) {
+                return err(call, prepared.errors.join('; '));
             }
-            const normalized: Record<string, string> = {};
-            for (const [key, value] of Object.entries(config)) {
-                normalized[key] = String(value);
-            }
-            binding.updateNode(nodeId, { config: normalized });
-            return ok(call, { nodeId, config: normalized });
+            binding.updateNode(nodeId, { config: prepared.config });
+            return ok(call, { nodeId, config: prepared.config });
         }
         if (call.name === 'rename') {
             const { nodeId, label } = call.args as { nodeId: string; label: string };
@@ -325,9 +358,10 @@ export const createNodeConfigToolProvider = (binding: CanvasBinding, catalog: Ca
 const ADD_NODE_DEF: ToolDef = {
     name: 'add_node',
     description:
-        "Add one new node of a block `type` at a canvas `position`. The node is created with the block's " +
-        'default config only — set non-default values afterwards with set_properties. Returns the new id. ' +
-        'It does NOT wire the node to anything.',
+        "Add one new node of a block `type` at a canvas `position`. Created with the block's default config; " +
+        'optionally pass `config` to set non-default values in the SAME call (merged over the defaults and ' +
+        'validated like set_properties — a bad value adds nothing). Returns the new id. It does NOT wire the ' +
+        'node to anything.',
     requires: 'canModifyCanvas',
     parameters: {
         type: 'object',
@@ -341,6 +375,10 @@ const ADD_NODE_DEF: ToolDef = {
                 description: 'Absolute canvas position in px.',
                 properties: { x: { type: 'number' }, y: { type: 'number' } },
                 required: ['x', 'y'],
+            },
+            config: {
+                type: 'object',
+                description: 'Optional initial config values to set on the new node (merged over the defaults).',
             },
         },
         required: ['type', 'position'],
@@ -360,17 +398,37 @@ const DELETE_NODE_DEF: ToolDef = {
     },
 };
 
-/** STRUCTURE provider (write: add/delete node) over a {@link CanvasBinding}: `add_node` (defaults-only, catalog-validated type) + `delete_node` (cascades edges). Composed into every block agent via the `lifecycle` skill. */
+/** STRUCTURE provider (write: add/delete node) over a {@link CanvasBinding}: `add_node` (catalog-validated type, optional initial config) + `delete_node` (cascades edges). Wired directly into every block agent (and the builder) via its constructor. */
 export const createNodeStructureToolProvider = (binding: CanvasBinding, catalog: CatalogLookup): ToolProvider => ({
     listTools: () => [ADD_NODE_DEF, DELETE_NODE_DEF],
     dispatch: (call: ToolCall): ToolResult => {
         if (call.name === 'add_node') {
-            const { type, position } = call.args as { type: string; position: XY };
+            const { type, position, config } = call.args as {
+                type: string;
+                position: XY;
+                config?: Record<string, unknown>;
+            };
             if (!catalog.has(type)) {
                 return err(call, `unknown block type "${type}"`);
             }
+            // Validate the optional initial config BEFORE creating, so a bad value adds nothing (atomic).
+            let initialConfig: Record<string, string> | undefined;
+            if (config && Object.keys(config).length > 0) {
+                const schema = catalog.schema(type);
+                if (!schema) {
+                    return err(call, `no schema for block type "${type}"`);
+                }
+                const prepared = prepareConfig(schema, config);
+                if ('errors' in prepared) {
+                    return err(call, prepared.errors.join('; '));
+                }
+                initialConfig = prepared.config;
+            }
             const { id } = binding.addNode(type, position);
-            return ok(call, { nodeId: id, type, position });
+            if (initialConfig) {
+                binding.updateNode(id, { config: initialConfig });
+            }
+            return ok(call, { nodeId: id, type, position, ...(initialConfig ? { config: initialConfig } : {}) });
         }
         if (call.name === 'delete_node') {
             const { nodeId } = call.args as { nodeId: string };

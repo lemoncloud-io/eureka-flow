@@ -5,6 +5,7 @@ import {
     createNodeConfigToolProvider,
     createNodeMoveToolProvider,
     createNodeReadToolProvider,
+    createNodeSearchToolProvider,
     createNodeStructureToolProvider,
     listNodeLocations,
 } from '../../tools/nodeTools';
@@ -133,6 +134,36 @@ describe('node read provider — list_nodes / describe_node', () => {
     });
 });
 
+// ── SEARCH (search_nodes over the current nodes; optional type scope) ────────────────────────────
+
+describe('node search provider — search_nodes', () => {
+    const catalog = createFixtureCatalog();
+    const search = (opts?: { type?: string }) =>
+        createNodeSearchToolProvider(createInMemoryCanvasBinding(makeInitialGraph()), catalog, opts);
+    const idsOf = (res: ToolResult) => (res.ok ? (res.data as { nodes: { id: string }[] }).nodes.map(n => n.id) : []);
+
+    it('unscoped: lists all current nodes when no query is given', async () => {
+        const res = await run(search(), 'search_nodes', {});
+        expect(idsOf(res).sort()).toEqual([IDS.buf, IDS.gen, IDS.prev, IDS.txt].sort());
+    });
+
+    it('matches the query against a node id, label, or block type (case-insensitive)', async () => {
+        const binding = createInMemoryCanvasBinding(makeInitialGraph());
+        binding.updateNode(IDS.prev, { label: 'Final Result' });
+        const provider = createNodeSearchToolProvider(binding, catalog);
+        expect(idsOf(await run(provider, 'search_nodes', { query: 'BUFFER' }))).toEqual([IDS.buf]); // by type
+        expect(idsOf(await run(provider, 'search_nodes', { query: 'N_GEN' }))).toEqual([IDS.gen]); // by id (case-insensitive)
+        expect(idsOf(await run(provider, 'search_nodes', { query: 'final' }))).toEqual([IDS.prev]); // by label (case-insensitive)
+    });
+
+    it('scoped by opts.type: only ever returns that block type (structural bound)', async () => {
+        const res = await run(search({ type: 'buffer' }), 'search_nodes', {});
+        const nodes = res.ok ? (res.data as { nodes: { type: string }[] }).nodes : [];
+        expect(nodes.length).toBeGreaterThan(0);
+        expect(nodes.every(n => n.type === 'buffer')).toBe(true);
+    });
+});
+
 // ── MOVE (write: position) over a CanvasBinding ─────────────────────────────────────────────────
 
 describe('node move provider — move_node over a CanvasBinding', () => {
@@ -219,6 +250,48 @@ describe('node structure provider — add_node / delete_node', () => {
             expect(added.position).toEqual({ x: 900, y: 120 });
         }
         expect(binding.readGraph().nodes).toHaveLength(5);
+    });
+
+    it('adds a node with initial config in ONE call (merged over defaults)', async () => {
+        const binding = createInMemoryCanvasBinding(makeInitialGraph());
+        const structure = createNodeStructureToolProvider(binding, catalog);
+        const res = await run(structure, 'add_node', {
+            type: 'single-output-generator',
+            position: { x: 0, y: 0 },
+            config: { model: 'gemini-2.5-pro' },
+        });
+        expect(res.ok).toBe(true);
+        if (res.ok) {
+            const { nodeId } = res.data as { nodeId: string };
+            expect(nodeById(binding.readGraph(), nodeId).config?.model).toBe('gemini-2.5-pro');
+        }
+        expect(binding.readGraph().nodes).toHaveLength(5);
+    });
+
+    it('treats an empty config object like a defaults-only add (no config in the result)', async () => {
+        const binding = createInMemoryCanvasBinding(makeInitialGraph());
+        const structure = createNodeStructureToolProvider(binding, catalog);
+        const res = await run(structure, 'add_node', { type: 'output-preview', position: { x: 0, y: 0 }, config: {} });
+        expect(res.ok).toBe(true);
+        if (res.ok) {
+            expect(res.data).not.toHaveProperty('config'); // empty config short-circuits to the defaults-only path
+        }
+        expect(binding.readGraph().nodes).toHaveLength(5);
+    });
+
+    it('rejects invalid initial config and adds NOTHING (atomic)', async () => {
+        const binding = createInMemoryCanvasBinding(makeInitialGraph());
+        const structure = createNodeStructureToolProvider(binding, catalog);
+        const res = await run(structure, 'add_node', {
+            type: 'single-output-generator',
+            position: { x: 0, y: 0 },
+            config: { model: 'gpt-4o' },
+        });
+        expect(res.ok).toBe(false);
+        if (!res.ok) {
+            expect(res.error).toContain('not an allowed option');
+        }
+        expect(binding.readGraph().nodes).toHaveLength(4); // nothing added
     });
 
     it('rejects an unknown block type and adds nothing', async () => {

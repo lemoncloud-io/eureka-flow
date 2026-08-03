@@ -1,29 +1,19 @@
-import type { CanvasBinding } from '../canvas/canvasBinding';
-import type { CatalogLookup } from '../catalog';
-import type { ToolProvider } from '../tools/types';
-
-/** The live-canvas deps a skill's tools bind to — the subset of {@link BaseAgentDeps} a capability needs (no gateway/session). */
-export interface SkillToolDeps {
-    binding: CanvasBinding;
-    catalog: CatalogLookup;
-}
-
 /**
- * A skill is one composable, self-contained capability: a name, a one-line description, and the tool
- * provider(s) that back it. It carries NO persona and NO workflow — each `ToolDef` already self-describes,
- * and the agent's persona owns the role and judgement. That passivity is what lets an agent compose several
- * skills, and lets one skill bundle several tools (a block's whole lifecycle) without becoming a mini-agent.
- * (Follows the Anthropic Agent Skills shape: name + description metadata, composable building blocks.)
+ * A skill — the in-process port of a Claude Code **Agent Skill**: a named, described unit of **instructions**
+ * a capable agent loads **on demand**. It is inert DATA, not a bundle of tool providers: `description` is the
+ * always-in-context router the model matches a task against, and `instructions` is the lazy-loaded playbook it
+ * follows once it invokes the skill (via the `use_skill` tool — see {@link ./skillProvider}). Progressive
+ * disclosure keeps the body out of context until it is actually needed.
+ *
+ * This is consumed by the Builder — the shipped composition specialist that carries MANY skills and loads them
+ * via `use_skill` ({@link ../agents/builderAgent}); the block/operation specialists do NOT use skills — they
+ * wire their tool providers directly. Design: docs/browser-agent/design/skills.md.
  */
 export interface Skill {
-    /** Capability id, e.g. 'inspect', 'move', 'edge', 'lifecycle:buffer'. */
+    /** Selection + dispatch key — the value passed to `use_skill`. Analog of a SKILL.md directory name. */
     name: string;
-    /** One line: what this capability is (metadata, not a workflow). */
+    /** LEVEL 1, always in context: WHAT the skill does and WHEN to use it — the trigger the model matches. */
     description: string;
-    /** The tool provider(s) backing the capability, bound to the live canvas. */
-    createTools(deps: SkillToolDeps): ToolProvider[];
+    /** LEVEL 2, loaded ON DEMAND: the workflow / domain playbook the model follows once it loads the skill. */
+    instructions: string;
 }
-
-/** Flatten a set of skills into the tool providers an agent carries, preserving order. */
-export const toolsFromSkills = (skills: Skill[], deps: SkillToolDeps): ToolProvider[] =>
-    skills.flatMap(skill => skill.createTools(deps));
