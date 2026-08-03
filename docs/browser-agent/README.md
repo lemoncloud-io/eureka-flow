@@ -62,8 +62,8 @@ roster + coverage lives in **[agents/README.md](agents/README.md)**:
 - **Operation agents** — cross-block: [locator.md](agents/locator.md) (**move**) and [edge.md](agents/edge.md)
   (**connect / disconnect**).
 - **The composition builder** — the orchestrator hands it a whole multi-block **plan** and it builds the
-  (sub-)flow itself (add · wire · configure · lay out), pulling on-demand playbooks via `use_skill`. Spec
-  co-located with its code: [`libs/agent/src/agents/builder.md`](../../libs/agent/src/agents/builder.md).
+  (sub-)flow itself (add · wire · configure · lay out), pulling on-demand playbooks via `use_skill`. Spec:
+  [builder.md](agents/builder.md).
 
 The operation-split [node.md](agents/node.md) (add/delete) and [property.md](agents/property.md) (config/rename)
 agents are **retired** — the block agent now owns their work. Each page is thin; behavior is specified

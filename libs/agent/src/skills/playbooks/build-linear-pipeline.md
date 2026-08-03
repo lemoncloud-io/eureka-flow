@@ -1,13 +1,13 @@
 ---
 name: build-linear-pipeline
-description: Build or extend a straight input → process… → output chain — add the blocks in order, wire each stage to the next, and lay them out left-to-right.
+description: Build or extend a flow from a plan — usually a straight input → process… → output chain — adding the blocks in dependency order, wiring each stage to the one(s) that consume it, and laying them out left-to-right. Also handles a branch or merge (a flow is a DAG).
 ---
 
-Assemble a linear flow — a single chain where each stage feeds the next.
+Assemble the flow as a directed acyclic graph (DAG) — most often a single linear chain where each stage feeds the next, but a stage may fan out to several consumers, or take inputs from several sources, when the plan calls for it.
 
 1. Read what is already on the canvas and the catalog for the block types you need; reuse an existing node instead of duplicating one.
-2. Add the stages in dependency order (source first, sink last), giving each its non-default config as you create it rather than adding then reconfiguring.
-3. Lay the chain out left-to-right: place each new node to the right of its predecessor, on the same vertical band, evenly spaced, so the flow reads in order.
-4. Wire adjacent stages — a source output to the next input, one edge per input. Never leave a required input dangling and never create a cycle.
+2. Add the stages in dependency order (sources first, sinks last), giving each its non-default config as you create it rather than adding then reconfiguring.
+3. Lay the flow out left-to-right: place each node to the right of the stage(s) that feed it, on an even vertical band, evenly spaced, so it reads in dependency order; put parallel branches on their own rows.
+4. Wire each stage to the one(s) that consume it, following the plan's dependencies — a source output to the intended target input. An output may fan out to several inputs, but each input takes exactly one edge. Never leave a required input dangling, and never create a cycle (the graph stays acyclic).
 5. Read the graph back; if a required input is unwired or a config is invalid, repair it before finishing.
-6. Report the chain you built (its nodes and edges) and anything you could not.
+6. Report the flow you built (its nodes and edges) and anything you could not.

@@ -4,7 +4,7 @@
 > **instructions** a capable agent loads **on demand**. A skill is inert data + a `use_skill` tool — NOT a
 > bundle of tool providers. Its consumer — the composition **Builder** agent — **shipped alongside it**
 > ([builderAgent.ts](../../../libs/agent/src/agents/builderAgent.ts), registered `type: 'builder'`), wiring
-> `createUseSkillToolProvider(SEED_SKILLS)`; design in [builder-agent-proposal.md](./builder-agent-proposal.md).
+> `createUseSkillToolProvider(SEED_SKILLS)`; design in [builder.md](../agents/builder.md).
 >
 > **Grounding.** Built on the shipped `@flows/agent` (`libs/agent/src`): the `BaseAgent` loop, the
 > `ToolProvider`/`ToolExecutor` seam, and `LlmGateway`. The **Builder** — the sole worker of **Strategy 2**

@@ -219,6 +219,29 @@ describe('edge provider — connect_nodes', () => {
         expect(clash.ok).toBe(false);
         expect(binding.readGraph().edges.filter(e => e.targetNodeId === 'm')).toHaveLength(2);
     });
+
+    it('allows an output port to fan out — one source output feeds several targets (only INPUTS are limited)', async () => {
+        const binding = createInMemoryCanvasBinding(makeGraph());
+        const edge = createEdgeToolProvider(binding, catalog);
+        // a(text-src).out → b(text-sink).in, then the SAME output port a.out → m(combine).a.
+        const first = await run(edge, 'connect_nodes', {
+            sourceNodeId: 'a',
+            sourcePortId: 'out',
+            targetNodeId: 'b',
+            targetPortId: 'in',
+        });
+        const second = await run(edge, 'connect_nodes', {
+            sourceNodeId: 'a',
+            sourcePortId: 'out',
+            targetNodeId: 'm',
+            targetPortId: 'a',
+        });
+        expect(first.ok).toBe(true);
+        expect(second.ok).toBe(true); // an output port is NOT consumed by its first edge — fan-out is allowed
+        const fromA = binding.readGraph().edges.filter(e => e.sourceNodeId === 'a' && e.sourcePortId === 'out');
+        expect(fromA).toHaveLength(2); // two edges leave the SAME output port, to different targets
+        expect(fromA.map(e => e.targetNodeId).sort()).toEqual(['b', 'm']);
+    });
 });
 
 describe('edge provider — disconnect_edge + list_edges', () => {

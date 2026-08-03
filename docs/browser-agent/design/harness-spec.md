@@ -325,8 +325,7 @@ constructors — they do not compose "skills." **Skills** are a distinct capabil
 whose instructions a capable agent loads **on demand** through a `use_skill` tool (the in-process Claude Code
 Agent Skills model). The one consumer is the **composition `builder`** (§6): it carries `use_skill` over the seed
 playbooks and pulls one for the how-to, while the fixed specialists carry none. Design + the `Skill` / `use_skill`
-surface: **[design/skills.md](./skills.md)**; the consumer:
-**[builder-agent-proposal.md](./builder-agent-proposal.md)**.
+surface: **[design/skills.md](./skills.md)**; the consumer: **[the builder](../agents/builder.md)**.
 
 ### System prompts — the behavioral contract
 

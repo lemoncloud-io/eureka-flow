@@ -193,8 +193,8 @@
 - (admin) give name its own language key
 - (admin) edit select options and suggest existing keys
 - (admin) let the editor set the config placeholder and its key
-- (admin) carry and edit the \*En language keys
-- (i18n) add translateField resolver for \*En language-key fields
+- (admin) carry and edit the *En language keys
+- (i18n) add translateField resolver for *En language-key fields
 - (admin) redesign UI as a dataflow instrument panel
 - (admin) extend block migration to port/config labels
 - (i18n) seed port/config field keys in blocks.json
@@ -385,7 +385,7 @@
 ### Bug Fixes
 
 - (permissions) rename isOwner -> hasOwned to match server /load contract
-- (flows) detect node*/edge* temp IDs to prevent 404 on node save
+- (flows) detect node_/edge_ temp IDs to prevent 404 on node save
 
 ## [2026-06-17] - root@0.54.0, @flows/web@0.54.0, @flows/admin@0.30.0
 
@@ -545,7 +545,7 @@
 - share actor selection across components via Zustand store
 - cache update correctness in optimistic mutations
 - use sentinel value for empty SelectItem in stage editor
-- only call useItem on /items/\* routes in header breadcrumb
+- only call useItem on /items/* routes in header breadcrumb
 - use entity-specific proxy path (/:type/:id/proxy) instead of /flows/
 - default to mockApi, switch to realApi only with VITE_PROCESS_API=real
 - improve navigator UX with contextual header and stage navigation

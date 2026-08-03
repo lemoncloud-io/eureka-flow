@@ -3,3 +3,9 @@
 /coverage
 /.nx/cache
 /.nx/workspace-data
+
+# Manifest + changelog files — keep them off the formatter so release version bumps and
+# feature branches don't reindent them (prettier's tabWidth:4 would rewrite the 2-space base).
+/package.json
+/apps/*/package.json
+/CHANGELOG.md

@@ -1,15 +1,14 @@
 # Builder agent (composition specialist)
 
-> **The composition specialist — the sole worker of [Strategy 2](../../../../docs/browser-agent/design/architecture.md#two-strategies-over-the-shared-foundation).** The orchestrator plans a multi-block build and **spawns** the Builder
+> **The composition specialist — the sole worker of [Strategy 2](../design/architecture.md#two-strategies-over-the-shared-foundation).** The orchestrator plans a multi-block build and **spawns** the Builder
 > (`agentType: 'builder'`) with the plan; the Builder **builds the whole (sub-)flow itself** on the live canvas —
 > add · wire · configure · lay out — using the full editing toolset and **`use_skill`** for the how-to. A **leaf**
-> sub-turn (no `spawn`, no nesting). It is co-located with its code ([builderAgent.ts](./builderAgent.ts)); the
-> harness model is canonical in [design/harness-spec.md §6/§8](../../../../docs/browser-agent/design/harness-spec.md)
-> and the proposal in [design/builder-agent-proposal.md](../../../../docs/browser-agent/design/builder-agent-proposal.md).
+> sub-turn (no `spawn`, no nesting). Its code is [builderAgent.ts](../../../libs/agent/src/agents/builderAgent.ts); the
+> harness model is canonical in [design/harness-spec.md §6/§8](../design/harness-spec.md).
 
 ## Canonical specs
 
-- **Persona** — `BUILDER_SYSTEM_PROMPT` in [builderAgent.ts](./builderAgent.ts): it receives a complete plan and
+- **Persona** — `BUILDER_SYSTEM_PROMPT` in [builderAgent.ts](../../../libs/agent/src/agents/builderAgent.ts): it receives a complete plan and
   executes it (it does **not** plan or coordinate — that is the orchestrator's job); build in dependency order,
   wire adjacent stages (one edge per input, no cycle), lay out left-to-right, configure against the real schema,
   **reject + report** an invalid value/field/connection (never substitute or force), and read the graph back to
@@ -17,7 +16,7 @@
 - **Base** — `createBuilderAgent(deps)` builds a `BaseAgent` subclass over the shared per-turn deps
   (`BuilderAgentDeps = BaseAgentDeps`); grant `canModifyCanvas` + `canEditConfig`, gated at the executor against
   the user's flow-role too (a viewer is denied).
-- **Registration** — `type: 'builder'` in [registrations.ts](./registrations.ts); discovered via `list_agents`,
+- **Registration** — `type: 'builder'` in [registrations.ts](../../../libs/agent/src/agents/registrations.ts); discovered via `list_agents`,
   so the orchestrator routes to it with **no persona edit** (the card summary is the routing signal).
 
 ## What it is
@@ -46,7 +45,7 @@ The full editing surface, wired directly over the live `binding` (no new tool co
 Grant `canModifyCanvas` + `canEditConfig`. Per-turn context seeds the full live node list
 (`renderNodeContext`); the catalog is pulled on demand (`catalog_search` / `describe_block`), and a playbook's
 body only when the Builder loads it. Progressive disclosure needs no extra wiring — the `use_skill` index rides
-its tool description ([design/skills.md](../../../../docs/browser-agent/design/skills.md)).
+its tool description ([design/skills.md](../design/skills.md)).
 
 ## Definition of done — verified behavior
 
@@ -63,12 +62,12 @@ its tool description ([design/skills.md](../../../../docs/browser-agent/design/s
 Where these live:
 
 - **Deterministic (always runs):**
-  [`scenarios/builder.spec.ts`](../__tests__/harness/scenarios/builder.spec.ts) — drives `createBuilderAgent`
+  [`scenarios/builder.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/builder.spec.ts) — drives `createBuilderAgent`
   directly over the shared `harness/fixtures`: build-a-pipeline / validate-and-repair / reject+report / tool
   surface / persona / skill load.
 - **Live (real Gemini, `RUN_LIVE`-gated):**
-  [`scenarios/builder.live.spec.ts`](../__tests__/harness/scenarios/builder.live.spec.ts) — the model builds a
+  [`scenarios/builder.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/builder.live.spec.ts) — the model builds a
   pipeline and its graph shape is checked (and skill selection observed).
 - **Integration (orchestrator → builder):**
-  [`scenarios/integration.spec.ts`](../__tests__/harness/scenarios/integration.spec.ts) (A7) — the orchestrator
+  [`scenarios/integration.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/integration.spec.ts) (A7) — the orchestrator
   plans a build and delegates the whole thing to one `builder` spawn.

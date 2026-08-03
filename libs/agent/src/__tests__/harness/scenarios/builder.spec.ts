@@ -249,7 +249,7 @@ describe('builder agent — progressive disclosure', () => {
 
         await agent.send('build a linear pipeline');
 
-        const marker = 'Assemble a linear flow'; // a phrase unique to the build-linear-pipeline BODY (not its description)
+        const marker = 'Assemble the flow as a directed acyclic graph'; // a phrase unique to the build-linear-pipeline BODY (not its description)
         // Iteration 1: use_skill is offered, but the body is not yet in the transcript.
         expect(JSON.stringify(gateway.calls[0].messages)).not.toContain(marker);
         // Iteration 2: the loaded instructions are now in context (as the use_skill tool result).

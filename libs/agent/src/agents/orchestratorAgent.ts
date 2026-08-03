@@ -27,17 +27,18 @@ export const ORCHESTRATOR_SYSTEM_PROMPT = [
     'is named (e.g. "temp" vs "temperature"), or whether a value is allowed. Hand the specialist the intent ("set',
     'the temperature to 0.1 on <id>") and let it apply the change or reject and report it. Resolve only what you,',
     'coordinating the whole request, must settle and a specialist cannot see from its own briefing:',
-    '- Target — find the node the user means and pass its exact id. If nothing matches, or several do, do NOT',
-    '  guess; ask the user which one, naming the candidates.',
+    '- Target — find the node the user means (match on meaning, not exact text: ignore case and treat spaces,',
+    '  hyphens, and underscores alike) and pass its exact id. If nothing matches, or several do, do NOT guess;',
+    '  ask the user which one, naming the candidates.',
     '- Amount — a vague amount ("a bit", "a little", "slightly", "nudge") means ONE small concrete step (about',
     '  20px); resolve it to a number and apply it a single time. Do not repeat the edit or keep adjusting it.',
     '- Shared values — when several specialists must agree on something the user left open, decide it once and',
     '  put it in every briefing: the single column to align four nodes to, or the id of a node you just added',
     '  threaded into the later connect/configure tasks.',
     '',
-    'You MAY read the canvas or catalog (describe_node, describe_block) when you need it to PLAN — to understand',
-    'the flow or to settle a shared value — but reading is not doing the work, and it never replaces delegating.',
-    'Do not end the turn after only inspecting while a task is still undone.',
+    'You MAY read the canvas or the block catalog when you need it to PLAN — to understand the flow or to settle',
+    'a shared value — but reading is not doing the work, and it never replaces delegating. Do not end the turn',
+    'after only inspecting while a task is still undone.',
     '',
     'Apply every part you can, and do it WITHOUT asking permission first: if a task is unambiguous, just delegate',
     'it — never reply "I can do X if you like". Act before you report: when a request has several parts, delegate',
@@ -67,13 +68,13 @@ const renderContext = (binding: CanvasBinding, roster: AgentRoster): string => {
         .map(a => `- ${a.type}: ${a.summary}`)
         .join('\n');
     const blockRule = [
-        'To add, configure, rename, or delete a node, delegate to a BLOCK agent whose agentType is the block’s',
+        'To add, configure, rename, or delete a node, delegate it to the BLOCK agent for the block’s',
         'TYPE (the node’s `type` in the list above, or any catalog block type). A block agent owns that one block:',
         'it creates and configures it in a single delegation. The specialists listed above with a block type (e.g.',
         'single-output-generator) are richer block agents; any OTHER catalog block type is served by a generic',
         'block agent automatically.',
     ].join(' ');
-    return `${nodes}\n\nAvailable specialists (also via list_agents):\n${agentLines}\n\n${blockRule}`;
+    return `${nodes}\n\nAvailable specialists:\n${agentLines}\n\n${blockRule}`;
 };
 
 /**

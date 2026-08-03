@@ -111,7 +111,7 @@ describe('use_skill — progressive disclosure through the BaseAgent loop', () =
 
         await agent.send('build me a pipeline');
 
-        const marker = 'Assemble a linear flow'; // a phrase unique to build-linear-pipeline's BODY (not its description)
+        const marker = 'Assemble the flow as a directed acyclic graph'; // a phrase unique to build-linear-pipeline's BODY (not its description)
 
         // Iteration 1: use_skill is offered, but its body is not yet in the transcript.
         const turn1 = gateway.calls[0];

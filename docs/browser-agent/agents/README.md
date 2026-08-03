@@ -12,8 +12,8 @@ is not a specialist — it coordinates these; its own model (loop, spawn, addres
   `edge` (connect/disconnect).
 - **The composition builder** — one capable specialist the orchestrator hands a multi-block **plan** to; it
   carries the full editing toolset **plus `use_skill`** and builds the whole (sub-)flow itself (add · wire ·
-  configure · lay out), pulling a progressively-disclosed playbook for the how-to. Its spec is co-located with
-  its code: [`libs/agent/src/agents/builder.md`](../../../libs/agent/src/agents/builder.md).
+  configure · lay out), pulling a progressively-disclosed playbook for the how-to. Its spec:
+  [builder.md](./builder.md).
 
 **The three kinds map onto two strategies**
 ([architecture.md · Two strategies](../design/architecture.md#two-strategies-over-the-shared-foundation)):

@@ -10,7 +10,7 @@ are the whole contract, shared by the orchestrator and its specialists. The
 [locator agent](../agents/locator.md) uses `updateNode` to move a node (`position`); a
 [block agent](../agents/blockAgent.md) uses it to rename (`label`) and set config (`config`), and uses
 `addNode` / `deleteNode` to create or remove a node of its type; the [edge agent](../agents/edge.md) uses
-`addEdge` / `deleteEdge`; and the [builder](../../../libs/agent/src/agents/builder.md) uses all of them. So
+`addEdge` / `deleteEdge`; and the [builder](../agents/builder.md) uses all of them. So
 the contract is a node patch (`NodePatch` = `{ label?, position?, config? }`) plus four structural
 primitives — `addNode`/`addEdge` return the new id, `deleteNode` cascades the node's edges.
 

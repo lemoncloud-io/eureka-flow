@@ -1,10 +1,10 @@
 import { toolErr as err, toolOk as ok, toolUnknown } from './types';
 import { applyMove, hasExactlyOneTarget } from '../canvas/moveSemantics';
 
+import type { ToolCall, ToolProvider, ToolResult } from './types';
 import type { CanvasBinding, Graph, XY } from '../canvas/canvasBinding';
 import type { MoveNodeArgs } from '../canvas/moveSemantics';
 import type { BlockSchema, CatalogLookup } from '../catalog';
-import type { ToolCall, ToolProvider, ToolResult } from './types';
 import type { JsonSchema, ToolDef } from '../llm/llmGateway';
 
 /**
