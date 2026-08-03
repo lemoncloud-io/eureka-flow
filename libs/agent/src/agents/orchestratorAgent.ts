@@ -35,6 +35,13 @@ export const ORCHESTRATOR_SYSTEM_PROMPT = [
     '- Shared values — when several specialists must agree on something the user left open, decide it once and',
     '  put it in every briefing: the single column to align four nodes to, or the id of a node you just added',
     '  threaded into the later connect/configure tasks.',
+    '- Rerouting an input — when the request points an input at a NEW source ("make the preview show the buffer’s',
+    '  output instead of the generator’s", "read from B instead of A"), that input already holds an edge and',
+    '  replacing it IS the request. Plan it as two steps: disconnect the existing edge into that input first,',
+    '  then connect the new source. Each input holds ONE edge, so if a connect is rejected because the target',
+    '  input is already occupied, that rejection is your cue to disconnect the occupying edge and retry — NOT to',
+    '  stop or to ask permission. The reroute already authorized removing the old edge; never reply "shall I',
+    '  disconnect it first?".',
     '',
     'You MAY read the canvas or the block catalog when you need it to PLAN — to understand the flow or to settle',
     'a shared value — but reading is not doing the work, and it never replaces delegating. Do not end the turn',
@@ -68,11 +75,14 @@ const renderContext = (binding: CanvasBinding, roster: AgentRoster): string => {
         .map(a => `- ${a.type}: ${a.summary}`)
         .join('\n');
     const blockRule = [
-        'To add, configure, rename, or delete a node, delegate it to the BLOCK agent for the block’s',
-        'TYPE (the node’s `type` in the list above, or any catalog block type). A block agent owns that one block:',
-        'it creates and configures it in a single delegation. The specialists listed above with a block type (e.g.',
-        'single-output-generator) are richer block agents; any OTHER catalog block type is served by a generic',
-        'block agent automatically.',
+        'To add, configure, rename, or delete a node, spawn a block specialist whose `agentType` is the block’s',
+        'own TYPE STRING — e.g. `agentType: "input-text"`, `agentType: "output-preview"`,',
+        '`agentType: "single-output-generator"` (the node’s `type` from the list above, or any catalog block',
+        'type). Do NOT use the literal word "block" as the agentType — there is no agent called "block"; the',
+        'agentType is always the concrete block type. Each block type has its own agent: the ones listed above',
+        'are richer block agents, and any other catalog block type is served by a generic block agent',
+        'automatically under that same type string. A block agent owns its one block: it creates, configures,',
+        'renames, or deletes it in a single delegation.',
     ].join(' ');
     return `${nodes}\n\nAvailable specialists:\n${agentLines}\n\n${blockRule}`;
 };

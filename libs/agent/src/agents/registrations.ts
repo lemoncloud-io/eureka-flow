@@ -36,7 +36,12 @@ export const DEFAULT_REGISTRATIONS: AgentRegistration[] = [
     {
         type: 'builder',
         summary:
-            'builds or extends a multi-block flow from a plan: adds, wires, configures, and lays out several nodes together — use for any build that spans more than one node',
+            'the flow builder — shapes the graph itself. It adds nodes and, above all, owns the EDGES between them: ' +
+            'connect, rewire, reroute, or disconnect, on nodes brand-new or already on the canvas. Send it anything ' +
+            'about wiring or dataflow — "connect A to B", "make the preview read from the buffer instead of the ' +
+            'generator", "insert a node between two others", "build a text → generator → preview pipeline" — together ' +
+            'with the configuring, renaming, moving, and layout a build needs. One reconnection or a whole pipeline: ' +
+            'if the shape or wiring of the flow changes, this is the agent',
         create: deps => createBuilderAgent(deps),
     },
 ];

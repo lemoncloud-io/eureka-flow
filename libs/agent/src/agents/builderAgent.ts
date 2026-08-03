@@ -56,6 +56,15 @@ export const BUILDER_SYSTEM_PROMPT = [
 export type BuilderAgentDeps = BaseAgentDeps;
 
 /**
+ * The Builder's think/act budget. A narrow specialist makes ONE edit, so the {@link DEFAULT_MAX_ITERATIONS}
+ * of 8 is plenty; the Builder instead realizes a WHOLE flow in a single turn — add several nodes, wire every
+ * edge, configure, lay out, then summarize — which easily exceeds 8 (observed: it added three nodes then hit
+ * the cap before wiring any edge). So it runs with a larger cap. Hardcoded for now; a caller may still override
+ * it by passing `deps.maxIterations`, and a future config can drive it.
+ */
+export const BUILDER_MAX_ITERATIONS = 20;
+
+/**
  * The composition specialist: the FULL editing toolset (read · catalog · structure · config · edge · move) plus
  * `use_skill` over {@link SEED_SKILLS}, all wired directly over the live `binding`. Grant is the union the
  * writes need (`canModifyCanvas` + `canEditConfig`), gated at the executor against the user's flow-role too. A
@@ -63,22 +72,27 @@ export type BuilderAgentDeps = BaseAgentDeps;
  */
 export class BuilderAgent extends BaseAgent {
     constructor(deps: BuilderAgentDeps) {
-        super(deps, {
-            id: 'builder',
-            description:
-                'Builds or extends a multi-block flow from a plan: adds, wires, configures, and lays out nodes.',
-            systemPrompt: BUILDER_SYSTEM_PROMPT,
-            grant: { canModifyCanvas: true, canEditConfig: true },
-            tools: [
-                createNodeReadToolProvider(deps.binding, deps.catalog), // list_nodes, describe_node
-                createCatalogToolProvider(deps.catalog), // catalog_search, describe_block
-                createNodeStructureToolProvider(deps.binding, deps.catalog), // add_node, delete_node
-                createNodeConfigToolProvider(deps.binding, deps.catalog), // set_properties, rename
-                createEdgeToolProvider(deps.binding, deps.catalog), // list_edges, connect_nodes, disconnect_edge
-                createNodeMoveToolProvider(deps.binding), // move_node
-                createUseSkillToolProvider(SEED_SKILLS), // use_skill (progressive-disclosure playbooks)
-            ],
-        });
+        // The Builder builds a whole flow per turn, so it defaults to a larger iteration cap than a narrow
+        // specialist; an explicit deps.maxIterations still wins (future config seam).
+        super(
+            { ...deps, maxIterations: deps.maxIterations ?? BUILDER_MAX_ITERATIONS },
+            {
+                id: 'builder',
+                description:
+                    'Shapes the flow graph: adds nodes and connects, rewires, reroutes, or disconnects the edges between them — new or existing, a single reconnection or a whole pipeline — plus the configuring, renaming, moving, and layout that goes with it.',
+                systemPrompt: BUILDER_SYSTEM_PROMPT,
+                grant: { canModifyCanvas: true, canEditConfig: true },
+                tools: [
+                    createNodeReadToolProvider(deps.binding, deps.catalog), // list_nodes, describe_node
+                    createCatalogToolProvider(deps.catalog), // catalog_search, describe_block
+                    createNodeStructureToolProvider(deps.binding, deps.catalog), // add_node, delete_node
+                    createNodeConfigToolProvider(deps.binding, deps.catalog), // set_properties, rename
+                    createEdgeToolProvider(deps.binding, deps.catalog), // list_edges, connect_nodes, disconnect_edge
+                    createNodeMoveToolProvider(deps.binding), // move_node
+                    createUseSkillToolProvider(SEED_SKILLS), // use_skill (progressive-disclosure playbooks)
+                ],
+            }
+        );
     }
 
     /** Seed the current live node list before every model call; the catalog + playbook bodies are pulled on demand. */
