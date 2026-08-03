@@ -60,5 +60,3 @@ tmp
 .playwright-mcp
 
 vite.config.*.timestamp*
-# Local eval-benchmark run logs (not committed)
-bench-runs/
