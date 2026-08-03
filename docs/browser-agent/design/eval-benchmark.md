@@ -1,17 +1,17 @@
-# Flow-agent eval — benchmarking two designs (tokens · correctness · time)
+# Flow-agent eval — comparing two designs by correctness
 
 > A **design-agnostic** benchmark: one fixed ladder of scenarios (simple → complex), each verified by code,
-> run identically against **two agent designs** so we can compare **tokens**, **correctness**, and **time**
-> on the same footing. This page is the spec for that benchmark — the scenario catalog, the oracle
-> discipline, the instrumentation seam, and the comparison protocol.
+> run identically against **two agent designs** so we can compare their **correctness** on the same footing.
+> This page is the spec for that benchmark — the scenario catalog, the oracle discipline, and the comparison
+> protocol.
 >
 > **Grounding.** Built on what ships in `@flows/agent` today: `runScenario` / `TurnResult`
 > (`libs/agent/src/__tests__/harness/runScenario.ts`), the `CanvasBinding` graph model
-> (`Graph = WorkflowState = { nodes: NodeData[]; edges: EdgeData[] }`), the `LlmGateway` seam with
-> `Chunk.usage` (`libs/agent/src/llm/llmGateway.ts`), and the fixture graph + catalog
+> (`Graph = WorkflowState = { nodes: NodeData[]; edges: EdgeData[] }`), the `LlmGateway` seam
+> (`libs/agent/src/llm/llmGateway.ts`), and the fixture graph + catalog
 > (`libs/agent/src/__tests__/harness/fixtures.ts`). Behavior & the loop: **[harness-spec.md](./harness-spec.md)**;
 > how we verify a single design: **[harness-scenarios.md](./harness-scenarios.md)**; types:
-> **[harness-interfaces.md](./harness-interfaces.md)**. Last updated 2026-08-02.
+> **[harness-interfaces.md](./harness-interfaces.md)**. Last updated 2026-08-03.
 
 ---
 
@@ -20,11 +20,10 @@
 **A scenario is a pure triple `(objective, initialGraph, oracle)` and knows nothing about the design under
 test.** The oracle reads only the three public observables of a turn — `outcome`, the post-turn `graph`, and
 `committed` — never any agent internals. So the _same_ scenario runs unchanged against either design; the only
-per-design code is a thin **adapter** that turns an objective + a graph into those three observables plus a
-cost record.
+per-design code is a thin **adapter** that turns an objective + a graph into those three observables.
 
 ```
-scenario  ─────────────►  RunAdapter (design A | design B)  ─────────────►  { outcome, graph, committed } + CostReport
+scenario  ─────────────►  RunAdapter (design A | design B)  ─────────────►  { outcome, graph, committed }
 (objective, graph)                                                           └── oracle reads these ──► pass / fail
 ```
 
@@ -35,26 +34,24 @@ flowchart LR
     SC["Scenario<br/>(objective, initialGraph, oracle)"]
     SC --> A1["Adapter · Strategy 1<br/>orchestrator + fan-out roster"]
     SC --> A2["Adapter · Strategy 2<br/>orchestrator + builder roster"]
-    A1 --> OB1["outcome · graph · committed<br/>+ CostReport"]
-    A2 --> OB2["outcome · graph · committed<br/>+ CostReport"]
-    OB1 --> OR["shared oracle · shared metering"]
+    A1 --> OB1["outcome · graph · committed"]
+    A2 --> OB2["outcome · graph · committed"]
+    OB1 --> OR["shared oracle"]
     OB2 --> OR
-    OR --> V["pass/fail · tokens · time"]
+    OR --> V["pass / fail"]
 ```
 
-This is the whole discipline: **correctness lives in the oracle (shared), cost lives in the instrumentation
-(shared), and only the adapter differs.** If a metric could only be produced by peeking inside one design,
-it is not a fair metric and does not belong here.
+This is the whole discipline: **correctness lives in the oracle (shared), and only the adapter differs.** If a
+verdict could only be produced by peeking inside one design, it is not a fair verdict and does not belong here.
 
 > **The two designs.** The concrete A/B here is the pair of strategies the harness can run
 > ([architecture.md · Two strategies](./architecture.md#two-strategies-over-the-shared-foundation)): **Design
 > A = Strategy 1** (the orchestrator fans out to narrow block + operation specialists; no skills) and **Design
 > B = Strategy 2** (the orchestrator hands the whole plan to one `builder` that carries tools + `use_skill`
 > and spawns nothing). Both run through the **same** `runScenario` orchestrator harness — they differ only in
-> the **roster** exposed — so the comparison is unusually clean: `subAgents` is many for Strategy 1 and one for
-> Strategy 2, falling straight out of the shared metering. The spec still does not care _what_ the two designs
-> are, so a genuinely different Design B (e.g. a single code-writing agent in the n8n "BUILD" shape,
-> `subAgents = 0`) drops in the same way — it is just another `RunAdapter`.
+> the **roster** exposed — so the comparison is unusually clean. The spec still does not care _what_ the two
+> designs are, so a genuinely different Design B (e.g. a single code-writing agent in the n8n "BUILD" shape)
+> drops in the same way — it is just another `RunAdapter`.
 
 ---
 
@@ -62,7 +59,7 @@ it is not a fair metric and does not belong here.
 
 ```ts
 // The ONLY per-design code. Both designs implement this. It must be a black box: given an objective over a
-// graph, produce the three observables the oracle reads, plus the cost record the instrumentation gathered.
+// graph, produce the three observables the oracle reads.
 interface RunAdapter {
     readonly designId: string; // 'strategy-1-fanout' | 'strategy-2-builder' (or any A/B) — labels the scorecard
     run(input: BenchmarkInput): Promise<BenchmarkResult>;
@@ -79,33 +76,30 @@ interface BenchmarkResult {
     outcome: TurnOutcome; // applied | partial | answered | refused  (shared parse: parseOutcome)
     graph: Graph; // post-turn live graph — the direct-edit oracle target
     committed: boolean; // did the live graph change this turn
-    cost: CostReport; // §3 — gathered by the metering gateway, NOT design-specific fields
 }
 ```
 
 **Both strategies' adapters are one-liners over the shipped harness** — `runScenario` already returns
-`{ outcome, graph, committed }`; each adapter only adds the metering wrapper (§4) around `makeGateway`,
-registers the strategy's **roster**, and attaches the `CostReport`:
+`{ outcome, graph, committed }`; each adapter only registers the strategy's **roster** and forwards the rest:
 
 ```ts
 const strategy1Adapter: RunAdapter = {
     designId: 'strategy-1-fanout',
     async run({ objective, initialGraph, userPermissions, catalog }) {
-        const meter = createMeteringHarness(agentType => baseGateway()); // §4
-        const started = clock.now();
         const { outcome, graph, committed } = await runScenario({
             objective,
             initialGraph,
             userPermissions,
             catalog,
             roster: fanoutRoster, // Strategy 1: block + operation agents (no builder)
-            makeGateway: meter.makeGateway, // the seam runScenario already exposes
+            makeGateway: () => liveGateway, // the seam runScenario already exposes
         });
-        return { outcome, graph, committed, cost: meter.report(clock.now() - started) };
+        return { outcome, graph, committed };
     },
 };
 // Strategy 2's adapter is identical but registers ONLY the builder: `roster: builderRoster`. Selecting the
-// roster is the one extra seam runScenario needs for the benchmark (test-only, alongside the §8 hooks).
+// roster is the one extra seam runScenario needs for the benchmark (test-only) — `createOrchestratorAgent`
+// already accepts a `roster`, so it is a passthrough.
 ```
 
 A design that is **not** the orchestrator harness at all (e.g. a single code-writing agent in the n8n
@@ -258,163 +252,41 @@ const requirements: Requirement[] = [
 const grade = (g: Graph) => requirements.filter(r => r.check(g)).length / requirements.length; // 0..1
 ```
 
-The scorecard (§7) reports the **requirement pass-rate per clause** for T4/T5, so a design's failure is
+The scorecard (§4) reports the **requirement pass-rate per clause** for T4/T5, so a design's failure is
 localized to _which_ invariant it broke — far more actionable than a single number.
 
 ---
 
-## 3 · What we measure — the `CostReport`
-
-Every run yields the same record. Nothing here reads design internals — all of it comes from the two seams
-every design shares: the **gateway** (each LLM round-trip flows through it) and the **wall clock**.
-
-```ts
-interface CostReport {
-    // ── tokens (the primary $ axis) ─────────────────────────────────────────
-    inputTokens: number; // Σ usage.inputTokens over every chat() call, all agents
-    outputTokens: number; // Σ usage.outputTokens
-    totalTokens: number; // inputTokens + outputTokens
-
-    // ── work done (why the tokens were spent) ───────────────────────────────
-    llmCalls: number; // number of chat() invocations — the LLM "steps" / round-trips
-    subAgents: number; // specialist spawns (many for Strategy 1's fan-out, one for Strategy 2's builder, 0 for a single-agent design — not special-cased)
-    toolCalls: number; // tool dispatches across all agents (from the transcript)
-    retries: number; // chat() calls that errored and were retried (0 if the loop doesn't retry)
-
-    // ── time ────────────────────────────────────────────────────────────────
-    wallClockMs: number; // end-to-end around the adapter's run() — what a user feels
-    modelMs: number; // Σ latency of each chat() — model time, isolates network/model from harness overhead
-
-    // ── per-agent breakdown (diagnostic; the multi-agent design's shape) ─────
-    byAgent: Record<string, { llmCalls: number; totalTokens: number; modelMs: number }>;
-}
-```
-
-**Why these and not others.**
-
-- **`totalTokens`** is the headline cost — it is what the bill tracks and what a bloated system prompt, a
-  chatty tool protocol, or an over-eager re-read shows up in.
-- **`llmCalls`** and **`subAgents`** _explain_ the token number: a multi-agent design pays a fresh system
-  prompt + graph context on every specialist turn, so it will spend more tokens for the same edit — this is
-  exactly the trade the benchmark exists to quantify. Splitting them out means a regression is diagnosable
-  ("+2k tokens because it now spawns twice") not just visible.
-- **`modelMs` vs `wallClockMs`** separates _"the model/network was slow"_ from _"the design serializes work"_.
-  A multi-agent design that fans out concurrently can have `modelMs ≫ wallClockMs`; a serial one has them
-  close. Comparing both tells you whether a design's latency is inherent or just poor parallelism.
-- **The eval's test-only outcome re-ask is excluded** from the cost. It is a harness artifact both adapters
-  incur identically; counting it would tax both designs equally but muddy the number. The metering harness
-  stops accumulating before the re-ask (§4) so `CostReport` reflects only the _work_ turn.
-
-**Fake vs live.** The fake gateway emits no `usage` (confirmed: `createFakeGateway` streams text/tool-calls
-only). So **token and time metrics are only meaningful on a live run** (real Gemini populates `usageMetadata`
-→ `Chunk.usage`). Correctness can be checked deterministically with scripts, but the _cross-design cost
-comparison must be live_. This is stated plainly so nobody reports "0 tokens" from a fake run as a win.
-
----
-
-## 4 · The instrumentation seam — a metering gateway
-
-Mirrors `verboseGateway.ts` (a pure pass-through wrapper) but accumulates instead of printing. **Zero product
-code changes**: it wraps the `LlmGateway` at the `makeGateway(agentType)` seam `runScenario` already exposes.
-
-```ts
-// Wrap the per-agent gateway factory. Each agent (orchestrator + every spawned child) gets its OWN wrapper,
-// all writing into one shared accumulator — so tokens/calls aggregate across the whole multi-agent turn while
-// `byAgent` keeps the per-specialist breakdown. Sub-agent count falls straight out of how many times the
-// factory is invoked for a non-orchestrator agentType (runScenario calls gatewayFor(spec.agentType) once per
-// spawned child — subAgentRunner.ts), so we never inspect the transcript to count spawns.
-const createMeteringHarness = (inner: (agentType: string) => LlmGateway) => {
-    const acc = { input: 0, output: 0, calls: 0, modelMs: 0, retries: 0, spawns: 0 };
-    const byAgent: Record<string, { llmCalls: number; totalTokens: number; modelMs: number }> = {};
-    let live = true; // flipped false before the outcome re-ask so it isn't billed (§3)
-
-    const makeGateway = (agentType: string): LlmGateway => {
-        if (agentType !== 'orchestrator') acc.spawns += 1; // one factory call == one specialist
-        const stats = (byAgent[agentType] ??= { llmCalls: 0, totalTokens: 0, modelMs: 0 });
-        const g = inner(agentType);
-        return {
-            capabilities: g.capabilities,
-            async *chat(req, opts) {
-                if (!live) return yield* g.chat(req, opts); // re-ask turn: pass through, don't bill
-                const t0 = clock.now();
-                acc.calls += 1;
-                stats.llmCalls += 1;
-                for await (const chunk of g.chat(req, opts)) {
-                    if (chunk.usage) {
-                        acc.input += chunk.usage.inputTokens ?? 0;
-                        acc.output += chunk.usage.outputTokens ?? 0;
-                        stats.totalTokens += (chunk.usage.inputTokens ?? 0) + (chunk.usage.outputTokens ?? 0);
-                    }
-                    yield chunk;
-                }
-                const dt = clock.now() - t0;
-                acc.modelMs += dt;
-                stats.modelMs += dt;
-            },
-        };
-    };
-
-    return {
-        makeGateway,
-        endWorkTurn: () => (live = false), // call right before runScenario's outcome re-ask
-        report: (wallClockMs: number): CostReport => ({
-            inputTokens: acc.input,
-            outputTokens: acc.output,
-            totalTokens: acc.input + acc.output,
-            llmCalls: acc.calls,
-            subAgents: acc.spawns,
-            toolCalls: 0 /* filled from the session transcript — count assistant toolCalls */,
-            retries: acc.retries,
-            wallClockMs,
-            modelMs: acc.modelMs,
-            byAgent,
-        }),
-    };
-};
-```
-
-Two small hooks make the numbers honest:
-
-- **`toolCalls`** is counted from the persisted transcript after the turn (sum of `toolCalls.length` over
-  assistant messages in every agent's `SessionState`), not from the gateway — a gateway wrapper can't see how
-  many _tools_ a single response fired. `runScenario` already holds the `storage`; expose it or fold the count
-  into the adapter.
-- **`endWorkTurn()`** is called between `orchestrator.send(objective)` and the outcome re-ask so the re-ask's
-  tokens are excluded (§3). This requires either a one-line hook in `runScenario` or having the adapter drive
-  the two `send` calls itself; either is a test-only change.
-
----
-
-## 5 · The comparison protocol (fighting non-determinism)
+## 3 · The comparison protocol (fighting non-determinism)
 
 A live model is stochastic — one run is an anecdote. The protocol turns anecdotes into a verdict.
+
+> **The comparison is only meaningful live.** Under the fake gateway both designs replay identical scripted
+> tool calls, so they produce identical graphs and the comparison is vacuous. The whole point — how well each
+> design's routing and prompting actually produce correct graphs — only shows up when a **real model** decides
+> the tool calls. So the benchmark runs against a live Gemini gateway; the fake gateway is for the
+> deterministic single-design specs, not for this A/B.
 
 1. **Same everything but the adapter.** Same model + `temperature: 0`, same `initialGraph` (deep-cloned per
    run), same catalog, same `userPermissions`, same timeout. Only `RunAdapter` differs. (`temperature: 0` is
    already the live-spec default; it does not remove non-determinism but shrinks it.)
-2. **N runs per (scenario × design).** Default `N = 5`. Discard a single warm-up run per design (JIT / cold
-   connection) before timing.
-3. **Correctness = pass-rate**, the fraction of the N runs whose oracle passes. This is the primary axis —
-   a design that is cheaper but wrong loses. Report it as `k/N`, not a boolean.
-4. **Cost & time = median (p50) over the N runs**, reported alongside p90 (tail matters for latency and for a
-   run that spirals into extra tool calls). Compute cost stats over **all** runs, and separately over **only
-   the passing** runs (a cheap-but-failing run shouldn't flatter the median).
-5. **Verdict per scenario:** rank by (a) pass-rate, then (b) median `totalTokens`, then (c) median
-   `wallClockMs`. A design "wins" a scenario only if it is at least as correct; cost never buys correctness.
-6. **Aggregate** across the ladder with tier weighting if desired (complex tiers are where designs diverge),
-   but always report the per-tier and per-scenario breakdown — an aggregate that hides "Design B is 3× cheaper
-   on T0 but fails every T4 build" is a lie.
+2. **N runs per (scenario × design).** Default `N = 5`; a first look can use `N = 1` (anecdotal).
+3. **Correctness = pass-rate**, the fraction of the N runs whose oracle passes. This is the only axis —
+   report it as `k/N`, not a boolean.
+4. **Verdict per scenario:** the design with the higher pass-rate wins the scenario; a tie is a tie. For the
+   graded T4/T5 scenarios, break a tie by the mean requirement pass-rate (`k/total` averaged over the runs) so
+   "3/4 vs 2/4" is visible even when both flat-fail the conjunction.
+5. **Aggregate** across the ladder with tier weighting if desired (complex tiers are where designs diverge),
+   but always report the per-tier and per-scenario breakdown — an aggregate that hides "Design B passes every
+   T0 but fails every T4 build" is a lie.
 
 ```ts
 interface ScorecardCell {
     scenarioId: string;
     designId: string;
     passRate: string; // 'k/N'
-    tokens: { p50: number; p90: number; p50Passing: number };
-    wallClockMs: { p50: number; p90: number };
-    modelMs: { p50: number };
-    llmCalls: { p50: number };
-    subAgents: { p50: number };
+    requirementRate?: string; // 'k/total' mean over runs — T4/T5 only, the partial-credit tie-breaker
+    notes: string[]; // per-run oracle notes for the misses (why a run failed)
 }
 // The benchmark runner: for each scenario, for each design, run N times, apply the shared oracle, aggregate.
 declare function runBenchmark(scenarios: Scenario[], designs: RunAdapter[], n: number): Promise<ScorecardCell[]>;
@@ -428,7 +300,7 @@ selectable (`-t T4.build`) so a design change can be spot-checked without the fu
 
 ---
 
-## 6 · The scenario ladder (simple → complex)
+## 4 · The scenario ladder (simple → complex)
 
 Every row is design-agnostic. The graphs: **`fixture`** = the shipped 4-node chain
 `input-text → buffer → single-output-generator → output-preview` (`makeInitialGraph()`), **`minimal`** = the
@@ -513,34 +385,34 @@ row uses the `unchanged` no-edit oracle.
 
 ---
 
-## 7 · Reporting — the scorecard
+## 5 · Reporting — the scorecard
 
 Print one table per tier and one aggregate, both designs side by side, mirroring the `afterAll` scorecard in
-`integration.live.spec.ts` but with the cost columns:
+`integration.live.spec.ts`:
 
 ```
 ━━━━━ BENCHMARK · model=gemini-2.5-flash · N=5 ━━━━━
-scenario            design         pass   tok(p50)  tok(p90)  llm  sub   wall(p50)  model(p50)
-T4.build-pipeline   strategy-1     5/5      12_400    15_100   9    3       8_200ms     7_100ms
-T4.build-pipeline   strategy-2     4/5       6_800     8_050   4    1       5_400ms     5_100ms
-                    ▶ winner: strategy-2 (both correct enough; 45% fewer tokens, 34% faster)
+scenario            design         pass   req(mean)   notes
+T4.build-pipeline   strategy-1     5/5    4/4         —
+T4.build-pipeline   strategy-2     4/5    3.6/4       1 run: forgot to wire the preview
+                    ▶ winner: strategy-1 (5/5 vs 4/5)
 ...
-━━━━━ AGGREGATE (pass-weighted) ━━━━━
-strategy-1     correctness 46/55   tokens 187k   wall 214s
-strategy-2     correctness 41/55   tokens  98k   wall 141s
+━━━━━ AGGREGATE ━━━━━
+strategy-1     correctness 46/55
+strategy-2     correctness 41/55
 ```
 
-The winner line is computed by §5's ranking (correctness first). Persist the raw `ScorecardCell[]` to JSON so
-two benchmark runs — before/after a prompt or design change — are diffable.
+The winner line is computed by §3's ranking (pass-rate first, requirement-rate tie-break). Persist the raw
+`ScorecardCell[]` to JSON so two benchmark runs — before/after a prompt or design change — are diffable.
 
 ---
 
-## 8 · Reused vs. new
+## 6 · Reused vs. new
 
-|                                            |                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Reused as-is**                           | `runScenario` / `TurnResult`, `parseOutcome` / `TurnOutcome`, `makeInitialGraph` / `createFixtureCatalog` / `IDS` / `nodeById`, the `makeGateway(agentType)` seam, the oracle discipline, `Chunk.usage` on the Gemini gateway, the `RUN_LIVE` gate + per-case selectability.                                                                         |
-| **New (all test-only, no product change)** | `RunAdapter` + the two adapters, `createMeteringHarness` (the metering gateway, modeled on `verboseGateway`), the `Scenario` catalog + shared oracles (§6), `runBenchmark` + the p50/p90 aggregation, the scorecard writer, and two tiny `runScenario` hooks (`endWorkTurn` boundary before the re-ask; expose `storage` for the `toolCalls` count). |
+|                                            |                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Reused as-is**                           | `runScenario` / `TurnResult`, `parseOutcome` / `TurnOutcome`, `makeInitialGraph` / `createFixtureCatalog` / `IDS` / `nodeById`, the `makeGateway(agentType)` seam, the oracle discipline, the live Gemini gateway, the `RUN_LIVE` gate + per-case selectability.                                             |
+| **New (all test-only, no product change)** | `RunAdapter` + the two adapters, the `fanoutRoster` / `builderRoster` pair, the `Scenario` catalog + shared oracles (§4), `runBenchmark` + the pass-rate aggregation, the scorecard writer, and one tiny `runScenario` hook (pass a `roster` through to `createOrchestratorAgent`, which already takes one). |
 
 Nothing here touches `BaseAgent`, the specialists, or the tools — the benchmark observes the shipped agent
 through seams it already has, which is the whole reason the two designs can be compared honestly.

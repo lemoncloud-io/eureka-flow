@@ -61,7 +61,7 @@ permissions, the same `CanvasBinding`. A strategy is selected entirely by **whic
 `AgentRoster` exposes** for the orchestrator to `spawn` into; nothing about the orchestrator itself
 changes. In practice you flip between them by what you register — expose the **builder** to run Strategy 2,
 or leave it out and register the **block + operation** agents to run Strategy 1. They are the two designs
-the [eval-benchmark](eval-benchmark.md) compares on tokens · correctness · latency.
+the [eval-benchmark](eval-benchmark.md) compares on correctness.
 
 ### Strategy 1 — fan-out to simple specialists (no skills)
 

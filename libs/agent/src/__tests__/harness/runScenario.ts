@@ -6,6 +6,7 @@ import { createFakeGateway } from '../../llm/fakeGateway';
 import { createInMemorySessionStore } from '../../session/session';
 
 import type { TurnOutcome } from './turnOutcome';
+import type { AgentRoster } from '../../agents/roster';
 import type { CanvasBinding, Graph } from '../../canvas/canvasBinding';
 import type { CatalogLookup } from '../../catalog';
 import type { FakeScriptStep } from '../../llm/fakeGateway';
@@ -35,6 +36,13 @@ export interface ScenarioInput {
     mode?: 'parallel' | 'serial';
     /** Catalog override; defaults to the fixture catalog. */
     catalog?: CatalogLookup;
+    /**
+     * Specialist roster the orchestrator may `spawn` into. OMIT for the default roster. The eval-benchmark
+     * (eval-benchmark.md) is the one caller that sets it — swapping the roster is how it runs the SAME
+     * scenario against the two designs (Strategy 1 fan-out vs Strategy 2 builder). A pure passthrough:
+     * `createOrchestratorAgent` already accepts a `roster` and falls back to the default when it is absent.
+     */
+    roster?: AgentRoster;
 }
 
 export interface TurnResult {
@@ -105,6 +113,7 @@ export const runScenario = async (input: ScenarioInput): Promise<TurnResult> => 
         catalog,
         userPermissions,
         mode: input.mode,
+        roster: input.roster, // undefined ⇒ createDefaultRoster(); the benchmark passes fanout/builder here
     });
 
     // A turn that threw is recorded by BaseAgent.send as `phase: 'error'` and NOT rethrown; surface it here
