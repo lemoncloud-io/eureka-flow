@@ -42,6 +42,15 @@ export interface ProviderModelEntry {
     /** Only for gateways reused via a baseUrl override (e.g. OPENROUTER_ENTRY). */
     baseUrl?: string;
     /**
+     * Subset of `models` that are dynamic *routes* rather than fixed model identities (e.g.
+     * `openrouter/free`, which may serve a different underlying model per call — see
+     * `Chunk.actualModel`). A model-manifest/benchmark consumer (see `modelManifest.ts`) must
+     * never count an entry in this list toward a "fixed model" qualification total, and must
+     * always separate its results by `actualModel` rather than aggregating them under the route
+     * id. Empty/absent means every model in `models` is a fixed identity.
+     */
+    dynamicRouteModels?: string[];
+    /**
      * Per-scenario timeout for real-key runs only (never applies to offline tests). Overrides the
      * real-provider test harness's default when this provider/model is known to be slower — e.g.
      * a free-tier OpenRouter model. Omit to use the harness default (see
@@ -69,7 +78,13 @@ const OPENAI_ENTRY: ProviderModelEntry = {
     // /runs/0/models), which also lists gpt-5/gpt-5.1/gpt-5.2 above it. Picked gpt-5-mini (not
     // gpt-5.2) to match this registry's pick-the-cheap-tier-first pattern. Not yet run against
     // this provider-native path — offline-wired only until a real run happens.
-    models: ['gpt-4o-mini', 'gpt-4.1-mini', 'gpt-5-mini'],
+    // gpt-4.1 added 2026-08-04 as a 4th capability/cost tier, for benchmark breadth — initially
+    // sourced only via OpenRouter's public Models API as a corroboration signal, then independently
+    // confirmed 2026-08-04 directly against OpenAI's own official docs
+    // (developers.openai.com/api/docs/models/gpt-4.1): exact id `gpt-4.1`, current (default
+    // snapshot gpt-4.1-2025-04-14), directly callable via Chat Completions/Assistants/Batch. This
+    // is a direct-provider confirmation, not an OpenRouter-namespace inference.
+    models: ['gpt-4o-mini', 'gpt-4.1-mini', 'gpt-5-mini', 'gpt-4.1'],
     defaultModel: 'gpt-4o-mini',
     apiKeyEnv: 'OPENAI_API_KEY',
     modelEnvOverride: 'OPENAI_TEST_MODEL',
@@ -86,7 +101,11 @@ const OPENAI_ENTRY: ProviderModelEntry = {
         'Old/new coverage: gpt-4o-mini (real-verified, current default) and gpt-4.1-mini are ' +
         'both 4.x-generation; gpt-5-mini is the newest-candidate addition, confirmed to exist in ' +
         "eureka's own model catalog but not yet run through this provider-native path — pending " +
-        'a real-key run (see provider-tool-calling.md §5).',
+        'a real-key run (see provider-tool-calling.md §5). gpt-4.1 (full, non-mini tier) added ' +
+        '2026-08-04 for capability-tier breadth per the model-manifest benchmark target — see ' +
+        "`modelManifest.ts`; confirmed directly against OpenAI's own docs (not just OpenRouter's " +
+        'mirrored catalog), so treat it the same confidence level as gpt-4.1-mini/gpt-5-mini: ' +
+        'registered, current, and directly confirmed — not yet real-key-verified.',
 };
 
 const GEMINI_ENTRY: ProviderModelEntry = {
@@ -100,7 +119,16 @@ const GEMINI_ENTRY: ProviderModelEntry = {
     // pro-preview tier to match this registry's pick-the-cheap-tier-first pattern. It's a
     // "-preview" model id, so it may be renamed/retired upstream without notice — flagged, not
     // treated as stable. Not yet run against this provider-native path.
-    models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash-preview'],
+    // gemini-2.5-flash-lite and gemini-3.1-pro-preview added 2026-08-04 for benchmark breadth —
+    // initially sourced only via OpenRouter's public Models API (under the `google/` namespace) as
+    // a corroboration signal, then independently confirmed 2026-08-04 directly against Google's
+    // own official docs (ai.google.dev/gemini-api/docs/models): gemini-2.5-flash-lite listed as
+    // Stable; gemini-3.1-pro-preview listed as Preview. Both are direct-provider confirmations, not
+    // OpenRouter-namespace inferences. gemini-2.5-flash-lite is the 2.5 generation's cheapest tier.
+    // gemini-3.1-pro-preview is a newer, larger, explicitly "-preview"-suffixed candidate — same
+    // upstream-rename/retire risk called out for gemini-3-flash-preview above; label as
+    // preview-only in any benchmark report.
+    models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash-preview', 'gemini-2.5-flash-lite', 'gemini-3.1-pro-preview'],
     defaultModel: 'gemini-2.5-flash',
     apiKeyEnv: 'GEMINI_API_KEY',
     modelEnvOverride: 'GEMINI_TEST_MODEL',
@@ -123,7 +151,11 @@ const GEMINI_ENTRY: ProviderModelEntry = {
         'Old/new coverage: gemini-2.5-flash (real-verified, current default) and gemini-2.5-pro ' +
         'are both 2.5-generation; gemini-3-flash-preview is the newest-candidate addition — a ' +
         "preview model id from eureka's own catalog, pending a real-key run and possibly subject " +
-        'to upstream rename/retirement given the -preview suffix.',
+        'to upstream rename/retirement given the -preview suffix. gemini-2.5-flash-lite ' +
+        '(stable, cheapest 2.5-gen tier) and gemini-3.1-pro-preview (newer, preview-suffixed) ' +
+        'added 2026-08-04 for benchmark breadth per `modelManifest.ts`; both confirmed directly ' +
+        'against ai.google.dev/gemini-api/docs/models (not just OpenRouter\'s mirrored catalog), ' +
+        'not yet real-key-verified through this native path.',
 };
 
 const OPENROUTER_ENTRY: ProviderModelEntry = {
@@ -135,7 +167,36 @@ const OPENROUTER_ENTRY: ProviderModelEntry = {
     // free route's* current behavior, not a specific model's identity or a permanent guarantee.
     // openai/gpt-4o-mini stays registered as an untested candidate — OpenRouter's own model-id
     // convention (`<upstream-provider>/<model>`), not yet run against the live API.
-    models: ['openrouter/free', 'openai/gpt-4o-mini'],
+    //
+    // Five more fixed ids added 2026-08-04 for benchmark breadth (target: >= 6 fixed OpenRouter
+    // models, excluding the openrouter/free route below) — all confirmed present via OpenRouter's
+    // public Models API (GET https://openrouter.ai/api/v1/models, no auth required) with
+    // tool-calling support (`supported_parameters` includes `tools`) at that check:
+    //   - google/gemini-2.5-flash, anthropic/claude-haiku-4.5: same underlying models as
+    //     GEMINI_ENTRY/ANTHROPIC_ENTRY, reachable here via OpenRouter's routing instead, for
+    //     cross-path comparison.
+    //   - openai/gpt-oss-20b:free — a genuinely FIXED model id (OpenRouter's own free-tier
+    //     pricing for this specific open-weight model), NOT the same thing as the openrouter/free
+    //     dynamic route below; kept distinct on purpose (see dynamicRouteModels below) and
+    //     deliberately exercises the `:free`-suffix case in the chart's point-id/companion-table
+    //     mapping (`verificationMetrics.ts`'s `buildElapsedVsTokensChart`).
+    //   - meta-llama/llama-3.3-70b-instruct, deepseek/deepseek-chat-v3.1 — added for
+    //     upstream-provider diversity within the OpenRouter benchmark pool.
+    // None of the five are yet real-key-verified through this path.
+    models: [
+        'openrouter/free',
+        'openai/gpt-4o-mini',
+        'google/gemini-2.5-flash',
+        'anthropic/claude-haiku-4.5',
+        'openai/gpt-oss-20b:free',
+        'meta-llama/llama-3.3-70b-instruct',
+        'deepseek/deepseek-chat-v3.1',
+    ],
+    // openrouter/free is a dynamic route (may serve a different underlying model per call, see
+    // Chunk.actualModel) — never a fixed model identity. Flagged here so a benchmark/manifest
+    // consumer (modelManifest.ts) excludes it from any "N fixed models" count and always separates
+    // its results by actualModel instead of aggregating under the route id itself.
+    dynamicRouteModels: ['openrouter/free'],
     defaultModel: 'openrouter/free',
     apiKeyEnv: 'OPENROUTER_API_KEY',
     modelEnvOverride: 'OPENROUTER_TEST_MODEL',
@@ -159,7 +220,10 @@ const OPENROUTER_ENTRY: ProviderModelEntry = {
         '(OPENROUTER_TEST_MODEL=openrouter/free): 8/8 accepted (5 strict pass, 3 known-variance, 0 ' +
         "fail, 0 timeout). openrouter/free is OpenRouter's free router and may route to different " +
         "underlying models over time, so this verifies that route's current behavior, not a fixed " +
-        'model identity or every OpenRouter model. openai/gpt-4o-mini remains an untested candidate.',
+        'model identity or every OpenRouter model — see dynamicRouteModels above. The other six ' +
+        'entries (openai/gpt-4o-mini plus the five added 2026-08-04: google/gemini-2.5-flash, ' +
+        'anthropic/claude-haiku-4.5, openai/gpt-oss-20b:free, meta-llama/llama-3.3-70b-instruct, ' +
+        'deepseek/deepseek-chat-v3.1) are all fixed model identities and untested candidates.',
 };
 
 const DEEPSEEK_ENTRY: ProviderModelEntry = {
@@ -269,7 +333,13 @@ const ANTHROPIC_ENTRY: ProviderModelEntry = {
     // claude-haiku-4-5 confirmed current (not deprecated/retired) in Anthropic's own tool-use
     // pricing table — the fastest/cheapest tier, matching this repo's pick-the-cheap-tier-first
     // pattern (gpt-4o-mini, gemini-2.5-flash, deepseek-v4-flash). Not yet run against a live key.
-    models: ['claude-haiku-4-5'],
+    // claude-sonnet-5 added 2026-08-04 as the old/new-tier counterpart (bigger/costlier,
+    // "best combination of speed and intelligence" per Anthropic's own docs), giving this entry
+    // the same cheap-tier + bigger-tier spread every other multi-model provider in this registry
+    // has — confirmed directly against platform.claude.com/docs/en/about-claude/models/overview
+    // (Claude API ID and alias both "claude-sonnet-5", generally available). Also not yet run
+    // against a live key.
+    models: ['claude-haiku-4-5', 'claude-sonnet-5'],
     defaultModel: 'claude-haiku-4-5',
     apiKeyEnv: 'ANTHROPIC_API_KEY',
     modelEnvOverride: 'ANTHROPIC_TEST_MODEL',
@@ -301,14 +371,15 @@ const ANTHROPIC_ENTRY: ProviderModelEntry = {
         'field instead of a system-role message, and a content-block-array response shape. Both ' +
         'single-turn tool calling and multi-turn tool-result mapping are implemented and ' +
         'offline-verified; NOT yet real-key-verified by this repo — no ANTHROPIC_API_KEY used. Do ' +
-        'not mark real-verified until an actual key run confirms this live. UNRESOLVED: a general ' +
-        'web search suggests the full/current Haiku 4.5 model id may require a date suffix (e.g. ' +
-        'claude-haiku-4-5-20251001) rather than the bare "claude-haiku-4-5" used here — lower ' +
-        "confidence than this file's other model ids, which come from a provider's own " +
-        'docs/pricing page, not a search summary. NOT changed here because existing offline tests ' +
-        'assert against the current literal value and no primary-source (Anthropic docs) ' +
-        'confirmation has been done — pending official model ID confirmation before either ' +
-        'changing defaultModel or adding a second dated entry to models[].',
+        'not mark real-verified until an actual key run confirms this live. RESOLVED 2026-08-04: ' +
+        "the bare \"claude-haiku-4-5\" used here is confirmed, via Anthropic's own official docs " +
+        '(platform.claude.com/docs/en/about-claude/models/overview), to be the documented "Claude ' +
+        'API alias" for this model — a convenience pointer that resolves to the pinned snapshot ' +
+        '`claude-haiku-4-5-20251001`. Both ids are valid; this entry keeping the bare alias is a ' +
+        'deliberate choice (matches this file\'s not-pinning-dated-snapshots convention elsewhere), ' +
+        'not an unconfirmed guess. The prior lower-confidence, search-sourced doubt about this id is ' +
+        'superseded by this primary-source confirmation. claude-sonnet-5 added 2026-08-04 as the ' +
+        'old/new-tier spread this entry previously lacked; equally unverified pending a real key.',
 };
 
 const GLM_ENTRY: ProviderModelEntry = {

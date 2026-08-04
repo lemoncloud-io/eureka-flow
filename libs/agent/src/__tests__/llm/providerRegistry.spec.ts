@@ -394,12 +394,14 @@ describe('PROVIDER_REGISTRY', () => {
 });
 
 describe('Old/new model-version compatibility (Part B)', () => {
-    // A provider is exempt from the "multiple models" bar only if its notes explain why — e.g.
-    // Claude currently has one model id with an open, flagged, not-yet-confirmed question about
-    // whether it needs a date suffix (see ANTHROPIC_ENTRY's notes) rather than a second, invented
-    // model id. This keeps the structural check honest: it fails loudly for a provider that's
-    // just been left at one model with no explanation, rather than silently passing everything.
-    const EXEMPT_SINGLE_MODEL_PROVIDERS = new Set(['anthropic']);
+    // A provider is exempt from the "multiple models" bar only if its notes explain why, rather
+    // than being silently left at one model. Claude was exempt here until 2026-08-04 for an open,
+    // not-yet-confirmed question about whether claude-haiku-4-5 needed a date suffix — once that
+    // was confirmed (Anthropic's own docs: it's a valid alias), the entry gained a genuine
+    // old/new-tier spread (claude-haiku-4-5 + claude-sonnet-5) instead, so nothing is exempt here
+    // anymore. This keeps the structural check honest: it fails loudly for a provider that's just
+    // been left at one model with no explanation, rather than silently passing everything.
+    const EXEMPT_SINGLE_MODEL_PROVIDERS = new Set<string>([]);
 
     it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
         '%s: has at least one current model entry',

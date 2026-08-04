@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     TIMEOUT_MARKER,
+    classifyGeminiFailureCategory,
     classifyLocatorScenarioResult,
     classifyThrownError,
     isAcceptedOutcome,
@@ -121,5 +122,74 @@ describe('isAcceptedOutcome', () => {
         expect(isAcceptedOutcome('fail')).toBe(false);
         expect(isAcceptedOutcome('timeout')).toBe(false);
         expect(isAcceptedOutcome('provider-error')).toBe(false);
+    });
+});
+
+describe('classifyGeminiFailureCategory', () => {
+    it('classifies a timeout marker as timeout, taking precedence over everything else', () => {
+        expect(classifyGeminiFailureCategory(`request timed out after 5000ms`, 500)).toBe('timeout');
+    });
+
+    it('classifies 401/403 as authentication', () => {
+        expect(classifyGeminiFailureCategory('Gemini request failed with status 401: {}', 401)).toBe('authentication');
+        expect(classifyGeminiFailureCategory('Gemini request failed with status 403: {}', 403)).toBe('authentication');
+    });
+
+    it('classifies 400 as invalid-request', () => {
+        expect(classifyGeminiFailureCategory('Gemini request failed with status 400: {}', 400)).toBe('invalid-request');
+    });
+
+    it('classifies 404 as unavailable-model', () => {
+        expect(classifyGeminiFailureCategory('Gemini request failed with status 404: {}', 404)).toBe('unavailable-model');
+    });
+
+    it('classifies 429 as rate-limit', () => {
+        expect(classifyGeminiFailureCategory('Gemini request failed with status 429: {}', 429)).toBe('rate-limit');
+    });
+
+    it('classifies a 5xx as retryable-upstream-failure', () => {
+        expect(classifyGeminiFailureCategory('Gemini request failed with status 503: {}', 503)).toBe(
+            'retryable-upstream-failure'
+        );
+    });
+
+    it('classifies a blockReason diagnostic as safety-block', () => {
+        expect(
+            classifyGeminiFailureCategory(
+                'Gemini response contained no candidates or no usable content parts (promptFeedback.blockReason=SAFETY)'
+            )
+        ).toBe('safety-block');
+    });
+
+    it('classifies a blocked safety rating as safety-block', () => {
+        expect(
+            classifyGeminiFailureCategory(
+                'Gemini response contained no candidates or no usable content parts (candidate.safetyRatings=[HARM_CATEGORY_HARASSMENT:HIGH:blocked])'
+            )
+        ).toBe('safety-block');
+    });
+
+    it('classifies the uniform "no candidates" diagnostic (no safety signal) as no-candidate', () => {
+        expect(
+            classifyGeminiFailureCategory(
+                'Gemini response contained no candidates or no usable content parts (no diagnostic metadata present)'
+            )
+        ).toBe('no-candidate');
+    });
+
+    it('classifies a JSON parse failure as parser-defect', () => {
+        expect(classifyGeminiFailureCategory('tool call arguments were not valid JSON')).toBe('parser-defect');
+    });
+
+    it('classifies finishReason=RECITATION as model-behavior-variance', () => {
+        expect(
+            classifyGeminiFailureCategory(
+                'Gemini response contained no candidates or no usable content parts (finishReason=RECITATION)'
+            )
+        ).toBe('model-behavior-variance');
+    });
+
+    it('falls back to unresolved for an uncharacterized message', () => {
+        expect(classifyGeminiFailureCategory('something unexpected happened')).toBe('unresolved');
     });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     accumulateExtendedUsage,
     accumulateUsage,
+    aggregateByActualModel,
     aggregateVerificationMetrics,
     buildElapsedVsTokensChart,
     buildVerificationMetricsReport,
@@ -10,17 +11,14 @@ import {
     formatCostRanking,
     formatMetricsMarkdownTable,
     formatTokenDiagnosticsTable,
+    formatVerificationRecordsCsv,
+    formatVerificationRecordsJsonl,
     mergeVerificationRecords,
     wrapGatewayWithUsageCapture,
 } from '../../llm/verificationMetrics';
 
 import type { Chunk, LlmGateway } from '../../llm/llmGateway';
-import type {
-    CapturedCallInfo,
-    ProviderModelAggregate,
-    VerificationMetricsReport,
-    VerificationRunRecord,
-} from '../../llm/verificationMetrics';
+import type { CapturedCallInfo, VerificationMetricsReport, VerificationRunRecord } from '../../llm/verificationMetrics';
 
 const drain = async (stream: AsyncIterable<Chunk>): Promise<Chunk[]> => {
     const chunks: Chunk[] = [];
@@ -639,120 +637,427 @@ describe('buildVerificationMetricsReport', () => {
     });
 });
 
+describe('aggregateByActualModel', () => {
+    it('groups a fixed-model provider (no actualModel ever reported) as one aggregate, identified by requested model', () => {
+        const records = [
+            record({ provider: 'Gemini', model: 'gemini-2.5-flash', scenarioId: 'a' }),
+            record({ provider: 'Gemini', model: 'gemini-2.5-flash', scenarioId: 'b' }),
+        ];
+        const aggregates = aggregateByActualModel(records);
+        expect(aggregates).toHaveLength(1);
+        expect(aggregates[0].requestedModel).toBe('gemini-2.5-flash');
+        expect(aggregates[0].actualModel).toBeUndefined();
+        expect(aggregates[0].unresolved).toBe(false);
+        expect(aggregates[0].scenarioCount).toBe(2);
+    });
+
+    it('requested and actual model can be the same value (a direct, non-routed OpenAI call echoing its own model back)', () => {
+        const records = [record({ provider: 'OpenAI', model: 'gpt-4o-mini', actualModel: 'gpt-4o-mini' })];
+        const aggregates = aggregateByActualModel(records);
+        expect(aggregates).toHaveLength(1);
+        expect(aggregates[0].requestedModel).toBe('gpt-4o-mini');
+        expect(aggregates[0].actualModel).toBe('gpt-4o-mini');
+        expect(aggregates[0].unresolved).toBe(false);
+    });
+
+    it('openrouter/free resolves to one named actual model', () => {
+        const records = [
+            record({ provider: 'OpenRouter', model: 'openrouter/free', actualModel: 'meta-llama/llama-3.3-70b-instruct:free' }),
+        ];
+        const aggregates = aggregateByActualModel(records);
+        expect(aggregates).toHaveLength(1);
+        expect(aggregates[0].requestedModel).toBe('openrouter/free');
+        expect(aggregates[0].actualModel).toBe('meta-llama/llama-3.3-70b-instruct:free');
+        expect(aggregates[0].unresolved).toBe(false);
+    });
+
+    it('one route resolving to two different actual models across calls produces two separate aggregates, never combined', () => {
+        const records = [
+            record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'a', actualModel: 'model-a', inputTokens: 100, outputTokens: 10 }),
+            record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'b', actualModel: 'model-b', inputTokens: 200, outputTokens: 20 }),
+        ];
+        const aggregates = aggregateByActualModel(records);
+        expect(aggregates).toHaveLength(2);
+        const byActual = new Map(aggregates.map(a => [a.actualModel, a]));
+        expect(byActual.get('model-a')?.totalTokens).toBe(110);
+        expect(byActual.get('model-b')?.totalTokens).toBe(220);
+        // Neither aggregate's requestedModel loses the route it came from.
+        expect(byActual.get('model-a')?.requestedModel).toBe('openrouter/free');
+        expect(byActual.get('model-b')?.requestedModel).toBe('openrouter/free');
+    });
+
+    it('a route call with no actualModel, on a route where other calls DID report one, is flagged unresolved — never guessed onto a resolved model', () => {
+        const records = [
+            record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'a', actualModel: 'model-a' }),
+            record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'b', actualModel: undefined }),
+        ];
+        const aggregates = aggregateByActualModel(records);
+        expect(aggregates).toHaveLength(2);
+        const unresolved = aggregates.find(a => a.unresolved);
+        expect(unresolved).toBeDefined();
+        expect(unresolved?.actualModel).toBeUndefined();
+        expect(unresolved?.requestedModel).toBe('openrouter/free');
+        expect(unresolved?.scenarioCount).toBe(1);
+        // Never merged into the resolved model's aggregate.
+        const resolved = aggregates.find(a => a.actualModel === 'model-a');
+        expect(resolved?.scenarioCount).toBe(1);
+    });
+
+    it('returns an empty array for an empty input', () => {
+        expect(aggregateByActualModel([])).toEqual([]);
+    });
+});
+
+/** Every four-space-indented `<id>: [x, y]` point line in a Mermaid source string, in source
+ * order — deliberately excludes `title`/`x-axis`/`y-axis`/`quadrant-N` lines, which share the same
+ * indentation but never contain a coordinate pair. */
+const mermaidPointLines = (mermaidSource: string): string[] =>
+    mermaidSource.split('\n').filter(l => /^ {4}\S+: \[-?\d/.test(l));
+
+/** Characters that must never appear anywhere in generated Mermaid source or SVG: a carriage
+ * return (Windows line ending or a stray `\r`), the Unicode line/paragraph separators (U+2028,
+ * U+2029 — invisible in most editors but treated as line breaks by some parsers and not by
+ * others, a classic source of "looks fine, parses wrong"), and common zero-width characters
+ * (U+200B zero-width space, U+FEFF byte-order-mark/zero-width-no-break-space) that can silently
+ * split or merge tokens depending on the exact parser. */
+const FORBIDDEN_INVISIBLE_CHARS = /[\r\u2028\u2029\u200B\uFEFF]/;
+
 describe('buildElapsedVsTokensChart', () => {
-    const aggregate = (overrides: Partial<ProviderModelAggregate>): ProviderModelAggregate => ({
-        provider: 'OpenAI',
-        model: 'gpt-4o-mini',
-        scenarioCount: 11,
-        passCount: 10,
-        knownVarianceCount: 1,
-        failCount: 0,
-        providerErrorCount: 0,
-        timeoutCount: 0,
-        acceptedCount: 11,
-        totalInputTokens: 100,
-        totalOutputTokens: 50,
-        totalTokens: 150,
-        tokensIncomplete: false,
-        totalCachedInputTokens: null,
-        totalCacheWriteInputTokens: null,
-        totalReasoningTokens: null,
-        totalToolUseInputTokens: null,
-        totalProviderTokens: null,
-        totalCost: 0.001,
-        avgCostPerScenario: 0.001 / 11,
-        costIncomplete: false,
-        distinctActualModels: [],
-        distinctPricingVersions: [],
-        distinctCacheWriteTtls: [],
-        totalElapsedMs: 5500,
-        avgElapsedMs: 500,
-        ...overrides,
+    it('renders a Mermaid quadrantChart source with the required title and axes, no code fence', () => {
+        const { mermaidSource } = buildElapsedVsTokensChart([record({})]);
+        expect(mermaidSource).not.toContain('```');
+        expect(mermaidSource.startsWith('quadrantChart')).toBe(true);
+        expect(mermaidSource).toContain('title Average elapsed time vs. consumed tokens by model');
+        expect(mermaidSource).toContain('x-axis Low elapsed --> High elapsed');
+        expect(mermaidSource).toContain('y-axis Low tokens --> High tokens');
     });
 
-    it('renders a Mermaid quadrantChart with the required title and axes', () => {
-        const { markdown } = buildElapsedVsTokensChart([aggregate({})]);
-        expect(markdown).toContain('```mermaid');
-        expect(markdown).toContain('quadrantChart');
-        expect(markdown).toContain('title Average elapsed time vs. consumed tokens by model');
-        expect(markdown).toContain('x-axis Low elapsed --> High elapsed');
-        expect(markdown).toContain('y-axis Low tokens --> High tokens');
-        expect(markdown).toContain('```\n');
-    });
-
-    it('plots x from avgElapsedMs and y from totalTokens, labeled by provider + model', () => {
-        const a = aggregate({ provider: 'Gemini', model: 'gemini-2.5-flash', avgElapsedMs: 1645, totalTokens: 7999 });
-        const { markdown, plotted } = buildElapsedVsTokensChart([a]);
-        expect(plotted).toEqual([a]);
+    it('assigns the single point the deterministic id M01, never a raw provider/model label', () => {
+        const r = record({
+            provider: 'Gemini',
+            model: 'gemini-2.5-flash',
+            elapsedMs: 1645,
+            inputTokens: 7767,
+            outputTokens: 232,
+        });
+        const { mermaidSource, tableMarkdown, plotted } = buildElapsedVsTokensChart([r]);
+        expect(plotted).toHaveLength(1);
+        expect(plotted[0].totalTokens).toBe(7999);
         // A single point normalizes to the midpoint (no other point to spread against).
-        expect(markdown).toContain('Gemini gemini-2.5-flash: [0.50, 0.50]');
+        expect(mermaidSource).toContain('M01: [0.50, 0.50]');
+        // The real model id never appears inside the Mermaid source — only in the table.
+        expect(mermaidSource).not.toContain('gemini');
+        expect(tableMarkdown).toContain('| M01 | Gemini | gemini-2.5-flash |');
     });
 
-    it('normalizes multiple points into the [0, 1] range required by quadrantChart, min at 0 and max at 1', () => {
-        const slow = aggregate({ provider: 'A', model: 'slow', avgElapsedMs: 1000, totalTokens: 1000 });
-        const fast = aggregate({ provider: 'A', model: 'fast', avgElapsedMs: 100, totalTokens: 100 });
-        const { markdown } = buildElapsedVsTokensChart([slow, fast]);
-        expect(markdown).toContain('A slow: [1.00, 1.00]');
-        expect(markdown).toContain('A fast: [0.00, 0.00]');
+    it('normalizes multiple points into the [0, 1] range required by quadrantChart, min at 0 and max at 1, in deterministic M01/M02 order', () => {
+        const slow = record({ provider: 'A', model: 'slow', elapsedMs: 1000, inputTokens: 1000, outputTokens: 0 });
+        const fast = record({ provider: 'A', model: 'fast', elapsedMs: 100, inputTokens: 100, outputTokens: 0 });
+        const { mermaidSource, tableMarkdown } = buildElapsedVsTokensChart([slow, fast]);
+        // aggregateByActualModel sorts by (provider, requestedModel) — "fast" < "slow" alphabetically.
+        expect(mermaidSource).toContain('M01: [0.00, 0.00]');
+        expect(mermaidSource).toContain('M02: [1.00, 1.00]');
+        expect(tableMarkdown).toContain('| M01 | A | fast |');
+        expect(tableMarkdown).toContain('| M02 | A | slow |');
     });
 
-    it('sanitizes a model id containing : and / so it never breaks the Mermaid point-label syntax', () => {
-        const a = aggregate({ provider: 'OpenRouter', model: 'openai/gpt-oss-20b:free' });
-        const { markdown } = buildElapsedVsTokensChart([a]);
-        // The label segment (before the coordinate pair) must carry no raw colon/bracket.
-        const line = markdown.split('\n').find(l => l.includes('gpt-oss-20b'));
-        expect(line).toBeDefined();
-        const labelPart = line?.split(':').slice(0, -1).join(':'); // everything before the final "[x, y]" colon
-        expect(labelPart).not.toMatch(/[:[\]]/);
-        expect(line).toContain('openai/gpt-oss-20b free'); // slash kept, colon replaced
+    it('produces the same point ids, coordinates, and SVG in the same order across repeated calls with the same records', () => {
+        const records = [
+            record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'a', actualModel: 'anthropic/claude-haiku-4.5' }),
+            record({ provider: 'Gemini', model: 'gemini-2.5-pro', scenarioId: 'b', elapsedMs: 500 }),
+        ];
+        const first = buildElapsedVsTokensChart(records);
+        const second = buildElapsedVsTokensChart(records);
+        expect(second.mermaidSource).toBe(first.mermaidSource);
+        expect(second.svg).toBe(first.svg);
+    });
+
+    it('labels a dynamic route by its actual resolved model in the table, never the requested route, while the chart uses only the opaque id', () => {
+        const r = record({ provider: 'OpenRouter', model: 'openrouter/free', actualModel: 'openai/gpt-oss-20b:free' });
+        const { mermaidSource, tableMarkdown } = buildElapsedVsTokensChart([r]);
+        expect(mermaidPointLines(mermaidSource)).toEqual(['    M01: [0.50, 0.50]']);
+        expect(tableMarkdown).toContain('| M01 | OpenRouter | openrouter/free | openai/gpt-oss-20b:free |');
+        expect(mermaidSource).not.toContain('gpt-oss');
+    });
+
+    it('gives a route resolving to two different actual models two separate points, never one averaged point', () => {
+        const a = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'a', actualModel: 'model-a', inputTokens: 100, outputTokens: 0, elapsedMs: 100 });
+        const b = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'b', actualModel: 'model-b', inputTokens: 900, outputTokens: 0, elapsedMs: 900 });
+        const { mermaidSource, tableMarkdown, plotted } = buildElapsedVsTokensChart([a, b]);
+        expect(plotted).toHaveLength(2);
+        expect(mermaidSource).toContain('M01: [0.00, 0.00]');
+        expect(mermaidSource).toContain('M02: [1.00, 1.00]');
+        expect(tableMarkdown).toContain('| M01 | OpenRouter | openrouter/free | model-a |');
+        expect(tableMarkdown).toContain('| M02 | OpenRouter | openrouter/free | model-b |');
+    });
+
+    it('labels an unresolved route call explicitly in the table — never guesses it onto a resolved model — while the chart stays a plain opaque id', () => {
+        const resolved = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'a', actualModel: 'model-a' });
+        const unresolvedCall = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'b', actualModel: undefined });
+        const { mermaidSource, tableMarkdown, plotted } = buildElapsedVsTokensChart([resolved, unresolvedCall]);
+        expect(plotted).toHaveLength(2);
+        expect(mermaidPointLines(mermaidSource)).toHaveLength(2);
+        expect(tableMarkdown).toContain('| OpenRouter | openrouter/free | unresolved |');
+        expect(mermaidSource).not.toContain('unresolved');
+    });
+
+    it('the companion table preserves the requested route in its own column even when the Point column carries the opaque id', () => {
+        const r = record({ provider: 'OpenRouter', model: 'openrouter/free', actualModel: 'model-a' });
+        const { tableMarkdown } = buildElapsedVsTokensChart([r]);
+        expect(tableMarkdown).toContain('| M01 | OpenRouter | openrouter/free | model-a |');
+    });
+
+    it('plots openrouter/free itself (no actual model resolved) behind an opaque id, exact route preserved in the table', () => {
+        const r = record({ provider: 'OpenRouter', model: 'openrouter/free' });
+        const { mermaidSource, tableMarkdown } = buildElapsedVsTokensChart([r]);
+        expect(mermaidPointLines(mermaidSource)).toEqual(['    M01: [0.50, 0.50]']);
+        expect(tableMarkdown).toContain('| M01 | OpenRouter | openrouter/free |');
+    });
+
+    it('regression: every model id from the original quadrantChart lexical-failure report gets a clean opaque point and an unchanged table row', () => {
+        // Exact identifiers reported to break the old character-sanitizing approach — every one of
+        // them a real, currently-registered or provider-reported OpenRouter identifier. Each gets a
+        // distinct elapsedMs/token value so a point can be uniquely traced back to its source record
+        // without depending on (or asserting) any particular sort order.
+        const ACTUAL_MODELS = [
+            'anthropic/claude-haiku-4.5',
+            'openai/gpt-oss-20b:free',
+            'google/gemma-4-26b-a4b-it:free',
+            'nvidia/nemotron-3-ultra-550b-a55b:free',
+            'nvidia/nemotron-nano-9b-v2:free',
+        ];
+        const records = [
+            ...ACTUAL_MODELS.map((actualModel, i) =>
+                record({
+                    provider: 'OpenRouter',
+                    model: 'openrouter/free',
+                    scenarioId: `scenario-${i}`,
+                    actualModel,
+                    elapsedMs: (i + 1) * 100,
+                    inputTokens: (i + 1) * 100,
+                    outputTokens: 0,
+                })
+            ),
+            record({
+                provider: 'OpenRouter',
+                model: 'openrouter/free',
+                scenarioId: 'scenario-unresolved',
+                actualModel: undefined,
+                elapsedMs: 600,
+                inputTokens: 600,
+                outputTokens: 0,
+            }),
+        ];
+        const { mermaidSource, tableMarkdown, plotted } = buildElapsedVsTokensChart(records);
+
+        // (b) number of Mermaid point lines equals number of plotted aggregates.
+        expect(plotted).toHaveLength(6);
+        const pointLines = mermaidPointLines(mermaidSource);
+        expect(pointLines).toHaveLength(6);
+
+        // (a)/(f)/(g): every point line matches a strict safe pattern — one opaque `M<digits>` id,
+        // one coordinate pair, nothing else; each line is its own newline-delimited entry (verified
+        // by the fact that `mermaidPointLines` split on '\n' found exactly 6 discrete matches, not
+        // one giant run-on match or fewer-than-expected lines from swallowed concatenation). No raw
+        // slash/colon/bracket/paren/whitespace inside any point identifier itself (the portion
+        // before the coordinate pair) — checked on the id token in isolation, not the whole line
+        // (which legitimately contains `[`, `]`, `,`, and a space as coordinate syntax).
+        const SAFE_POINT_LINE = /^ {4}M\d+: \[\d\.\d\d, \d\.\d\d\]$/;
+        const usedIds = new Set<string>();
+        for (const line of pointLines) {
+            expect(line).toMatch(SAFE_POINT_LINE);
+            const id = line.trim().split(':')[0];
+            expect(id).toMatch(/^M[0-9]+$/);
+            expect(id).not.toMatch(/[/:[\]() \t]/);
+            usedIds.add(id);
+        }
+        expect(usedIds.size).toBe(6); // every point got its own distinct id — none reused
+
+        // Parse the companion table's Point/Actual-model columns so each id can be traced back to
+        // its source record without assuming a particular sort order.
+        const tableRowById = new Map<string, string>();
+        for (const line of tableMarkdown.split('\n')) {
+            const cells = line.split('|').map(c => c.trim());
+            if (cells.length >= 5 && /^M[0-9]+$/.test(cells[1])) {
+                tableRowById.set(cells[1], cells[4]); // [ '', Point, Provider, Requested, Actual, ... ]
+            }
+        }
+
+        // (c) each short point id used in the chart also appears as a table row.
+        for (const id of usedIds) {
+            expect(tableRowById.has(id)).toBe(true);
+        }
+        // (d) exact canonical actual-model ids — slash, dot, colon, `:free` suffix all intact —
+        // remain unchanged in the table; every one of the 5 real ids plus the literal "unresolved"
+        // label is present exactly once.
+        const tableActualModels = Array.from(tableRowById.values()).sort();
+        expect(tableActualModels).toEqual([...ACTUAL_MODELS, 'unresolved'].sort());
+
+        // (e) the dynamic openrouter/free route produced separate points per distinct actual model
+        // — never one averaged/merged point — plus one more for the unresolved call.
+        expect(tableRowById.size).toBe(ACTUAL_MODELS.length + 1);
+
+        // None of the raw identifiers — slashes, dots, colons — leak into the Mermaid source itself.
+        for (const actualModel of ACTUAL_MODELS) {
+            expect(mermaidSource).not.toContain(actualModel);
+        }
+        expect(mermaidSource).not.toMatch(/[/]/);
+    });
+
+    it('unresolved labels containing parentheses never reach the Mermaid source — only the opaque id does', () => {
+        const resolved = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'a', actualModel: 'model-a' });
+        const unresolvedCall = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'b', actualModel: undefined });
+        const { mermaidSource, tableMarkdown } = buildElapsedVsTokensChart([resolved, unresolvedCall]);
+        expect(mermaidSource).not.toMatch(/[()]/);
+        expect(tableMarkdown).toContain('unresolved'); // still present, in the table only
     });
 
     it('marks a partial token total with * in the companion table, same convention as formatMetricsMarkdownTable', () => {
-        const a = aggregate({ totalTokens: 300, tokensIncomplete: true });
-        const { markdown } = buildElapsedVsTokensChart([a]);
-        expect(markdown).toContain('300*');
+        const r = record({ inputTokens: 300, outputTokens: null });
+        const { tableMarkdown } = buildElapsedVsTokensChart([r]);
+        expect(tableMarkdown).toContain('300*');
     });
 
-    it('never fabricates a point for an aggregate with totalTokens: null — excludes it, never coerces to 0', () => {
-        const withTokens = aggregate({ provider: 'A', model: 'has-tokens', totalTokens: 200 });
-        const noTokens = aggregate({ provider: 'B', model: 'no-tokens', totalTokens: null, tokensIncomplete: true });
-        const { markdown, plotted, excluded } = buildElapsedVsTokensChart([withTokens, noTokens]);
+    it('never fabricates a point for a group with no token usage at all — excludes it, never coerces to 0', () => {
+        const withTokens = record({ provider: 'A', model: 'has-tokens', inputTokens: 200, outputTokens: 0 });
+        const noTokens = record({ provider: 'B', model: 'no-tokens', inputTokens: null, outputTokens: null });
+        const { mermaidSource, tableMarkdown, plotted, excluded } = buildElapsedVsTokensChart([withTokens, noTokens]);
 
-        expect(plotted).toEqual([withTokens]);
-        expect(excluded).toEqual([noTokens]);
-        expect(markdown).not.toContain('B no-tokens: [');
-        expect(markdown).toContain('excluded from the chart');
-        expect(markdown).toContain('B no-tokens');
-        expect(markdown).not.toMatch(/no-tokens.*\[0\.00, 0\.00\]/); // never silently plotted at 0
+        expect(plotted).toHaveLength(1);
+        expect(plotted[0].requestedModel).toBe('has-tokens');
+        expect(excluded).toHaveLength(1);
+        expect(excluded[0].requestedModel).toBe('no-tokens');
+        expect(mermaidSource).not.toContain('B no-tokens: [');
+        expect(tableMarkdown).toContain('excluded from the chart');
+        expect(tableMarkdown).toContain('B no-tokens');
+        expect(mermaidSource).not.toMatch(/no-tokens.*\[0\.00, 0\.00\]/); // never silently plotted at 0
     });
 
     it('returns an honest empty-state message, not an empty chart, when nothing is plottable', () => {
-        const noTokens = aggregate({ totalTokens: null, tokensIncomplete: true });
-        const { markdown, plotted } = buildElapsedVsTokensChart([noTokens]);
+        const noTokens = record({ inputTokens: null, outputTokens: null });
+        const { mermaidSource, svg, tableMarkdown, plotted } = buildElapsedVsTokensChart([noTokens]);
         expect(plotted).toEqual([]);
-        expect(markdown).not.toContain('```mermaid');
-        expect(markdown.toLowerCase()).toContain('no plottable');
+        expect(mermaidSource).toBe('');
+        expect(svg).toBe('');
+        expect(tableMarkdown.toLowerCase()).toContain('no plottable');
     });
 
     it('returns an empty chart-state for an empty input, not an error', () => {
-        const { markdown, plotted, excluded } = buildElapsedVsTokensChart([]);
+        const { mermaidSource, svg, tableMarkdown, plotted, excluded } = buildElapsedVsTokensChart([]);
         expect(plotted).toEqual([]);
         expect(excluded).toEqual([]);
-        expect(markdown.toLowerCase()).toContain('no plottable');
+        expect(mermaidSource).toBe('');
+        expect(svg).toBe('');
+        expect(tableMarkdown.toLowerCase()).toContain('no plottable');
     });
 
     it('includes the required interpretation note about lower-left meaning faster/fewer tokens, and its correctness caveat', () => {
-        const { markdown } = buildElapsedVsTokensChart([aggregate({})]);
-        expect(markdown.toLowerCase()).toContain('lower-left');
-        expect(markdown.toLowerCase()).toContain('faster');
-        expect(markdown.toLowerCase()).toContain('does not by itself measure correctness');
+        const { tableMarkdown } = buildElapsedVsTokensChart([record({})]);
+        expect(tableMarkdown.toLowerCase()).toContain('lower-left');
+        expect(tableMarkdown.toLowerCase()).toContain('faster');
+        expect(tableMarkdown.toLowerCase()).toContain('does not by itself measure correctness');
     });
 
     it('preserves the exact numeric avgElapsedMs/totalTokens values in the companion table, not just normalized coordinates', () => {
-        const a = aggregate({ provider: 'Gemini', model: 'gemini-2.5-pro', avgElapsedMs: 3483.6363636363635, totalTokens: 5893 });
-        const { markdown } = buildElapsedVsTokensChart([a]);
-        expect(markdown).toContain('3484ms'); // rounded for the table, still the real value
-        expect(markdown).toContain('5893');
+        const r = record({
+            provider: 'Gemini',
+            model: 'gemini-2.5-pro',
+            elapsedMs: 3483.6363636363635,
+            inputTokens: 5656,
+            outputTokens: 237,
+        });
+        const { tableMarkdown } = buildElapsedVsTokensChart([r]);
+        expect(tableMarkdown).toContain('3484ms'); // rounded for the table, still the real value
+        expect(tableMarkdown).toContain('5893');
+    });
+
+    describe('point-line newline separation (regression: VS Code "two lines read as one" failure)', () => {
+        // Reproduces the exact shape of the reported failure — 20 points, so point ids reach two
+        // digits on both sides of a round number (M09/M10/M11/M20), the same boundary the bug
+        // report named specifically.
+        const twentyPointRecords = Array.from({ length: 20 }, (_, i) =>
+            record({
+                provider: 'OpenRouter',
+                model: 'openrouter/free',
+                scenarioId: `s${i}`,
+                actualModel: `vendor/model-${i}:free`,
+                elapsedMs: (i + 1) * 10,
+                inputTokens: (i + 1) * 10,
+                outputTokens: 0,
+            })
+        );
+
+        it('produces exactly one point per plotted aggregate, each its own literal-\\n-delimited line', () => {
+            const { mermaidSource, plotted } = buildElapsedVsTokensChart(twentyPointRecords);
+            expect(plotted).toHaveLength(20);
+
+            // Splitting on the literal newline character must yield exactly one point line per
+            // plotted aggregate — if two points were ever concatenated without a separating '\n',
+            // split('\n') would find fewer lines than plotted aggregates, exactly as the bug
+            // report's "M10: [...]    M11: [...]" symptom describes.
+            const lines = mermaidPointLines(mermaidSource);
+            expect(lines).toHaveLength(20);
+            expect(new Set(lines).size).toBe(20); // no duplicate/merged line text either
+
+            // The specific boundary named in the bug report: M10 and M11 must be two distinct
+            // array entries, not one string containing both.
+            const m10 = lines.find(l => l.startsWith('    M10:'));
+            const m11 = lines.find(l => l.startsWith('    M11:'));
+            expect(m10).toBeDefined();
+            expect(m11).toBeDefined();
+            expect(m10).not.toContain('M11');
+            expect(m11).not.toContain('M10');
+        });
+
+        it('contains no carriage return, Unicode line/paragraph separator, or zero-width character anywhere in the Mermaid source', () => {
+            const { mermaidSource } = buildElapsedVsTokensChart(twentyPointRecords);
+            expect(mermaidSource).not.toMatch(FORBIDDEN_INVISIBLE_CHARS);
+            // Confirms line count via '\n' matches the visual line count exactly — i.e. every
+            // line break in this string really is the literal '\n' character, not some other
+            // Unicode separator that a naive visual read (or a lenient parser) might also treat
+            // as a break while a stricter one (VS Code's Mermaid extension) does not.
+            expect(mermaidSource.split('\n')).toHaveLength(mermaidSource.split(/\r\n|\r|\n/).length);
+        });
+
+        it('the rendered SVG also contains no carriage return, Unicode separator, or zero-width character', () => {
+            const { svg } = buildElapsedVsTokensChart(twentyPointRecords);
+            expect(svg).not.toMatch(FORBIDDEN_INVISIBLE_CHARS);
+        });
+    });
+});
+
+describe('buildElapsedVsTokensChart — SVG output', () => {
+    it('renders a well-formed SVG document with the correct point count and no raw model text', () => {
+        const records = [
+            record({ provider: 'Gemini', model: 'gemini-2.5-flash', scenarioId: 'a', elapsedMs: 500, inputTokens: 100, outputTokens: 0 }),
+            record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'b', actualModel: 'anthropic/claude-haiku-4.5', elapsedMs: 900, inputTokens: 300, outputTokens: 0 }),
+        ];
+        const { svg, plotted } = buildElapsedVsTokensChart(records);
+        expect(svg.startsWith('<svg')).toBe(true);
+        expect(svg.trim().endsWith('</svg>')).toBe(true);
+        expect(svg).toContain('<circle');
+        expect((svg.match(/<circle/g) ?? [])).toHaveLength(plotted.length);
+        expect(svg).toContain('>M01<');
+        expect(svg).toContain('>M02<');
+        expect(svg).not.toContain('gemini-2.5-flash');
+        expect(svg).not.toContain('anthropic/claude-haiku-4.5');
+        expect(svg).not.toContain('openrouter/free');
+    });
+
+    it('is empty when nothing is plottable, same as mermaidSource', () => {
+        const { svg } = buildElapsedVsTokensChart([record({ inputTokens: null, outputTokens: null })]);
+        expect(svg).toBe('');
+    });
+
+    it('produces the same point ids/order as mermaidSource — the two representations cannot diverge because both come from the same points array', () => {
+        const records = [
+            record({ provider: 'A', model: 'slow', scenarioId: 'a', elapsedMs: 1000, inputTokens: 1000, outputTokens: 0 }),
+            record({ provider: 'A', model: 'fast', scenarioId: 'b', elapsedMs: 100, inputTokens: 100, outputTokens: 0 }),
+        ];
+        const { mermaidSource, svg } = buildElapsedVsTokensChart(records);
+        const idsInMermaid = mermaidPointLines(mermaidSource).map(l => l.trim().split(':')[0]);
+        const idsInSvg = Array.from(svg.matchAll(/>(M\d+)</g)).map(m => m[1]);
+        expect(idsInSvg).toEqual(idsInMermaid);
     });
 });
 
@@ -838,5 +1143,60 @@ describe('distinctSourceSessions', () => {
     it('returns a single-entry array when everything came from one session', () => {
         const merged = mergeVerificationRecords(undefined, [record({})], '2026-07-30T10:00:00.000Z');
         expect(distinctSourceSessions(merged)).toEqual(['2026-07-30T10:00:00.000Z']);
+    });
+});
+
+describe('formatVerificationRecordsCsv', () => {
+    it('returns just a header row for an empty record set', () => {
+        const csv = formatVerificationRecordsCsv([]);
+        expect(csv.split('\n')).toHaveLength(1);
+        expect(csv).toContain('provider,model,actualModel,scenarioId,outcome');
+    });
+
+    it('emits one data row per record, preserving canonical model ids exactly', () => {
+        const csv = formatVerificationRecordsCsv([
+            record({ provider: 'OpenRouter', model: 'openrouter/free', actualModel: 'meta-llama/llama-3.3-70b-instruct:free' }),
+        ]);
+        const rows = csv.split('\n');
+        expect(rows).toHaveLength(2);
+        expect(rows[1]).toContain('openrouter/free');
+        expect(rows[1]).toContain('meta-llama/llama-3.3-70b-instruct:free');
+    });
+
+    it('never sanitizes slashes, colons, or parentheses — only the Mermaid label does that', () => {
+        const csv = formatVerificationRecordsCsv([record({ model: 'openai/gpt-oss-20b:free (preview)' })]);
+        expect(csv).toContain('openai/gpt-oss-20b:free (preview)');
+    });
+
+    it('emits an empty cell (never a fabricated 0) for a missing optional usage field', () => {
+        const csv = formatVerificationRecordsCsv([record({ inputTokens: null, outputTokens: null, reasoningTokens: undefined })]);
+        const [header, row] = csv.split('\n');
+        const cols = header.split(',');
+        const cells = row.split(',');
+        expect(cells[cols.indexOf('inputTokens')]).toBe('');
+        expect(cells[cols.indexOf('reasoningTokens')]).toBe('');
+    });
+
+    it('quote-escapes a field containing a comma', () => {
+        const csv = formatVerificationRecordsCsv([record({ scenarioId: 'a, b' })]);
+        expect(csv).toContain('"a, b"');
+    });
+});
+
+describe('formatVerificationRecordsJsonl', () => {
+    it('returns an empty string for an empty record set', () => {
+        expect(formatVerificationRecordsJsonl([])).toBe('');
+    });
+
+    it('emits exactly one JSON line per record, each parseable independently', () => {
+        const records = [
+            record({ scenarioId: 'move-node-right' }),
+            record({ scenarioId: 'move-node-left', model: 'openrouter/free', actualModel: 'model-a' }),
+        ];
+        const jsonl = formatVerificationRecordsJsonl(records);
+        const lines = jsonl.split('\n');
+        expect(lines).toHaveLength(2);
+        expect(JSON.parse(lines[0])).toEqual(records[0]);
+        expect(JSON.parse(lines[1])).toEqual(records[1]);
     });
 });

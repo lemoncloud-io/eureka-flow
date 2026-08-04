@@ -7,6 +7,7 @@ import { createVirtualAgentEnvironment } from '../../environment/createVirtualAg
 import { createFetchHttpRequest } from '../../http/FetchHttpRequest';
 import {
     TIMEOUT_MARKER,
+    classifyGeminiFailureCategory,
     classifyLocatorScenarioResult,
     classifyThrownError,
     isAcceptedOutcome,
@@ -20,6 +21,8 @@ import {
     formatCostRanking,
     formatMetricsMarkdownTable,
     formatTokenDiagnosticsTable,
+    formatVerificationRecordsCsv,
+    formatVerificationRecordsJsonl,
     mergeVerificationRecords,
     wrapGatewayWithUsageCapture,
 } from '../../llm/verificationMetrics';
@@ -48,16 +51,52 @@ import type { LocatorScenarioResult } from '../../llm/verifyLocatorScenarios';
  * reasoning `runMatrix`'s own per-block afterAll already applies to `rows.length === 0`).
  */
 const ALL_METRIC_RECORDS: VerificationRunRecord[] = [];
-const METRICS_DIR = join(__dirname, '../../../../../docs/browser-agent/verification-metrics');
+
+/**
+ * Explicit opt-in required on top of a real provider key: a key being present alone is NOT
+ * sufficient to make a live network call. This is the same "never run live merely because a key
+ * variable exists" rule the surrounding docs describe — it was previously enforced only by whoever
+ * chose to set a key at all; this makes it a real, checked gate.
+ */
+const LIVE_RUN_OPTED_IN = process.env['RUN_LIVE_PROVIDER_TESTS'] === '1';
+
+/** Optional single-provider filter for an inexpensive smoke run before the full matrix — matches
+ * `ProviderModelEntry.providerId` (e.g. `openai`, `gemini`, `openrouter`), not the display name.
+ * Unset means every registered provider with a key (and RUN_LIVE_PROVIDER_TESTS=1) is in scope,
+ * same as before this option existed. Combine with the entry's own `<PROVIDER>_TEST_MODEL`
+ * override (see `providerRegistry.ts`) to narrow to exactly one provider AND one model. */
+const LIVE_PROVIDER_FILTER = process.env['LIVE_PROVIDER_FILTER'];
+
+/** Output directory for every generated artifact (Markdown/JSON/CSV/JSONL/run-manifest). Defaults
+ * to this repo's existing in-tree path (unchanged behavior); set to an absolute path outside the
+ * working tree to keep live-run output out of `git status` entirely — see
+ * docs/browser-agent/foundations/production-readiness.md for example commands. */
+const METRICS_DIR = process.env['LIVE_METRICS_OUTPUT_DIR'] ?? join(__dirname, '../../../../../docs/browser-agent/verification-metrics');
 const METRICS_MD_PATH = join(METRICS_DIR, 'latest.md');
 const METRICS_JSON_PATH = join(METRICS_DIR, 'latest.json');
+const METRICS_CSV_PATH = join(METRICS_DIR, 'latest.csv');
+const METRICS_JSONL_PATH = join(METRICS_DIR, 'latest.jsonl');
+const RUN_MANIFEST_PATH = join(METRICS_DIR, 'run-manifest.json');
+/** Canonical, editable Mermaid source for the elapsed-vs-tokens chart — the actual `.mmd` file, no
+ * code fence, no Markdown wrapper. `latest.md` links to this file rather than re-embedding the
+ * Mermaid text inline, since inline-fenced Mermaid is exactly what an editor/extension rendering
+ * quirk (see production-readiness.md's Mermaid-rendering note) can fail on inconsistently — an SVG
+ * embed always renders, everywhere, and this file stays the one place the raw source lives. */
+const CHART_MMD_PATH = join(METRICS_DIR, 'elapsed-vs-tokens.mmd');
+/** Rendered SVG of the identical chart, generated from the same aggregate/point data
+ * `CHART_MMD_PATH` is generated from — see `buildElapsedVsTokensChart`'s own doc for why the two
+ * cannot diverge (neither is derived from the other; both come from the same `points` array). */
+const CHART_SVG_PATH = join(METRICS_DIR, 'elapsed-vs-tokens.svg');
 
 /**
  * Env-gated real-provider run of the full scenario matrix (list_nodes vs move_node selection, all
  * four move directions, absolute position, refusal, unknown-target) — all single-turn. Skipped
- * entirely unless the provider's key env var is set; never hits the network in CI or a keyless
- * run, and no key is ever read into a browser bundle (Node test env, `process.env` only) or
- * logged.
+ * entirely unless BOTH `RUN_LIVE_PROVIDER_TESTS=1` is explicitly set AND the provider's key env
+ * var is present — a key being set is no longer sufficient by itself, so a key left in the
+ * environment for an unrelated reason can never trigger an accidental live run. Optionally narrow
+ * to one provider with `LIVE_PROVIDER_FILTER=<providerId>` (combine with `<PROVIDER>_TEST_MODEL`
+ * for one provider AND one model). Never hits the network in CI or a keyless/opted-out run, and no
+ * key is ever read into a browser bundle (Node test env, `process.env` only) or logged.
  *
  * Deliberately does NOT include a multi-step `list_nodes` -> `move_node` conversation: that needs
  * the real tool-result round-trip, a structurally different harness than this file's
@@ -148,6 +187,20 @@ const raceWithTimeout = async <T>(promise: Promise<T>, timeoutMs: number, label:
     }
 };
 
+/** Sanitized failure category — populated for Gemini only (the sole provider with a real
+ * classifier today, see `classifyRealProviderResult.ts`'s own doc for why one isn't invented for
+ * the others without a concrete failure to classify), and only for the two outcomes that
+ * represent a real failure/error rather than a scoring disagreement. */
+const errorCategoryFor = (
+    provider: string,
+    outcome: RealProviderOutcome,
+    message: string | undefined
+): string | undefined => {
+    if (provider !== 'Gemini') return undefined;
+    if (outcome !== 'fail' && outcome !== 'provider-error') return undefined;
+    return classifyGeminiFailureCategory(message ?? '');
+};
+
 const runMatrix = (
     providerLabel: string,
     provider: string,
@@ -191,6 +244,7 @@ const runMatrix = (
                     // real timeouts (rows.length would shrink instead of counting the failure).
                     const message = err instanceof Error ? err.message : String(err);
                     const outcome = classifyThrownError(err);
+                    const errorCategory = errorCategoryFor(provider, outcome, message);
                     rows.push({ scenarioId: scenario.id, outcome, note: message });
                     const endedAt = Date.now();
                     ALL_METRIC_RECORDS.push({
@@ -202,6 +256,10 @@ const runMatrix = (
                         endedAt,
                         elapsedMs: endedAt - startedAt,
                         ...usage,
+                        toolCallName: null,
+                        canvasStateCorrect: isAcceptedOutcome(outcome),
+                        retries: 0,
+                        ...(errorCategory ? { errorCategory } : {}),
                     });
                     throw err;
                 }
@@ -211,6 +269,7 @@ const runMatrix = (
                 // (provider-error is checked before knownVariance so a thrown provider/gateway
                 // failure can never be misread as a tool-choice variance).
                 const { outcome, note } = classifyLocatorScenarioResult(result, scenario.knownVariance);
+                const errorCategory = errorCategoryFor(provider, outcome, note ?? result.error);
                 rows.push({ scenarioId: scenario.id, outcome, ...(note ? { note } : {}) });
                 const endedAt = Date.now();
                 ALL_METRIC_RECORDS.push({
@@ -222,6 +281,12 @@ const runMatrix = (
                     endedAt,
                     elapsedMs: endedAt - startedAt,
                     ...usage,
+                    toolCallName: result.toolCallName,
+                    ...(result.argsValid !== undefined ? { argsValid: result.argsValid } : {}),
+                    ...(result.dispatchOk !== undefined ? { dispatchOk: result.dispatchOk } : {}),
+                    canvasStateCorrect: isAcceptedOutcome(outcome),
+                    retries: 0,
+                    ...(errorCategory ? { errorCategory } : {}),
                 });
 
                 if (outcome === 'known-variance') {
@@ -260,14 +325,22 @@ const runMatrix = (
 // Registry-driven: loops every entry in PROVIDER_REGISTRY (see the module doc above for which
 // providers are currently registered) and, per entry, every model resolveModelsToRun() returns —
 // every configured model unless the entry's modelEnvOverride narrows it to one. Each
-// (provider, model) pair gets its own describe.runIf, gated on that entry's own apiKeyEnv —
-// identical skip semantics to before.
+// (provider, model) pair gets its own describe.runIf, gated on THREE things now, all required:
+// RUN_LIVE_PROVIDER_TESTS=1 (explicit opt-in — a key alone is no longer sufficient), that entry's
+// own apiKeyEnv, and (if set) LIVE_PROVIDER_FILTER matching this entry's providerId.
+const PLANNED_PAIRS: Array<{ provider: string; providerId: string; model: string; keyPresent: boolean }> = [];
 for (const entry of PROVIDER_REGISTRY) {
     const apiKey = process.env[entry.apiKeyEnv];
     const overrideValue = entry.modelEnvOverride ? process.env[entry.modelEnvOverride] : undefined;
+    const providerSelected = !LIVE_PROVIDER_FILTER || LIVE_PROVIDER_FILTER === entry.providerId;
 
     for (const model of resolveModelsToRun(entry, overrideValue)) {
-        describe.runIf(!!apiKey)(`${entry.displayName} scenario matrix (env-gated) — ${model}`, () => {
+        if (providerSelected) {
+            PLANNED_PAIRS.push({ provider: entry.displayName, providerId: entry.providerId, model, keyPresent: !!apiKey });
+        }
+        const willRun = LIVE_RUN_OPTED_IN && !!apiKey && providerSelected;
+
+        describe.runIf(willRun)(`${entry.displayName} scenario matrix (env-gated) — ${model}`, () => {
             runMatrix(
                 `${entry.displayName} (${model})`,
                 entry.displayName,
@@ -283,6 +356,29 @@ for (const entry of PROVIDER_REGISTRY) {
             );
         });
     }
+}
+
+// Printed at module-collection time — before vitest runs a single test body, so this always
+// appears before any real network call could happen, whether or not anything is actually gated
+// in to run. Never silent about what would/would not run and why.
+{
+    const runnable = PLANNED_PAIRS.filter(p => p.keyPresent);
+    const totalRequests = runnable.length * LOCATOR_SCENARIOS.length;
+    console.log('\n[realLocatorScenarios] live-run selection:');
+    console.log(`  RUN_LIVE_PROVIDER_TESTS=${LIVE_RUN_OPTED_IN ? '1 (opted in)' : 'unset — nothing will run'}`);
+    console.log(`  LIVE_PROVIDER_FILTER=${LIVE_PROVIDER_FILTER ?? '(none — every registered provider in scope)'}`);
+    if (PLANNED_PAIRS.length === 0) {
+        console.log('  no (provider, model) pairs match the current filter');
+    } else {
+        for (const pair of PLANNED_PAIRS) {
+            const status = !LIVE_RUN_OPTED_IN ? 'skipped: opt-in not set' : pair.keyPresent ? 'WILL RUN' : `skipped: ${pair.providerId} key not set`;
+            console.log(`  - ${pair.provider} (${pair.providerId}) / ${pair.model} — ${status}`);
+        }
+    }
+    console.log(
+        `  ${runnable.length} (provider, model) pair(s) × ${LOCATOR_SCENARIOS.length} scenarios = ` +
+            `${LIVE_RUN_OPTED_IN ? totalRequests : 0} expected live request(s) this run.\n`
+    );
 }
 
 // File-level afterAll (not nested inside runMatrix/describe — see the module doc above): fires
@@ -319,13 +415,25 @@ afterAll(() => {
         aggregates,
         records: mergedRecords,
     };
-    const chart = buildElapsedVsTokensChart(aggregates);
+    const chart = buildElapsedVsTokensChart(mergedRecords);
 
     const sessions = distinctSourceSessions(mergedRecords);
     const sessionsNote =
         sessions.length > 1
             ? `\n\nThis report combines ${sessions.length} sessions — generated at: ${sessions.join(', ')}.`
             : '';
+
+    // The chart section embeds the rendered SVG and links to the canonical .mmd source, rather
+    // than re-embedding raw Mermaid text inline — an inline ```mermaid fence is exactly what an
+    // editor/extension rendering inconsistency can fail on; an <img>-embedded SVG always renders,
+    // everywhere, and elapsed-vs-tokens.mmd stays the one place anyone needs to go to edit the
+    // actual chart source. Both files are generated from `chart.points`, never from each other.
+    const chartSection =
+        chart.points.length > 0
+            ? `## Average elapsed time vs. consumed tokens by model\n\n` +
+              `![Average elapsed time vs. consumed tokens by model](./elapsed-vs-tokens.svg)\n\n` +
+              `[Mermaid source](./elapsed-vs-tokens.mmd)\n\n${chart.tableMarkdown}\n`
+            : `## Average elapsed time vs. consumed tokens by model\n\n${chart.tableMarkdown}\n`;
 
     const markdown =
         `# LlmGateway verification metrics — generated ${report.generatedAt}\n\n` +
@@ -339,12 +447,37 @@ afterAll(() => {
         `${formatMetricsMarkdownTable(report.aggregates)}\n\n` +
         `## Cost ranking (cheapest to most expensive)\n\n${formatCostRanking(report.aggregates)}\n\n` +
         `## Token diagnostics\n\n${formatTokenDiagnosticsTable(report.aggregates)}\n\n` +
-        `## Average elapsed time vs. consumed tokens by model\n\n${chart.markdown}\n`;
+        `${chartSection}`;
+
+    const runManifest = {
+        generatedAt,
+        runLiveProviderTestsOptedIn: LIVE_RUN_OPTED_IN,
+        liveProviderFilter: LIVE_PROVIDER_FILTER ?? null,
+        scenarioCount: LOCATOR_SCENARIOS.length,
+        attemptedThisSession: ALL_METRIC_RECORDS.map(r => ({ provider: r.provider, model: r.model, scenarioId: r.scenarioId, outcome: r.outcome })),
+        sourceSessions: sessions,
+    };
 
     mkdirSync(METRICS_DIR, { recursive: true });
     writeFileSync(METRICS_MD_PATH, markdown);
     writeFileSync(METRICS_JSON_PATH, JSON.stringify(report, null, 2));
+    writeFileSync(METRICS_CSV_PATH, formatVerificationRecordsCsv(mergedRecords));
+    writeFileSync(METRICS_JSONL_PATH, formatVerificationRecordsJsonl(mergedRecords));
+    writeFileSync(RUN_MANIFEST_PATH, JSON.stringify(runManifest, null, 2));
 
-    console.log(`\n[verificationMetrics] wrote ${METRICS_MD_PATH} and ${METRICS_JSON_PATH}`);
+    // Only written when there's an actual chart to write — never overwrites/deletes a previously
+    // generated .mmd/.svg with empty placeholder content when this particular run had nothing
+    // plottable (e.g. a partial re-run of one provider). The .mmd/.svg pair is regenerated as a
+    // unit, from the same `chart.points`, whenever there IS something to plot.
+    if (chart.points.length > 0) {
+        writeFileSync(CHART_MMD_PATH, chart.mermaidSource);
+        writeFileSync(CHART_SVG_PATH, chart.svg);
+    }
+
+    console.log(
+        `\n[verificationMetrics] wrote ${METRICS_MD_PATH}, ${METRICS_JSON_PATH}, ${METRICS_CSV_PATH}, ` +
+            `${METRICS_JSONL_PATH}, ${RUN_MANIFEST_PATH}` +
+            (chart.points.length > 0 ? `, ${CHART_MMD_PATH}, and ${CHART_SVG_PATH}` : ' (no chart data to write this run)')
+    );
     console.table(aggregates);
 });

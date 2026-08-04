@@ -1,3 +1,4 @@
+import { isAcceptedOutcome } from './classifyRealProviderResult';
 import { COST_CURRENCY } from './pricing';
 
 import type { RealProviderOutcome } from './classifyRealProviderResult';
@@ -288,6 +289,30 @@ export interface VerificationRunRecord extends UsageTotals, ExtendedUsageInfo {
     startedAt: number;
     endedAt: number;
     elapsedMs: number;
+    /** The structured tool call name the model emitted, if any — `null` means no tool call;
+     * absent means this record predates the field (e.g. a merged-in older report). */
+    toolCallName?: string | null;
+    /** Whether the tool call's `argsDelta` parsed as valid JSON — absent when no tool call was
+     * made at all (the question doesn't arise), `false` only for an actual JSON-parse failure. */
+    argsValid?: boolean;
+    /** Whether `ToolExecutor.dispatch` reported success — absent when no dispatch was attempted
+     * (no tool call, or invalid args caught before dispatch). */
+    dispatchOk?: boolean;
+    /** Whether this harness's own acceptance criterion (`isAcceptedOutcome`: pass OR
+     * known-variance) was met — i.e. the canvas ended up in a state this scenario's `check()`
+     * accepts, whether that meant a correct mutation or a correctly-withheld one. Not an
+     * independent judgment separate from `outcome` — a restatement of it under this more specific
+     * name, since `check()` already validates canvas state as part of scoring every scenario. */
+    canvasStateCorrect?: boolean;
+    /** Retry attempts made before this outcome. Always `0` today — this harness has no retry
+     * logic yet; the field exists so a future retry mechanism doesn't need a schema change. */
+    retries?: number;
+    /** Sanitized, provider-neutral failure category (see `classifyGeminiFailureCategory` in
+     * `classifyRealProviderResult.ts`) — currently populated for Gemini `fail`/`provider-error`
+     * outcomes only; absent for every other provider/outcome (no generic classifier exists yet
+     * for OpenAI/Anthropic/OpenRouter — see that module's own doc for why this isn't invented
+     * without a concrete failure to classify). */
+    errorCategory?: string;
 }
 
 export interface ProviderModelAggregate {
@@ -717,27 +742,173 @@ export const mergeVerificationRecords = (
 export const distinctSourceSessions = (records: readonly MergedVerificationRunRecord[]): string[] =>
     Array.from(new Set(records.map(r => r.sourceGeneratedAt))).sort();
 
-export interface ElapsedVsTokensChart {
-    /** Full Markdown block: a Mermaid `quadrantChart`, a companion table carrying the exact
-     * numeric values (Mermaid's own point coordinates are normalized 0-1, so they alone can't
-     * carry real units), and a one-line interpretation note. Ready to embed directly in a report —
-     * never a fragment the caller has to further assemble. */
-    markdown: string;
-    /** Aggregates actually plotted — every one reported a non-null `totalTokens`. */
-    plotted: readonly ProviderModelAggregate[];
-    /** Aggregates left out of the chart because `totalTokens` is `null` (no scenario in that
-     * group reported any usage at all) — never silently dropped from the report, always listed. */
-    excluded: readonly ProviderModelAggregate[];
+/**
+ * Per-(provider, requestedModel, actualModel) aggregate, used specifically by
+ * {@link buildElapsedVsTokensChart}. Unlike {@link ProviderModelAggregate} (grouped by requested
+ * model/route only, with `distinctActualModels` as a footnoted mixing signal), this groups
+ * further by the actual model a route resolved to — so a route like OpenRouter's `openrouter/free`
+ * that serves two different underlying models across calls produces two separate aggregates here,
+ * each with its own point, instead of one aggregate with a footnote. See
+ * {@link aggregateByActualModel} for the exact splitting rule.
+ */
+export interface ActualModelAggregate {
+    provider: string;
+    /** What the caller asked for — a fixed model id, or a route like `openrouter/free`. */
+    requestedModel: string;
+    /** The model that actually served these calls, when the provider reported one. Absent means
+     * either (a) this provider/route never reports `actualModel` at all (a fixed-model gateway,
+     * not a route — e.g. Gemini, Anthropic today), or (b) it's a route that reported one for
+     * *other* calls in this same requestedModel group but not for these particular calls — see
+     * `unresolved`, which distinguishes the two so (b) is never silently treated as (a). */
+    actualModel?: string;
+    /** True only for case (b) above: this requestedModel group has at least one record with an
+     * `actualModel`, but these particular records have none — a route that should be resolvable
+     * but wasn't for this call. Always `false` for a provider that never reports `actualModel` at
+     * all (case (a)) — there was nothing to resolve, so it isn't flagged as unresolved. */
+    unresolved: boolean;
+    scenarioCount: number;
+    passCount: number;
+    acceptedCount: number;
+    totalInputTokens: number | null;
+    totalOutputTokens: number | null;
+    totalTokens: number | null;
+    tokensIncomplete: boolean;
+    totalElapsedMs: number;
+    avgElapsedMs: number;
 }
 
-/** Mermaid's `Label: [x, y]` point syntax breaks on a raw `:`/`[`/`]` inside the label (a model id
- * like `openai/gpt-oss-20b:free` has exactly that) — strip them for the chart label only; the
- * companion table (and the aggregate itself) still carries the exact, unmodified model id. */
-const sanitizeQuadrantLabel = (label: string): string =>
-    label
-        .replace(/[:[\]]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+const routeKey = (provider: string, requestedModel: string): string => `${provider}::${requestedModel}`;
+
+/**
+ * Groups real-provider records by (provider, requestedModel — `record.model`), then splits each
+ * group further by `actualModel`, but **only when at least one record in that requestedModel
+ * group reported one**. A fixed-model provider that never reports `actualModel` (Gemini, Anthropic
+ * today) therefore stays a single aggregate per requested model, exactly like
+ * {@link aggregateVerificationMetrics}'s own grouping — this never invents a per-model split where
+ * the provider gives no evidence one exists. A route like OpenRouter's `openrouter/free` splits
+ * into one aggregate per distinct actual model it resolved to, plus a separate `unresolved: true`
+ * aggregate for any call on that same route that didn't report one — never guessed, never merged
+ * into an arbitrary one of the resolved models.
+ */
+export const aggregateByActualModel = (records: readonly VerificationRunRecord[]): ActualModelAggregate[] => {
+    const byRoute = new Map<string, VerificationRunRecord[]>();
+    for (const record of records) {
+        const key = routeKey(record.provider, record.model);
+        const arr = byRoute.get(key);
+        if (arr) arr.push(record);
+        else byRoute.set(key, [record]);
+    }
+
+    const aggregates: ActualModelAggregate[] = [];
+    for (const routeRecords of byRoute.values()) {
+        const { provider, model: requestedModel } = routeRecords[0];
+        const routeHasAnyActualModel = routeRecords.some(r => r.actualModel !== undefined);
+
+        const subGroups = new Map<string | undefined, VerificationRunRecord[]>();
+        for (const r of routeRecords) {
+            const key = routeHasAnyActualModel ? r.actualModel : undefined;
+            const arr = subGroups.get(key);
+            if (arr) arr.push(r);
+            else subGroups.set(key, [r]);
+        }
+
+        for (const [actualModel, group] of subGroups) {
+            let totalInputTokens: number | null = null;
+            let inputMissing = false;
+            let totalOutputTokens: number | null = null;
+            let outputMissing = false;
+            let totalElapsedMs = 0;
+            for (const r of group) {
+                if (r.inputTokens !== null) totalInputTokens = (totalInputTokens ?? 0) + r.inputTokens;
+                else inputMissing = true;
+                if (r.outputTokens !== null) totalOutputTokens = (totalOutputTokens ?? 0) + r.outputTokens;
+                else outputMissing = true;
+                totalElapsedMs += r.elapsedMs;
+            }
+            const totalTokens =
+                totalInputTokens !== null || totalOutputTokens !== null
+                    ? (totalInputTokens ?? 0) + (totalOutputTokens ?? 0)
+                    : null;
+
+            aggregates.push({
+                provider,
+                requestedModel,
+                ...(actualModel !== undefined ? { actualModel } : {}),
+                unresolved: routeHasAnyActualModel && actualModel === undefined,
+                scenarioCount: group.length,
+                passCount: group.filter(r => r.outcome === 'pass').length,
+                acceptedCount: group.filter(r => isAcceptedOutcome(r.outcome)).length,
+                totalInputTokens,
+                totalOutputTokens,
+                totalTokens,
+                tokensIncomplete: inputMissing || outputMissing,
+                totalElapsedMs,
+                avgElapsedMs: totalElapsedMs / group.length,
+            });
+        }
+    }
+
+    return aggregates.sort(
+        (a, b) =>
+            a.provider.localeCompare(b.provider) ||
+            a.requestedModel.localeCompare(b.requestedModel) ||
+            (a.actualModel ?? '').localeCompare(b.actualModel ?? '')
+    );
+};
+
+/** One plotted point's full identity: its opaque chart id, its normalized [0,1] coordinates, and
+ * the real aggregate it came from. The single source of truth both `mermaidSource` and `svg` are
+ * rendered from — never independently recomputed by either, so the two representations cannot
+ * diverge from each other. */
+export interface QuadrantPoint {
+    pointId: string;
+    x: number;
+    y: number;
+    aggregate: ActualModelAggregate;
+}
+
+export interface ElapsedVsTokensChart {
+    /** Canonical, editable Mermaid `quadrantChart` source — plain Mermaid text, no ```mermaid code
+     * fence, no Markdown wrapper (write this directly to a `.mmd` file as-is). Empty string when
+     * nothing is plottable. Every point line is built from a plain string array joined with a
+     * single literal `\n` — see `buildMermaidSource`'s own doc for why this specific construction
+     * matters. */
+    mermaidSource: string;
+    /** A rendered SVG of the identical chart, built directly from {@link points} — not by parsing
+     * or rendering `mermaidSource` through Mermaid itself (this repo takes no Mermaid-rendering
+     * dependency), but from the same underlying coordinate/point-id data, so it is guaranteed
+     * consistent with `mermaidSource` by construction. Empty string when nothing is plottable. */
+    svg: string;
+    /** The companion table (Point/Provider/Requested model/Actual model/Avg elapsed/Total tokens),
+     * the excluded-records note, and the interpretation note — everything the old combined
+     * `markdown` field carried except the chart itself, which now lives in `mermaidSource`/`svg`. */
+    tableMarkdown: string;
+    /** Every point actually plotted, in the same deterministic order as `mermaidSource`'s point
+     * lines — the shared data both `mermaidSource` and `svg` render from. */
+    points: readonly QuadrantPoint[];
+    /** Aggregates actually plotted — every one reported a non-null `totalTokens`. */
+    plotted: readonly ActualModelAggregate[];
+    /** Aggregates left out of the chart because `totalTokens` is `null` (no scenario in that
+     * group reported any usage at all) — never silently dropped from the report, always listed. */
+    excluded: readonly ActualModelAggregate[];
+}
+
+/**
+ * Real provider/model identifiers are NEVER placed in a Mermaid quadrant point label — not even
+ * sanitized. Punctuation-stripping was tried first and proved insufficient in practice (real
+ * identifiers like `anthropic/claude-haiku-4.5`, `openai/gpt-oss-20b:free`, or an
+ * `(unresolved)`-suffixed label kept finding new ways to break Mermaid's lexer as new model ids
+ * were added) — a durable fix has to stop relying on which punctuation happens to be safe today.
+ * Instead every plotted point gets an opaque, deterministic id (`M01`, `M02`, ...), assigned by
+ * its position in the already-deterministically-sorted `plotted` array (see
+ * {@link aggregateByActualModel}'s stable sort) — same input records always produce the same ids
+ * in the same order. The id matches a fixed, minimal grammar (`M` + digits) that can never contain
+ * a slash, colon, bracket, parenthesis, or space, regardless of what any provider ever names a
+ * model. The real provider/requestedModel/actualModel strings move to the companion table's own
+ * `Point` column (see {@link buildElapsedVsTokensChart}) — never lost, just never inside the
+ * Mermaid block itself.
+ */
+const formatQuadrantPointId = (index: number): string => `M${String(index + 1).padStart(2, '0')}`;
 
 /** Min-max normalize into Mermaid quadrantChart's required [0, 1] point range. A single point (or
  * every point sharing the same value) would divide by zero — placed at the midpoint instead, not
@@ -745,39 +916,132 @@ const sanitizeQuadrantLabel = (label: string): string =>
 const normalizeToUnitRange = (value: number, min: number, max: number): number =>
     max === min ? 0.5 : (value - min) / (max - min);
 
-const formatChartTokenCell = (aggregate: ProviderModelAggregate): string => {
+const formatChartTokenCell = (aggregate: ActualModelAggregate): string => {
     const tokens = aggregate.totalTokens as number; // caller only passes plottable (non-null) aggregates
     return aggregate.tokensIncomplete ? `${tokens}*` : String(tokens);
 };
 
+/** The label a chart point/table row uses to identify a model. A fixed-model provider (no
+ * `actualModel` evidence anywhere on this route) is identified by its requested model — nothing
+ * to resolve. A route with a resolved `actualModel` is identified by that actual model, never the
+ * requested route, so two actual models served through the same route never collapse into one
+ * label. A route call that reported no `actualModel`, on a route where *other* calls did, is
+ * labeled `(unresolved)` rather than guessed. */
+const modelLabel = (a: ActualModelAggregate): string => {
+    if (a.actualModel !== undefined) return a.actualModel;
+    if (a.unresolved) return `${a.requestedModel} (unresolved)`;
+    return a.requestedModel;
+};
+
 /**
- * The July 30 requirement: a two-dimensional view of every (provider, model) aggregate — x = avg
- * elapsed time, y = consumed (total) tokens, point label = provider/model — built directly from
- * {@link ProviderModelAggregate}, so it regenerates automatically every time the report does
- * rather than needing to be hand-maintained (see `latest.md`'s own prior "manually added" chart
- * section, which a future run would have silently overwritten without ever restoring this one).
+ * Canonical Mermaid `quadrantChart` source for `points` — plain text, no ```mermaid code fence, no
+ * Markdown wrapper (this is exactly what gets written to `elapsed-vs-tokens.mmd`). Built as a
+ * plain string array joined with a single literal `\n` — never string concatenation, never
+ * template-literal interpolation of multi-line content — so every point is guaranteed its own,
+ * fully-separated source line; see `verificationMetrics.spec.ts`'s newline-separation regression
+ * test for the byte-level check this claim is held to.
+ */
+const buildMermaidSource = (points: readonly QuadrantPoint[]): string =>
+    [
+        'quadrantChart',
+        '    title Average elapsed time vs. consumed tokens by model',
+        '    x-axis Low elapsed --> High elapsed',
+        '    y-axis Low tokens --> High tokens',
+        '    quadrant-1 Slower, more tokens',
+        '    quadrant-2 Faster, more tokens',
+        '    quadrant-3 Faster, fewer tokens',
+        '    quadrant-4 Slower, fewer tokens',
+        ...points.map(p => `    ${p.pointId}: [${p.x.toFixed(2)}, ${p.y.toFixed(2)}]`),
+    ].join('\n');
+
+const SVG_SIZE = 520;
+const SVG_MARGIN = 56;
+const SVG_PLOT_SIZE = SVG_SIZE - SVG_MARGIN * 2;
+
+/** x in [0,1] -> svg x: left = low elapsed, right = high elapsed (matches the Mermaid x-axis). */
+const toSvgX = (x: number): number => SVG_MARGIN + x * SVG_PLOT_SIZE;
+/** y in [0,1] -> svg y: SVG's own y grows downward, the opposite of "high tokens = higher on the
+ * chart" — inverted once here, rather than left as a footgun at every call site. */
+const toSvgY = (y: number): number => SVG_MARGIN + (1 - y) * SVG_PLOT_SIZE;
+
+/**
+ * A rendered SVG of the identical chart `buildMermaidSource` describes, built directly from the
+ * same `points` array — never by parsing or rendering `mermaidSource` itself (this repo takes no
+ * Mermaid-rendering dependency: no `@mermaid-js/mermaid-cli`, no headless-browser install). Only
+ * ever contains opaque `M<digits>` point ids and this function's own static English labels —
+ * never a raw provider/model string — so, like the Mermaid source, it structurally cannot
+ * reintroduce the punctuation-in-a-label failure this whole design exists to prevent.
+ */
+const buildElapsedVsTokensSvg = (points: readonly QuadrantPoint[]): string => {
+    const mid = SVG_MARGIN + SVG_PLOT_SIZE / 2;
+    const right = SVG_MARGIN + SVG_PLOT_SIZE;
+    const bottom = SVG_MARGIN + SVG_PLOT_SIZE;
+
+    const pointMarkup = points.flatMap(p => {
+        const cx = toSvgX(p.x);
+        const cy = toSvgY(p.y);
+        return [
+            `    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5" fill="#2563eb" />`,
+            `    <text x="${(cx + 8).toFixed(1)}" y="${(cy - 8).toFixed(1)}" font-size="12" font-family="monospace" fill="#111">${p.pointId}</text>`,
+        ];
+    });
+
+    return [
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SVG_SIZE} ${SVG_SIZE}" width="${SVG_SIZE}" height="${SVG_SIZE}" font-family="sans-serif">`,
+        `    <rect x="0" y="0" width="${SVG_SIZE}" height="${SVG_SIZE}" fill="#ffffff" />`,
+        `    <text x="${SVG_SIZE / 2}" y="20" font-size="14" text-anchor="middle" fill="#111">Average elapsed time vs. consumed tokens by model</text>`,
+        `    <rect x="${SVG_MARGIN}" y="${SVG_MARGIN}" width="${SVG_PLOT_SIZE}" height="${SVG_PLOT_SIZE}" fill="none" stroke="#999" />`,
+        `    <line x1="${mid}" y1="${SVG_MARGIN}" x2="${mid}" y2="${bottom}" stroke="#ddd" />`,
+        `    <line x1="${SVG_MARGIN}" y1="${mid}" x2="${right}" y2="${mid}" stroke="#ddd" />`,
+        `    <text x="${SVG_MARGIN + 4}" y="${SVG_MARGIN + 16}" font-size="10" fill="#555">Faster, more tokens</text>`,
+        `    <text x="${right - 4}" y="${SVG_MARGIN + 16}" font-size="10" text-anchor="end" fill="#555">Slower, more tokens</text>`,
+        `    <text x="${SVG_MARGIN + 4}" y="${bottom - 8}" font-size="10" fill="#555">Faster, fewer tokens</text>`,
+        `    <text x="${right - 4}" y="${bottom - 8}" font-size="10" text-anchor="end" fill="#555">Slower, fewer tokens</text>`,
+        `    <text x="${SVG_SIZE / 2}" y="${SVG_SIZE - 14}" font-size="11" text-anchor="middle" fill="#111">Low elapsed --&gt; High elapsed</text>`,
+        `    <text x="16" y="${SVG_SIZE / 2}" font-size="11" text-anchor="middle" fill="#111" transform="rotate(-90 16 ${SVG_SIZE / 2})">Low tokens --&gt; High tokens</text>`,
+        ...pointMarkup,
+        '</svg>',
+    ].join('\n');
+};
+
+/**
+ * A two-dimensional view of every (provider, requested model, actual model) aggregate — x = avg
+ * elapsed time, y = consumed (total) tokens, point label = the actual model that served the calls
+ * when one was reported, else the requested model — built directly from real-provider records via
+ * {@link aggregateByActualModel}, so it regenerates automatically every time the report does
+ * rather than needing to be hand-maintained.
+ *
+ * A route (e.g. OpenRouter's `openrouter/free`) that resolved to more than one actual model across
+ * its calls gets one point per actual model — never one point silently averaging two different
+ * models' cost/speed profiles together. A route call with no reported `actualModel`, on a route
+ * where other calls did report one, gets its own explicitly `(unresolved)`-labeled point — never
+ * guessed onto one of the resolved models.
  *
  * Never fabricates a token value: an aggregate with `totalTokens === null` (no scenario in that
  * group reported any usage) is excluded from the plotted points entirely — Mermaid has no
- * "unknown" coordinate — and listed explicitly in `excluded`/the note below the chart instead of
+ * "unknown" coordinate — and listed explicitly in `excluded`/the note in `tableMarkdown` instead of
  * being silently dropped or coerced to 0. A partial total (`tokensIncomplete: true`) IS plotted
  * (it's a real, if incomplete, number) and marked with the same `*` convention as
  * {@link formatMetricsMarkdownTable}, in the companion table.
  */
-export const buildElapsedVsTokensChart = (aggregates: readonly ProviderModelAggregate[]): ElapsedVsTokensChart => {
+export const buildElapsedVsTokensChart = (records: readonly VerificationRunRecord[]): ElapsedVsTokensChart => {
+    const aggregates = aggregateByActualModel(records);
     const plotted = aggregates.filter(a => a.totalTokens !== null);
     const excluded = aggregates.filter(a => a.totalTokens === null);
 
     const excludedNote =
         excluded.length > 0
             ? `\n\n${excluded.length} record(s) excluded from the chart — no token usage reported at all ` +
-              `(never coerced to 0): ${excluded.map(a => `${a.provider} ${a.model}`).join(', ')}.`
+              `(never coerced to 0): ${excluded.map(a => `${a.provider} ${modelLabel(a)}`).join(', ')}.`
             : '';
 
     if (plotted.length === 0) {
         return {
-            markdown:
+            mermaidSource: '',
+            svg: '',
+            tableMarkdown:
                 '_No plottable elapsed-time/token data — no aggregate reported a token total._' + excludedNote,
+            points: [],
             plotted,
             excluded,
         };
@@ -790,40 +1054,132 @@ export const buildElapsedVsTokensChart = (aggregates: readonly ProviderModelAggr
     const minTokens = Math.min(...tokenValues);
     const maxTokens = Math.max(...tokenValues);
 
-    const chartLines = [
-        '```mermaid',
-        'quadrantChart',
-        '    title Average elapsed time vs. consumed tokens by model',
-        '    x-axis Low elapsed --> High elapsed',
-        '    y-axis Low tokens --> High tokens',
-        '    quadrant-1 Slower, more tokens',
-        '    quadrant-2 Faster, more tokens',
-        '    quadrant-3 Faster, fewer tokens',
-        '    quadrant-4 Slower, fewer tokens',
-        ...plotted.map(a => {
-            const x = normalizeToUnitRange(a.avgElapsedMs, minElapsed, maxElapsed);
-            const y = normalizeToUnitRange(a.totalTokens as number, minTokens, maxTokens);
-            const label = sanitizeQuadrantLabel(`${a.provider} ${a.model}`);
-            return `    ${label}: [${x.toFixed(2)}, ${y.toFixed(2)}]`;
-        }),
-        '```',
-    ];
+    // One id + one pair of normalized coordinates per plotted point, by array position — `plotted`
+    // is already deterministically ordered (aggregateByActualModel's stable sort), so the same
+    // input records always yield the same ids in the same order across regenerations. Both
+    // `mermaidSource` and `svg` render from this exact array — neither recomputes independently.
+    const points: QuadrantPoint[] = plotted.map((a, i) => ({
+        pointId: formatQuadrantPointId(i),
+        x: normalizeToUnitRange(a.avgElapsedMs, minElapsed, maxElapsed),
+        y: normalizeToUnitRange(a.totalTokens as number, minTokens, maxTokens),
+        aggregate: a,
+    }));
+
+    const mermaidSource = buildMermaidSource(points);
+    const svg = buildElapsedVsTokensSvg(points);
 
     const tableLines = [
-        '| Provider | Model | Avg elapsed | Total tokens |',
-        '| --- | --- | ---: | ---: |',
-        ...plotted.map(
-            a => `| ${a.provider} | ${a.model} | ${Math.round(a.avgElapsedMs)}ms | ${formatChartTokenCell(a)} |`
+        '| Point | Provider | Requested model | Actual model | Avg elapsed | Total tokens |',
+        '| --- | --- | --- | --- | ---: | ---: |',
+        ...points.map(
+            p =>
+                `| ${p.pointId} | ${p.aggregate.provider} | ${p.aggregate.requestedModel} | ` +
+                `${p.aggregate.actualModel ?? (p.aggregate.unresolved ? 'unresolved' : '—')} | ` +
+                `${Math.round(p.aggregate.avgElapsedMs)}ms | ${formatChartTokenCell(p.aggregate)} |`
         ),
     ];
 
     const interpretationNote =
         '\n\n_Lower-left generally means faster and fewer tokens — this chart does not by itself measure ' +
-        'correctness; see the Pass/Accepted columns in the table above it for that._';
+        'correctness; see the Pass/Accepted columns in the table above it for that._' +
+        '\n\n_A route (e.g. `openrouter/free`) is not a fixed model — "Requested model" is what the caller ' +
+        'asked for, "Actual model" is what the provider reported actually serving that call. A row where ' +
+        'these differ is a route resolving to a specific underlying model._';
 
     return {
-        markdown: [...chartLines, '', ...tableLines].join('\n') + excludedNote + interpretationNote,
+        mermaidSource,
+        svg,
+        tableMarkdown: tableLines.join('\n') + excludedNote + interpretationNote,
+        points,
         plotted,
         excluded,
     };
 };
+
+const csvEscape = (value: string): string => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+
+const numberOrEmpty = (value: number | null | undefined): string => (value === null || value === undefined ? '' : String(value));
+
+/**
+ * One row per scenario attempt — the exact-value companion to {@link formatMetricsMarkdownTable},
+ * which aggregates. Canonical model ids are preserved exactly; the opaque `M01`/`M02`-style point
+ * ids {@link buildElapsedVsTokensChart} assigns for its Mermaid block are that chart's own
+ * display-only concern and never apply here. Missing (never-fabricated-zero) usage/cost fields are
+ * emitted as empty CSV cells, not `0`.
+ */
+export const formatVerificationRecordsCsv = (records: readonly VerificationRunRecord[]): string => {
+    const header = [
+        'provider',
+        'model',
+        'actualModel',
+        'scenarioId',
+        'outcome',
+        'startedAt',
+        'endedAt',
+        'elapsedMs',
+        'inputTokens',
+        'cachedInputTokens',
+        'cacheWriteInputTokens',
+        'cacheWriteTtl',
+        'outputTokens',
+        'reasoningTokens',
+        'toolUseInputTokens',
+        'providerTotalTokens',
+        'providerReportedCost',
+        'estimatedCost',
+        'costSource',
+        'pricingVersion',
+        'toolCallName',
+        'argsValid',
+        'dispatchOk',
+        'canvasStateCorrect',
+        'retries',
+        'errorCategory',
+    ];
+    const boolOrEmpty = (value: boolean | undefined): string => (value === undefined ? '' : String(value));
+    const lines = [header.join(',')];
+    for (const r of records) {
+        lines.push(
+            [
+                r.provider,
+                r.model,
+                r.actualModel ?? '',
+                r.scenarioId,
+                r.outcome,
+                String(r.startedAt),
+                String(r.endedAt),
+                String(r.elapsedMs),
+                numberOrEmpty(r.inputTokens),
+                numberOrEmpty(r.cachedInputTokens),
+                numberOrEmpty(r.cacheWriteInputTokens),
+                r.cacheWriteTtl ?? '',
+                numberOrEmpty(r.outputTokens),
+                numberOrEmpty(r.reasoningTokens),
+                numberOrEmpty(r.toolUseInputTokens),
+                numberOrEmpty(r.providerTotalTokens),
+                numberOrEmpty(r.providerReportedCost),
+                numberOrEmpty(r.estimatedCost),
+                r.costSource ?? '',
+                r.pricingVersion ?? '',
+                r.toolCallName ?? '',
+                boolOrEmpty(r.argsValid),
+                boolOrEmpty(r.dispatchOk),
+                boolOrEmpty(r.canvasStateCorrect),
+                numberOrEmpty(r.retries),
+                r.errorCategory ?? '',
+            ]
+                .map(csvEscape)
+                .join(',')
+        );
+    }
+    return lines.join('\n');
+};
+
+/**
+ * Scenario-level JSONL artifact — one JSON object per line, one line per scenario attempt. Same
+ * field set as {@link formatVerificationRecordsCsv}, in its native (non-string) shape; suitable
+ * for streaming/append-only writes during a long benchmark run, unlike the JSON array report
+ * (`buildVerificationMetricsReport`), which needs the full record set up front.
+ */
+export const formatVerificationRecordsJsonl = (records: readonly VerificationRunRecord[]): string =>
+    records.map(r => JSON.stringify(r)).join('\n');

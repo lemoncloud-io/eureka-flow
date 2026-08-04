@@ -12,9 +12,11 @@ import type { UsageTotals } from '../../llm/verificationMetrics';
 /**
  * Env-gated real-provider tool-call verification: gateway + ToolExecutor, single turn.
  *
- * Each provider block is skipped entirely unless its key env var is set — CI and keyless runs
- * never hit the network, and no key is ever read into a browser bundle (this is a Node test env;
- * keys are `process.env` only, never `VITE_` vars) or logged. A provider's tool calling is not
+ * Each provider block is skipped entirely unless BOTH `RUN_LIVE_PROVIDER_TESTS=1` is explicitly
+ * set AND its key env var is present — a key alone is not sufficient (same explicit-opt-in rule
+ * `realLocatorScenarios.spec.ts` enforces). CI and keyless/opted-out runs never hit the network,
+ * and no key is ever read into a browser bundle (this is a Node test env; keys are `process.env`
+ * only, never `VITE_` vars) or logged. A provider's tool calling is not
  * considered verified until its env-gated block has actually run green against the live API; the
  * offline `*.spec.ts` files (and `verifyProviderToolCall.spec.ts`) prove only the mapping/
  * parsing/scoring logic, not the models' behavior.
@@ -46,12 +48,13 @@ afterEach(() => {
     capturedUsage = { inputTokens: null, outputTokens: null, totalTokens: null };
 });
 
+const LIVE_RUN_OPTED_IN = process.env['RUN_LIVE_PROVIDER_TESTS'] === '1';
 const OPENAI_API_KEY = process.env['OPENAI_API_KEY'];
 const OPENAI_MODEL = process.env['OPENAI_TEST_MODEL']; // optional override; default gpt-4o-mini
 const GEMINI_API_KEY = process.env['GEMINI_API_KEY'];
 const GEMINI_MODEL = process.env['GEMINI_TEST_MODEL']; // optional override; default gemini-2.5-flash
 
-describe.runIf(!!OPENAI_API_KEY)('OpenAI real tool-call verification (env-gated)', () => {
+describe.runIf(LIVE_RUN_OPTED_IN && !!OPENAI_API_KEY)('OpenAI real tool-call verification (env-gated)', () => {
     it('returns a structured move_node call that ToolExecutor executes: (100,200) -> (200,200)', async () => {
         scenarioStartedAt = Date.now();
         const gateway = wrapGatewayWithUsageCapture(
@@ -74,7 +77,7 @@ describe.runIf(!!OPENAI_API_KEY)('OpenAI real tool-call verification (env-gated)
     });
 });
 
-describe.runIf(!!GEMINI_API_KEY)('Gemini real tool-call verification (env-gated)', () => {
+describe.runIf(LIVE_RUN_OPTED_IN && !!GEMINI_API_KEY)('Gemini real tool-call verification (env-gated)', () => {
     it('returns a structured move_node call that ToolExecutor executes: (100,200) -> (200,200)', async () => {
         scenarioStartedAt = Date.now();
         const gateway = wrapGatewayWithUsageCapture(

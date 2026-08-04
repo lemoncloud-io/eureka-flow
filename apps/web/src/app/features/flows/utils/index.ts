@@ -135,7 +135,26 @@ export type {
     GenerateResponse,
 } from './createGenerateApiLlmGateway';
 // Promoted into @flows/agent so the browser panel and the local terminal build the catalog identically.
+// (This file's own local ./createBlockCatalogLookup module was removed as part of that promotion —
+// re-exporting from @flows/agent is the only valid source now, not a stylistic preference.)
 export { createBlockCatalogLookup } from '@flows/agent';
+
+export {
+    createEurekaToolCallLlmGateway,
+    EurekaToolCallGatewayError,
+    EurekaToolCallHttpError,
+    EurekaToolCallInvalidResponseError,
+    EurekaToolCallNetworkError,
+    EurekaToolCallProviderError,
+} from './createEurekaToolCallLlmGateway';
+export type {
+    CreateEurekaToolCallLlmGatewayOptions,
+    EurekaToolCallErrorBody,
+    EurekaToolCallErrorResponse,
+    EurekaToolCallRequest,
+    EurekaToolCallResponse,
+    EurekaToolCallSuccessResponse,
+} from './createEurekaToolCallLlmGateway';
 
 // ============================================================
 // Input File Upload Utilities

@@ -104,6 +104,29 @@ const GEMINI_PRICING: Record<string, ModelPricing> = {
             'may change or the model may be retired without notice, same caveat providerRegistry.ts ' +
             'already carries for this entry',
     },
+    'gemini-2.5-flash-lite': {
+        currency: 'USD',
+        inputPerMillion: 0.1,
+        cachedInputPerMillion: 0.01,
+        outputPerMillion: 0.4,
+        source:
+            "OpenRouter's public Models API (GET https://openrouter.ai/api/v1/models), fetched " +
+            "2026-08-04 — a cross-provider mirror of Google's own rate, not Google's pricing page " +
+            'directly; re-verify against ai.google.dev/gemini-api/docs/pricing before trusting at scale.',
+    },
+    'gemini-3.1-pro-preview': {
+        currency: 'USD',
+        inputPerMillion: 2.0,
+        cachedInputPerMillion: 0.2,
+        outputPerMillion: 12.0,
+        // OpenRouter's own listing documents a >200k-token override tier ($4/$18) for this model —
+        // not modeled here, same standard-tier-only convention as gemini-2.5-pro above.
+        longContextThresholdTokens: 200_000,
+        source:
+            "OpenRouter's public Models API (GET https://openrouter.ai/api/v1/models), fetched " +
+            '2026-08-04 — preview model id, pricing may change or the model may be retired without ' +
+            "notice; sourced from OpenRouter's mirror, not Google's pricing page directly.",
+    },
 };
 
 /**
@@ -142,6 +165,16 @@ const OPENAI_PRICING: Record<string, ModelPricing> = {
         outputPerMillion: 2.0,
         source: 'developers.openai.com/api/docs/pricing, fetched 2026-07-31',
     },
+    'gpt-4.1': {
+        currency: 'USD',
+        inputPerMillion: 2.0,
+        cachedInputPerMillion: 0.5,
+        outputPerMillion: 8.0,
+        source:
+            "OpenRouter's public Models API (GET https://openrouter.ai/api/v1/models), fetched " +
+            "2026-08-04 — a cross-provider mirror of OpenAI's own rate, not OpenAI's pricing page " +
+            'directly; re-verify against developers.openai.com/api/docs/pricing before trusting at scale.',
+    },
 };
 
 /**
@@ -172,6 +205,20 @@ const ANTHROPIC_PRICING: Record<string, ModelPricing> = {
         cacheWrite1hPerMillion: 2.0,
         outputPerMillion: 5.0,
         source: 'platform.claude.com/docs/en/about-claude/pricing, fetched 2026-07-31',
+    },
+    'claude-sonnet-5': {
+        currency: 'USD',
+        // Standard pricing ($3/$15), effective starting September 1, 2026 — NOT the temporary
+        // introductory pricing ($2/$10 through August 31, 2026), matching this table's convention
+        // of not modeling time-boxed promotional rates (same reasoning as the un-modeled long-context
+        // tiers elsewhere in this file). Re-check after that date if trusting this for a near-term
+        // real-key run priced before the standard rate takes effect.
+        inputPerMillion: 3.0,
+        cachedInputPerMillion: 0.3,
+        cacheWritePerMillion: 3.75,
+        cacheWrite1hPerMillion: 6.0,
+        outputPerMillion: 15.0,
+        source: 'platform.claude.com/docs/en/about-claude/pricing, fetched 2026-08-04',
     },
 };
 

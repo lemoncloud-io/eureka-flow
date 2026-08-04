@@ -105,15 +105,21 @@ including in CI, which does not run real-key tests.
 
 ## 5. Provider/model support
 
-| Provider | Gateway | Status |
-| --- | --- | --- |
-| OpenAI | `createOpenAiLlmGateway` | Implemented, real-provider verified |
-| Gemini | `createGeminiToolLlmGateway` | Implemented, real-provider verified |
-| OpenRouter | `createOpenAiLlmGateway` + `baseUrl` override | Implemented, real-provider verified (OpenAI-wire-compatible, zero new gateway code) |
-| Anthropic / Claude | `createAnthropicToolLlmGateway` | Implemented, offline-verified; not yet run against a live key |
-| DeepSeek | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; not yet run against a live key |
-| Qwen | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; not yet run against a live key |
-| GLM (Z.ai) | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; response `tool_calls[].function.arguments` shape not yet confirmed against a captured response |
+**This table is per-gateway, not per-model** — "real-provider verified" means at least one model
+was live-tested through that gateway, never that every registered model for that provider was.
+See the "Real-verified model(s)" column for exactly which ones, and
+`libs/agent/src/llm/modelManifest.ts`/`providerRegistry.ts`'s `realVerifiedModels` for the
+authoritative per-model list.
+
+| Provider | Gateway | Gateway status | Real-verified model(s) |
+| --- | --- | --- | --- |
+| OpenAI | `createOpenAiLlmGateway` | Implemented, real-provider verified | `gpt-4o-mini` only — `gpt-4.1-mini`, `gpt-5-mini`, `gpt-4.1` are registered/confirmed-current but not yet real-key-verified |
+| Gemini | `createGeminiToolLlmGateway` | Implemented, real-provider verified | `gemini-2.5-flash` only — `gemini-2.5-pro`, `gemini-3-flash-preview`, `gemini-2.5-flash-lite`, `gemini-3.1-pro-preview` are registered/confirmed-current but not yet real-key-verified |
+| OpenRouter | `createOpenAiLlmGateway` + `baseUrl` override | Implemented, real-provider verified (OpenAI-wire-compatible, zero new gateway code) | `openrouter/free` only (a dynamic route, not a fixed model) — all 6 fixed OpenRouter models are registered but not yet real-key-verified |
+| Anthropic / Claude | `createAnthropicToolLlmGateway` | Implemented, offline-verified; not yet run against a live key | none |
+| DeepSeek | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; not yet run against a live key | none |
+| Qwen | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; not yet run against a live key | none |
+| GLM (Z.ai) | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; response `tool_calls[].function.arguments` shape not yet confirmed against a captured response | none |
 
 The full per-provider model list, API key env var name, and any real-verified model ids live in
 `libs/agent/src/llm/providerRegistry.ts`, which is the source of truth this table summarizes —
@@ -124,6 +130,12 @@ implies `status: 'implemented'`).
 Registered model ids are fixed, concrete versions rather than provider-side `"latest"` aliases, so
 a recorded real-key verification stays a meaningful, checkable claim regardless of what a provider
 later calls "latest".
+
+`libs/agent/src/llm/modelManifest.ts` projects `providerRegistry.ts` into a per-model benchmark
+manifest (discovery source/timestamp, fixed-vs-dynamic-route, stable-vs-preview, and a fuller
+qualification-status vocabulary than `ProviderStatus` above tracks) — as of 2026-08-04 this covers
+4 fixed OpenAI models, 5 fixed Gemini models, and 6 fixed OpenRouter models (plus
+`openrouter/free`, tracked separately as a dynamic route, never counted as a 7th fixed model).
 
 ## 6. Usage, cost, and elapsed-time monitoring
 
@@ -148,6 +160,17 @@ not inside the gateway wrapper, so it stays honest even when a scenario times ou
 throws before its own `finally` block runs. Usage capture is best-effort: if a scenario times out
 before its usage arrives, the usage field is `null` for that scenario — indistinguishable from (and
 reported the same as) a provider that never returns usage at all, never fabricated as zero.
+
+**Requested vs. actual model.** `Chunk.actualModel` carries the model that actually served a call
+when the provider reports one — distinct from the requested model/route the caller asked for. For
+a direct provider call this is normally the same value; for a route like OpenRouter's
+`openrouter/free`, it can differ, since the route may serve a different underlying model call to
+call. The cost/token report (`formatMetricsMarkdownTable`) still groups by requested model, with a
+`†` footnote when a group's calls resolved to more than one actual model. The elapsed-time-vs-tokens
+chart (`buildElapsedVsTokensChart`, via `aggregateByActualModel`) groups more strictly: a route that
+resolved to more than one actual model gets one point per actual model, and a route call that
+reported no actual model — on a route where other calls did — gets its own point labeled
+`(unresolved)`, never merged into one of the resolved models or guessed.
 
 ## 7. Security: provider keys never reach the browser
 
@@ -198,4 +221,31 @@ that provider.
 - A general-purpose "forward any `ChatRequest` to a real provider and stream back `Chunk`s" proxy,
   which would let a real chat UI drive a live multi-turn conversation through one of these
   providers, does not exist — the verification harness runs one fixed scenario per call, not
-  arbitrary chat.
+  arbitrary chat. **Update:** a browser-facing version of exactly this now exists in code —
+  `createEurekaToolCallLlmGateway` (§10) — but it forwards to eureka-flows-api, not directly to a
+  provider, and that backend endpoint is not deployed yet. It doesn't remove this limitation for
+  provider-native `libs/agent` gateways, it's a separate, app-layer path.
+
+## 10. Browser production integration
+
+This document (§1-9) covers the provider-native *verification* gateways in `libs/agent` — used by
+this repo's own offline/real-key test suites, never by the running browser app directly. The
+browser app's own production gateway is a separate, app-layer piece:
+`createEurekaToolCallLlmGateway` (`apps/web/src/app/features/flows/utils/`), wired into
+`FlowAgentPanel.tsx` behind the `VITE_EUREKA_TOOL_CALL_ENDPOINT` feature flag (off by default). It
+implements the same shared `LlmGateway` contract as every gateway in this document, but instead of
+calling a provider directly, it calls a single eureka-flows-api endpoint
+(`docs/browser-agent/foundations/eureka-tool-calling-endpoint-contract.md` — **not deployed**,
+implementation contract only) which is meant to do the provider-native mapping described in §2
+server-side, using the same normalized `Chunk` shape as its response.
+
+See `docs/browser-agent/foundations/production-readiness.md` for the full architecture, the
+model-manifest benchmark built on top of `providerRegistry.ts`, the qualification policy, and the
+current, dated status of every test layer (unit / provider-adapter contract / eureka-flows-api
+browser contract / live-provider qualification / production E2E) — that document is the current
+single source of truth for "is this production-ready", not this one.
+
+See `docs/browser-agent/foundations/tool-calling-integration-handoff.md` for the consolidated
+engineering handoff covering this same work end to end — architecture, implemented-vs-prototype
+status, verification evidence, the proposed production flow, open technical decisions, and a
+prioritized remaining-work checklist for whoever continues the backend integration.

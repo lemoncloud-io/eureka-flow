@@ -71,3 +71,65 @@ export const classifyLocatorScenarioResult = (
  */
 export const isAcceptedOutcome = (outcome: RealProviderOutcome): boolean =>
     outcome === 'pass' || outcome === 'known-variance';
+
+/**
+ * Fine-grained failure categories for Gemini specifically (Phase 8 of the production-review
+ * request) — a reporting-only refinement of the coarse `provider-error`/`fail` outcome above,
+ * built entirely from sanitized diagnostics `GeminiToolLlmGateway.ts` already produces
+ * (`describeGeminiFailure`'s `finishReason=`/`promptFeedback.blockReason=`/`safetyRatings=`
+ * markers, plus an HTTP status when available). Never changes `RealProviderOutcome` scoring —
+ * purely a classification layer for the human-facing report.
+ *
+ * `no-candidate` and `malformed-provider-response` are NOT distinguished by this classifier:
+ * `describeGeminiFailure` deliberately covers "no candidates", "missing content", "missing
+ * parts", and "empty parts" with one uniform message shape (see its own doc comment), so there is
+ * no diagnostic signal today to tell those apart. Both map to `no-candidate` here; splitting them
+ * would need a `GeminiToolLlmGateway.ts` change to preserve which specific shape occurred, which
+ * this repo should only do once a live run actually needs the distinction (see the "Add
+ * regression tests only when a concrete implementation defect is found" rule this task was given
+ * — the same caution applies to adding classification precision with no real failure to justify
+ * it yet).
+ */
+export type GeminiFailureCategory =
+    | 'authentication'
+    | 'invalid-request'
+    | 'unavailable-model'
+    | 'rate-limit'
+    | 'timeout'
+    | 'retryable-upstream-failure'
+    | 'safety-block'
+    | 'no-candidate'
+    | 'parser-defect'
+    | 'model-behavior-variance'
+    | 'unresolved';
+
+/** Classify a Gemini failure message (+ optional sanitized HTTP status) into one of
+ * {@link GeminiFailureCategory}. Pure string/shape matching — no network, no live call. Order
+ * matters: an HTTP-status-derived category takes precedence over a message-content match, since a
+ * non-2xx response never reaches Gemini's own JSON body at all. */
+export const classifyGeminiFailureCategory = (message: string, httpStatus?: number): GeminiFailureCategory => {
+    if (message.includes(TIMEOUT_MARKER)) return 'timeout';
+
+    if (httpStatus !== undefined) {
+        if (httpStatus === 401 || httpStatus === 403) return 'authentication';
+        if (httpStatus === 400) return 'invalid-request';
+        if (httpStatus === 404) return 'unavailable-model';
+        if (httpStatus === 429) return 'rate-limit';
+        if (httpStatus >= 500) return 'retryable-upstream-failure';
+    }
+
+    if (/blockReason=/.test(message) || /safetyRatings=\[[^\]]*blocked/.test(message)) {
+        return 'safety-block';
+    }
+    if (/not valid JSON|JSON\.parse|Unexpected token/i.test(message)) {
+        return 'parser-defect';
+    }
+    if (/finishReason=(RECITATION|OTHER)/.test(message)) {
+        return 'model-behavior-variance';
+    }
+    if (/no candidates or no usable content parts/.test(message)) {
+        return 'no-candidate';
+    }
+
+    return 'unresolved';
+};

@@ -7,6 +7,7 @@ export type {
     LlmGateway,
     LlmGatewayCapabilities,
     ToolDef,
+    UsageInfo,
 } from './llmGateway';
 export { createFakeGateway } from './fakeGateway';
 export type { FakeGateway, FakeResponse, FakeScriptStep } from './fakeGateway';

@@ -75,6 +75,12 @@ export interface LocatorScenarioResult {
      */
     path?: 'refusal' | 'executor-error';
     error?: string;
+    /** Whether the tool call's `argsDelta` parsed as valid JSON — absent when no tool call was
+     * made at all (the question doesn't arise), `false` only for an actual parse failure. */
+    argsValid?: boolean;
+    /** Whether `ToolExecutor.dispatch` reported success — absent when no dispatch was attempted
+     * (no tool call, or args invalid before dispatch was ever reached). */
+    dispatchOk?: boolean;
     /**
      * Set only when the failure came from a thrown gateway/provider error (e.g. Gemini "no
      * candidates", an HTTP failure) caught by the try/catch below — never from a normal `check()`
@@ -570,6 +576,7 @@ export const runLocatorScenario = async (
                     positionsBefore,
                     positionsAfter: positionsBefore,
                     error: 'tool call arguments were not valid JSON',
+                    argsValid: false,
                 };
             }
             toolCall = { id: toolCallChunk.id, name: toolCallChunk.name, args };
@@ -594,6 +601,8 @@ export const runLocatorScenario = async (
             positionsAfter,
             ...(path ? { path } : {}),
             ...(error ? { error } : {}),
+            ...(toolCall ? { argsValid: true } : {}),
+            ...(dispatchResult ? { dispatchOk: dispatchResult.ok } : {}),
         };
     } catch (err) {
         // Everything in the try block above is a real thrown error escaping gateway.chat() itself

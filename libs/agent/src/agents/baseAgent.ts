@@ -39,7 +39,7 @@ export interface CollectedToolCall {
     rawArgs: string;
 }
 
-interface CollectedResponse {
+export interface CollectedResponse {
     text: string;
     toolCalls: CollectedToolCall[];
 }
@@ -52,8 +52,13 @@ const safeJsonParse = (raw: string): unknown => {
     }
 };
 
-/** Drain a chat stream into accumulated text + parsed tool calls. */
-const collect = async (stream: AsyncIterable<Chunk>): Promise<CollectedResponse> => {
+/**
+ * Drain a chat stream into accumulated text + parsed tool calls. Exported (not just used
+ * internally) so its id-merge behavior — argsDelta chunks sharing a `toolCall.id` are
+ * accumulated, never dispatched as separate calls — has direct regression coverage; see
+ * `baseAgent.spec.ts` for the duplicate-id safety-net test this specifically supports.
+ */
+export const collect = async (stream: AsyncIterable<Chunk>): Promise<CollectedResponse> => {
     let text = '';
     const order: string[] = [];
     const acc = new Map<string, { name: string; rawArgs: string }>();
