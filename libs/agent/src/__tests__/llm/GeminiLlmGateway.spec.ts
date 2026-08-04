@@ -178,6 +178,50 @@ describe('createGeminiLlmGateway', () => {
         ]);
     });
 
+    it('groups parallel tool results into ONE user content (response count must match the model turn)', async () => {
+        // A model turn with N functionCalls must be answered by a single user turn with N functionResponses.
+        // Vertex 400s otherwise ("number of function response parts ... equal to ... function call parts"); the
+        // Developer API tolerates the split. So two parallel calls come back as one grouped user turn.
+        const http = new ScriptedHttpRequest([{ json: geminiReply('done') }]);
+
+        await drain(
+            createGateway(http).chat({
+                messages: [
+                    { role: 'user', content: 'add two' },
+                    {
+                        role: 'assistant',
+                        content: null,
+                        toolCalls: [
+                            { id: 'c1', name: 'add_node', args: '{"type":"a"}' },
+                            { id: 'c2', name: 'add_node', args: '{"type":"b"}' },
+                        ],
+                    },
+                    { role: 'tool', content: '{"nodeId":"n1"}', toolCallId: 'c1' },
+                    { role: 'tool', content: '{"nodeId":"n2"}', toolCallId: 'c2' },
+                ],
+                tools: [{ name: 'add_node', description: 'add', parameters: { type: 'object' } }],
+            })
+        );
+
+        expect((http.requests[0].body as Record<string, unknown>)['contents']).toEqual([
+            { role: 'user', parts: [{ text: 'add two' }] },
+            {
+                role: 'model',
+                parts: [
+                    { functionCall: { name: 'add_node', args: { type: 'a' } } },
+                    { functionCall: { name: 'add_node', args: { type: 'b' } } },
+                ],
+            },
+            {
+                role: 'user',
+                parts: [
+                    { functionResponse: { name: 'add_node', response: { nodeId: 'n1' } } },
+                    { functionResponse: { name: 'add_node', response: { nodeId: 'n2' } } },
+                ],
+            },
+        ]);
+    });
+
     it('streams a response functionCall as a toolCall chunk (synthesized id), then done', async () => {
         const args = { nodeId: 'n1', by: { dx: 20, dy: 0 } };
         const http = new ScriptedHttpRequest([

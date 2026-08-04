@@ -42,7 +42,7 @@ const ORCHESTRATOR_PLANNING = [
     '  20px); resolve it to a number and apply it a single time. Do not repeat the edit or keep adjusting it.',
     '- Shared values — when parts of the request must agree on something the user left open, decide it once and',
     '  carry it through what you delegate: the single column several nodes align to, or the id of a node you just',
-    '  added that the rest of the work depends on.',
+    '  added (take it from that specialist’s result) that the wiring and configuring then depend on.',
     '',
     'You MAY read the canvas or the block catalog when you need it to PLAN — to understand the flow or to settle',
     'a shared value — but reading is not doing the work, and it never replaces delegating. Do not end the turn',

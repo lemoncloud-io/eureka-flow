@@ -164,10 +164,17 @@ const toGeminiRequest = (req: ChatRequest, generation?: GeminiGenerationConfig) 
         }
         if (message.role === 'tool') {
             const name = (message.toolCallId ? nameByCallId.get(message.toolCallId) : undefined) ?? 'tool';
-            contents.push({
-                role: 'user',
-                parts: [{ functionResponse: { name, response: toResponseObject(message.content) } }],
-            });
+            const part: GeminiPart = { functionResponse: { name, response: toResponseObject(message.content) } };
+            // Group consecutive tool results into ONE user content. Gemini requires the number of
+            // functionResponse parts to equal the preceding model turn's functionCall parts — Vertex enforces
+            // this strictly (a 400 otherwise) while the Developer API tolerates the split. So a batch of parallel
+            // tool calls comes back as a single user turn carrying every response, not one turn per response.
+            const last = contents[contents.length - 1];
+            if (last?.role === 'user' && last.parts[0]?.functionResponse !== undefined) {
+                last.parts.push(part);
+            } else {
+                contents.push({ role: 'user', parts: [part] });
+            }
             continue;
         }
         if (message.role === 'assistant') {
