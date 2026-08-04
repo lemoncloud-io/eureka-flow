@@ -35,7 +35,7 @@ classDiagram
         <<interface>>
         +has(type) boolean
         +schema(type) BlockSchema
-        +search(query) List~CatalogHit~
+        +search(query) List~BlockSchema~
     }
 
     %% ── delegation · spawn + roster ───────────────────────────────
@@ -81,7 +81,7 @@ classDiagram
     }
 
     ToolProvider ..> CanvasBinding : node read/move/config/structure edit live
-    ToolProvider ..> CatalogLookup : catalog_search · describe_block · describe_node
+    ToolProvider ..> CatalogLookup : catalog_search · describe_node
     ToolProvider ..> AgentRoster : list_agents reads
     ToolProvider ..> SubAgentRunner : spawn delegates to
 
@@ -149,21 +149,12 @@ declare function createNodeSearchToolProvider(
 //   search_nodes({ query? })  → { nodes: NodeLocation[] }        // COMPACT; query matches id/label/type; opts.type (if set) restricts to that type
 //   describe_node({ nodeId }) → { type, currentConfig, schema }  // same detail tool (by id — never type-scoped)
 
-// CATALOG — search (compact) + describe_block (detail). Never dumps the catalog.
+// CATALOG — catalog_search returns each matching block type's FULL schema (ports + config fields). Never dumps the catalog.
 declare function createCatalogToolProvider(catalog: CatalogLookup): ToolProvider;
 interface CatalogSearchInput {
     query: string;
 }
-interface DescribeBlockInput {
-    type: string;
-}
-interface CatalogHit {
-    type: string;
-    label: string;
-    summary: string;
-}
-//   catalog_search({ query }) → { hits: CatalogHit[] }  // COMPACT: lexical shortlist (type, label, summary)
-//   describe_block({ type })  → { schema: BlockSchema } // DETAIL: one block's full schema (fields + a select's enum)
+//   catalog_search({ query }) → { hits: BlockSchema[] }  // each hit is that type's FULL schema (type, label, ports, config fields)
 
 // NODE MOVE (write: position) — LOCATOR carries this over the live binding:
 declare function createNodeMoveToolProvider(binding: CanvasBinding): ToolProvider;
@@ -370,7 +361,7 @@ shared per-turn deps; the seed playbooks are wired internally from `SEED_SKILLS`
 export type BuilderAgentDeps = BaseAgentDeps; // no extra fields — SEED_SKILLS wired internally
 export declare class BuilderAgent extends BaseAgent {
     constructor(deps: BuilderAgentDeps);
-    // tools = [ read (list_nodes, describe_node), catalog (catalog_search, describe_block),
+    // tools = [ read (list_nodes, describe_node), catalog (catalog_search),
     //           structure (add_node, delete_node), config (set_properties, rename),
     //           edge (list_edges, connect_nodes, disconnect_edge), move (move_node),
     //           createUseSkillToolProvider(SEED_SKILLS) (use_skill) ]
@@ -382,13 +373,13 @@ export declare const BUILDER_SYSTEM_PROMPT: string;
 
 ## 5 · Catalog types
 
-Read by `catalog_search` / `describe_block`, `describe_node`, and `set_properties` validation.
+Read by `catalog_search`, `describe_node`, and `set_properties` validation.
 
 ```ts
 interface CatalogLookup {
     has(type: string): boolean;
     schema(type: string): BlockSchema | undefined;
-    search(query: string): CatalogHit[];
+    search(query: string): BlockSchema[]; // each hit is that type's FULL schema (ports + config fields)
 }
 interface BlockSchema {
     type: string;

@@ -41,8 +41,11 @@ export interface Chunk {
     text?: string;
     toolCall?: { id: string; name: string; argsDelta: string };
     done?: boolean;
-    /** Optional token accounting, emitted with the final (`done`) chunk when the provider reports it. */
-    usage?: { inputTokens?: number; outputTokens?: number };
+    /**
+     * Optional token accounting, emitted with the final (`done`) chunk when the provider reports it.
+     * `totalTokens` is the ground-truth count (includes thinking); `cachedTokens` are implicit-cache hits.
+     */
+    usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; cachedTokens?: number };
 }
 
 /** What a gateway/model supports; check before sending tool definitions. */

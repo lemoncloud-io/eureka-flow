@@ -2,8 +2,8 @@
 
 > A **design-agnostic** benchmark: one fixed ladder of scenarios (simple → complex), each verified by code,
 > run identically against **two agent designs** so we can compare their **correctness** on the same footing.
-> This page is the spec for that benchmark — the scenario catalog, the oracle discipline, and the comparison
-> protocol.
+> This page is the spec for that benchmark — the scenario catalog, the oracle discipline, the comparison
+> protocol, and (once two designs are co-correct) the cost & time metering that ranks them.
 >
 > **Grounding.** Built on what ships in `@flows/agent` today: `runScenario` / `TurnResult`
 > (`libs/agent/src/__tests__/harness/runScenario.ts`), the `CanvasBinding` graph model
@@ -53,6 +53,27 @@ verdict could only be produced by peeking inside one design, it is not a fair ve
 > designs are, so a genuinely different Design B (e.g. a single code-writing agent in the n8n "BUILD" shape)
 > drops in the same way — it is just another `RunAdapter`.
 
+> **Isolating the builder — the roster picks the routing rule.** For the A/B to measure Strategy 2 and not a
+> hybrid, the builder roster is **builder-exclusive**, and the orchestrator is shown a **builder-routing rule**:
+> _all_ node & wiring work — add, configure, rename, delete, connect, rewire, insert, build — goes to the one
+> `builder`, and there are no per-block agents. The **generic-block rule** ("any other catalog block type is
+> served by a generic block agent automatically") is shown **only** to rosters that carry block specialists —
+> fan-out and the shipped default — so Strategy 1 and production routing stay byte-for-byte the same.
+> `renderContext` derives which rule to render from the roster it already holds (builder-exclusive ⇒ the builder
+> rule, otherwise the block rule). The sub-agent runner's catalog fallback is **unchanged**, but under the
+> builder roster nothing invites it — no prompt advertises a generic block agent and only the builder card is
+> visible; a **transcript guard** on the live run (no agent label other than `…:builder` may appear) surfaces it
+> if it ever fires.
+
+> **Each strategy briefs with its own mental model — two orchestrator prompts, one gate.** The routing rule was
+> the first cut; the orchestrator's _base_ system prompt is now chosen the same way (`orchestratorPromptFor`).
+> **Fan-out** (and the shipped default) keeps the _decompose_ prompt — break the request into the smallest
+> per-specialist tasks and coordinate them, independent together and dependent in sequence. **Builder** gets a
+> _plan-and-hand-off_ prompt — do NOT decompose; work the request into ONE complete plan and delegate it to the
+> Builder in a single briefing. So Strategy 2 is briefed to play to the Builder's strength — one pass, no
+> re-discovery — rather than made to fragment a job it can do whole. Same builder-exclusive gate as the routing
+> rule, so fan-out and production are byte-for-byte unchanged.
+
 ---
 
 ## 1 · The adapter contract
@@ -75,7 +96,9 @@ interface BenchmarkInput {
 interface BenchmarkResult {
     outcome: TurnOutcome; // applied | partial | answered | refused  (shared parse: parseOutcome)
     graph: Graph; // post-turn live graph — the direct-edit oracle target
-    committed: boolean; // did the live graph change this turn
+    committed: boolean; // did the live graph change this turn  ── correctness fields above ──
+    cost: TurnCost; // NEW — per-turn token / round-trip / USD accounting (defined + metered in §4)
+    elapsedMs: number; // NEW — end-to-end run() wall-clock (§4)
 }
 ```
 
@@ -101,6 +124,12 @@ const strategy1Adapter: RunAdapter = {
 // roster is the one extra seam runScenario needs for the benchmark (test-only) — `createOrchestratorAgent`
 // already accepts a `roster`, so it is a passthrough.
 ```
+
+The benchmark adds two things to this passthrough. **(a) Metering:** `makeGateway` composes a metering gateway
+over the live one so every round-trip's usage is summed and `run()` is timed, populating `cost` + `elapsedMs`
+(§4). **(b) Isolation:** under the builder-exclusive roster the orchestrator is shown the builder-routing rule —
+all node & wiring work goes to the one builder, never the generic-block rule (§0) — so Strategy 2 is a _pure_
+builder design, not builder-plus-block-agents.
 
 A design that is **not** the orchestrator harness at all (e.g. a single code-writing agent in the n8n
 "BUILD" shape) implements the same interface over its own entry point. If it does not expose an
@@ -252,7 +281,7 @@ const requirements: Requirement[] = [
 const grade = (g: Graph) => requirements.filter(r => r.check(g)).length / requirements.length; // 0..1
 ```
 
-The scorecard (§4) reports the **requirement pass-rate per clause** for T4/T5, so a design's failure is
+The scorecard (§6) reports the **requirement pass-rate per clause** for T4/T5, so a design's failure is
 localized to _which_ invariant it broke — far more actionable than a single number.
 
 ---
@@ -279,6 +308,12 @@ A live model is stochastic — one run is an anecdote. The protocol turns anecdo
 5. **Aggregate** across the ladder with tier weighting if desired (complex tiers are where designs diverge),
    but always report the per-tier and per-scenario breakdown — an aggregate that hides "Design B passes every
    T0 but fails every T4 build" is a lie.
+6. **Efficiency — compared only among the runs that _pass_.** Correctness gates; the cost of a wrong answer is
+   meaningless, so efficiency is aggregated **over passing runs only**, and cross-design only for scenarios
+   **both** designs pass. Per such cell, report mean `totalTokenCount` and mean round-trips — the trusted, cache-
+   and network-independent axes (§4) — plus wall-clock and list/effective cost as reported-but-not-ranked. The
+   **verdict is two-part:** the correctness winner (pass-rate, item 4) **then**, among the co-correct, the
+   efficiency winner ranked on tokens/round-trips. Cost never folds into the correctness ranking.
 
 ```ts
 interface ScorecardCell {
@@ -287,6 +322,12 @@ interface ScorecardCell {
     passRate: string; // 'k/N'
     requirementRate?: string; // 'k/total' mean over runs — T4/T5 only, the partial-credit tie-breaker
     notes: string[]; // per-run oracle notes for the misses (why a run failed)
+    // efficiency — means over the PASSING runs only (undefined when k=0); see §4
+    tokens?: number; // mean totalTokenCount — the ranked axis
+    roundTrips?: number; // mean chat() calls — the ranked axis
+    elapsedMs?: number; // mean wall-clock — reported, not ranked
+    usdList?: number; // mean cache-blind cost — reported, not ranked
+    usdEffective?: number; // mean cache-aware cost — reported, not ranked
 }
 // The benchmark runner: for each scenario, for each design, run N times, apply the shared oracle, aggregate.
 declare function runBenchmark(scenarios: Scenario[], designs: RunAdapter[], n: number): Promise<ScorecardCell[]>;
@@ -300,7 +341,183 @@ selectable (`-t T4.build`) so a design change can be spot-checked without the fu
 
 ---
 
-## 4 · The scenario ladder (simple → complex)
+## 4 · Cost & time — the efficiency axis
+
+Correctness gates; once two designs are **co-correct** on a scenario the open question is _which produces the
+same right graph more cheaply and faster_. The benchmark meters four numbers per turn — but they are **not**
+equal in trustworthiness, and only two of them decide the efficiency verdict.
+
+### 4.1 · What to measure — and what each axis is worth
+
+| axis              | what                                                                                                 | trust         | why                                                                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **total tokens**  | Σ per-call `totalTokenCount` over every agent of the turn (re-sent prompt + thinking included, §4.3) | **primary**   | network-independent, deterministic-ish at temp 0, cache-independent, and the actual cost driver                                           |
+| **round-trips**   | count of `chat()` calls in the turn                                                                  | primary       | a clean latency proxy that does not move with the network                                                                                 |
+| **cost (USD)**    | _list_ (tokens × rate) and _effective_ (cache-aware, §4.3)                                           | derived       | human-readable; the _effective_ figure is real spend but **non-deterministic** (implicit-cache hits vary run-to-run and leak across runs) |
+| **wall-clock ms** | end-to-end `run()` latency                                                                           | **secondary** | user-facing but **noisy** — network variance, and fan-out parallelizes children while the builder is one long serial agent                |
+
+**Raw tokens and round-trips decide the efficiency verdict; wall-clock and cost are reported but not trusted to
+rank.** Cost is twice-derived — a price constant we own times a cache state we do not control — so the stable,
+cache-independent `totalTokenCount` is the axis the comparison rests on, and the cost columns are a readout of
+real (effective) and list-price spend.
+
+```ts
+// Rates WE own — confirm against current Google AI pricing. Raw tokens are the ground-truth axis; these only
+// scale the derived cost columns. cachedPerM applies to cachedContentTokenCount (implicit-cache hits, §4.3).
+// Keyed by model so a bigger model reprices without touching the Meter.
+const PRICES: Record<string, { inPerM: number; outPerM: number; cachedPerM: number }> = {
+    'gemini-2.5-flash': { inPerM: 0.3, outPerM: 2.5, cachedPerM: 0.03 }, // cached = 10% of input (90% off), Dev API + Vertex
+};
+```
+
+### 4.2 · Where to measure — a metering gateway over the seam runScenario already exposes
+
+Every LLM round-trip of every agent (orchestrator + each spawned specialist/builder) already flows through the
+gateway the benchmark wraps around `makeGateway`. That is the exact choke point for metering — no new seam. The
+Meter is test-only; the only product touch is surfacing a few more usage fields on `Chunk.usage` (§4.3).
+
+```mermaid
+flowchart LR
+    subgraph turn["one turn · one run()"]
+      O["orchestrator gateway"] --> M
+      C1["child gateway"] --> M
+      C2["child gateway"] --> M
+      M["metering wrapper<br/>records transcript · sums usage · counts calls"] --> G["real Gemini gateway"]
+    end
+    M -.->|"usage on the done chunk"| MT["Meter · per-turn"]
+    turn -.->|"performance.now around run"| WC["elapsedMs"]
+```
+
+- **Meter** — a per-turn accumulator (`addUsage(u)`, `tick()`, `totals(): TokenTotals`): pure counting, no
+  pricing. Each metering gateway reads `chunk.usage` on the one usage-bearing `done` chunk per call (§4.3) and
+  adds it once; `tick()` counts the call. A fresh Meter per `run()` (per scenario × design × run _i_) is threaded
+  into `makeGateway`, so **all** agents of the turn write into the same Meter and the totals are the whole-turn
+  sum.
+- **Wall-clock** — `performance.now()` immediately around the `run()` call, so `elapsedMs` includes every
+  round-trip and the outcome re-ask, i.e. the latency a user feels.
+- **Result surface** — `BenchmarkResult` (§1) grows `cost: TurnCost` + `elapsedMs`; the correctness fields are
+  untouched.
+
+```ts
+interface TokenTotals {
+    // what Meter.totals() returns — pure counting, provider-neutral
+    inputTokens: number; // Σ promptTokenCount — re-sent history included (that IS the bill, §4.3)
+    cachedTokens: number; // Σ cachedContentTokenCount — input served from the implicit cache
+    outputTokens: number; // Σ (totalTokenCount − promptTokenCount) — visible output + thinking
+    totalTokens: number; // Σ totalTokenCount — the stable, cache-independent ground-truth axis
+    roundTrips: number; // count of chat() calls in the turn
+}
+// the single pricing seam — a pure fn over TokenTotals + PRICES (§4.1); nothing else applies a rate
+declare function price(t: TokenTotals, model: string): { usdList: number; usdEffective: number };
+interface TurnCost extends TokenTotals {
+    usdList: number; // cache-blind: all input at standard rate — stable, apples-to-apples
+    usdEffective: number; // cache-aware: cached input at cachedPerM — real spend, but noisy + order-dependent
+}
+```
+
+A provider that reports no usage yields `undefined` → counted as 0 and flagged once in the scorecard, so a
+silent 0 never masquerades as "free."
+
+**Structure & reuse.** Metering is an `LlmGateway` **decorator**, exactly like the shipped recorder;
+`makeGateway` **composes** them (`recordingGateway(meteringGateway(gateway, meter), label)`) so the transcript
+logic is not duplicated and, both being pure pass-through observers, composition order is free. Three
+separations keep it DRY and provider-neutral: the **Meter** only accumulates `Chunk.usage` and counts calls (no
+provider field names, no rates); every Gemini-specific mapping (`promptTokenCount` / `totalTokenCount` /
+`cachedContentTokenCount` → `Chunk.usage`) stays in `GeminiLlmGateway`; and **counting vs. pricing** are split —
+`Meter.totals()` returns raw `TokenTotals`, and a single pure `price(totals, model)` derives the USD columns from
+the one `PRICES` table.
+
+### 4.3 · Token accounting under a re-sending loop
+
+The think/act loop re-sends the whole conversation every iteration, so call N's `promptTokenCount` already
+includes the re-sent prefix. That is the bill, not an artefact to correct for — the provider charges the full
+prompt on every call. **So a turn's cost is exactly Σ over every call `(input + output)`, across the orchestrator
+and every child — re-sends counted each time, because they are paid each time. Summing is correct; it is not
+double-counting.**
+
+A concrete turn makes it click — a generator agent handling _"set the generator's temperature to 0.2 on gen_1"_
+over three rounds (tokens illustrative; the real ones come from `usageMetadata`):
+
+```
+══ round 1 ══                                                        billed as →
+◀ system   generator-specialist persona ............ ~350 ┐
+◀ tools    6 fn-declarations: describe_node,          ~520 ├ base prefix
+           set_properties, catalog_search, …               │  ~1050 → INPUT (call 1)
+◀ context  nodes: gen_1 (single-output-generator) .. ~160 │
+◀ user     "set gen_1 temperature to 0.2" ............ ~20 ┘
+▶ (thinking) ........................................ ~120 → OUTPUT
+▶ calls    describe_node({ id:"gen_1" }) .............. ~15 → OUTPUT
+     ⟨tool runs locally — 0 tokens⟩
+◀ result   { model:"gemini-2.5-flash", temperature:"0.7" }  ~60 → INPUT (re-sent from call 2)
+
+══ round 2 ══  (re-sends base + round-1 call + result)
+◀ …base 1050 + call 15 + result 60 ................ = 1125 → INPUT (call 2)
+▶ (thinking) ......................................... ~80 → OUTPUT
+▶ calls    set_properties({ id:"gen_1",               ~25 → OUTPUT
+             props:{ temperature:"0.2" } })
+     ⟨tool edits the config — 0 tokens⟩
+◀ result   { ok:true } ................................ ~8 → INPUT (re-sent from call 3)
+
+══ round 3 ══  (re-sends everything so far)
+◀ …prev 1125 + call 25 + result 8 ................. = 1158 → INPUT (call 3)
+▶ (thinking) ......................................... ~40 → OUTPUT
+▶ says     "Set the temperature to 0.2." ............. ~15 → OUTPUT  (no tool call → done)
+```
+
+Thinking is billed as output when generated but is **not** re-sent as input — only the visible assistant parts
+(tool calls / text) and tool results re-enter the prompt. Per call, this is what `usageMetadata` reports and the
+Meter sums:
+
+|  call | input `prompt` |   cached | new (prompt − cached) | output (visible + thinking) |  `total` |
+| ----: | -------------: | -------: | --------------------: | --------------------------: | -------: |
+|     1 |           1050 |        0 |                  1050 |              135 (15 + 120) |     1185 |
+|     2 |           1125 |    ~1050 |                    75 |               105 (25 + 80) |     1230 |
+|     3 |           1158 |    ~1125 |                    33 |                55 (15 + 40) |     1213 |
+| **Σ** |       **3333** | **2175** |              **1158** |                     **295** | **3628** |
+
+Priced at the `PRICES` rates (in \$0.30/M, out \$2.50/M, cached \$0.03/M):
+
+```
+list cost (cache-blind):  3333×0.30/M + 295×2.50/M                = $0.00174
+effective cost (cached):  1158×0.30/M + 2175×0.03/M + 295×2.50/M  = $0.00115   (~34% less)
+                          └ new input ┘└ cached −90% ┘└ output (never cached) ┘
+```
+
+Three properties of the accounting, verified against `GeminiLlmGateway`:
+
+1. **One usage per call.** The gateway is non-streaming (one `chat()` = one `generateContent` = one bill) and
+   yields `usage` exactly once, on the `done` chunk. The Meter adds it once per call — no within-call double
+   count.
+2. **Bill on `totalTokenCount`, not `candidatesTokenCount`.** `candidatesTokenCount` is only the _visible_
+   output — 55 tokens across the three calls above — so a candidates-only meter would report 55 where the true
+   output is **295**, silently dropping the 240 thinking tokens (`thinkingBudget: 1024`), the bulk and priciest
+   part of the output side. So `Chunk.usage` surfaces `usageMetadata.totalTokenCount` and derives
+   `output = total − prompt`, immune to whether candidates includes thoughts.
+3. **Implicit caching is on — capture `cachedContentTokenCount`.** Gemini 2.5+ caches automatically (only
+   _explicit_ `CachedContent` is off). A prefix shared with a recent call is billed 90% off (\$0.03/M vs
+   \$0.30/M), reported as `cachedContentTokenCount` — the `cached` column, which turned this turn's bill from
+   \$0.00174 to \$0.00115.
+   The loop is the ideal shape (stable prefix front, new turn appended end), and the refund lands on exactly the
+   re-sent prefix, favouring the builder's one long thread. Two consequences: **(a)** price cached input at
+   `cachedPerM` or cost over-states input; **(b)** implicit hits are best-effort and _order-dependent_ — a
+   design that runs second can hit the first's warm prefix — so the _effective_ figure is non-deterministic and
+   the fair cross-design axis stays raw `totalTokenCount`. Report both a _list_ figure (cache-blind, stable) and
+   an _effective_ one (real spend); their gap = how cache-friendly each design is.
+
+The example already shows the **four ways a tool call costs**, all captured by metering `usageMetadata` per call
+(never reconstructed from text): the **tool schemas** in the ~520-token base (input every call, then cached), the
+**tool call** as output, the **tool result** as re-sent input (fat reads like `catalog_search` accumulate), and
+each exchange forcing another **round-trip**. Local tool _execution_ is free in tokens (`⟨0 tokens⟩` above) — the
+one tool cost outside the bill; it lands only in wall-clock (negligible in-memory, but the dominant time cost
+once tools hit real services at n8n scale).
+
+Nominally this re-send tax is where the designs diverge — the builder re-sends _one long history_ across up to 20
+iterations, fan-out spreads _short, isolated_ child histories (a fresh store each) plus the orchestrator's — but
+caching refunds most of it, so the real gap is empirical. The Meter settles it by summing per-call totals.
+
+---
+
+## 5 · The scenario ladder (simple → complex)
 
 Every row is design-agnostic. The graphs: **`fixture`** = the shipped 4-node chain
 `input-text → buffer → single-output-generator → output-preview` (`makeInitialGraph()`), **`minimal`** = the
@@ -385,37 +602,52 @@ row uses the `unchanged` no-edit oracle.
 
 ---
 
-## 5 · Reporting — the scorecard
+## 6 · Reporting — the scorecard
 
 Print one table per tier and one aggregate, both designs side by side, mirroring the `afterAll` scorecard in
-`integration.live.spec.ts`:
+`integration.live.spec.ts`. Each cell now also carries the efficiency columns (means over the **passing** runs
+only, §4): `tok` mean `totalTokenCount` · `rt` mean round-trips · `ms` mean wall-clock · and the **list** /
+**effective** cost (cache-blind / cache-aware). Below the per-tier tables, an **efficiency summary** aggregates
+the scenarios **both** designs pass:
 
 ```
 ━━━━━ BENCHMARK · model=gemini-2.5-flash · N=5 ━━━━━
-scenario            design         pass   req(mean)   notes
-T4.build-pipeline   strategy-1     5/5    4/4         —
-T4.build-pipeline   strategy-2     4/5    3.6/4       1 run: forgot to wire the preview
-                    ▶ winner: strategy-1 (5/5 vs 4/5)
+scenario            design         pass   req(mean)   tok     rt   ms      $list    $eff     notes
+T4.build-pipeline   strategy-1     5/5    4/4         18.4k   9    22.1s   0.0031   0.0022   —
+T4.build-pipeline   strategy-2     4/5    3.6/4       12.1k   5    17.8s   0.0021   0.0013   1 run: forgot to wire preview
+                    ▶ correctness: strategy-1 (5/5 vs 4/5) · efficiency: strategy-2 (−34% tok, −44% rt)
 ...
+━━━ EFFICIENCY (scenarios BOTH designs pass) ━━━
+strategy-1     Σ 71.2k tok · 38 rt · 96s   ·  $list 0.012 / $eff 0.008
+strategy-2     Σ 49.8k tok · 24 rt · 74s   ·  $list 0.009 / $eff 0.005   →  −30% tok, −37% rt
 ━━━━━ AGGREGATE ━━━━━
 strategy-1     correctness 46/55
 strategy-2     correctness 41/55
 ```
 
-The winner line is computed by §3's ranking (pass-rate first, requirement-rate tie-break). Persist the raw
-`ScorecardCell[]` to JSON so two benchmark runs — before/after a prompt or design change — are diffable.
+The verdict is **two-part** (§3): the correctness winner by pass-rate (requirement-rate tie-break), **then** the
+efficiency winner among the co-correct, ranked on `tok`/`rt` (the trusted axes) — cost and `ms` are shown but
+never fold into the ranking. Persist the raw `ScorecardCell[]` — now including the cost/time fields — to JSON so
+two benchmark runs (before/after a prompt or design change) are diffable; the `bench-runs/` mechanism
+(timestamped + `latest.*`) is otherwise unchanged.
 
 ---
 
-## 6 · Reused vs. new
+## 7 · Reused vs. new
 
-|                                            |                                                                                                                                                                                                                                                                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Reused as-is**                           | `runScenario` / `TurnResult`, `parseOutcome` / `TurnOutcome`, `makeInitialGraph` / `createFixtureCatalog` / `IDS` / `nodeById`, the `makeGateway(agentType)` seam, the oracle discipline, the live Gemini gateway, the `RUN_LIVE` gate + per-case selectability.                                             |
-| **New (all test-only, no product change)** | `RunAdapter` + the two adapters, the `fanoutRoster` / `builderRoster` pair, the `Scenario` catalog + shared oracles (§4), `runBenchmark` + the pass-rate aggregation, the scorecard writer, and one tiny `runScenario` hook (pass a `roster` through to `createOrchestratorAgent`, which already takes one). |
+|                                     |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Reused as-is**                    | `runScenario` / `TurnResult`, `parseOutcome` / `TurnOutcome`, `makeInitialGraph` / `createFixtureCatalog` / `IDS` / `nodeById`, the `makeGateway(agentType)` seam, the recording gateway, the oracle discipline + the whole scenario ladder, the live Gemini gateway, the `bench-runs/` persistence, the `RUN_LIVE` gate + per-case selectability.                                                                                                                                                                                         |
+| **New — product code (two, small)** | (1) `renderContext` renders the routing rule from the roster it already holds — `BLOCK_RULE` unless the roster is builder-exclusive, then `BUILDER_RULE` (`orchestratorAgent.ts`, §0). (2) surface `totalTokenCount` + `cachedContentTokenCount` (+ thinking) on `Chunk.usage` and in `GeminiLlmGateway` — a ~3-field read — so cost captures thinking tokens **and** the implicit-cache discount (§4.3).                                                                                                                                  |
+| **New — test-only**                 | `RunAdapter` + the two adapters, the `fanoutRoster` / `builderRoster` pair, the `Scenario` catalog + shared oracles (§5), the `Meter` + metering wrapper (a decorator **composed** with the existing recorder), `TurnCost` / `elapsedMs` on `BenchmarkResult`, `runBenchmark` + the pass-rate/efficiency aggregation, the scorecard writer (cost/time columns + efficiency summary), the offline Meter + isolation tests, and one tiny `runScenario` hook (pass a `roster` through to `createOrchestratorAgent`, which already takes one). |
 
-Nothing here touches `BaseAgent`, the specialists, or the tools — the benchmark observes the shipped agent
-through seams it already has, which is the whole reason the two designs can be compared honestly.
+Both product changes leave the default (production) roster and Strategy 1 byte-for-byte the same — the routing
+gate fires only for a builder-**exclusive** roster, and the usage fields are additive — so `roster.ts` and
+`subAgentRunner.ts` are untouched and the runner's catalog fallback stays (the §0 residual, transcript-guarded).
+Everything else is test-only and carries no duplication: metering is a decorator composed with the existing
+recorder, the `Meter` is a provider-neutral accumulator, and pricing is a single pure `price()` (§4.2). Nothing
+touches `BaseAgent`, the specialists, or the tools — the benchmark observes the shipped agent through seams it
+already has, which is why the two designs can be compared honestly.
 
 ---
 

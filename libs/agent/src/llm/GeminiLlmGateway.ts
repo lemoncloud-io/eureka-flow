@@ -4,25 +4,80 @@ import type { AgentEnvironmentSupportable } from '../environment';
 import type { HttpRequestSupportable } from '../http';
 import type { ChatRequest, Chunk, JsonSchema, LlmGateway, LlmGatewayCapabilities, ToolDef } from './llmGateway';
 
+/** Generation parameters applied to every request; shared by both provider factories. */
+export interface GeminiGenerationConfig {
+    temperature?: number;
+    maxOutputTokens?: number;
+    thinkingBudget?: number;
+}
+
+/**
+ * Transient-throttle retry (shared by both factories). A cold Vertex DSQ project — and rate-limited Developer
+ * keys — reject bursts with 429/503; backing off and retrying lets a multi-call agent turn ride through instead
+ * of failing. Applies only to retryable HTTP statuses; other errors still throw at once.
+ */
+export interface GeminiRetryConfig {
+    /** Total HTTP attempts per request (1 = no retry). Default 4. */
+    maxAttempts?: number;
+    /** Base backoff in ms; grows exponentially (base·2^(n−1)) with jitter, capped. Default 1000. */
+    baseDelayMs?: number;
+}
+
 export interface GeminiLlmGatewayOptions {
     /** Provides tracing, time, and cancellation. */
     environment: AgentEnvironmentSupportable;
     /** HTTP port. */
     http: HttpRequestSupportable;
-    /** Gemini API key; sent as the x-goog-api-key header, never traced. */
+    /** Gemini Developer API key; sent as the x-goog-api-key header, never traced. */
     apiKey: string;
     /** Defaults to gemini-2.5-flash. */
     model?: string;
     /** Override to route through a backend proxy. */
     baseUrl?: string;
     /** Optional generation parameters applied to every request. */
-    generation?: { temperature?: number; maxOutputTokens?: number; thinkingBudget?: number };
+    generation?: GeminiGenerationConfig;
+    /** Optional transient-throttle (429/503) retry-with-backoff; defaults to 4 attempts, 1s base. */
+    retry?: GeminiRetryConfig;
 }
 
-/** The Gemini gateway: the shared contract plus provider/model identity. */
+/**
+ * Vertex AI options. The endpoint is project/location-scoped and auth is OAuth2, so the credential is not a
+ * static key but an async token provider — a Vertex access token expires (~1h). Supply it however you like:
+ * a service account via google-auth-library in prod, or `gcloud auth print-access-token` for a one-off run.
+ * The request/response body (including usageMetadata) is identical to the Developer API — only URL + auth differ.
+ */
+export interface VertexLlmGatewayOptions {
+    /** Provides tracing, time, and cancellation. */
+    environment: AgentEnvironmentSupportable;
+    /** HTTP port. */
+    http: HttpRequestSupportable;
+    /** GCP project id that owns the Vertex endpoint (and the billing the $300 trial credit pays). */
+    project: string;
+    /** Vertex region, or 'global'. Defaults to 'global'. */
+    location?: string;
+    /** Supplies a fresh OAuth2 access token (Bearer); called once per chat() so it can refresh. Never traced. */
+    getAccessToken: () => string | Promise<string>;
+    /** Defaults to gemini-2.5-flash. */
+    model?: string;
+    /** Override the aiplatform host (e.g. a proxy); defaults to the regional/global Vertex host. */
+    baseUrl?: string;
+    /** Optional generation parameters applied to every request. */
+    generation?: GeminiGenerationConfig;
+    /** Optional transient-throttle (429/503) retry-with-backoff; defaults to 4 attempts, 1s base. */
+    retry?: GeminiRetryConfig;
+}
+
+/** The Gemini gateway backed by the Developer API: the shared contract plus provider/model identity. */
 export interface GeminiLlmGateway extends LlmGateway {
     readonly capabilities: LlmGatewayCapabilities;
     readonly provider: 'gemini';
+    readonly model: string;
+}
+
+/** The same Gemini core backed by Vertex AI: the shared contract with a distinct provider tag. */
+export interface VertexLlmGateway extends LlmGateway {
+    readonly capabilities: LlmGatewayCapabilities;
+    readonly provider: 'vertex';
     readonly model: string;
 }
 
@@ -30,9 +85,23 @@ const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
 const ERROR_BODY_SNIPPET_LENGTH = 200;
 
-/** A provider/proxy could echo request data back; scrub the key before it reaches an error. */
+/** A provider/proxy could echo request data back; scrub each secret before it reaches an error. */
 const redactText = (value: string, secret: string): string =>
     secret.length > 0 ? value.split(secret).join('[redacted]') : value;
+
+/** The result of authorizing one request: the headers to send + the secrets to scrub from any error body. */
+interface AuthResult {
+    headers: Record<string, string>;
+    secrets: string[];
+}
+
+/** What varies between the Developer API and Vertex: where to POST, and how to authorize (+ what to redact). */
+interface GeminiTransport {
+    /** The absolute generateContent URL for this model. */
+    endpoint(model: string): string;
+    /** Per-request auth — headers to send, plus the secret strings to redact from an error body. */
+    authorize(): AuthResult | Promise<AuthResult>;
+}
 
 // ── Gemini generateContent shapes (function-calling) ──────────────────────────────────────────
 // Content.role is only user|model; a tool RESULT is a `user` turn carrying a functionResponse part.
@@ -77,7 +146,7 @@ const toResponseObject = (content: string | null): Record<string, unknown> => {
 const toGeminiParameters = (schema: JsonSchema): JsonSchema => schema;
 
 /** Map the provider-neutral request onto Gemini's generateContent shape (tool `name` recovered from prior `toolCalls` by id). */
-const toGeminiRequest = (req: ChatRequest, generation?: GeminiLlmGatewayOptions['generation']) => {
+const toGeminiRequest = (req: ChatRequest, generation?: GeminiGenerationConfig) => {
     const nameByCallId = new Map<string, string>();
     for (const message of req.messages) {
         for (const call of message.toolCalls ?? []) {
@@ -145,15 +214,44 @@ const toGeminiRequest = (req: ChatRequest, generation?: GeminiLlmGatewayOptions[
 
 interface GeminiResponse {
     candidates?: Array<{ content?: { parts?: GeminiPart[] }; finishReason?: string }>;
-    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+    usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        totalTokenCount?: number;
+        cachedContentTokenCount?: number;
+    };
     promptFeedback?: { blockReason?: string };
 }
 
-/** LlmGateway backed by Gemini's generateContent API with function-calling; non-streaming under the hood, response `functionCall`s surface as {@link Chunk} `toolCall`s. */
-export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): GeminiLlmGateway => {
-    const { environment, http, apiKey } = options;
-    const model = options.model ?? DEFAULT_MODEL;
-    const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
+interface GeminiCoreDeps {
+    environment: AgentEnvironmentSupportable;
+    http: HttpRequestSupportable;
+    model: string;
+    generation?: GeminiGenerationConfig;
+    retry?: GeminiRetryConfig;
+    transport: GeminiTransport;
+}
+
+/**
+ * The provider-neutral core of the Gemini gateway: body build → request loop → response parse → usageMetadata
+ * mapping → chunk yield, written ONCE. Only the {@link GeminiTransport} (endpoint URL + auth) is injected, so
+ * the Developer API and Vertex share every line except where and how they POST. Function-calling; non-streaming
+ * under the hood — response `functionCall`s surface as {@link Chunk} `toolCall`s.
+ */
+const createGeminiCoreGateway = ({
+    environment,
+    http,
+    model,
+    generation,
+    retry,
+    transport,
+}: GeminiCoreDeps): LlmGateway & { capabilities: LlmGatewayCapabilities } => {
+    // Transient-throttle retry: a cold Vertex DSQ project (and rate-limited Developer keys) reject bursts with
+    // 429/503. Back off and retry the SAME request so a multi-call agent turn rides through. Other errors throw.
+    const RETRYABLE_STATUS = new Set([429, 503]);
+    const maxHttpAttempts = Math.max(1, retry?.maxAttempts ?? 4);
+    const baseDelayMs = retry?.baseDelayMs ?? 1000;
+    const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
     const trace = environment.traceReporter;
 
     // Gemini returns no tool-call ids; synthesize a stable one so the agent loop can correlate results.
@@ -162,7 +260,10 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
 
     async function* chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk> {
         const startedAt = environment.now();
-        const body = toGeminiRequest(req, options.generation);
+        const body = toGeminiRequest(req, generation);
+        const url = transport.endpoint(model);
+        // Authorize once per chat() call: a Vertex token can refresh here; a static Developer key is a no-op.
+        const { headers, secrets } = await transport.authorize();
 
         trace?.debug('llm.gemini.request', {
             model,
@@ -179,17 +280,28 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
         let cleanStop = false;
 
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-            const response = await http.request({
-                method: 'POST',
-                url: `${baseUrl}/v1beta/models/${model}:generateContent`,
-                headers: { 'x-goog-api-key': apiKey },
-                body,
-                ...(opts?.signal ? { signal: opts.signal } : {}),
-            });
+            const send = () =>
+                http.request({ method: 'POST', url, headers, body, ...(opts?.signal ? { signal: opts.signal } : {}) });
+            // Send, then retry 429/503 with exponential backoff + jitter (capped) until it succeeds or attempts run out.
+            let response = await send();
+            for (
+                let httpAttempt = 1;
+                httpAttempt < maxHttpAttempts &&
+                !response.ok &&
+                RETRYABLE_STATUS.has(response.status) &&
+                !opts?.signal?.aborted;
+                httpAttempt += 1
+            ) {
+                const backoffMs =
+                    Math.min(baseDelayMs * 2 ** (httpAttempt - 1), 15_000) + Math.floor(Math.random() * 250);
+                trace?.debug('llm.gemini.retry', { model, status: response.status, httpAttempt, backoffMs });
+                await sleep(backoffMs);
+                response = await send();
+            }
 
             if (!response.ok) {
                 const errorBody = await response.text().catch(() => '');
-                const safeBody = redactText(errorBody, apiKey);
+                const safeBody = secrets.reduce((acc, secret) => redactText(acc, secret), errorBody);
 
                 trace?.error('llm.gemini.error', { model, status: response.status });
                 throw new Error(
@@ -233,6 +345,10 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
                   ...(usageMeta.candidatesTokenCount !== undefined
                       ? { outputTokens: usageMeta.candidatesTokenCount }
                       : {}),
+                  ...(usageMeta.totalTokenCount !== undefined ? { totalTokens: usageMeta.totalTokenCount } : {}),
+                  ...(usageMeta.cachedContentTokenCount !== undefined
+                      ? { cachedTokens: usageMeta.cachedContentTokenCount }
+                      : {}),
               }
             : undefined;
 
@@ -259,10 +375,58 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
         yield { done: true, ...(usage ? { usage } : {}) };
     }
 
+    return { capabilities: { toolCalls: true }, chat };
+};
+
+/** Developer API transport: a static x-goog-api-key header + the generativelanguage.googleapis.com endpoint. */
+const developerTransport = (options: GeminiLlmGatewayOptions): GeminiTransport => {
+    const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
     return {
-        capabilities: { toolCalls: true },
-        provider: 'gemini',
-        model,
-        chat,
+        endpoint: model => `${baseUrl}/v1beta/models/${model}:generateContent`,
+        authorize: () => ({ headers: { 'x-goog-api-key': options.apiKey }, secrets: [options.apiKey] }),
     };
+};
+
+/** Vertex AI transport: a fresh Bearer token per call + the project/location-scoped aiplatform endpoint. */
+const vertexTransport = (options: VertexLlmGatewayOptions): GeminiTransport => {
+    const location = options.location ?? 'global';
+    const host =
+        options.baseUrl ??
+        (location === 'global' ? 'https://aiplatform.googleapis.com' : `https://${location}-aiplatform.googleapis.com`);
+    return {
+        endpoint: model =>
+            `${host}/v1/projects/${options.project}/locations/${location}/publishers/google/models/${model}:generateContent`,
+        authorize: async () => {
+            const token = await options.getAccessToken();
+            return { headers: { Authorization: `Bearer ${token}` }, secrets: [token] };
+        },
+    };
+};
+
+/** LlmGateway backed by the Gemini Developer API (x-goog-api-key). Behavior is unchanged from before the split. */
+export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): GeminiLlmGateway => {
+    const model = options.model ?? DEFAULT_MODEL;
+    const core = createGeminiCoreGateway({
+        environment: options.environment,
+        http: options.http,
+        model,
+        ...(options.generation ? { generation: options.generation } : {}),
+        ...(options.retry ? { retry: options.retry } : {}),
+        transport: developerTransport(options),
+    });
+    return { ...core, provider: 'gemini', model };
+};
+
+/** The same Gemini core, backed by Vertex AI (OAuth2 Bearer + regional endpoint); draws the $300 trial credit. */
+export const createVertexLlmGateway = (options: VertexLlmGatewayOptions): VertexLlmGateway => {
+    const model = options.model ?? DEFAULT_MODEL;
+    const core = createGeminiCoreGateway({
+        environment: options.environment,
+        http: options.http,
+        model,
+        ...(options.generation ? { generation: options.generation } : {}),
+        ...(options.retry ? { retry: options.retry } : {}),
+        transport: vertexTransport(options),
+    });
+    return { ...core, provider: 'vertex', model };
 };

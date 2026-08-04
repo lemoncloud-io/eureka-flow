@@ -225,9 +225,11 @@ stops on no tool calls); the structured `TurnOutcome` is produced only by the ev
 ## 8 · Tools
 
 All routed through the shipped `ToolExecutor` (validate args → check the agent's `grant` + the user's permissions → run). Reads follow
-a **compact-list + detail** convention: a `list_*` / `*_search` tool returns a cheap shortlist (ids + labels,
-no config/schema), paired with a `describe_*` tool that returns one item's full detail on demand
-(`list_nodes` → `describe_node`, `catalog_search` → `describe_block`). Node **read** comes in two forms over
+a **compact-list + detail** convention for the canvas: a `list_*` / `*_search` tool returns a cheap shortlist
+(ids + labels, no config/schema), paired with `describe_node`, which returns one node's full detail on demand
+(`list_nodes` → `describe_node`). The **block catalog** is a single tool instead — `catalog_search` returns each
+matching block type's FULL schema (ports + config fields) directly, because a type's schema is static, so there
+is nothing per-instance to defer (unlike a live node → `describe_node`). Node **read** comes in two forms over
 ONE `describe_node`: the full `list_nodes` (all nodes), carried by the orchestrator, the operation agents
 (locator, edge), and the builder; and **`search_nodes`**, a general search over the current nodes (`query` matched against a
 node's id, label, and type), which a block agent carries **scoped to its own block type** so it never sees
@@ -244,8 +246,7 @@ connects/disconnects.
 | `search_nodes`                            | read     | live canvas           | **compact** search over the current nodes — `query` matches id/label/type; a block agent carries it **scoped to its own type** (optional structural bound).             |
 | `describe_node`                           | read     | live canvas + catalog | **detail** for one node: block schema, current config, a select's allowed options.                                                                                      |
 | `list_edges`                              | read     | live canvas           | **compact** edge list (`edgeId`, `source:port → target:port`); the palette the edge agent disconnects from.                                                             |
-| `catalog_search`                          | read     | block catalog         | **compact** lexical shortlist over `blockRegistry`. Never dumps.                                                                                                        |
-| `describe_block`                          | read     | block catalog         | **detail** for one block type: full schema (required fields + a select's enum).                                                                                         |
+| `catalog_search`                          | read     | block catalog         | **lexical search** over `blockRegistry`; each hit is that type's FULL schema (ports + config fields) — no separate describe step. Never dumps the whole catalog.        |
 | `move_node` / `set_properties` / `rename` | write    | live canvas           | patch one node via `updateNode`; a bad edit is rejected and the graph is left untouched.                                                                                |
 | `add_node` / `delete_node`                | write    | live canvas           | `addNode` (defaults, or defaults + optional `config` in one call, returns the new id) / `deleteNode` (edges cascade); rejects unknown type / bad config / missing node. |
 | `connect_nodes` / `disconnect_edge`       | write    | live canvas           | `addEdge` (validated: ports · type-compat · no-cycle; returns the new id) / `deleteEdge`; a bad connection is rejected, graph untouched.                                |
@@ -269,14 +270,14 @@ The main agent coordinates; each specialist carries only what its job needs and 
 **live `CanvasBinding`**. All go through the same executor gate (the agent's fixed grant **and** the user's
 permissions).
 
-| Agent                                               | Read                                                                                   | Write                                                                                                  | Delegate                                  | Grant                                                                                |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------ |
-| **orchestrator** (main)                             | `list_nodes`, `describe_node`, `catalog_search`, `describe_block`                      | **— none**                                                                                             | `list_agents`, `spawn`                    | `{}` (empty) — writes gated by each child's own fixed grant + the user's permissions |
-| **BlockAgent(type)** (sub, generic)                 | `search_nodes` (type-scoped), `describe_node`                                          | `add_node`, `set_properties`, `rename`, `delete_node`                                                  | —                                         | `canModifyCanvas` + `canEditConfig`                                                  |
-| **GeneratorAgent** (sub, `single-output-generator`) | same as BlockAgent                                                                     | same as BlockAgent                                                                                     | —                                         | `canModifyCanvas` + `canEditConfig`                                                  |
-| **locator** (sub, operation)                        | `list_nodes` (full), `describe_node`                                                   | `move_node` — the node **move** provider over the live `CanvasBinding`                                 | —                                         | `canModifyCanvas`                                                                    |
-| **edge** (sub, operation)                           | `list_nodes` (full), `describe_node`, `list_edges`                                     | `connect_nodes`, `disconnect_edge`                                                                     | —                                         | `canModifyCanvas`                                                                    |
-| **builder** (sub, composition)                      | `list_nodes` (full), `describe_node`, `list_edges`, `catalog_search`, `describe_block` | `add_node`, `set_properties`, `rename`, `delete_node`, `connect_nodes`, `disconnect_edge`, `move_node` | `use_skill` (load a playbook); no `spawn` | `canModifyCanvas` + `canEditConfig`                                                  |
+| Agent                                               | Read                                                                 | Write                                                                                                  | Delegate                                  | Grant                                                                                |
+| --------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| **orchestrator** (main)                             | `list_nodes`, `describe_node`, `catalog_search`                      | **— none**                                                                                             | `list_agents`, `spawn`                    | `{}` (empty) — writes gated by each child's own fixed grant + the user's permissions |
+| **BlockAgent(type)** (sub, generic)                 | `search_nodes` (type-scoped), `describe_node`                        | `add_node`, `set_properties`, `rename`, `delete_node`                                                  | —                                         | `canModifyCanvas` + `canEditConfig`                                                  |
+| **GeneratorAgent** (sub, `single-output-generator`) | same as BlockAgent                                                   | same as BlockAgent                                                                                     | —                                         | `canModifyCanvas` + `canEditConfig`                                                  |
+| **locator** (sub, operation)                        | `list_nodes` (full), `describe_node`                                 | `move_node` — the node **move** provider over the live `CanvasBinding`                                 | —                                         | `canModifyCanvas`                                                                    |
+| **edge** (sub, operation)                           | `list_nodes` (full), `describe_node`, `list_edges`                   | `connect_nodes`, `disconnect_edge`                                                                     | —                                         | `canModifyCanvas`                                                                    |
+| **builder** (sub, composition)                      | `list_nodes` (full), `describe_node`, `list_edges`, `catalog_search` | `add_node`, `set_properties`, `rename`, `delete_node`, `connect_nodes`, `disconnect_edge`, `move_node` | `use_skill` (load a playbook); no `spawn` | `canModifyCanvas` + `canEditConfig`                                                  |
 
 - The **orchestrator has no write tools** — every edit goes through a sub-agent. This forces
   the full multi-agent path (best for evaluating the orchestrator) and keeps it a pure coordinator. It
@@ -294,8 +295,8 @@ permissions).
   pre-validate the block schema: whether a config field exists, how it is named (`temp` vs `temperature`), or
   whether a value is allowed. That is the **specialist's** job — it reads the schema (`describe_node`), applies
   or rejects the edit, and reports the rejection (a block agent surfaces a bad value/type/unknown key; the
-  edge agent a cycle/occupied input). The orchestrator keeps its read tools (`describe_node`, `catalog_search`,
-  `describe_block`) and **may** consult them to _plan_ — to understand the flow or settle a shared value — but
+  edge agent a cycle/occupied input). The orchestrator keeps its read tools (`describe_node`, `catalog_search`)
+  and **may** consult them to _plan_ — to understand the flow or settle a shared value — but
   reading never substitutes for delegating, and it does not gate delegation on a field-level check. So a
   single-task ask with a bad value (invalid model, unknown field) is a **specialist rejection that bubbles up**,
   not an orchestrator pre-check: nothing lands and the turn is `refused`.

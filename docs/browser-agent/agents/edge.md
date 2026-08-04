@@ -11,10 +11,11 @@
 ## Canonical specs
 
 - **Persona** — `EDGE_SYSTEM_PROMPT` in
-  [edgeAgent.ts](../../../libs/agent/src/agents/edgeAgent.ts): connect/disconnect-only scope,
-  read-before-connect (`describe_node` for both endpoints' ports), and — the load-bearing rule — a rejected
-  connection (unknown port, incompatible port types, would-create-cycle) is **reported, not worked around**;
-  it never reroutes to a different port to force a link.
+  [edgeAgent.ts](../../../libs/agent/src/agents/edgeAgent.ts): connect/disconnect-only scope; it wires straight
+  from a node's **type** (ports follow from the block type, so it does not `describe_node` each endpoint just to
+  look ports up — that is reserved for a block that exposes several ports and needs disambiguating), and — the
+  load-bearing rule — a rejected connection (unknown port, incompatible port types, would-create-cycle) is
+  **reported, not worked around**; it never reroutes to a different port to force a link.
 - **Behavior & oracles** — [harness-scenarios.md](../design/harness-scenarios.md): how the edits are
   verified (the oracle discipline) and the scenario specs it points to.
 - **Tools & the turn loop** — [architecture.md](../design/architecture.md) and
@@ -61,7 +62,7 @@ interface DisconnectEdgeArgs {
 | Tool              | Kind   | Notes                                                                                                                                              |
 | ----------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list_nodes`      | read   | `binding.readGraph()` → the node list, seeded into context each turn                                                                               |
-| `describe_node`   | read   | one node's block schema — its input/output ports and their types (read before connecting)                                                          |
+| `describe_node`   | read   | one node's block schema — its input/output ports and their types; consulted only to disambiguate a multi-port block, not before every connect      |
 | `list_edges`      | read   | compact edge list: `edgeId`, `source:port → target:port` — the palette of edges to disconnect                                                      |
 | `connect_nodes`   | mutate | `ConnectNodesArgs`; validates ports · type-compat · no-cycle · input-not-occupied, then `binding.addEdge`; returns `{ edgeId }`; `canModifyCanvas` |
 | `disconnect_edge` | mutate | `DisconnectEdgeArgs` → `binding.deleteEdge(id)`; requires `canModifyCanvas`                                                                        |

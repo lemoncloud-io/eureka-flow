@@ -1,7 +1,6 @@
 import { parseSkill } from './parseSkill';
 import buildLinearPipelineMd from './playbooks/build-linear-pipeline.md?raw';
 import configureGeneratorMd from './playbooks/configure-generator.md?raw';
-import validateAndRepairMd from './playbooks/validate-and-repair.md?raw';
 
 import type { Skill } from './skill';
 
@@ -13,7 +12,5 @@ import type { Skill } from './skill';
  */
 export const buildLinearPipelineSkill: Skill = parseSkill(buildLinearPipelineMd);
 export const configureGeneratorSkill: Skill = parseSkill(configureGeneratorMd);
-export const validateAndRepairSkill: Skill = parseSkill(validateAndRepairMd);
-
 /** The seed set a composition agent starts from. */
-export const SEED_SKILLS: Skill[] = [buildLinearPipelineSkill, configureGeneratorSkill, validateAndRepairSkill];
+export const SEED_SKILLS: Skill[] = [buildLinearPipelineSkill, configureGeneratorSkill];

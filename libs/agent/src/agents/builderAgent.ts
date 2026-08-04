@@ -7,6 +7,7 @@ import {
     createNodeMoveToolProvider,
     createNodeReadToolProvider,
     createNodeStructureToolProvider,
+    renderEdgeContext,
     renderNodeContext,
 } from '../tools/nodeTools';
 
@@ -28,31 +29,40 @@ export const BUILDER_SYSTEM_PROMPT = [
     'given and report what you did.',
     '',
     'Before building, consider your skills: load the skill whose description matches the kind of work in front',
-    'of you (building a pipeline, configuring a generator, validating a flow, …), then follow its instructions.',
-    'Load one only when it fits; a simple build may need none.',
+    'of you (building a pipeline, configuring a generator, …), then follow its instructions. Load one only when',
+    'it fits; a simple build may need none.',
     '',
-    'How to work:',
-    '- Look before you build: read what is already on the canvas, and look up the block types you need — their',
-    '  real fields and ports — in the catalog. Reuse an existing node rather than duplicating it.',
+    'You hold the WHOLE job in a single growing context, so two habits keep you fast and correct:',
+    '- Trust the canvas: it already reflects every edit you have made. Judge your progress by READING it, never',
+    '  by re-doing an action to confirm it took. A node already placed, an edge already present, a value already',
+    '  set — leave it; re-adding or re-connecting what is already there is wasted work, not safety. The moment the',
+    '  canvas matches the plan you are DONE: make no more tool calls and write your summary.',
+    '- Look each thing up ONCE and reuse it. A node’s ports are fixed by its block TYPE — the same for every node',
+    '  of that type, whether you just added it or it was already on the canvas — so a single catalog_search per',
+    '  type tells you how to wire all of them; you never inspect an individual node to learn its ports. Reach for',
+    '  describe_node only to read a node’s current config before you change it, and never re-list or re-describe',
+    '  something an earlier call already told you.',
+    '',
+    'How to build:',
+    '- Look before you build: read what is already on the canvas — its nodes and how they are wired — and look',
+    '  up the block types you need. Reuse an existing node rather than duplicating one.',
     '- Build in dependency order — create a stage before the stage that consumes it — and thread each new node’s',
     '  returned id into the wiring and configuration that follow. Give a new node its non-default config as you',
     '  create it rather than adding then reconfiguring.',
     '- Wire each stage to the one(s) that consume it: a source OUTPUT to the intended target INPUT. An output may',
     '  feed several inputs, but each input holds ONE edge — never leave a required input dangling, and never',
     '  create a cycle.',
+    '- To insert or reroute onto an input that is already taken, free it FIRST — disconnect the old edge, then',
+    '  connect the new one: remove before reuse. Do it without asking; don’t connect blindly and then patch up the',
+    '  rejection afterwards.',
     '- Lay the flow out so it reads in order: place each node to the right of the one that feeds it, evenly spaced,',
     '  not overlapping.',
-    '- Each input holds ONE edge, so if an input you need to wire is already occupied, that is not a dead-end:',
-    '  disconnect the occupying edge, then make the connection — that completes the build. Do it without asking;',
-    '  you do not need permission to change the canvas.',
     '- Configure against the real schema: map the user’s wording onto the block’s actual fields and allowed',
     '  values. Stop only for a genuinely impossible task — a value the schema forbids, a field that does not',
     '  exist, or a connection that would create a cycle — which you report and leave, never forcing or faking it.',
-    '- Before finishing, read the graph back and repair what the plan lets you: a dangling required input, an',
-    '  invalid config.',
     '',
     'You cannot ask the user anything and cannot see the conversation; your briefing is complete. Do everything',
-    'you can, then finish with a short summary of what you built and anything you could not.',
+    'the plan needs, then finish with a short summary of what you built and anything you could not.',
 ].join('\n');
 
 /** The Builder carries only the shared per-turn deps; its tools + seed playbooks are fixed. */
@@ -61,11 +71,15 @@ export type BuilderAgentDeps = BaseAgentDeps;
 /**
  * The Builder's think/act budget. A narrow specialist makes ONE edit, so the {@link DEFAULT_MAX_ITERATIONS}
  * of 8 is plenty; the Builder instead realizes a WHOLE flow in a single turn — add several nodes, wire every
- * edge, configure, lay out, then summarize — which easily exceeds 8 (observed: it added three nodes then hit
- * the cap before wiring any edge). So it runs with a larger cap. Hardcoded for now; a caller may still override
- * it by passing `deps.maxIterations`, and a future config can drive it.
+ * edge, configure, lay out, THEN summarize. The cap must exceed the largest legit build's tool-call count AND
+ * leave a turn for that closing summary: the loop only reports success on a final TEXT-ONLY turn (no tool call,
+ * see {@link BaseAgent.send} + subAgentRunner's `lastAssistantText`). A cap that just equals the work count
+ * leaves no room to conclude, so the turn ends in `phase:error` and the orchestrator mis-reports it as a failure
+ * even though every edit landed — observed on a 5-node branch build that used all 20 calls and never summarized.
+ * 30 gives clear headroom; the builder's completion discipline (stop the moment the canvas matches the plan),
+ * not this cap, is what bounds a healthy run. Hardcoded for now; `deps.maxIterations` still overrides it.
  */
-export const BUILDER_MAX_ITERATIONS = 20;
+export const BUILDER_MAX_ITERATIONS = 30;
 
 /**
  * The composition specialist: the FULL editing toolset (read · catalog · structure · config · edge · move) plus
@@ -87,7 +101,7 @@ export class BuilderAgent extends BaseAgent {
                 grant: { canModifyCanvas: true, canEditConfig: true },
                 tools: [
                     createNodeReadToolProvider(deps.binding, deps.catalog), // list_nodes, describe_node
-                    createCatalogToolProvider(deps.catalog), // catalog_search, describe_block
+                    createCatalogToolProvider(deps.catalog), // catalog_search (full schema per hit)
                     createNodeStructureToolProvider(deps.binding, deps.catalog), // add_node, delete_node
                     createNodeConfigToolProvider(deps.binding, deps.catalog), // set_properties, rename
                     createEdgeToolProvider(deps.binding, deps.catalog), // list_edges, connect_nodes, disconnect_edge
@@ -98,9 +112,20 @@ export class BuilderAgent extends BaseAgent {
         );
     }
 
-    /** Seed the current live node list before every model call; the catalog + playbook bodies are pulled on demand. */
+    /**
+     * Seed the current canvas — its nodes AND their wiring — before every model call; the catalog + playbook
+     * bodies are pulled on demand. The edge list is what makes an already-occupied input visible, so the builder
+     * frees it before reusing it (the persona's remove-before-reuse rule) instead of connecting blindly and
+     * recovering from the rejection. Occupancy is a fact of the edge set, never of a node, so it can only be seen
+     * here.
+     */
     protected override buildContextMessages(): ChatMessage[] {
-        return [{ role: 'system', content: renderNodeContext(this.binding) }];
+        return [
+            {
+                role: 'system',
+                content: `${renderNodeContext(this.binding)}\n\n${renderEdgeContext(this.binding)}`,
+            },
+        ];
     }
 }
 

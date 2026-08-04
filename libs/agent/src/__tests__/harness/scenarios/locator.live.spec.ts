@@ -17,35 +17,27 @@ import { describe, expect, it } from 'vitest';
 
 import { createLocatorAgent } from '../../../agents/locatorAgent';
 import { createInMemoryCanvasBinding } from '../../../canvas/inMemoryCanvasBinding';
-import { createVirtualAgentEnvironment } from '../../../environment/createVirtualAgentEnvironment';
-import { createFetchHttpRequest } from '../../../http/FetchHttpRequest';
-import { createGeminiLlmGateway } from '../../../llm/GeminiLlmGateway';
 import { createInMemorySessionStore } from '../../../session/session';
 import { nodeById } from '../fixtures';
+import { resolveLiveGateway } from '../liveGateway';
 
 import type { Graph } from '../../../canvas/canvasBinding';
 import type { CatalogLookup } from '../../../catalog';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
-const apiKey = process.env.GEMINI_API_KEY;
 const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
-// Opt-in gate: live specs hit the real API, so they run only when RUN_LIVE is set — a key in .env.local
-// is not enough (else `nx test` would run them). Run live with `RUN_LIVE=1 npx vitest run <file>`.
-const SKIP_LIVE = !apiKey || !process.env.RUN_LIVE;
+// One seam picks the provider: Vertex when VERTEX_* env is set (draws the $300 credit), else the Developer
+// API key, else undefined (vertex-migration.md).
+const gateway = resolveLiveGateway({
+    model,
+    generation: { temperature: 0, thinkingBudget: 1024, maxOutputTokens: 8192 },
+});
+// Opt-in gate: live specs hit the real API, so they run only when RUN_LIVE is set (else `nx test` would run them).
+const SKIP_LIVE = !gateway || !process.env.RUN_LIVE;
 const TIMEOUT_MS = 120_000;
 
 // The locator only moves — describe_node is never exercised, so an empty catalog is enough.
 const emptyCatalog: CatalogLookup = { has: () => false, schema: () => undefined, search: () => [] };
-
-const gateway = apiKey
-    ? createGeminiLlmGateway({
-          environment: createVirtualAgentEnvironment(),
-          http: createFetchHttpRequest(),
-          apiKey,
-          model,
-          generation: { temperature: 0, thinkingBudget: 1024, maxOutputTokens: 8192 },
-      })
-    : undefined;
 
 const node = (id: string, x: number, y: number, label: string): NodeData => ({
     id,

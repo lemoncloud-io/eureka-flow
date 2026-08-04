@@ -79,6 +79,26 @@ export const renderNodeContext = (
     return `${heading}\n${lines.join('\n')}`;
 };
 
+/**
+ * Render the edge list as the compact per-turn context block (one line per edge: id · source port → target
+ * port). The companion to {@link renderNodeContext} for an agent that reshapes wiring: whether an input is
+ * already taken is a fact of the edge set, never of a node, so seeing the edges is the only way to judge
+ * occupancy from context — and to free an input before reusing it — instead of discovering it through a
+ * rejected connect. Same shape/headings contract as the node renderer.
+ */
+export const renderEdgeContext = (binding: CanvasBinding, headings: NodeContextHeadings = {}): string => {
+    const { edges } = binding.readGraph();
+    const heading = headings.heading ?? 'Current edges (source → target):';
+    const empty = headings.empty ?? 'No edges on the canvas yet.';
+    if (edges.length === 0) {
+        return empty;
+    }
+    const lines = edges.map(
+        e => `- id="${e.id}" ${e.sourceNodeId}:${e.sourcePortId} → ${e.targetNodeId}:${e.targetPortId}`
+    );
+    return `${heading}\n${lines.join('\n')}`;
+};
+
 // ── Shared node lookup ───────────────────────────────────────────────────────────────────────────
 
 /** The live node behind an id, or the "no such node" error to return — one not-found wording for every node/edge tool. */
@@ -97,15 +117,18 @@ const LIST_NODES_DEF: ToolDef = {
     name: 'list_nodes',
     description:
         'List the nodes with their id, type, label and current position (reflects edits made so far ' +
-        'this turn). Use it to find the node the user means and read its position.',
+        'this turn). Use it to find the node the user means and read its position. It does NOT include ports ' +
+        'or config — use describe_node (an existing node) or catalog_search (a block type) for those.',
     parameters: { type: 'object', properties: {} },
 };
 
 const DESCRIBE_NODE_DEF: ToolDef = {
     name: 'describe_node',
     description:
-        "Describe one node in detail: its block type, current config values, and the block's schema " +
-        "(including a select field's allowed options). Use before set_properties to see valid values.",
+        'Describe one node in detail: its block type, its ports (inputs/outputs), its current config values, and ' +
+        "the block's config schema (including a select field's allowed options). A node's ports follow from its " +
+        'type, so use this to read a node’s current config before set_properties — or to disambiguate a block ' +
+        'with several ports — not routinely before every connect.',
     parameters: {
         type: 'object',
         properties: { nodeId: { type: 'string', description: 'The id of the node to describe.' } },
@@ -118,7 +141,8 @@ const SEARCH_NODES_DEF: ToolDef = {
     description:
         'Search the nodes you can see on the canvas (reflects edits made this turn). Pass a `query` to narrow ' +
         "the results — it is matched case-insensitively against each node's id, label, and block type; omit it " +
-        'to list them all. Returns id, type, label and position. Use it to find the node id you need.',
+        'to list them all. Returns a compact list (id, type, label, position) — NOT ports or config. Use it to ' +
+        'find the node id you need, then describe_node it for its ports or config.',
     parameters: {
         type: 'object',
         properties: {
@@ -408,16 +432,13 @@ export const createNodeStructureToolProvider = (binding: CanvasBinding, catalog:
                 position: XY;
                 config?: Record<string, unknown>;
             };
-            if (!catalog.has(type)) {
+            const schema = catalog.schema(type);
+            if (!schema) {
                 return err(call, `unknown block type "${type}"`);
             }
             // Validate the optional initial config BEFORE creating, so a bad value adds nothing (atomic).
             let initialConfig: Record<string, string> | undefined;
             if (config && Object.keys(config).length > 0) {
-                const schema = catalog.schema(type);
-                if (!schema) {
-                    return err(call, `no schema for block type "${type}"`);
-                }
                 const prepared = prepareConfig(schema, config);
                 if ('errors' in prepared) {
                     return err(call, prepared.errors.join('; '));

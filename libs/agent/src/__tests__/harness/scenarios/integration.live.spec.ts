@@ -29,37 +29,29 @@ import '../../loadEnvLocal'; // FIRST: load repo-root .env.local so GEMINI_API_K
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { createVirtualAgentEnvironment } from '../../../environment/createVirtualAgentEnvironment';
-import { createFetchHttpRequest } from '../../../http/FetchHttpRequest';
-import { createGeminiLlmGateway } from '../../../llm/GeminiLlmGateway';
 import { GENERATOR_MODELS, IDS, makeInitialGraph, nodeById } from '../fixtures';
+import { resolveLiveGateway } from '../liveGateway';
 import { runScenario } from '../runScenario';
 import { outcomeText } from '../turnOutcome';
 import { verboseGateway } from '../verboseGateway';
 
 import type { ScenarioInput, TurnResult } from '../runScenario';
 
-const apiKey = process.env.GEMINI_API_KEY;
 const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+// A single tool-capable gateway shared by the orchestrator + every spawned specialist; one seam picks the
+// provider — Vertex when VERTEX_* env is set (draws the $300 credit), else the Developer API key, else
+// undefined (vertex-migration.md). Each chat() is an independent generateContent call, so one instance is fine.
+const gateway = resolveLiveGateway({
+    model,
+    // temperature: 0 → greedy decoding, the most repeatable output a real model gives (the eval still
+    // tolerates non-determinism, but this cuts it). Keep thinking but BOUND it and leave ample output
+    // room: gemini-2.5-flash otherwise sometimes spends its whole output budget on thoughts and returns
+    // an empty candidate. The invariant is maxOutputTokens ≫ thinkingBudget; thinkingBudget: 0 disables thinking.
+    generation: { temperature: 0, thinkingBudget: 1024, maxOutputTokens: 8192 },
+});
 // Opt-in gate: live specs hit the real API, so they run only when RUN_LIVE is set — a key in .env.local
 // is not enough (else `nx test` would run them). Run live with `RUN_LIVE=1 npx vitest run <file>`.
-const SKIP_LIVE = !apiKey || !process.env.RUN_LIVE;
-
-// A single tool-capable gateway shared by the orchestrator + every spawned specialist. Each chat() is
-// an independent generateContent call, so one instance is fine. Built only when a key is present.
-const gateway = apiKey
-    ? createGeminiLlmGateway({
-          environment: createVirtualAgentEnvironment(),
-          http: createFetchHttpRequest(),
-          apiKey,
-          model,
-          // temperature: 0 → greedy decoding, the most repeatable output a real model gives (the eval still
-          // tolerates non-determinism, but this cuts it). Keep thinking but BOUND it and leave ample output
-          // room: gemini-2.5-flash otherwise sometimes spends its whole output budget on thoughts and returns
-          // an empty candidate. The invariant is maxOutputTokens ≫ thinkingBudget; thinkingBudget: 0 disables thinking.
-          generation: { temperature: 0, thinkingBudget: 1024, maxOutputTokens: 8192 },
-      })
-    : undefined;
+const SKIP_LIVE = !gateway || !process.env.RUN_LIVE;
 
 // Live multi-agent turns are several network round-trips; give each case room.
 const TIMEOUT_MS = 120_000;

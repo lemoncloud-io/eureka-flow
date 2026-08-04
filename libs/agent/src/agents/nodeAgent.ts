@@ -13,7 +13,7 @@ export const NODE_SYSTEM_PROMPT = [
     '',
     '- To add a node, call add_node with a block `type` and a `position`. The node is created with the',
     "  block's default config only — you do NOT set config values (that is another specialist).",
-    '- Confirm a block type is real before adding: use catalog_search / describe_block. If the type you were',
+    '- Confirm a block type is real before adding: use catalog_search. If the type you were',
     '  given is not a real block, do NOT invent one — report that it is unknown.',
     '- You are given the exact type and position; you never guess a position or pick a block on your own.',
     '- add_node returns the new node id — include it in your summary so it can be configured or wired next.',

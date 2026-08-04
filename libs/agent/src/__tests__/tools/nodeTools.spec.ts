@@ -8,6 +8,7 @@ import {
     createNodeSearchToolProvider,
     createNodeStructureToolProvider,
     listNodeLocations,
+    renderEdgeContext,
 } from '../../tools/nodeTools';
 import { createFixtureCatalog } from '../harness/fixtures';
 import { IDS, makeInitialGraph, nodeById } from '../harness/fixtures';
@@ -353,5 +354,25 @@ describe('listNodeLocations', () => {
             edges: [],
         });
         expect(listNodeLocations(binding).map(n => n.id)).toEqual(['a']);
+    });
+});
+
+describe('renderEdgeContext', () => {
+    it('renders one line per edge (id · source:port → target:port)', () => {
+        const binding = createInMemoryCanvasBinding({
+            nodes: [makeNode('a'), makeNode('b'), makeNode('c')],
+            edges: [
+                { id: 'e1', sourceNodeId: 'a', sourcePortId: 'out', targetNodeId: 'b', targetPortId: 'in' },
+                { id: 'e2', sourceNodeId: 'b', sourcePortId: 'out', targetNodeId: 'c', targetPortId: 'in' },
+            ],
+        });
+        expect(renderEdgeContext(binding)).toBe(
+            'Current edges (source → target):\n- id="e1" a:out → b:in\n- id="e2" b:out → c:in'
+        );
+    });
+
+    it('reports no edges when the graph has none — the fact occupancy is read from', () => {
+        const binding = createInMemoryCanvasBinding({ nodes: [makeNode('a')], edges: [] });
+        expect(renderEdgeContext(binding)).toBe('No edges on the canvas yet.');
     });
 });

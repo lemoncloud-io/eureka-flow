@@ -202,13 +202,14 @@ describe('createGeminiLlmGateway', () => {
         ]);
     });
 
-    it('throws on non-ok responses with the status but never the API key', async () => {
-        const http = new ScriptedHttpRequest([{ status: 429, text: 'rate limited' }]);
+    it('throws on a non-retryable non-ok response with the status but never the API key', async () => {
+        // 400 is not retryable (unlike 429/503), so it throws on the first response — the immediate-throw path.
+        const http = new ScriptedHttpRequest([{ status: 400, text: 'bad request' }]);
         const trace = new BufferAgentTraceReporter();
 
         const attempt = drain(createGateway(http, trace).chat(userSays('q')));
 
-        await expect(attempt).rejects.toThrow(/status 429.*rate limited/);
+        await expect(attempt).rejects.toThrow(/status 400.*bad request/);
         await attempt.catch((error: Error) => expect(error.message).not.toContain(API_KEY));
         expect(trace.entries.some(entry => entry.level === 'error')).toBe(true);
         expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);

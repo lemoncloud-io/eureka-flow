@@ -28,7 +28,7 @@
 ## What it is
 
 An add/delete specialist: it changes the **set of nodes** on the canvas and nothing else — it never moves,
-configures, renames, or connects. It reads the block catalog with `catalog_search` / `describe_block` to
+configures, renames, or connects. It reads the block catalog with `catalog_search` to
 confirm a type the orchestrator named is real, then creates or deletes.
 
 - **`add_node` creates with defaults.** It places one node of a given `type` at a given `position`, seeded
@@ -57,17 +57,16 @@ interface DeleteNodeArgs {
 
 ## Tools
 
-| Tool             | Kind   | Notes                                                                                               |
-| ---------------- | ------ | --------------------------------------------------------------------------------------------------- |
-| `list_nodes`     | read   | `binding.readGraph()` → the node list, seeded into context each turn                                |
-| `describe_node`  | read   | one node's schema + current config — used to confirm a delete target                                |
-| `catalog_search` | read   | compact lexical shortlist over the block catalog — confirm a named type is real                     |
-| `describe_block` | read   | one block type's full schema — confirm the type before creating                                     |
-| `add_node`       | mutate | `AddNodeArgs` → `binding.addNode(type, position)`; returns `{ nodeId }`; requires `canModifyCanvas` |
-| `delete_node`    | mutate | `DeleteNodeArgs` → `binding.deleteNode(id)` (edges cascade); requires `canModifyCanvas`             |
+| Tool             | Kind   | Notes                                                                                                     |
+| ---------------- | ------ | --------------------------------------------------------------------------------------------------------- |
+| `list_nodes`     | read   | `binding.readGraph()` → the node list, seeded into context each turn                                      |
+| `describe_node`  | read   | one node's schema + current config — used to confirm a delete target                                      |
+| `catalog_search` | read   | lexical search over the block catalog; each hit is that type's full schema — confirm a named type is real |
+| `add_node`       | mutate | `AddNodeArgs` → `binding.addNode(type, position)`; returns `{ nodeId }`; requires `canModifyCanvas`       |
+| `delete_node`    | mutate | `DeleteNodeArgs` → `binding.deleteNode(id)` (edges cascade); requires `canModifyCanvas`                   |
 
 Read tools come from the `tools/nodeTools.ts` read provider (`list_nodes` + `describe_node`) and the catalog
-provider (`catalog_search` + `describe_block`); the writes from the node **structure** provider
+provider (`catalog_search`); the writes from the node **structure** provider
 (`createNodeStructureToolProvider`). Both writes require `canModifyCanvas` — flows defines it as "add/delete
 nodes, connect edges" (Owner + Editor), the same capability the locator's move needs — gated at the executor
 against **both** the agent's grant and the user's flow-role, so a viewer is denied. (Flows' `canEditStructure`

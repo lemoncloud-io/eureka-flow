@@ -5,4 +5,4 @@
 export type { Skill } from './skill';
 export { parseSkill } from './parseSkill';
 export { createUseSkillToolProvider, USE_SKILL_TOOL } from './skillProvider';
-export { SEED_SKILLS, buildLinearPipelineSkill, configureGeneratorSkill, validateAndRepairSkill } from './skills';
+export { SEED_SKILLS, buildLinearPipelineSkill, configureGeneratorSkill } from './skills';

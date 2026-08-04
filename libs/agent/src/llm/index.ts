@@ -11,6 +11,13 @@ export type {
 export { createFakeGateway } from './fakeGateway';
 export type { FakeGateway, FakeResponse, FakeScriptStep } from './fakeGateway';
 
-// Gemini provider (HTTP)
-export { createGeminiLlmGateway } from './GeminiLlmGateway';
-export type { GeminiLlmGateway, GeminiLlmGatewayOptions } from './GeminiLlmGateway';
+// Gemini provider (HTTP) — Developer API and Vertex AI share one core, differing only in URL + auth.
+export { createGeminiLlmGateway, createVertexLlmGateway } from './GeminiLlmGateway';
+export type {
+    GeminiGenerationConfig,
+    GeminiLlmGateway,
+    GeminiLlmGatewayOptions,
+    GeminiRetryConfig,
+    VertexLlmGateway,
+    VertexLlmGatewayOptions,
+} from './GeminiLlmGateway';

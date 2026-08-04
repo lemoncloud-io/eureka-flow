@@ -95,53 +95,6 @@ describe('builder agent — builds a flow from a plan', () => {
     });
 });
 
-describe('builder agent — validate and repair', () => {
-    it('loads validate-and-repair and wires a dangling required input rather than leaving it unconnected', async () => {
-        // A generator whose input is not connected — the well-formedness gap the builder must repair.
-        const initial: Graph = {
-            nodes: [
-                { id: 'n_txt', type: 'input-text', position: { x: 100, y: 100 }, config: { text: 'hi' } },
-                {
-                    id: 'n_gen',
-                    type: 'single-output-generator',
-                    position: { x: 300, y: 100 },
-                    config: { model: 'gemini-2.5-flash' },
-                },
-            ],
-            edges: [],
-        };
-        const { agent, gateway, graph } = setup(
-            [
-                { toolCalls: [{ name: 'use_skill', args: { name: 'validate-and-repair' } }] },
-                { toolCalls: [{ name: 'list_edges', args: {} }] },
-                {
-                    toolCalls: [
-                        {
-                            name: 'connect_nodes',
-                            args: {
-                                sourceNodeId: 'n_txt',
-                                sourcePortId: 'out',
-                                targetNodeId: 'n_gen',
-                                targetPortId: 'in',
-                            },
-                        },
-                    ],
-                },
-                { text: 'The generator input was dangling; wired the text input into it.' },
-            ],
-            initial
-        );
-
-        await agent.send("the generator's input is unwired; connect the text input to it");
-
-        // the validate-and-repair playbook actually LOADED — its body (not just its index description) entered
-        // context as the use_skill result on the iteration after the call.
-        expect(JSON.stringify(gateway.calls[1].messages)).toContain('Every required input port must be connected');
-        // …and the dangling required input is now wired.
-        expect(graph().edges.some(e => e.sourceNodeId === 'n_txt' && e.targetNodeId === 'n_gen')).toBe(true);
-    });
-});
-
 describe('builder agent — reject and report (never force)', () => {
     it('reports a rejected connection (occupied input) and does not displace the occupying edge', async () => {
         // The generator's input is already wired from the text input; wiring the buffer into that SAME input
@@ -212,7 +165,6 @@ describe('builder agent — tool surface', () => {
             'list_nodes',
             'describe_node',
             'catalog_search',
-            'describe_block',
             'add_node',
             'delete_node',
             'set_properties',

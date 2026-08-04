@@ -15,29 +15,22 @@ import { describe, expect, it } from 'vitest';
 
 import { createBuilderAgent } from '../../../agents/builderAgent';
 import { createInMemoryCanvasBinding } from '../../../canvas/inMemoryCanvasBinding';
-import { createVirtualAgentEnvironment } from '../../../environment/createVirtualAgentEnvironment';
-import { createFetchHttpRequest } from '../../../http/FetchHttpRequest';
-import { createGeminiLlmGateway } from '../../../llm/GeminiLlmGateway';
 import { createInMemorySessionStore } from '../../../session/session';
 import { createFixtureCatalog } from '../fixtures';
+import { resolveLiveGateway } from '../liveGateway';
 
 import type { Graph } from '../../../canvas/canvasBinding';
 
-const apiKey = process.env.GEMINI_API_KEY;
 const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+// One seam picks the provider: Vertex when VERTEX_* env is set (draws the $300 credit), else the Developer
+// API key, else undefined (vertex-migration.md).
+const gateway = resolveLiveGateway({
+    model,
+    generation: { temperature: 0, thinkingBudget: 2048, maxOutputTokens: 8192 },
+});
 // Opt-in gate: live specs hit the real API, so they run only when RUN_LIVE is set (else `nx test` would run them).
-const SKIP_LIVE = !apiKey || !process.env.RUN_LIVE;
+const SKIP_LIVE = !gateway || !process.env.RUN_LIVE;
 const TIMEOUT_MS = 180_000;
-
-const gateway = apiKey
-    ? createGeminiLlmGateway({
-          environment: createVirtualAgentEnvironment(),
-          http: createFetchHttpRequest(),
-          apiKey,
-          model,
-          generation: { temperature: 0, thinkingBudget: 2048, maxOutputTokens: 8192 },
-      })
-    : undefined;
 
 /** Run the builder DIRECTLY (no orchestrator) with a concrete plan over a starting graph; return the post-turn graph. */
 const runBuilder = async (plan: string, initial: Graph): Promise<Graph> => {

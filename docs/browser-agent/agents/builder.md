@@ -35,15 +35,17 @@ The full editing surface, wired directly over the live `binding` (no new tool co
 | Group     | Tools                                            | Provider                                  |
 | --------- | ------------------------------------------------ | ----------------------------------------- |
 | Read      | `list_nodes`, `describe_node`                    | `createNodeReadToolProvider`              |
-| Catalog   | `catalog_search`, `describe_block`               | `createCatalogToolProvider`               |
+| Catalog   | `catalog_search`                                 | `createCatalogToolProvider`               |
 | Structure | `add_node`, `delete_node`                        | `createNodeStructureToolProvider`         |
 | Config    | `set_properties`, `rename`                       | `createNodeConfigToolProvider`            |
 | Edge      | `list_edges`, `connect_nodes`, `disconnect_edge` | `createEdgeToolProvider`                  |
 | Layout    | `move_node`                                      | `createNodeMoveToolProvider`              |
 | Skills    | `use_skill`                                      | `createUseSkillToolProvider(SEED_SKILLS)` |
 
-Grant `canModifyCanvas` + `canEditConfig`. Per-turn context seeds the full live node list
-(`renderNodeContext`); the catalog is pulled on demand (`catalog_search` / `describe_block`), and a playbook's
+Grant `canModifyCanvas` + `canEditConfig`. Per-turn context seeds the full live canvas — its nodes
+(`renderNodeContext`) **and their wiring** (`renderEdgeContext`), so an already-occupied input is visible in
+context and the Builder frees it before reusing it rather than discovering the conflict through a rejected
+connect (occupancy is a fact of the edge set, never of a node). The catalog is pulled on demand (`catalog_search` — a hit carries the type's full schema), and a playbook's
 body only when the Builder loads it. Progressive disclosure needs no extra wiring — the `use_skill` index rides
 its tool description ([design/skills.md](../design/skills.md)).
 
