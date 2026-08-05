@@ -1,0 +1,267 @@
+# Local terminal — a headless view over the flow-agent
+
+> **What.** A Node terminal that drives the shipped orchestrator + specialist roster **outside the browser**,
+> so we can _use_ the feature by hand. **Left pane** = the live `{ nodes, edges }` JSON of the canvas;
+> **right pane** = a chat with the agent. You type an objective; the agent edits the canvas; both panes
+> update as the turn unfolds.
+>
+> **Same stack as the browser.** The terminal runs the **real engine**: canvas edits go through
+> `createEngineCanvasBinding` over a headless `FlowEngine`, and the block catalog is built from the same
+> block registry — the exact pieces the browser's `FlowAgentPanel` wires. Only two things differ, both behind
+> a port: the **model gateway** (the terminal talks **directly** to Gemini instead of the backend proxy the
+> web uses — this is the whole point, since the browser can't call Gemini cross-origin) and the **renderer**
+> (two panes instead of React). Nothing about the engine, the canvas rules, or the agent is re-implemented.
+>
+> **Grounding.** Assembly over public `@flows/engine` + `@flows/agent` on this branch
+> (`feat/structural-agents`). The engine runs headless today (`libs/engine/src/cli` / `yarn engine:demo`:
+> `load → add → undo → redo → save → run` in Node); the agent runs headless today
+> (`__tests__/headless-gemini.smoke.spec.ts`); the reactive-store wiring mirrors the shipped web binding
+> `apps/web/.../hooks/useAgentSession.ts`. Gemini Developer API only (Vertex dropped 2026-08-05). Last updated
+> 2026-08-05.
+
+---
+
+## 1 · What it is
+
+The terminal is a thin **renderer + input loop wrapped around the real flow stack**. It assembles exactly
+what the browser's `FlowAgentPanel` assembles for the agent —
+
+```ts
+const engine  = createFlowEngine({ getBlockRegistry });      // real engine (headless)
+const binding = createEngineCanvasBinding(engine);           // real canvas rules
+const catalog = createBlockCatalogLookup(blockRegistry);     // real blocks
+const gateway = /* direct Gemini here; backend proxy in the browser */;
+```
+
+— drives `createOrchestratorAgent` over it through a reactive `SessionStore`, and paints the result into two
+panes. The only component with genuinely new behaviour is the **two-pane renderer**; the rest is thin glue:
+
+- the **driver** that runs one turn per input — a few lines around `createOrchestratorAgent`;
+- an **observable session store** — a ~20-line store whose `save` triggers a redraw (the pattern the web hook
+  uses inline);
+- the **entry** — argument parsing, env loading, engine/binding/catalog assembly, and a `readline` loop.
+
+```
+┌─────────────────────────────┬──────────────────────────────────────┐
+│  CANVAS  (binding.readGraph) │  CHAT  (session transcript)          │
+│  {                           │  › add a text input and preview,     │
+│    "nodes": [                │    wire them together                │
+│      { "id": "n_1",          │                                      │
+│        "type": "input-text", │  ⚙ spawn → builder … ok              │
+│        "position": {x,y},    │  ● Added input-text (n_1) and        │
+│        "config": {…} }, …    │    output-preview (n_2), out→in.     │
+│    ],                        │  ────────────────────────────────    │
+│    "edges": [ … ]            │  › _                                 │
+│  }                           │                                      │
+└─────────────────────────────┴──────────────────────────────────────┘
+```
+
+## 2 · Principles (locked)
+
+1. **Real engine, not a stand-in.** Canvas edits go through `createEngineCanvasBinding` over a headless
+   `FlowEngine` — the _same_ binding the desktop/mobile editors and the browser agent panel use (its own doc
+   comment lists "a headless Node run" as a supported caller). So default-config seeding on add, port/type
+   checks on connect, cascade deletes, and transactions/undo behave **exactly as in the browser**. The
+   in-memory binding is kept only as an offline stub for renderer development, never the default.
+2. **The injected `SessionStore` is the reactive seam.** The agent calls `storage.save(state)` on **every**
+   write (`baseAgent.ts`). The view supplies a store whose `save` is its "re-present" signal — here, a redraw.
+   One contract between agent and presentation; no second channel.
+3. **View is separated from driver (SRP).** The **driver** (turns + state) knows nothing about the terminal
+   or ANSI codes; the **renderer** knows nothing about the orchestrator. They meet only at the driver's small
+   interface (§5), so the renderer can be swapped — plain redraw today, `ink` tomorrow — without touching the
+   driver.
+4. **Everything is injected (DIP / OCP).** `gateway`, `binding`, `catalog`, `userPermissions` are inputs. The
+   terminal and the browser build the _same_ engine binding + catalog; they differ only in which `LlmGateway`
+   they inject. A different environment is a different injection, not a code change.
+5. **Same seam as the web (DRY).** Engine, binding, catalog, and the reactive-store wiring are the shipped
+   code the web already uses. What you validate here behaves the same in the real UI — nothing to re-plumb
+   later (§7).
+6. **Errors are shown, never swallowed.** `send()` never throws; failures land as `phase:'error'` +
+   `state.error`. The view reads `phase` off every emitted state and surfaces the reason.
+7. **No test-only affordances leak in.** The eval harness's `OUTCOME_REQUEST` re-ask (`runScenario.ts`) is a
+   machine-readable verdict for oracles — it **must not** run here. Production turns end with the
+   orchestrator's plain-text message; that is what the chat renders.
+
+## 3 · Architecture
+
+One Node process. The real flow stack in the middle is byte-for-byte the browser's; the renderer is the new
+part, and the gateway is the one intentional swap.
+
+```mermaid
+flowchart TB
+  subgraph proc["agent:terminal (one Node process)"]
+    ENTRY["entry / bootstrap<br/>(args, env, assembly)"]
+    IN["input reader (readline)<br/>+ command router"]
+    DRV["driver — createTerminalRun<br/>(thin glue)"]
+    STORE["observable SessionStore<br/>save(state) ⇒ notify"]
+    ORCH["createOrchestratorAgent"]
+    REND["two-pane renderer  ★NEW"]
+
+    subgraph real["real flow stack (same as browser)"]
+      ENG["FlowEngine (createFlowEngine)"]
+      BIND["createEngineCanvasBinding(engine)"]
+      CAT["createBlockCatalogLookup(registry)"]
+      ENG --- BIND
+    end
+    GW["LlmGateway — direct Gemini  (browser: backend proxy)"]
+
+    ENTRY --> IN
+    IN -- "agent text" --> DRV
+    IN -- "/meta command" --> REND
+    DRV --> ORCH
+    STORE -. injected .-> ORCH
+    ORCH -- "writes state per op" --> STORE
+    ORCH -- "spawns specialists → edit" --> BIND
+    ORCH -- "chat() / tools" --> GW
+    CAT -- "catalog_search tool" --> ORCH
+    STORE -- "notify(state)" --> REND
+    BIND -- "readGraph() (same tick)" --> REND
+  end
+  REND --> SCREEN["two panes on screen"]
+  GW -- "server-side fetch (no CORS)" --> GOOG["Google · generativelanguage.googleapis.com"]
+```
+
+## 4 · The reactive seam — `SessionStore.save` as the observer
+
+```ts
+// session/session.ts — the port the agent writes through
+interface SessionStore {
+    load(flowId: string): SessionState | null;
+    create(flowId: string): SessionState;
+    save(state: SessionState): void; // ← called on EVERY write; THIS is the observer hook
+}
+interface SessionState {
+    flowId: string;
+    messages: Message[];
+    phase: AgentPhase;
+    error?: string;
+}
+```
+
+The terminal supplies a store whose `save` redraws:
+
+```ts
+const store = createObservableSessionStore(state => render(state, binding.readGraph()));
+```
+
+Rules the seam guarantees (and the renderer must respect):
+
+- `save` may fire **many times per turn** — redraw must be cheap and must snapshot (copy) any state it keeps,
+  since the agent mutates `state.messages` in place between saves.
+- `phase` transitions `idle → thinking → done|error`; the renderer reads it to show a spinner / final / error.
+- The engine has no push callback the terminal subscribes to, so the renderer re-reads `binding.readGraph()`
+  (i.e. `engine.getGraph()`) inside `notify`. Because a spawned specialist's canvas edits land _before_ its
+  `spawn` tool-result is recorded, the left pane advances **as each specialist finishes** — not only at turn
+  end. (In the browser the same engine also pushes to React Flow; the terminal simply re-reads instead.)
+
+## 5 · The driver contract
+
+A small surface the renderer and entry depend on — the Node analogue of `useAgentSession`, minus React-only
+lifecycle (hydrate / StrictMode arm-dispose):
+
+```ts
+interface TerminalRun {
+    submit(text: string): Promise<void>; // drive one turn; no-op while a turn is in flight (agent's own guard)
+    abort(): void; // orchestrator.abort() — cancels stream + spawned children
+    reset(seed?: Graph): void; // engine.loadGraph(seed ?? empty) + new session (/reset, /seed)
+    getGraph(): Graph; // binding.readGraph()
+    getState(): SessionState | null; // latest emitted transcript+phase
+    onChange(listener: (s: SessionState, g: Graph) => void): () => void; // subscribe; returns unsubscribe
+}
+
+interface TerminalRunDeps {
+    // every dependency injected (Principle 4); the ENTRY assembles them
+    gateway: LlmGateway;
+    binding: CanvasBinding; // the real engine binding — the entry assembles it (see impl-notes)
+    catalog: CatalogLookup; // from the same registry the engine uses
+    userPermissions: AgentGrant;
+    storage?: SessionStore; // default the observable store
+    flowId?: string; // default 'terminal'
+}
+```
+
+`submit` is a thin wrapper over `orchestrator.send` — the agent already resolves at the turn boundary, never
+throws (records `phase:'error'`), no-ops on a concurrent send, and appends to an append-only transcript across
+turns. `reset`/`seed` go through the engine's single ingress `engine.loadGraph(state)`. The driver adds no
+logic beyond wiring the observable store and exposing `getGraph`.
+
+## 6 · The terminal view
+
+### 6.1 Components inside the view
+
+| Component                             | Responsibility                                                                                                                                                                           | Talks to                      |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| **Entry / bootstrap** (`terminal.ts`) | Parse argv, load env, **assemble the real stack** (engine + binding + catalog), resolve the gateway (or a fake), build the driver, subscribe the renderer to `onChange`, start the loop. | everything, once              |
+| **Input reader** (`node:readline`)    | Read one line; own the `› ` prompt; disable input while a turn is in flight.                                                                                                             | → command router              |
+| **Command router**                    | A `/…` line is a **meta command** handled locally (never sent to the agent); anything else is `driver.submit(text)`.                                                                     | → renderer / → driver         |
+| **Driver** (`TerminalRun`, §5)        | Run one turn; own the observable store + orchestrator; expose `getGraph`/`onChange`/`abort`/`reset`.                                                                                     | → orchestrator, store, engine |
+| **Observable store** (§4)             | `save(state) ⇒ notify` — the single change signal.                                                                                                                                       | → renderer (via `onChange`)   |
+| **Two-pane renderer** ★               | The only new-logic component. Paints the **left** pane from `getGraph()` and the **right** pane from the transcript on every `notify`; handles resize, colour, scroll-tail, spinner.     | ← store, engine; → screen     |
+
+### 6.2 How it works (one typed line)
+
+```mermaid
+sequenceDiagram
+  actor U as You
+  participant I as Input + router
+  participant D as Driver
+  participant O as Orchestrator
+  participant B as Engine binding
+  participant S as Observable store
+  participant R as Renderer
+
+  U->>I: type a line + Enter
+  alt line starts with "/"
+    I->>R: handle meta command locally (/graph, /reset, …)
+  else objective for the agent
+    I->>D: submit(line)
+    D->>O: orchestrator.send(line)
+    loop each op in the turn
+      O->>B: spawn specialists → engine.transact(...) edits the canvas
+      O->>S: save(state)   (per user/assistant/tool write)
+      S->>R: notify(state)
+      R->>B: readGraph()  (engine.getGraph())
+      R-->>U: redraw LEFT = graph, RIGHT = transcript
+    end
+    O-->>D: send() resolves (phase = done | error)
+    D->>R: final notify → last redraw (error in red if any)
+  end
+```
+
+The panes refresh **during** the turn, once per agent write — you watch real engine edits appear as each
+specialist finishes, not only at the end.
+
+### 6.3 Layout, rendering & commands
+
+- **Left pane** — pretty-printed `getGraph()` (nodes then edges), tinted with `picocolors`. Overflow → a
+  scroll-tail; `/graph` dumps full JSON. Read `node.customLabel` for the display name; note the engine seeds
+  real default `config` on add, so new nodes show populated config (not `{}`).
+- **Right pane** — transcript (newest at bottom) above a `› ` input line; spinner while `phase==='thinking'`.
+  From `SessionState.messages`: `user` → the typed line; `assistant` **with** `toolCalls` → `content` + a dim
+  `⚙ name … ok|error` per call, and for `spawn` the matching `tool` message's summary; `assistant`
+  **without** `toolCalls` → the final reply. `--verbose` also prints raw tool args + tool-result JSON.
+- **Meta commands** (view-local): `/graph`, `/seed <file>`, `/save <file>`, `/reset`, `/verbose`,
+  `/provider`, `/quit`; **Ctrl-C** → `abort()` mid-turn, else confirm-quit. `/reset` and `/seed` call
+  `driver.reset(seed?)` → `engine.loadGraph`.
+- **Offline dev** — `--fake` injects a scripted `createFakeGateway` (zero API spend) and, if no backend is
+  configured, a stub block registry (see impl-notes); the engine + binding are still real, so canvas
+  behaviour is unchanged.
+
+## 7 · Wiring the real UI later — the minimal-change guarantee
+
+The terminal drives the agent over the **same stack and the same seam** the shipped web binding uses (real
+engine binding + catalog + a reactive `SessionStore`), so validating here _is_ validating the real contract —
+a behaviour that works in the terminal works in the panel unchanged, with nothing to re-plumb. The only atom
+that would otherwise live in two places is the observable `SessionStore` (the web hook writes one inline; the
+terminal needs one too); if we ever want a single implementation, extract
+`createObservableSessionStore(onSave)` into `@flows/agent` and have both wrap it — a tiny additive move,
+**out of scope** here. The design reserves that seam so the consolidation is a lift, not a rewrite.
+
+## 8 · Out of scope (v1)
+
+- Consolidating the observable store into `@flows/agent` (see §7 — reserved, not done).
+- Live run/execution of the flow (the engine can, via a socket port; the terminal only _builds_ flows here).
+- Persisting the session transcript across process restarts (`/save` + `/seed` cover graph round-trips).
+- Rendering child sub-agent transcripts (absent from the orchestrator session by design; the `spawn` summary
+  is the visible signal).
+- A published `bin` / global install — runs via the repo `agent:terminal` script.
