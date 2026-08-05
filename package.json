@@ -14,6 +14,7 @@
     "build:all:prod": "npx nx run-many --target=build --configuration=prod --all",
     "graph": "nx graph",
     "engine:demo": "esbuild libs/engine/src/cli/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/engine-cli/demo.mjs && node dist/engine-cli/demo.mjs",
+    "agent:terminal": "node libs/agent/src/cli/build.mjs && node --env-file=.env.local dist/agent-cli/terminal.mjs",
     "!web": "------------- web scripts -------------",
     "web:start": "yarn clean:cache && npx nx serve web --port 3000",
     "web:build": "npx nx build web",

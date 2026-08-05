@@ -23,13 +23,15 @@
 
 ## 1 · What it is
 
-The terminal is a thin **renderer + input loop wrapped around the real flow stack**. It assembles exactly
-what the browser's `FlowAgentPanel` assembles for the agent —
+The terminal is a thin **renderer + input loop wrapped around the real flow stack**. It builds the same
+`engine` → `binding` → `catalog` trio the browser's `FlowAgentPanel` uses — the browser calls `createFlowEngine`
+with blocks from its store; the terminal wraps that in `createFlowWorkspace` to load the same blocks over HTTP —
 
 ```ts
-const engine  = createFlowEngine({ getBlockRegistry });      // real engine (headless)
-const binding = createEngineCanvasBinding(engine);           // real canvas rules
-const catalog = createBlockCatalogLookup(blockRegistry);     // real blocks
+const { engine, repository } = createFlowWorkspace({ http });         // engine + block repository (headless)
+await repository.load(flowId);                                        // or loadBlocks() — no flow, blocks only
+const binding = createEngineCanvasBinding(engine);                    // real canvas rules (same as the browser)
+const catalog = createBlockCatalogLookup(repository.blockRegistry()); // real blocks (same registry → same catalog)
 const gateway = /* direct Gemini here; backend proxy in the browser */;
 ```
 
@@ -61,8 +63,9 @@ panes. The only component with genuinely new behaviour is the **two-pane rendere
 1. **Real engine, not a stand-in.** Canvas edits go through `createEngineCanvasBinding` over a headless
    `FlowEngine` — the _same_ binding the desktop/mobile editors and the browser agent panel use (its own doc
    comment lists "a headless Node run" as a supported caller). So default-config seeding on add, port/type
-   checks on connect, cascade deletes, and transactions/undo behave **exactly as in the browser**. The
-   in-memory binding is kept only as an offline stub for renderer development, never the default.
+   checks on connect, cascade deletes, and transactions/undo behave **exactly as in the browser**. Even
+   offline this real binding runs (over a stub HTTP port); the in-memory binding survives only in unit tests,
+   never in the running terminal.
 2. **The injected `SessionStore` is the reactive seam.** The agent calls `storage.save(state)` on **every**
    write (`baseAgent.ts`). The view supplies a store whose `save` is its "re-present" signal — here, a redraw.
    One contract between agent and presentation; no second channel.
@@ -98,7 +101,7 @@ flowchart TB
     REND["two-pane renderer  ★NEW"]
 
     subgraph real["real flow stack (same as browser)"]
-      ENG["FlowEngine (createFlowEngine)"]
+      ENG["FlowEngine (createFlowWorkspace)"]
       BIND["createEngineCanvasBinding(engine)"]
       CAT["createBlockCatalogLookup(registry)"]
       ENG --- BIND
@@ -172,10 +175,10 @@ interface TerminalRun {
 interface TerminalRunDeps {
     // every dependency injected (Principle 4); the ENTRY assembles them
     gateway: LlmGateway;
-    binding: CanvasBinding; // the real engine binding — the entry assembles it (see impl-notes)
+    binding: CanvasBinding; // the real engine binding — the entry assembles it
     catalog: CatalogLookup; // from the same registry the engine uses
     userPermissions: AgentGrant;
-    storage?: SessionStore; // default the observable store
+    loadGraph?: (graph: Graph) => void; // re-seed on reset (entry passes engine.loadGraph); omit → reset only clears the session
     flowId?: string; // default 'terminal'
 }
 ```
@@ -233,19 +236,48 @@ specialist finishes, not only at the end.
 
 ### 6.3 Layout, rendering & commands
 
-- **Left pane** — pretty-printed `getGraph()` (nodes then edges), tinted with `picocolors`. Overflow → a
-  scroll-tail; `/graph` dumps full JSON. Read `node.customLabel` for the display name; note the engine seeds
-  real default `config` on add, so new nodes show populated config (not `{}`).
+- **Left pane** — pretty-printed `getGraph()` (nodes then edges), tinted with `picocolors`. Read
+  `node.customLabel` for the display name; note the engine seeds real default `config` on add, so new nodes
+  show populated config (not `{}`).
 - **Right pane** — transcript (newest at bottom) above a `› ` input line; spinner while `phase==='thinking'`.
-  From `SessionState.messages`: `user` → the typed line; `assistant` **with** `toolCalls` → `content` + a dim
-  `⚙ name … ok|error` per call, and for `spawn` the matching `tool` message's summary; `assistant`
-  **without** `toolCalls` → the final reply. `--verbose` also prints raw tool args + tool-result JSON.
-- **Meta commands** (view-local): `/graph`, `/seed <file>`, `/save <file>`, `/reset`, `/verbose`,
-  `/provider`, `/quit`; **Ctrl-C** → `abort()` mid-turn, else confirm-quit. `/reset` and `/seed` call
-  `driver.reset(seed?)` → `engine.loadGraph`.
-- **Offline dev** — `--fake` injects a scripted `createFakeGateway` (zero API spend) and, if no backend is
-  configured, a stub block registry (see impl-notes); the engine + binding are still real, so canvas
-  behaviour is unchanged.
+  From `SessionState.messages`: `user` → the typed line; `assistant` **with** `toolCalls` → `content` + one line
+  per call — dim `⚙ name`, or red `✗ name` on error (status shows as glyph/colour, not a text word); each
+  following `tool` message adds its summary (spawn `summary`, else `error: …`, else the raw result), for every
+  tool result not only `spawn`; `assistant` **without** `toolCalls` → the final reply. `--verbose` also prints
+  raw tool args + tool-result JSON.
+- **Scrolling** — the alt-screen replaces native scrollback, so each pane scrolls in-app. One pane is the
+  scroll target at a time (marked `‹scroll›` in its header); `/pane` switches canvas⇄chat. Scroll it with the
+  **mouse wheel** or **↑/↓** (the entry requests alternate-scroll `?1007h` so xterm.js/VS Code maps the wheel
+  to arrow keys; input history is disabled to free the arrows), **PageUp/PageDown** (a page), or — for
+  terminals that grab those keys (VS Code grabs Shift+PageUp) — the typed **`/u` `/d` `/top` `/bottom`**, which
+  always reach the app. `/keys` echoes each keypress name for diagnosing a stubborn terminal. A `▲N`/`▼N`
+  marker shows off-screen lines; a new objective snaps back to the live tail. Offsets are pure state in
+  `composeFrame` (clamped + echoed back), so the math is unit-tested; the handlers only nudge them and repaint.
+- **Meta commands** (view-local): `/pane`, `/u [n]`, `/d [n]`, `/top`, `/bottom`, `/keys`, `/graph` (writes
+  full JSON to `./graph.json`), `/seed <file>`, `/save` (backend, or `<file>` local — see below), `/reset`,
+  `/verbose`, `/provider`, `/log`, `/help`, `/quit`; **Ctrl-C** → `abort()` mid-turn else quit; **Ctrl-D** →
+  quit. `/reset` and `/seed` call `driver.reset(seed?)`.
+- **Backend wire log** — on by default, `agent-terminal.log` records four channels as one timeline:
+  **chat** (the orchestrator transcript as `user` → `assistant` → tool-result turns, taken from the session so
+  it reads like a normal conversation), **canvas** (`+ node` / `+ edge` / `~ node` / `- node`, with results —
+  the local engine edits that never reach a backend, so this is where node creation is visible), **model** (one
+  token-`usage` line per call, tagged `orchestrator`/`builder`; the fake logs `no backend call`, so usage is
+  the backend-call proof), and, in connected mode, **flow-API** HTTP. The file is truncated at startup;
+  `--log <file>` sets the path, `--no-log` disables, `/log` shows it. The chat channel is fed the session
+  state; the others are transparent decorators over the gateway / `CanvasBinding` / `HttpPort`.
+- **Saving to the backend** — in connected mode the terminal persists the built flow the way the web's save
+  button does: a single `repository.save()` (`POST /flows/:id/save`) that sends the whole graph. The server
+  upserts nodes + edges by their client-minted ids (`upsertNodesV2` get-or-make), so a brand-new flow (`id 0`)
+  is created and its minted id returned — there is no separate "create nodes to get ids" step. Save runs
+  automatically after each completed turn (disable with `--no-autosave`) and on `/save`; a non-owner editor
+  sees `saved settings only …` when the server drops added/deleted structure. Offline, `/save` writes a local
+  JSON file instead. `/save <file>` always exports locally.
+- **Offline / demo** — `--fake` injects a constant-reply fake gateway (zero API spend); `--demo` additionally seeds a
+  big graph + a long reply so both panes overflow for scroll-testing. The engine + binding are always real, so
+  canvas behaviour is unchanged.
+- **One-shot (headless)** — `--once <objective>` skips the TUI entirely: drives a single turn, prints the
+  assistant reply then the resulting graph JSON to stdout, autosaves in connected mode, and exits (non-zero on
+  a failed turn). The scriptable, non-interactive counterpart to the two-pane loop.
 
 ## 7 · Wiring the real UI later — the minimal-change guarantee
 

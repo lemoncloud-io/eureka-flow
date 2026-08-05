@@ -7,6 +7,7 @@ export * from './environment';
 export * from './http';
 export * from './llm';
 export * from './catalog';
+export * from './blockCatalog';
 export * from './canvas';
 export * from './tools';
 export * from './skills';
