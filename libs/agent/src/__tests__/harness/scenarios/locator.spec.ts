@@ -166,7 +166,7 @@ describe('locator agent — additional coverage', () => {
         expect(state().phase).toBe('done');
     });
 
-    it('seeds the model with the current node list on the first request', async () => {
+    it('does not inject the node list; offers get_graph to pull it (Approach 3)', async () => {
         const { agent, gateway } = setup(
             [makeNode('n1', 5, 5, { type: 'http', customLabel: 'Fetch' })],
             [{ text: 'ok' }]
@@ -176,21 +176,28 @@ describe('locator agent — additional coverage', () => {
             .filter(m => m.role === 'system')
             .map(m => m.content)
             .join('\n');
-        expect(systemContent).toMatch(/id="n1"/);
-        expect(systemContent).toMatch(/Fetch/);
+        // Approach 3: the live node list is NOT auto-injected — the locator pulls it via get_graph.
+        expect(systemContent).not.toMatch(/id="n1"/);
+        const toolNames = new Set((gateway.calls[0].tools ?? []).map(t => t.name));
+        expect(toolNames.has('get_graph')).toBe(true);
     });
 
-    it('re-seeds updated positions on the second request within a turn', async () => {
-        const { agent, gateway } = setup(
+    it('get_graph reflects the updated position after a move (pull, not push)', async () => {
+        const { agent, storage, flowId } = setup(
             [makeNode('n1', 0, 0, { customLabel: 'Fetch' })],
-            [{ toolCalls: [{ name: 'move_node', args: { nodeId: 'n1', by: { dx: 10, dy: 0 } } }] }, { text: 'done' }]
+            [
+                { toolCalls: [{ name: 'move_node', args: { nodeId: 'n1', by: { dx: 10, dy: 0 } } }] },
+                { toolCalls: [{ name: 'get_graph', args: {} }] },
+                { text: 'done' },
+            ]
         );
-        await agent.send('move Fetch right 10');
-        const secondReqSystem = gateway.calls[1].messages
-            .filter(m => m.role === 'system')
-            .map(m => m.content)
+        await agent.send('move Fetch right 10, then check');
+        // Approach 3: the agent pulls; the get_graph result carries the post-move position.
+        const toolText = (storage.load(flowId)?.messages ?? [])
+            .filter(m => m.role === 'tool')
+            .map(m => m.content ?? '')
             .join('\n');
-        expect(secondReqSystem).toMatch(/\(10, 0\)/);
+        expect(toolText).toMatch(/\(10, 0\)/);
     });
 
     it('persists the transcript to storage', async () => {

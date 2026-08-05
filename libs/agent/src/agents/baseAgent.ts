@@ -156,6 +156,15 @@ export abstract class BaseAgent implements Agent {
         return [];
     }
 
+    /**
+     * Prepended once to the first user message of a fresh conversation — the initial state an agent is handed up
+     * front (Approach 3, cache-context-ordering.md). Default none: a top-level agent (builder / orchestrator)
+     * seeds the starting graph here; a spawned child pulls current state on demand via get_graph instead.
+     */
+    protected initialUserPreamble(): string {
+        return '';
+    }
+
     /** Hook fired at each turn's start with its abort signal; a subclass that spawns children forwards it. */
     protected onTurnSignal(_signal: AbortSignal): void {
         // default: no children to forward to
@@ -229,7 +238,11 @@ export abstract class BaseAgent implements Agent {
         }
         this.onTurnSignal(signal);
 
-        state.messages.push({ id: this.nextId('u'), role: 'user', content: text, ts: this.stamp() });
+        // Seed the initial state into the first user message of a fresh conversation (Approach 3); later turns
+        // pull current state via get_graph, so the transcript stays append-only.
+        const preamble = state.messages.length === 0 ? this.initialUserPreamble() : '';
+        const userContent = preamble ? `${preamble}\n\n${text}` : text;
+        state.messages.push({ id: this.nextId('u'), role: 'user', content: userContent, ts: this.stamp() });
         state.phase = 'thinking';
         state.error = undefined;
         storage.save(state);

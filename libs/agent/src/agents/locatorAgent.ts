@@ -1,9 +1,12 @@
 import { BaseAgent } from './baseAgent';
-import { createNodeMoveToolProvider, createNodeReadToolProvider, renderNodeContext } from '../tools/nodeTools';
+import {
+    createGraphReadToolProvider,
+    createNodeMoveToolProvider,
+    createNodeReadToolProvider,
+} from '../tools/nodeTools';
 
 import type { BaseAgentDeps } from './baseAgent';
 import type { Agent } from '../agent';
-import type { ChatMessage } from '../llm/llmGateway';
 
 /** The locator agent's persona. */
 export const LOCATOR_SYSTEM_PROMPT = [
@@ -34,13 +37,12 @@ export class LocatorAgent extends BaseAgent {
             description: 'Moves existing nodes on the canvas.',
             systemPrompt: LOCATOR_SYSTEM_PROMPT,
             grant: { canModifyCanvas: true },
-            tools: [createNodeReadToolProvider(deps.binding, deps.catalog), createNodeMoveToolProvider(deps.binding)],
+            tools: [
+                createNodeReadToolProvider(deps.binding, deps.catalog),
+                createNodeMoveToolProvider(deps.binding),
+                createGraphReadToolProvider(deps.binding),
+            ],
         });
-    }
-
-    /** Seed the model with the current node list before every model call. */
-    protected override buildContextMessages(): ChatMessage[] {
-        return [{ role: 'system', content: renderNodeContext(this.binding) }];
     }
 }
 

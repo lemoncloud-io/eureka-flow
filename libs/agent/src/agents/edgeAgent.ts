@@ -1,10 +1,9 @@
 import { BaseAgent } from './baseAgent';
 import { createEdgeToolProvider } from '../tools/edgeTools';
-import { createNodeReadToolProvider, renderNodeContext } from '../tools/nodeTools';
+import { createGraphReadToolProvider, createNodeReadToolProvider } from '../tools/nodeTools';
 
 import type { BaseAgentDeps } from './baseAgent';
 import type { Agent } from '../agent';
-import type { ChatMessage } from '../llm/llmGateway';
 
 /** The `edge` specialist persona: connect or disconnect edges only. Frees an occupied input to complete the connection; reports only a truly impossible link (cycle / bad port). */
 export const EDGE_SYSTEM_PROMPT = [
@@ -41,13 +40,9 @@ export class EdgeAgent extends BaseAgent {
             tools: [
                 createNodeReadToolProvider(deps.binding, deps.catalog),
                 createEdgeToolProvider(deps.binding, deps.catalog),
+                createGraphReadToolProvider(deps.binding),
             ],
         });
-    }
-
-    /** Seed the model with the current node list (over the live canvas) before every model call. */
-    protected override buildContextMessages(): ChatMessage[] {
-        return [{ role: 'system', content: renderNodeContext(this.binding) }];
     }
 }
 

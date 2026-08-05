@@ -3,6 +3,7 @@ import { SEED_SKILLS, createUseSkillToolProvider } from '../skills';
 import { createCatalogToolProvider } from '../tools/catalogTools';
 import { createEdgeToolProvider } from '../tools/edgeTools';
 import {
+    createGraphReadToolProvider,
     createNodeConfigToolProvider,
     createNodeMoveToolProvider,
     createNodeReadToolProvider,
@@ -13,7 +14,6 @@ import {
 
 import type { BaseAgentDeps } from './baseAgent';
 import type { Agent } from '../agent';
-import type { ChatMessage } from '../llm/llmGateway';
 
 /**
  * The Builder persona: it EXECUTES a plan, it does not make one. The orchestrator plans a multi-block build and
@@ -107,6 +107,7 @@ export class BuilderAgent extends BaseAgent {
                     createNodeConfigToolProvider(deps.binding, deps.catalog), // set_properties, rename
                     createEdgeToolProvider(deps.binding, deps.catalog), // list_edges, connect_nodes, disconnect_edge
                     createNodeMoveToolProvider(deps.binding), // move_node
+                    createGraphReadToolProvider(deps.binding), // get_graph (pull the whole canvas on demand)
                     createUseSkillToolProvider(SEED_SKILLS), // use_skill (progressive-disclosure playbooks)
                 ],
             }
@@ -114,21 +115,14 @@ export class BuilderAgent extends BaseAgent {
     }
 
     /**
-     * Seed the current canvas — its nodes AND their wiring — at the TAIL of every model call, as a live
-     * observation rather than a system header, so the frozen transcript above it stays an append-only, cacheable
-     * prefix (the canvas changes each turn; keeping it last is what lets the persona + history cache — see
-     * cache-context-ordering.md). The edge list is what makes an already-occupied input visible, so the builder
-     * frees it before reusing it (the persona's remove-before-reuse rule) instead of connecting blindly and
-     * recovering from the rejection. Occupancy is a fact of the edge set, never of a node, so it can only be seen
-     * here.
+     * Seed the starting canvas — its nodes AND their wiring — into the builder's FIRST user message (Approach 3),
+     * then let it pull fresh state via get_graph as it builds. The edge list is what makes an already-occupied
+     * input visible, so the builder frees it before reusing it (the persona's remove-before-reuse rule) instead
+     * of connecting blindly and recovering from the rejection. Occupancy is a fact of the edge set, never of a
+     * node, so it can only be seen through the wiring.
      */
-    protected override buildLiveObservation(): ChatMessage[] {
-        return [
-            {
-                role: 'user',
-                content: `${renderNodeContext(this.binding)}\n\n${renderEdgeContext(this.binding)}`,
-            },
-        ];
+    protected override initialUserPreamble(): string {
+        return `${renderNodeContext(this.binding)}\n\n${renderEdgeContext(this.binding)}`;
     }
 }
 

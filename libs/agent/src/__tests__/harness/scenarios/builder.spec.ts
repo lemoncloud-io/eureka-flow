@@ -209,11 +209,11 @@ describe('builder agent — progressive disclosure', () => {
     });
 });
 
-describe('builder agent — cache-friendly context ordering', () => {
-    it('injects the live canvas at the TAIL as a user turn, not in a system header', async () => {
-        // The canvas changes every turn, so it must sit LAST (the uncached slot), leaving the persona +
-        // transcript above it an append-only, cacheable prefix — see cache-context-ordering.md. As a system
-        // header instead, the volatile block would truncate the cached prefix down to just the persona.
+describe('builder agent — Approach 3: initial graph in the first user message + get_graph', () => {
+    it('seeds the starting canvas into the first user message and offers get_graph (no per-turn injection)', async () => {
+        // Approach 3 (cache-context-ordering.md): the graph is not pushed every turn. It rides the FIRST user
+        // message as the starting state, and the builder pulls fresh state on demand via get_graph — so the
+        // transcript stays append-only and no volatile block sits in the cached prefix.
         const initial: Graph = {
             nodes: [{ id: 'n_seed', type: 'input-text', position: { x: 0, y: 0 }, config: { text: 'hi' } }],
             edges: [],
@@ -223,15 +223,18 @@ describe('builder agent — cache-friendly context ordering', () => {
         await agent.send('inspect the canvas');
 
         const messages = gateway.calls[0].messages;
-        const last = messages[messages.length - 1];
-        // the live canvas is the LAST message and a user turn (a live observation, not persona text)
-        expect(last.role).toBe('user');
-        expect(last.content).toContain('n_seed');
-        // and it is NOT glued into a system header (that would sit in the cached prefix)
+        // the starting graph rides the FIRST user message (a user turn), together with the plan text
+        const firstUser = messages.find(m => m.role === 'user');
+        expect(firstUser?.content).toContain('n_seed');
+        expect(firstUser?.content).toContain('inspect the canvas');
+        // it is NOT injected into a system header (that would sit in the cached prefix)
         const systemContent = messages
             .filter(m => m.role === 'system')
             .map(m => m.content)
             .join('\n');
         expect(systemContent).not.toContain('n_seed');
+        // and the builder can PULL fresh state on demand
+        const toolNames = new Set((gateway.calls[0].tools ?? []).map(t => t.name));
+        expect(toolNames.has('get_graph')).toBe(true);
     });
 });

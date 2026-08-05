@@ -103,6 +103,29 @@ roughly **half** fan-out's cost.
 > real 31 / 49%. Baseline caveat: the before-N=3 also predates the grouping fix, but grouping is a wire-shape fix
 > with no round-trip mechanism, so the tail-placement is the attributable cause.
 
+## Approach 3 — pull instead of push (variant under comparison)
+
+Approaches 1 (head) and 2 (tail) both **push** the whole canvas into context every turn. Approach 3 tests the
+opposite: don't push at all. The starting graph rides the **first user message** (a one-time seed via
+`initialUserPreamble`), and every agent gets a **`get_graph`** tool to **pull** the current canvas on demand.
+The transcript stays append-only (pulled state arrives as frozen tool results), and per-turn tokens drop below
+Approach 2 when the model pulls sparingly.
+
+- **Top-level agents (builder, orchestrator)** seed the starting graph in their first user message and pull
+  fresh state via `get_graph` as they work.
+- **Spawned fan-out children** are not handed the graph; they share the live binding and pull `get_graph`
+  themselves (the orchestrator's `task` already names the concrete ids to act on). Scoping the subgraph into each
+  task — the n8n-scale answer — is deferred; children pull the whole graph for now.
+- **Per-agent injection removed:** the builder's `buildLiveObservation`, and the canvas half of every
+  specialist's / the orchestrator's `buildContextMessages` (block agents keep their static config schema; the
+  orchestrator keeps its roster).
+
+The risk it probes: the model may **over-pull** (defensive round-trips) or **under-pull** (act on stale state).
+Measured against Approaches 1 and 2 on the T4+ ladder — results appended once the run lands.
+
+**Retrievable commits:** Approach 1 = `809169b` (head), Approach 2 = `ea980b9` (tail), Approach 3 = this commit
+(pull).
+
 ## Reused vs new
 
 - **Reused, unchanged:** `renderNodeContext` / `renderEdgeContext`, `mapTranscript`, the completion-grounding

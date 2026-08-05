@@ -1,10 +1,9 @@
 import { BaseAgent } from './baseAgent';
 import {
+    createGraphReadToolProvider,
     createNodeConfigToolProvider,
     createNodeSearchToolProvider,
     createNodeStructureToolProvider,
-    listNodeLocationsOfType,
-    renderNodeContext,
 } from '../tools/nodeTools';
 
 import type { BaseAgentDeps } from './baseAgent';
@@ -65,27 +64,25 @@ export class BlockAgent extends BaseAgent {
                 createNodeSearchToolProvider(deps.binding, deps.catalog, { type: deps.blockType }),
                 createNodeStructureToolProvider(deps.binding, deps.catalog),
                 createNodeConfigToolProvider(deps.binding, deps.catalog),
+                createGraphReadToolProvider(deps.binding),
             ],
         });
         this.blockType = deps.blockType;
         this.blockLabel = label;
     }
 
-    /** Seed ONLY this block type's nodes + the block's config schema before every model call. */
+    /** Seed the block's config schema (static, per type) each call; pull live nodes on demand via get_graph. */
     protected override buildContextMessages(): ChatMessage[] {
-        const nodes = renderNodeContext(
-            this.binding,
-            {
-                heading: `Your ${this.blockLabel} (${this.blockType}) nodes on the canvas:`,
-                empty: `No ${this.blockLabel} (${this.blockType}) nodes on the canvas yet.`,
-            },
-            listNodeLocationsOfType(this.binding, this.blockType)
-        );
         const schema = this.catalog.schema(this.blockType);
-        const schemaBlock = schema
-            ? `\n\nThe ${this.blockLabel} config schema (fields + any allowed options):\n${JSON.stringify(schema.config)}`
-            : '';
-        return [{ role: 'system', content: `${nodes}${schemaBlock}` }];
+        if (!schema) {
+            return [];
+        }
+        return [
+            {
+                role: 'system',
+                content: `The ${this.blockLabel} config schema (fields + any allowed options):\n${JSON.stringify(schema.config)}`,
+            },
+        ];
     }
 }
 

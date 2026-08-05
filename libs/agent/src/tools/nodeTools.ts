@@ -177,6 +177,30 @@ export const createNodeReadToolProvider = (binding: CanvasBinding, catalog: Cata
     },
 });
 
+/** GET_GRAPH: the whole canvas — every node + every edge — in one call. */
+const GET_GRAPH_DEF: ToolDef = {
+    name: 'get_graph',
+    description:
+        'Show the whole current flow in one call: every node (id, type, label, position) and every edge ' +
+        '(source → target). Call it when you need to see the canvas as it is now — after making changes, or ' +
+        'before deciding your next step.',
+    parameters: { type: 'object', properties: {} },
+};
+
+/**
+ * The PULL counterpart to injecting the canvas into context each turn (cache-context-ordering.md, Approach 3):
+ * an agent fetches current state on demand via `get_graph`, which returns the same nodes + edges render.
+ */
+export const createGraphReadToolProvider = (binding: CanvasBinding): ToolProvider => ({
+    listTools: () => [GET_GRAPH_DEF],
+    dispatch: (call: ToolCall): ToolResult => {
+        if (call.name === 'get_graph') {
+            return ok(call, { graph: `${renderNodeContext(binding)}\n\n${renderEdgeContext(binding)}` });
+        }
+        return toolUnknown(call);
+    },
+});
+
 /**
  * SEARCH provider: `search_nodes` (a search over the current nodes — `query` matched against id/label/type)
  * + `describe_node` (detail). `opts.type` is OPTIONAL: when set it structurally scopes the search to that ONE

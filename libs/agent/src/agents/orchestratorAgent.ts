@@ -2,7 +2,12 @@ import { BaseAgent } from './baseAgent';
 import { createDefaultRoster } from './registrations';
 import { createSubAgentRunner } from './subAgentRunner';
 import { createCatalogToolProvider } from '../tools/catalogTools';
-import { createNodeReadToolProvider, renderNodeContext } from '../tools/nodeTools';
+import {
+    createGraphReadToolProvider,
+    createNodeReadToolProvider,
+    renderEdgeContext,
+    renderNodeContext,
+} from '../tools/nodeTools';
 import { createAgentDirectoryToolProvider, createSpawnToolProvider } from '../tools/spawnTools';
 
 import type { BaseAgentDeps, CollectedToolCall } from './baseAgent';
@@ -157,14 +162,17 @@ export const orchestratorPromptFor = (roster: AgentRoster): string =>
     isBuilderExclusive(roster) ? BUILDER_ORCHESTRATOR_SYSTEM_PROMPT : ORCHESTRATOR_SYSTEM_PROMPT;
 
 /** The orchestrator's per-turn context: the live-canvas node list + the discovered roster + the routing rule. */
-export const renderContext = (binding: CanvasBinding, roster: AgentRoster): string => {
-    const nodes = renderNodeContext(binding); // headings default to exactly these strings
+/** The roster block: the specialists on offer + the routing rule. Static across a turn (no live canvas). */
+export const renderRoster = (roster: AgentRoster): string => {
     const agentLines = roster
         .list()
         .map(a => `- ${a.type}: ${a.summary}`)
         .join('\n');
-    return `${nodes}\n\nAvailable specialists:\n${agentLines}\n\n${routingRuleFor(roster)}`;
+    return `Available specialists:\n${agentLines}\n\n${routingRuleFor(roster)}`;
 };
+
+export const renderContext = (binding: CanvasBinding, roster: AgentRoster): string =>
+    `${renderNodeContext(binding)}\n\n${renderRoster(roster)}`;
 
 /**
  * The orchestrator's think/act budget. It DELEGATES (each spawn is one iteration) and also reads to plan, so a
@@ -209,6 +217,7 @@ export class OrchestratorAgent extends BaseAgent {
                 grant: {},
                 tools: [
                     createNodeReadToolProvider(deps.binding, deps.catalog),
+                    createGraphReadToolProvider(deps.binding),
                     createCatalogToolProvider(deps.catalog),
                     createAgentDirectoryToolProvider(roster),
                     createSpawnToolProvider(runner, deps.binding, () => signalHolder.current),
@@ -220,7 +229,15 @@ export class OrchestratorAgent extends BaseAgent {
     }
 
     protected override buildContextMessages(): ChatMessage[] {
-        return [{ role: 'system', content: renderContext(this.binding, this.roster) }];
+        return [{ role: 'system', content: renderRoster(this.roster) }];
+    }
+
+    /**
+     * Seed the starting canvas into the orchestrator's first user message (Approach 3); it pulls fresh state via
+     * get_graph as spawned children mutate the canvas, rather than re-reading an injected copy each turn.
+     */
+    protected override initialUserPreamble(): string {
+        return `${renderNodeContext(this.binding)}\n\n${renderEdgeContext(this.binding)}`;
     }
 
     /** Forward this turn's abort signal so spawned children cancel when the orchestrator aborts. */

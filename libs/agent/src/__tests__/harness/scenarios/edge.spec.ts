@@ -153,13 +153,16 @@ describe('edge agent — occupied input', () => {
 });
 
 describe('edge agent — context', () => {
-    it('seeds the current node list into context on the first request', async () => {
+    it('does not inject the node list; offers get_graph to pull current state (Approach 3)', async () => {
         const { agent, gateway } = setup([{ text: 'ok' }]);
         await agent.send('what can you connect?');
         const systemContent = gateway.calls[0].messages
             .filter(m => m.role === 'system')
             .map(m => m.content)
             .join('\n');
-        expect(systemContent).toMatch(/id="a"/);
+        // Approach 3: no auto-injected node list — the edge agent pulls current state on demand.
+        expect(systemContent).not.toMatch(/id="a"/);
+        const toolNames = new Set((gateway.calls[0].tools ?? []).map(t => t.name));
+        expect(toolNames.has('get_graph')).toBe(true);
     });
 });
