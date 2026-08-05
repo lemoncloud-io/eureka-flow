@@ -138,8 +138,21 @@ export abstract class BaseAgent implements Agent {
         this.config = { ...base, ...(deps.config ?? {}), tools: base.tools };
     }
 
-    /** Per-turn dynamic context injected as system message(s) after the persona, recomputed each iteration. */
+    /**
+     * Static per-turn context injected right after the persona — the cached head. For an agent whose head does
+     * not change turn to turn (roster, capabilities). Volatile state that changes every turn belongs in
+     * {@link buildLiveObservation} instead, so it lands at the tail and never truncates the cacheable prefix.
+     */
     protected buildContextMessages(): ChatMessage[] {
+        return [];
+    }
+
+    /**
+     * Volatile per-turn observation appended at the very tail, after the transcript — the uncached slot. Keeping
+     * a value that changes each turn (the live canvas) last means it never breaks the cached prefix over the
+     * persona + transcript. Ephemeral: recomputed each iteration, never persisted, so history stays append-only.
+     */
+    protected buildLiveObservation(): ChatMessage[] {
         return [];
     }
 
@@ -233,6 +246,7 @@ export abstract class BaseAgent implements Agent {
                     { role: 'system', content: config.systemPrompt },
                     ...this.buildContextMessages(),
                     ...mapTranscript(state.messages),
+                    ...this.buildLiveObservation(),
                 ];
                 const tools = await executor.listTools(config);
                 const res = await collect(gateway.chat({ messages: chatMessages, tools, stream: true }, { signal }));

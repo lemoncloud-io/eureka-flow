@@ -208,3 +208,30 @@ describe('builder agent — progressive disclosure', () => {
         expect(JSON.stringify(gateway.calls[1].messages)).toContain(marker);
     });
 });
+
+describe('builder agent — cache-friendly context ordering', () => {
+    it('injects the live canvas at the TAIL as a user turn, not in a system header', async () => {
+        // The canvas changes every turn, so it must sit LAST (the uncached slot), leaving the persona +
+        // transcript above it an append-only, cacheable prefix — see cache-context-ordering.md. As a system
+        // header instead, the volatile block would truncate the cached prefix down to just the persona.
+        const initial: Graph = {
+            nodes: [{ id: 'n_seed', type: 'input-text', position: { x: 0, y: 0 }, config: { text: 'hi' } }],
+            edges: [],
+        };
+        const { agent, gateway } = setup([{ text: 'nothing to change' }], initial);
+
+        await agent.send('inspect the canvas');
+
+        const messages = gateway.calls[0].messages;
+        const last = messages[messages.length - 1];
+        // the live canvas is the LAST message and a user turn (a live observation, not persona text)
+        expect(last.role).toBe('user');
+        expect(last.content).toContain('n_seed');
+        // and it is NOT glued into a system header (that would sit in the cached prefix)
+        const systemContent = messages
+            .filter(m => m.role === 'system')
+            .map(m => m.content)
+            .join('\n');
+        expect(systemContent).not.toContain('n_seed');
+    });
+});

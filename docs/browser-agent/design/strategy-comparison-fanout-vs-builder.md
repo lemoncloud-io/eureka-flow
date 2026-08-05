@@ -17,6 +17,12 @@ comparison.
 **Read the numbers as directional, not precise** — see [Validity](#validity) (temp=0 is non-deterministic on
 2.5 Flash; two cells were lost to network errors; the run predates the tool-result grouping fix).
 
+> **Update — the cost half has since changed ([cache-context-ordering.md](./cache-context-ordering.md)).** Moving
+> the builder's live canvas to the tail (an append-only, cacheable transcript + fewer round-trips) roughly
+> **halved** the builder's cost at N=3 (T6 `$eff` 0.0210→0.0098, T8 0.0295→0.0156) with correctness held (3/3),
+> **flipping** the verdict below: the builder is now cheaper than fan-out, not ~equal. The re-send-tax section and
+> the `$` figures here record the pre-change checkpoint — the baseline the fix improved on.
+
 ---
 
 ## The headline

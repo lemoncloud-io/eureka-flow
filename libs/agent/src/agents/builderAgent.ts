@@ -114,16 +114,18 @@ export class BuilderAgent extends BaseAgent {
     }
 
     /**
-     * Seed the current canvas — its nodes AND their wiring — before every model call; the catalog + playbook
-     * bodies are pulled on demand. The edge list is what makes an already-occupied input visible, so the builder
+     * Seed the current canvas — its nodes AND their wiring — at the TAIL of every model call, as a live
+     * observation rather than a system header, so the frozen transcript above it stays an append-only, cacheable
+     * prefix (the canvas changes each turn; keeping it last is what lets the persona + history cache — see
+     * cache-context-ordering.md). The edge list is what makes an already-occupied input visible, so the builder
      * frees it before reusing it (the persona's remove-before-reuse rule) instead of connecting blindly and
      * recovering from the rejection. Occupancy is a fact of the edge set, never of a node, so it can only be seen
      * here.
      */
-    protected override buildContextMessages(): ChatMessage[] {
+    protected override buildLiveObservation(): ChatMessage[] {
         return [
             {
-                role: 'system',
+                role: 'user',
                 content: `${renderNodeContext(this.binding)}\n\n${renderEdgeContext(this.binding)}`,
             },
         ];

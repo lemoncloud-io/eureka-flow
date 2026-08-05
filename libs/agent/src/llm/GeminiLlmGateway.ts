@@ -157,6 +157,19 @@ const toGeminiRequest = (req: ChatRequest, generation?: GeminiGenerationConfig) 
     const systemTexts: string[] = [];
     const contents: GeminiContent[] = [];
 
+    // Append a part to the open trailing user turn, or start a new one. Gemini wants alternating roles and
+    // requires a model turn's N functionCalls to be answered by N functionResponses in a SINGLE user turn — so
+    // consecutive user-side parts coalesce into one content: parallel tool results (Vertex 400s on the split;
+    // the Developer API tolerates it), plus a trailing live observation that rides the tool-result turn as text.
+    const appendUserPart = (part: GeminiPart) => {
+        const last = contents[contents.length - 1];
+        if (last?.role === 'user') {
+            last.parts.push(part);
+        } else {
+            contents.push({ role: 'user', parts: [part] });
+        }
+    };
+
     for (const message of req.messages) {
         if (message.role === 'system') {
             systemTexts.push(message.content ?? '');
@@ -164,17 +177,7 @@ const toGeminiRequest = (req: ChatRequest, generation?: GeminiGenerationConfig) 
         }
         if (message.role === 'tool') {
             const name = (message.toolCallId ? nameByCallId.get(message.toolCallId) : undefined) ?? 'tool';
-            const part: GeminiPart = { functionResponse: { name, response: toResponseObject(message.content) } };
-            // Group consecutive tool results into ONE user content. Gemini requires the number of
-            // functionResponse parts to equal the preceding model turn's functionCall parts — Vertex enforces
-            // this strictly (a 400 otherwise) while the Developer API tolerates the split. So a batch of parallel
-            // tool calls comes back as a single user turn carrying every response, not one turn per response.
-            const last = contents[contents.length - 1];
-            if (last?.role === 'user' && last.parts[0]?.functionResponse !== undefined) {
-                last.parts.push(part);
-            } else {
-                contents.push({ role: 'user', parts: [part] });
-            }
+            appendUserPart({ functionResponse: { name, response: toResponseObject(message.content) } });
             continue;
         }
         if (message.role === 'assistant') {
@@ -187,7 +190,7 @@ const toGeminiRequest = (req: ChatRequest, generation?: GeminiGenerationConfig) 
             contents.push({ role: 'model', parts: parts.length > 0 ? parts : [{ text: '' }] });
             continue;
         }
-        contents.push({ role: 'user', parts: [{ text: message.content ?? '' }] });
+        appendUserPart({ text: message.content ?? '' });
     }
 
     const generationConfig = {

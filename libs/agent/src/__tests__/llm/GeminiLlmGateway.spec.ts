@@ -222,6 +222,41 @@ describe('createGeminiLlmGateway', () => {
         ]);
     });
 
+    it('coalesces a trailing user turn into the tool-result content (a live observation rides the results turn)', async () => {
+        // The builder appends the live canvas as a trailing user turn AFTER the tool results; it must merge into
+        // the SAME user content (functionResponse parts + a text part), preserving role alternation (no two
+        // consecutive user contents) and the response-count invariant.
+        const http = new ScriptedHttpRequest([{ json: geminiReply('done') }]);
+
+        await drain(
+            createGateway(http).chat({
+                messages: [
+                    { role: 'user', content: 'add one' },
+                    {
+                        role: 'assistant',
+                        content: null,
+                        toolCalls: [{ id: 'c1', name: 'add_node', args: '{"type":"a"}' }],
+                    },
+                    { role: 'tool', content: '{"nodeId":"n1"}', toolCallId: 'c1' },
+                    { role: 'user', content: 'Current canvas: n1' },
+                ],
+                tools: [{ name: 'add_node', description: 'add', parameters: { type: 'object' } }],
+            })
+        );
+
+        expect((http.requests[0].body as Record<string, unknown>)['contents']).toEqual([
+            { role: 'user', parts: [{ text: 'add one' }] },
+            { role: 'model', parts: [{ functionCall: { name: 'add_node', args: { type: 'a' } } }] },
+            {
+                role: 'user',
+                parts: [
+                    { functionResponse: { name: 'add_node', response: { nodeId: 'n1' } } },
+                    { text: 'Current canvas: n1' },
+                ],
+            },
+        ]);
+    });
+
     it('streams a response functionCall as a toolCall chunk (synthesized id), then done', async () => {
         const args = { nodeId: 'n1', by: { dx: 20, dy: 0 } };
         const http = new ScriptedHttpRequest([
