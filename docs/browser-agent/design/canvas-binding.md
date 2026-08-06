@@ -6,11 +6,10 @@
 > implementation: [`engineCanvasBinding.ts`](../../../libs/agent/src/canvas/engineCanvasBinding.ts). Last updated 2026-08-02.
 
 `readGraph` + `updateNode` + the structural primitives (`addNode` / `deleteNode` / `addEdge` / `deleteEdge`)
-are the whole contract, shared by the orchestrator and its specialists. The
-[locator agent](../agents/locator.md) uses `updateNode` to move a node (`position`); a
-[block agent](../agents/blockAgent.md) uses it to rename (`label`) and set config (`config`), and uses
-`addNode` / `deleteNode` to create or remove a node of its type; the [edge agent](../agents/edge.md) uses
-`addEdge` / `deleteEdge`; and the [builder](../agents/builder.md) uses all of them. So
+are the whole contract, shared by the orchestrator and its specialists. A
+[block agent](../agents/blockAgent.md) uses `updateNode` to rename (`label`) and set config (`config`); the
+[builder](../agents/builder.md) uses all of them — `updateNode` to move (`position`),
+`addNode` / `deleteNode` to create or remove nodes, and `addEdge` / `deleteEdge` to wire them. So
 the contract is a node patch (`NodePatch` = `{ label?, position?, config? }`) plus four structural
 primitives — `addNode`/`addEdge` return the new id, `deleteNode` cascades the node's edges.
 

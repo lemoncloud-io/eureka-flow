@@ -1,9 +1,10 @@
 import { BaseAgent } from './baseAgent';
 import {
-    createGraphReadToolProvider,
     createNodeConfigToolProvider,
     createNodeSearchToolProvider,
     createNodeStructureToolProvider,
+    listNodeLocationsOfType,
+    renderNodeContext,
 } from '../tools/nodeTools';
 
 import type { BaseAgentDeps } from './baseAgent';
@@ -64,25 +65,32 @@ export class BlockAgent extends BaseAgent {
                 createNodeSearchToolProvider(deps.binding, deps.catalog, { type: deps.blockType }),
                 createNodeStructureToolProvider(deps.binding, deps.catalog),
                 createNodeConfigToolProvider(deps.binding, deps.catalog),
-                createGraphReadToolProvider(deps.binding),
             ],
         });
         this.blockType = deps.blockType;
         this.blockLabel = label;
     }
 
-    /** Seed the block's config schema (static, per type) each call; pull live nodes on demand via get_graph. */
+    /**
+     * Seed this block type's OWN nodes + its config schema into the per-turn head. A block agent is a short
+     * (2–3 turn) specialist, so the live canvas rides the head each turn rather than a get_graph pull it could
+     * not amortize (lifetime-matched context, context-strategy-and-composition.md). Type-scoped: it only ever
+     * sees its own block type, never the whole canvas.
+     */
     protected override buildContextMessages(): ChatMessage[] {
-        const schema = this.catalog.schema(this.blockType);
-        if (!schema) {
-            return [];
-        }
-        return [
+        const nodes = renderNodeContext(
+            this.binding,
             {
-                role: 'system',
-                content: `The ${this.blockLabel} config schema (fields + any allowed options):\n${JSON.stringify(schema.config)}`,
+                heading: `Your ${this.blockLabel} (${this.blockType}) nodes on the canvas:`,
+                empty: `No ${this.blockLabel} (${this.blockType}) nodes on the canvas yet.`,
             },
-        ];
+            listNodeLocationsOfType(this.binding, this.blockType)
+        );
+        const schema = this.catalog.schema(this.blockType);
+        const schemaBlock = schema
+            ? `\n\nThe ${this.blockLabel} config schema (fields + any allowed options):\n${JSON.stringify(schema.config)}`
+            : '';
+        return [{ role: 'system', content: `${nodes}${schemaBlock}` }];
     }
 }
 

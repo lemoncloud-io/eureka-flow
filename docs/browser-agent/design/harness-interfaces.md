@@ -122,7 +122,7 @@ enforced by each tool's `requires` gate in the executor.
 Specialists and the orchestrator edit the **live `CanvasBinding` directly** (`updateNode` for a node patch;
 `addNode` / `deleteNode` / `addEdge` / `deleteEdge` for structure), and reads (`list_nodes` / `describe_node`
 / `list_edges`) reflect the live canvas including edits made this turn — so a node created by a block agent
-is visible to the edge agent that wires it, and an id returned by `addNode` / `addEdge` names a node/edge the
+is visible to the builder that wires it, and an id returned by `addNode` / `addEdge` names a node/edge the
 next read will show.
 
 ## 3 · Tools
@@ -132,7 +132,7 @@ next read will show.
 // a paired `describe_*` returns the FULL detail for ONE item. Lists stay cheap; detail is pulled on demand.
 
 // NODE READ (FULL) — over the live CanvasBinding: list_nodes (compact, ALL nodes) + describe_node.
-// Carried by the orchestrator + the operation agents (locator, edge).
+// Carried by the orchestrator + the builder.
 declare function createNodeReadToolProvider(binding: CanvasBinding, catalog: CatalogLookup): ToolProvider;
 //   list_nodes()              → { nodes: NodeLocation[] }        // COMPACT: id, type, label, position — reuses listNodeLocations
 //   describe_node({ nodeId }) → { type, currentConfig, schema }  // DETAIL: current config + block schema + a select's options
@@ -278,7 +278,7 @@ interface AgentCard {
 // One specialist registration — everything both list_agents and spawn need, so registering an agent
 // is a one-liner with NO prompt edit. There is NO per-registration grant: a specialist is bounded by the
 // tools it carries + its OWN fixed grant (set in its constructor), with the user ceiling enforced at the
-// executor. `create` builds the specialist's OWN BaseAgent subclass (LocatorAgent / BlockAgent) — each a
+// executor. `create` builds the specialist's OWN BaseAgent subclass (BuilderAgent / BlockAgent) — each a
 // concrete agent, so `create` just forwards the base deps below (a BlockAgent also closes over its blockType).
 type SpecialistTurnDeps = BaseAgentDeps; // exactly the shared per-turn deps — no extra fields
 // = { gateway, storage, flowId, maxIterations?, binding, catalog, userPermissions } where:
@@ -287,7 +287,7 @@ type SpecialistTurnDeps = BaseAgentDeps; // exactly the shared per-turn deps —
 //   userPermissions — the user's flow-role ceiling (viewer ⇒ no edits — R2); the child's OWN grant is
 //                     fixed in its constructor, NOT supplied here
 interface AgentRegistration {
-    type: string; // spawn key, e.g. 'locator' — also the AgentCard.type
+    type: string; // spawn key, e.g. 'builder' — also the AgentCard.type
     summary: string; // the one-line capability the card shows
     create(deps: SpecialistTurnDeps): Agent; // build the concrete specialist agent, bound to the live canvas
 }
@@ -299,12 +299,6 @@ interface AgentRoster {
 declare function createAgentRoster(registrations: AgentRegistration[]): AgentRoster;
 
 // the roster's EXPLICIT entries (type · the concrete agent `create` builds):
-{
-    type: 'locator';
-} // create → createLocatorAgent({ binding, catalog, … })       — operation: move_node
-{
-    type: 'edge';
-} // create → createEdgeAgent({ binding, catalog, … })          — operation: connect_nodes + disconnect_edge
 {
     type: 'single-output-generator';
 } // create → createGeneratorAgent({ binding, catalog, … })     — named block specialist (BlockAgent + AI persona)
@@ -319,32 +313,27 @@ declare function createAgentRoster(registrations: AgentRegistration[]): AgentRos
 // registered GeneratorAgent (explicit wins). list_agents shows only the explicit entries above.
 //   resolveAgent = roster.get(agentType) ?? genericBlockRegistration(agentType, catalog)   // in createSubAgentRunner
 
-// NOTE: the old operation-split `node` + `property` agents are NOT registered (the orchestrator can't spawn
-// them). Their modules stay in the tree until a later cleanup; block agents own add/configure/rename/delete.
+// NOTE: the operation agents `locator` / `edge` and the old operation-split `node` / `property` have been
+// REMOVED; the builder owns wiring + layout, and block agents own add/configure/rename/delete.
 ```
 
-**The registration set _is_ the strategy.** The orchestrator, its tools and the loop never change; a
-deployment picks a design purely by which specialists it registers — the **block + operation** agents for
-**Strategy 1**, or the **builder** for **Strategy 2**
-([architecture.md · Two strategies](./architecture.md#two-strategies-over-the-shared-foundation)).
-`list_agents` returns exactly the exposed set, so the orchestrator never needs to know which strategy it is in.
+**The registration set _is_ the roster.** The orchestrator, its tools and the loop never change; a deployment
+exposes specialists purely by which it registers. The shipped roster is the **hybrid** — the **builder**
+(structure) + the **block agents** (content)
+([architecture.md · the hybrid writer layer](./architecture.md#the-hybrid-writer-layer)). `list_agents` returns
+exactly the exposed set, so the orchestrator discovers its roster at runtime rather than hardcoding it.
 
 ```mermaid
 flowchart LR
     RA["AgentRoster<br/>registry behind list_agents + spawn"]
-    subgraph S1["Strategy 1 · narrow specialists"]
+    subgraph HY["the hybrid roster"]
         direction TB
-        L["locator → LocatorAgent"]
-        E["edge → EdgeAgent"]
-        G["single-output-generator → GeneratorAgent"]
-        F["«fallback» any catalog type → BlockAgent(type)"]
+        B["builder → BuilderAgent<br/>+ use_skill(SEED_SKILLS) · STRUCTURE"]
+        G["single-output-generator → GeneratorAgent · CONTENT"]
+        F["«fallback» any catalog type → BlockAgent(type) · CONTENT"]
     end
-    subgraph S2["Strategy 2 · one builder"]
-        B["builder → BuilderAgent<br/>+ use_skill(SEED_SKILLS)"]
-    end
-    RA --> S1 & S2
-    S1 -. "create(deps) → subclass of BaseAgent «reused»" .-> BASE["BaseAgent"]
-    S2 -. create .-> BASE
+    RA --> HY
+    HY -. "create(deps) → subclass of BaseAgent «reused»" .-> BASE["BaseAgent"]
 ```
 
 ### The Builder — a composition specialist (consumer of skills)
@@ -465,7 +454,7 @@ interface ScenarioInput {
 }
 declare function runScenario(input: ScenarioInput): Promise<TurnResult>;
 
-// One fake gateway per agent (keyed by agentType) — see impl-notes for why.
+// One fake gateway per agent (keyed by agentType) so each sub-agent's script stays isolated.
 type FakeScript = Record<string, FakeScriptStep[]>; // keyed by agentType → one scripted gateway per agent
 ```
 

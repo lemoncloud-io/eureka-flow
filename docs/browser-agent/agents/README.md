@@ -5,33 +5,38 @@ is not a specialist — it coordinates these; its own model (loop, spawn, addres
 [harness docs](../design/harness-spec.md). Agents come in three kinds:
 
 - **Block agents — one per block type**, owning that block's whole lifecycle (add · configure · rename · delete).
-  The orchestrator addresses one by putting the **block's type** in `spawn`'s `agentType`. A named specialist
-  (registered) wins; otherwise the sub-agent runner synthesizes a **generic `BlockAgent(type)`** from the
-  catalog — so any block type is covered without a new registration or prompt edit.
-- **Operation agents — cross-block**, owning an operation that isn't about a single block: `locator` (move),
-  `edge` (connect/disconnect).
-- **The composition builder** — one capable specialist the orchestrator hands a multi-block **plan** to; it
-  carries the full editing toolset **plus `use_skill`** and builds the whole (sub-)flow itself (add · wire ·
-  configure · lay out), pulling a progressively-disclosed playbook for the how-to. Its spec:
-  [builder.md](./builder.md).
+  In the shipped hybrid the orchestrator routes each node's **content** (config · rename) to them. It addresses
+  one by putting the **block's type** in `spawn`'s `agentType`. A named specialist (registered) wins; otherwise
+  the sub-agent runner synthesizes a **generic `BlockAgent(type)`** from the catalog — so any block type is
+  covered without a new registration or prompt edit.
+- **The composition builder** — one capable specialist the orchestrator hands the whole **structure** to (add ·
+  wire · lay out); it carries the full editing toolset **plus `use_skill`** and builds the (sub-)flow itself,
+  pulling a progressively-disclosed playbook for the how-to. Its spec: [builder.md](./builder.md).
+- **Removed operation agents** — `locator` (move) and `edge` (connect/disconnect) were cross-block operation
+  agents; the builder now owns wiring and layout, so they — and the older operation-split `node` / `property`
+  agents — have been removed.
 
-**The three kinds map onto two strategies**
-([architecture.md · Two strategies](../design/architecture.md#two-strategies-over-the-shared-foundation)):
-the **block + operation** agents are **Strategy 1**'s roster (the orchestrator fans work out to them; no
-skills), and the **builder** is **Strategy 2**'s roster (the orchestrator hands it the whole plan; it uses
-`use_skill`). Same orchestrator + foundation either way — the roster you expose picks the design, and the
-[eval-benchmark](../design/eval-benchmark.md) compares them. The rows below cover both rosters.
+**The roster realizes the shipped HYBRID design**
+([architecture.md · the hybrid writer layer](../design/architecture.md#the-hybrid-writer-layer)): the
+orchestrator hands the whole **structure** to the **builder** (which uses `use_skill`) and fans each node's
+**content** out to the **block agents** in parallel — same orchestrator + foundation throughout. This design was
+chosen by comparing two earlier candidates (pure fan-out vs one all-doing builder) head-to-head in the
+[eval-benchmark](../design/eval-benchmark.md);
+[context-strategy-and-composition.md](../design/context-strategy-and-composition.md) records the findings. The
+rows below cover the shipped roster.
 
 ## Roster & coverage
 
-| Agent                       | Kind            | Capability                                                                                     | Grant                               | SPEC                                                | Deterministic                                                                                            | Live                                                                                               |
-| --------------------------- | --------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **block agent** (per type)  | block (generic) | add · configure · rename · delete a node of its type                                           | `canModifyCanvas` + `canEditConfig` | [blockAgent.md](./blockAgent.md)                    | [`scenarios/blockAgent.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/blockAgent.spec.ts) | —                                                                                                  |
-| **single-output-generator** | block (named)   | AI text generator — full lifecycle + model/provider knowledge                                  | `canModifyCanvas` + `canEditConfig` | [generator.md](./generator.md)                      | [`scenarios/generator.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/generator.spec.ts)   | —                                                                                                  |
-| **locator**                 | operation       | moves one existing node                                                                        | `canModifyCanvas`                   | [locator.md](./locator.md)                          | [`scenarios/locator.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/locator.spec.ts)       | [`locator.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/locator.live.spec.ts) |
-| **edge**                    | operation       | connects two nodes or disconnects                                                              | `canModifyCanvas`                   | [edge.md](./edge.md)                                | [`scenarios/edge.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/edge.spec.ts)             | —                                                                                                  |
-| **builder**                 | composition     | builds/extends a multi-block flow from a plan (add · wire · configure · lay out) + `use_skill` | `canModifyCanvas` + `canEditConfig` | [builder.md](./builder.md)                          | [`scenarios/builder.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/builder.spec.ts)       | [`builder.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/builder.live.spec.ts) |
-| ~~node~~ · ~~property~~     | retired         | superseded by the block agent (unregistered — kept in tree)                                    | —                                   | [node.md](./node.md) · [property.md](./property.md) | `scenarios/node.spec.ts` · `scenarios/property.spec.ts` (still run, direct-drive)                        | —                                                                                                  |
+| Agent                       | Kind            | Capability                                                                                     | Grant                               | SPEC                             | Deterministic                                                                                            | Live                                                                                               |
+| --------------------------- | --------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **block agent** (per type)  | block (generic) | add · configure · rename · delete a node of its type                                           | `canModifyCanvas` + `canEditConfig` | [blockAgent.md](./blockAgent.md) | [`scenarios/blockAgent.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/blockAgent.spec.ts) | —                                                                                                  |
+| **single-output-generator** | block (named)   | AI text generator — full lifecycle + model/provider knowledge                                  | `canModifyCanvas` + `canEditConfig` | [generator.md](./generator.md)   | [`scenarios/generator.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/generator.spec.ts)   | —                                                                                                  |
+| **builder**                 | composition     | builds/extends a multi-block flow from a plan (add · wire · configure · lay out) + `use_skill` | `canModifyCanvas` + `canEditConfig` | [builder.md](./builder.md)       | [`scenarios/builder.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/builder.spec.ts)       | [`builder.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/builder.live.spec.ts) |
+
+**Removed:** the cross-block operation agents `locator` (move) + `edge` (connect/disconnect) and the older
+operation-split `node` (add/delete) + `property` (config/rename) — their work folded into the builder
+(wiring/layout) and the block agents (config/rename). Their edit primitives remain as the tool providers the
+builder + block agents carry.
 
 Block-agent live coverage is exercised through the integration live suite (the model spawns block agents by
 type); a dedicated `blockAgent.live`/`generator.live` can be added when it earns its keep.

@@ -20,11 +20,10 @@ matrix.
 - **Per agent, no orchestrator** — `scenarios/<agent>.{spec,live.spec}.ts`: the agent driven **directly** with
   a concrete task, asserting the live graph — its definition of done. Block agents: `scenarios/blockAgent.*`
   (generic add/configure/rename/delete + type-scoped `search_nodes`), `scenarios/generator.*` (the
-  `single-output-generator` specialist, incl. add+configure in one turn). Operation agents:
-  `scenarios/locator.*`, `scenarios/edge.*`. Composition: `scenarios/builder.*` — the composition `builder`
-  driven directly (no orchestrator) to build a whole flow in one sub-turn (add → wire → configure → repair,
-  incl. `use_skill`). (`scenarios/node.*` + `scenarios/property.*` remain for the
-  now-unregistered `node` / `property` modules, driven directly, until a later cleanup.)
+  `single-output-generator` specialist, incl. add+configure in one turn). Composition: `scenarios/builder.*` —
+  the composition `builder` driven directly (no orchestrator) to build a whole flow in one sub-turn (add → wire
+  → configure → repair, incl. `use_skill`). (The operation agents `locator` / `edge` and the operation-split
+  `node` / `property` have been removed, so their scenario specs are gone too.)
 - **Integration, orchestrator × agents** — `scenarios/integration.{spec,live.spec}.ts`: the orchestrator
   resolving a request and delegating across specialists (the applied/refused/answered matrix — `partial` is a
   production outcome but not a test target, see below). The live variant checks only the outcome + graph oracle.

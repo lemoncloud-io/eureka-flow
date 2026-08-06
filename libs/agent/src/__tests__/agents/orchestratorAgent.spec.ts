@@ -21,13 +21,14 @@ const scripts = (): Record<string, FakeScriptStep[]> => ({
             toolCalls: [
                 {
                     name: 'spawn',
-                    args: { children: [{ agentType: 'locator', task: `move ${IDS.txt} right by 20px` }] },
+                    args: { children: [{ agentType: 'builder', task: `move ${IDS.txt} right by 20px` }] },
                 },
             ],
         },
         { text: 'Moved the input right by 20px.' },
     ],
-    locator: [
+    // A move is structural, so it routes to the builder (edge/locator are retired).
+    builder: [
         { toolCalls: [{ name: 'move_node', args: { nodeId: IDS.txt, by: { dx: 20, dy: 0 } } }] },
         { text: 'moved' },
     ],

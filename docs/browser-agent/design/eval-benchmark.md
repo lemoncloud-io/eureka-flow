@@ -1,5 +1,12 @@
 # Flow-agent eval — comparing two designs by correctness
 
+> **SETTLED (2026-08-05) — historical record.** This benchmark produced the shipped decision: the **hybrid**
+> (builder builds the structure; block specialists author the content) —
+> [context-strategy-and-composition.md](./context-strategy-and-composition.md) §7,
+> [architecture.md · the hybrid writer layer](./architecture.md#the-hybrid-writer-layer). The two-design A/B
+> below is kept as the record of _how_ that was decided, not a live gate; with edge + locator retired the
+> fan-out arm is now degenerate.
+>
 > A **design-agnostic** benchmark: one fixed ladder of scenarios (simple → complex), each verified by code,
 > run identically against **two agent designs** so we can compare their **correctness** on the same footing.
 > This page is the spec for that benchmark — the scenario catalog, the oracle discipline, the comparison
@@ -45,7 +52,7 @@ This is the whole discipline: **correctness lives in the oracle (shared), and on
 verdict could only be produced by peeking inside one design, it is not a fair verdict and does not belong here.
 
 > **The two designs.** The concrete A/B here is the pair of strategies the harness can run
-> ([architecture.md · Two strategies](./architecture.md#two-strategies-over-the-shared-foundation)): **Design
+> ([architecture.md · the hybrid writer layer](./architecture.md#the-hybrid-writer-layer)): **Design
 > A = Strategy 1** (the orchestrator fans out to narrow block + operation specialists; no skills) and **Design
 > B = Strategy 2** (the orchestrator hands the whole plan to one `builder` that carries tools + `use_skill`
 > and spawns nothing). Both run through the **same** `runScenario` orchestrator harness — they differ only in
@@ -366,7 +373,7 @@ real (effective) and list-price spend.
 // scale the derived cost columns. cachedPerM applies to cachedContentTokenCount (implicit-cache hits, §4.3).
 // Keyed by model so a bigger model reprices without touching the Meter.
 const PRICES: Record<string, { inPerM: number; outPerM: number; cachedPerM: number }> = {
-    'gemini-2.5-flash': { inPerM: 0.3, outPerM: 2.5, cachedPerM: 0.03 }, // cached = 10% of input (90% off), Dev API + Vertex
+    'gemini-2.5-flash': { inPerM: 0.3, outPerM: 2.5, cachedPerM: 0.03 }, // cached = 10% of input (90% off)
 };
 ```
 

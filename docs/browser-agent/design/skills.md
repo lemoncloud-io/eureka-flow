@@ -7,10 +7,10 @@
 > `createUseSkillToolProvider(SEED_SKILLS)`; design in [builder.md](../agents/builder.md).
 >
 > **Grounding.** Built on the shipped `@flows/agent` (`libs/agent/src`): the `BaseAgent` loop, the
-> `ToolProvider`/`ToolExecutor` seam, and `LlmGateway`. The **Builder** — the sole worker of **Strategy 2**
-> ([architecture.md](./architecture.md#two-strategies-over-the-shared-foundation)) — is the one consumer; the
-> other agents (orchestrator, locator, edge, block agents, generator) **do not use skills** — they wire their
-> tool providers directly. Last updated 2026-08-02.
+> `ToolProvider`/`ToolExecutor` seam, and `LlmGateway`. The **Builder** — the flow's structural writer in the
+> shipped [hybrid](./architecture.md#the-hybrid-writer-layer) — is the one consumer; the other agents
+> (orchestrator, block agents, generator) **do not use skills** — they wire their tool providers directly. Last
+> updated 2026-08-05.
 
 ---
 

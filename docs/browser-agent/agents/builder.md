@@ -1,6 +1,6 @@
 # Builder agent (composition specialist)
 
-> **The composition specialist — the sole worker of [Strategy 2](../design/architecture.md#two-strategies-over-the-shared-foundation).** The orchestrator plans a multi-block build and **spawns** the Builder
+> **The composition specialist — the flow's structural writer in the shipped [hybrid](../design/architecture.md#the-hybrid-writer-layer).** The orchestrator plans the whole structure and **spawns** the Builder
 > (`agentType: 'builder'`) with the plan; the Builder **builds the whole (sub-)flow itself** on the live canvas —
 > add · wire · configure · lay out — using the full editing toolset and **`use_skill`** for the how-to. A **leaf**
 > sub-turn (no `spawn`, no nesting). Its code is [builderAgent.ts](../../../libs/agent/src/agents/builderAgent.ts); the
@@ -32,22 +32,27 @@ Builder can build many kinds of flow.
 
 The full editing surface, wired directly over the live `binding` (no new tool code), plus `use_skill`:
 
-| Group     | Tools                                            | Provider                                  |
-| --------- | ------------------------------------------------ | ----------------------------------------- |
-| Read      | `list_nodes`, `describe_node`                    | `createNodeReadToolProvider`              |
-| Catalog   | `catalog_search`                                 | `createCatalogToolProvider`               |
-| Structure | `add_node`, `delete_node`                        | `createNodeStructureToolProvider`         |
-| Config    | `set_properties`, `rename`                       | `createNodeConfigToolProvider`            |
-| Edge      | `list_edges`, `connect_nodes`, `disconnect_edge` | `createEdgeToolProvider`                  |
-| Layout    | `move_node`                                      | `createNodeMoveToolProvider`              |
-| Skills    | `use_skill`                                      | `createUseSkillToolProvider(SEED_SKILLS)` |
+| Group      | Tools                                            | Provider                                  |
+| ---------- | ------------------------------------------------ | ----------------------------------------- |
+| Read       | `list_nodes`, `describe_node`                    | `createNodeReadToolProvider`              |
+| Graph read | `get_graph` (pull the whole canvas on demand)    | `createGraphReadToolProvider`             |
+| Catalog    | `catalog_search`                                 | `createCatalogToolProvider`               |
+| Structure  | `add_node`, `delete_node`                        | `createNodeStructureToolProvider`         |
+| Config     | `set_properties`, `rename`                       | `createNodeConfigToolProvider`            |
+| Edge       | `list_edges`, `connect_nodes`, `disconnect_edge` | `createEdgeToolProvider`                  |
+| Layout     | `move_node`                                      | `createNodeMoveToolProvider`              |
+| Skills     | `use_skill`                                      | `createUseSkillToolProvider(SEED_SKILLS)` |
 
-Grant `canModifyCanvas` + `canEditConfig`. Per-turn context seeds the full live canvas — its nodes
-(`renderNodeContext`) **and their wiring** (`renderEdgeContext`), so an already-occupied input is visible in
-context and the Builder frees it before reusing it rather than discovering the conflict through a rejected
-connect (occupancy is a fact of the edge set, never of a node). The catalog is pulled on demand (`catalog_search` — a hit carries the type's full schema), and a playbook's
-body only when the Builder loads it. Progressive disclosure needs no extra wiring — the `use_skill` index rides
-its tool description ([design/skills.md](../design/skills.md)).
+Grant `canModifyCanvas` + `canEditConfig`. As a long-lived agent the Builder uses **lifetime-matched context**:
+it seeds the starting canvas — its nodes (`renderNodeContext`) **and their wiring** (`renderEdgeContext`) —
+**once** into its first user message (`initialUserPreamble`), then pulls fresh state on demand via `get_graph`,
+so its growing transcript stays a cacheable prefix
+([design/context-strategy-and-composition.md](../design/context-strategy-and-composition.md)). Seeding the edges
+is what makes an already-occupied input visible, so the Builder frees it before reusing it rather than
+discovering the conflict through a rejected connect (occupancy is a fact of the edge set, never of a node). The
+catalog is pulled on demand (`catalog_search` — a hit carries the type's full schema), and a playbook's body only
+when the Builder loads it. Progressive disclosure needs no extra wiring — the `use_skill` index rides its tool
+description ([design/skills.md](../design/skills.md)).
 
 ## Definition of done — verified behavior
 
@@ -58,8 +63,8 @@ its tool description ([design/skills.md](../design/skills.md)).
   it unconnected.
 - **Reject + report** — an invalid value / unknown field / rejected connection is reported, never substituted or
   forced (the specialist-reject contract, shared with the block agent).
-- **Carries the full toolset + `use_skill`** — the offered tools include the read/config/structure/edge/move/
-  catalog set and `use_skill`; loading `build-linear-pipeline` brings its instructions into context.
+- **Carries the full toolset + `use_skill`** — the offered tools include the read/graph-read/config/structure/
+  edge/move/catalog set and `use_skill`; loading `build-linear-pipeline` brings its instructions into context.
 
 Where these live:
 

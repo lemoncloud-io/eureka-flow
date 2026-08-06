@@ -188,7 +188,7 @@ const GET_GRAPH_DEF: ToolDef = {
 };
 
 /**
- * The PULL counterpart to injecting the canvas into context each turn (cache-context-ordering.md, Approach 3):
+ * The PULL counterpart to injecting the canvas into context each turn (context-strategy-and-composition.md):
  * an agent fetches current state on demand via `get_graph`, which returns the same nodes + edges render.
  */
 export const createGraphReadToolProvider = (binding: CanvasBinding): ToolProvider => ({

@@ -1,6 +1,12 @@
 /**
  * EVAL BENCHMARK — comparing two designs by CORRECTNESS (docs/browser-agent/design/eval-benchmark.md).
  *
+ * SETTLED (2026-08-05) — this A/B produced the shipped decision: the HYBRID (builder builds structure, block
+ * specialists author content) — see context-strategy-and-composition.md §7. This spec is kept as the HISTORICAL
+ * experiment record, not a live gate. NOTE: since edge + locator were retired, the `fanoutRoster` is now
+ * degenerate (just the generator), so the fan-out arm no longer models a real design — do not read new meaning
+ * into a re-run.
+ *
  * The SAME design-agnostic scenario ladder is run against the TWO designs — Strategy 1 (orchestrator fans out
  * to narrow specialists; the `fanoutRoster` = every registration EXCEPT the builder) and Strategy 2 (the
  * orchestrator hands the whole plan to one `builder`; the `builderRoster` = only the builder). Both go through
@@ -54,8 +60,8 @@ import type { TurnOutcome } from '../turnOutcome';
 
 // ── live gate + gateway ──────────────────────────────────────────────────────────────────────────
 const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
-// One seam for the whole live suite: Vertex when VERTEX_* env is set (draws the $300 credit), else the
-// Developer API key, else undefined (vertex-migration.md). temperature 0 → the most repeatable real output.
+// One seam for the whole live suite: the Gemini Developer API when GEMINI_API_KEY is set, else undefined.
+// temperature 0 → the most repeatable real output.
 const gateway = resolveLiveGateway({
     model,
     generation: { temperature: 0, thinkingBudget: 1024, maxOutputTokens: 8192 },
@@ -64,8 +70,8 @@ const SKIP_LIVE = !gateway || !process.env.RUN_LIVE;
 const N = Math.max(1, Number(process.env.BENCH_N ?? '1')); // runs per (scenario × design); smoke default 1
 const VERBOSE = !!process.env.LIVE_VERBOSE; // ALSO echo the transcript to the console (it is ALWAYS saved to file)
 const TIMEOUT_MS = 240_000 * N; // a live multi-agent turn (+ the outcome re-ask) is several round-trips
-// Ease Dynamic-Shared-Quota pressure on a cold project: pause after each (scenario × design) cell. Off by
-// default (0); set e.g. BENCH_PAUSE_MS=8000 for a Vertex run so bursts don't stack up and 429.
+// Ease rate-limit (429) pressure: pause after each (scenario × design) cell. Off by default (0); set e.g.
+// BENCH_PAUSE_MS=3000 if a run starts hitting the Developer API's per-minute limit.
 const PAUSE_MS = Math.max(0, Number(process.env.BENCH_PAUSE_MS ?? '0'));
 
 // ── full-transcript recorder ───────────────────────────────────────────────────────────────────────
@@ -131,7 +137,7 @@ interface BenchmarkResult {
     outcome: TurnOutcome;
     graph: Graph;
     committed: boolean;
-    cost: TurnCost; // NEW — the turn's summed token counts + list/effective $ (eval-benchmark-cost-time.md §3)
+    cost: TurnCost; // NEW — the turn's summed token counts + list/effective $ (eval-benchmark.md §4.2)
     elapsedMs: number; // NEW — wall-clock latency of the whole run() (secondary, noisy axis)
 }
 interface RunAdapter {
@@ -501,7 +507,7 @@ const SMOKE: Scenario[] = [
 ];
 
 // ── the scorecard ──────────────────────────────────────────────────────────────────────────────────
-// Efficiency (eval-benchmark-cost-time.md §4) rides BESIDE correctness, never replaces it: raw tokens and
+// Efficiency (eval-benchmark.md §4.1) rides BESIDE correctness, never replaces it: raw tokens and
 // round-trips are the trusted axes; wall-clock + $ are reported but not ranked on. Each axis is summed over one
 // turn, aggregated ONLY over PASSING runs (a wrong answer's cost is meaningless), then the co-passing scenarios
 // are summed per design for the head-to-head. ONE key list drives zero/add/scale so no column is re-inlined.

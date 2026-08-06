@@ -38,9 +38,9 @@ import { verboseGateway } from '../verboseGateway';
 import type { ScenarioInput, TurnResult } from '../runScenario';
 
 const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
-// A single tool-capable gateway shared by the orchestrator + every spawned specialist; one seam picks the
-// provider — Vertex when VERTEX_* env is set (draws the $300 credit), else the Developer API key, else
-// undefined (vertex-migration.md). Each chat() is an independent generateContent call, so one instance is fine.
+// A single tool-capable gateway shared by the orchestrator + every spawned specialist; one seam resolves it —
+// the Gemini Developer API when GEMINI_API_KEY is set, else undefined (skip). Each chat() is an independent
+// generateContent call, so one instance is fine.
 const gateway = resolveLiveGateway({
     model,
     // temperature: 0 → greedy decoding, the most repeatable output a real model gives (the eval still

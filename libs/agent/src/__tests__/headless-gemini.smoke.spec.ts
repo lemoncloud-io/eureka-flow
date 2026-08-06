@@ -14,14 +14,14 @@
  *
  * So this file proves three things, each labelled:
  *   1. REAL KEY  — a direct gateway.chat() reaches Gemini headlessly (plain text, no tools).
- *   2. REAL KEY  — the real Gemini gateway + locator actually moves the node (function-calling).
- *   3. CONTROL   — the same locator pipeline with the fake gateway moves the node offline.
+ *   2. REAL KEY  — the real Gemini gateway + builder actually moves the node (function-calling).
+ *   3. CONTROL   — the same builder pipeline with the fake gateway moves the node offline.
  */
 import './loadEnvLocal'; // FIRST: load repo-root .env.local so GEMINI_API_KEY is set before the gate below
 
 import { describe, expect, it } from 'vitest';
 
-import { createLocatorAgent } from '../agents/locatorAgent';
+import { createBuilderAgent } from '../agents/builderAgent';
 import { createInMemoryCanvasBinding } from '../canvas/inMemoryCanvasBinding';
 import { createVirtualAgentEnvironment } from '../environment/createVirtualAgentEnvironment';
 import { createFetchHttpRequest } from '../http/FetchHttpRequest';
@@ -91,9 +91,9 @@ describe('flow agent headless (Node, no DOM) with a real Gemini key', () => {
         expect(text.trim().length).toBeGreaterThan(0);
     });
 
-    // ── 2. REAL KEY — real Gemini gateway drives the locator end-to-end (a–f) → node moves ──
+    // ── 2. REAL KEY — real Gemini gateway drives the builder end-to-end (a–f) → node moves ──
     // A real function-calling round-trip, so this is opt-in via RUN_LIVE (see SKIP_LIVE).
-    it.skipIf(SKIP_LIVE)('drives the locator with the real Gemini gateway (a–f) → node moves, phase done', async () => {
+    it.skipIf(SKIP_LIVE)('drives the builder with the real Gemini gateway (a–f) → node moves, phase done', async () => {
         const environment = createVirtualAgentEnvironment(); // (b)
         const http = createFetchHttpRequest();
         const gateway = createGeminiLlmGateway({
@@ -106,7 +106,7 @@ describe('flow agent headless (Node, no DOM) with a real Gemini key', () => {
 
         const binding = createInMemoryCanvasBinding(seedGraph()); // (c) two real nodes
         const storage = createInMemorySessionStore(); // (d) in-memory session
-        const agent = createLocatorAgent({
+        const agent = createBuilderAgent({
             gateway,
             binding,
             storage,
@@ -120,16 +120,16 @@ describe('flow agent headless (Node, no DOM) with a real Gemini key', () => {
         const after = posOf(binding, 'n1'); // (f)
 
         const state = storage.load(FLOW_ID) as SessionState;
-        console.log('[2] real-gateway locator: before', before, '→ after', after, '| phase', state.phase);
+        console.log('[2] real-gateway builder: before', before, '→ after', after, '| phase', state.phase);
 
-        // The tool-capable gateway lets the locator actually issue move_node:
+        // The tool-capable gateway lets the builder actually issue move_node:
         expect(state.phase).toBe('done');
         expect(after?.x ?? 0).toBeGreaterThan(before?.x ?? 0); // moved right
         expect(after?.y).toBe(before?.y); // y kept
     });
 
     // ── 3. CONTROL — same pipeline, fake tool-capable gateway → the node actually moves ───
-    // Proves the locator → binding → executor → storage pipeline is sound headlessly; the only
+    // Proves the builder → binding → executor → storage pipeline is sound headlessly; the only
     // missing piece for the real path is a gateway that can emit tool calls.
     it('moves the node headlessly via the fake (tool-capable) gateway', async () => {
         const binding = createInMemoryCanvasBinding(seedGraph());
@@ -138,7 +138,7 @@ describe('flow agent headless (Node, no DOM) with a real Gemini key', () => {
             { toolCalls: [{ name: 'move_node', args: { nodeId: 'n1', by: { dx: 40, dy: 0 } } }] },
             { text: 'Moved the input-text node 40px right to (140, 200).' },
         ]);
-        const agent = createLocatorAgent({
+        const agent = createBuilderAgent({
             gateway,
             binding,
             storage,
@@ -151,7 +151,7 @@ describe('flow agent headless (Node, no DOM) with a real Gemini key', () => {
         await agent.send('move the input-text node right by 40px');
         const after = posOf(binding, 'n1');
 
-        console.log('[3] fake-gateway locator: before', before, '→ after', after);
+        console.log('[3] fake-gateway builder: before', before, '→ after', after);
         expect(after).toEqual({ x: 140, y: 200 });
         expect((storage.load('flow-control') as SessionState).phase).toBe('done');
     });

@@ -22,8 +22,7 @@ import { resolveLiveGateway } from '../liveGateway';
 import type { Graph } from '../../../canvas/canvasBinding';
 
 const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
-// One seam picks the provider: Vertex when VERTEX_* env is set (draws the $300 credit), else the Developer
-// API key, else undefined (vertex-migration.md).
+// One seam resolves the gateway: the Gemini Developer API when GEMINI_API_KEY is set, else undefined (skip).
 const gateway = resolveLiveGateway({
     model,
     generation: { temperature: 0, thinkingBudget: 2048, maxOutputTokens: 8192 },

@@ -16,8 +16,8 @@
   [blockAgent.ts](../../../libs/agent/src/agents/blockAgent.ts): single-block scope (handles ONLY its own
   type), full lifecycle (add / set_properties / rename / delete), merge-only config writes, and — the
   load-bearing rule — **never substitute a rejected value**; it reports the valid options and lets the
-  orchestrator decide. It cannot move or connect nodes (those are the [locator](./locator.md) / [edge](./edge.md)
-  operation agents).
+  orchestrator decide. It cannot move or connect nodes — that is the [builder](./builder.md)'s job (it owns
+  wiring and layout).
 - **Addressing & the generic fallback** — [harness-spec.md §6](../design/harness-spec.md): `roster.get(type)`
   (a named specialist wins) `??` a generic `BlockAgent(type)` when `catalog.has(type)`.
 - **Behavior & oracles** — [harness-scenarios.md](../design/harness-scenarios.md): the oracle discipline and
@@ -95,5 +95,5 @@ Where these live:
   R2 viewer-denied rename) lives there.
 
 > The named `single-output-generator` block specialist has its own spec: **[generator.md](./generator.md)**.
-> The retired operation-split agents it replaces are **[node.md](./node.md)** (add/delete) and
-> **[property.md](./property.md)** (config/rename), kept for reference until a later cleanup.
+> The block agent replaces the earlier operation-split `node` (add/delete) and `property` (config/rename)
+> agents, which have been removed.

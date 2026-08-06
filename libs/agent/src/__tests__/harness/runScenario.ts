@@ -32,15 +32,15 @@ export interface ScenarioInput {
      * same instance for all agents is fine; each `chat()` call is independent.
      */
     makeGateway?: (agentType: string) => LlmGateway;
-    /** Dispatch mode for sub-agents — for the serial≡parallel proof (A4). Default parallel. */
+    /** Dispatch mode for sub-agents — parallel barrier (default) or serial; passed through to the sub-agent runner. */
     mode?: 'parallel' | 'serial';
     /** Catalog override; defaults to the fixture catalog. */
     catalog?: CatalogLookup;
     /**
-     * Specialist roster the orchestrator may `spawn` into. OMIT for the default roster. The eval-benchmark
-     * (eval-benchmark.md) is the one caller that sets it — swapping the roster is how it runs the SAME
-     * scenario against the two designs (Strategy 1 fan-out vs Strategy 2 builder). A pure passthrough:
-     * `createOrchestratorAgent` already accepts a `roster` and falls back to the default when it is absent.
+     * Specialist roster the orchestrator may `spawn` into. OMIT for the default (shipped hybrid) roster. The
+     * historical eval-benchmark (eval-benchmark.md) is the one caller that sets it — swapping the roster is how
+     * it ran the SAME scenario against the two designs it compared. A pure passthrough: `createOrchestratorAgent`
+     * already accepts a `roster` and falls back to the default when it is absent.
      */
     roster?: AgentRoster;
 }
@@ -113,7 +113,7 @@ export const runScenario = async (input: ScenarioInput): Promise<TurnResult> => 
         catalog,
         userPermissions,
         mode: input.mode,
-        roster: input.roster, // undefined ⇒ createDefaultRoster(); the benchmark passes fanout/builder here
+        roster: input.roster, // undefined ⇒ createDefaultRoster(); the historical benchmark passes a roster here
     });
 
     // A turn that threw is recorded by BaseAgent.send as `phase: 'error'` and NOT rethrown; surface it here

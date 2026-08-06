@@ -42,11 +42,11 @@ describe('Harness scenarios — outcome coverage', () => {
     it('A1 — nudge the input right a bit (relational: x↑, y=)', async () => {
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'locator', task: `move node ${IDS.txt} right by 20px` }]),
+                spawn([{ agentType: 'builder', task: `move node ${IDS.txt} right by 20px` }]),
                 text('Moved the input right.'),
                 report({ status: 'applied', summary: 'moved the input right' }),
             ],
-            locator: [step([moveBy(IDS.txt, 20, 0)]), text(`moved ${IDS.txt}`)],
+            builder: [step([moveBy(IDS.txt, 20, 0)]), text(`moved ${IDS.txt}`)],
         };
         const before = nodeById(makeInitialGraph(), IDS.txt).position;
         const result = await runScenario({
@@ -110,28 +110,28 @@ describe('Harness scenarios — outcome coverage', () => {
         expect(nodeById(result.graph, IDS.prev).customLabel).toBe('Result');
     });
 
-    it('A4 — line the four up on one column (four locators, one per node; x equal, y kept)', async () => {
-        // Each locator moves ONE node; the orchestrator picks the shared column (x=300) and hands each
-        // child a complete task. All four locator children share the one `locator` script — a
-        // task-parsing step — so each moves the node named in ITS briefing.
+    it('A4 — line the four up on one column (the builder lays them out; x equal, y kept)', async () => {
+        // Layout is structural, so it is one job for the builder: the orchestrator settles the shared column
+        // (x=300) and hands the whole alignment to a single builder, which moves each node onto it.
         const script: FakeScript = {
             orchestrator: [
                 spawn([
-                    { agentType: 'locator', task: `move ${IDS.txt} to (300, 100)` },
-                    { agentType: 'locator', task: `move ${IDS.buf} to (300, 200)` },
-                    { agentType: 'locator', task: `move ${IDS.gen} to (300, 300)` },
-                    { agentType: 'locator', task: `move ${IDS.prev} to (300, 400)` },
+                    {
+                        agentType: 'builder',
+                        task: `align to column x=300: ${IDS.txt}→y100, ${IDS.buf}→y200, ${IDS.gen}→y300, ${IDS.prev}→y400`,
+                    },
                 ]),
                 text('Aligned all four to one column.'),
                 report({ status: 'applied', summary: 'aligned all four to one column' }),
             ],
-            locator: [
-                req => {
-                    const task = req.messages.find(m => m.role === 'user')?.content ?? '';
-                    const m = /move (\S+) to \((\d+),\s*(\d+)\)/.exec(task);
-                    return m ? { toolCalls: [moveTo(m[1], Number(m[2]), Number(m[3]))] } : { text: 'no target' };
-                },
-                text('moved'),
+            builder: [
+                step([
+                    moveTo(IDS.txt, 300, 100),
+                    moveTo(IDS.buf, 300, 200),
+                    moveTo(IDS.gen, 300, 300),
+                    moveTo(IDS.prev, 300, 400),
+                ]),
+                text('aligned all four to one column'),
             ],
         };
         const result = await runScenario({
@@ -153,21 +153,28 @@ describe('Harness scenarios — outcome coverage', () => {
         expect(result.committed).toBe(true);
     });
 
-    // ── applied (structural: block + edge composition) ──────────────────────────────────────────────
-    it('A5 — delete the buffer AND rewire input→generator (block + edge composition → applied)', async () => {
-        // A compound structural turn: the BUFFER block agent deletes the buffer (its edges cascade, freeing the
-        // generator's input), then the edge agent connects the input straight to the generator. Ordered, not
-        // concurrent: connect_nodes now REJECTS an occupied input, so the delete must free gen.in BEFORE the
-        // rewire lands — the orchestrator sequences the two spawns (delete → connect).
+    // ── applied (structural composition delegated to the builder) ────────────────────────────────────
+    it('A5 — delete the buffer AND rewire input→generator (the builder composes it → applied)', async () => {
+        // A compound structural turn is one builder job: it deletes the buffer (its edges cascade, freeing the
+        // generator's input) and then connects the input straight to the generator. Ordered, not concurrent:
+        // connect_nodes REJECTS an occupied input, so the builder frees gen.in (remove-before-reuse) BEFORE the
+        // rewire — a discipline its persona spells out.
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'buffer', task: `delete node ${IDS.buf}` }]),
-                spawn([{ agentType: 'edge', task: `connect ${IDS.txt} out to ${IDS.gen} in` }]),
+                spawn([
+                    {
+                        agentType: 'builder',
+                        task: `delete node ${IDS.buf}, then connect ${IDS.txt} out to ${IDS.gen} in`,
+                    },
+                ]),
                 text('Deleted the buffer and reconnected the input straight into the generator.'),
                 report({ status: 'applied', summary: 'deleted the buffer; rewired input→generator' }),
             ],
-            buffer: [step([deleteNode(IDS.buf)]), text('deleted the buffer')],
-            edge: [step([connect(IDS.txt, 'out', IDS.gen, 'in')]), text('connected input to generator')],
+            builder: [
+                step([deleteNode(IDS.buf)]),
+                step([connect(IDS.txt, 'out', IDS.gen, 'in')]),
+                text('deleted the buffer and connected input to generator'),
+            ],
         };
         const result = await runScenario({
             objective: 'delete the buffer and connect the input directly to the generator',
@@ -185,35 +192,41 @@ describe('Harness scenarios — outcome coverage', () => {
         expect(result.graph.edges.some(e => e.sourceNodeId === IDS.gen && e.targetNodeId === IDS.prev)).toBe(true);
     });
 
-    it('A6 — add a generator (add + set model in ONE block sub-turn), then wire it (block→edge → applied)', async () => {
-        // The block-ownership payoff: the single-output-generator block agent ADDS and CONFIGURES the new node
-        // in ONE sub-turn (no node+property split), then the orchestrator threads the new id into the edge
-        // spawn. The in-memory binding mints `n_1` for the first add (fixture ids are non-numeric), so the
-        // briefings reference it; the ASSERTIONS find the new node by exclusion, so they don't couple to the id.
+    it('A6 — add a generator, configure it, and wire it — one builder build (→ applied)', async () => {
+        // Adding, configuring, and wiring a new node is structure: one builder job. The builder adds the node
+        // with its model set inline (config as it creates it), then threads the new id into the connection. The
+        // in-memory binding mints `n_1` for the first add (fixture ids are non-numeric); the ASSERTIONS find the
+        // new node by exclusion, so they don't couple to the id scheme.
         const NEW = 'n_1';
         const script: FakeScript = {
             orchestrator: [
                 spawn([
                     {
-                        agentType: 'single-output-generator',
-                        task: 'add a single-output-generator at (900, 300) and set its model to gemini-2.5-pro',
+                        agentType: 'builder',
+                        task: 'add a single-output-generator at (900, 300), set its model to gemini-2.5-pro, and wire the existing generator into it',
                     },
                 ]),
-                spawn([{ agentType: 'edge', task: `connect ${IDS.gen} out to ${NEW} in` }]),
                 text('Added a generator, set its model, and wired it after the existing generator.'),
                 report({ status: 'applied', summary: 'added + configured a new generator; wired it' }),
             ],
-            'single-output-generator': [
-                step([addNode('single-output-generator', 900, 300)]),
-                step([setProps(NEW, { model: 'gemini-2.5-pro' })]),
-                text(`added generator ${NEW} and set its model`),
+            builder: [
+                step([
+                    {
+                        name: 'add_node',
+                        args: {
+                            type: 'single-output-generator',
+                            position: { x: 900, y: 300 },
+                            config: { model: 'gemini-2.5-pro' },
+                        },
+                    },
+                ]),
+                step([connect(IDS.gen, 'out', NEW, 'in')]),
+                text(`added generator ${NEW}, set its model, and wired it`),
             ],
-            edge: [step([connect(IDS.gen, 'out', NEW, 'in')]), text('connected')],
         };
         const result = await runScenario({
             objective: 'add a generator after the existing generator and set its model to gemini-2.5-pro',
             initialGraph: makeInitialGraph(),
-            mode: 'serial', // the block agent must add+configure before the edge can reference the new id
             script,
         });
 
@@ -229,7 +242,7 @@ describe('Harness scenarios — outcome coverage', () => {
     // ── applied (composition: a whole build delegated to the builder) ────────────────────────────────
     it('A7 — build a pipeline (orchestrator plans → ONE builder spawn → builds it)', async () => {
         // The orchestrator plans a multi-block build and hands the WHOLE thing to the composition builder as
-        // ONE spawn (not a per-block fan-out). The builder adds the three stages, configures the generator
+        // ONE spawn (the builder composes the whole flow itself). The builder adds the three stages, configures the generator
         // inline, and wires the chain. Empty canvas → the in-memory binding mints n_1, n_2, n_3 for the adds;
         // the assertions find nodes by TYPE, so they never couple to the id scheme.
         const [TXT, GEN, PREV] = ['n_1', 'n_2', 'n_3'];

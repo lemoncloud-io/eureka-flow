@@ -164,17 +164,17 @@ describe('block agent — type-scoped reads', () => {
         expect(result.nodes?.some(n => n.id === IDS.gen || n.id === IDS.txt || n.id === IDS.prev)).toBe(false);
     });
 
-    it('does not inject the live node list; offers get_graph to pull it (Approach 3)', async () => {
+    it('injects the live own-type node list into the head; no get_graph (head context)', async () => {
         const { agent, gateway } = setup('buffer', [{ text: 'ok' }]);
         await agent.send('what can you do?');
         const systemContent = gateway.calls[0].messages
             .filter(m => m.role === 'system')
             .map(m => m.content)
             .join('\n');
-        // Approach 3: the live node list is NOT auto-injected — the block agent pulls it via get_graph.
-        expect(systemContent).not.toMatch(new RegExp(`id="${IDS.buf}"`));
+        // Head context: the block agent gets its own-type node list every turn — no get_graph pull to amortize.
+        expect(systemContent).toMatch(new RegExp(`id="${IDS.buf}"`));
         const toolNames = new Set((gateway.calls[0].tools ?? []).map(t => t.name));
-        expect(toolNames.has('get_graph')).toBe(true);
+        expect(toolNames.has('get_graph')).toBe(false);
     });
 });
 

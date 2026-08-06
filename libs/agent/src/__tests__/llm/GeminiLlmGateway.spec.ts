@@ -179,9 +179,9 @@ describe('createGeminiLlmGateway', () => {
     });
 
     it('groups parallel tool results into ONE user content (response count must match the model turn)', async () => {
-        // A model turn with N functionCalls must be answered by a single user turn with N functionResponses.
-        // Vertex 400s otherwise ("number of function response parts ... equal to ... function call parts"); the
-        // Developer API tolerates the split. So two parallel calls come back as one grouped user turn.
+        // A model turn with N functionCalls must be answered by a single user turn with N functionResponses
+        // (the response-part count must match the call-part count). So two parallel calls come back grouped
+        // into one user turn, not split across two.
         const http = new ScriptedHttpRequest([{ json: geminiReply('done') }]);
 
         await drain(
@@ -222,10 +222,10 @@ describe('createGeminiLlmGateway', () => {
         ]);
     });
 
-    it('coalesces a trailing user turn into the tool-result content (a live observation rides the results turn)', async () => {
-        // The builder appends the live canvas as a trailing user turn AFTER the tool results; it must merge into
-        // the SAME user content (functionResponse parts + a text part), preserving role alternation (no two
-        // consecutive user contents) and the response-count invariant.
+    it('coalesces a trailing user turn into the tool-result content (role alternation is preserved)', async () => {
+        // A trailing user text turn that follows the tool results must merge into the SAME user content
+        // (functionResponse parts + a text part), preserving role alternation (no two consecutive user
+        // contents) and the response-count invariant.
         const http = new ScriptedHttpRequest([{ json: geminiReply('done') }]);
 
         await drain(
