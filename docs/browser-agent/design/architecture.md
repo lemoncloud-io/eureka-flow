@@ -67,26 +67,26 @@ routes each part of a request to the right one: the whole **structure** to the `
 ```mermaid
 flowchart TD
     Panel[Agent Panel] --> Orch["Orchestrator — plan · route · coordinate<br/>(no write tools)"]
-    Orch -->|"one plan · the whole structure"| B["builder — full editing toolset + use_skill<br/>add · wire · lay out (leaf · no spawn)"]
+    Orch -->|"one plan · the whole structure"| B["builder — full editing toolset + use_skill<br/>add · wire · label · lay out (leaf · no spawn)"]
     Orch -->|"per-node content · in parallel"| C
     subgraph C["Content specialists — one per block type"]
         direction LR
-        GEN["generator<br/>configure · rename"]
-        BA["BlockAgent(type) ×N<br/>configure · rename"]
+        GEN["generator<br/>configure (content)"]
+        BA["BlockAgent(type) ×N<br/>configure (content)"]
     end
     B <-->|"use_skill · index in context, body on demand"| SK[["SEED_SKILLS · playbooks<br/>build-linear-pipeline · configure-generator"]]
-    B -->|"add_node · connect_nodes · move_node · set_properties …"| Bind
-    GEN -->|"set_properties · rename"| Bind
-    BA -->|"set_properties · rename"| Bind
+    B -->|"add_node · connect_nodes · move_node · set_properties · rename …"| Bind
+    GEN -->|"set_properties"| Bind
+    BA -->|"set_properties"| Bind
     Bind[("CanvasBinding · live canvas")]
     Orch -. "reads · list_nodes / describe_node" .-> Bind
 ```
 
-|                         | role                                                                                                                                            |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Orchestrator**        | plan · route · coordinate — no write tools                                                                                                      |
-| **Builder**             | realizes the whole **structure** from one plan (add · wire · lay out); carries `use_skill` over `SEED_SKILLS`; a leaf (spawns nothing)          |
-| **Content specialists** | one per block type (block agent ×N · the AI generator) — the orchestrator routes each node's **content** (config · rename) to them, in parallel |
+|                         | role                                                                                                                                           |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Orchestrator**        | plan · route · coordinate — no write tools                                                                                                     |
+| **Builder**             | realizes the whole **structure** from one plan (add · wire · label · lay out); carries `use_skill` over `SEED_SKILLS`; a leaf (spawns nothing) |
+| **Content specialists** | one per block type (block agent ×N · the AI generator) — the orchestrator routes each node's **content** (config) to them, in parallel         |
 
 Both write the **same live `CanvasBinding`** through the **same tools** under the **same two-gate
 permission model**, so the foundation below is unchanged.

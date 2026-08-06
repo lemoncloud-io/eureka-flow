@@ -13,7 +13,8 @@ import type { JsonSchema, ToolDef } from '../llm/llmGateway';
  *   • `createNodeReadToolProvider`      — `list_nodes` + `describe_node`   (read: all nodes)
  *   • `createNodeSearchToolProvider`    — `search_nodes` + `describe_node` (read: optionally type-scoped)
  *   • `createNodeMoveToolProvider`      — `move_node`                      (write: position)
- *   • `createNodeConfigToolProvider`    — `set_properties` + `rename`      (write: config/label)
+ *   • `createNodeConfigToolProvider`    — `set_properties`                 (write: config)
+ *   • `createNodeRenameToolProvider`    — `rename`                         (write: label — builder-only)
  *   • `createNodeStructureToolProvider` — `add_node` + `delete_node`       (write: add/delete node)
  * Also owns the node projection (`listNodeLocations`), the per-turn context block (`renderNodeContext`),
  * and the shared `requireNode` lookup (reused by the edge tool).
@@ -290,7 +291,7 @@ export const createNodeMoveToolProvider = (binding: CanvasBinding): ToolProvider
     },
 });
 
-// ── CONFIG — set_properties + rename (write: config/label), over a CanvasBinding ─────────────────
+// ── CONFIG — set_properties (write: config), over a CanvasBinding ─────────────────────────────────
 
 const SET_PROPERTIES_DEF: ToolDef = {
     name: 'set_properties',
@@ -305,20 +306,6 @@ const SET_PROPERTIES_DEF: ToolDef = {
             config: { type: 'object', description: 'The config keys to set (only the changed ones).' },
         },
         required: ['nodeId', 'config'],
-    },
-};
-
-const RENAME_DEF: ToolDef = {
-    name: 'rename',
-    description: "Rename an existing node (its custom label). Pass '' to clear a custom label.",
-    requires: 'canEditConfig',
-    parameters: {
-        type: 'object',
-        properties: {
-            nodeId: { type: 'string', description: 'The id of the node to rename.' },
-            label: { type: 'string', description: "The new label ('' clears a custom label)." },
-        },
-        required: ['nodeId', 'label'],
     },
 };
 
@@ -370,9 +357,9 @@ const prepareConfig = (
     return { config: normalized };
 };
 
-/** CONFIG provider (write: config/label) over a {@link CanvasBinding}: `set_properties` (merged, catalog-validated) + `rename` (`''` clears the label). A rejected value is never applied. Wired directly into every block agent (and the builder) via its constructor. */
+/** CONFIG provider (write: config) over a {@link CanvasBinding}: `set_properties` (merged, catalog-validated). A rejected value is never applied. Wired directly into every block agent (and the builder) via its constructor. Labeling lives in the separate {@link createNodeRenameToolProvider}, so a block agent configures but does not rename. */
 export const createNodeConfigToolProvider = (binding: CanvasBinding, catalog: CatalogLookup): ToolProvider => ({
-    listTools: () => [SET_PROPERTIES_DEF, RENAME_DEF],
+    listTools: () => [SET_PROPERTIES_DEF],
     dispatch: (call: ToolCall): ToolResult => {
         if (call.name === 'set_properties') {
             const { nodeId, config } = call.args as { nodeId: string; config: Record<string, unknown> };
@@ -390,6 +377,35 @@ export const createNodeConfigToolProvider = (binding: CanvasBinding, catalog: Ca
             binding.updateNode(nodeId, { config: prepared.config });
             return ok(call, { nodeId, config: prepared.config });
         }
+        return toolUnknown(call);
+    },
+});
+
+// ── RENAME — rename (write: label), over a CanvasBinding ──────────────────────────────────────────
+
+const RENAME_DEF: ToolDef = {
+    name: 'rename',
+    description: "Rename an existing node (its custom label). Pass '' to clear a custom label.",
+    requires: 'canEditConfig',
+    parameters: {
+        type: 'object',
+        properties: {
+            nodeId: { type: 'string', description: 'The id of the node to rename.' },
+            label: { type: 'string', description: "The new label ('' clears a custom label)." },
+        },
+        required: ['nodeId', 'label'],
+    },
+};
+
+/**
+ * RENAME provider (write: label) over a {@link CanvasBinding}: `rename` sets a node's `customLabel` (`''`
+ * clears it). Carried by the BUILDER only — labeling a node is part of authoring the flow's structure at build
+ * time, not per-node content, so block agents configure but do not rename. Needs no catalog: a label is free
+ * text, not a schema-validated field.
+ */
+export const createNodeRenameToolProvider = (binding: CanvasBinding): ToolProvider => ({
+    listTools: () => [RENAME_DEF],
+    dispatch: (call: ToolCall): ToolResult => {
         if (call.name === 'rename') {
             const { nodeId, label } = call.args as { nodeId: string; label: string };
             const found = requireNode(binding, call, nodeId);
@@ -408,8 +424,8 @@ const ADD_NODE_DEF: ToolDef = {
     description:
         "Add one new node of a block `type` at a canvas `position`. Created with the block's default config; " +
         'optionally pass `config` to set non-default values in the SAME call (merged over the defaults and ' +
-        'validated like set_properties — a bad value adds nothing). Returns the new id. It does NOT wire the ' +
-        'node to anything.',
+        "validated like set_properties — a bad value adds nothing). Returns the new node's id and its default " +
+        'label (rename it if the plan wants a clearer name). It does NOT wire the node to anything.',
     requires: 'canModifyCanvas',
     parameters: {
         type: 'object',
@@ -473,7 +489,15 @@ export const createNodeStructureToolProvider = (binding: CanvasBinding, catalog:
             if (initialConfig) {
                 binding.updateNode(id, { config: initialConfig });
             }
-            return ok(call, { nodeId: id, type, position, ...(initialConfig ? { config: initialConfig } : {}) });
+            // Report the node's default label (the block's catalog label) so the builder knows what the new node
+            // is called and can rename it at build time; a fresh node carries no customLabel yet.
+            return ok(call, {
+                nodeId: id,
+                type,
+                label: schema.label,
+                position,
+                ...(initialConfig ? { config: initialConfig } : {}),
+            });
         }
         if (call.name === 'delete_node') {
             const { nodeId } = call.args as { nodeId: string };

@@ -63,9 +63,9 @@ Verified deterministically (no real provider): a scripted fake-gateway response 
 `move_node { nodeId, by: { dx: 10, dy: 0 } }` flows through the executor and moves the
 text-input node 10px right — the meeting's verification case — and the same call is
 denied when the agent lacks the `canModifyCanvas` grant. The shipped tool set now spans
-node read (`list_nodes` + `describe_node`), move (`move_node`), and config
-(`set_properties` + `rename`), plus the orchestrator's catalog, `list_agents`, and `spawn`
-tools; property/rename tools are no longer a later slice.
+node read (`list_nodes` + `describe_node`), move (`move_node`), config
+(`set_properties`), and rename (`rename`), plus the orchestrator's catalog, `list_agents`, and
+`spawn` tools; property/rename tools are no longer a later slice.
 
 ## 4. Implementations
 

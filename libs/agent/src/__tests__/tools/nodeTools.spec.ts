@@ -5,6 +5,7 @@ import {
     createNodeConfigToolProvider,
     createNodeMoveToolProvider,
     createNodeReadToolProvider,
+    createNodeRenameToolProvider,
     createNodeSearchToolProvider,
     createNodeStructureToolProvider,
     listNodeLocations,
@@ -27,10 +28,16 @@ const makeNode = (id: string, x = 0, y = 0, extra: Partial<NodeData> = {}): Node
     ...extra,
 });
 
-// ── CONFIG (write: config/label) ──────────────────────────────────────────────────────────────
+// ── CONFIG (write: config) ────────────────────────────────────────────────────────────────────
 
-describe('node config provider — set_properties / rename validation', () => {
+describe('node config provider — set_properties validation', () => {
     const catalog = createFixtureCatalog();
+
+    it('exposes ONLY set_properties — no rename (labeling is the builder-only rename provider)', async () => {
+        const defs = await createNodeConfigToolProvider(createInMemoryCanvasBinding(), catalog).listTools();
+        expect(defs.map(t => t.name)).toEqual(['set_properties']);
+        expect(defs[0].requires).toBe('canEditConfig');
+    });
 
     it('applies a valid select value and merges over existing config', async () => {
         const binding = createInMemoryCanvasBinding(makeInitialGraph());
@@ -83,14 +90,31 @@ describe('node config provider — set_properties / rename validation', () => {
         const res = await run(config, 'set_properties', { nodeId: 'ghost', config: { model: 'gemini-2.5-pro' } });
         expect(res.ok).toBe(false);
     });
+});
 
-    it("renames and clears the label with ''", async () => {
+// ── RENAME (write: label) — the builder-only labeling provider ───────────────────────────────────
+
+describe('node rename provider — rename', () => {
+    it('exposes only rename, gated by canEditConfig', async () => {
+        const defs = await createNodeRenameToolProvider(createInMemoryCanvasBinding()).listTools();
+        expect(defs.map(t => t.name)).toEqual(['rename']);
+        expect(defs[0].requires).toBe('canEditConfig');
+    });
+
+    it("sets a node's customLabel and clears it with ''", async () => {
         const binding = createInMemoryCanvasBinding(makeInitialGraph());
-        const config = createNodeConfigToolProvider(binding, catalog);
-        await run(config, 'rename', { nodeId: IDS.prev, label: 'Result' });
+        const rename = createNodeRenameToolProvider(binding);
+        await run(rename, 'rename', { nodeId: IDS.prev, label: 'Result' });
         expect(nodeById(binding.readGraph(), IDS.prev).customLabel).toBe('Result');
-        await run(config, 'rename', { nodeId: IDS.prev, label: '' });
+        await run(rename, 'rename', { nodeId: IDS.prev, label: '' });
         expect(nodeById(binding.readGraph(), IDS.prev).customLabel).toBeUndefined();
+    });
+
+    it('rejects renaming a missing node and changes nothing', async () => {
+        const binding = createInMemoryCanvasBinding(makeInitialGraph());
+        const res = await run(createNodeRenameToolProvider(binding), 'rename', { nodeId: 'ghost', label: 'X' });
+        expect(res.ok).toBe(false);
+        expect(res.ok === false && res.error).toMatch(/no node with id "ghost"/);
     });
 });
 
@@ -239,16 +263,18 @@ describe('node structure provider — add_node / delete_node', () => {
         expect(defs.every(d => d.requires === 'canModifyCanvas')).toBe(true);
     });
 
-    it('adds a node of the given type at the position and returns its new id', async () => {
+    it('adds a node of the given type at the position and returns its new id + default label', async () => {
         const binding = createInMemoryCanvasBinding(makeInitialGraph());
         const structure = createNodeStructureToolProvider(binding, catalog);
         const res = await run(structure, 'add_node', { type: 'buffer', position: { x: 900, y: 120 } });
         expect(res.ok).toBe(true);
         if (res.ok) {
-            const { nodeId } = res.data as { nodeId: string };
+            const { nodeId, label } = res.data as { nodeId: string; label: string };
             const added = nodeById(binding.readGraph(), nodeId);
             expect(added.type).toBe('buffer');
             expect(added.position).toEqual({ x: 900, y: 120 });
+            // the result carries the block's default (catalog) label, so the builder knows what the node is called
+            expect(label).toBe('Buffer'); // the fixture catalog's label for the `buffer` type
         }
         expect(binding.readGraph().nodes).toHaveLength(5);
     });

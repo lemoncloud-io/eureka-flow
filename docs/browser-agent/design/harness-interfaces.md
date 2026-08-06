@@ -308,13 +308,13 @@ declare function createAgentRoster(registrations: AgentRegistration[]): AgentRos
 
 // GENERIC BLOCK FALLBACK — not a registration. The sub-agent runner resolves an agentType the roster does
 // not carry: if `catalog.has(agentType)`, it builds a generic BlockAgent(agentType) on the fly (add_node +
-// set_properties + rename + delete_node for that block); otherwise the spawn fails "no specialist". So
+// set_properties + delete_node for that block); otherwise the spawn fails "no specialist". So
 // `agentType: 'buffer'` → generic BlockAgent('buffer'); `agentType: 'single-output-generator'` → the
 // registered GeneratorAgent (explicit wins). list_agents shows only the explicit entries above.
 //   resolveAgent = roster.get(agentType) ?? genericBlockRegistration(agentType, catalog)   // in createSubAgentRunner
 
 // NOTE: the operation agents `locator` / `edge` and the old operation-split `node` / `property` have been
-// REMOVED; the builder owns wiring + layout, and block agents own add/configure/rename/delete.
+// REMOVED; the builder owns wiring + layout + labeling (rename), and block agents own add/configure/delete.
 ```
 
 **The registration set _is_ the roster.** The orchestrator, its tools and the loop never change; a deployment
@@ -340,7 +340,7 @@ flowchart LR
 
 The **composition** specialist: the orchestrator plans a multi-block build and spawns it; it builds the whole
 (sub-)flow itself. It introduces **no new types** — it is a `BaseAgent` subclass that carries the FULL editing
-toolset (the §3 read / config / structure / edge / move + catalog providers) plus `use_skill`, under grant
+toolset (the §3 read / config / rename / structure / edge / move + catalog providers) plus `use_skill`, under grant
 `{ canModifyCanvas, canEditConfig }`. A **leaf** sub-turn (no `spawn`, no nesting). Its deps are exactly the
 shared per-turn deps; the seed playbooks are wired internally from `SEED_SKILLS`, so the skill source can evolve
 ([skills.md](./skills.md)) with **no change to this consumer**.
@@ -351,7 +351,7 @@ export type BuilderAgentDeps = BaseAgentDeps; // no extra fields — SEED_SKILLS
 export declare class BuilderAgent extends BaseAgent {
     constructor(deps: BuilderAgentDeps);
     // tools = [ read (list_nodes, describe_node), catalog (catalog_search),
-    //           structure (add_node, delete_node), config (set_properties, rename),
+    //           structure (add_node, delete_node), config (set_properties), rename (rename),
     //           edge (list_edges, connect_nodes, disconnect_edge), move (move_node),
     //           createUseSkillToolProvider(SEED_SKILLS) (use_skill) ]
     // grant = { canModifyCanvas, canEditConfig }; buildContextMessages seeds the live node list.

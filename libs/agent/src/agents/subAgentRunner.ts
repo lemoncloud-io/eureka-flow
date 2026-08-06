@@ -36,9 +36,9 @@ export interface SubAgentRunner {
 
 /**
  * Resolve an `agentType` the roster does not explicitly carry to a GENERIC block agent, if the type is a real
- * catalog block. This is the hybrid roster's fallback: named specialists (locator/edge/generator) are explicit
- * registrations; every other catalog block type gets a `BlockAgent(type)` synthesized on the fly. Returns
- * `undefined` for a non-block type, so the runner's "no specialist" failure path is unchanged.
+ * catalog block. This is the hybrid roster's fallback: named specialists (the builder, the generator) are
+ * explicit registrations; every other catalog block type gets a `BlockAgent(type)` synthesized on the fly.
+ * Returns `undefined` for a non-block type, so the runner's "no specialist" failure path is unchanged.
  */
 const genericBlockRegistration = (type: string, catalog: CatalogLookup): AgentRegistration | undefined => {
     if (!catalog.has(type)) {
@@ -47,7 +47,7 @@ const genericBlockRegistration = (type: string, catalog: CatalogLookup): AgentRe
     const label = catalog.schema(type)?.label ?? type;
     return {
         type,
-        summary: `block agent for ${label}: create, configure, rename, or delete a ${type} node`,
+        summary: `block agent for ${label}: create, configure, or delete a ${type} node`,
         create: deps => createBlockAgent({ ...deps, blockType: type }),
     };
 };

@@ -7,8 +7,8 @@
 
 `readGraph` + `updateNode` + the structural primitives (`addNode` / `deleteNode` / `addEdge` / `deleteEdge`)
 are the whole contract, shared by the orchestrator and its specialists. A
-[block agent](../agents/blockAgent.md) uses `updateNode` to rename (`label`) and set config (`config`); the
-[builder](../agents/builder.md) uses all of them — `updateNode` to move (`position`),
+[block agent](../agents/blockAgent.md) uses `updateNode` to set config (`config`); the
+[builder](../agents/builder.md) uses all of them — `updateNode` to move (`position`) and rename (`label`),
 `addNode` / `deleteNode` to create or remove nodes, and `addEdge` / `deleteEdge` to wire them. So
 the contract is a node patch (`NodePatch` = `{ label?, position?, config? }`) plus four structural
 primitives — `addNode`/`addEdge` return the new id, `deleteNode` cascades the node's edges.

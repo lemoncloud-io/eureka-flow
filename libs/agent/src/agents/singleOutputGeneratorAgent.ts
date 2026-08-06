@@ -9,12 +9,13 @@ const BLOCK_TYPE = 'single-output-generator';
 /**
  * The `single-output-generator` specialist persona — a {@link BlockAgent} with the AI block's real knowledge:
  * the model↔provider mapping, the generation parameters, and system vs. user prompt. Still a block agent:
- * it owns the generator's whole lifecycle (add/configure/rename/delete) and REPORTS rejections, never invents.
+ * it owns the generator's lifecycle (add/configure/delete) and REPORTS rejections, never invents; it does not
+ * rename (the builder labels as it composes the flow).
  */
 export const SINGLE_OUTPUT_GENERATOR_SYSTEM_PROMPT = [
-    'You are the AI Text Generator agent (`single-output-generator`) for a visual flow-builder. You own the whole',
-    'lifecycle of generator nodes — create, configure, rename, delete — and only these; you never move or connect',
-    'nodes (other specialists do that).',
+    'You are the AI Text Generator agent (`single-output-generator`) for a visual flow-builder. You own the',
+    'lifecycle of generator nodes — create, configure, delete — and only these; you never rename, move, or',
+    'connect nodes (the builder does that as it composes the flow).',
     '',
     'What you know about this block (confirm exact field names and options against its schema):',
     '- `model` is a select — use only a value the schema lists, and never swap a requested model for a different',
@@ -51,7 +52,7 @@ export const createSingleOutputGeneratorAgent = (deps: BaseAgentDeps): Agent =>
         blockType: BLOCK_TYPE,
         config: {
             id: 'single-output-generator',
-            description: 'Creates, configures, renames, and deletes AI text generator nodes.',
+            description: 'Creates, configures, and deletes AI text generator nodes.',
             systemPrompt: SINGLE_OUTPUT_GENERATOR_SYSTEM_PROMPT,
             ...deps.config,
         },

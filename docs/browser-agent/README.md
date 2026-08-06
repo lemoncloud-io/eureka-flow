@@ -11,9 +11,9 @@ You talk to the **Panel**, which drives the **orchestrator** — the main agent 
 orchestrator runs a think/act loop — ask the **LlmGateway**, run tool calls through the one
 **ToolExecutor** (which checks permissions), repeat until the model is done — but carries no write tools
 of its own: it delegates edits by spawning **specialist** sub-agents, split by the **kind of work** — it hands
-the whole **structure** (add · wire · lay out) to the composition **builder**, and fans each node's **content**
-(config · rename) out to the **block agents** (one per block type) — that reach the live canvas through a single
-shared seam, the **CanvasBinding**. The persisted **SessionState** is what the Panel renders from.
+the whole **structure** (add · wire · label · lay out) to the composition **builder**, and fans each node's
+**content** (config) out to the **block agents** (one per block type) — that reach the live canvas through a
+single shared seam, the **CanvasBinding**. The persisted **SessionState** is what the Panel renders from.
 
 ```
 Panel → Orchestrator → LlmGateway (think)
@@ -32,8 +32,8 @@ two earlier candidates (pure fan-out vs one all-doing builder); the findings are
 ```mermaid
 flowchart LR
     Panel[Panel] --> Orch["Orchestrator<br/>plan · route · no write tools"]
-    Orch -->|"structure · one plan"| B["builder<br/>full toolset + use_skill(SEED_SKILLS)"]
-    Orch -->|"content · in parallel"| BA["block agents ×N<br/>configure · rename"]
+    Orch -->|"structure · one plan"| B["builder<br/>add · wire · label · lay out + use_skill(SEED_SKILLS)"]
+    Orch -->|"content · in parallel"| BA["block agents ×N<br/>configure (content)"]
     B --> CB[("CanvasBinding<br/>live canvas")]
     BA --> CB
 ```
@@ -58,14 +58,14 @@ docs (start with [architecture.md](design/architecture.md)); the full roster + c
 
 - **The composition builder** — the orchestrator hands it the whole **structure** and it builds the (sub-)flow
   itself (add · wire · lay out), pulling on-demand playbooks via `use_skill`. Spec: [builder.md](agents/builder.md).
-- **Block agents** — one per block type; the orchestrator routes each node's **content** (config · rename) to
+- **Block agents** — one per block type; the orchestrator routes each node's **content** (config) to
   them. A block that earns domain knowledge gets a named specialist (e.g. [single-output-generator.md](agents/single-output-generator.md));
   every other type is served by a generic [blockAgent.md](agents/blockAgent.md) synthesized from the catalog.
 
 The cross-block operation agents `locator` (**move**) and `edge` (**connect / disconnect**) — and the older
 operation-split `node` (add/delete) and `property` (config/rename) agents — have been **removed**: the builder
-owns wiring and layout, and block agents own config/rename. Their edit primitives live on as the tool providers
-those agents carry.
+owns wiring, layout, and labeling (rename), and block agents own config. Their edit primitives live on as the
+tool providers those agents carry.
 
 **[foundations/](foundations/)** — shared infrastructure, both built.
 

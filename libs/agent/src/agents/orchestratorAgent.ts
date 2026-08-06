@@ -17,9 +17,10 @@ import type { Message, SessionState } from '../session/session';
 
 /**
  * The orchestrator's system prompt — one prompt in three sections: the PERSONA (who you are; you delegate, you
- * never edit the canvas), the ROUTING break-down (split the request by KIND — the whole structure to the builder
- * as one plan, each node's content to that block's own specialist), and the PLANNING discipline (resolve
- * target/amount/shared-values, act without asking, take an "impossible" report at its word, stop when done).
+ * never edit the canvas), the ROUTING break-down (split the request by KIND — the whole structure, wiring,
+ * layout, and labels to the builder as one plan; each node's content, i.e. its config, to that block's own
+ * specialist), and the PLANNING discipline (resolve target/amount/shared-values, act without asking, take an
+ * "impossible" report at its word, stop when done).
  */
 export const ORCHESTRATOR_SYSTEM_PROMPT = [
     // — Persona —
@@ -33,14 +34,16 @@ export const ORCHESTRATOR_SYSTEM_PROMPT = [
     '',
     // — Routing: split the request by the KIND of work —
     'Split the request by the KIND of work, and give each part to the specialist built for it:',
-    '- Anything that shapes the flow — adding or deleting nodes, wiring or rewiring them, inserting or rerouting,',
-    '  moving or laying them out — is one coordinated job for the builder. Work it out into ONE complete plan',
-    '  (which nodes to add, how they connect, how they are arranged) and hand that whole plan to the `builder` in',
-    '  a SINGLE delegation; do not fragment a build across many calls, and do not look for per-block "add" or',
-    '  "wiring" agents — there are none. One build is one builder briefing: spawning it again to finish leftover',
-    '  work makes it start over and rediscover the canvas, so give it everything the first time.',
-    '- Changing an existing node’s own CONTENT — its configuration values or its name — is independent per node.',
-    '  Route each such change to that block’s own specialist, whose `agentType` is the block’s TYPE STRING (e.g.',
+    '- Anything that shapes or arranges the flow — adding or deleting nodes, wiring or rewiring them, inserting',
+    '  or rerouting, moving, laying them out, or naming/relabeling nodes — is one coordinated job for the builder.',
+    '  A node’s label is part of authoring the flow, so renaming belongs to the build, not to a per-node change.',
+    '  Work it out into ONE complete plan (which nodes to add, how they connect, what they are called, how they',
+    '  are arranged) and hand that whole plan to the `builder` in a SINGLE delegation; do not fragment a build',
+    '  across many calls, and do not look for per-block "add", "wiring", or "rename" agents — there are none. One',
+    '  build is one builder briefing: spawning it again to finish leftover work makes it start over and rediscover',
+    '  the canvas, so give it everything the first time.',
+    '- Changing an existing node’s own CONTENT — its configuration values — is independent per node. Route each',
+    '  such change to that block’s own specialist, whose `agentType` is the block’s TYPE STRING (e.g.',
     '  `agentType: "single-output-generator"`, or any catalog block type, which a generic block agent serves',
     '  under that same type string — never the literal word "block"). Run independent content changes in parallel.',
     'A request that needs both — build a flow, then tune a node in it — is a sequence: the structure first, then',

@@ -1,8 +1,9 @@
 # Generator agent (`single-output-generator` specialist)
 
 > **The AI text generator block specialist.** A [block agent](./blockAgent.md) for `single-output-generator`
-> with the AI block's real knowledge baked into its persona. It owns the generator's whole lifecycle — **add ·
-> configure · rename · delete** — and, being a block agent, **adds and configures in one sub-turn**. It is
+> with the AI block's real knowledge baked into its persona. It owns the generator's content lifecycle — **add ·
+> configure · delete** (rename is the builder's) — and, being a block agent, **adds and configures in one
+> sub-turn**. It is
 > **spawned by the orchestrator** with `agentType: 'single-output-generator'`, which resolves to this named
 > specialist instead of a generic block agent. Behavior and oracles are canonical in the harness docs + scenario
 > specs below.
@@ -11,7 +12,8 @@
 
 - **Persona** — `SINGLE_OUTPUT_GENERATOR_SYSTEM_PROMPT` in
   [singleOutputGeneratorAgent.ts](../../../libs/agent/src/agents/singleOutputGeneratorAgent.ts): the same block-agent contract
-  (full lifecycle, merge-only writes, reject + report, never invent) plus the generator's domain knowledge.
+  (content lifecycle — add · configure · delete, not rename — merge-only writes, reject + report, never invent)
+  plus the generator's domain knowledge.
 - **Base** — `createSingleOutputGeneratorAgent` is `createBlockAgent` fixed to `single-output-generator` with a
   persona/id/description override (same tools, grant, and type-scoped reads as the generic
   [block agent](./blockAgent.md)).
@@ -37,8 +39,8 @@ adds the block's domain knowledge so the model configures it correctly:
 ## Tools
 
 Identical to the [block agent](./blockAgent.md#tools): `search_nodes` (scoped to `single-output-generator`) +
-`describe_node`; `add_node` / `set_properties` / `rename` / `delete_node`. Grant `canModifyCanvas` +
-`canEditConfig`, gated at the executor against the user's flow-role too.
+`describe_node`; `add_node` / `set_properties` / `delete_node` (no `rename` — the builder labels). Grant
+`canModifyCanvas` + `canEditConfig`, gated at the executor against the user's flow-role too.
 
 ## Definition of done — verified behavior
 

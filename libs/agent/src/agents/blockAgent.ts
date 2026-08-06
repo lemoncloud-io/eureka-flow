@@ -12,15 +12,16 @@ import type { Agent } from '../agent';
 import type { ChatMessage } from '../llm/llmGateway';
 
 /**
- * The generic per-block persona: one agent OWNS one block type end-to-end — add, configure, rename, delete a
- * node of that type. Its reads are type-scoped (`search_nodes` only lists its own type). It validates against
- * the block's schema and REPORTS rejections rather than inventing a value (the Q2/Q4 contract).
+ * The generic per-block persona: one agent OWNS one block type end-to-end — add, configure, delete a node of
+ * that type. Its reads are type-scoped (`search_nodes` only lists its own type). It validates against the
+ * block's schema and REPORTS rejections rather than inventing a value (the Q2/Q4 contract). It does NOT rename:
+ * labeling a node is the builder's job, done as it composes the flow.
  */
 export const blockAgentSystemPrompt = (type: string, label: string): string =>
     [
-        `You are the ${label} agent for a visual flow-builder. You own the whole lifecycle of ${label} (\`${type}\`)`,
-        `nodes — you create, configure, rename, and delete them, and nothing else: you handle only \`${type}\``,
-        'nodes, and you never move or connect nodes (other specialists do that).',
+        `You are the ${label} agent for a visual flow-builder. You own the lifecycle of ${label} (\`${type}\`)`,
+        `nodes — you create, configure, and delete them, and nothing else: you handle only \`${type}\` nodes,`,
+        'and you never rename, move, or connect nodes (the builder does that as it composes the flow).',
         '',
         'How to work:',
         '- Take the fewest steps that satisfy the intent: when a new node needs non-default values, give it those',
@@ -46,8 +47,8 @@ export interface BlockAgentDeps extends BaseAgentDeps {
 }
 
 /**
- * The generic block specialist: type-scoped read + structure (add/delete) + config (set_properties/rename)
- * providers over the live `binding`. Grant is the union of what add/delete and config need
+ * The generic block specialist: type-scoped read + structure (add/delete) + config (set_properties)
+ * providers over the live `binding` — no rename (the builder labels). Grant is the union of what add/delete and config need
  * (`canModifyCanvas` + `canEditConfig`). Its persona + seeded context are parameterized by `blockType`.
  */
 export class BlockAgent extends BaseAgent {
@@ -58,7 +59,7 @@ export class BlockAgent extends BaseAgent {
         const label = deps.catalog.schema(deps.blockType)?.label ?? deps.blockType;
         super(deps, {
             id: `block:${deps.blockType}`,
-            description: `Creates, configures, renames, and deletes ${label} (${deps.blockType}) nodes.`,
+            description: `Creates, configures, and deletes ${label} (${deps.blockType}) nodes.`,
             systemPrompt: blockAgentSystemPrompt(deps.blockType, label),
             grant: { canModifyCanvas: true, canEditConfig: true },
             tools: [
@@ -94,5 +95,5 @@ export class BlockAgent extends BaseAgent {
     }
 }
 
-/** Create a generic block {@link Agent} for `deps.blockType`; `send(text)` runs one add/configure/rename/delete turn. */
+/** Create a generic block {@link Agent} for `deps.blockType`; `send(text)` runs one add/configure/delete turn. */
 export const createBlockAgent = (deps: BlockAgentDeps): Agent => new BlockAgent(deps);

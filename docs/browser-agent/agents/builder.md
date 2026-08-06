@@ -2,7 +2,7 @@
 
 > **The composition specialist — the flow's structural writer in the shipped [hybrid](../design/architecture.md#the-hybrid-writer-layer).** The orchestrator plans the whole structure and **spawns** the Builder
 > (`agentType: 'builder'`) with the plan; the Builder **builds the whole (sub-)flow itself** on the live canvas —
-> add · wire · configure · lay out — using the full editing toolset and **`use_skill`** for the how-to. A **leaf**
+> add · wire · configure · label · lay out — using the full editing toolset and **`use_skill`** for the how-to. A **leaf**
 > sub-turn (no `spawn`, no nesting). Its code is [builderAgent.ts](../../../libs/agent/src/agents/builderAgent.ts); the
 > harness model is canonical in [design/harness-spec.md §6/§8](../design/harness-spec.md).
 
@@ -10,9 +10,9 @@
 
 - **Persona** — `BUILDER_SYSTEM_PROMPT` in [builderAgent.ts](../../../libs/agent/src/agents/builderAgent.ts): it receives a complete plan and
   executes it (it does **not** plan or coordinate — that is the orchestrator's job); build in dependency order,
-  wire adjacent stages (one edge per input, no cycle), lay out left-to-right, configure against the real schema,
-  **reject + report** an invalid value/field/connection (never substitute or force), and read the graph back to
-  repair before finishing.
+  wire adjacent stages (one edge per input, no cycle), lay out left-to-right, name nodes to match their role
+  (`rename`, using the default label `add_node` returns), configure against the real schema, **reject + report**
+  an invalid value/field/connection (never substitute or force), and read the graph back to repair before finishing.
 - **Base** — `createBuilderAgent(deps)` builds a `BaseAgent` subclass over the shared per-turn deps
   (`BuilderAgentDeps = BaseAgentDeps`); grant `canModifyCanvas` + `canEditConfig`, gated at the executor against
   the user's flow-role too (a viewer is denied).
@@ -22,9 +22,9 @@
 ## What it is
 
 The broadest specialist: it changes the flow as a _whole_ rather than one node or one operation. Given a plan it
-reads the canvas + catalog, composes the nodes, wires them, configures them, lays them out, then validates and
-repairs — all in one sub-turn — returning a summary to the orchestrator (its edits are already on the live
-canvas). Domain specifics (the linear-pipeline shape, the generator's model↔provider map, the well-formedness
+reads the canvas + catalog, composes the nodes, wires them, configures them, names them, lays them out, then
+validates and repairs — all in one sub-turn — returning a summary to the orchestrator (its edits are already on
+the live canvas). Domain specifics (the linear-pipeline shape, the generator's model↔provider map, the well-formedness
 checklist) live in **playbooks** it loads on demand, not in the persona — so the persona stays lean while the
 Builder can build many kinds of flow.
 
@@ -38,7 +38,8 @@ The full editing surface, wired directly over the live `binding` (no new tool co
 | Graph read | `get_graph` (pull the whole canvas on demand)    | `createGraphReadToolProvider`             |
 | Catalog    | `catalog_search`                                 | `createCatalogToolProvider`               |
 | Structure  | `add_node`, `delete_node`                        | `createNodeStructureToolProvider`         |
-| Config     | `set_properties`, `rename`                       | `createNodeConfigToolProvider`            |
+| Config     | `set_properties`                                 | `createNodeConfigToolProvider`            |
+| Label      | `rename`                                         | `createNodeRenameToolProvider`            |
 | Edge       | `list_edges`, `connect_nodes`, `disconnect_edge` | `createEdgeToolProvider`                  |
 | Layout     | `move_node`                                      | `createNodeMoveToolProvider`              |
 | Skills     | `use_skill`                                      | `createUseSkillToolProvider(SEED_SKILLS)` |
@@ -63,8 +64,8 @@ description ([design/skills.md](../design/skills.md)).
   it unconnected.
 - **Reject + report** — an invalid value / unknown field / rejected connection is reported, never substituted or
   forced (the specialist-reject contract, shared with the block agent).
-- **Carries the full toolset + `use_skill`** — the offered tools include the read/graph-read/config/structure/
-  edge/move/catalog set and `use_skill`; loading `build-linear-pipeline` brings its instructions into context.
+- **Carries the full toolset + `use_skill`** — the offered tools include the read/graph-read/config/rename/
+  structure/edge/move/catalog set and `use_skill`; loading `build-linear-pipeline` brings its instructions into context.
 
 Where these live:
 

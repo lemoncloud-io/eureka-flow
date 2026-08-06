@@ -1,7 +1,8 @@
 /**
  * Generic BlockAgent scenarios (no orchestrator): drive a `BlockAgent(type)` directly with a concrete task
  * over a fake gateway and assert the live graph — its definition of done. One agent owns one block type's
- * whole lifecycle (add · configure · rename · delete) and its reads are TYPE-SCOPED (`search_nodes`). The
+ * whole lifecycle (add · configure · delete — NOT rename, which the builder owns) and its reads are
+ * TYPE-SCOPED (`search_nodes`). The
  * named generator specialist has its own suite (singleOutputGenerator.spec.ts); cross-agent behavior is integration.spec.ts.
  */
 import { describe, expect, it } from 'vitest';
@@ -120,16 +121,15 @@ describe('block agent — configure (merged, validated)', () => {
     });
 });
 
-describe('block agent — rename + delete', () => {
-    it("renames a node's custom label", async () => {
-        const { agent, nodeOf } = setup('output-preview', [
-            { toolCalls: [{ name: 'rename', args: { nodeId: IDS.prev, label: 'Result' } }] },
-            { text: 'Renamed to Result.' },
-        ]);
+describe('block agent — delete + no rename', () => {
+    it('does NOT offer rename — labeling a node is the builder’s job, owned at build time', async () => {
+        const { agent, gateway } = setup('output-preview', [{ text: 'ok' }]);
 
-        await agent.send(`rename node ${IDS.prev} to Result`);
+        await agent.send('what can you do?');
 
-        expect(nodeOf(IDS.prev)?.customLabel).toBe('Result');
+        const toolNames = new Set((gateway.calls[0].tools ?? []).map(t => t.name));
+        expect(toolNames.has('set_properties')).toBe(true); // it still configures its block
+        expect(toolNames.has('rename')).toBe(false); // but never renames — the builder labels
     });
 
     it('deletes a node of its type and its edges cascade', async () => {

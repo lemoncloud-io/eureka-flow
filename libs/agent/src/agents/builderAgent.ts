@@ -7,6 +7,7 @@ import {
     createNodeConfigToolProvider,
     createNodeMoveToolProvider,
     createNodeReadToolProvider,
+    createNodeRenameToolProvider,
     createNodeStructureToolProvider,
     renderEdgeContext,
     renderNodeContext,
@@ -24,9 +25,9 @@ import type { Agent } from '../agent';
  */
 export const BUILDER_SYSTEM_PROMPT = [
     'You are the Builder for the Eureka visual flow-builder. The orchestrator hands you a PLAN — a complete,',
-    'self-contained objective — and you BUILD it on the live canvas: add nodes, wire them, configure them, and',
-    'lay them out. You do not plan or coordinate and you cannot talk to the user; you carry out the plan you were',
-    'given and report what you did.',
+    'self-contained objective — and you BUILD it on the live canvas: add nodes, wire them, configure them, name',
+    'them, and lay them out. You do not plan or coordinate and you cannot talk to the user; you carry out the plan',
+    'you were given and report what you did.',
     '',
     'Before building, consider your skills: load the skill whose description matches the kind of work in front',
     'of you (building a pipeline, configuring a generator, …), then follow its instructions. Load one only when',
@@ -50,6 +51,9 @@ export const BUILDER_SYSTEM_PROMPT = [
     '- Build in dependency order — create a stage before the stage that consumes it — and thread each new node’s',
     '  returned id into the wiring and configuration that follow. Give a new node its non-default config as you',
     '  create it rather than adding then reconfiguring.',
+    '- Name nodes as you build: add_node hands back a node’s default label; when the plan gives a node a specific',
+    '  purpose, rename it to match (e.g. a generator that summarizes → “Summarizer”) so the flow reads clearly —',
+    '  a plain relabel, no reconfiguring. Renaming is the Builder’s to do; leave a default label alone otherwise.',
     '- Wire each stage to the one(s) that consume it: a source OUTPUT to the intended target INPUT. An output may',
     '  feed several inputs, but each input holds ONE edge — never leave a required input dangling, and never',
     '  create a cycle.',
@@ -83,8 +87,8 @@ export type BuilderAgentDeps = BaseAgentDeps;
 export const BUILDER_MAX_ITERATIONS = 30;
 
 /**
- * The composition specialist: the FULL editing toolset (read · catalog · structure · config · edge · move) plus
- * `use_skill` over {@link SEED_SKILLS}, all wired directly over the live `binding`. Grant is the union the
+ * The composition specialist: the FULL editing toolset (read · catalog · structure · config · rename · edge ·
+ * move) plus `use_skill` over {@link SEED_SKILLS}, all wired directly over the live `binding`. Grant is the union the
  * writes need (`canModifyCanvas` + `canEditConfig`), gated at the executor against the user's flow-role too. A
  * leaf sub-turn: it carries no `spawn`, so it never nests.
  */
@@ -104,7 +108,8 @@ export class BuilderAgent extends BaseAgent {
                     createNodeReadToolProvider(deps.binding, deps.catalog), // list_nodes, describe_node
                     createCatalogToolProvider(deps.catalog), // catalog_search (full schema per hit)
                     createNodeStructureToolProvider(deps.binding, deps.catalog), // add_node, delete_node
-                    createNodeConfigToolProvider(deps.binding, deps.catalog), // set_properties, rename
+                    createNodeConfigToolProvider(deps.binding, deps.catalog), // set_properties
+                    createNodeRenameToolProvider(deps.binding), // rename (labels — the builder owns labeling at build time)
                     createEdgeToolProvider(deps.binding, deps.catalog), // list_edges, connect_nodes, disconnect_edge
                     createNodeMoveToolProvider(deps.binding), // move_node
                     createGraphReadToolProvider(deps.binding), // get_graph (pull the whole canvas on demand)

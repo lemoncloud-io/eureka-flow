@@ -132,8 +132,8 @@ flowchart TD
        **orchestrator recognizes the capability gap** from its own system prompt (§8) and states it in its
        plain-text reply; the eval parses this as a `refused` outcome whose `reason` names the gap. Not a write
        rejection — no edit reaches the canvas. (The shipped roster **covers** the whole edit space — the
-       **builder** for structure (add / delete / wire / move / lay out) and the **block agents** for content
-       (configure / rename) — so this path is for genuinely unsupported asks, not structural edits.)
+       **builder** for structure (add / delete / wire / move / label / lay out) and the **block agents** for
+       content (configure) — so this path is for genuinely unsupported asks, not structural edits.)
 - **How a failure resolves the turn follows what LANDS** — the eval reads the outcome out (§4): everything
   intended lands → `applied`; nothing lands (ambiguous target, an impossible whole request, or permission
   denied) → `refused` (the `reason` carries any question for the user); some lands, some doesn't → `partial`.
@@ -158,16 +158,16 @@ two sub-agent shapes below are the shipped roster.
 
 > **Removed in the shipped hybrid (2026-08-05).** The cross-block **operation agents** `locator` (move) and
 > `edge` (connect/disconnect) — and the older operation-split `node` / `property` agents — have been **removed**;
-> the **builder** owns wiring and layout, and block agents own config/rename
+> the **builder** owns wiring, layout, and labeling (rename), and block agents own config
 > ([architecture.md · the hybrid writer layer](./architecture.md#the-hybrid-writer-layer)). Their edit primitives
 > live on as the tool providers the builder + block agents carry.
 
 **Sub-agents come in two shapes — block agents (per block type) and the composition builder.** A **block agent**
-owns one block type's content end-to-end (add · configure · rename · delete a node of that type), with
-**type-scoped** reads (`search_nodes` lists only its own type); the orchestrator addresses it by putting the
+owns one block type's content end-to-end (add · configure · delete a node of that type — NOT rename, the
+builder's), with **type-scoped** reads (`search_nodes` lists only its own type); the orchestrator addresses it by putting the
 **block's type** in `spawn`'s `agentType`. The **builder** is the composition specialist: the orchestrator plans
 a multi-block build and spawns it (`agentType: 'builder'`) with the plan, and it builds the whole (sub-)flow
-itself — it carries the FULL editing toolset (read · catalog · add/delete · config · connect/disconnect · move)
+itself — it carries the FULL editing toolset (read · catalog · add/delete · config · rename · connect/disconnect · move)
 plus `use_skill`, and pulls a progressively-disclosed playbook ([skills.md](./skills.md)) for the how-to. Like
 every sub-agent it is a leaf (no `spawn`). Addressing resolves in the sub-agent runner, which holds the catalog:
 
@@ -175,7 +175,7 @@ every sub-agent it is a leaf (no `spawn`). Addressing resolves in the sub-agent 
    `single-output-generator` → `GeneratorAgent`, a `BlockAgent` with a richer AI persona) and the composition
    **`builder`**;
 2. else, if `agentType` is a **valid catalog block type**, a **generic `BlockAgent(agentType)`** is synthesized
-   on the fly (create + configure + rename + delete that block, driven purely by its schema) — so any
+   on the fly (create + configure + delete that block, driven purely by its schema) — so any
    server-served block is covered with no new code;
 3. else, the spawn fails with `no specialist of type "<agentType>"` (unchanged).
 
@@ -238,7 +238,7 @@ the whole canvas — the scope is an optional structural bound, not a limit of t
 (`canEditConfig`), and the canvas-modifying writes `move_node` plus the structural `add_node` / `delete_node` /
 `connect_nodes` / `disconnect_edge` (all `canModifyCanvas`, the flow-role flag that literally covers "add/delete
 nodes, connect edges") — so an agent mixes in only the writes its grant allows: a **block agent** adds /
-configures / renames / deletes its block (both grants); the **builder** additionally moves and wires
+configures / deletes its block (both grants); the **builder** additionally renames, moves, and wires
 (connect/disconnect) with its full toolset.
 
 | Tool                                      | Kind     | Target                | Notes                                                                                                                                                                   |
@@ -274,7 +274,7 @@ permissions).
 | Agent                                               | Read                                                                 | Write                                                                                                  | Delegate                                  | Grant                                                                                |
 | --------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------ |
 | **orchestrator** (main)                             | `list_nodes`, `describe_node`, `catalog_search`                      | **— none**                                                                                             | `list_agents`, `spawn`                    | `{}` (empty) — writes gated by each child's own fixed grant + the user's permissions |
-| **BlockAgent(type)** (sub, generic)                 | `search_nodes` (type-scoped), `describe_node`                        | `add_node`, `set_properties`, `rename`, `delete_node`                                                  | —                                         | `canModifyCanvas` + `canEditConfig`                                                  |
+| **BlockAgent(type)** (sub, generic)                 | `search_nodes` (type-scoped), `describe_node`                        | `add_node`, `set_properties`, `delete_node` (no `rename` — builder's)                                  | —                                         | `canModifyCanvas` + `canEditConfig`                                                  |
 | **GeneratorAgent** (sub, `single-output-generator`) | same as BlockAgent                                                   | same as BlockAgent                                                                                     | —                                         | `canModifyCanvas` + `canEditConfig`                                                  |
 | **builder** (sub, composition)                      | `list_nodes` (full), `describe_node`, `list_edges`, `catalog_search` | `add_node`, `set_properties`, `rename`, `delete_node`, `connect_nodes`, `disconnect_edge`, `move_node` | `use_skill` (load a playbook); no `spawn` | `canModifyCanvas` + `canEditConfig`                                                  |
 
@@ -341,7 +341,7 @@ The little that is genuinely new over the reused surface: the `spawn` runner + r
 block-agent fallback), the type-scoped `search_nodes` read tool, the write toolset (move / config / rename plus
 the structural `add_node` / `delete_node` / `connect_nodes` / `disconnect_edge`), config-carrying `updateNode`
 and the `addNode` / `deleteNode` / `addEdge` / `deleteEdge` binding primitives, the orchestrator / `BlockAgent`
-(+ the `GeneratorAgent` specialist) / `edge` / **`BuilderAgent`** (the composition specialist: the full toolset +
+(+ the `GeneratorAgent` specialist) / **`BuilderAgent`** (the composition specialist: the full toolset +
 `use_skill` over `SEED_SKILLS`) subclasses, and the eval harness.
 
 The map below places what is new on top of the reused foundation, and splits the new agents by the strategy
@@ -367,8 +367,8 @@ flowchart TB
     end
     subgraph roster["NEW · the hybrid roster"]
         direction LR
-        BLD["BuilderAgent · use_skill(SEED_SKILLS)<br/>structure: add · wire · move · lay out"]
-        BLK["BlockAgent(type) · GeneratorAgent<br/>content: configure · rename"]
+        BLD["BuilderAgent · use_skill(SEED_SKILLS)<br/>structure: add · wire · move · label · lay out"]
+        BLK["BlockAgent(type) · GeneratorAgent<br/>content: configure"]
     end
     shared --> reused
     roster --> shared

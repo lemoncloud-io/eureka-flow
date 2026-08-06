@@ -17,6 +17,11 @@ describe('the orchestrator prompt routes by kind of work', () => {
         expect(ORCHESTRATOR_SYSTEM_PROMPT).toMatch(/SINGLE delegation/);
     });
 
+    it('routes naming / relabeling to the builder (part of the build), not as per-node content', () => {
+        expect(ORCHESTRATOR_SYSTEM_PROMPT).toMatch(/naming\/relabeling nodes/);
+        expect(ORCHESTRATOR_SYSTEM_PROMPT).toMatch(/renaming belongs to the build/);
+    });
+
     it("sends a node's content to that block's own specialist, addressed by its type string", () => {
         expect(ORCHESTRATOR_SYSTEM_PROMPT).toMatch(/CONTENT/);
         expect(ORCHESTRATOR_SYSTEM_PROMPT).toMatch(/TYPE STRING/);

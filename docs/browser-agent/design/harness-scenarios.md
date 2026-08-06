@@ -19,7 +19,7 @@ matrix.
 
 - **Per agent, no orchestrator** — `scenarios/<agent>.{spec,live.spec}.ts`: the agent driven **directly** with
   a concrete task, asserting the live graph — its definition of done. Block agents: `scenarios/blockAgent.*`
-  (generic add/configure/rename/delete + type-scoped `search_nodes`), `scenarios/generator.*` (the
+  (generic add/configure/delete + type-scoped `search_nodes`), `scenarios/singleOutputGenerator.*` (the
   `single-output-generator` specialist, incl. add+configure in one turn). Composition: `scenarios/builder.*` —
   the composition `builder` driven directly (no orchestrator) to build a whole flow in one sub-turn (add → wire
   → configure → repair, incl. `use_skill`). (The operation agents `locator` / `edge` and the operation-split

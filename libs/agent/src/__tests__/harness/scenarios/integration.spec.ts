@@ -89,16 +89,16 @@ describe('Harness scenarios — outcome coverage', () => {
         expect(nodeById(result.graph, IDS.gen).config).toEqual({ model: 'gemini-2.5-pro', temperature: '0.7' });
     });
 
-    it("A3 — rename the preview to 'Result' (generic block agent by type)", async () => {
-        // The preview has no named specialist, so the orchestrator addresses it by its block type
-        // (`output-preview`) → a generic BlockAgent resolved via the runner's catalog fallback.
+    it("A3 — rename the preview to 'Result' (the builder labels at build time)", async () => {
+        // Renaming a node is authoring the flow — a build-time act — so it is the builder's job, not a per-node
+        // content change. The orchestrator hands the relabel to a single `builder` spawn.
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'output-preview', task: `rename ${IDS.prev} to "Result"` }]),
+                spawn([{ agentType: 'builder', task: `rename ${IDS.prev} to "Result"` }]),
                 text('Renamed the preview to Result.'),
                 report({ status: 'applied', summary: 'renamed the preview' }),
             ],
-            'output-preview': [step([rename(IDS.prev, 'Result')]), text('renamed')],
+            builder: [step([rename(IDS.prev, 'Result')]), text('renamed')],
         };
         const result = await runScenario({
             objective: "rename the preview to 'Result'",
@@ -108,6 +108,28 @@ describe('Harness scenarios — outcome coverage', () => {
 
         expect(result.outcome.status).toBe('applied');
         expect(nodeById(result.graph, IDS.prev).customLabel).toBe('Result');
+    });
+
+    it('A3b — set the buffer’s delay via a generic block agent (addressed by an unregistered type)', async () => {
+        // `buffer` has no NAMED specialist, so the orchestrator addresses it by its block TYPE and the runner
+        // synthesizes a generic BlockAgent('buffer') from the catalog — the end-to-end generic-fallback path
+        // (unit-covered in subAgentRunner.spec.ts). Config is a per-node content change the block agent still owns.
+        const script: FakeScript = {
+            orchestrator: [
+                spawn([{ agentType: 'buffer', task: `set delayMs to 250 on ${IDS.buf}` }]),
+                text('Set the buffer delay to 250ms.'),
+                report({ status: 'applied', summary: 'set the buffer delay' }),
+            ],
+            buffer: [step([setProps(IDS.buf, { delayMs: '250' })]), text('set delay')],
+        };
+        const result = await runScenario({
+            objective: 'set the buffer delay to 250ms',
+            initialGraph: makeInitialGraph(),
+            script,
+        });
+
+        expect(result.outcome.status).toBe('applied');
+        expect(nodeById(result.graph, IDS.buf).config?.delayMs).toBe('250');
     });
 
     it('A4 — line the four up on one column (the builder lays them out; x equal, y kept)', async () => {
@@ -404,14 +426,14 @@ describe('Harness scenarios — outcome coverage', () => {
     it('R2 — rename the preview as a viewer (permission denied → refused)', async () => {
         const script: FakeScript = {
             orchestrator: [
-                spawn([{ agentType: 'output-preview', task: `rename ${IDS.prev} to "Result"` }]),
+                spawn([{ agentType: 'builder', task: `rename ${IDS.prev} to "Result"` }]),
                 text('I couldn’t rename the preview — permission denied.'),
                 report({ status: 'refused', reason: 'permission denied: viewers cannot edit nodes' }),
             ],
-            'output-preview': [step([rename(IDS.prev, 'Result')]), text('could not rename: permission denied')],
+            builder: [step([rename(IDS.prev, 'Result')]), text('could not rename: permission denied')],
         };
         // viewer ⇒ empty userPermissions ⇒ rename denied at the executor's requires-gate, even though
-        // the block agent grants itself canEditConfig
+        // the builder grants itself canEditConfig
         const result = await runScenario({
             objective: "rename the preview to 'Result'",
             initialGraph: makeInitialGraph(),
