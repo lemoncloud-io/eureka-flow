@@ -15,8 +15,8 @@ export const USE_SKILL_TOOL = 'use_skill';
  * returned instructions. Because `BaseAgent` re-sends tool defs every iteration and feeds tool results back,
  * disclosure needs no loop change — this is an ordinary `ToolProvider` an agent lists in `AgentConfig.tools`.
  *
- * Carried by the Builder (the shipped composition specialist) over SEED_SKILLS; the block/operation
- * specialists wire their tool providers directly and do not use it. Design: docs/browser-agent/design/skills.md.
+ * Carried by the Builder (the shipped composition specialist) over SEED_SKILLS; the block specialists do not
+ * use it — they just list their tool values.
  */
 export const createUseSkillToolProvider = (skills: Skill[]): ToolProvider => {
     const byName = new Map<string, Skill>();

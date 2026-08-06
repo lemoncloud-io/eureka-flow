@@ -22,8 +22,7 @@ matrix.
   (generic add/configure/delete + type-scoped `search_nodes`), `scenarios/singleOutputGenerator.*` (the
   `single-output-generator` specialist, incl. add+configure in one turn). Composition: `scenarios/builder.*` —
   the composition `builder` driven directly (no orchestrator) to build a whole flow in one sub-turn (add → wire
-  → configure → repair, incl. `use_skill`). (The operation agents `locator` / `edge` and the operation-split
-  `node` / `property` have been removed, so their scenario specs are gone too.)
+  → configure → repair, incl. `use_skill`).
 - **Integration, orchestrator × agents** — `scenarios/integration.{spec,live.spec}.ts`: the orchestrator
   resolving a request and delegating across specialists (the applied/refused/answered matrix — `partial` is a
   production outcome but not a test target, see below). The live variant checks only the outcome + graph oracle.

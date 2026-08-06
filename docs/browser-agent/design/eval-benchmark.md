@@ -2,7 +2,7 @@
 
 > **SETTLED (2026-08-05) — historical record.** This benchmark produced the shipped decision: the **hybrid**
 > (builder builds the structure; block specialists author the content) —
-> [context-strategy-and-composition.md](./context-strategy-and-composition.md) §7,
+> [context-strategy-and-composition.md](./context-strategy-and-composition.md),
 > [architecture.md · the hybrid writer layer](./architecture.md#the-hybrid-writer-layer). The two-design A/B
 > below is kept as the record of _how_ that was decided, not a live gate; with edge + locator retired the
 > fan-out arm is now degenerate.

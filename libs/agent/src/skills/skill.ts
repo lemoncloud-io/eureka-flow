@@ -6,8 +6,8 @@
  * disclosure keeps the body out of context until it is actually needed.
  *
  * This is consumed by the Builder — the shipped composition specialist that carries MANY skills and loads them
- * via `use_skill` ({@link ../agents/builderAgent}); the block/operation specialists do NOT use skills — they
- * wire their tool providers directly. Design: docs/browser-agent/design/skills.md.
+ * via `use_skill` ({@link ../agents/builderAgent}); the block specialists do NOT use skills — they just list
+ * their tool values.
  */
 export interface Skill {
     /** Selection + dispatch key — the value passed to `use_skill`. Analog of a SKILL.md directory name. */

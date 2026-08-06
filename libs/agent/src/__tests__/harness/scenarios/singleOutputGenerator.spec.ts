@@ -1,8 +1,8 @@
 /**
  * Generator specialist scenarios (no orchestrator): drive the `single-output-generator` block agent directly.
- * It is a BlockAgent with an AI persona, so it owns the generator's whole lifecycle AND can add+configure in
- * ONE turn (the block-ownership payoff). Cross-agent behavior is integration.spec.ts; live variant is
- * generator.live.spec.ts.
+ * It is a BlockAgent with an AI persona, so it CONFIGURES a generator — sets the model + sampling fields on an
+ * existing node — and reports rejections without inventing; it does not add/delete/rename (the builder shapes
+ * the flow). Cross-agent behavior is integration.spec.ts; live coverage rides the integration live suite.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -34,49 +34,9 @@ const setup = (script: FakeScriptStep[]) => {
     const state = (): SessionState => storage.load(flowId) as SessionState;
     const nodes = () => binding.readGraph().nodes;
     const nodeOf = (id: string) => nodes().find(n => n.id === id);
-    const addedGenerator = () => nodes().find(n => n.type === GEN && n.id !== IDS.gen);
     const toolMsg = () => state().messages.find(m => m.role === 'tool');
-    return { binding, gateway, agent, state, nodes, nodeOf, addedGenerator, toolMsg };
+    return { binding, gateway, agent, state, nodes, nodeOf, toolMsg };
 };
-
-describe('generator agent — add + configure in ONE turn', () => {
-    it('adds a generator and sets its model in a single sub-turn', async () => {
-        // The in-memory binding mints `n_1` for the first add (fixture ids are non-numeric); the assertion
-        // finds the new node by exclusion, so it never couples to the id scheme.
-        const NEW = 'n_1';
-        const { agent, addedGenerator } = setup([
-            { toolCalls: [{ name: 'add_node', args: { type: GEN, position: { x: 900, y: 300 } } }] },
-            { toolCalls: [{ name: 'set_properties', args: { nodeId: NEW, config: { model: 'gemini-2.5-pro' } } }] },
-            { text: 'Added a generator and set its model to gemini-2.5-pro.' },
-        ]);
-
-        await agent.send('add a single-output-generator at (900, 300) and set its model to gemini-2.5-pro');
-
-        const added = addedGenerator();
-        expect(added).toBeDefined();
-        expect(added?.config?.model).toBe('gemini-2.5-pro');
-    });
-
-    it('adds a generator with its model in ONE add_node call (config inline)', async () => {
-        const { agent, addedGenerator } = setup([
-            {
-                toolCalls: [
-                    {
-                        name: 'add_node',
-                        args: { type: GEN, position: { x: 900, y: 300 }, config: { model: 'gemini-2.5-pro' } },
-                    },
-                ],
-            },
-            { text: 'Added a generator configured with gemini-2.5-pro.' },
-        ]);
-
-        await agent.send('add a single-output-generator at (900, 300) with model gemini-2.5-pro');
-
-        const added = addedGenerator();
-        expect(added).toBeDefined();
-        expect(added?.config?.model).toBe('gemini-2.5-pro');
-    });
-});
 
 describe('generator agent — configure existing', () => {
     it('sets the model and KEEPS the existing temperature (merge)', async () => {

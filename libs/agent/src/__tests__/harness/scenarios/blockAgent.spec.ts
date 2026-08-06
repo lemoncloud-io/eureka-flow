@@ -1,9 +1,9 @@
 /**
  * Generic BlockAgent scenarios (no orchestrator): drive a `BlockAgent(type)` directly with a concrete task
- * over a fake gateway and assert the live graph — its definition of done. One agent owns one block type's
- * whole lifecycle (add · configure · delete — NOT rename, which the builder owns) and its reads are
- * TYPE-SCOPED (`search_nodes`). The
- * named generator specialist has its own suite (singleOutputGenerator.spec.ts); cross-agent behavior is integration.spec.ts.
+ * over a fake gateway and assert the live graph — its definition of done. One agent CONFIGURES one block
+ * type's nodes (sets fields on an existing node — NOT add/delete/rename, which the builder owns) and its
+ * reads are TYPE-SCOPED (`search_nodes`). The named generator specialist has its own suite
+ * (singleOutputGenerator.spec.ts); cross-agent behavior is integration.spec.ts.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -35,65 +35,9 @@ const setup = (blockType: string, script: FakeScriptStep[]) => {
     const state = (): SessionState => storage.load(flowId) as SessionState;
     const nodes = () => binding.readGraph().nodes;
     const nodeOf = (id: string) => nodes().find(n => n.id === id);
-    const ofType = (type: string) => nodes().filter(n => n.type === type);
     const toolMsg = () => state().messages.find(m => m.role === 'tool');
-    return { binding, gateway, agent, state, nodes, nodeOf, ofType, toolMsg };
+    return { binding, gateway, agent, state, nodes, nodeOf, toolMsg };
 };
-
-describe('block agent — add (create a node of its type)', () => {
-    it('adds a new node of its block type at the given position', async () => {
-        const { agent, ofType } = setup('buffer', [
-            { toolCalls: [{ name: 'add_node', args: { type: 'buffer', position: { x: 500, y: 500 } } }] },
-            { text: 'Added a buffer at (500, 500).' },
-        ]);
-
-        await agent.send('add a buffer at (500, 500)');
-
-        const buffers = ofType('buffer');
-        expect(buffers).toHaveLength(2); // the fixture buffer + the new one
-        expect(buffers.some(b => b.position.x === 500 && b.position.y === 500)).toBe(true);
-    });
-});
-
-describe('block agent — add with initial config (one call)', () => {
-    it('creates a node of its type with the given config in a single add_node call', async () => {
-        const { agent, ofType } = setup('buffer', [
-            {
-                toolCalls: [
-                    {
-                        name: 'add_node',
-                        args: { type: 'buffer', position: { x: 500, y: 500 }, config: { delayMs: '250' } },
-                    },
-                ],
-            },
-            { text: 'Added a buffer with delayMs 250.' },
-        ]);
-
-        await agent.send('add a buffer at (500, 500) with delayMs 250');
-
-        const added = ofType('buffer').find(b => b.position.x === 500 && b.position.y === 500);
-        expect(added?.config?.delayMs).toBe('250');
-    });
-
-    it('rejects an invalid initial config and adds NOTHING (atomic)', async () => {
-        const { agent, ofType, toolMsg } = setup('buffer', [
-            {
-                toolCalls: [
-                    {
-                        name: 'add_node',
-                        args: { type: 'buffer', position: { x: 500, y: 500 }, config: { delayMs: 'abc' } },
-                    },
-                ],
-            },
-            { text: 'delayMs must be a number; nothing added.' },
-        ]);
-
-        await agent.send('add a buffer with delayMs abc');
-
-        expect(ofType('buffer')).toHaveLength(1); // only the fixture buffer — the bad add landed nothing
-        expect(toolMsg()?.content).toMatch(/not a number/);
-    });
-});
 
 describe('block agent — configure (merged, validated)', () => {
     it('sets a config value and keeps the others (merge)', async () => {
@@ -121,29 +65,18 @@ describe('block agent — configure (merged, validated)', () => {
     });
 });
 
-describe('block agent — delete + no rename', () => {
-    it('does NOT offer rename — labeling a node is the builder’s job, owned at build time', async () => {
+describe('block agent — tool surface (configure-only)', () => {
+    it('offers ONLY search + config — no add/delete (the builder shapes the flow) and no rename (it labels)', async () => {
         const { agent, gateway } = setup('output-preview', [{ text: 'ok' }]);
 
         await agent.send('what can you do?');
 
         const toolNames = new Set((gateway.calls[0].tools ?? []).map(t => t.name));
-        expect(toolNames.has('set_properties')).toBe(true); // it still configures its block
-        expect(toolNames.has('rename')).toBe(false); // but never renames — the builder labels
-    });
-
-    it('deletes a node of its type and its edges cascade', async () => {
-        const { agent, binding, nodeOf } = setup('buffer', [
-            { toolCalls: [{ name: 'delete_node', args: { nodeId: IDS.buf } }] },
-            { text: 'Deleted the buffer.' },
-        ]);
-
-        await agent.send(`delete node ${IDS.buf}`);
-
-        expect(nodeOf(IDS.buf)).toBeUndefined();
-        expect(binding.readGraph().edges.some(e => e.sourceNodeId === IDS.buf || e.targetNodeId === IDS.buf)).toBe(
-            false
-        );
+        expect([...toolNames].sort()).toEqual(['describe_node', 'search_nodes', 'set_properties']);
+        // the structural + label writes belong to the builder, never a block agent
+        for (const absent of ['add_node', 'delete_node', 'rename', 'move_node', 'connect_nodes']) {
+            expect(toolNames.has(absent)).toBe(false);
+        }
     });
 });
 

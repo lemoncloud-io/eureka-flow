@@ -47,7 +47,7 @@ const genericBlockRegistration = (type: string, catalog: CatalogLookup): AgentRe
     const label = catalog.schema(type)?.label ?? type;
     return {
         type,
-        summary: `block agent for ${label}: create, configure, or delete a ${type} node`,
+        summary: `block agent for ${label}: configure a ${type} node`,
         create: deps => createBlockAgent({ ...deps, blockType: type }),
     };
 };
@@ -88,8 +88,8 @@ export const createSubAgentRunner = (deps: SubAgentRunnerDeps): SubAgentRunner =
         binding: CanvasBinding,
         signal?: AbortSignal
     ): Promise<SpawnChildResult> => {
-        // Explicit registration wins (operation agents + named block specialists); otherwise fall back to a
-        // generic block agent when the agentType is a real catalog block type (§ hybrid roster).
+        // A named registration wins; otherwise fall back to a generic block agent when the agentType is a
+        // real catalog block type.
         const registration = roster.get(spec.agentType) ?? genericBlockRegistration(spec.agentType, catalog);
         if (!registration) {
             return { ok: false, summary: `no specialist of type "${spec.agentType}" is available` };

@@ -57,15 +57,10 @@ docs (start with [architecture.md](design/architecture.md)); the full roster + c
 **[agents/README.md](agents/README.md)**:
 
 - **The composition builder** — the orchestrator hands it the whole **structure** and it builds the (sub-)flow
-  itself (add · wire · lay out), pulling on-demand playbooks via `use_skill`. Spec: [builder.md](agents/builder.md).
+  itself (add · wire · label · lay out), pulling on-demand playbooks via `use_skill`. Spec: [builder.md](agents/builder.md).
 - **Block agents** — one per block type; the orchestrator routes each node's **content** (config) to
   them. A block that earns domain knowledge gets a named specialist (e.g. [single-output-generator.md](agents/single-output-generator.md));
   every other type is served by a generic [blockAgent.md](agents/blockAgent.md) synthesized from the catalog.
-
-The cross-block operation agents `locator` (**move**) and `edge` (**connect / disconnect**) — and the older
-operation-split `node` (add/delete) and `property` (config/rename) agents — have been **removed**: the builder
-owns wiring, layout, and labeling (rename), and block agents own config. Their edit primitives live on as the
-tool providers those agents carry.
 
 **[foundations/](foundations/)** — shared infrastructure, both built.
 

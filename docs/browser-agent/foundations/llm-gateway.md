@@ -54,7 +54,7 @@ sequenceDiagram
     Agent->>Agent: accumulate deltas → parse ToolCall
     Agent->>EX: dispatch(agentConfig, toolCall, userPermissions)
     EX->>EX: route by name → validate args → check both gates (grant + user role)
-    EX->>CV: e.g. move_node → node move tool provider (`createNodeMoveToolProvider`) → updateNode(position)
+    EX->>CV: e.g. move_node → the MOVE_NODE tool's handler → updateNode(position)
     CV-->>EX: ToolResult
     EX-->>Agent: ToolResult (fed back as a tool message)
 ```

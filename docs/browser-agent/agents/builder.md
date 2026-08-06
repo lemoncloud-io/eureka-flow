@@ -30,19 +30,22 @@ Builder can build many kinds of flow.
 
 ## Tools
 
-The full editing surface, wired directly over the live `binding` (no new tool code), plus `use_skill`:
+The full editing surface, **listed as tool values and composed by `toolset`** (`tools/toolset.ts`), plus
+`use_skill`:
 
-| Group      | Tools                                            | Provider                                  |
-| ---------- | ------------------------------------------------ | ----------------------------------------- |
-| Read       | `list_nodes`, `describe_node`                    | `createNodeReadToolProvider`              |
-| Graph read | `get_graph` (pull the whole canvas on demand)    | `createGraphReadToolProvider`             |
-| Catalog    | `catalog_search`                                 | `createCatalogToolProvider`               |
-| Structure  | `add_node`, `delete_node`                        | `createNodeStructureToolProvider`         |
-| Config     | `set_properties`                                 | `createNodeConfigToolProvider`            |
-| Label      | `rename`                                         | `createNodeRenameToolProvider`            |
-| Edge       | `list_edges`, `connect_nodes`, `disconnect_edge` | `createEdgeToolProvider`                  |
-| Layout     | `move_node`                                      | `createNodeMoveToolProvider`              |
-| Skills     | `use_skill`                                      | `createUseSkillToolProvider(SEED_SKILLS)` |
+| Group      | Tools                                            |
+| ---------- | ------------------------------------------------ |
+| Read       | `list_nodes`, `describe_node`                    |
+| Graph read | `get_graph` (pull the whole canvas on demand)    |
+| Catalog    | `catalog_search`                                 |
+| Structure  | `add_node`, `delete_node`                        |
+| Config     | `set_properties`                                 |
+| Label      | `rename`                                         |
+| Edge       | `list_edges`, `connect_nodes`, `disconnect_edge` |
+| Layout     | `move_node`                                      |
+
+One `toolset({ binding, catalog }, [ …all of the above… ])` call yields the Builder's tool provider (each tool
+selected by identity, no strings); `use_skill` (over `SEED_SKILLS`) is wired alongside it.
 
 Grant `canModifyCanvas` + `canEditConfig`. As a long-lived agent the Builder uses **lifetime-matched context**:
 it seeds the starting canvas — its nodes (`renderNodeContext`) **and their wiring** (`renderEdgeContext`) —
@@ -71,11 +74,11 @@ Where these live:
 
 - **Deterministic (always runs):**
   [`scenarios/builder.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/builder.spec.ts) — drives `createBuilderAgent`
-  directly over the shared `harness/fixtures`: build-a-pipeline / validate-and-repair / reject+report / tool
-  surface / persona / skill load.
+  directly over the shared `harness/fixtures`: build-a-pipeline / reject+report / tool surface / persona /
+  skill load.
 - **Live (real Gemini, `RUN_LIVE`-gated):**
   [`scenarios/builder.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/builder.live.spec.ts) — the model builds a
-  pipeline and its graph shape is checked (and skill selection observed).
+  pipeline (graph shape checked, skill selection observed) and repairs a dangling generator input.
 - **Integration (orchestrator → builder):**
   [`scenarios/integration.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/integration.spec.ts) (A7) — the orchestrator
   plans a build and delegates the whole thing to one `builder` spawn.

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { createCatalogToolProvider } from '../../tools/catalogTools';
+import { createInMemoryCanvasBinding } from '../../canvas/inMemoryCanvasBinding';
+import { CATALOG_SEARCH, CATALOG_TOOLS } from '../../tools/catalogTools';
+import { toolset } from '../../tools/toolset';
 import { createFixtureCatalog } from '../harness/fixtures';
 
 import type { ToolCall, ToolProvider, ToolResult } from '../../tools/types';
@@ -9,12 +11,13 @@ const call = (name: string, args: unknown): ToolCall => ({ id: `c-${name}`, name
 const run = async (provider: ToolProvider, name: string, args: unknown): Promise<ToolResult> =>
     provider.dispatch(call(name, args));
 
-describe('catalog tool provider — catalog_search (full schema per hit)', () => {
+describe('catalog tools — catalog_search (full schema per hit)', () => {
     const catalog = createFixtureCatalog();
+    // catalog_search reads only the catalog; the binding is an unused-but-required piece of the shared deps bag.
+    const cat = (): ToolProvider => toolset({ binding: createInMemoryCanvasBinding(), catalog }, CATALOG_TOOLS);
 
     it('returns matching block types WITH their full schema — ports and config fields inlined', async () => {
-        const cat = createCatalogToolProvider(catalog);
-        const res = await run(cat, 'catalog_search', { query: 'delay' });
+        const res = await run(cat(), 'catalog_search', { query: 'delay' });
         expect(res.ok).toBe(true);
         if (res.ok) {
             const data = res.data as {
@@ -31,8 +34,7 @@ describe('catalog tool provider — catalog_search (full schema per hit)', () =>
     });
 
     it('an empty query returns the whole catalog (each entry a full schema)', async () => {
-        const cat = createCatalogToolProvider(catalog);
-        const res = await run(cat, 'catalog_search', { query: '' });
+        const res = await run(cat(), 'catalog_search', { query: '' });
         expect(res.ok).toBe(true);
         if (res.ok) {
             const data = res.data as { hits: { type: string }[] };
@@ -40,11 +42,11 @@ describe('catalog tool provider — catalog_search (full schema per hit)', () =>
         }
     });
 
-    it('describe_block is gone — it was folded into catalog_search, so it is now an unknown tool', async () => {
-        const cat = createCatalogToolProvider(catalog);
-        const tools = await cat.listTools();
-        expect(tools.map(t => t.name)).toEqual(['catalog_search']);
-        const res = await run(cat, 'describe_block', { type: 'single-output-generator' });
+    it('catalog_search is the only catalog tool — describe_block was folded in and is now unknown', async () => {
+        expect(CATALOG_TOOLS.map(t => t.def.name)).toEqual(['catalog_search']);
+        expect(CATALOG_SEARCH.def.name).toBe('catalog_search');
+        const res = await run(cat(), 'describe_block', { type: 'single-output-generator' });
         expect(res.ok).toBe(false);
+        expect(res.ok === false && res.error).toMatch(/unknown tool/);
     });
 });

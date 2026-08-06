@@ -9,8 +9,8 @@
 > **Grounding.** Built on the shipped `@flows/agent` (`libs/agent/src`): the `BaseAgent` loop, the
 > `ToolProvider`/`ToolExecutor` seam, and `LlmGateway`. The **Builder** — the flow's structural writer in the
 > shipped [hybrid](./architecture.md#the-hybrid-writer-layer) — is the one consumer; the other agents
-> (orchestrator, block agents, generator) **do not use skills** — they wire their tool providers directly. Last
-> updated 2026-08-05.
+> (orchestrator, block agents, generator) **do not use skills** — they list their tool values via `toolset`.
+> Last updated 2026-08-05.
 
 ---
 
@@ -86,7 +86,6 @@ agent already holds the tools):
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `build-linear-pipeline` | the input → process… → output chain: add in dependency order, wire adjacent stages, lay out left-to-right                                                                                                                                                       |
 | `configure-generator`   | the generator's model↔provider-key map + sampling params + system-vs-user prompt (the same know-how as the generator specialist's `SINGLE_OUTPUT_GENERATOR_SYSTEM_PROMPT`, re-authored as a loadable Builder playbook — the const still drives the specialist) |
-| `validate-and-repair`   | the well-formedness checklist: no dangling required input, valid configs, no cycle — and the repair moves                                                                                                                                                       |
 
 `configure-generator` shows the direction: a named specialist's **configuration** know-how carved into a
 loadable skill the Builder can pull — "fewer, more capable agents, each built from many skills" — while the

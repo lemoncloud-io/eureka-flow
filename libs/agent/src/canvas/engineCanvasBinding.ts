@@ -18,7 +18,7 @@ const labelFor = (patch: NodePatch): string => {
  * editor, the mobile editor, the tutorial and a headless Node run.
  *
  * No permission check here: `ToolExecutor` already gates each tool on the capability it
- * requires, and a coarser gate could only fail silently. See `design/canvas-binding.md`.
+ * requires, and a coarser gate could only fail silently.
  */
 export const createEngineCanvasBinding = (engine: FlowEngine): CanvasBinding => {
     const nodeById = (id: string): NodeData | undefined => engine.getGraph().nodes.find(n => n.id === id);

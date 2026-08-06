@@ -20,20 +20,16 @@ until the model is done. All of them reach the live canvas through a single shar
 however the editing gets done; what the orchestrator does is **split each request by the KIND of work** and
 delegate each part to the specialist built for it:
 
-- **Structure → the builder.** Which nodes exist, how they wire together, and how they lay out is
-  coordination-heavy, so the orchestrator plans it and hands the **whole structural plan to one `builder`**,
-  which realizes it on the canvas (add · wire · lay out) with on-demand `use_skill` playbooks and spawns
-  nothing.
-- **Content → per-node specialists.** A node's own values — its configuration and its name — are independent
-  per node, so the orchestrator **fans those out in parallel** to the specialist for that block type (one
-  **block agent** per block type; the AI **generator** is the richest of them).
+- **Structure → the builder.** Which nodes exist, how they wire together, how they are labelled, and how they
+  lay out is coordination-heavy, so the orchestrator plans it and hands the **whole structural plan to one
+  `builder`**, which realizes it on the canvas (add · wire · label · lay out) with on-demand `use_skill`
+  playbooks and spawns nothing.
+- **Content → per-node specialists.** A node's own configuration values are independent per node, so the
+  orchestrator **fans those out in parallel** to the specialist for that block type (one **block agent** per
+  block type; the AI **generator** is the richest of them).
 
-This split is the decision the [eval-benchmark](eval-benchmark.md) reached and
-[context-strategy-and-composition.md](context-strategy-and-composition.md) records: the builder wins at
-coordination-heavy structure, while fan-out's one strength — independent per-node work — is exactly content
-authoring. The two are **complementary, not either/or**. This page describes the shared primitives the
-writers are built from; the spawn / roster / runner topology is in
-[harness-spec.md](harness-spec.md) and [harness-interfaces.md](harness-interfaces.md) §4.
+This page describes the shared primitives the writers are built from; the spawn / roster / runner topology is
+in [harness-spec.md](harness-spec.md) and [harness-interfaces.md](harness-interfaces.md) §4.
 
 ```
 Panel → Agent → LlmGateway (think)
@@ -90,14 +86,6 @@ flowchart TD
 
 Both write the **same live `CanvasBinding`** through the **same tools** under the **same two-gate
 permission model**, so the foundation below is unchanged.
-
-> **How this was decided.** Two earlier candidates — pure **fan-out** (every edit, structural or not, to a
-> narrow specialist) and a single all-doing **builder** — were compared head-to-head by the
-> [eval-benchmark](eval-benchmark.md). The builder won coordination-heavy **structure**; fan-out won
-> **independent per-node** work. The shipped hybrid above takes each at its proven strength. The **edge** and
-> **locator** operation agents (whose wiring / move work the builder now owns) — and the older `node` /
-> `property` agents — have been removed. Full findings:
-> [context-strategy-and-composition.md](context-strategy-and-composition.md).
 
 ## Principles
 
@@ -344,6 +332,15 @@ Tools come from **providers**, and an agent can compose several — its `tools` 
 lists and runs its own tools; the executor unions their `listTools()` for the model and builds a
 `name → provider` index so `dispatch` routes each call. A provider holds no agent-specific state, so one
 provider can back several agents; each agent's `grant` decides what it may actually call.
+
+Each canvas tool is a **self-named value** — a `CanvasTool` carrying its `def` (the single source of its name)
+and a `build(deps)` that binds it to the live canvas — the model every mature agent SDK uses (LangChain's
+`tools: [a, b]`, the Vercel AI SDK's tool objects). An agent assembles its toolset by **listing the tool
+values** it carries (`toolset(deps, [SET_PROPERTIES, …])`), so composition is a **list of values selected by
+identity**, not strings and not a bespoke provider per operation. That makes rename/delete a **compile error at
+every use** — an unresolved import the compiler, linter, and editor all flag — and a real MCP server drops in
+later as just another list of named tools. The orchestration seams (`list_agents`, `spawn`) stay bespoke providers:
+they close over the roster/runner, not a canvas.
 
 **Permission is two gates, per-tool.** Each tool declares the capability it needs via `ToolDef.requires`
 (reads omit it). A required-capability call runs only if that capability is enabled in **both** the

@@ -51,54 +51,13 @@ const makeFakeGateway = (reply: string): LlmGateway => ({
 const FAKE_REPLY =
     '[--fake] No model wired — I can read the canvas but not build. Set GEMINI_API_KEY (or drop --fake) to build for real.';
 
-/** A deliberately long reply (`--demo`) so the CHAT pane overflows and PageUp/PageDown have something to scroll. */
-const LONG_FAKE_REPLY = [
-    '[--demo] A long fake reply so you can test scrolling the CHAT pane.',
-    'PageUp / PageDown (or ↑/↓ / wheel) scroll the active pane — canvas by default; type /pane to scroll this CHAT pane.',
-    '',
-    ...Array.from(
-        { length: 60 },
-        (_, i) =>
-            `  ${String(i + 1).padStart(2, '0')}. demo chat line — lorem ipsum dolor sit amet, consectetur adipiscing elit.`
-    ),
-    '',
-    'End of the long reply. PageUp to see line 01; PageDown to return to the bottom.',
-].join('\n');
-
-/** A big seeded graph (`--demo`) — three input→buffer→generator→preview chains — so the CANVAS pane overflows. */
-const buildDemoGraph = (): Graph => {
-    const chain = ['input-text', 'buffer', 'single-output-generator', 'output-preview'];
-    const nodes: Graph['nodes'] = [];
-    const edges: Graph['edges'] = [];
-    let seq = 0;
-    for (let col = 0; col < 3; col += 1) {
-        let prev: string | null = null;
-        for (const type of chain) {
-            const id = `demo-n${(seq += 1)}`;
-            nodes.push({ id, type, position: { x: col * 260, y: chain.indexOf(type) * 130 }, config: {} });
-            if (prev) {
-                edges.push({
-                    id: `demo-e${seq}`,
-                    sourceNodeId: prev,
-                    sourcePortId: 'out',
-                    targetNodeId: id,
-                    targetPortId: 'in',
-                });
-            }
-            prev = id;
-        }
-    }
-    return { nodes, edges };
-};
-
 const HELP =
-    'scroll ‹scroll› pane: mouse wheel / ↑↓ / PgUp PgDn / /u /d /top /bottom · /pane switch canvas⇄chat · /save (backend, or <f> local) /graph /seed <f> /reset /verbose /provider /keys /log /quit · Ctrl-C aborts';
-const SCROLL_HINT = 'scroll the ‹scroll› pane: mouse wheel or ↑/↓ or /u /d · /pane switches · /help';
+    'scroll ‹scroll› pane: mouse wheel / ↑↓ / PgUp PgDn / /top /bottom · /pane switch canvas⇄chat · /save (backend, or <f> local) /graph /seed <f> /reset /verbose /provider /keys /log /quit · Ctrl-C aborts';
+const SCROLL_HINT = 'scroll the ‹scroll› pane: mouse wheel or ↑/↓ · /pane switches · /help';
 
 const main = async (): Promise<void> => {
-    const demo = hasFlag('--demo'); // scroll demo: forces offline+fake, seeds a big graph + a long reply
-    const fake = demo || hasFlag('--fake');
-    const offline = demo || hasFlag('--offline');
+    const fake = hasFlag('--fake');
+    const offline = hasFlag('--offline');
     let verbose = hasFlag('--verbose');
     const connected = !offline && !!process.env.FLOW_API_URL;
     const loadFlowId = flagValue('--flow');
@@ -107,9 +66,7 @@ const main = async (): Promise<void> => {
     const autosave = connected && !hasFlag('--no-autosave');
 
     // Gateway: direct Gemini from env, or the fake for UI dev. No credential and no --fake ⇒ print + exit.
-    const rawGateway = fake
-        ? makeFakeGateway(demo ? LONG_FAKE_REPLY : FAKE_REPLY)
-        : resolveLiveGateway({ model: flagValue('--model') });
+    const rawGateway = fake ? makeFakeGateway(FAKE_REPLY) : resolveLiveGateway({ model: flagValue('--model') });
     if (!rawGateway) {
         console.error(ENV_CONTRACT);
         process.exitCode = 1;
@@ -138,7 +95,6 @@ const main = async (): Promise<void> => {
     // Wrap the ONE canvas binding all agents share, so node/edge edits show up in the log.
     const binding = wire ? wire.binding(stack.binding) : stack.binding;
     if (seedFile) stack.engine.loadGraph(JSON.parse(readFileSync(seedFile, 'utf8')) as Graph);
-    else if (demo) stack.engine.loadGraph(buildDemoGraph());
 
     const run = createTerminalRun({
         gateway,
@@ -264,14 +220,14 @@ const main = async (): Promise<void> => {
     out.on('resize', paint);
 
     // PageUp/PageDown scroll the ACTIVE pane (`/pane` switches it). These are keys readline ignores, so line
-    // editing is unaffected — but some terminals grab PageUp for their own scrollback, so `/u` `/d` `/top`
-    // `/bottom` do the same thing by typed command (those always reach the app). A new objective snaps to tail.
+    // editing is unaffected — but some terminals grab PageUp for their own scrollback, so `/top` `/bottom`
+    // jump to the ends by typed command (those always reach the app). A new objective snaps to tail.
     readline.emitKeypressEvents(process.stdin, rl);
     if (process.stdin.isTTY) {
         try {
             process.stdin.setRawMode(true); // belt-and-braces; readline usually sets this already
         } catch {
-            /* not a raw-capable TTY — the /u /d commands still work */
+            /* not a raw-capable TTY — /top /bottom still work by typed command */
         }
     }
     process.stdin.on('keypress', (_s: string | undefined, key: readline.Key | undefined) => {
@@ -343,16 +299,6 @@ const main = async (): Promise<void> => {
             case '/keys':
                 showKeys = !showKeys;
                 notice = `key echo ${showKeys ? 'on — press a key' : 'off'}`;
-                return true;
-            case '/u':
-            case '/up':
-                scrollActive(scrollPage() * (Number(arg) > 0 ? Number(arg) : 1));
-                notice = `scrolled ${scrollTarget} up`;
-                return true;
-            case '/d':
-            case '/down':
-                scrollActive(-scrollPage() * (Number(arg) > 0 ? Number(arg) : 1));
-                notice = `scrolled ${scrollTarget} down`;
                 return true;
             case '/top':
                 scrollTop();

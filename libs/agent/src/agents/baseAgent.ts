@@ -143,16 +143,16 @@ export abstract class BaseAgent implements Agent {
      * specialist (2–3 turns) puts its live canvas here: re-sending it each turn is cheap and it cannot amortize
      * a get_graph pull. A LONG-lived agent (builder / orchestrator) keeps this stable — roster or schema only —
      * and seeds the volatile canvas ONCE via {@link initialUserPreamble}, then pulls on demand, so its growing
-     * transcript stays a cacheable prefix (lifetime-matched context; see context-strategy-and-composition.md).
+     * transcript stays a cacheable prefix.
      */
     protected buildContextMessages(): ChatMessage[] {
         return [];
     }
 
     /**
-     * Prepended once to the first user message of a fresh conversation — the initial state an agent is handed up
-     * front (seed-once + pull; context-strategy-and-composition.md). Default none: a top-level agent (builder / orchestrator)
-     * seeds the starting graph here; a spawned child pulls current state on demand via get_graph instead.
+     * Prepended once to the first user message of a fresh conversation — the initial state an agent is handed
+     * up front (seed-once + pull). Default none: a top-level agent (builder / orchestrator) seeds the starting
+     * graph here; a spawned child pulls current state on demand via get_graph instead.
      */
     protected initialUserPreamble(): string {
         return '';
@@ -231,8 +231,8 @@ export abstract class BaseAgent implements Agent {
         }
         this.onTurnSignal(signal);
 
-        // Seed the initial state into the first user message of a fresh conversation (Approach 3); later turns
-        // pull current state via get_graph, so the transcript stays append-only.
+        // Seed the initial state into the first user message of a fresh conversation; later turns pull current
+        // state via get_graph, so the transcript stays append-only.
         const preamble = state.messages.length === 0 ? this.initialUserPreamble() : '';
         const userContent = preamble ? `${preamble}\n\n${text}` : text;
         state.messages.push({ id: this.nextId('u'), role: 'user', content: userContent, ts: this.stamp() });

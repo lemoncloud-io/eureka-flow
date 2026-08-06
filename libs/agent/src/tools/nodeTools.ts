@@ -1,23 +1,18 @@
-import { toolErr as err, toolOk as ok, toolUnknown } from './types';
+import { toolErr as err, toolOk as ok } from './types';
 import { applyMove, hasExactlyOneTarget } from '../canvas/moveSemantics';
 
-import type { ToolCall, ToolProvider, ToolResult } from './types';
+import type { CanvasTool } from './toolset';
+import type { ToolCall, ToolResult } from './types';
 import type { CanvasBinding, Graph, XY } from '../canvas/canvasBinding';
 import type { MoveNodeArgs } from '../canvas/moveSemantics';
 import type { BlockSchema, CatalogLookup } from '../catalog';
 import type { JsonSchema, ToolDef } from '../llm/llmGateway';
 
 /**
- * The node tool domain — everything an agent does to canvas nodes, split by operation so agents
- * take only what they need:
- *   • `createNodeReadToolProvider`      — `list_nodes` + `describe_node`   (read: all nodes)
- *   • `createNodeSearchToolProvider`    — `search_nodes` + `describe_node` (read: optionally type-scoped)
- *   • `createNodeMoveToolProvider`      — `move_node`                      (write: position)
- *   • `createNodeConfigToolProvider`    — `set_properties`                 (write: config)
- *   • `createNodeRenameToolProvider`    — `rename`                         (write: label — builder-only)
- *   • `createNodeStructureToolProvider` — `add_node` + `delete_node`       (write: add/delete node)
- * Also owns the node projection (`listNodeLocations`), the per-turn context block (`renderNodeContext`),
- * and the shared `requireNode` lookup (reused by the edge tool).
+ * The node tool domain — every canvas-node tool as a {@link CanvasTool} value: read (`list_nodes` /
+ * `describe_node` / `search_nodes` / `get_graph`), `move_node`, `set_properties`, `rename`, and structure
+ * (`add_node` / `delete_node`). Also owns the node projection (`listNodeLocations`), the per-turn context
+ * blocks (`renderNodeContext` / `renderEdgeContext`), and the shared `requireNode` lookup (reused by the edge tools).
  */
 
 // ── Projection + per-turn context ────────────────────────────────────────────────────────────────
@@ -112,7 +107,7 @@ export const requireNode = (
     return node ? { node } : { error: err(call, `no node with id "${nodeId}" exists on the canvas`) };
 };
 
-// ── READ — list_nodes (compact) + describe_node (detail), over any CanvasBinding ─────────────────
+// ── Tool defs (schemas) ────────────────────────────────────────────────────────────────────────
 
 const LIST_NODES_DEF: ToolDef = {
     name: 'list_nodes',
@@ -155,30 +150,6 @@ const SEARCH_NODES_DEF: ToolDef = {
     },
 };
 
-/** describe_node result (type + current config + block schema) — shared by the full read + the scoped search providers. Looks a node up by id: describe is always by a known id, so it is never type-scoped (only the node LIST is). */
-const describeNodeResult = (binding: CanvasBinding, catalog: CatalogLookup, call: ToolCall): ToolResult => {
-    const { nodeId } = call.args as { nodeId: string };
-    const found = requireNode(binding, call, nodeId);
-    if ('error' in found) return found.error;
-    const { node } = found;
-    return ok(call, { type: node.type, currentConfig: node.config ?? {}, schema: catalog.schema(node.type) });
-};
-
-/** READ provider over any {@link CanvasBinding}: `list_nodes` (compact, ALL nodes) + `describe_node` (detail). Carried by the orchestrator, the operation agents (locator, edge), and the builder. */
-export const createNodeReadToolProvider = (binding: CanvasBinding, catalog: CatalogLookup): ToolProvider => ({
-    listTools: () => [LIST_NODES_DEF, DESCRIBE_NODE_DEF],
-    dispatch: (call: ToolCall): ToolResult => {
-        if (call.name === 'list_nodes') {
-            return ok(call, { nodes: listNodeLocations(binding) });
-        }
-        if (call.name === 'describe_node') {
-            return describeNodeResult(binding, catalog, call);
-        }
-        return toolUnknown(call);
-    },
-});
-
-/** GET_GRAPH: the whole canvas — every node + every edge — in one call. */
 const GET_GRAPH_DEF: ToolDef = {
     name: 'get_graph',
     description:
@@ -187,57 +158,6 @@ const GET_GRAPH_DEF: ToolDef = {
         'before deciding your next step.',
     parameters: { type: 'object', properties: {} },
 };
-
-/**
- * The PULL counterpart to injecting the canvas into context each turn (context-strategy-and-composition.md):
- * an agent fetches current state on demand via `get_graph`, which returns the same nodes + edges render.
- */
-export const createGraphReadToolProvider = (binding: CanvasBinding): ToolProvider => ({
-    listTools: () => [GET_GRAPH_DEF],
-    dispatch: (call: ToolCall): ToolResult => {
-        if (call.name === 'get_graph') {
-            return ok(call, { graph: `${renderNodeContext(binding)}\n\n${renderEdgeContext(binding)}` });
-        }
-        return toolUnknown(call);
-    },
-});
-
-/**
- * SEARCH provider: `search_nodes` (a search over the current nodes — `query` matched against id/label/type)
- * + `describe_node` (detail). `opts.type` is OPTIONAL: when set it structurally scopes the search to that ONE
- * block type (a block agent passes its own type, so it only ever sees that type and never the whole canvas);
- * left unset it is a general node search any agent can carry.
- */
-export const createNodeSearchToolProvider = (
-    binding: CanvasBinding,
-    catalog: CatalogLookup,
-    opts: { type?: string } = {}
-): ToolProvider => ({
-    listTools: () => [SEARCH_NODES_DEF, DESCRIBE_NODE_DEF],
-    dispatch: (call: ToolCall): ToolResult => {
-        if (call.name === 'search_nodes') {
-            const { query } = (call.args ?? {}) as { query?: string };
-            // Apply the optional structural scope first, then the query filter.
-            let nodes = opts.type ? listNodeLocationsOfType(binding, opts.type) : listNodeLocations(binding);
-            const q = query?.trim().toLowerCase();
-            if (q) {
-                nodes = nodes.filter(
-                    n =>
-                        n.id.toLowerCase().includes(q) ||
-                        (n.label ?? '').toLowerCase().includes(q) ||
-                        n.type.toLowerCase().includes(q)
-                );
-            }
-            return ok(call, { nodes });
-        }
-        if (call.name === 'describe_node') {
-            return describeNodeResult(binding, catalog, call);
-        }
-        return toolUnknown(call);
-    },
-});
-
-// ── MOVE — move_node (write: position), applied straight through the CanvasBinding ───────────────
 
 const MOVE_NODE_DEF: ToolDef = {
     name: 'move_node',
@@ -266,33 +186,6 @@ const MOVE_NODE_DEF: ToolDef = {
     },
 };
 
-/** MOVE provider (write: position): `move_node` applied straight through the {@link CanvasBinding}; returns `{ nodeId, label, from, to }`. Carried by the `locator`. */
-export const createNodeMoveToolProvider = (binding: CanvasBinding): ToolProvider => ({
-    listTools: () => [MOVE_NODE_DEF],
-    dispatch: (call: ToolCall): ToolResult => {
-        if (call.name === 'move_node') {
-            const args = call.args as MoveNodeArgs;
-            if (!hasExactlyOneTarget(args)) {
-                return err(call, 'move_node requires exactly one of `by` (relative) or `to` (absolute)');
-            }
-            const found = requireNode(binding, call, args.nodeId);
-            if ('error' in found) return found.error;
-            const { node } = found;
-            const from: XY = { x: node.position.x, y: node.position.y };
-            const to = applyMove(from, args);
-            if (!Number.isFinite(to.x) || !Number.isFinite(to.y)) {
-                // Guard here too (the executor validator also rejects these) so a direct caller can't corrupt a position.
-                return err(call, 'move_node resulting position must be finite numbers');
-            }
-            binding.updateNode(args.nodeId, { position: to });
-            return ok(call, { nodeId: args.nodeId, label: node.customLabel, from, to });
-        }
-        return toolUnknown(call);
-    },
-});
-
-// ── CONFIG — set_properties (write: config), over a CanvasBinding ─────────────────────────────────
-
 const SET_PROPERTIES_DEF: ToolDef = {
     name: 'set_properties',
     description:
@@ -308,6 +201,65 @@ const SET_PROPERTIES_DEF: ToolDef = {
         required: ['nodeId', 'config'],
     },
 };
+
+const RENAME_DEF: ToolDef = {
+    name: 'rename',
+    description: "Rename an existing node (its custom label). Pass '' to clear a custom label.",
+    requires: 'canEditConfig',
+    parameters: {
+        type: 'object',
+        properties: {
+            nodeId: { type: 'string', description: 'The id of the node to rename.' },
+            label: { type: 'string', description: "The new label ('' clears a custom label)." },
+        },
+        required: ['nodeId', 'label'],
+    },
+};
+
+const ADD_NODE_DEF: ToolDef = {
+    name: 'add_node',
+    description:
+        "Add one new node of a block `type` at a canvas `position`. Created with the block's default config; " +
+        'optionally pass `config` to set non-default values in the SAME call (merged over the defaults and ' +
+        "validated like set_properties — a bad value adds nothing). Returns the new node's id and its default " +
+        'label (rename it if the plan wants a clearer name). It does NOT wire the node to anything.',
+    requires: 'canModifyCanvas',
+    parameters: {
+        type: 'object',
+        properties: {
+            type: {
+                type: 'string',
+                description: 'The block type to create.',
+            },
+            position: {
+                type: 'object',
+                description: 'Absolute canvas position in px.',
+                properties: { x: { type: 'number' }, y: { type: 'number' } },
+                required: ['x', 'y'],
+            },
+            config: {
+                type: 'object',
+                description: 'Optional initial config values to set on the new node (merged over the defaults).',
+            },
+        },
+        required: ['type', 'position'],
+    },
+};
+
+const DELETE_NODE_DEF: ToolDef = {
+    name: 'delete_node',
+    description:
+        'Delete one existing node. Every edge connected to it is removed with it (cascade). ' +
+        'The removed edges are reported in the result.',
+    requires: 'canModifyCanvas',
+    parameters: {
+        type: 'object',
+        properties: { nodeId: { type: 'string', description: 'The id of the node to delete.' } },
+        required: ['nodeId'],
+    },
+};
+
+// ── Config validation (shared by set_properties + add_node's optional initial config) ────────────
 
 /** Validate config entries against a block schema. Returns human-readable errors (empty = valid). */
 const validateConfigEntries = (schema: BlockSchema, config: Record<string, unknown>): string[] => {
@@ -357,160 +309,203 @@ const prepareConfig = (
     return { config: normalized };
 };
 
-/** CONFIG provider (write: config) over a {@link CanvasBinding}: `set_properties` (merged, catalog-validated). A rejected value is never applied. Wired directly into every block agent (and the builder) via its constructor. Labeling lives in the separate {@link createNodeRenameToolProvider}, so a block agent configures but does not rename. */
-export const createNodeConfigToolProvider = (binding: CanvasBinding, catalog: CatalogLookup): ToolProvider => ({
-    listTools: () => [SET_PROPERTIES_DEF],
-    dispatch: (call: ToolCall): ToolResult => {
-        if (call.name === 'set_properties') {
-            const { nodeId, config } = call.args as { nodeId: string; config: Record<string, unknown> };
-            const found = requireNode(binding, call, nodeId);
-            if ('error' in found) return found.error;
-            const { node } = found;
-            const schema = catalog.schema(node.type);
-            if (!schema) {
-                return err(call, `no schema for block type "${node.type}"`);
-            }
-            const prepared = prepareConfig(schema, config);
-            if ('errors' in prepared) {
-                return err(call, prepared.errors.join('; '));
-            }
-            binding.updateNode(nodeId, { config: prepared.config });
-            return ok(call, { nodeId, config: prepared.config });
-        }
-        return toolUnknown(call);
-    },
-});
+// ── Handlers — one per tool, each a pure function of (binding[, catalog], call) ───────────────────
 
-// ── RENAME — rename (write: label), over a CanvasBinding ──────────────────────────────────────────
-
-const RENAME_DEF: ToolDef = {
-    name: 'rename',
-    description: "Rename an existing node (its custom label). Pass '' to clear a custom label.",
-    requires: 'canEditConfig',
-    parameters: {
-        type: 'object',
-        properties: {
-            nodeId: { type: 'string', description: 'The id of the node to rename.' },
-            label: { type: 'string', description: "The new label ('' clears a custom label)." },
-        },
-        required: ['nodeId', 'label'],
-    },
+/** describe_node result (type + current config + block schema). Looks a node up by id: describe is always by a known id, so it is never type-scoped (only the node LIST is). */
+const describeNodeResult = (binding: CanvasBinding, catalog: CatalogLookup, call: ToolCall): ToolResult => {
+    const { nodeId } = call.args as { nodeId: string };
+    const found = requireNode(binding, call, nodeId);
+    if ('error' in found) return found.error;
+    const { node } = found;
+    return ok(call, { type: node.type, currentConfig: node.config ?? {}, schema: catalog.schema(node.type) });
 };
 
-/**
- * RENAME provider (write: label) over a {@link CanvasBinding}: `rename` sets a node's `customLabel` (`''`
- * clears it). Carried by the BUILDER only — labeling a node is part of authoring the flow's structure at build
- * time, not per-node content, so block agents configure but do not rename. Needs no catalog: a label is free
- * text, not a schema-validated field.
- */
-export const createNodeRenameToolProvider = (binding: CanvasBinding): ToolProvider => ({
-    listTools: () => [RENAME_DEF],
-    dispatch: (call: ToolCall): ToolResult => {
-        if (call.name === 'rename') {
-            const { nodeId, label } = call.args as { nodeId: string; label: string };
-            const found = requireNode(binding, call, nodeId);
-            if ('error' in found) return found.error;
-            binding.updateNode(nodeId, { label });
-            return ok(call, { nodeId, label });
-        }
-        return toolUnknown(call);
-    },
-});
-
-// ── STRUCTURE — add_node + delete_node (write: add/delete node), over a CanvasBinding ────────────
-
-const ADD_NODE_DEF: ToolDef = {
-    name: 'add_node',
-    description:
-        "Add one new node of a block `type` at a canvas `position`. Created with the block's default config; " +
-        'optionally pass `config` to set non-default values in the SAME call (merged over the defaults and ' +
-        "validated like set_properties — a bad value adds nothing). Returns the new node's id and its default " +
-        'label (rename it if the plan wants a clearer name). It does NOT wire the node to anything.',
-    requires: 'canModifyCanvas',
-    parameters: {
-        type: 'object',
-        properties: {
-            type: {
-                type: 'string',
-                description: 'The block type to create.',
-            },
-            position: {
-                type: 'object',
-                description: 'Absolute canvas position in px.',
-                properties: { x: { type: 'number' }, y: { type: 'number' } },
-                required: ['x', 'y'],
-            },
-            config: {
-                type: 'object',
-                description: 'Optional initial config values to set on the new node (merged over the defaults).',
-            },
-        },
-        required: ['type', 'position'],
-    },
+/** search_nodes result: `opts.searchType` (when set) structurally scopes to ONE block type; then the `query` filter. */
+const searchNodesResult = (binding: CanvasBinding, searchType: string | undefined, call: ToolCall): ToolResult => {
+    const { query } = (call.args ?? {}) as { query?: string };
+    let nodes = searchType ? listNodeLocationsOfType(binding, searchType) : listNodeLocations(binding);
+    const q = query?.trim().toLowerCase();
+    if (q) {
+        nodes = nodes.filter(
+            n =>
+                n.id.toLowerCase().includes(q) ||
+                (n.label ?? '').toLowerCase().includes(q) ||
+                n.type.toLowerCase().includes(q)
+        );
+    }
+    return ok(call, { nodes });
 };
 
-const DELETE_NODE_DEF: ToolDef = {
-    name: 'delete_node',
-    description:
-        'Delete one existing node. Every edge connected to it is removed with it (cascade). ' +
-        'The removed edges are reported in the result.',
-    requires: 'canModifyCanvas',
-    parameters: {
-        type: 'object',
-        properties: { nodeId: { type: 'string', description: 'The id of the node to delete.' } },
-        required: ['nodeId'],
-    },
+/** move_node result: exactly one of `by`/`to`, applied through the binding; guards a non-finite destination. */
+const moveNodeResult = (binding: CanvasBinding, call: ToolCall): ToolResult => {
+    const args = call.args as MoveNodeArgs;
+    if (!hasExactlyOneTarget(args)) {
+        return err(call, 'move_node requires exactly one of `by` (relative) or `to` (absolute)');
+    }
+    const found = requireNode(binding, call, args.nodeId);
+    if ('error' in found) return found.error;
+    const { node } = found;
+    const from: XY = { x: node.position.x, y: node.position.y };
+    const to = applyMove(from, args);
+    if (!Number.isFinite(to.x) || !Number.isFinite(to.y)) {
+        // Guard here too (the executor validator also rejects these) so a direct caller can't corrupt a position.
+        return err(call, 'move_node resulting position must be finite numbers');
+    }
+    binding.updateNode(args.nodeId, { position: to });
+    return ok(call, { nodeId: args.nodeId, label: node.customLabel, from, to });
 };
 
-/** STRUCTURE provider (write: add/delete node) over a {@link CanvasBinding}: `add_node` (catalog-validated type, optional initial config) + `delete_node` (cascades edges). Wired directly into every block agent (and the builder) via its constructor. */
-export const createNodeStructureToolProvider = (binding: CanvasBinding, catalog: CatalogLookup): ToolProvider => ({
-    listTools: () => [ADD_NODE_DEF, DELETE_NODE_DEF],
-    dispatch: (call: ToolCall): ToolResult => {
-        if (call.name === 'add_node') {
-            const { type, position, config } = call.args as {
-                type: string;
-                position: XY;
-                config?: Record<string, unknown>;
-            };
-            const schema = catalog.schema(type);
-            if (!schema) {
-                return err(call, `unknown block type "${type}"`);
-            }
-            // Validate the optional initial config BEFORE creating, so a bad value adds nothing (atomic).
-            let initialConfig: Record<string, string> | undefined;
-            if (config && Object.keys(config).length > 0) {
-                const prepared = prepareConfig(schema, config);
-                if ('errors' in prepared) {
-                    return err(call, prepared.errors.join('; '));
-                }
-                initialConfig = prepared.config;
-            }
-            const { id } = binding.addNode(type, position);
-            if (initialConfig) {
-                binding.updateNode(id, { config: initialConfig });
-            }
-            // Report the node's default label (the block's catalog label) so the builder knows what the new node
-            // is called and can rename it at build time; a fresh node carries no customLabel yet.
-            return ok(call, {
-                nodeId: id,
-                type,
-                label: schema.label,
-                position,
-                ...(initialConfig ? { config: initialConfig } : {}),
-            });
+/** set_properties result: partial `config` merged over existing, catalog-validated; a rejected value is never applied. */
+const setPropertiesResult = (binding: CanvasBinding, catalog: CatalogLookup, call: ToolCall): ToolResult => {
+    const { nodeId, config } = call.args as { nodeId: string; config: Record<string, unknown> };
+    const found = requireNode(binding, call, nodeId);
+    if ('error' in found) return found.error;
+    const { node } = found;
+    const schema = catalog.schema(node.type);
+    if (!schema) {
+        return err(call, `no schema for block type "${node.type}"`);
+    }
+    const prepared = prepareConfig(schema, config);
+    if ('errors' in prepared) {
+        return err(call, prepared.errors.join('; '));
+    }
+    binding.updateNode(nodeId, { config: prepared.config });
+    return ok(call, { nodeId, config: prepared.config });
+};
+
+/** rename result: sets a node's `customLabel` (`''` clears it). No catalog — a label is free text, not schema-validated. */
+const renameResult = (binding: CanvasBinding, call: ToolCall): ToolResult => {
+    const { nodeId, label } = call.args as { nodeId: string; label: string };
+    const found = requireNode(binding, call, nodeId);
+    if ('error' in found) return found.error;
+    binding.updateNode(nodeId, { label });
+    return ok(call, { nodeId, label });
+};
+
+/** add_node result: catalog-validated type + optional initial config (validated BEFORE creating, so a bad value adds nothing). */
+const addNodeResult = (binding: CanvasBinding, catalog: CatalogLookup, call: ToolCall): ToolResult => {
+    const { type, position, config } = call.args as {
+        type: string;
+        position: XY;
+        config?: Record<string, unknown>;
+    };
+    const schema = catalog.schema(type);
+    if (!schema) {
+        return err(call, `unknown block type "${type}"`);
+    }
+    // Validate the optional initial config BEFORE creating, so a bad value adds nothing (atomic).
+    let initialConfig: Record<string, string> | undefined;
+    if (config && Object.keys(config).length > 0) {
+        const prepared = prepareConfig(schema, config);
+        if ('errors' in prepared) {
+            return err(call, prepared.errors.join('; '));
         }
-        if (call.name === 'delete_node') {
-            const { nodeId } = call.args as { nodeId: string };
-            const found = requireNode(binding, call, nodeId);
-            if ('error' in found) return found.error;
-            const droppedEdges = binding
-                .readGraph()
-                .edges.filter(e => e.sourceNodeId === nodeId || e.targetNodeId === nodeId)
-                .map(e => e.id)
-                .filter((id): id is string => id !== undefined);
-            binding.deleteNode(nodeId);
-            return ok(call, { nodeId, droppedEdges });
-        }
-        return toolUnknown(call);
-    },
-});
+        initialConfig = prepared.config;
+    }
+    const { id } = binding.addNode(type, position);
+    if (initialConfig) {
+        binding.updateNode(id, { config: initialConfig });
+    }
+    // Report the node's default label (the block's catalog label) so the builder knows what the new node is
+    // called and can rename it at build time; a fresh node carries no customLabel yet.
+    return ok(call, {
+        nodeId: id,
+        type,
+        label: schema.label,
+        position,
+        ...(initialConfig ? { config: initialConfig } : {}),
+    });
+};
+
+/** delete_node result: removes the node and cascades every edge that touches it, reporting the dropped edge ids. */
+const deleteNodeResult = (binding: CanvasBinding, call: ToolCall): ToolResult => {
+    const { nodeId } = call.args as { nodeId: string };
+    const found = requireNode(binding, call, nodeId);
+    if ('error' in found) return found.error;
+    const droppedEdges = binding
+        .readGraph()
+        .edges.filter(e => e.sourceNodeId === nodeId || e.targetNodeId === nodeId)
+        .map(e => e.id)
+        .filter((id): id is string => id !== undefined);
+    binding.deleteNode(nodeId);
+    return ok(call, { nodeId, droppedEdges });
+};
+
+// ── The tools — self-named values, selected by identity, bound to deps by `toolset` ──────────────
+
+export const LIST_NODES: CanvasTool = {
+    def: LIST_NODES_DEF,
+    build:
+        ({ binding }) =>
+        call =>
+            ok(call, { nodes: listNodeLocations(binding) }),
+};
+export const DESCRIBE_NODE: CanvasTool = {
+    def: DESCRIBE_NODE_DEF,
+    build:
+        ({ binding, catalog }) =>
+        call =>
+            describeNodeResult(binding, catalog, call),
+};
+export const SEARCH_NODES: CanvasTool = {
+    def: SEARCH_NODES_DEF,
+    build:
+        ({ binding, searchType }) =>
+        call =>
+            searchNodesResult(binding, searchType, call),
+};
+export const GET_GRAPH: CanvasTool = {
+    def: GET_GRAPH_DEF,
+    build:
+        ({ binding }) =>
+        call =>
+            ok(call, { graph: `${renderNodeContext(binding)}\n\n${renderEdgeContext(binding)}` }),
+};
+export const MOVE_NODE: CanvasTool = {
+    def: MOVE_NODE_DEF,
+    build:
+        ({ binding }) =>
+        call =>
+            moveNodeResult(binding, call),
+};
+export const SET_PROPERTIES: CanvasTool = {
+    def: SET_PROPERTIES_DEF,
+    build:
+        ({ binding, catalog }) =>
+        call =>
+            setPropertiesResult(binding, catalog, call),
+};
+export const RENAME: CanvasTool = {
+    def: RENAME_DEF,
+    build:
+        ({ binding }) =>
+        call =>
+            renameResult(binding, call),
+};
+export const ADD_NODE: CanvasTool = {
+    def: ADD_NODE_DEF,
+    build:
+        ({ binding, catalog }) =>
+        call =>
+            addNodeResult(binding, catalog, call),
+};
+export const DELETE_NODE: CanvasTool = {
+    def: DELETE_NODE_DEF,
+    build:
+        ({ binding }) =>
+        call =>
+            deleteNodeResult(binding, call),
+};
+
+/** Every node tool — the bundle for callers that want the whole node surface (e.g. the capability-gate audit). */
+export const NODE_TOOLS: CanvasTool[] = [
+    LIST_NODES,
+    DESCRIBE_NODE,
+    SEARCH_NODES,
+    GET_GRAPH,
+    MOVE_NODE,
+    SET_PROPERTIES,
+    RENAME,
+    ADD_NODE,
+    DELETE_NODE,
+];

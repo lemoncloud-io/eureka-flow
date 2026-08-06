@@ -1,8 +1,8 @@
 import type { EdgeData } from '@lemoncloud/eureka-flows-api';
 
 /**
- * Pure, DOM-free edge-validation rules — the single source of truth shared by the headless `edge` tool
- * (`createEdgeToolProvider`) and the React canvas (`apps/web` re-exports these from `@flows/agent`, so there
+ * Pure, DOM-free edge-validation rules — the single source of truth shared by the headless edge tools
+ * (`edgeTools.ts`) and the React canvas (`apps/web` re-exports these from `@flows/agent`, so there
  * is one implementation, not two that can drift). Mirrors `moveSemantics.ts`: no imports beyond a type.
  */
 

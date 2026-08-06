@@ -17,7 +17,7 @@
 > `load → add → undo → redo → save → run` in Node); the agent runs headless today
 > (`__tests__/headless-gemini.smoke.spec.ts`); the reactive-store wiring mirrors the shipped web binding
 > `apps/web/.../hooks/useAgentSession.ts`. Gemini Developer API only (Vertex dropped 2026-08-05). Last updated
-> 2026-08-05.
+> 2026-08-06.
 
 ---
 
@@ -85,7 +85,9 @@ panes. The only component with genuinely new behaviour is the **two-pane rendere
    machine-readable verdict for oracles — it **must not** run here. Production turns end with the
    orchestrator's plain-text message; that is what the chat renders.
 
-## 3 · Architecture — terminal vs web
+## 3 · Architecture
+
+### 3.1 · Terminal vs web
 
 Both hosts assemble and drive the **same** core: `FlowEngine` → `createEngineCanvasBinding` →
 `createBlockCatalogLookup`, with `createOrchestratorAgent` on top writing through a reactive `SessionStore`.
@@ -134,6 +136,52 @@ flowchart TB
 The one asymmetry _inside_ the core is how blocks are loaded: the terminal pulls the registry over HTTP via
 `createFlowWorkspace`, the browser reads it from the app's store — same registry in, so the binding and catalog
 are identical either way. (For the terminal's own internal wiring — entry, input router, driver — see §6.)
+
+### 3.2 · The core loop
+
+Strip the plumbing (config objects, engine internals, the wire log) and the logic is one loop: a typed line
+becomes agent edits, and every edit redraws. Five pieces play — `Terminal` (the `main()` entry) is the only
+concrete one; the rest are interfaces it drives.
+
+```mermaid
+classDiagram
+    direction LR
+
+    class Terminal {
+        <<view>>
+        paint()
+    }
+    class TerminalRun {
+        <<driver>>
+        submit(text)
+        onChange(listener)
+    }
+    class Agent {
+        <<orchestrator>>
+        send(text)
+    }
+    class CanvasBinding {
+        <<canvas>>
+        readGraph()
+        addNode()
+    }
+    class SessionStore {
+        <<seam>>
+        save(state)
+    }
+
+    Terminal --> TerminalRun : 1 submit text
+    TerminalRun --> Agent : 2 send text
+    Agent --> CanvasBinding : 3a edit canvas
+    Agent --> SessionStore : 3b save state, each write
+    SessionStore --> TerminalRun : 4 onChange
+    TerminalRun --> CanvasBinding : 5 readGraph
+    TerminalRun --> Terminal : 6 state + graph, redraw
+```
+
+The seam is the whole trick: the agent writes session state on every step (3b), each write fires `onChange`
+(4), and the driver re-reads the graph (5) and repaints (6) — so the canvas advances mid-turn, not only at the
+end. Per-piece detail: the seam §4, the driver §5, the renderer §6.
 
 ## 4 · The reactive seam — `SessionStore.save` as the observer
 
@@ -260,11 +308,11 @@ specialist finishes, not only at the end.
   scroll target at a time (marked `‹scroll›` in its header); `/pane` switches canvas⇄chat. Scroll it with the
   **mouse wheel** or **↑/↓** (the entry requests alternate-scroll `?1007h` so xterm.js/VS Code maps the wheel
   to arrow keys; input history is disabled to free the arrows), **PageUp/PageDown** (a page), or — for
-  terminals that grab those keys (VS Code grabs Shift+PageUp) — the typed **`/u` `/d` `/top` `/bottom`**, which
+  terminals that grab those keys (VS Code grabs Shift+PageUp) — the typed **`/top` `/bottom`**, which
   always reach the app. `/keys` echoes each keypress name for diagnosing a stubborn terminal. A `▲N`/`▼N`
   marker shows off-screen lines; a new objective snaps back to the live tail. Offsets are pure state in
   `composeFrame` (clamped + echoed back), so the math is unit-tested; the handlers only nudge them and repaint.
-- **Meta commands** (view-local): `/pane`, `/u [n]`, `/d [n]`, `/top`, `/bottom`, `/keys`, `/graph` (writes
+- **Meta commands** (view-local): `/pane`, `/top`, `/bottom`, `/keys`, `/graph` (writes
   full JSON to `./graph.json`), `/seed <file>`, `/save` (backend, or `<file>` local — see below), `/reset`,
   `/verbose`, `/provider`, `/log`, `/help`, `/quit`; **Ctrl-C** → `abort()` mid-turn else quit; **Ctrl-D** →
   quit. `/reset` and `/seed` call `driver.reset(seed?)`.
@@ -283,9 +331,8 @@ specialist finishes, not only at the end.
   automatically after each completed turn (disable with `--no-autosave`) and on `/save`; a non-owner editor
   sees `saved settings only …` when the server drops added/deleted structure. Offline, `/save` writes a local
   JSON file instead. `/save <file>` always exports locally.
-- **Offline / demo** — `--fake` injects a constant-reply fake gateway (zero API spend); `--demo` additionally seeds a
-  big graph + a long reply so both panes overflow for scroll-testing. The engine + binding are always real, so
-  canvas behaviour is unchanged.
+- **Offline** — `--fake` injects a constant-reply fake gateway (zero API spend); the engine + binding are
+  always real, so canvas behaviour is unchanged.
 - **One-shot (headless)** — `--once <objective>` skips the TUI entirely: drives a single turn, prints the
   assistant reply then the resulting graph JSON to stdout, autosaves in connected mode, and exits (non-zero on
   a failed turn). The scriptable, non-interactive counterpart to the two-pane loop.

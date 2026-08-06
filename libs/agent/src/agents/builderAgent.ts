@@ -1,17 +1,20 @@
 import { BaseAgent } from './baseAgent';
 import { SEED_SKILLS, createUseSkillToolProvider } from '../skills';
-import { createCatalogToolProvider } from '../tools/catalogTools';
-import { createEdgeToolProvider } from '../tools/edgeTools';
+import { CATALOG_SEARCH } from '../tools/catalogTools';
+import { CONNECT_NODES, DISCONNECT_EDGE, LIST_EDGES } from '../tools/edgeTools';
 import {
-    createGraphReadToolProvider,
-    createNodeConfigToolProvider,
-    createNodeMoveToolProvider,
-    createNodeReadToolProvider,
-    createNodeRenameToolProvider,
-    createNodeStructureToolProvider,
+    ADD_NODE,
+    DELETE_NODE,
+    DESCRIBE_NODE,
+    GET_GRAPH,
+    LIST_NODES,
+    MOVE_NODE,
+    RENAME,
+    SET_PROPERTIES,
     renderEdgeContext,
     renderNodeContext,
 } from '../tools/nodeTools';
+import { toolset } from '../tools/toolset';
 
 import type { BaseAgentDeps } from './baseAgent';
 import type { Agent } from '../agent';
@@ -88,7 +91,7 @@ export const BUILDER_MAX_ITERATIONS = 30;
 
 /**
  * The composition specialist: the FULL editing toolset (read · catalog · structure · config · rename · edge ·
- * move) plus `use_skill` over {@link SEED_SKILLS}, all wired directly over the live `binding`. Grant is the union the
+ * move) listed as {@link CanvasTool} values and composed by {@link toolset}, plus `use_skill` over {@link SEED_SKILLS}. Grant is the union the
  * writes need (`canModifyCanvas` + `canEditConfig`), gated at the executor against the user's flow-role too. A
  * leaf sub-turn: it carries no `spawn`, so it never nests.
  */
@@ -105,14 +108,22 @@ export class BuilderAgent extends BaseAgent {
                 systemPrompt: BUILDER_SYSTEM_PROMPT,
                 grant: { canModifyCanvas: true, canEditConfig: true },
                 tools: [
-                    createNodeReadToolProvider(deps.binding, deps.catalog), // list_nodes, describe_node
-                    createCatalogToolProvider(deps.catalog), // catalog_search (full schema per hit)
-                    createNodeStructureToolProvider(deps.binding, deps.catalog), // add_node, delete_node
-                    createNodeConfigToolProvider(deps.binding, deps.catalog), // set_properties
-                    createNodeRenameToolProvider(deps.binding), // rename (labels — the builder owns labeling at build time)
-                    createEdgeToolProvider(deps.binding, deps.catalog), // list_edges, connect_nodes, disconnect_edge
-                    createNodeMoveToolProvider(deps.binding), // move_node
-                    createGraphReadToolProvider(deps.binding), // get_graph (pull the whole canvas on demand)
+                    // The whole editing surface, selected by identity: read + catalog + structure (add/delete)
+                    // + config + rename + edges + move + the get_graph pull.
+                    toolset({ binding: deps.binding, catalog: deps.catalog }, [
+                        LIST_NODES,
+                        DESCRIBE_NODE,
+                        CATALOG_SEARCH,
+                        ADD_NODE,
+                        DELETE_NODE,
+                        SET_PROPERTIES,
+                        RENAME,
+                        LIST_EDGES,
+                        CONNECT_NODES,
+                        DISCONNECT_EDGE,
+                        MOVE_NODE,
+                        GET_GRAPH,
+                    ]),
                     createUseSkillToolProvider(SEED_SKILLS), // use_skill (progressive-disclosure playbooks)
                 ],
             }
@@ -120,11 +131,9 @@ export class BuilderAgent extends BaseAgent {
     }
 
     /**
-     * Seed the starting canvas — its nodes AND their wiring — into the builder's FIRST user message (Approach 3),
-     * then let it pull fresh state via get_graph as it builds. The edge list is what makes an already-occupied
-     * input visible, so the builder frees it before reusing it (the persona's remove-before-reuse rule) instead
-     * of connecting blindly and recovering from the rejection. Occupancy is a fact of the edge set, never of a
-     * node, so it can only be seen through the wiring.
+     * Seed the starting canvas — nodes AND wiring — into the builder's first user message; it then pulls fresh
+     * state via get_graph as it builds. The edges are seeded so an already-occupied input is visible from
+     * context (occupancy is a fact of the edge set, not of a node).
      */
     protected override initialUserPreamble(): string {
         return `${renderNodeContext(this.binding)}\n\n${renderEdgeContext(this.binding)}`;

@@ -1,14 +1,10 @@
 import { BaseAgent } from './baseAgent';
 import { createDefaultRoster } from './registrations';
 import { createSubAgentRunner } from './subAgentRunner';
-import { createCatalogToolProvider } from '../tools/catalogTools';
-import {
-    createGraphReadToolProvider,
-    createNodeReadToolProvider,
-    renderEdgeContext,
-    renderNodeContext,
-} from '../tools/nodeTools';
+import { CATALOG_SEARCH } from '../tools/catalogTools';
+import { DESCRIBE_NODE, GET_GRAPH, LIST_NODES, renderEdgeContext, renderNodeContext } from '../tools/nodeTools';
 import { createAgentDirectoryToolProvider, createSpawnToolProvider } from '../tools/spawnTools';
+import { toolset } from '../tools/toolset';
 
 import type { BaseAgentDeps, CollectedToolCall } from './baseAgent';
 import type { AgentRoster } from './roster';
@@ -146,9 +142,13 @@ export class OrchestratorAgent extends BaseAgent {
                 // and each spawned child is gated by its own grant + the user's permissions at the executor.
                 grant: {},
                 tools: [
-                    createNodeReadToolProvider(deps.binding, deps.catalog),
-                    createGraphReadToolProvider(deps.binding),
-                    createCatalogToolProvider(deps.catalog),
+                    // Read + plan only — no write tools. list_nodes/describe_node + the get_graph pull + catalog.
+                    toolset({ binding: deps.binding, catalog: deps.catalog }, [
+                        LIST_NODES,
+                        DESCRIBE_NODE,
+                        GET_GRAPH,
+                        CATALOG_SEARCH,
+                    ]),
                     createAgentDirectoryToolProvider(roster),
                     createSpawnToolProvider(runner, deps.binding, () => signalHolder.current),
                 ],
@@ -163,7 +163,7 @@ export class OrchestratorAgent extends BaseAgent {
     }
 
     /**
-     * Seed the starting canvas into the orchestrator's first user message (Approach 3); it pulls fresh state via
+     * Seed the starting canvas into the orchestrator's first user message; it then pulls fresh state via
      * get_graph as spawned children mutate the canvas, rather than re-reading an injected copy each turn.
      */
     protected override initialUserPreamble(): string {

@@ -156,14 +156,8 @@ out to the block agents. The `spawn` / roster mechanism is design-agnostic — t
 is how the earlier fan-out-vs-builder A/B was measured ([eval-benchmark](./eval-benchmark.md), now settled). The
 two sub-agent shapes below are the shipped roster.
 
-> **Removed in the shipped hybrid (2026-08-05).** The cross-block **operation agents** `locator` (move) and
-> `edge` (connect/disconnect) — and the older operation-split `node` / `property` agents — have been **removed**;
-> the **builder** owns wiring, layout, and labeling (rename), and block agents own config
-> ([architecture.md · the hybrid writer layer](./architecture.md#the-hybrid-writer-layer)). Their edit primitives
-> live on as the tool providers the builder + block agents carry.
-
 **Sub-agents come in two shapes — block agents (per block type) and the composition builder.** A **block agent**
-owns one block type's content end-to-end (add · configure · delete a node of that type — NOT rename, the
+configures one block type's nodes (sets the fields of an existing node — NOT add/delete/rename, which are the
 builder's), with **type-scoped** reads (`search_nodes` lists only its own type); the orchestrator addresses it by putting the
 **block's type** in `spawn`'s `agentType`. The **builder** is the composition specialist: the orchestrator plans
 a multi-block build and spawns it (`agentType: 'builder'`) with the plan, and it builds the whole (sub-)flow
@@ -175,8 +169,8 @@ every sub-agent it is a leaf (no `spawn`). Addressing resolves in the sub-agent 
    `single-output-generator` → `GeneratorAgent`, a `BlockAgent` with a richer AI persona) and the composition
    **`builder`**;
 2. else, if `agentType` is a **valid catalog block type**, a **generic `BlockAgent(agentType)`** is synthesized
-   on the fly (create + configure + delete that block, driven purely by its schema) — so any
-   server-served block is covered with no new code;
+   on the fly (configures that block's nodes, driven purely by its schema) — so any server-served block is
+   covered with no new code;
 3. else, the spawn fails with `no specialist of type "<agentType>"` (unchanged).
 
 The orchestrator knows a node's type from `list_nodes` and the available block types from `catalog_search`, so
@@ -237,9 +231,9 @@ node's id, label, and type), which a block agent carries **scoped to its own blo
 the whole canvas — the scope is an optional structural bound, not a limit of the tool. **Write** is split by capability — `set_properties` / `rename`
 (`canEditConfig`), and the canvas-modifying writes `move_node` plus the structural `add_node` / `delete_node` /
 `connect_nodes` / `disconnect_edge` (all `canModifyCanvas`, the flow-role flag that literally covers "add/delete
-nodes, connect edges") — so an agent mixes in only the writes its grant allows: a **block agent** adds /
-configures / deletes its block (both grants); the **builder** additionally renames, moves, and wires
-(connect/disconnect) with its full toolset.
+nodes, connect edges") — so an agent mixes in only the writes its grant allows: a **block agent** only
+configures its block (`canEditConfig`); the **builder** carries every canvas-modifying write — add, delete,
+rename, move, connect/disconnect (both grants).
 
 | Tool                                      | Kind     | Target                | Notes                                                                                                                                                                   |
 | ----------------------------------------- | -------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -259,8 +253,8 @@ Permissions map op → capability: `set_properties`/`rename` need `canEditConfig
 "add/delete/resize nodes, connect edges, undo/redo, layout" — Owner + Editor). Note the name trap: flows'
 `canEditStructure` is **flow metadata** (rename/publish, Owner only), **not** graph structure, so structural
 graph edits use `canModifyCanvas`, not `canEditStructure`. Two layers gate a write: each specialist's OWN
-fixed grant (declared in its constructor — the builder and block agents grant themselves `canModifyCanvas` +
-`canEditConfig`) and the user's flow-role permissions (derived in the
+fixed grant (declared in its constructor — the builder grants itself `canModifyCanvas` + `canEditConfig`, a
+block agent only `canEditConfig`) and the user's flow-role permissions (derived in the
 **frontend** via `getPermissions` → `toAgentGrant`, `@flows/flows`, and threaded in as `userPermissions`). The
 executor gates each write on **both**, so a viewer (`userPermissions {}`) is denied even though the specialist
 grants itself the capability, while an editor — who has `canModifyCanvas` — is allowed (interfaces §4).
@@ -274,8 +268,8 @@ permissions).
 | Agent                                               | Read                                                                 | Write                                                                                                  | Delegate                                  | Grant                                                                                |
 | --------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------ |
 | **orchestrator** (main)                             | `list_nodes`, `describe_node`, `catalog_search`                      | **— none**                                                                                             | `list_agents`, `spawn`                    | `{}` (empty) — writes gated by each child's own fixed grant + the user's permissions |
-| **BlockAgent(type)** (sub, generic)                 | `search_nodes` (type-scoped), `describe_node`                        | `add_node`, `set_properties`, `delete_node` (no `rename` — builder's)                                  | —                                         | `canModifyCanvas` + `canEditConfig`                                                  |
-| **GeneratorAgent** (sub, `single-output-generator`) | same as BlockAgent                                                   | same as BlockAgent                                                                                     | —                                         | `canModifyCanvas` + `canEditConfig`                                                  |
+| **BlockAgent(type)** (sub, generic)                 | `search_nodes` (type-scoped), `describe_node`                        | `set_properties` (configure only)                                                                      | —                                         | `canEditConfig`                                                                      |
+| **GeneratorAgent** (sub, `single-output-generator`) | same as BlockAgent                                                   | same as BlockAgent                                                                                     | —                                         | `canEditConfig`                                                                      |
 | **builder** (sub, composition)                      | `list_nodes` (full), `describe_node`, `list_edges`, `catalog_search` | `add_node`, `set_properties`, `rename`, `delete_node`, `connect_nodes`, `disconnect_edge`, `move_node` | `use_skill` (load a playbook); no `spawn` | `canModifyCanvas` + `canEditConfig`                                                  |
 
 - The **orchestrator has no write tools** — every edit goes through a sub-agent. This forces
@@ -317,8 +311,8 @@ permissions).
 
 ### Skills — a separate, progressively-disclosed capability (used by the `builder`, not the other agents)
 
-The orchestrator and the block specialists **wire their tool providers directly** in their
-constructors — they do not compose "skills." **Skills** are a distinct capability: named, described **playbooks**
+The orchestrator and the block specialists **list the tool values they carry** (`toolset(deps, [...])`) in
+their constructors — they do not compose "skills." **Skills** are a distinct capability: named, described **playbooks**
 whose instructions a capable agent loads **on demand** through a `use_skill` tool (the in-process Claude Code
 Agent Skills model). The one consumer is the **composition `builder`** (§6): it carries `use_skill` over the seed
 playbooks and pulls one for the how-to, while the fixed specialists carry none. Design + the `Skill` / `use_skill`
