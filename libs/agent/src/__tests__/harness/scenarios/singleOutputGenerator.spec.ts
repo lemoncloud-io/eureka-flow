@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { createGeneratorAgent } from '../../../agents/generatorAgent';
+import { createSingleOutputGeneratorAgent } from '../../../agents/singleOutputGeneratorAgent';
 import { createInMemoryCanvasBinding } from '../../../canvas/inMemoryCanvasBinding';
 import { createFakeGateway } from '../../../llm/fakeGateway';
 import { createInMemorySessionStore } from '../../../session/session';
@@ -23,7 +23,7 @@ const setup = (script: FakeScriptStep[]) => {
     const gateway = createFakeGateway(script);
     const storage: SessionStore = createInMemorySessionStore();
     const flowId = 'flow-1';
-    const agent = createGeneratorAgent({
+    const agent = createSingleOutputGeneratorAgent({
         gateway,
         binding,
         catalog,
@@ -104,7 +104,7 @@ describe('generator agent — configure existing', () => {
 });
 
 describe('generator agent — specialist persona', () => {
-    it('drives GENERATOR_SYSTEM_PROMPT, not the generic block prompt (the override rides through)', async () => {
+    it('drives SINGLE_OUTPUT_GENERATOR_SYSTEM_PROMPT, not the generic block prompt (the override rides through)', async () => {
         const { agent, gateway } = setup([{ text: 'ok' }]);
 
         await agent.send('what can you do?');
@@ -114,7 +114,7 @@ describe('generator agent — specialist persona', () => {
             .map(m => m.content)
             .join('\n');
         // Domain knowledge ONLY the generator persona carries — the generic blockAgentSystemPrompt (label
-        // "Generator") never mentions the AI-block name or provider keys, so this proves createGeneratorAgent's
+        // "Generator") never mentions the AI-block name or provider keys, so this proves createSingleOutputGeneratorAgent's
         // persona override actually reached the model rather than the generic block prompt.
         expect(systemContent).toMatch(/AI Text Generator/);
         expect(systemContent).toMatch(/OpenAI key/);

@@ -302,7 +302,7 @@ permissions).
 - **Per-agent detail lives with each agent, not here.** The table above is the orchestrator's view of the
   surface; each agent's persona, exact tool behavior, and definition of done are its own SPEC — the generic
   block agent [agents/blockAgent.md](../agents/blockAgent.md), the generator specialist
-  [agents/generator.md](../agents/generator.md), and the composition [agents/builder.md](../agents/builder.md).
+  [agents/single-output-generator.md](../agents/single-output-generator.md), and the composition [agents/builder.md](../agents/builder.md).
   The roster + coverage map is [agents/README.md](../agents/README.md).
 - **Composition is split by KIND — the hybrid**
   ([architecture.md · the hybrid writer layer](./architecture.md#the-hybrid-writer-layer)). The orchestrator

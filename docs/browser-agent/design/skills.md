@@ -82,11 +82,11 @@ them every iteration, and feeds each tool result back — so the index is always
 Instructions-first playbooks under `skills/playbooks/*.md` (know-how, no tools of their own — the consuming
 agent already holds the tools):
 
-| Skill                   | Body carries                                                                                                                                                                                                                                      |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build-linear-pipeline` | the input → process… → output chain: add in dependency order, wire adjacent stages, lay out left-to-right                                                                                                                                         |
-| `configure-generator`   | the generator's model↔provider-key map + sampling params + system-vs-user prompt (the same know-how as the generator specialist's `GENERATOR_SYSTEM_PROMPT`, re-authored as a loadable Builder playbook — the const still drives the specialist) |
-| `validate-and-repair`   | the well-formedness checklist: no dangling required input, valid configs, no cycle — and the repair moves                                                                                                                                         |
+| Skill                   | Body carries                                                                                                                                                                                                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build-linear-pipeline` | the input → process… → output chain: add in dependency order, wire adjacent stages, lay out left-to-right                                                                                                                                                       |
+| `configure-generator`   | the generator's model↔provider-key map + sampling params + system-vs-user prompt (the same know-how as the generator specialist's `SINGLE_OUTPUT_GENERATOR_SYSTEM_PROMPT`, re-authored as a loadable Builder playbook — the const still drives the specialist) |
+| `validate-and-repair`   | the well-formedness checklist: no dangling required input, valid configs, no cycle — and the repair moves                                                                                                                                                       |
 
 `configure-generator` shows the direction: a named specialist's **configuration** know-how carved into a
 loadable skill the Builder can pull — "fewer, more capable agents, each built from many skills" — while the

@@ -2,7 +2,7 @@
  * Generic BlockAgent scenarios (no orchestrator): drive a `BlockAgent(type)` directly with a concrete task
  * over a fake gateway and assert the live graph — its definition of done. One agent owns one block type's
  * whole lifecycle (add · configure · rename · delete) and its reads are TYPE-SCOPED (`search_nodes`). The
- * named generator specialist has its own suite (generator.spec.ts); cross-agent behavior is integration.spec.ts.
+ * named generator specialist has its own suite (singleOutputGenerator.spec.ts); cross-agent behavior is integration.spec.ts.
  */
 import { describe, expect, it } from 'vitest';
 

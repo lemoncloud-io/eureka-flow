@@ -9,10 +9,10 @@
 
 ## Canonical specs
 
-- **Persona** — `GENERATOR_SYSTEM_PROMPT` in
-  [generatorAgent.ts](../../../libs/agent/src/agents/generatorAgent.ts): the same block-agent contract
+- **Persona** — `SINGLE_OUTPUT_GENERATOR_SYSTEM_PROMPT` in
+  [singleOutputGeneratorAgent.ts](../../../libs/agent/src/agents/singleOutputGeneratorAgent.ts): the same block-agent contract
   (full lifecycle, merge-only writes, reject + report, never invent) plus the generator's domain knowledge.
-- **Base** — `createGeneratorAgent` is `createBlockAgent` fixed to `single-output-generator` with a
+- **Base** — `createSingleOutputGeneratorAgent` is `createBlockAgent` fixed to `single-output-generator` with a
   persona/id/description override (same tools, grant, and type-scoped reads as the generic
   [block agent](./blockAgent.md)).
 - **Behavior & oracles** — [harness-scenarios.md](../design/harness-scenarios.md).
@@ -52,7 +52,7 @@ Identical to the [block agent](./blockAgent.md#tools): `search_nodes` (scoped to
 Where these live:
 
 - **Deterministic (always runs):**
-  [`scenarios/generator.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/generator.spec.ts) —
+  [`scenarios/singleOutputGenerator.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/singleOutputGenerator.spec.ts) —
   add+configure-in-one-turn / merge / reject-bad-model / type-scoped reads.
 - **Integration (orchestrator coordinating agents):**
   [`scenarios/integration.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/integration.spec.ts)

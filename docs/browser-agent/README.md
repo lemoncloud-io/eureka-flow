@@ -59,7 +59,7 @@ docs (start with [architecture.md](design/architecture.md)); the full roster + c
 - **The composition builder** — the orchestrator hands it the whole **structure** and it builds the (sub-)flow
   itself (add · wire · lay out), pulling on-demand playbooks via `use_skill`. Spec: [builder.md](agents/builder.md).
 - **Block agents** — one per block type; the orchestrator routes each node's **content** (config · rename) to
-  them. A block that earns domain knowledge gets a named specialist (e.g. [generator.md](agents/generator.md));
+  them. A block that earns domain knowledge gets a named specialist (e.g. [single-output-generator.md](agents/single-output-generator.md));
   every other type is served by a generic [blockAgent.md](agents/blockAgent.md) synthesized from the catalog.
 
 The cross-block operation agents `locator` (**move**) and `edge` (**connect / disconnect**) — and the older

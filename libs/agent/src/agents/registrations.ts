@@ -1,6 +1,6 @@
 import { createBuilderAgent } from './builderAgent';
-import { createGeneratorAgent } from './generatorAgent';
 import { createAgentRoster } from './roster';
+import { createSingleOutputGeneratorAgent } from './singleOutputGeneratorAgent';
 
 import type { AgentRegistration, AgentRoster } from './roster';
 
@@ -20,7 +20,7 @@ export const DEFAULT_REGISTRATIONS: AgentRegistration[] = [
         type: 'single-output-generator',
         summary:
             'AI text generator content: configure or rename a generator node (knows models, provider keys, temperature/topK/topP)',
-        create: deps => createGeneratorAgent(deps),
+        create: deps => createSingleOutputGeneratorAgent(deps),
     },
     {
         type: 'builder',

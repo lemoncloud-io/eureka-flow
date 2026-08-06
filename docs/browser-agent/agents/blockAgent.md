@@ -94,6 +94,6 @@ Where these live:
   (+ `.live`) — a generic block agent addressed by type (A3 rename via `output-preview`, A5 delete via `buffer`,
   R2 viewer-denied rename) lives there.
 
-> The named `single-output-generator` block specialist has its own spec: **[generator.md](./generator.md)**.
+> The named `single-output-generator` block specialist has its own spec: **[single-output-generator.md](./single-output-generator.md)**.
 > The block agent replaces the earlier operation-split `node` (add/delete) and `property` (config/rename)
 > agents, which have been removed.

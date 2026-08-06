@@ -301,7 +301,7 @@ declare function createAgentRoster(registrations: AgentRegistration[]): AgentRos
 // the roster's EXPLICIT entries (type · the concrete agent `create` builds):
 {
     type: 'single-output-generator';
-} // create → createGeneratorAgent({ binding, catalog, … })     — named block specialist (BlockAgent + AI persona)
+} // create → createSingleOutputGeneratorAgent({ binding, catalog, … })     — named block specialist (BlockAgent + AI persona)
 {
     type: 'builder';
 } // create → createBuilderAgent({ binding, catalog, … })       — COMPOSITION specialist: full toolset + use_skill(SEED_SKILLS)

@@ -4,7 +4,7 @@ export type { BaseAgentDeps, CollectedToolCall } from './baseAgent';
 // Block agents (per block type): the generic BlockAgent + the named generator specialist.
 export { createBlockAgent, BlockAgent, blockAgentSystemPrompt } from './blockAgent';
 export type { BlockAgentDeps } from './blockAgent';
-export { createGeneratorAgent, GENERATOR_SYSTEM_PROMPT } from './generatorAgent';
+export { createSingleOutputGeneratorAgent, SINGLE_OUTPUT_GENERATOR_SYSTEM_PROMPT } from './singleOutputGeneratorAgent';
 // Composition specialist: the Builder (full editing toolset + use_skill over SEED_SKILLS).
 export { createBuilderAgent, BuilderAgent, BUILDER_SYSTEM_PROMPT } from './builderAgent';
 export type { BuilderAgentDeps } from './builderAgent';

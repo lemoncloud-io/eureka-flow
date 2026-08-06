@@ -4,14 +4,14 @@ import type { BaseAgentDeps } from './baseAgent';
 import type { Agent } from '../agent';
 
 /** The block type the generator specialist owns. */
-const GENERATOR_TYPE = 'single-output-generator';
+const BLOCK_TYPE = 'single-output-generator';
 
 /**
  * The `single-output-generator` specialist persona — a {@link BlockAgent} with the AI block's real knowledge:
  * the model↔provider mapping, the generation parameters, and system vs. user prompt. Still a block agent:
  * it owns the generator's whole lifecycle (add/configure/rename/delete) and REPORTS rejections, never invents.
  */
-export const GENERATOR_SYSTEM_PROMPT = [
+export const SINGLE_OUTPUT_GENERATOR_SYSTEM_PROMPT = [
     'You are the AI Text Generator agent (`single-output-generator`) for a visual flow-builder. You own the whole',
     'lifecycle of generator nodes — create, configure, rename, delete — and only these; you never move or connect',
     'nodes (other specialists do that).',
@@ -45,14 +45,14 @@ export const GENERATOR_SYSTEM_PROMPT = [
  * Create the generator {@link Agent}: a {@link createBlockAgent} fixed to `single-output-generator` with the
  * specialist persona overriding the generic block prompt (same tools + grant + type-scoped reads).
  */
-export const createGeneratorAgent = (deps: BaseAgentDeps): Agent =>
+export const createSingleOutputGeneratorAgent = (deps: BaseAgentDeps): Agent =>
     createBlockAgent({
         ...deps,
-        blockType: GENERATOR_TYPE,
+        blockType: BLOCK_TYPE,
         config: {
-            id: 'generator',
+            id: 'single-output-generator',
             description: 'Creates, configures, renames, and deletes AI text generator nodes.',
-            systemPrompt: GENERATOR_SYSTEM_PROMPT,
+            systemPrompt: SINGLE_OUTPUT_GENERATOR_SYSTEM_PROMPT,
             ...deps.config,
         },
     });
