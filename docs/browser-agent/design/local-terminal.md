@@ -85,44 +85,55 @@ panes. The only component with genuinely new behaviour is the **two-pane rendere
    machine-readable verdict for oracles — it **must not** run here. Production turns end with the
    orchestrator's plain-text message; that is what the chat renders.
 
-## 3 · Architecture
+## 3 · Architecture — terminal vs web
 
-One Node process. The real flow stack in the middle is byte-for-byte the browser's; the renderer is the new
-part, and the gateway is the one intentional swap.
+Both hosts assemble and drive the **same** core: `FlowEngine` → `createEngineCanvasBinding` →
+`createBlockCatalogLookup`, with `createOrchestratorAgent` on top writing through a reactive `SessionStore`.
+They diverge at exactly **two** injection points — the **view** (①) and the **model gateway** (②). Read each
+side of the diagram top-to-bottom as one host; the middle box is one set of shipped modules, instantiated per
+host (not a runtime the two share).
 
 ```mermaid
 flowchart TB
-  subgraph proc["agent:terminal (one Node process)"]
-    ENTRY["entry / bootstrap<br/>(args, env, assembly)"]
-    IN["input reader (readline)<br/>+ command router"]
-    DRV["driver — createTerminalRun<br/>(thin glue)"]
-    STORE["observable SessionStore<br/>save(state) ⇒ notify"]
-    ORCH["createOrchestratorAgent"]
-    REND["two-pane renderer  ★NEW"]
-
-    subgraph real["real flow stack (same as browser)"]
-      ENG["FlowEngine (createFlowWorkspace)"]
-      BIND["createEngineCanvasBinding(engine)"]
-      CAT["createBlockCatalogLookup(registry)"]
-      ENG --- BIND
-    end
-    GW["LlmGateway — direct Gemini  (browser: backend proxy)"]
-
-    ENTRY --> IN
-    IN -- "agent text" --> DRV
-    IN -- "/meta command" --> REND
-    DRV --> ORCH
-    STORE -. injected .-> ORCH
-    ORCH -- "writes state per op" --> STORE
-    ORCH -- "spawns specialists → edit" --> BIND
-    ORCH -- "chat() / tools" --> GW
-    CAT -- "catalog_search tool" --> ORCH
-    STORE -- "notify(state)" --> REND
-    BIND -- "readGraph() (same tick)" --> REND
+  subgraph view["① VIEW — the only new-logic part (differs)"]
+    direction LR
+    TV["TERMINAL ★NEW<br/>two-pane renderer<br/>readline + ANSI<br/>left = canvas JSON · right = chat"]
+    WV["WEB<br/>FlowAgentPanel<br/>React Flow canvas + chat panel<br/>(useAgentSession)"]
   end
-  REND --> SCREEN["two panes on screen"]
-  GW -- "server-side fetch (no CORS)" --> GOOG["Google · generativelanguage.googleapis.com"]
+
+  subgraph core["SAME CODE — assembled once per host"]
+    direction TB
+    STORE["observable SessionStore<br/>save(state) ⇒ re-present · the reactive seam"]
+    ORCH["createOrchestratorAgent + specialist roster"]
+    BIND["createEngineCanvasBinding(engine) → FlowEngine"]
+    CAT["createBlockCatalogLookup(registry)"]
+    CAT -- "catalog_search" --> ORCH
+    ORCH -- "spawn specialists → edit canvas" --> BIND
+    ORCH -- "save per write" --> STORE
+  end
+
+  subgraph gw["② MODEL GATEWAY (differs)"]
+    direction LR
+    TG["TERMINAL ★<br/>direct Gemini<br/>server-side fetch, no CORS"]
+    WG["WEB<br/>createGenerateApiLlmGateway<br/>→ app backend proxy"]
+  end
+
+  STORE -- "notify → redraw" --> TV
+  STORE -- "notify → setState" --> WV
+  BIND -- "readGraph() (re-read)" --> TV
+  BIND -- "engine push" --> WV
+
+  ORCH -- "chat() / tools" --> TG
+  ORCH -- "chat() / tools" --> WG
+
+  TG -- "no CORS" --> GEM["Google · generativelanguage.googleapis.com"]
+  WG -- "HTTP" --> PROXY["app backend /generate"]
+  PROXY --> GEM
 ```
+
+The one asymmetry _inside_ the core is how blocks are loaded: the terminal pulls the registry over HTTP via
+`createFlowWorkspace`, the browser reads it from the app's store — same registry in, so the binding and catalog
+are identical either way. (For the terminal's own internal wiring — entry, input router, driver — see §6.)
 
 ## 4 · The reactive seam — `SessionStore.save` as the observer
 
