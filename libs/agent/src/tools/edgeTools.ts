@@ -42,9 +42,17 @@ const CONNECT_NODES_DEF: ToolDef = {
         type: 'object',
         properties: {
             sourceNodeId: { type: 'string', description: 'The id of the source node (from list_nodes).' },
-            sourcePortId: { type: 'string', description: 'An OUTPUT port id on the source (from describe_node).' },
+            sourcePortId: {
+                type: 'string',
+                description:
+                    "An OUTPUT port id on the source — ports are fixed by the node's block type; look the type up once via catalog_search.",
+            },
             targetNodeId: { type: 'string', description: 'The id of the target node (from list_nodes).' },
-            targetPortId: { type: 'string', description: 'An INPUT port id on the target (from describe_node).' },
+            targetPortId: {
+                type: 'string',
+                description:
+                    "An INPUT port id on the target — ports are fixed by the node's block type; look the type up once via catalog_search.",
+            },
         },
         required: ['sourceNodeId', 'sourcePortId', 'targetNodeId', 'targetPortId'],
     },

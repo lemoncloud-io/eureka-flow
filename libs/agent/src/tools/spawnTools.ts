@@ -9,8 +9,10 @@ import type { ToolDef } from '../llm/llmGateway';
 const LIST_AGENTS_DEF: ToolDef = {
     name: 'list_agents',
     description:
-        'List the specialists available to delegate to: each type and a one-line description of what ' +
-        'it can do. Discover your roster here — do not assume any specialist that is not listed.',
+        'List the NAMED specialists available to delegate to: each type and a one-line description of what ' +
+        'it can do. This is not the whole roster: a per-block content specialist also exists for any catalog ' +
+        'block type, addressed by that type string, even though it is not listed here. Do not assume any OTHER ' +
+        'specialist beyond these two kinds.',
     parameters: { type: 'object', properties: {} },
 };
 
@@ -43,7 +45,9 @@ const SPAWN_DEF: ToolDef = {
                         },
                         agentType: {
                             type: 'string',
-                            description: 'Which specialist to use (a type from list_agents).',
+                            description:
+                                'Which specialist to use: a type from list_agents, or any catalog block ' +
+                                'type string for a per-block content change.',
                         },
                     },
                     required: ['task', 'agentType'],

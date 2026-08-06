@@ -49,7 +49,7 @@ export const createSingleOutputGeneratorAgent = (deps: BaseAgentDeps): Agent =>
         blockType: BLOCK_TYPE,
         config: {
             id: 'single-output-generator',
-            description: 'Creates, configures, and deletes AI text generator nodes.',
+            description: 'Configures AI text generator (single-output-generator) nodes.',
             systemPrompt: SINGLE_OUTPUT_GENERATOR_SYSTEM_PROMPT,
             ...deps.config,
         },

@@ -151,8 +151,9 @@ export abstract class BaseAgent implements Agent {
 
     /**
      * Prepended once to the first user message of a fresh conversation — the initial state an agent is handed
-     * up front (seed-once + pull). Default none: a top-level agent (builder / orchestrator) seeds the starting
-     * graph here; a spawned child pulls current state on demand via get_graph instead.
+     * up front (seed-once + pull). Default none: a long-lived top-level agent (builder / orchestrator) seeds the
+     * starting graph here and then pulls fresh state via get_graph; a short-lived block specialist carries no
+     * get_graph and instead re-seeds its type-scoped canvas each turn via buildContextMessages.
      */
     protected initialUserPreamble(): string {
         return '';
