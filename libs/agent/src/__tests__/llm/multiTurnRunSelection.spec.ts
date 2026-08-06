@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseModelFilter, planMultiTurnModelSelection } from '../../llm/multiTurnRunSelection';
+import { PROVIDER_REGISTRY, resolveModelsToRun as resolveRealModelsToRun } from '../../llm/providerRegistry';
 
 import type { ProviderModelEntry } from '../../llm/providerRegistry';
 
@@ -172,5 +173,81 @@ describe('planMultiTurnModelSelection: consolidated expected-task-count arithmet
         const repetitions = 2;
         expect(selection.pairs).toHaveLength(2);
         expect(selection.pairs.length * scenarios.length * repetitions).toBe(12);
+    });
+});
+
+// =================================================================================================
+// Against the REAL PROVIDER_REGISTRY (not the synthetic fixture above) — confirms Anthropic
+// selection works with the actual registered entries, not just a hand-built stand-in. No live
+// calls: planMultiTurnModelSelection is pure and never touches the network.
+// =================================================================================================
+
+describe('planMultiTurnModelSelection: Anthropic multi-model selection (real PROVIDER_REGISTRY)', () => {
+    const resolveModelsToRun = (entry: ProviderModelEntry): readonly string[] =>
+        resolveRealModelsToRun(entry, entry.modelEnvOverride ? process.env[entry.modelEnvOverride] : undefined);
+
+    it('selects both currently-registered Claude models, in registry order, when filtered to anthropic', () => {
+        const selection = planMultiTurnModelSelection({
+            registry: PROVIDER_REGISTRY,
+            providerFilter: 'anthropic',
+            modelFilter: 'claude-haiku-4-5,claude-sonnet-5',
+            resolveModelsToRun,
+        });
+        expect(selection.pairs.map(p => p.model)).toEqual(['claude-haiku-4-5', 'claude-sonnet-5']);
+        expect(selection.pairs.every(p => p.entry.providerId === 'anthropic')).toBe(true);
+    });
+
+    it('preserves registry order even when the filter lists the models in reverse', () => {
+        const selection = planMultiTurnModelSelection({
+            registry: PROVIDER_REGISTRY,
+            providerFilter: 'anthropic',
+            modelFilter: 'claude-sonnet-5,claude-haiku-4-5',
+            resolveModelsToRun,
+        });
+        expect(selection.pairs.map(p => p.model)).toEqual(['claude-haiku-4-5', 'claude-sonnet-5']);
+    });
+
+    it('an anthropic provider filter with no model filter selects every currently-registered Claude model', () => {
+        const selection = planMultiTurnModelSelection({
+            registry: PROVIDER_REGISTRY,
+            providerFilter: 'anthropic',
+            modelFilter: undefined,
+            resolveModelsToRun,
+        });
+        expect(selection.pairs.map(p => p.model)).toEqual(['claude-haiku-4-5', 'claude-sonnet-5']);
+    });
+
+    it('never mixes in an OpenAI (or any other provider) pair when filtered to anthropic', () => {
+        const selection = planMultiTurnModelSelection({
+            registry: PROVIDER_REGISTRY,
+            providerFilter: 'anthropic',
+            modelFilter: undefined,
+            resolveModelsToRun,
+        });
+        expect(selection.pairs.every(p => p.entry.providerId === 'anthropic')).toBe(true);
+        expect(selection.pairs.some(p => p.entry.providerId === 'openai')).toBe(false);
+    });
+
+    it('rejects an unregistered Claude model id BEFORE any gateway/network call — never silently dropped', () => {
+        expect(() =>
+            planMultiTurnModelSelection({
+                registry: PROVIDER_REGISTRY,
+                providerFilter: 'anthropic',
+                modelFilter: 'claude-haiku-4-5,claude-opus-9-fake',
+                resolveModelsToRun,
+            })
+        ).toThrow(/unknown model "claude-opus-9-fake"/);
+    });
+
+    it('rejects a real model id that belongs to a DIFFERENT, non-selected provider', () => {
+        // gpt-4o-mini is real, but the provider filter narrows to anthropic only.
+        expect(() =>
+            planMultiTurnModelSelection({
+                registry: PROVIDER_REGISTRY,
+                providerFilter: 'anthropic',
+                modelFilter: 'gpt-4o-mini',
+                resolveModelsToRun,
+            })
+        ).toThrow(/unknown model "gpt-4o-mini"/);
     });
 });

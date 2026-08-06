@@ -11,6 +11,7 @@ import { buildMultiTurnDashboardHtml } from '../../llm/multiTurnDashboard';
 import { planMultiTurnModelSelection } from '../../llm/multiTurnRunSelection';
 import {
     buildMultiTurnVerificationReport,
+    formatGenerationConfigurationMarkdown,
     formatMultiTurnCompletionModeMarkdownTable,
     formatMultiTurnModelSummaryMarkdownTable,
     formatMultiTurnRecordsCsv,
@@ -20,12 +21,12 @@ import {
     resolveEffectiveCost,
 } from '../../llm/multiTurnVerificationMetrics';
 import { PRICING_CONFIG_VERSION } from '../../llm/pricing';
-import { PROVIDER_REGISTRY, createGatewayForEntry, resolveModelsToRun } from '../../llm/providerRegistry';
+import { PROVIDER_REGISTRY, createGatewayForEntry, deriveGenerationConfiguration, resolveModelsToRun } from '../../llm/providerRegistry';
 import { accumulateExtendedUsage, wrapGatewayWithUsageCapture } from '../../llm/verificationMetrics';
 import { LOCATOR_SCENARIOS, MULTI_TURN_ONLY_SCENARIO_IDS, runMultiTurnLocatorScenario } from '../../llm/verifyLocatorScenarios';
 
 import type { MultiTurnLiveRecord, MultiTurnReportingOutcome, MultiTurnRunManifest } from '../../llm/multiTurnVerificationMetrics';
-import type { ProviderModelEntry } from '../../llm/providerRegistry';
+import type { GenerationConfiguration, ProviderModelEntry } from '../../llm/providerRegistry';
 import type { CapturedCallInfo } from '../../llm/verificationMetrics';
 import type { LocatorScenarioId, MultiTurnOnlyScenarioId } from '../../llm/verifyLocatorScenarios';
 
@@ -170,10 +171,19 @@ const PLANNED_PAIRS: PlannedPair[] = [];
  * a clean/default env — `describe.runIf(false)` avoids that while still running nothing. */
 const SELECTED_PAIRS: SelectedPair[] = [];
 
+// One entry per PROVIDER actually planned this run (never per model — see
+// GenerationConfiguration's own doc for why that would just repeat the same values). `generation`
+// is never passed to createGatewayForEntry today (see runOneAttempt below), so this always
+// reflects that — becomes accurate automatically if a future change ever starts configuring it.
+const GENERATION_CONFIGURATION: Record<string, GenerationConfiguration> = {};
+
 for (const { entry, model } of MODEL_SELECTION.pairs) {
     const keyPresent = !!process.env[entry.apiKeyEnv];
     PLANNED_PAIRS.push({ provider: entry.displayName, providerId: entry.providerId, model, keyPresent });
     SELECTED_PAIRS.push({ entry, model, willRun: LIVE_RUN_OPTED_IN && keyPresent });
+    if (!(entry.providerId in GENERATION_CONFIGURATION)) {
+        GENERATION_CONFIGURATION[entry.providerId] = deriveGenerationConfiguration(entry.gatewayType);
+    }
 }
 
 // Printed at module-collection time — before any test body runs, so this always appears before a
@@ -440,6 +450,7 @@ afterAll(() => {
         `\`success\` — a lookup-first \`provider-error\`, \`timeout\`, or \`max-turns\` is never counted as ` +
         `"accepted" merely because its strategy looks reasonable; see the failure/provider-error/timeout/ ` +
         `max-turns columns for those.\n\n` +
+        `## Generation configuration\n\n${formatGenerationConfigurationMarkdown(GENERATION_CONFIGURATION)}\n\n` +
         `## By model (initial strategy)\n\n${formatMultiTurnModelSummaryMarkdownTable(report.modelSummaries)}\n\n` +
         `## By model (completion mode)\n\n${formatMultiTurnCompletionModeMarkdownTable(report.modelSummaries)}\n\n` +
         `## By scenario\n\n${formatMultiTurnScenarioMarkdownTable(report.scenarioSummaries)}\n\n` +
@@ -462,6 +473,7 @@ afterAll(() => {
         pricingVersion: PRICING_CONFIG_VERSION,
         gitSha: gitState.sha,
         gitDirty: gitState.dirty,
+        generationConfiguration: GENERATION_CONFIGURATION,
     };
 
     // One consolidated set of artifacts per invocation — covering every selected model/pair

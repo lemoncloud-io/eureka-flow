@@ -671,3 +671,101 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
 });
+
+describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
+    it('a text response with a valid top-level model reports it as actualModel on the done chunk', async () => {
+        const http = new ScriptedHttpRequest([{ json: { ...anthropicText('hi'), model: 'claude-haiku-4-5-20251001' } }]);
+
+        const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+        const done = chunks.find(c => c.done);
+        expect(done?.actualModel).toBe('claude-haiku-4-5-20251001');
+    });
+
+    it('a tool-call response with a valid top-level model reports it as actualModel on the done chunk', async () => {
+        const http = new ScriptedHttpRequest([
+            { json: { ...anthropicToolUse('toolu_01abc', 'move_node', { nodeId: 'text-1' }), model: 'claude-sonnet-5-20260815' } },
+        ]);
+
+        const chunks = await drain(createGateway(http).chat(userSays('move it')));
+
+        const done = chunks.find(c => c.done);
+        expect(done?.actualModel).toBe('claude-sonnet-5-20260815');
+        // The tool-call chunk itself is unaffected — actualModel only ever appears on `done`.
+        const toolCallChunk = chunks.find(c => c.toolCall);
+        expect(toolCallChunk).not.toHaveProperty('actualModel');
+    });
+
+    it('a two-turn tool-result flow reports actualModel on BOTH turns’ done chunks — never lost across a round trip', async () => {
+        const http = new ScriptedHttpRequest([
+            { json: { ...anthropicToolUse('toolu_1', 'list_nodes', {}), model: 'claude-haiku-4-5-20251001' } },
+            { json: { ...anthropicText('Moved it.'), model: 'claude-haiku-4-5-20251001' } },
+        ]);
+        const gateway = createGateway(http);
+
+        const firstChunks = await drain(gateway.chat(userSays('go')));
+        expect(firstChunks.find(c => c.done)?.actualModel).toBe('claude-haiku-4-5-20251001');
+
+        const secondChunks = await drain(
+            gateway.chat({
+                messages: [
+                    { role: 'user', content: 'go' },
+                    { role: 'assistant', content: null, toolCalls: [{ id: 'toolu_1', name: 'list_nodes', args: '{}' }] },
+                    { role: 'tool', content: '{"nodes":[]}', toolCallId: 'toolu_1' },
+                ],
+                tools: [],
+            })
+        );
+        expect(secondChunks.find(c => c.done)?.actualModel).toBe('claude-haiku-4-5-20251001');
+    });
+
+    it('a missing top-level model leaves actualModel undefined — never fabricated from the requested model', async () => {
+        const http = new ScriptedHttpRequest([{ json: anthropicText('hi') }]); // no `model` field at all
+
+        const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+        const done = chunks.find(c => c.done);
+        expect(done).not.toHaveProperty('actualModel');
+    });
+
+    it('an empty-string top-level model leaves actualModel undefined', async () => {
+        const http = new ScriptedHttpRequest([{ json: { ...anthropicText('hi'), model: '' } }]);
+
+        const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+        expect(chunks.find(c => c.done)).not.toHaveProperty('actualModel');
+    });
+
+    it('a non-string top-level model (malformed response) leaves actualModel undefined rather than throwing or coercing', async () => {
+        const http = new ScriptedHttpRequest([{ json: { ...anthropicText('hi'), model: 12345 } }]);
+
+        const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+        expect(chunks.find(c => c.done)).not.toHaveProperty('actualModel');
+    });
+
+    it('reporting actualModel changes nothing else about text/tool-call/usage/error parsing (no regression)', async () => {
+        const http = new ScriptedHttpRequest([{ json: { ...anthropicToolUse('toolu_1', 'move_node', { nodeId: 'text-1' }), model: 'claude-haiku-4-5-20251001' } }]);
+
+        const chunks = await drain(createGateway(http).chat(userSays('move it')));
+
+        expect(chunks).toEqual([
+            { toolCall: { id: 'toolu_1', name: 'move_node', argsDelta: '{"nodeId":"text-1"}' } },
+            {
+                done: true,
+                usage: withAnthropicCost({ inputTokens: 20, outputTokens: 8 }),
+                actualModel: 'claude-haiku-4-5-20251001',
+            },
+        ]);
+    });
+
+    it('requestedModel (the gateway’s own `model`) and actualModel stay independently reported and can differ', async () => {
+        const http = new ScriptedHttpRequest([{ json: { ...anthropicText('hi'), model: 'claude-haiku-4-5-20251001' } }]);
+        const gateway = createGateway(http);
+
+        expect(gateway.model).toBe('claude-haiku-4-5'); // the bare alias requested
+        const chunks = await drain(gateway.chat(userSays('q')));
+        expect(chunks.find(c => c.done)?.actualModel).toBe('claude-haiku-4-5-20251001'); // the pinned snapshot served
+        expect(gateway.model).not.toBe(chunks.find(c => c.done)?.actualModel);
+    });
+});

@@ -1,5 +1,6 @@
 import { COST_CURRENCY } from './pricing';
 
+import type { GenerationConfiguration, GenerationParameterValue } from './providerRegistry';
 import type { ExtendedUsageInfo, UsageTotals } from './verificationMetrics';
 import type { MultiTurnCompletionMode, MultiTurnStrategy, MultiTurnTaskOutcome, MultiTurnTurnTrace } from './verifyLocatorScenarios';
 import type { XY } from '../canvas/canvasBinding';
@@ -738,6 +739,37 @@ export const formatMultiTurnRecordsMarkdownDetails = (records: readonly MultiTur
     return [header, separator, ...rows].join('\n');
 };
 
+/** One cell: `'explicit'` shows its value (never absent — see {@link GenerationParameterValue}'s
+ * own doc), `'provider-default'`/`'unsupported'` show only the status word, never a guessed
+ * number. */
+const generationParameterCell = (p: GenerationParameterValue<number | string>): string =>
+    p.status === 'explicit' ? `explicit (${String(p.value)})` : p.status;
+
+/**
+ * A concise, one-row-per-provider configuration section for `latest.md` — see
+ * `providerRegistry.ts`'s `deriveGenerationConfiguration` for how each cell's status is decided.
+ * Never fabricates a numeric provider default: a `'provider-default'`/`'unsupported'` cell shows
+ * only that word, never a guessed value.
+ */
+export const formatGenerationConfigurationMarkdown = (config: Readonly<Record<string, GenerationConfiguration>>): string => {
+    const providerIds = Object.keys(config);
+    if (providerIds.length === 0) {
+        return '_No generation configuration recorded._';
+    }
+
+    const header = '| Provider | Temperature | Top-p | Top-k | Max output tokens | Reasoning effort |';
+    const separator = '| --- | --- | --- | --- | --- | --- |';
+    const rows = providerIds.map(providerId => {
+        const c = config[providerId];
+        return (
+            `| ${providerId} | ${generationParameterCell(c.temperature)} | ${generationParameterCell(c.topP)} | ` +
+            `${generationParameterCell(c.topK)} | ${generationParameterCell(c.maxOutputTokens)} | ` +
+            `${generationParameterCell(c.reasoningEffort)} |`
+        );
+    });
+    return [header, separator, ...rows].join('\n');
+};
+
 // =============================================================================================
 // Run manifest — task I. Type only; the live spec constructs and writes the actual value (it
 // alone knows env filters, planned pairs, and git state — this module stays filesystem/env-free).
@@ -771,4 +803,15 @@ export interface MultiTurnRunManifest {
      * here or anywhere else in this manifest. */
     gitSha: string | null;
     gitDirty: boolean | null;
+    /**
+     * Effective generation/sampling settings this run's request path actually sends — see
+     * `providerRegistry.ts`'s `deriveGenerationConfiguration` for exactly how each field's
+     * `'explicit' | 'provider-default' | 'unsupported'` status is decided. Keyed by `providerId`
+     * (e.g. `'openai'`, `'anthropic'`) rather than by model: every model behind the same
+     * `gatewayType` shares the same request-shape capabilities, so one entry per PROVIDER actually
+     * planned in this run is enough — never one entry per model, which would just repeat the same
+     * values `plannedPairs.length` times for a single-provider, multi-model run like the OpenAI
+     * baseline. Empty object only if `plannedPairs` itself is empty (nothing was planned at all).
+     */
+    generationConfiguration: Record<string, GenerationConfiguration>;
 }

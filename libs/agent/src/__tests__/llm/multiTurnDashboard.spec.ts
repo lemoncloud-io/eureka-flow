@@ -167,3 +167,78 @@ describe('buildMultiTurnDashboardHtml: HTML/XSS safety for arbitrary model/scena
         expect(embedded.records[0].scenarioId).toBe('</script><script>alert(2)</script>');
     });
 });
+
+describe('buildMultiTurnDashboardHtml: compatibility with Anthropic records (no regression to the OpenAI baseline)', () => {
+    // Anthropic's gateway never reports `actualModel` (unlike OpenAI's, which reads it from the
+    // response body) — this must render as "no actual model known", never a fabricated value or a
+    // crash, exactly like this dashboard's existing (already-tested) handling of any other record
+    // missing an optional field.
+    const anthropicRecord = makeRecord({
+        provider: 'Claude',
+        providerId: 'anthropic',
+        requestedModel: 'claude-haiku-4-5',
+        actualModel: undefined,
+        scenarioId: 'move-named-node-without-id',
+        strategy: 'lookup-first',
+        completionMode: 'tool-action',
+        turnCount: 2,
+        requestedToolSequence: ['list_nodes', 'move_node'],
+        providerTotalTokens: undefined, // Anthropic reports no provider-total-tokens concept either
+        totalTokens: 220,
+        effectiveCost: 0.00045,
+    });
+    const openAiRecord = makeRecord(); // the existing baseline shape, untouched
+
+    it('renders both an Anthropic and an OpenAI record in one report without error', () => {
+        const report = buildMultiTurnVerificationReport([openAiRecord, anthropicRecord], '2026-08-06T00:00:00.000Z');
+        const html = buildMultiTurnDashboardHtml(report);
+        expect(html).toContain('gpt-4o-mini');
+        expect(html).toContain('claude-haiku-4-5');
+        expect(html).toContain('"providerId":"anthropic"');
+        // Never a fabricated actualModel for the Anthropic record.
+        const dataBlockMatch = html.match(/<script id="report-data"[^>]*>([\s\S]*?)<\/script>/);
+        const embedded = JSON.parse((dataBlockMatch as RegExpMatchArray)[1]) as { records: MultiTurnLiveRecord[] };
+        const anthropicEmbedded = embedded.records.find(r => r.providerId === 'anthropic');
+        expect(anthropicEmbedded?.actualModel).toBeUndefined();
+    });
+
+    it('the model filter distinguishes the two providers even though only one (OpenAI) has an actualModel', () => {
+        const report = buildMultiTurnVerificationReport([openAiRecord, anthropicRecord], '2026-08-06T00:00:00.000Z');
+        const html = buildMultiTurnDashboardHtml(report);
+        // Two distinct requested-model checkboxes, one per provider — no crash from the missing
+        // actualModel on the Claude record.
+        expect(html).toContain('id="model-filters"');
+        expect(html).toContain('gpt-4o-mini');
+        expect(html).toContain('claude-haiku-4-5');
+    });
+
+    it('an Anthropic-only report (no OpenAI record at all) still renders every required chart section', () => {
+        const report = buildMultiTurnVerificationReport([anthropicRecord], '2026-08-06T00:00:00.000Z');
+        const html = buildMultiTurnDashboardHtml(report);
+        for (const id of ['chart-success-rate', 'chart-latency', 'chart-cost', 'chart-strategy', 'chart-completion-mode', 'chart-scatter']) {
+            expect(html).toContain(`id="${id}"`);
+        }
+        expect(html).not.toContain('gpt-4o-mini');
+    });
+
+    it('now that Anthropic reports a real actualModel, the dashboard distinguishes requested vs. actual for Claude too, not just OpenAI', () => {
+        const resolvedAnthropicRecord = makeRecord({
+            provider: 'Claude',
+            providerId: 'anthropic',
+            requestedModel: 'claude-haiku-4-5',
+            actualModel: 'claude-haiku-4-5-20251001',
+            scenarioId: 'move-node-right',
+            strategy: 'direct',
+            completionMode: 'tool-action',
+        });
+        const report = buildMultiTurnVerificationReport([resolvedAnthropicRecord], '2026-08-06T00:00:00.000Z');
+        const html = buildMultiTurnDashboardHtml(report);
+        expect(html).toContain('claude-haiku-4-5');
+        expect(html).toContain('claude-haiku-4-5-20251001');
+        const dataBlockMatch = html.match(/<script id="report-data"[^>]*>([\s\S]*?)<\/script>/);
+        const embedded = JSON.parse((dataBlockMatch as RegExpMatchArray)[1]) as { records: MultiTurnLiveRecord[] };
+        expect(embedded.records[0].requestedModel).toBe('claude-haiku-4-5');
+        expect(embedded.records[0].actualModel).toBe('claude-haiku-4-5-20251001');
+        expect(embedded.records[0].requestedModel).not.toBe(embedded.records[0].actualModel);
+    });
+});

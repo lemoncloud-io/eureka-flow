@@ -1,4 +1,4 @@
-import { createAnthropicToolLlmGateway } from './AnthropicToolLlmGateway';
+import { DEFAULT_MAX_TOKENS as ANTHROPIC_DEFAULT_MAX_TOKENS, createAnthropicToolLlmGateway } from './AnthropicToolLlmGateway';
 import { createGeminiToolLlmGateway } from './GeminiToolLlmGateway';
 import { createOpenAiLlmGateway } from './OpenAiLlmGateway';
 
@@ -25,6 +25,122 @@ import type { LlmGateway } from './llmGateway';
 export type GatewayType = 'openai-compatible' | 'gemini-native' | 'anthropic-native';
 
 export type ProviderStatus = 'implemented' | 'planned' | 'blocked';
+
+/**
+ * `'explicit'` — the request path sends a concrete, known value (either the caller configured it,
+ * or the gateway itself always sends a specific default of its own — see `maxOutputTokens` on
+ * `anthropic-native`, where Anthropic requires the field on every call). `value` is always present.
+ *
+ * `'provider-default'` — the underlying provider's API genuinely accepts this parameter, but
+ * nothing in this request path ever sends it, so the provider silently applies whatever default
+ * behavior it has server-side. `value` is deliberately absent: this codebase's gateways never read
+ * or hardcode the provider's own numeric/string default, so stating one here would be a guess, not
+ * a fact the request path actually knows (see `deriveGenerationConfiguration`'s own doc for why
+ * this distinction matters and how each gatewayType was classified).
+ *
+ * `'unsupported'` — the parameter cannot be sent meaningfully through this request path: either
+ * the provider's actual API has no such concept at all (e.g. OpenAI Chat Completions has no
+ * `top_k`), or this codebase's type-level shape for the parameter (e.g. a `reasoningEffort` string)
+ * doesn't correspond to anything the provider's request format accepts (e.g. Anthropic's opt-in,
+ * token-budget-based "extended thinking" is a categorically different mechanism). `value` is absent.
+ */
+export type GenerationParameterStatus = 'explicit' | 'provider-default' | 'unsupported';
+
+export interface GenerationParameterValue<T> {
+    status: GenerationParameterStatus;
+    /** Present only when `status === 'explicit'`. */
+    value?: T;
+}
+
+/**
+ * The effective generation/sampling configuration a gatewayType's request path actually sends —
+ * see {@link deriveGenerationConfiguration}. Deliberately independent of any specific model: every
+ * model behind the same `gatewayType` shares the same request-shape capabilities (a model choice
+ * doesn't change which fields THIS CODE knows how to send), even though a specific model's own
+ * provider-side default behavior could differ from another model's.
+ */
+export interface GenerationConfiguration {
+    temperature: GenerationParameterValue<number>;
+    topP: GenerationParameterValue<number>;
+    topK: GenerationParameterValue<number>;
+    maxOutputTokens: GenerationParameterValue<number>;
+    reasoningEffort: GenerationParameterValue<string>;
+}
+
+/**
+ * Derives the effective generation configuration a `gatewayType`'s request path actually sends,
+ * given the (optional) generation options a caller configured. Grounded ONLY in what each
+ * gateway's own request-body builder does — never in an assumption about what a provider's API
+ * "really" supports beyond what this codebase's code demonstrates awareness of:
+ *
+ * - `temperature`: every gatewayType has a real, if currently always-unpopulated (see
+ *   `createGatewayForEntry`, which never passes `generation`), conditional field for it — so this
+ *   is always `'provider-default'` today, becoming `'explicit'` the moment a caller configures it.
+ * - `topP`: OpenAI, Anthropic, and Gemini's request formats all genuinely document a `top_p`
+ *   parameter — but no gateway in this codebase has a field for it, so it is always
+ *   `'provider-default'`, never `'unsupported'` (none of these providers lacks the concept).
+ * - `topK`: Anthropic's and Gemini's request formats genuinely document `top_k` (unlike `top_p`,
+ *   this is NOT universal) — `'provider-default'` for those two, but OpenAI's Chat Completions API
+ *   has no such parameter at all, so it is `'unsupported'` for `openai-compatible`. Never claim
+ *   OpenAI supports `top_k` merely because other providers do.
+ * - `maxOutputTokens`: `openai-compatible`/`gemini-native` only send it when configured (optional
+ *   field, provider decides otherwise) — `'provider-default'` when unset. `anthropic-native` is
+ *   different: Anthropic's Messages API REQUIRES `max_tokens` on every call, so this gateway always
+ *   sends a concrete number — the caller's value, or its own `DEFAULT_MAX_TOKENS` (1024) otherwise
+ *   — making this `'explicit'` unconditionally, never `'provider-default'` (there is no provider
+ *   default to fall back to; a real number is always on the wire, and this function always knows
+ *   exactly what it is).
+ * - `reasoningEffort`: OpenAI's reasoning-model family (o-series/gpt-5) documents a
+ *   `reasoning_effort` string parameter this codebase never sends — `'provider-default'` (OpenAI
+ *   applies its own default effort). Anthropic's and Gemini's "extended thinking"/`thinkingConfig`
+ *   mechanisms are token-budget-based, not an effort-level string, and neither is ever sent by
+ *   these gateways at all — `'unsupported'` for both, since there is no equivalent of this
+ *   string-shaped parameter to fall back to a provider default on.
+ */
+export const deriveGenerationConfiguration = (
+    gatewayType: GatewayType,
+    generation?: { temperature?: number; maxOutputTokens?: number }
+): GenerationConfiguration => {
+    const temperature: GenerationParameterValue<number> =
+        generation?.temperature !== undefined
+            ? { status: 'explicit', value: generation.temperature }
+            : { status: 'provider-default' };
+    const optionalMaxOutputTokens: GenerationParameterValue<number> =
+        generation?.maxOutputTokens !== undefined
+            ? { status: 'explicit', value: generation.maxOutputTokens }
+            : { status: 'provider-default' };
+
+    switch (gatewayType) {
+        case 'openai-compatible':
+            return {
+                temperature,
+                topP: { status: 'provider-default' },
+                topK: { status: 'unsupported' },
+                maxOutputTokens: optionalMaxOutputTokens,
+                reasoningEffort: { status: 'provider-default' },
+            };
+        case 'anthropic-native':
+            return {
+                temperature,
+                topP: { status: 'provider-default' },
+                topK: { status: 'provider-default' },
+                maxOutputTokens: { status: 'explicit', value: generation?.maxOutputTokens ?? ANTHROPIC_DEFAULT_MAX_TOKENS },
+                reasoningEffort: { status: 'unsupported' },
+            };
+        case 'gemini-native':
+            return {
+                temperature,
+                topP: { status: 'provider-default' },
+                topK: { status: 'provider-default' },
+                maxOutputTokens: optionalMaxOutputTokens,
+                reasoningEffort: { status: 'unsupported' },
+            };
+        default: {
+            const exhaustiveCheck: never = gatewayType;
+            throw new Error(`deriveGenerationConfiguration: no derivation for gatewayType "${String(exhaustiveCheck)}"`);
+        }
+    }
+};
 
 export interface ProviderModelEntry {
     /** Stable id, e.g. 'openai' | 'gemini'. */

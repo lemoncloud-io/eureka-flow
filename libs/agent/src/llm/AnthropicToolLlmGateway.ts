@@ -77,8 +77,11 @@ export interface AnthropicToolLlmGateway extends LlmGateway {
 const DEFAULT_MODEL = 'claude-haiku-4-5';
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 const ANTHROPIC_VERSION = '2023-06-01';
-/** Anthropic requires max_tokens on every request; 1024 matches the value used throughout Anthropic's own docs examples. */
-const DEFAULT_MAX_TOKENS = 1024;
+/** Anthropic requires max_tokens on every request; 1024 matches the value used throughout
+ * Anthropic's own docs examples. Exported so `providerRegistry.ts`'s `deriveGenerationConfiguration`
+ * can report the EXACT value this gateway actually sends when the caller doesn't override it,
+ * rather than re-hardcoding (and risking drifting from) this number in a second place. */
+export const DEFAULT_MAX_TOKENS = 1024;
 const ERROR_BODY_SNIPPET_LENGTH = 200;
 
 /** A provider/proxy could echo request data back; scrub the key before it reaches an error. */
@@ -201,7 +204,20 @@ interface AnthropicResponse {
     content?: AnthropicContentBlock[];
     stop_reason?: string;
     usage?: AnthropicUsage;
+    /** The model that actually served the request, e.g. the pinned snapshot a bare alias like
+     * `claude-haiku-4-5` resolved to. Typed `unknown`, not `string` — this is straight off
+     * `JSON.parse`, so a malformed/misbehaving response body could hand back anything; see
+     * {@link asNonEmptyString} for the runtime check that decides whether to trust it. */
+    model?: unknown;
 }
+
+/** `payload.model` is untrusted JSON, not a value this code controls — never assume it's a
+ * string just because the response type says so. Absent, empty, or non-string all map to
+ * `undefined` (never fabricated from the requested model) — mirrors OpenAI's `Chunk.actualModel`
+ * convention but with an explicit runtime type check, since Anthropic's response shape here is
+ * declared `unknown` rather than `string`. */
+const asNonEmptyString = (value: unknown): string | undefined =>
+    typeof value === 'string' && value.length > 0 ? value : undefined;
 
 /**
  * Maps Anthropic's `usage` onto the normalized {@link UsageInfo} shape. Anthropic's own
@@ -316,6 +332,7 @@ export const createAnthropicToolLlmGateway = (options: AnthropicToolLlmGatewayOp
         }
 
         const usage = toUsageInfo(payload.usage, model, effectiveCacheWriteTtl);
+        const actualModel = asNonEmptyString(payload.model);
 
         trace?.debug('llm.anthropic.response', {
             model,
@@ -325,6 +342,7 @@ export const createAnthropicToolLlmGateway = (options: AnthropicToolLlmGatewayOp
             toolCallCount: toolUses.length,
             durationMs: environment.now() - startedAt,
             ...(usage ? { usage } : {}),
+            ...(actualModel !== undefined ? { actualModel } : {}),
         });
 
         if (text) {
@@ -333,7 +351,7 @@ export const createAnthropicToolLlmGateway = (options: AnthropicToolLlmGatewayOp
         for (const call of toolUses) {
             yield { toolCall: { id: call.id, name: call.name, argsDelta: JSON.stringify(call.input) } };
         }
-        yield { done: true, ...(usage ? { usage } : {}) };
+        yield { done: true, ...(usage ? { usage } : {}), ...(actualModel !== undefined ? { actualModel } : {}) };
     }
 
     return {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
 import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
-import { PROVIDER_REGISTRY, createGatewayForEntry, resolveModelsToRun } from '../../llm/providerRegistry';
+import { PROVIDER_REGISTRY, createGatewayForEntry, deriveGenerationConfiguration, resolveModelsToRun } from '../../llm/providerRegistry';
 
 import type { Chunk } from '../../llm/llmGateway';
 import type { ProviderModelEntry, ProviderStatus } from '../../llm/providerRegistry';
@@ -468,5 +468,77 @@ describe('resolveModelsToRun', () => {
 
     it('treats an empty-string override as "no override" (falsy)', () => {
         expect(resolveModelsToRun(entry, '')).toEqual(entry.models);
+    });
+});
+
+describe('deriveGenerationConfiguration', () => {
+    it('openai-compatible, no generation configured: matches the confirmed default-config OpenAI baseline exactly', () => {
+        // The exact representation confirmed for the real gpt-4o-mini/gpt-5-mini baseline run —
+        // never claiming a numeric provider default this codebase doesn't actually know.
+        expect(deriveGenerationConfiguration('openai-compatible')).toEqual({
+            temperature: { status: 'provider-default' },
+            topP: { status: 'provider-default' },
+            topK: { status: 'unsupported' },
+            maxOutputTokens: { status: 'provider-default' },
+            reasoningEffort: { status: 'provider-default' },
+        });
+    });
+
+    it('openai-compatible with explicit generation options: reports the exact configured values, never a default', () => {
+        const config = deriveGenerationConfiguration('openai-compatible', { temperature: 0.2, maxOutputTokens: 512 });
+        expect(config.temperature).toEqual({ status: 'explicit', value: 0.2 });
+        expect(config.maxOutputTokens).toEqual({ status: 'explicit', value: 512 });
+        // Configuring temperature/maxOutputTokens never changes top_p/top_k/reasoningEffort — each
+        // parameter's status is independent.
+        expect(config.topP).toEqual({ status: 'provider-default' });
+        expect(config.topK).toEqual({ status: 'unsupported' });
+        expect(config.reasoningEffort).toEqual({ status: 'provider-default' });
+    });
+
+    it('anthropic-native, no generation configured: maxOutputTokens is EXPLICIT (1024) — never provider-default, since Anthropic requires the field and this gateway always sends a concrete number', () => {
+        const config = deriveGenerationConfiguration('anthropic-native');
+        expect(config.maxOutputTokens).toEqual({ status: 'explicit', value: 1024 });
+    });
+
+    it('anthropic-native with an explicit maxOutputTokens: reports the caller value, not the gateway default', () => {
+        const config = deriveGenerationConfiguration('anthropic-native', { maxOutputTokens: 2048 });
+        expect(config.maxOutputTokens).toEqual({ status: 'explicit', value: 2048 });
+    });
+
+    it('anthropic-native: top_k is provider-default (Anthropic\'s Messages API documents it), NOT unsupported — the opposite of OpenAI', () => {
+        const config = deriveGenerationConfiguration('anthropic-native');
+        expect(config.topK).toEqual({ status: 'provider-default' });
+        expect(config.topK.status).not.toBe('unsupported');
+    });
+
+    it('anthropic-native: reasoningEffort is unsupported — Claude\'s extended thinking is a different, token-budget mechanism this gateway never sends', () => {
+        const config = deriveGenerationConfiguration('anthropic-native');
+        expect(config.reasoningEffort).toEqual({ status: 'unsupported' });
+    });
+
+    it('gemini-native: maxOutputTokens/temperature are provider-default when unset, matching the optional-field gatewayTypes (never explicit-by-default like Anthropic)', () => {
+        const config = deriveGenerationConfiguration('gemini-native');
+        expect(config.temperature).toEqual({ status: 'provider-default' });
+        expect(config.maxOutputTokens).toEqual({ status: 'provider-default' });
+        expect(config.topP).toEqual({ status: 'provider-default' });
+        expect(config.topK).toEqual({ status: 'provider-default' });
+        expect(config.reasoningEffort).toEqual({ status: 'unsupported' });
+    });
+
+    it('never reports a numeric value for a provider-default or unsupported status (no guessed defaults)', () => {
+        for (const gatewayType of ['openai-compatible', 'anthropic-native', 'gemini-native'] as const) {
+            const config = deriveGenerationConfiguration(gatewayType);
+            for (const param of Object.values(config)) {
+                if (param.status !== 'explicit') {
+                    expect(param.value).toBeUndefined();
+                }
+            }
+        }
+    });
+
+    it('round-trips cleanly through JSON (exactly what run-manifest.json persists)', () => {
+        const config = deriveGenerationConfiguration('anthropic-native');
+        const roundTripped = JSON.parse(JSON.stringify(config));
+        expect(roundTripped).toEqual(config);
     });
 });

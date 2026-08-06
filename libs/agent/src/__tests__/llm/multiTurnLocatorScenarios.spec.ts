@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
+import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
+import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
+import { createAnthropicToolLlmGateway } from '../../llm/AnthropicToolLlmGateway';
+import { accumulateExtendedUsage, wrapGatewayWithUsageCapture } from '../../llm/verificationMetrics';
 import { LOCATOR_SCENARIOS, runMultiTurnLocatorScenario } from '../../llm/verifyLocatorScenarios';
 
 import type { ChatRequest, Chunk, LlmGateway } from '../../llm/llmGateway';
+import type { CapturedCallInfo } from '../../llm/verificationMetrics';
 
 /** A gateway that returns the next scripted response on each successive `chat()` call, and records
  * every `ChatRequest` it was given — so transcript construction between turns can be asserted.
@@ -500,5 +505,128 @@ describe('single-turn catalog is unaffected by the multi-turn-only scenario', ()
             'unknown-target',
         ]);
         expect(LOCATOR_SCENARIOS.map(s => s.id)).not.toContain('move-named-node-without-id');
+    });
+});
+
+// =================================================================================================
+// runMultiTurnLocatorScenario wired to a REAL createAnthropicToolLlmGateway, over a scripted (no
+// network) HTTP layer — the strongest OFFLINE confidence check available before ever spending a
+// real Anthropic API call: proves the full benchmark pipeline (transcript construction, real
+// Anthropic request/response mapping, ToolExecutor dispatch, usage capture/accumulation) works
+// end-to-end through the actual gateway code, not just through AnthropicToolLlmGateway.spec.ts's
+// own isolated unit tests or this file's synthetic scriptedGateway fake.
+// =================================================================================================
+
+describe('runMultiTurnLocatorScenario + a real Anthropic gateway (offline, scripted HTTP — zero network)', () => {
+    it('completes the move-named-node-without-id lookup-action round trip through real Anthropic request/response mapping', async () => {
+        const http = new ScriptedHttpRequest([
+            {
+                json: {
+                    content: [{ type: 'tool_use', id: 'toolu_1', name: 'list_nodes', input: {} }],
+                    stop_reason: 'tool_use',
+                    usage: { input_tokens: 200, output_tokens: 20 },
+                    // The pinned snapshot the bare 'claude-haiku-4-5' alias actually resolved to —
+                    // deliberately different from the requested model string.
+                    model: 'claude-haiku-4-5-20251001',
+                },
+            },
+            {
+                json: {
+                    content: [
+                        { type: 'tool_use', id: 'toolu_2', name: 'move_node', input: { nodeId: 'node-a17', by: { dx: 100, dy: 0 } } },
+                    ],
+                    stop_reason: 'tool_use',
+                    usage: { input_tokens: 260, output_tokens: 25 },
+                    model: 'claude-haiku-4-5-20251001',
+                },
+            },
+        ]);
+        const gateway = createAnthropicToolLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: 'test-anthropic-key',
+            model: 'claude-haiku-4-5',
+        });
+        const captured: CapturedCallInfo[] = [];
+        const wrapped = wrapGatewayWithUsageCapture(gateway, c => captured.push(c));
+
+        const result = await runMultiTurnLocatorScenario(wrapped, 'move-named-node-without-id');
+
+        expect(result.taskOutcome).toBe('success');
+        expect(result.strategy).toBe('lookup-first');
+        expect(result.completionMode).toBe('tool-action');
+        expect(result.toolSequence).toEqual(['list_nodes', 'move_node']);
+        // The real ToolExecutor genuinely dispatched move_node with the id discovered from the real
+        // (scripted) Anthropic list_nodes response — not a forced/mocked outcome.
+        expect(result.positionsAfter['node-a17']).toEqual({ x: 300, y: 300 });
+        expect(result.positionsAfter['node-b42']).toEqual(result.positionsBefore['node-b42']);
+
+        // Real Anthropic tool-result transcript mapping: Anthropic has no role:'tool' — a tool
+        // result must appear as a USER message carrying a tool_result block correlated by
+        // tool_use_id, verified against the actual request body this gateway sent, not a mock.
+        expect(http.requests).toHaveLength(2);
+        interface AnthropicWireMessage {
+            role: string;
+            content: string | Array<{ type: string; id?: string; name?: string; input?: unknown; tool_use_id?: string; content?: string }>;
+        }
+        const secondBody = http.requests[1].body as { messages: AnthropicWireMessage[] };
+        const assistantIdx = secondBody.messages.findIndex(m => m.role === 'assistant');
+        expect(assistantIdx).toBeGreaterThanOrEqual(0);
+        const assistantContent = secondBody.messages[assistantIdx].content;
+        expect(assistantContent).toEqual([{ type: 'tool_use', id: 'toolu_1', name: 'list_nodes', input: {} }]);
+        const toolResultMsg = secondBody.messages[assistantIdx + 1];
+        expect(toolResultMsg.role).toBe('user');
+        const toolResultBlock = (toolResultMsg.content as Array<{ type: string; tool_use_id?: string; content?: string }>)[0];
+        expect(toolResultBlock.type).toBe('tool_result');
+        expect(toolResultBlock.tool_use_id).toBe('toolu_1');
+        // The real list_nodes dispatch result (containing the discovered node) is what was actually
+        // sent back — proving the tool_use_id -> tool_result correlation carries real dispatch data,
+        // not a placeholder.
+        expect(toolResultBlock.content).toContain('node-a17');
+
+        // Usage accumulation over BOTH turns, via the same accumulateExtendedUsage the live runner
+        // (realMultiTurnLocatorScenarios.spec.ts) uses — proves multi-call usage genuinely sums,
+        // not just that a single call's usage maps correctly (already covered by
+        // AnthropicToolLlmGateway.spec.ts's own isolated tests).
+        expect(captured).toHaveLength(2);
+        const usage = accumulateExtendedUsage(captured);
+        expect(usage.inputTokens).toBe(460); // 200 + 260
+        expect(usage.outputTokens).toBe(45); // 20 + 25
+        expect(usage.totalTokens).toBe(505);
+        // claude-haiku-4-5 is priced in pricing.ts, so a real cost estimate is expected, never null.
+        expect(usage.estimatedCost).not.toBeNull();
+        expect(usage.costSource).toBe('estimated');
+
+        // Requested vs. actual model stay distinct: the gateway was asked for the bare alias, but
+        // both turns' captured usage reports the pinned snapshot Anthropic actually served —
+        // exactly the field realMultiTurnLocatorScenarios.spec.ts's lastReportedActualModel()
+        // reads to populate MultiTurnLiveRecord.actualModel.
+        expect(gateway.model).toBe('claude-haiku-4-5');
+        expect(captured.every(c => c.actualModel === 'claude-haiku-4-5-20251001')).toBe(true);
+        expect(captured[0].actualModel).not.toBe(gateway.model);
+    });
+
+    it('a genuine dispatch failure through the real Anthropic mapping still fails the strict check — never forced to success', async () => {
+        const http = new ScriptedHttpRequest([
+            {
+                json: {
+                    content: [{ type: 'tool_use', id: 'toolu_1', name: 'move_node', input: { nodeId: 'login-button', by: { dx: 100, dy: 0 } } }],
+                    stop_reason: 'tool_use',
+                    usage: { input_tokens: 150, output_tokens: 15 },
+                },
+            },
+        ]);
+        const gateway = createAnthropicToolLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: 'test-anthropic-key',
+            model: 'claude-haiku-4-5',
+        });
+
+        const result = await runMultiTurnLocatorScenario(gateway, 'move-named-node-without-id');
+
+        expect(result.taskOutcome).toBe('failure');
+        expect(result.completionMode).toBe('none');
+        expect(result.error).toContain('no node with id "login-button" exists');
     });
 });

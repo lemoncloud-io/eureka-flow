@@ -5,6 +5,7 @@ import {
     aggregateMultiTurnByScenario,
     buildMultiTurnVerificationReport,
     costPerSuccessfulTask,
+    formatGenerationConfigurationMarkdown,
     formatMultiTurnCompletionModeMarkdownTable,
     formatMultiTurnModelSummaryMarkdownTable,
     formatMultiTurnRecordsCsv,
@@ -779,10 +780,78 @@ describe('MultiTurnRunManifest.requestedModels', () => {
             pricingVersion: '2026-07-31',
             gitSha: null,
             gitDirty: null,
+            generationConfiguration: {
+                openai: {
+                    temperature: { status: 'provider-default' },
+                    topP: { status: 'provider-default' },
+                    topK: { status: 'unsupported' },
+                    maxOutputTokens: { status: 'provider-default' },
+                    reasoningEffort: { status: 'provider-default' },
+                },
+            },
         };
         expect(manifest.requestedModels).toEqual(['gpt-4o-mini', 'gpt-5-mini']);
         // Round-trips through JSON exactly (this is what run-manifest.json actually persists).
         expect((JSON.parse(JSON.stringify(manifest)) as MultiTurnRunManifest).requestedModels).toEqual(['gpt-4o-mini', 'gpt-5-mini']);
+    });
+});
+
+describe('formatGenerationConfigurationMarkdown', () => {
+    it('shows the status word for provider-default/unsupported cells, never a guessed numeric value', () => {
+        const table = formatGenerationConfigurationMarkdown({
+            openai: {
+                temperature: { status: 'provider-default' },
+                topP: { status: 'provider-default' },
+                topK: { status: 'unsupported' },
+                maxOutputTokens: { status: 'provider-default' },
+                reasoningEffort: { status: 'provider-default' },
+            },
+        });
+        expect(table).toContain('| openai |');
+        expect(table).toContain('provider-default');
+        expect(table).toContain('unsupported');
+        // Never a bare number that could be mistaken for a known provider default.
+        expect(table).not.toMatch(/provider-default \(\d/);
+    });
+
+    it('shows the exact value for an explicit cell — e.g. anthropic\'s always-explicit maxOutputTokens', () => {
+        const table = formatGenerationConfigurationMarkdown({
+            anthropic: {
+                temperature: { status: 'provider-default' },
+                topP: { status: 'provider-default' },
+                topK: { status: 'provider-default' },
+                maxOutputTokens: { status: 'explicit', value: 1024 },
+                reasoningEffort: { status: 'unsupported' },
+            },
+        });
+        expect(table).toContain('explicit (1024)');
+    });
+
+    it('renders one row per provider when multiple providers are present in one run', () => {
+        const table = formatGenerationConfigurationMarkdown({
+            openai: {
+                temperature: { status: 'provider-default' },
+                topP: { status: 'provider-default' },
+                topK: { status: 'unsupported' },
+                maxOutputTokens: { status: 'provider-default' },
+                reasoningEffort: { status: 'provider-default' },
+            },
+            anthropic: {
+                temperature: { status: 'provider-default' },
+                topP: { status: 'provider-default' },
+                topK: { status: 'provider-default' },
+                maxOutputTokens: { status: 'explicit', value: 1024 },
+                reasoningEffort: { status: 'unsupported' },
+            },
+        });
+        const rows = table.split('\n').slice(2); // drop header + separator
+        expect(rows).toHaveLength(2);
+        expect(table).toContain('| openai |');
+        expect(table).toContain('| anthropic |');
+    });
+
+    it('reports "no configuration recorded" rather than an empty/misleading table when nothing was planned', () => {
+        expect(formatGenerationConfigurationMarkdown({})).toMatch(/no generation configuration recorded/i);
     });
 });
 
