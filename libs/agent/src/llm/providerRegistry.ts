@@ -76,8 +76,10 @@ const OPENAI_ENTRY: ProviderModelEntry = {
     // changes) and gpt-4.1-mini are both the 4.x generation. gpt-5-mini added as the newest
     // candidate — confirmed present in eureka-flows-api's own live model catalog (GET
     // /runs/0/models), which also lists gpt-5/gpt-5.1/gpt-5.2 above it. Picked gpt-5-mini (not
-    // gpt-5.2) to match this registry's pick-the-cheap-tier-first pattern. Not yet run against
-    // this provider-native path — offline-wired only until a real run happens.
+    // gpt-5.2) to match this registry's pick-the-cheap-tier-first pattern. Real-key-verified
+    // 2026-08-06 through this same provider-native path (live single-turn and multi-turn runs,
+    // including a genuine list_nodes → move_node multi-turn round trip on
+    // move-named-node-without-id) — see `realVerifiedModels` below.
     // gpt-4.1 added 2026-08-04 as a 4th capability/cost tier, for benchmark breadth — initially
     // sourced only via OpenRouter's public Models API as a corroboration signal, then independently
     // confirmed 2026-08-04 directly against OpenAI's own official docs
@@ -90,22 +92,23 @@ const OPENAI_ENTRY: ProviderModelEntry = {
     modelEnvOverride: 'OPENAI_TEST_MODEL',
     supportsToolCalls: true,
     // Message-mapping code handles role:'tool' and assistant tool_calls natively, offline-verified
-    // (OpenAiLlmGateway.spec.ts). No live run has exercised the multi-turn round trip yet.
+    // (OpenAiLlmGateway.spec.ts). Real-key-verified 2026-08-06: gpt-4o-mini and gpt-5-mini both
+    // completed a genuine multi-turn round trip (list_nodes → real tool result → move_node) via
+    // realMultiTurnLocatorScenarios.spec.ts's move-named-node-without-id scenario.
     supportsMultiTurnToolResults: true,
     status: 'implemented',
     offlineVerified: true,
-    realVerifiedModels: ['gpt-4o-mini'],
+    realVerifiedModels: ['gpt-4o-mini', 'gpt-5-mini'],
     notes:
         'OpenAI-wire-compatible — OpenRouter (see OPENROUTER_ENTRY) already reuses this same ' +
         'gateway via a baseUrl override. DeepSeek/Qwen could too, but are not registered yet. ' +
         'Old/new coverage: gpt-4o-mini (real-verified, current default) and gpt-4.1-mini are ' +
         'both 4.x-generation; gpt-5-mini is the newest-candidate addition, confirmed to exist in ' +
-        "eureka's own model catalog but not yet run through this provider-native path — pending " +
-        'a real-key run (see provider-tool-calling.md §5). gpt-4.1 (full, non-mini tier) added ' +
-        '2026-08-04 for capability-tier breadth per the model-manifest benchmark target — see ' +
-        "`modelManifest.ts`; confirmed directly against OpenAI's own docs (not just OpenRouter's " +
-        'mirrored catalog), so treat it the same confidence level as gpt-4.1-mini/gpt-5-mini: ' +
-        'registered, current, and directly confirmed — not yet real-key-verified.',
+        "eureka's own model catalog and real-key-verified 2026-08-06 (single-turn smoke plus a " +
+        'genuine multi-turn list_nodes → move_node round trip) through this same provider-native ' +
+        'path. gpt-4.1 (full, non-mini tier) added 2026-08-04 for capability-tier breadth per the ' +
+        "model-manifest benchmark target — see `modelManifest.ts`; confirmed directly against OpenAI's " +
+        "own docs (not just OpenRouter's mirrored catalog), but not yet real-key-verified.",
 };
 
 const GEMINI_ENTRY: ProviderModelEntry = {

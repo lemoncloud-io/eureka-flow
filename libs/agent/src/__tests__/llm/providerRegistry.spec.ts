@@ -444,10 +444,12 @@ describe('Old/new model-version compatibility (Part B)', () => {
 
     it('newest-generation additions do not silently replace defaultModel or realVerifiedModels', () => {
         // Adding a newer-generation model id to a provider's models[] must never move that
-        // provider's defaultModel or realVerifiedModels for a provider that already has a
-        // real-key-verified entry.
+        // provider's defaultModel, nor silently drop an existing realVerifiedModels entry.
+        // gpt-5-mini joined gpt-4o-mini here 2026-08-06 after a genuine real-key multi-turn round
+        // trip (realMultiTurnLocatorScenarios.spec.ts, move-named-node-without-id) — an actual
+        // verification, not a default-model change.
         expect(findEntry('openai').defaultModel).toBe('gpt-4o-mini');
-        expect(findEntry('openai').realVerifiedModels).toEqual(['gpt-4o-mini']);
+        expect(findEntry('openai').realVerifiedModels).toEqual(['gpt-4o-mini', 'gpt-5-mini']);
         expect(findEntry('gemini').defaultModel).toBe('gemini-2.5-flash');
         expect(findEntry('gemini').realVerifiedModels).toEqual(['gemini-2.5-flash']);
     });

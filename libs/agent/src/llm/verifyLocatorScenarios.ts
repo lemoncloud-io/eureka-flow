@@ -6,11 +6,11 @@ import { createNodeMoveToolProvider, createNodeReadToolProvider, renderNodeConte
 import { createToolExecutor } from '../tools/toolExecutor';
 
 import type { AgentConfig } from '../agent';
-import type { Chunk, LlmGateway } from './llmGateway';
+import type { ChatMessage, Chunk, LlmGateway } from './llmGateway';
 import type { CanvasBinding, XY } from '../canvas/canvasBinding';
 import type { Direction } from '../canvas/moveSemantics';
 import type { AgentGrant } from '../permissions';
-import type { ToolResult } from '../tools/types';
+import type { ToolCall, ToolResult } from '../tools/types';
 
 // No blocks are ever described in these scenarios — every scenario only calls list_nodes and/or
 // move_node — so an empty catalog is sufficient for the read provider's describe_node tool.
@@ -44,6 +44,13 @@ export interface SeedNode {
     id: string;
     type: string;
     position: XY;
+    /** Optional visible label (`NodeLocation.label`/`NodeData.customLabel`) — absent for every
+     * existing single-turn scenario (none of them need one); used by multi-turn-only scenarios
+     * that identify a target by name rather than by an id the prompt could reveal. Passed through
+     * only by {@link runMultiTurnLocatorScenario}'s own binding construction — `runLocatorScenario`
+     * (single-turn) is unchanged and never reads this field, so adding it here has no effect on any
+     * existing scenario's behavior. */
+    label?: string;
 }
 
 export type LocatorScenarioId =
@@ -131,6 +138,34 @@ interface ScenarioDefinition {
     check: ScenarioCheck;
     /** See {@link LocatorScenarioKnownVariance}. Absent means no documented alternate outcome. */
     knownVariance?: LocatorScenarioKnownVariance;
+}
+
+/**
+ * Same shape as {@link ScenarioDefinition} minus `knownVariance` (multi-turn-only scenarios never
+ * need one — `runMultiTurnLocatorScenario` doesn't read `knownVariance` for ANY scenario, single-
+ * turn or not) and with an `id` scoped to {@link MultiTurnOnlyScenarioId} instead of
+ * `LocatorScenarioId`. Kept as its own type — rather than widening `ScenarioDefinition.id` itself —
+ * specifically so `SCENARIOS`/`LOCATOR_SCENARIOS` (the single-turn catalog) keep inferring exactly
+ * `LocatorScenarioId` as before, with zero type-level ripple onto the single-turn benchmark.
+ *
+ * `hideInitialNodeContext` is required (not optional) so every new multi-turn-only scenario has to
+ * make this choice explicitly rather than silently inheriting the single-turn default. `true` means
+ * `runMultiTurnLocatorScenario` omits the per-turn `renderNodeContext` system message from the
+ * FIRST request only (every request after a tool call still reflects live canvas state through the
+ * real tool-result message, never through this system message) — the only way a scenario can make
+ * `list_nodes` the sole source of node ids instead of a redundant confirmation of ids already
+ * visible in the first request. `ScenarioDefinition` (single-turn catalog) has no such field at
+ * all, so every existing single-turn scenario run through `runMultiTurnLocatorScenario` keeps
+ * getting the node-context message on turn 1 exactly as before — this field only exists on, and
+ * only ever gates behavior for, the `MultiTurnOnlyScenarioDefinition` union member.
+ */
+interface MultiTurnOnlyScenarioDefinition {
+    id: MultiTurnOnlyScenarioId;
+    description: string;
+    seedNodes: SeedNode[];
+    prompt: string;
+    check: ScenarioCheck;
+    hideInitialNodeContext: boolean;
 }
 
 const buildConfig = (binding: CanvasBinding): AgentConfig => ({
@@ -629,4 +664,424 @@ export const runAllLocatorScenarios = async (gateway: LlmGateway): Promise<Locat
         results.push(await runLocatorScenario(gateway, scenario.id));
     }
     return results;
+};
+
+// =============================================================================================
+// Multi-turn runner
+//
+// `runLocatorScenario` above is deliberately single-turn (one `gateway.chat()` call). This section
+// adds a second, independent entry point that allows up to `maxTurns` model turns, feeding a real
+// tool-result back into the transcript between turns — so a model that looks up first (`list_nodes`)
+// can still complete the task on a later turn instead of only being scored as a documented
+// "known-variance" allowance. It reuses this module's existing scenario catalog, `buildConfig`,
+// `snapshotPositions`, `drain`, and each scenario's own `check()` — none of that is duplicated.
+// `runLocatorScenario`/`runAllLocatorScenarios` and `realLocatorScenarios.spec.ts` are untouched by
+// this section; the single-turn matrix and its knownVariance classification remain exactly as before.
+// =============================================================================================
+
+/**
+ * Scenario ids that exist ONLY for {@link runMultiTurnLocatorScenario} — never added to `SCENARIOS`/
+ * `LOCATOR_SCENARIOS` (the single-turn catalog), so the single-turn benchmark's scenario count,
+ * report tables, and `knownVariance` behavior are completely unaffected by anything added here.
+ * `findScenario` (used only by `runLocatorScenario`/`runAllLocatorScenarios`) never looks these up;
+ * only {@link findAnyScenario} (used only by the multi-turn runner) does.
+ */
+export type MultiTurnOnlyScenarioId = 'move-named-node-without-id';
+
+const MOVE_NAMED_NODE_TARGET_ID = 'node-a17';
+const MOVE_NAMED_NODE_DISTRACTOR_1_ID = 'node-b42';
+const MOVE_NAMED_NODE_DISTRACTOR_2_ID = 'node-c88';
+const MOVE_NAMED_NODE_SEED_POSITION: XY = { x: 200, y: 300 };
+const MOVE_NAMED_NODE_AMOUNT = 100;
+const MOVE_NAMED_NODE_EXPECTED = applyMove(MOVE_NAMED_NODE_SEED_POSITION, {
+    by: directionToDelta('right', MOVE_NAMED_NODE_AMOUNT),
+});
+
+/**
+ * Multi-turn-only: names the target by its visible label ("Login button"), never by its opaque
+ * node id (`node-a17` — not `login-button`), so the id genuinely cannot be inferred from the user
+ * instruction alone. Two labeled distractor nodes (a same-type "Sign up" button and a differently-
+ * typed "Email" field) are seeded alongside it, so a model that moves the wrong node — or the right
+ * node type but wrong instance — fails the strict check below, not just a scenario with nothing
+ * else on the canvas to confuse it.
+ *
+ * `hideInitialNodeContext: true` makes `list_nodes` GENUINELY required, not merely available: the
+ * first request contains only the system prompt and the user's label-only instruction — no
+ * `renderNodeContext` system message, so no node id (target or distractor) is visible anywhere
+ * before a `list_nodes` call. Ids become known only via the real tool-result message
+ * `runMultiTurnLocatorScenario` appends after dispatch. (An earlier version of this scenario left
+ * the per-turn context in on turn 1, which — exactly like every other scenario in this file —
+ * defeated the "requires a lookup" premise: a model could read `node-a17` straight out of that
+ * context and call `move_node` directly. That's still fine for every *other* scenario here, whose
+ * whole point is "resolve however you like" — it was wrong specifically for the one scenario whose
+ * entire purpose is exercising the lookup-first round trip.) A model that still guesses a
+ * plausible-looking id without calling `list_nodes` first can only pass by getting catastrophically
+ * lucky (a random id colliding with the real one) — not a real risk in practice, and every other
+ * outcome for that path fails the dispatch or the strict position check below.
+ */
+const MOVE_NAMED_NODE_WITHOUT_ID: MultiTurnOnlyScenarioDefinition = {
+    id: 'move-named-node-without-id',
+    description:
+        'Multi-turn-only: the prompt names the target by its visible label ("Login button"), never its ' +
+        'opaque node id, AND the first request omits the per-turn node-context message entirely — so ' +
+        'list_nodes is the only way to discover any node id before calling move_node with a relative ' +
+        '`by` delta. Only the named node may move; two labeled/typed distractor nodes must stay exactly ' +
+        'where they started.',
+    hideInitialNodeContext: true,
+    seedNodes: [
+        {
+            id: MOVE_NAMED_NODE_TARGET_ID,
+            type: 'button',
+            label: 'Login',
+            position: { ...MOVE_NAMED_NODE_SEED_POSITION },
+        },
+        { id: MOVE_NAMED_NODE_DISTRACTOR_1_ID, type: 'button', label: 'Sign up', position: { x: 500, y: 300 } },
+        { id: MOVE_NAMED_NODE_DISTRACTOR_2_ID, type: 'text-input', label: 'Email', position: { x: 200, y: 500 } },
+    ],
+    prompt: 'Move the Login button 100 pixels to the right.',
+    check: outcome => {
+        if (!outcome.toolCall) {
+            // Covers both a plain refusal AND a "which node do you mean?" clarifying question —
+            // this scenario's target is never ambiguous (only one node is labeled "Login"), so
+            // neither a refusal nor a text-only answer is ever correct here, regardless of content.
+            return { pass: false, error: 'model did not emit a structured tool call' };
+        }
+        if (outcome.toolCall.name !== 'move_node') {
+            // Covers a bare `list_nodes` call that never proceeds to `move_node` on this same
+            // check() invocation — the runner's own `isContinuableLookup` is what decides whether
+            // that earns another turn; this check() only ever sees it as "not yet a pass".
+            return { pass: false, error: `unexpected tool call: ${outcome.toolCall.name}` };
+        }
+        if (!outcome.dispatchResult) {
+            return { pass: false, error: 'no dispatch result' };
+        }
+        if (!outcome.dispatchResult.ok) {
+            // A guessed/nonexistent id (e.g. the literal string "login-button") fails here with
+            // ToolExecutor's own "no node with id ... exists" error — never silently treated as a
+            // pass, and never given another turn (isContinuableLookup only re-tries `list_nodes`).
+            return { pass: false, error: outcome.dispatchResult.error };
+        }
+        const after = outcome.positionsAfter[MOVE_NAMED_NODE_TARGET_ID];
+        if (after?.x !== MOVE_NAMED_NODE_EXPECTED.x || after?.y !== MOVE_NAMED_NODE_EXPECTED.y) {
+            // Covers moving a real-but-wrong node (e.g. the "Sign up" distractor by mistake): the
+            // dispatch succeeds, but the named target itself never reaches the expected position.
+            return {
+                pass: false,
+                error: `named node moved to (${after?.x},${after?.y}), expected ` +
+                    `(${MOVE_NAMED_NODE_EXPECTED.x},${MOVE_NAMED_NODE_EXPECTED.y})`,
+            };
+        }
+        for (const distractorId of [MOVE_NAMED_NODE_DISTRACTOR_1_ID, MOVE_NAMED_NODE_DISTRACTOR_2_ID]) {
+            const before = outcome.positionsBefore[distractorId];
+            const distractorAfter = outcome.positionsAfter[distractorId];
+            if (distractorAfter?.x !== before?.x || distractorAfter?.y !== before?.y) {
+                return { pass: false, error: `distractor node ${distractorId} was also moved` };
+            }
+        }
+        return { pass: true };
+    },
+};
+
+/** Every scenario that exists only for the multi-turn runner — currently just the one above. Kept
+ * as its own array, deliberately never merged into or appended onto `SCENARIOS`. */
+const MULTI_TURN_ONLY_SCENARIOS: readonly MultiTurnOnlyScenarioDefinition[] = [MOVE_NAMED_NODE_WITHOUT_ID];
+
+/** Exported so callers outside this module (e.g. `realMultiTurnLocatorScenarios.spec.ts`'s
+ * `LIVE_MULTI_TURN_SCENARIOS` id validation) can accept a multi-turn-only id without importing
+ * `MULTI_TURN_ONLY_SCENARIOS` itself or duplicating its id list. */
+export const MULTI_TURN_ONLY_SCENARIO_IDS: readonly MultiTurnOnlyScenarioId[] = MULTI_TURN_ONLY_SCENARIOS.map(s => s.id);
+
+/** Scenario lookup for {@link runMultiTurnLocatorScenario} only — checks the single-turn `SCENARIOS`
+ * catalog first (so every existing scenario id still resolves exactly as before), then falls back
+ * to {@link MULTI_TURN_ONLY_SCENARIOS}. `runLocatorScenario`/`runAllLocatorScenarios` keep using the
+ * original `findScenario` above, which has no knowledge of `MULTI_TURN_ONLY_SCENARIOS` at all — so
+ * a multi-turn-only scenario id is simply unresolvable through the single-turn path, by
+ * construction, not by an added guard. Returns a union of both scenario shapes — the caller only
+ * ever reads `seedNodes`/`prompt`/`check`, present identically on both. */
+const findAnyScenario = (
+    scenarioId: LocatorScenarioId | MultiTurnOnlyScenarioId
+): ScenarioDefinition | MultiTurnOnlyScenarioDefinition => {
+    const scenario: ScenarioDefinition | MultiTurnOnlyScenarioDefinition | undefined =
+        SCENARIOS.find(s => s.id === scenarioId) ?? MULTI_TURN_ONLY_SCENARIOS.find(s => s.id === scenarioId);
+    if (!scenario) {
+        throw new Error(`unknown locator scenario id: ${scenarioId}`);
+    }
+    return scenario;
+};
+
+/** How a multi-turn run ended. Decided ONLY from `scenario.check()`'s pass/fail result (or a
+ * turn-count/provider exhaustion) — never from `knownVariance`, which this runner does not consult. */
+export type MultiTurnTaskOutcome = 'success' | 'failure' | 'provider-error' | 'max-turns';
+
+/** Descriptive classification of *how* a successful run got there — purely informational, and
+ * computed only from the already-decided {@link MultiTurnTaskOutcome}. Never itself a pass/fail
+ * signal: a `'lookup-first'` run is exactly as much a pass as a `'direct'` one. */
+export type MultiTurnStrategy = 'direct' | 'lookup-first' | 'text-only' | 'other';
+
+/** One model turn's outcome, in the order turns occurred. */
+export interface MultiTurnTurnTrace {
+    turn: number;
+    toolCallName: string | null;
+    textPresent: boolean;
+    /** Whether `argsDelta` parsed as valid JSON — absent when no tool call was made this turn. */
+    argsValid?: boolean;
+    /** Whether `ToolExecutor.dispatch` reported success — absent when no dispatch was attempted. */
+    dispatchOk?: boolean;
+    /**
+     * Set only on a genuinely successful `list_nodes` lookup that earns another turn instead of
+     * completing the task (see `isContinuableLookup`) — never set together with `error`. Exists so
+     * that step can be told apart from an actual problem: a `pass: false` from `scenario.check()`
+     * here doesn't mean anything went wrong, only that the task isn't done yet.
+     */
+    stepStatus?: 'continued';
+    /** Present iff `stepStatus === 'continued'` — a human-readable reason another turn was earned. */
+    continuationReason?: string;
+    /**
+     * A genuine problem on this turn: invalid tool-call JSON, a failed `ToolExecutor.dispatch`, or a
+     * terminal (non-continuable) failed strict check. Never set on a successful, continuable
+     * `list_nodes` lookup — see `stepStatus`/`continuationReason` for that case instead.
+     */
+    error?: string;
+}
+
+export interface MultiTurnLocatorScenarioResult {
+    scenarioId: LocatorScenarioId | MultiTurnOnlyScenarioId;
+    taskOutcome: MultiTurnTaskOutcome;
+    strategy: MultiTurnStrategy;
+    /** See {@link MultiTurnCompletionMode} — orthogonal to `strategy`, always `'none'` unless
+     * `taskOutcome === 'success'`. */
+    completionMode: MultiTurnCompletionMode;
+    turnCount: number;
+    /** Tool call names, one per turn that made one, in the order they occurred (e.g. `['list_nodes', 'move_node']`). */
+    toolSequence: string[];
+    turns: MultiTurnTurnTrace[];
+    positionsBefore: Record<string, XY>;
+    positionsAfter: Record<string, XY>;
+    error?: string;
+}
+
+export interface RunMultiTurnLocatorScenarioOptions {
+    /** Maximum model turns before giving up with `taskOutcome: 'max-turns'`. Defaults to 3. */
+    maxTurns?: number;
+}
+
+const DEFAULT_MAX_TURNS = 3;
+
+/**
+ * Serializes a {@link ToolResult} into a tool-message's `content` string. `BaseAgent`'s own
+ * `resultToContent` (`libs/agent/src/agents/baseAgent.ts`) does exactly this but is a private
+ * module-level `const`, not exported — so it can't be imported here. Kept byte-for-byte identical
+ * (`result.ok ? JSON.stringify(result.data ?? { ok: true }) : JSON.stringify({ error: result.error })`)
+ * so a tool-result message built by this runner is indistinguishable from one `BaseAgent` would have
+ * produced from the same `ToolResult`, and matches the shape asserted in the provider gateway specs
+ * (e.g. `GeminiToolLlmGateway.spec.ts`'s `{ role: 'tool', content: '{"ok":true}', toolCallId: 'c1' }`).
+ */
+const toolResultToMessageContent = (result: ToolResult): string =>
+    result.ok ? JSON.stringify(result.data ?? { ok: true }) : JSON.stringify({ error: result.error });
+
+/** Only a successful, non-mutating `list_nodes` lookup earns another turn — see the module doc above. */
+const isContinuableLookup = (toolCall: ToolCall, dispatchResult: ToolResult): boolean =>
+    toolCall.name === 'list_nodes' && dispatchResult.ok;
+
+/**
+ * Describes the observed interaction shape, independent of {@link MultiTurnTaskOutcome} — a
+ * `lookup-first` or `text-only` run is exactly as much that strategy whether it ultimately
+ * succeeded, failed, hit `max-turns`, or errored. Only `direct` is defined in terms of the outcome
+ * (it requires `success`); the other three are pure observations about what happened, checked in
+ * this order:
+ *
+ * 1. `lookup-first` — the first tool call of the run was `list_nodes`, regardless of what happened
+ *    after (a later success, a later failure, exhausting `maxTurns`, or a provider error on a
+ *    later turn all still count).
+ * 2. `text-only` — no tool was ever called, but at least one completed turn's response contained
+ *    non-empty text (whether that text satisfied the scenario's strict check or not).
+ * 3. `direct` — `taskOutcome` is `success`, it was reached on turn 1, and exactly one (non-
+ *    `list_nodes`) tool was called.
+ * 4. `other` — everything else (e.g. an immediate wrong non-`list_nodes` tool call, or a run with
+ *    neither a tool call nor any text at all).
+ */
+const classifyMultiTurnStrategy = (
+    taskOutcome: MultiTurnTaskOutcome,
+    turns: readonly MultiTurnTurnTrace[],
+    toolSequence: readonly string[]
+): MultiTurnStrategy => {
+    if (toolSequence[0] === 'list_nodes') {
+        return 'lookup-first';
+    }
+    if (toolSequence.length === 0 && turns.some(t => t.textPresent)) {
+        return 'text-only';
+    }
+    if (taskOutcome === 'success' && turns.length === 1 && toolSequence.length === 1) {
+        return 'direct';
+    }
+    return 'other';
+};
+
+/**
+ * Orthogonal to {@link MultiTurnStrategy}: `strategy` describes how a run STARTED (was the first
+ * tool call `list_nodes`?); `completionMode` describes how a SUCCESSFUL run ENDED — did its
+ * terminal successful turn act via a tool call, or answer via text? Never a pass/fail signal and
+ * never used to derive `taskOutcome` — always `'none'` for anything other than `'success'`.
+ *
+ * - `'tool-action'` — the terminal successful turn made a tool call. This includes the rare case
+ *   where `list_nodes` itself is the scenario's own expected completing action (e.g.
+ *   `list-nodes-read-only`, whose `check()` passes directly on a bare `list_nodes` call): the task
+ *   still completed via a tool call, not text, which is the distinction this field exists to
+ *   capture — not "which specific tool", only "tool call vs. text".
+ * - `'text-response'` — the terminal successful turn had no tool call. Covers both a direct
+ *   text-only success (e.g. a clarifying question accepted immediately) and a `list_nodes` lookup
+ *   followed by an accepted text response on a later turn — in both cases the LAST successful turn
+ *   itself was text, even though `strategy` may say `'lookup-first'` because of an earlier turn.
+ */
+export type MultiTurnCompletionMode = 'tool-action' | 'text-response' | 'none';
+
+const classifyCompletionMode = (
+    taskOutcome: MultiTurnTaskOutcome,
+    turns: readonly MultiTurnTurnTrace[]
+): MultiTurnCompletionMode => {
+    if (taskOutcome !== 'success') {
+        return 'none';
+    }
+    // Every 'success' exit pushes exactly one turn trace for its own turn before returning — see
+    // the `!toolCallChunk` and tool-call branches below — so `turns` is never empty here.
+    const terminalTurn = turns[turns.length - 1];
+    return terminalTurn?.toolCallName != null ? 'tool-action' : 'text-response';
+};
+
+/**
+ * Multi-turn sibling of {@link runLocatorScenario}: allows up to `options.maxTurns` (default 3)
+ * model turns instead of exactly one, feeding a real assistant tool-call + tool-result message pair
+ * back into the transcript between turns. A turn ends the run immediately on success or on any
+ * failure EXCEPT a successful `list_nodes` lookup, which earns another turn (see the module doc
+ * above for why, and `check()`'s own per-scenario logic for how e.g. `unknown-target`'s
+ * executor-error path already counts as success without needing a second turn).
+ *
+ * Pure and offline-testable: takes any {@link LlmGateway} (fake or real), uses a fresh
+ * `createInMemoryCanvasBinding` and real `ToolExecutor`, and never reads `knownVariance`.
+ */
+export const runMultiTurnLocatorScenario = async (
+    gateway: LlmGateway,
+    scenarioId: LocatorScenarioId | MultiTurnOnlyScenarioId,
+    options?: RunMultiTurnLocatorScenarioOptions
+): Promise<MultiTurnLocatorScenarioResult> => {
+    const maxTurns = options?.maxTurns ?? DEFAULT_MAX_TURNS;
+    const scenario = findAnyScenario(scenarioId);
+    const binding = createInMemoryCanvasBinding({
+        nodes: scenario.seedNodes.map(n => ({ id: n.id, type: n.type, position: { ...n.position }, customLabel: n.label })),
+        edges: [],
+    });
+    const executor = createToolExecutor();
+    const config = buildConfig(binding);
+    const positionsBefore = snapshotPositions(binding);
+
+    // Every single-turn scenario (run here or via runLocatorScenario) gets the per-turn node-context
+    // system message on turn 1 exactly as before — `hideInitialNodeContext` exists only on
+    // MultiTurnOnlyScenarioDefinition, so this is `false` for anything from `SCENARIOS`.
+    const hideInitialNodeContext = 'hideInitialNodeContext' in scenario && scenario.hideInitialNodeContext;
+    const transcript: ChatMessage[] = [
+        { role: 'system', content: config.systemPrompt },
+        ...(hideInitialNodeContext ? [] : [{ role: 'system', content: renderNodeContext(binding) } as ChatMessage]),
+        { role: 'user', content: scenario.prompt },
+    ];
+
+    const turns: MultiTurnTurnTrace[] = [];
+    const toolSequence: string[] = [];
+
+    const finalize = (taskOutcome: MultiTurnTaskOutcome, error?: string): MultiTurnLocatorScenarioResult => ({
+        scenarioId,
+        taskOutcome,
+        strategy: classifyMultiTurnStrategy(taskOutcome, turns, toolSequence),
+        completionMode: classifyCompletionMode(taskOutcome, turns),
+        turnCount: turns.length,
+        toolSequence: [...toolSequence],
+        turns: [...turns],
+        positionsBefore,
+        positionsAfter: snapshotPositions(binding),
+        ...(error ? { error } : {}),
+    });
+
+    for (let turnNumber = 1; turnNumber <= maxTurns; turnNumber += 1) {
+        let chunks: Chunk[];
+        try {
+            chunks = await drain(gateway.chat({ messages: transcript, tools: await executor.listTools(config) }));
+        } catch (err) {
+            // A thrown provider/gateway error escaping gateway.chat() itself — never a normal
+            // check()-scored outcome. Completed turn traces and toolSequence are preserved (they
+            // were already pushed for prior turns before this one threw).
+            const message = err instanceof Error ? err.message : String(err);
+            return finalize('provider-error', message.slice(0, ERROR_MESSAGE_LIMIT));
+        }
+
+        const toolCallChunk = chunks.find(c => c.toolCall)?.toolCall ?? null;
+        const textPresent = chunks.some(c => typeof c.text === 'string' && c.text.length > 0);
+
+        if (!toolCallChunk) {
+            const { pass, error } = scenario.check({
+                toolCall: null,
+                positionsBefore,
+                positionsAfter: snapshotPositions(binding),
+                textPresent,
+            });
+            turns.push({ turn: turnNumber, toolCallName: null, textPresent, ...(error ? { error } : {}) });
+            return finalize(pass ? 'success' : 'failure', error);
+        }
+
+        let args: unknown;
+        try {
+            args = JSON.parse(toolCallChunk.argsDelta);
+        } catch {
+            const error = 'tool call arguments were not valid JSON';
+            turns.push({ turn: turnNumber, toolCallName: toolCallChunk.name, textPresent, argsValid: false, error });
+            return finalize('failure', error);
+        }
+
+        const toolCall: ToolCall = { id: toolCallChunk.id, name: toolCallChunk.name, args };
+        const dispatchResult = await executor.dispatch(config, toolCall, VERIFY_USER_PERMISSIONS);
+        toolSequence.push(toolCall.name);
+
+        // Append the real assistant tool-call + tool-result message pair before the next turn —
+        // same shape BaseAgent.send() persists (assistant `toolCalls[].args` is the raw JSON
+        // string, not the parsed value; see `mapTranscript`/`recordToolResult` in baseAgent.ts).
+        transcript.push({
+            role: 'assistant',
+            content: null,
+            toolCalls: [{ id: toolCall.id, name: toolCall.name, args: toolCallChunk.argsDelta }],
+        });
+        transcript.push({
+            role: 'tool',
+            content: toolResultToMessageContent(dispatchResult),
+            toolCallId: toolCall.id,
+        });
+
+        const positionsAfter = snapshotPositions(binding);
+        const { pass, error } = scenario.check({ toolCall, dispatchResult, positionsBefore, positionsAfter, textPresent });
+        const continuable = !pass && isContinuableLookup(toolCall, dispatchResult);
+
+        turns.push({
+            turn: turnNumber,
+            toolCallName: toolCall.name,
+            textPresent,
+            argsValid: true,
+            dispatchOk: dispatchResult.ok,
+            // A continuable lookup's check() message (e.g. "unexpected tool call: list_nodes") is
+            // never a real problem — it only means the task isn't done yet — so it's never surfaced
+            // as `error` here; `error` is reserved for a terminal (non-continuable) failed check.
+            ...(continuable
+                ? { stepStatus: 'continued' as const, continuationReason: `task not complete after ${toolCall.name}` }
+                : error
+                  ? { error }
+                  : {}),
+        });
+
+        if (pass) {
+            return finalize('success');
+        }
+        if (!continuable) {
+            return finalize('failure', error);
+        }
+        // Successful, non-mutating list_nodes lookup that didn't itself satisfy the scenario —
+        // loop continues to the next turn with the tool-result now in the transcript.
+    }
+
+    return finalize('max-turns');
 };
