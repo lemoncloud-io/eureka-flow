@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-08-07] - root@0.67.1, @flows/web@0.67.1, @flows/admin@0.41.1
+
+### Chores
+
+- the mechanical follow-ups from the #126 review
+
 ## [2026-08-07] - root@0.67.0, @flows/web@0.67.0, @flows/admin@0.41.0
 
 ### Features
