@@ -242,7 +242,7 @@ const embedsTypedPath = (g: Graph, types: string[]): boolean => {
     }
     return true;
 };
-// (3) validity — the engine's OWN semantics reused as the oracle (canvas/edgeSemantics.ts + a driver check)
+// (3) validity — the engine's OWN semantics reused as the oracle (libs/engine/src/core/{cycle,edges}.ts + a driver check)
 const isValid = (g: Graph, cat: CatalogLookup): boolean =>
     g.edges.every(e => portsCompatible(e, g, cat)) && !hasCycle(g) && atMostOneDriverPerInput(g);
 // (6) refactor — preserved dataflow + intended delta, no golden graph
