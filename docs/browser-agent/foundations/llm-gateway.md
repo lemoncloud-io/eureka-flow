@@ -82,8 +82,8 @@ node read (`list_nodes` + `describe_node`), move (`move_node`), config
 - Auth via the `x-goog-api-key` **header** — never in the URL; the key appears in neither
   error messages (error bodies are key-redacted before throwing) nor traces (trace
   redaction also guards secret-looking fields). Test-verified.
-- Uses the Agent Environment for tracing and time; cancellation flows through the
-  request's `AbortSignal`.
+- Traced from outside by the per-agent `tracingGateway` decorator; cancellation flows through
+  the request's `AbortSignal`.
 - System messages map to `systemInstruction`; assistant turns to the `model` role.
 - The provider call is not streamed: the buffered response is re-emitted as chunks — any text,
   then each `functionCall` as a tool-call chunk, then a `done` chunk carrying usage tokens.
@@ -166,8 +166,6 @@ model answer, because no real receiver exists yet to prove that leg.
   skipped unless `GEMINI_API_KEY` is set) drives the real Gemini gateway end-to-end when run
   manually; the Generate API gateway still has no live receiver (§6). The real-API smoke testing
   that established §6's facts used throwaway dev-only hooks, not this gateway.
-- **No full editor E2E has been run.** The Environment self-check
-  (`runAgentEnvironmentSelfCheck`) remains callable in the browser as a smoke check for
-  localStorage and trace; `/dev/agent-harness` covers a manual real-browser Environment
+- **No full editor E2E has been run.** `/dev/agent-harness` covers a manual real-browser
   verification driving the orchestrator through `createGenerateApiLlmGateway`; a real
   editor/E2E pass is a follow-up step.

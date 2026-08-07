@@ -1,6 +1,5 @@
 import { isPlainObject } from '../utils/json';
 
-import type { AgentEnvironmentSupportable } from '../environment';
 import type { HttpRequestSupportable } from '../http';
 import type { ChatRequest, Chunk, JsonSchema, LlmGateway, LlmGatewayCapabilities, ToolDef } from './llmGateway';
 
@@ -24,8 +23,6 @@ export interface GeminiRetryConfig {
 }
 
 export interface GeminiLlmGatewayOptions {
-    /** Provides tracing, time, and cancellation. */
-    environment: AgentEnvironmentSupportable;
     /** HTTP port. */
     http: HttpRequestSupportable;
     /** Gemini Developer API key; sent as the x-goog-api-key header, never traced. */
@@ -191,7 +188,7 @@ interface GeminiResponse {
  * Function-calling; non-streaming under the hood — response `functionCall`s surface as {@link Chunk} `toolCall`s.
  */
 export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): GeminiLlmGateway => {
-    const { environment, http, generation, retry } = options;
+    const { http, generation, retry } = options;
     const model = options.model ?? DEFAULT_MODEL;
     const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
     const apiKey = options.apiKey;
@@ -203,23 +200,16 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
     const maxHttpAttempts = Math.max(1, retry?.maxAttempts ?? 4);
     const baseDelayMs = retry?.baseDelayMs ?? 1000;
     const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
-    const trace = environment.traceReporter;
 
     // Gemini returns no tool-call ids; synthesize a stable one so the agent loop can correlate results.
+    // Request/response/error tracing is layered on from outside by the per-agent `tracingGateway` decorator.
     let callCounter = 0;
     const nextCallId = () => `gemini-call-${(callCounter += 1)}`;
 
     async function* chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk> {
-        const startedAt = environment.now();
         const body = toGeminiRequest(req, generation);
         const headers = { 'x-goog-api-key': apiKey };
         const secrets = [apiKey];
-
-        trace?.debug('llm.gemini.request', {
-            model,
-            messageCount: req.messages.length,
-            toolCount: req.tools.length,
-        });
 
         // Retry a degenerate empty response (thinking-only / MAX_TOKENS, no parts) once; HTTP errors throw immediately.
         // An empty candidate that finished STOP and was not blocked is a legitimate empty turn — fall through, don't retry/throw.
@@ -244,7 +234,6 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
             ) {
                 const backoffMs =
                     Math.min(baseDelayMs * 2 ** (httpAttempt - 1), 15_000) + Math.floor(Math.random() * 250);
-                trace?.debug('llm.gemini.retry', { model, status: response.status, httpAttempt, backoffMs });
                 await sleep(backoffMs);
                 response = await send();
             }
@@ -253,7 +242,6 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
                 const errorBody = await response.text().catch(() => '');
                 const safeBody = secrets.reduce((acc, secret) => redactText(acc, secret), errorBody);
 
-                trace?.error('llm.gemini.error', { model, status: response.status });
                 throw new Error(
                     `Gemini request failed with status ${response.status}: ${safeBody.slice(0, ERROR_BODY_SNIPPET_LENGTH)}`
                 );
@@ -271,11 +259,9 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
             }
 
             emptyReason = finishReason ?? blockReason ?? 'no candidates';
-            trace?.debug('llm.gemini.empty', { model, attempt, reason: emptyReason });
         }
 
         if (!cleanStop && (!parts || parts.length === 0)) {
-            trace?.error('llm.gemini.error', { model, reason: emptyReason });
             throw new Error(
                 `Gemini response contained no content parts after ${MAX_ATTEMPTS} attempt(s) (reason: ${emptyReason})`
             );
@@ -301,14 +287,6 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
                       : {}),
               }
             : undefined;
-
-        trace?.debug('llm.gemini.response', {
-            model,
-            textLength: text.length,
-            toolCallCount: functionCalls.length,
-            durationMs: environment.now() - startedAt,
-            ...(usage ? { usage } : {}),
-        });
 
         if (text) {
             yield { text };

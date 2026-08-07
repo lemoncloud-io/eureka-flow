@@ -7,7 +7,6 @@ import { AgentPanel } from '../components/AgentPanel';
 import { useAgent } from '../hooks/useAgent';
 import { useAgentEnvironment } from '../hooks/useAgentEnvironment';
 import { createGenerateApiLlmGateway } from '../utils';
-import { withGatewayTracing } from '../utils/agentTracing';
 
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
@@ -27,22 +26,19 @@ const TEXT_INPUT_NODE: NodeData = { id: 'text-1', type: 'text-input', position: 
  * the run is wired but not yet functional end-to-end.
  */
 export const AgentHarnessPage = () => {
-    const { environment, traceReporter, getTraceEntries } = useAgentEnvironment();
+    const { storage, tracer, getTraceEntries } = useAgentEnvironment();
 
     const binding = useMemo(() => createInMemoryCanvasBinding({ nodes: [{ ...TEXT_INPUT_NODE }], edges: [] }), []);
     const catalog = useMemo(() => createCatalogLookup([]), []);
     const gateway = useMemo(
         () =>
-            withGatewayTracing(
-                createGenerateApiLlmGateway({
-                    getConnection: () => {
-                        const { isConnected, id } = useWebSocketStore.getState();
-                        return { isConnected, connectionId: id, generateReceiver: null };
-                    },
-                }),
-                traceReporter
-            ),
-        [traceReporter]
+            createGenerateApiLlmGateway({
+                getConnection: () => {
+                    const { isConnected, id } = useWebSocketStore.getState();
+                    return { isConnected, connectionId: id, generateReceiver: null };
+                },
+            }),
+        []
     );
 
     const { session, send } = useAgent({
@@ -50,7 +46,8 @@ export const AgentHarnessPage = () => {
         flowId: HARNESS_FLOW_ID,
         gateway,
         catalog,
-        environment,
+        storage,
+        tracer,
         userPermissions: { canModifyCanvas: true, canEditConfig: true },
     });
 
@@ -61,13 +58,13 @@ export const AgentHarnessPage = () => {
     useEffect(() => {
         const id = setInterval(() => {
             setTick(t => t + 1);
-            void environment.storage
+            void storage
                 .listKeys('session:')
                 .then(keys => setStorageKeys(keys))
                 .catch(() => undefined);
         }, 250);
         return () => clearInterval(id);
-    }, [environment]);
+    }, [storage]);
 
     const node = binding.readGraph().nodes[0];
     const traceMessages = getTraceEntries().map(entry => `${entry.level}:${entry.message}`);

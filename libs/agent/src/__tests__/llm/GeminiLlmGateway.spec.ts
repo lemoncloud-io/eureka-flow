@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
-import { BufferAgentTraceReporter } from '../../environment/trace/traceReporters';
 import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
 import { createGeminiLlmGateway } from '../../llm/GeminiLlmGateway';
 
@@ -14,12 +12,7 @@ const geminiReply = (text: string) => ({
     usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 34 },
 });
 
-const createGateway = (http: ScriptedHttpRequest, traceReporter?: BufferAgentTraceReporter) =>
-    createGeminiLlmGateway({
-        environment: createVirtualAgentEnvironment({ ...(traceReporter ? { traceReporter } : {}), now: () => 1000 }),
-        http,
-        apiKey: API_KEY,
-    });
+const createGateway = (http: ScriptedHttpRequest) => createGeminiLlmGateway({ http, apiKey: API_KEY });
 
 const drain = async (stream: AsyncIterable<Chunk>): Promise<Chunk[]> => {
     const chunks: Chunk[] = [];
@@ -57,7 +50,6 @@ describe('createGeminiLlmGateway', () => {
     it('maps system messages to systemInstruction and assistant turns to the model role', async () => {
         const http = new ScriptedHttpRequest([{ json: geminiReply('ok') }]);
         const gateway = createGeminiLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
             generation: { temperature: 0.2, maxOutputTokens: 64 },
@@ -94,7 +86,6 @@ describe('createGeminiLlmGateway', () => {
     it('honors model and baseUrl overrides (the proxy path)', async () => {
         const http = new ScriptedHttpRequest([{ json: geminiReply('ok') }]);
         const gateway = createGeminiLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
             model: 'gemini-2.5-pro',
@@ -284,14 +275,11 @@ describe('createGeminiLlmGateway', () => {
     it('throws on a non-retryable non-ok response with the status but never the API key', async () => {
         // 400 is not retryable (unlike 429/503), so it throws on the first response — the immediate-throw path.
         const http = new ScriptedHttpRequest([{ status: 400, text: 'bad request' }]);
-        const trace = new BufferAgentTraceReporter();
 
-        const attempt = drain(createGateway(http, trace).chat(userSays('q')));
+        const attempt = drain(createGateway(http).chat(userSays('q')));
 
         await expect(attempt).rejects.toThrow(/status 400.*bad request/);
         await attempt.catch((error: Error) => expect(error.message).not.toContain(API_KEY));
-        expect(trace.entries.some(entry => entry.level === 'error')).toBe(true);
-        expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
     });
 
     it('redacts the API key when an error body echoes it', async () => {
@@ -334,29 +322,12 @@ describe('createGeminiLlmGateway', () => {
 
     it('maps generation.thinkingBudget to generationConfig.thinkingConfig', async () => {
         const http = new ScriptedHttpRequest([{ json: geminiReply('ok') }]);
-        const gateway = createGeminiLlmGateway({
-            environment: createVirtualAgentEnvironment(),
-            http,
-            apiKey: API_KEY,
-            generation: { thinkingBudget: 0 },
-        });
+        const gateway = createGeminiLlmGateway({ http, apiKey: API_KEY, generation: { thinkingBudget: 0 } });
 
         await drain(gateway.chat(userSays('q')));
 
         expect((http.requests[0].body as Record<string, unknown>)['generationConfig']).toEqual({
             thinkingConfig: { thinkingBudget: 0 },
         });
-    });
-
-    it('traces request and response without leaking the key', async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiReply('traced') }]);
-        const trace = new BufferAgentTraceReporter();
-
-        await drain(createGateway(http, trace).chat(userSays('q')));
-
-        const messages = trace.entries.map(entry => entry.message);
-        expect(messages).toContain('llm.gemini.request');
-        expect(messages).toContain('llm.gemini.response');
-        expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
     });
 });

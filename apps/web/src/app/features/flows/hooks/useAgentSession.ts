@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import type { Agent, AgentEnvironmentSupportable, SessionState, SessionStore } from '@flows/agent';
+import type { Agent, AgentStorageSupportable, SessionState, SessionStore, Tracer } from '@flows/agent';
 
-// Per-flow session persistence through the Agent Environment's storage port (survives reload).
+/** The narrow persistence slice this hook needs — just the two JSON ops, per ISP. */
+type SessionPersistence = Pick<AgentStorageSupportable, 'getJson' | 'setJson'>;
+
+// Per-flow session persistence through the injected storage port (survives reload).
 // Best-effort: storage errors are swallowed, and a stale `thinking` phase is cleared so the panel isn't stuck.
 const SESSION_KEY_PREFIX = 'session:';
 const keyFor = (flowId: string): string => `${SESSION_KEY_PREFIX}${flowId}`;
@@ -25,8 +28,10 @@ interface AgentInstance {
 
 export interface UseAgentSessionArgs {
     flowId: string;
-    /** The browser Agent Environment: session persistence flows through its storage port, run lifecycle through its trace reporter. */
-    environment: AgentEnvironmentSupportable;
+    /** Session persistence port (survives reload). */
+    persistence: SessionPersistence;
+    /** Tracer for run-lifecycle events (agent.run.start/done/error). */
+    tracer: Tracer;
     /** Build the agent over the hook's {@link SessionStore}. Wrap in `useCallback` so it's stable per (flowId + agent inputs). */
     createAgent: (storage: SessionStore) => Agent;
 }
@@ -44,7 +49,12 @@ export interface UseAgentSessionResult {
  * caller's choice via `createAgent`; nothing here is locator-specific. `send` is gated on async
  * hydration, and the outgoing agent is aborted + silenced on flow switch / unmount.
  */
-export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSessionArgs): UseAgentSessionResult => {
+export const useAgentSession = ({
+    flowId,
+    persistence,
+    tracer,
+    createAgent,
+}: UseAgentSessionArgs): UseAgentSessionResult => {
     const [session, setSession] = useState<SessionState | null>(null);
 
     const instance = useMemo<AgentInstance>(() => {
@@ -65,8 +75,8 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
             },
             save: s => {
                 current = s;
-                // Real run data through the environment's storage port (best-effort, like before).
-                void environment.storage.setJson(keyFor(s.flowId), s).catch(() => undefined);
+                // Real run data through the injected storage port (best-effort, like before).
+                void persistence.setJson(keyFor(s.flowId), s).catch(() => undefined);
                 if (alive) {
                     setSession(snapshot(s));
                 }
@@ -85,7 +95,7 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
             // Applied only while live and nothing has produced state yet; invoked from an effect (pure memo through StrictMode).
             hydrate: async () => {
                 try {
-                    const persisted = await environment.storage.getJson<SessionState>(keyFor(flowId));
+                    const persisted = await persistence.getJson<SessionState>(keyFor(flowId));
                     if (alive && current === null && persisted) {
                         const restored = sanitizePersisted(persisted);
                         current = restored;
@@ -97,7 +107,7 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
             },
             getPhase: () => current?.phase ?? null,
         };
-    }, [flowId, environment, createAgent]);
+    }, [flowId, persistence, tracer, createAgent]);
 
     // `send` is blocked until this instance's transcript has been read; flipped true by the hydration effect below.
     const [hydrated, setHydrated] = useState(false);
@@ -142,17 +152,17 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
             }
             // BaseAgent.send resolves after the whole turn (failures become session.error, not a reject),
             // so read the settled phase to tell done from errored. Only flowId + outcome are traced — never secrets.
-            const trace = environment.traceReporter;
-            trace?.info('agent.run.start', { flowId });
+            const runError = () => tracer.emit({ name: 'agent.run.error', level: 'error', fields: { flowId } });
+            tracer.emit({ name: 'agent.run.start', level: 'info', fields: { flowId } });
             void instance.agent.send(trimmed).then(
                 () =>
                     instance.getPhase() === 'error'
-                        ? trace?.error('agent.run.error', { flowId })
-                        : trace?.info('agent.run.done', { flowId }),
-                () => trace?.error('agent.run.error', { flowId })
+                        ? runError()
+                        : tracer.emit({ name: 'agent.run.done', level: 'info', fields: { flowId } }),
+                () => runError()
             );
         },
-        [instance, environment, flowId, hydrated]
+        [instance, tracer, flowId, hydrated]
     );
 
     const abort = useCallback(() => instance.agent.abort(), [instance]);

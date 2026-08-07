@@ -62,10 +62,8 @@ docs (start with [architecture.md](design/architecture.md)); the full roster + c
   them. A block that earns domain knowledge gets a named specialist (e.g. [single-output-generator.md](agents/single-output-generator.md));
   every other type is served by a generic [blockAgent.md](agents/blockAgent.md) synthesized from the catalog.
 
-**[foundations/](foundations/)** — shared infrastructure, both built.
+**[foundations/](foundations/)** — shared infrastructure.
 
-- [environment.md](foundations/environment.md) — the runtime capability boundary (storage / trace / time /
-  cancellation).
 - [llm-gateway.md](foundations/llm-gateway.md) — the `LlmGateway` contract + Gemini provider + HTTP port.
 
 ## Running the live evals

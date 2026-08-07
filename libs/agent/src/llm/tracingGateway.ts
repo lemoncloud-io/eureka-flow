@@ -1,4 +1,4 @@
-import { LLM_REQUEST, LLM_RESPONSE } from '../trace/events';
+import { LLM_ERROR, LLM_REQUEST, LLM_RESPONSE } from '../trace/events';
 
 import type { Chunk, LlmGateway } from './llmGateway';
 import type { Tracer } from '../trace';
@@ -19,10 +19,19 @@ export const tracingGateway = (inner: LlmGateway, tracer: () => Tracer, now: () 
         let usage: Chunk['usage'];
         const toolCallIds = new Set<string>();
 
-        for await (const chunk of inner.chat(req, opts)) {
-            if (chunk.usage) usage = chunk.usage;
-            if (chunk.toolCall) toolCallIds.add(chunk.toolCall.id);
-            yield chunk;
+        try {
+            for await (const chunk of inner.chat(req, opts)) {
+                if (chunk.usage) usage = chunk.usage;
+                if (chunk.toolCall) toolCallIds.add(chunk.toolCall.id);
+                yield chunk;
+            }
+        } catch (err) {
+            t.emit({
+                name: LLM_ERROR,
+                level: 'error',
+                fields: { durationMs: now() - startedAt, reason: err instanceof Error ? err.name : 'unknown' },
+            });
+            throw err;
         }
 
         t.emit({

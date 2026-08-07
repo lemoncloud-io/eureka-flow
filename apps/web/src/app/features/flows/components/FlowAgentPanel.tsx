@@ -8,7 +8,6 @@ import { AgentPanel } from './AgentPanel';
 import { useAgent } from '../hooks/useAgent';
 import { useAgentEnvironment } from '../hooks/useAgentEnvironment';
 import { createBlockCatalogLookup, createGenerateApiLlmGateway } from '../utils';
-import { withGatewayTracing } from '../utils/agentTracing';
 
 import type { FlowEngine } from '@flows/engine';
 import type { FlowPermissions } from '@flows/flows';
@@ -34,21 +33,19 @@ export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelPr
     // Reads cannot lag a projection that pauses mid-drag; edits land in `transact`, so they
     // checkpoint for undo like a user drag.
     const binding = useMemo(() => createEngineCanvasBinding(engine), [engine]);
-    const { environment, traceReporter } = useAgentEnvironment();
+    const { storage, tracer } = useAgentEnvironment();
     // Backend Generate API gateway; the model's answer returns over the flow socket. Connection state
-    // is read fresh on every chat() call (a reconnect issues a new id), never cached.
+    // is read fresh on every chat() call (a reconnect issues a new id), never cached. The agent wraps this
+    // gateway with its own tracing decorator, so no app-side trace wrapper is needed here.
     const gateway = useMemo(
         () =>
-            withGatewayTracing(
-                createGenerateApiLlmGateway({
-                    getConnection: () => {
-                        const { isConnected, id } = useWebSocketStore.getState();
-                        return { isConnected, connectionId: id, generateReceiver: null };
-                    },
-                }),
-                traceReporter
-            ),
-        [traceReporter]
+            createGenerateApiLlmGateway({
+                getConnection: () => {
+                    const { isConnected, id } = useWebSocketStore.getState();
+                    return { isConnected, connectionId: id, generateReceiver: null };
+                },
+            }),
+        []
     );
     // The user's flow-role permissions — the executor's ceiling on every specialist tool (a viewer's
     // move_node/rename is denied there, regardless of each agent's own fixed grant).
@@ -57,7 +54,7 @@ export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelPr
     const blockRegistry = useBlockRegistry();
     const catalog = useMemo(() => createBlockCatalogLookup(blockRegistry), [blockRegistry]);
 
-    const { session, send } = useAgent({ binding, flowId, gateway, environment, userPermissions, catalog });
+    const { session, send } = useAgent({ binding, flowId, gateway, storage, tracer, userPermissions, catalog });
 
     return <AgentPanel session={session} onSend={send} />;
 };

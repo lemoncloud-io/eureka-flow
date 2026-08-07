@@ -1,6 +1,9 @@
 # Change note — remove the Agent Environment
 
-**Status:** planned · **Branch:** `feat/agent-observability` (from `develop`)
+**Status:** landed · **Branch:** `feat/agent-observability` (from `develop`)
+
+> **Landed** across Track 1 (`storage/` extraction) + Track 2 (trace system, gateway/web migration, composite deletion). Two deviations from the plan below: (1) the per-agent `tracingGateway` wrap lives in `BaseAgent` (the agent self-wraps) rather than at `resolveLiveGateway`, so the gateway is decoupled with no new port and `now` is dropped entirely; (2) `tracingGateway` also emits an `llm.error` event on a thrown chat, so gateway-boundary errors stay observable even though the internal `llm.gemini.retry/empty` debug lines are gone.
+
 **Type:** transition/how-to (a→b). The clean end-state for tracing lives in [trace-spec.md](./trace-spec.md); this note is the migration that makes "no `environment/`" true.
 **Provenance:** grounded in a 9-agent removal audit (6 facet mappers + 3 adversarial completeness critics) over the whole repo. Every consumer below was verified by grep+read, not recollection.
 

@@ -23,7 +23,6 @@ import { describe, expect, it } from 'vitest';
 
 import { createBuilderAgent } from '../agents/builderAgent';
 import { createInMemoryCanvasBinding } from '../canvas/inMemoryCanvasBinding';
-import { createVirtualAgentEnvironment } from '../environment/createVirtualAgentEnvironment';
 import { createFetchHttpRequest } from '../http/FetchHttpRequest';
 import { createFakeGateway } from '../llm/fakeGateway';
 import { createGeminiLlmGateway } from '../llm/GeminiLlmGateway';
@@ -69,10 +68,8 @@ describe('flow agent headless (Node, no DOM) with a real Gemini key', () => {
     // ── 1. REAL KEY — proves the key/model/HTTP/Node path works headlessly ────────────────
     // A plain text chat (no tools) is the simplest real-key check. Opt-in via RUN_LIVE (see SKIP_LIVE).
     it.skipIf(SKIP_LIVE)('reaches Gemini over the network (plain text chat)', async () => {
-        const environment = createVirtualAgentEnvironment(); // (b) Node env — REQUIRED by the gateway
         const http = createFetchHttpRequest(); // Node 18+ global fetch; no DOM
         const gateway = createGeminiLlmGateway({
-            environment,
             http,
             apiKey: process.env.GEMINI_API_KEY as string, // (a) key from env, sent only as x-goog-api-key
             model: MODEL,
@@ -94,10 +91,8 @@ describe('flow agent headless (Node, no DOM) with a real Gemini key', () => {
     // ── 2. REAL KEY — real Gemini gateway drives the builder end-to-end (a–f) → node moves ──
     // A real function-calling round-trip, so this is opt-in via RUN_LIVE (see SKIP_LIVE).
     it.skipIf(SKIP_LIVE)('drives the builder with the real Gemini gateway (a–f) → node moves, phase done', async () => {
-        const environment = createVirtualAgentEnvironment(); // (b)
         const http = createFetchHttpRequest();
         const gateway = createGeminiLlmGateway({
-            environment,
             http,
             apiKey: process.env.GEMINI_API_KEY as string, // (a) key from env
             model: MODEL, // real model id

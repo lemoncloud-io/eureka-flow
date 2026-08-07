@@ -1,9 +1,7 @@
 /**
- * Public entry for @flows/agent: the browser Agent Environment (storage, trace, self-check),
- * the HTTP and LLM ports, and the orchestrator vertical — the main agent plus its specialist
- * roster (canvas seam, tools, session, agents).
+ * Public entry for @flows/agent: the storage + trace ports, the HTTP and LLM ports, and the
+ * orchestrator vertical — the main agent plus its specialist roster (canvas seam, tools, session, agents).
  */
-export * from './environment';
 export * from './storage';
 export * from './trace';
 export * from './http';

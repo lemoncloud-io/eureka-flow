@@ -1,5 +1,4 @@
 import { createGeminiLlmGateway } from './GeminiLlmGateway';
-import { createVirtualAgentEnvironment } from '../environment/createVirtualAgentEnvironment';
 import { createFetchHttpRequest } from '../http/FetchHttpRequest';
 
 import type { GeminiGenerationConfig } from './GeminiLlmGateway';
@@ -32,7 +31,6 @@ export const resolveLiveGateway = ({ model, generation }: LiveGatewayConfig = {}
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return undefined;
 
-    const environment = createVirtualAgentEnvironment();
     const http = createFetchHttpRequest();
     const resolvedModel = model ?? liveModel();
     // Optional env-tuned 429/503 retry (LLM_RETRY_ATTEMPTS / LLM_RETRY_BASE_MS); unset → the gateway's 4×/1s default.
@@ -47,5 +45,5 @@ export const resolveLiveGateway = ({ model, generation }: LiveGatewayConfig = {}
             : undefined;
     const gen = { ...(generation ? { generation } : {}), ...(retry ? { retry } : {}) };
 
-    return createGeminiLlmGateway({ environment, http, apiKey, model: resolvedModel, ...gen });
+    return createGeminiLlmGateway({ http, apiKey, model: resolvedModel, ...gen });
 };
