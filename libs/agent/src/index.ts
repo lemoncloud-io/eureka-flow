@@ -5,6 +5,7 @@
  */
 export * from './environment';
 export * from './storage';
+export * from './trace';
 export * from './http';
 export * from './llm';
 export * from './catalog';

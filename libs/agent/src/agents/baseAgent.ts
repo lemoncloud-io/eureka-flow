@@ -1,4 +1,6 @@
+import { tracingGateway } from '../llm/tracingGateway';
 import { createToolExecutor } from '../tools/toolExecutor';
+import { MESSAGE, NoopTracer, TURN_DONE, TURN_ERROR, TURN_START, TURN_STEP } from '../trace';
 import { errorMessage } from '../utils/errors';
 
 import type { Agent, AgentConfig } from '../agent';
@@ -8,6 +10,7 @@ import type { ChatMessage, Chunk, LlmGateway } from '../llm/llmGateway';
 import type { AgentGrant } from '../permissions';
 import type { Message, SessionState, SessionStore } from '../session/session';
 import type { ToolCall, ToolExecutor, ToolResult } from '../tools/types';
+import type { TraceContext, Tracer } from '../trace';
 
 /** Safety cap on think/act iterations per turn, if a subclass/caller doesn't set one. */
 export const DEFAULT_MAX_ITERATIONS = 8;
@@ -23,6 +26,8 @@ export interface BaseAgentDeps {
     catalog: CatalogLookup;
     /** The user's flow-role ceiling; the executor gates every capability tool against it, on top of each agent's own grant. */
     userPermissions: AgentGrant;
+    /** Identity-bound tracer (from the spawner); default no-op. The agent wraps its own gateway/executor with it. */
+    tracer?: Tracer;
     /** Defaults to a fresh {@link createToolExecutor}. */
     executor?: ToolExecutor;
     /** Safety cap on think/act iterations per turn. */
@@ -125,15 +130,23 @@ export abstract class BaseAgent implements Agent {
     private seq = 0;
     private controller: AbortController | null = null;
 
+    /** The identity-bound tracer (runId/agent id/flowPath), the base for each turn's context-bound child. */
+    private readonly identityTracer: Tracer;
+    /** Holds the in-flight turn's tracer (identity + turn); read by the wrapped gateway/executor and by children. */
+    private readonly turn: { current: Tracer };
+
     /** @param base the subclass's persona defaults + fixed tools; `deps.config` overrides everything but `tools`. */
     constructor(deps: BaseAgentDeps, base: AgentConfig) {
-        this.gateway = deps.gateway;
+        this.identityTracer = deps.tracer ?? NoopTracer;
+        this.turn = { current: this.identityTracer };
+        // Self-wrap: llm.* and tool.* carry the agent's identity + turn via the holder accessor, no re-wrapping.
+        this.gateway = tracingGateway(deps.gateway, () => this.turn.current);
         this.storage = deps.storage;
         this.flowId = deps.flowId;
         this.binding = deps.binding;
         this.catalog = deps.catalog;
         this.userPermissions = deps.userPermissions;
-        this.executor = deps.executor ?? createToolExecutor();
+        this.executor = deps.executor ?? createToolExecutor(() => this.turn.current);
         this.maxIterations = deps.maxIterations ?? DEFAULT_MAX_ITERATIONS;
         this.config = { ...base, ...(deps.config ?? {}), tools: base.tools };
     }
@@ -172,6 +185,39 @@ export abstract class BaseAgent implements Agent {
         return Date.now();
     }
 
+    /** The in-flight turn's tracer — a subclass forwards it to spawned children (see the orchestrator). */
+    protected currentTracer(): Tracer {
+        return this.turn.current;
+    }
+
+    /** Fired whenever the in-flight turn's tracer advances; a subclass that spawns children republishes it. */
+    protected onTurnTracer(_tracer: Tracer): void {
+        // default: no children to forward to
+    }
+
+    /** Context merged onto the identity tracer at the start of each send(); the root mints a runId here. */
+    protected beginRunContext(): TraceContext {
+        return {};
+    }
+
+    private setTurnTracer(tracer: Tracer): void {
+        this.turn.current = tracer;
+        this.onTurnTracer(tracer);
+    }
+
+    /** Emit the appended message as a `message` event on the current turn tracer (the readable transcript). */
+    private emitMessage(msg: Message): void {
+        this.turn.current.emit({
+            name: MESSAGE,
+            fields: {
+                role: msg.role,
+                content: msg.content ?? '',
+                ...(msg.toolCalls ? { toolCalls: msg.toolCalls.map(tc => ({ name: tc.name, args: tc.args })) } : {}),
+                ...(msg.toolCallId ? { toolCallId: msg.toolCallId } : {}),
+            },
+        });
+    }
+
     /** Run one assistant message's tool calls and feed results back into the transcript. Serial by default; a subclass may override to run an independent batch concurrently. */
     protected async runToolCalls(
         calls: CollectedToolCall[],
@@ -201,14 +247,16 @@ export abstract class BaseAgent implements Agent {
         if (recorded) {
             recorded.status = result.ok ? 'ok' : 'error';
         }
-        state.messages.push({
+        const toolMsg: Message = {
             id: this.nextId('t'),
             role: 'tool',
             content: resultToContent(result),
             toolCallId: tc.id,
             ts: this.stamp(),
-        });
+        };
+        state.messages.push(toolMsg);
         this.storage.save(state);
+        this.emitMessage(toolMsg);
     }
 
     async send(text: string, opts?: { signal?: AbortSignal }): Promise<void> {
@@ -232,22 +280,37 @@ export abstract class BaseAgent implements Agent {
         }
         this.onTurnSignal(signal);
 
+        // One request = one runId (the root mints it via beginRunContext; children inherit their parent's).
+        const runTracer = this.identityTracer.child(this.beginRunContext());
+        this.setTurnTracer(runTracer);
+        runTracer.emit({ name: TURN_START, fields: { graph: this.binding.readGraph() } });
+
         // Seed the initial state into the first user message of a fresh conversation; later turns pull current
         // state via get_graph, so the transcript stays append-only.
         const preamble = state.messages.length === 0 ? this.initialUserPreamble() : '';
         const userContent = preamble ? `${preamble}\n\n${text}` : text;
-        state.messages.push({ id: this.nextId('u'), role: 'user', content: userContent, ts: this.stamp() });
+        const userMsg: Message = { id: this.nextId('u'), role: 'user', content: userContent, ts: this.stamp() };
+        state.messages.push(userMsg);
         state.phase = 'thinking';
         state.error = undefined;
         storage.save(state);
+        this.emitMessage(userMsg);
+
+        const finishTurn = (name: string, extra: Record<string, unknown> = {}): void => {
+            this.turn.current.emit({ name, fields: { graph: this.binding.readGraph(), ...extra } });
+        };
 
         try {
             for (let i = 0; i < maxIterations; i += 1) {
                 if (signal.aborted) {
                     state.phase = 'done';
                     storage.save(state);
+                    finishTurn(TURN_DONE);
                     return;
                 }
+
+                this.setTurnTracer(runTracer.child({ turn: i }));
+                this.turn.current.emit({ name: TURN_STEP, fields: { turn: i } });
 
                 const chatMessages: ChatMessage[] = [
                     { role: 'system', content: config.systemPrompt },
@@ -261,6 +324,7 @@ export abstract class BaseAgent implements Agent {
                 if (signal.aborted) {
                     state.phase = 'done';
                     storage.save(state);
+                    finishTurn(TURN_DONE);
                     return;
                 }
 
@@ -279,6 +343,7 @@ export abstract class BaseAgent implements Agent {
                     };
                     state.messages.push(assistantMsg);
                     storage.save(state);
+                    this.emitMessage(assistantMsg);
 
                     await this.runToolCalls(res.toolCalls, assistantMsg, state);
                     // The turn ends only on a message with no tool calls; keep looping.
@@ -287,30 +352,36 @@ export abstract class BaseAgent implements Agent {
 
                 // Final text only — the turn is complete.
                 if (res.text) {
-                    state.messages.push({
+                    const finalMsg: Message = {
                         id: this.nextId('a'),
                         role: 'assistant',
                         content: res.text,
                         ts: this.stamp(),
-                    });
+                    };
+                    state.messages.push(finalMsg);
+                    this.emitMessage(finalMsg);
                 }
                 state.phase = 'done';
                 storage.save(state);
+                finishTurn(TURN_DONE);
                 return;
             }
 
             state.phase = 'error';
             state.error = `${config.id}: exceeded ${maxIterations} reasoning iterations without finishing`;
             storage.save(state);
+            finishTurn(TURN_ERROR, { error: state.error });
         } catch (err) {
             if (signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
                 state.phase = 'done';
                 storage.save(state);
+                finishTurn(TURN_DONE);
                 return;
             }
             state.phase = 'error';
             state.error = errorMessage(err);
             storage.save(state);
+            finishTurn(TURN_ERROR, { error: state.error });
         }
     }
 

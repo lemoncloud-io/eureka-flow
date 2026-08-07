@@ -5,11 +5,13 @@ import { CATALOG_SEARCH } from '../tools/catalogTools';
 import { DESCRIBE_NODE, GET_GRAPH, LIST_NODES, renderEdgeContext, renderNodeContext } from '../tools/nodeTools';
 import { createAgentDirectoryToolProvider, createSpawnToolProvider } from '../tools/spawnTools';
 import { toolset } from '../tools/toolset';
+import { NoopTracer } from '../trace';
 
 import type { BaseAgentDeps, CollectedToolCall } from './baseAgent';
 import type { AgentRoster } from './roster';
 import type { ChatMessage, LlmGateway } from '../llm/llmGateway';
 import type { Message, SessionState } from '../session/session';
+import type { TraceContext, Tracer } from '../trace';
 
 /**
  * The orchestrator's system prompt — one prompt in three sections: the PERSONA (who you are; you delegate, you
@@ -118,6 +120,10 @@ export class OrchestratorAgent extends BaseAgent {
     private readonly roster: AgentRoster;
     /** Holds the current turn's abort signal so spawned children inherit it (set in {@link onTurnSignal}). */
     private readonly signalHolder: { current?: AbortSignal };
+    /** Holds the current turn's tracer so spawned children hang under the right run/turn (set in {@link onTurnTracer}). */
+    private readonly tracerHolder: { current: Tracer };
+    /** Run-monotonic counter minting one runId per user request (see {@link beginRunContext}). */
+    private runSeq = 0;
 
     constructor(deps: OrchestratorAgentDeps) {
         const roster = deps.roster ?? createDefaultRoster();
@@ -131,6 +137,7 @@ export class OrchestratorAgent extends BaseAgent {
             userPermissions: deps.userPermissions,
         });
         const signalHolder: { current?: AbortSignal } = {};
+        const tracerHolder: { current: Tracer } = { current: NoopTracer };
         // The orchestrator coordinates multi-step jobs, so it defaults to a larger budget than a narrow
         // specialist; an explicit deps.maxIterations still wins. Children keep their OWN caps (the runner above
         // is passed deps.maxIterations, undefined by default → each child uses its own: builder 30, others 8).
@@ -152,12 +159,29 @@ export class OrchestratorAgent extends BaseAgent {
                         CATALOG_SEARCH,
                     ]),
                     createAgentDirectoryToolProvider(roster),
-                    createSpawnToolProvider(runner, deps.binding, () => signalHolder.current),
+                    createSpawnToolProvider(
+                        runner,
+                        deps.binding,
+                        () => signalHolder.current,
+                        () => tracerHolder.current
+                    ),
                 ],
             }
         );
         this.roster = roster;
         this.signalHolder = signalHolder;
+        this.tracerHolder = tracerHolder;
+    }
+
+    /** Republish the in-flight turn's tracer so the spawn tool hands children the right run/turn parent. */
+    protected override onTurnTracer(tracer: Tracer): void {
+        this.tracerHolder.current = tracer;
+    }
+
+    /** Mint one runId per user request — the root correlation key every descendant event inherits. */
+    protected override beginRunContext(): TraceContext {
+        this.runSeq += 1;
+        return { runId: `run-${this.runSeq}` };
     }
 
     protected override buildContextMessages(): ChatMessage[] {

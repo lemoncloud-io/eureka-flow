@@ -5,6 +5,7 @@ import type { AgentRoster } from '../agents/roster';
 import type { SpawnInput, SubAgentRunner } from '../agents/subAgentRunner';
 import type { CanvasBinding } from '../canvas/canvasBinding';
 import type { ToolDef } from '../llm/llmGateway';
+import type { Tracer } from '../trace';
 
 const LIST_AGENTS_DEF: ToolDef = {
     name: 'list_agents',
@@ -62,7 +63,8 @@ const SPAWN_DEF: ToolDef = {
 export const createSpawnToolProvider = (
     runner: SubAgentRunner,
     binding: CanvasBinding,
-    getSignal?: () => AbortSignal | undefined
+    getSignal?: () => AbortSignal | undefined,
+    getTracer?: () => Tracer
 ): ToolProvider => ({
     listTools: () => [SPAWN_DEF],
     dispatch: async (call: ToolCall): Promise<ToolResult> => {
@@ -70,7 +72,7 @@ export const createSpawnToolProvider = (
         if (!Array.isArray(children) || children.length === 0) {
             return toolErr(call, 'spawn requires at least one child');
         }
-        const results = await runner.fanOut(children, binding, getSignal?.());
+        const results = await runner.fanOut(children, binding, getSignal?.(), getTracer?.());
         return toolOk(call, { children: results });
     },
 });
