@@ -41,6 +41,7 @@ const store = create<WebSocketState & WebSocketActions>((set, get) => ({
         set({
             connectionStatus: status,
             isConnected: status === 'connected',
+            ...(status === 'connected' ? {} : { id: null }),
         }),
 
     /**
