@@ -1,6 +1,7 @@
+import { arePortTypesCompatible, wouldCreateCycle } from '@flows/engine';
+
 import { requireNode } from './nodeTools';
 import { toolErr as err, toolOk as ok } from './types';
-import { arePortTypesCompatible, wouldCreateCycle } from '../canvas/edgeSemantics';
 
 import type { CanvasTool } from './toolset';
 import type { ToolCall, ToolResult } from './types';

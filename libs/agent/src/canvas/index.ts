@@ -3,4 +3,5 @@ export { createEngineCanvasBinding } from './engineCanvasBinding';
 export { createInMemoryCanvasBinding } from './inMemoryCanvasBinding';
 export { applyMove, hasExactlyOneTarget } from './moveSemantics';
 export type { Delta, MoveNodeArgs } from './moveSemantics';
-export { arePortTypesCompatible, wouldCreateCycle } from './edgeSemantics';
+// Edge validation (`arePortTypesCompatible`, `wouldCreateCycle`) is NOT re-exported here: it lives in
+// `@flows/engine`, which both the edge tools and apps/web import directly. One implementation, no hop.

@@ -20,12 +20,16 @@ export const getPortStyleKey = (portType: string): PortStyleKey => PORT_STYLE_KE
 
 /**
  * Check if two port types are compatible for connection.
- * Handles undefined target type by treating it as 'any'.
+ *
+ * `any` — or an absent type — is a wildcard on EITHER side; otherwise a case-insensitive equality.
+ * Source is optional because a block's port schema declares `type?`, so callers reading a catalog
+ * (the agent's edge tools) legitimately hold `string | undefined` on both sides.
  */
-export const arePortTypesCompatible = (sourceType: string, targetType: string | undefined): boolean => {
-    const normalizedTarget = targetType ?? 'any';
-    if (sourceType === 'any' || normalizedTarget === 'any') return true;
-    return sourceType.toLowerCase() === normalizedTarget.toLowerCase();
+export const arePortTypesCompatible = (sourceType: string | undefined, targetType: string | undefined): boolean => {
+    const source = sourceType ?? 'any';
+    const target = targetType ?? 'any';
+    if (source === 'any' || target === 'any') return true;
+    return source.toLowerCase() === target.toLowerCase();
 };
 
 export const getConnectionKey = (conn: EdgeData): string =>
