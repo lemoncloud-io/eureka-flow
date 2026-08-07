@@ -143,6 +143,10 @@ export const createOps = (doc: FlowDocument, deps: OpsDeps = {}): { ops: GraphOp
 
             const registry = deps.getBlockRegistry?.();
             const sourceType = portType(registry, source, sourcePortId, 'outputs');
+            // `sourceType &&` is the NO-REGISTRY skip, not a null guard: without a block registry every
+            // port type reads back undefined, and an unknown type is not the same claim as a wildcard, so
+            // the check is not made at all rather than made permissively. (arePortTypesCompatible is itself
+            // null-safe, so this is about not asserting compatibility we cannot see.)
             if (sourceType && !arePortTypesCompatible(sourceType, portType(registry, target, targetPortId, 'inputs'))) {
                 throw new EngineError('INCOMPATIBLE_PORTS', 'Those ports carry different types');
             }

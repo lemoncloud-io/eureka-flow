@@ -37,6 +37,9 @@ apps/admin/.env.prod
 *.sln
 *.sw?
 
+# `agent:terminal` local export (`/graph`, and `/save` when offline) — written to the repo root
+graph.json
+
 # Logs
 logs
 *.log

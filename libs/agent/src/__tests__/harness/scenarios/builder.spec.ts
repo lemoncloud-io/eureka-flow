@@ -10,7 +10,7 @@ import { createBuilderAgent } from '../../../agents/builderAgent';
 import { createInMemoryCanvasBinding } from '../../../canvas/inMemoryCanvasBinding';
 import { createFakeGateway } from '../../../llm/fakeGateway';
 import { createInMemorySessionStore } from '../../../session/session';
-import { createFixtureCatalog } from '../fixtures';
+import { createFixtureCatalog, nodeOfType as nodeOfTypeIn } from '../fixtures';
 
 import type { Graph } from '../../../canvas/canvasBinding';
 import type { FakeScriptStep } from '../../../llm/fakeGateway';
@@ -31,7 +31,7 @@ const setup = (script: FakeScriptStep[], initialGraph?: Graph) => {
         userPermissions: { canModifyCanvas: true, canEditConfig: true },
     });
     const graph = () => binding.readGraph();
-    const nodeOfType = (type: string) => graph().nodes.find(n => n.type === type);
+    const nodeOfType = (type: string) => nodeOfTypeIn(graph(), type);
     /** The concatenated content of every tool-result message — how a rejection reason reaches the builder. */
     const toolText = () =>
         (storage.load(flowId)?.messages ?? [])
@@ -84,11 +84,11 @@ describe('builder agent — builds a flow from a plan', () => {
         // the three block types are present (asserted by TYPE, never by minted id)
         expect(g.nodes.map(n => n.type).sort()).toEqual(['input-text', 'output-preview', 'single-output-generator']);
         // the generator carries the model set at creation (add + configure in one call)
-        expect(nodeOfType('single-output-generator')?.config?.model).toBe('gemini-2.5-pro');
+        expect(nodeOfType('single-output-generator').config?.model).toBe('gemini-2.5-pro');
         // wired in dependency order: input → generator → preview, and nothing else
-        const txt = nodeOfType('input-text')!;
-        const gen = nodeOfType('single-output-generator')!;
-        const prev = nodeOfType('output-preview')!;
+        const txt = nodeOfType('input-text');
+        const gen = nodeOfType('single-output-generator');
+        const prev = nodeOfType('output-preview');
         expect(g.edges.some(e => e.sourceNodeId === txt.id && e.targetNodeId === gen.id)).toBe(true);
         expect(g.edges.some(e => e.sourceNodeId === gen.id && e.targetNodeId === prev.id)).toBe(true);
         expect(g.edges).toHaveLength(2);
