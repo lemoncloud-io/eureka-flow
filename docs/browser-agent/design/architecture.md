@@ -113,8 +113,8 @@ permission model**, so the foundation below is unchanged.
 
 ### The pieces (UML)
 
-These primitives are the **reused foundation** — identical under both strategies, and (relative to
-`develop`, where `@flows/agent` does not exist) the layer everything else is built on. The strategy-specific
+These primitives are the **reused foundation** — identical however the editing is delegated, and (relative to
+`develop`, where `@flows/agent` does not exist) the layer everything else is built on. The hybrid writer layer's
 pieces (`spawn` / roster / the specialists / the builder / skills) sit _above_ this and are detailed in
 [harness-interfaces.md §4](harness-interfaces.md#4--spawn--sub-agents-over-the-live-binding).
 
@@ -262,7 +262,7 @@ interface Chunk {
     text?: string;
     toolCall?: { id: string; name: string; argsDelta: string };
     done?: boolean;
-    usage?: { inputTokens?: number; outputTokens?: number }; // emitted with the final chunk when reported
+    usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; cachedTokens?: number }; // emitted with the final chunk when reported
 }
 
 // ── ToolExecutor & tools ─────────────────────────────────────────────────────

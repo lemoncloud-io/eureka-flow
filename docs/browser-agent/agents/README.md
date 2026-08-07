@@ -31,7 +31,7 @@ rows below cover the shipped roster.
 | **builder**                 | composition     | builds/extends a multi-block flow from a plan (add · wire · configure · label · lay out) + `use_skill` | `canModifyCanvas` + `canEditConfig` | [builder.md](./builder.md)                                 | [`scenarios/builder.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/builder.spec.ts)                             | [`builder.live.spec.ts`](../../../libs/agent/src/__tests__/harness/scenarios/builder.live.spec.ts) |
 
 Block-agent live coverage is exercised through the integration live suite (the model spawns block agents by
-type); a dedicated `blockAgent.live`/`generator.live` can be added when it earns its keep.
+type); a dedicated `blockAgent.live`/`singleOutputGenerator.live` can be added when it earns its keep.
 
 Integration — the orchestrator coordinating multiple agents — is verified once, across the whole roster:
 
@@ -58,8 +58,9 @@ table in step with it.
 
 **A new BLOCK type usually needs NO new agent** — the generic [block agent](./blockAgent.md) covers it from the
 catalog (only add a named specialist, like [single-output-generator.md](./single-output-generator.md), when a block earns block-specific
-prompt knowledge). The checklist above is for a genuinely new agent (a named block specialist or a new operation
-agent).
+prompt knowledge). The checklist above is for a genuinely new agent — a named block specialist. (A new
+**operation** is not its own agent: it is a tool value on the agent that should carry it — the builder for
+graph shape, a block agent for config.)
 
 ## How verification works
 

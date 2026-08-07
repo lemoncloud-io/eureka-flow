@@ -312,7 +312,7 @@ declare function createAgentRoster(registrations: AgentRegistration[]): AgentRos
 // not carry: if `catalog.has(agentType)`, it builds a generic BlockAgent(agentType) on the fly (configures
 // that block's nodes via set_properties); otherwise the spawn fails "no specialist". So
 // `agentType: 'buffer'` → generic BlockAgent('buffer'); `agentType: 'single-output-generator'` → the
-// registered GeneratorAgent (explicit wins). list_agents shows only the explicit entries above.
+// registered single-output-generator specialist (explicit wins). list_agents shows only the explicit entries above.
 //   resolveAgent = roster.get(agentType) ?? genericBlockRegistration(agentType, catalog)   // in createSubAgentRunner
 
 // The builder owns all graph-shape work (add/delete/wire/move/label); block agents only configure.
@@ -330,7 +330,7 @@ flowchart LR
     subgraph HY["the hybrid roster"]
         direction TB
         B["builder → BuilderAgent<br/>+ use_skill(SEED_SKILLS) · STRUCTURE"]
-        G["single-output-generator → GeneratorAgent · CONTENT"]
+        G["single-output-generator → BlockAgent · CONTENT"]
         F["«fallback» any catalog type → BlockAgent(type) · CONTENT"]
     end
     RA --> HY

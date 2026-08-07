@@ -17,7 +17,7 @@
 > `load → add → undo → redo → save → run` in Node); the agent runs headless today
 > (`__tests__/headless-gemini.smoke.spec.ts`); the reactive-store wiring mirrors the shipped web binding
 > `apps/web/.../hooks/useAgentSession.ts`. Gemini Developer API only (Vertex dropped 2026-08-05). Last updated
-> 2026-08-06.
+> 2026-08-07.
 
 ---
 
@@ -91,16 +91,21 @@ panes. The only component with genuinely new behaviour is the **two-pane rendere
 
 Both hosts assemble and drive the **same** core: `FlowEngine` → `createEngineCanvasBinding` →
 `createBlockCatalogLookup`, with `createOrchestratorAgent` on top writing through a reactive `SessionStore`.
-They diverge at exactly **two** injection points — the **view** (①) and the **model gateway** (②). Read each
-side of the diagram top-to-bottom as one host; the middle box is one set of shipped modules, instantiated per
-host (not a runtime the two share).
+They diverge at two edges — the **view** (①) and the **model gateway** (②); the middle box is one set of shipped
+modules, instantiated per host (not a runtime the two share).
+
+The view difference runs deeper than it looks. The terminal drives **one** renderer from a **single** reactive
+seam — the `SessionStore` notify redraws, and that same callback re-reads the graph. The web has **two**: the
+agent's **chat panel** re-renders from the session store, while the **canvas is the existing editor**, fed
+separately (the engine pushes into a Zustand store that the SVG `WorkflowCanvas` reads — not React Flow).
 
 ```mermaid
 flowchart TB
-  subgraph view["① VIEW — the only new-logic part (differs)"]
+  subgraph view["① VIEW (differs)"]
     direction LR
-    TV["TERMINAL ★NEW<br/>two-pane renderer<br/>readline + ANSI<br/>left = canvas JSON · right = chat"]
-    WV["WEB<br/>FlowAgentPanel<br/>React Flow canvas + chat panel<br/>(useAgentSession)"]
+    TV["TERMINAL ★NEW<br/>ONE two-pane renderer<br/>readline + ANSI<br/>left = canvas JSON · right = chat"]
+    WCHAT["WEB · AgentPanel ★<br/>chat panel only<br/>(useAgentSession)"]
+    WCANVAS["WEB · WorkflowCanvas<br/>existing SVG editor canvas<br/>(useCanvasStore — not React Flow)"]
   end
 
   subgraph core["SAME CODE — assembled once per host"]
@@ -117,21 +122,25 @@ flowchart TB
   subgraph gw["② MODEL GATEWAY (differs)"]
     direction LR
     TG["TERMINAL ★<br/>direct Gemini<br/>server-side fetch, no CORS"]
-    WG["WEB<br/>createGenerateApiLlmGateway<br/>→ app backend proxy"]
+    WG["WEB<br/>createGenerateApiLlmGateway<br/>backend proxy + WebSocket"]
   end
 
-  STORE -- "notify → redraw" --> TV
-  STORE -- "notify → setState" --> WV
-  BIND -- "readGraph() (re-read)" --> TV
-  BIND -- "engine push" --> WV
+  STORE -- "notify → redraw (both panes)" --> TV
+  BIND -- "readGraph() re-read" --> TV
+  STORE -- "notify → setState" --> WCHAT
+  BIND -- "engine.subscribe → canvas store" --> WCANVAS
 
   ORCH -- "chat() / tools" --> TG
   ORCH -- "chat() / tools" --> WG
 
   TG -- "no CORS" --> GEM["Google · generativelanguage.googleapis.com"]
-  WG -- "HTTP" --> PROXY["app backend /generate"]
+  WG -- "ack + socket" --> PROXY["app backend · /runs/:id/generate"]
   PROXY --> GEM
 ```
+
+_The web agent panel is DEV-only today — its gateway's WebSocket receiver is still a TODO, so a turn there
+doesn't complete yet. What's shipped and shared is the **core** (binding, catalog, orchestrator); the terminal
+is what drives it end-to-end._
 
 The one asymmetry _inside_ the core is how blocks are loaded: the terminal pulls the registry over HTTP via
 `createFlowWorkspace`, the browser reads it from the app's store — same registry in, so the binding and catalog
@@ -214,7 +223,8 @@ Rules the seam guarantees (and the renderer must respect):
 - The engine has no push callback the terminal subscribes to, so the renderer re-reads `binding.readGraph()`
   (i.e. `engine.getGraph()`) inside `notify`. Because a spawned specialist's canvas edits land _before_ its
   `spawn` tool-result is recorded, the left pane advances **as each specialist finishes** — not only at turn
-  end. (In the browser the same engine also pushes to React Flow; the terminal simply re-reads instead.)
+  end. (In the browser the same engine pushes into the Zustand canvas store the SVG `WorkflowCanvas` reads; the
+  terminal simply re-reads instead.)
 
 ## 5 · The driver contract
 
@@ -320,7 +330,8 @@ specialist finishes, not only at the end.
   **chat** (the orchestrator transcript as `user` → `assistant` → tool-result turns, taken from the session so
   it reads like a normal conversation), **canvas** (`+ node` / `+ edge` / `~ node` / `- node`, with results —
   the local engine edits that never reach a backend, so this is where node creation is visible), **model** (one
-  token-`usage` line per call, tagged `orchestrator`/`builder`; the fake logs `no backend call`, so usage is
+  token-`usage` line per call, tagged `orchestrator`/`builder`/`agent` (the third covers the configure-only
+  block/generator specialists); the fake logs `no backend call`, so usage is
   the backend-call proof), and, in connected mode, **flow-API** HTTP. The file is truncated at startup;
   `--log <file>` sets the path, `--no-log` disables, `/log` shows it. The chat channel is fed the session
   state; the others are transparent decorators over the gateway / `CanvasBinding` / `HttpPort`.
