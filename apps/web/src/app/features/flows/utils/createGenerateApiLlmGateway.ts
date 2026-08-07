@@ -1,6 +1,6 @@
 import { api } from '@flows/web-core';
 
-import type { ChatRequest, Chunk, LlmGateway } from '@flows/agent';
+import type { ChatMessage, ChatRequest, Chunk, LlmGateway, ToolDef } from '@flows/agent';
 
 /**
  * Frontend adapter foundation for eureka-flow's Generate API (item 7, GenAI adaptor with
@@ -28,8 +28,8 @@ import type { ChatRequest, Chunk, LlmGateway } from '@flows/agent';
 
 /** Structural stand-in for the eventual real receiver (e.g. `ProxyTransportReceiver`). */
 export interface GenerateReceiver<T> {
-    /** Registers interest for `connectionId`, runs `fire` (the HTTP POST), resolves with the reassembled result. */
-    wait(connectionId: string, fire: () => Promise<unknown>): Promise<T>;
+    /** Registers interest for `requestId`, runs `fire` (the HTTP POST), resolves with the reassembled result. */
+    wait(requestId: string, fire: () => Promise<unknown>): Promise<T>;
 }
 
 export interface GenerateContent {
@@ -41,6 +41,7 @@ export interface GenerateContent {
 }
 
 export interface GenerateRequestBody {
+    requestId: string;
     model: string;
     prompt: string | { type?: string; content: string | GenerateContent | GenerateContent[] };
     system?: string;
@@ -53,9 +54,12 @@ export interface GenerateRequestBody {
         topP?: number;
         imageConfig?: { aspectRatio?: string; imageSize?: string };
     };
+    messages?: ChatMessage[];
+    tools?: ToolDef[];
 }
 
 export interface GenerateResponse {
+    requestId?: string;
     output: {
         content: string | { data?: string };
     };
@@ -66,6 +70,7 @@ export interface GenerateResponse {
         totalToken?: number;
         imageToken?: number;
     };
+    toolCalls?: Array<{ id: string; name: string; args: unknown }>;
 }
 
 /** The live flow socket's state, read fresh on every `chat()` call — never cached, since a
@@ -87,6 +92,10 @@ export interface CreateGenerateApiLlmGatewayOptions {
     /** Defaults to `gemini-2.5-flash`. */
     model?: string;
     generation?: { temperature?: number };
+    /** Enables the provider-neutral messages/tools fields and tool-call response chunks. */
+    toolCalls?: boolean;
+    /** Generate route; defaults to the production Run endpoint. */
+    endpointPath?: string;
 }
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
@@ -96,8 +105,10 @@ const defaultPost: GeneratePostFn = (url, body, config) => api.post(url, body, c
 
 const toGenerateRequestBody = (
     req: ChatRequest,
+    requestId: string,
     model: string,
-    generation?: { temperature?: number }
+    generation?: { temperature?: number },
+    toolCalls?: boolean
 ): GenerateRequestBody => {
     const systemTexts = req.messages.filter(message => message.role === 'system').map(message => message.content ?? '');
     const turnMessages = req.messages.filter(message => message.role === 'user' || message.role === 'assistant');
@@ -115,49 +126,66 @@ const toGenerateRequestBody = (
               };
 
     return {
+        requestId,
         model,
         prompt,
         ...(systemTexts.length > 0 ? { system: systemTexts.join('\n\n') } : {}),
         ...(generation?.temperature !== undefined ? { config: { temperature: generation.temperature } } : {}),
+        ...(toolCalls ? { messages: req.messages, tools: req.tools } : {}),
     };
 };
 
 /**
- * The Generate API gateway: implements the shared `chat()` contract over Claire's
- * `POST /runs/0/generate` + WebSocket-receiver design. See the module doc for the current
- * (receiver-injected, fake-tested) scope and what remains TODO.
+ * Implements the shared `chat()` contract over Generate HTTP ACK + WebSocket result delivery.
  */
 export const createGenerateApiLlmGateway = (options: CreateGenerateApiLlmGatewayOptions): LlmGateway => {
-    const { getConnection, post = defaultPost, model = DEFAULT_MODEL, generation } = options;
+    const {
+        getConnection,
+        post = defaultPost,
+        model = DEFAULT_MODEL,
+        generation,
+        toolCalls = false,
+        endpointPath = '/runs/0/generate',
+    } = options;
 
     async function* chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk> {
         const { isConnected, connectionId, generateReceiver } = getConnection();
 
-        if (!isConnected) {
+        if (connectionId && !isConnected) {
             throw new Error('Generate API gateway unavailable: the flow socket is not connected');
         }
-        if (!connectionId) {
-            throw new Error('Generate API gateway unavailable: no connectionId (socket not ready yet)');
-        }
-        if (!generateReceiver) {
-            throw new Error('Generate API gateway unavailable: no generate receiver registered on the socket');
-        }
-
-        if (req.tools.length > 0) {
+        if (!toolCalls && req.tools.length > 0) {
             throw new Error(`${TEXT_ONLY}: tool definitions are not supported`);
         }
-        if (req.messages.some(message => message.role === 'tool' || (message.toolCalls?.length ?? 0) > 0)) {
+        if (
+            !toolCalls &&
+            req.messages.some(message => message.role === 'tool' || (message.toolCalls?.length ?? 0) > 0)
+        ) {
             throw new Error(`${TEXT_ONLY}: tool messages are not supported`);
         }
 
-        const body = toGenerateRequestBody(req, model, generation);
+        const requestId = crypto.randomUUID();
+        const body = toGenerateRequestBody(req, requestId, model, generation, toolCalls);
 
-        const response = await generateReceiver.wait(connectionId, async () => {
-            await post('/runs/0/generate', body, {
-                params: { connection: connectionId, transport: 1 },
-                ...(opts?.signal ? { signal: opts.signal } : {}),
+        const _request = async (): Promise<GenerateResponse> => {
+            if (!connectionId) {
+                const $http = await post(endpointPath, body, {
+                    params: {},
+                    ...(opts?.signal ? { signal: opts.signal } : {}),
+                });
+                return (($http as { data?: unknown })?.data ?? $http) as GenerateResponse;
+            }
+            if (!generateReceiver) {
+                throw new Error('Generate API gateway unavailable: no generate receiver registered on the socket');
+            }
+            return generateReceiver.wait(requestId, async () => {
+                await post(endpointPath, body, {
+                    params: { connection: connectionId, transport: 1 },
+                    ...(opts?.signal ? { signal: opts.signal } : {}),
+                });
             });
-        });
+        };
+        const response = await _request();
 
         if (opts?.signal?.aborted) {
             throw new DOMException('Aborted', 'AbortError');
@@ -171,7 +199,16 @@ export const createGenerateApiLlmGateway = (options: CreateGenerateApiLlmGateway
             throw new Error(`${TEXT_ONLY}: response content is not text (image/object output)`);
         }
 
-        yield { text: content };
+        if (content) yield { text: content };
+        for (const toolCall of response.toolCalls ?? []) {
+            yield {
+                toolCall: {
+                    id: toolCall.id,
+                    name: toolCall.name,
+                    argsDelta: JSON.stringify(toolCall.args ?? {}),
+                },
+            };
+        }
 
         const usage = response.usage
             ? {
@@ -185,7 +222,7 @@ export const createGenerateApiLlmGateway = (options: CreateGenerateApiLlmGateway
     }
 
     return {
-        capabilities: { toolCalls: false },
+        capabilities: { toolCalls },
         chat,
     };
 };

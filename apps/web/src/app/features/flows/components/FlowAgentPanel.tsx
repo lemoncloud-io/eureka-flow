@@ -1,14 +1,14 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import { createEngineCanvasBinding, toAgentGrant } from '@flows/agent';
 import { useBlockRegistry } from '@flows/flows';
-import { useWebSocketStore } from '@flows/socket';
 
 import { AgentPanel } from './AgentPanel';
 import { useAgent } from '../hooks/useAgent';
 import { useAgentStorage } from '../hooks/useAgentStorage';
 import { useAgentTrace } from '../hooks/useAgentTrace';
-import { createBlockCatalogLookup, createGenerateApiLlmGateway } from '../utils';
+import { useToolSocketConnection } from '../hooks/useToolSocketConnection';
+import { createBlockCatalogLookup, createFlowJSONTransportReceiver, createGenerateApiLlmGateway } from '../utils';
 
 import type { FlowEngine } from '@flows/engine';
 import type { FlowPermissions } from '@flows/flows';
@@ -26,9 +26,11 @@ interface FlowAgentPanelProps {
  * {@link useAgent}, and hands `session` + `send` to the presentational {@link AgentPanel}. All the
  * agent wiring lives here, so FlowEditorPage only mounts `<FlowAgentPanel />`.
  *
- * The gateway is the backend-proxied {@link createGenerateApiLlmGateway}; its result arrives over the
- * live flow socket (state read fresh from {@link useWebSocketStore}). The generate receiver + tool
- * calls are pending in the socket layer, so the panel is wired but not yet functional end-to-end.
+ * The gateway is the tool-capable {@link createGenerateApiLlmGateway} over `POST /runs/0/generate`.
+ * Its result is delivered over the dedicated tool WebSocket ({@link useToolSocketConnection}),
+ * reassembled by a {@link createFlowJSONTransportReceiver} JSONTransport receiver and correlated by
+ * request id. When the tool socket has no connection id the gateway falls back to HTTP-only delivery
+ * (the completed result in the POST body). See `docs/browser-agent/design/flow-api-gateway.md`.
  */
 export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelProps) => {
     // Reads cannot lag a projection that pauses mid-drag; edits land in `transact`, so they
@@ -36,18 +38,18 @@ export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelPr
     const binding = useMemo(() => createEngineCanvasBinding(engine), [engine]);
     const storage = useAgentStorage();
     const { tracer } = useAgentTrace();
-    // Backend Generate API gateway; the model's answer returns over the flow socket. Connection state
-    // is read fresh on every chat() call (a reconnect issues a new id), never cached. The agent wraps this
-    // gateway with its own tracing decorator, so no app-side trace wrapper is needed here.
+    // Dedicated tool socket + JSONTransport receiver: the model's answer (text and/or tool calls) arrives
+    // over this socket, correlated by request id. The agent wraps the gateway with its own tracing decorator.
+    const toolSocket = useToolSocketConnection();
+    const receiver = useMemo(() => createFlowJSONTransportReceiver(toolSocket), [toolSocket]);
+    useEffect(() => receiver.attach(), [receiver]);
     const gateway = useMemo(
         () =>
             createGenerateApiLlmGateway({
-                getConnection: () => {
-                    const { isConnected, id } = useWebSocketStore.getState();
-                    return { isConnected, connectionId: id, generateReceiver: null };
-                },
+                toolCalls: true,
+                getConnection: () => ({ ...toolSocket.getSnapshot(), generateReceiver: receiver.generateReceiver }),
             }),
-        []
+        [toolSocket, receiver]
     );
     // The user's flow-role permissions — the executor's ceiling on every specialist tool (a viewer's
     // move_node/rename is denied there, regardless of each agent's own fixed grant).

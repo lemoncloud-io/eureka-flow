@@ -20,11 +20,11 @@ const READY_CONNECTION: GenerateConnectionSnapshot = {
 /** A fake receiver: runs `fire` (the POST), then resolves/rejects with a scripted result. */
 const makeFakeReceiver = (
     resolveWith: GenerateResponse | (() => Promise<GenerateResponse>)
-): { receiver: GenerateReceiver<GenerateResponse>; waits: { connectionId: string }[] } => {
-    const waits: { connectionId: string }[] = [];
+): { receiver: GenerateReceiver<GenerateResponse>; waits: { requestId: string }[] } => {
+    const waits: { requestId: string }[] = [];
     const receiver: GenerateReceiver<GenerateResponse> = {
-        wait: async (connectionId, fire) => {
-            waits.push({ connectionId });
+        wait: async (requestId, fire) => {
+            waits.push({ requestId });
             await fire();
             return typeof resolveWith === 'function' ? resolveWith() : resolveWith;
         },
@@ -70,10 +70,15 @@ describe('createGenerateApiLlmGateway', () => {
             await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/not connected/);
         });
 
-        it('throws a clear error when connectionId is missing', async () => {
-            const { receiver } = makeFakeReceiver(textResponse('x'));
-            const gateway = createGateway({ connection: { connectionId: null, generateReceiver: receiver } }, vi.fn());
-            await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/no connectionId/);
+        it('uses the HTTP response when connectionId is missing', async () => {
+            const post = vi.fn().mockResolvedValue({ data: textResponse('http') });
+            const gateway = createGateway(
+                { connection: { isConnected: false, connectionId: null, generateReceiver: null } },
+                post
+            );
+
+            expect(await drain(gateway.chat(userSays('hi')))).toEqual([{ text: 'http' }, { done: true }]);
+            expect(post.mock.calls[0][2]).toEqual({ params: {} });
         });
 
         it('throws a clear error when the generate receiver is missing', async () => {
@@ -174,8 +179,8 @@ describe('createGenerateApiLlmGateway', () => {
         it('calls the receiver before post (receiver wraps the trigger) and posts to /runs/0/generate', async () => {
             const order: string[] = [];
             const receiver: GenerateReceiver<GenerateResponse> = {
-                wait: async (connectionId, fire) => {
-                    order.push(`wait:${connectionId}`);
+                wait: async (requestId, fire) => {
+                    order.push(`wait:${requestId}`);
                     await fire();
                     return textResponse('ok');
                 },
@@ -187,8 +192,9 @@ describe('createGenerateApiLlmGateway', () => {
 
             await drain(gateway.chat(userSays('hi')));
 
-            expect(order).toEqual(['wait:conn-1', 'post']);
+            expect(order).toEqual([expect.stringMatching(/^wait:/), 'post']);
             expect(post.mock.calls[0][0]).toBe('/runs/0/generate');
+            expect(post.mock.calls[0][1].requestId).toBe(order[0].slice('wait:'.length));
         });
 
         it('includes connection and transport=1 in post params', async () => {
@@ -215,7 +221,7 @@ describe('createGenerateApiLlmGateway', () => {
         it('throws AbortError if the signal is aborted by the time the receiver resolves', async () => {
             const controller = new AbortController();
             const receiver: GenerateReceiver<GenerateResponse> = {
-                wait: async (_connectionId, fire) => {
+                wait: async (_requestId, fire) => {
                     await fire();
                     controller.abort();
                     return textResponse('ok');
@@ -280,6 +286,29 @@ describe('createGenerateApiLlmGateway', () => {
 
             await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/missing output.content/);
         });
+    });
+
+    it('sends tools through run generate and emits returned tool calls when enabled', async () => {
+        const { receiver } = makeFakeReceiver({
+            output: { content: '' },
+            toolCalls: [{ id: 'call-1', name: 'move_node', args: { nodeId: 'n1' } }],
+        });
+        const post = vi.fn().mockResolvedValue(undefined);
+        const gateway = createGateway({ toolCalls: true, connection: { generateReceiver: receiver } }, post);
+        const request: ChatRequest = {
+            messages: [{ role: 'user', content: 'Move the node.' }],
+            tools: [{ name: 'move_node', description: 'Move a node', parameters: { type: 'object' } }],
+        };
+
+        const chunks = await drain(gateway.chat(request));
+
+        expect(gateway.capabilities).toEqual({ toolCalls: true });
+        expect(post.mock.calls[0][0]).toBe('/runs/0/generate');
+        expect(post.mock.calls[0][1]).toMatchObject({ messages: request.messages, tools: request.tools });
+        expect(chunks).toEqual([
+            { toolCall: { id: 'call-1', name: 'move_node', argsDelta: '{"nodeId":"n1"}' } },
+            { done: true },
+        ]);
     });
 
     describe('tool rejection (text-only)', () => {
