@@ -1,5 +1,56 @@
 # Changelog
 
+## [2026-08-07] - root@0.67.0, @flows/web@0.67.0, @flows/admin@0.41.0
+
+### Features
+
+- (agent) ship the hybrid writer layer; retire the fan-out A/B
+- (agent) local terminal to drive the flow-agent headless
+- (agent) pull the graph via get_graph — the Approach-3 context variant
+- (agent) live canvas to the tail — cacheable transcript, ~halves builder cost
+- (agent) checkpoint — builder+skills, two-prompt orchestrator, catalog fold, eval harness
+- (agent) correctness-only eval-benchmark comparing the two roster designs
+- (agent) on-demand skill playbooks + the Builder that composes them
+- (agent) block-oriented agents composed from skills
+- (agent) structural node & edge specialist agents over the live canvas
+
+### Bug Fixes
+
+- (agent) run agent:terminal without a .env.local
+- (agent) align agent prompts and tool descriptions with the shipped design
+- (agent) group parallel tool results into one user content (both Gemini APIs)
+- (agent) reroute at the right altitude; orchestrator/builder own destruction correctly
+- (agent) builder finishes multi-node builds; orchestrator routes + reroutes correctly
+- (agent) fail loudly on unknown id and skip the empty-patch transaction
+
+### Documentation
+
+- (agent) doc↔code accuracy pass for PR + local-terminal diagrams
+- (agent) terminal-vs-web architecture diagram
+- (agent) design + impl-notes for the local terminal
+
+### Refactor
+
+- (engine) one edge-validation rule, owned by the engine
+- (agent) compose agent tools from self-named tool values
+- (agent) rename is the builder's, added at build time
+- (agent) rename generator specialist → single-output-generator
+- (agent) agents complete completable requests; refuse only the impossible
+- (agent) orchestrator composes canvas read from the inspect skill
+- (agent) orchestrator delegates intent; specialists own schema validation
+
+### Chores
+
+- keep bench-runs/ + manifest prettierignore rules local-only
+- (agent) reconcile branch WIP — prompts, docs, tests; un-churn manifests
+- (agent) wip edge reject-occupied-input
+
+### Other
+
+- test: (agent) consolidate live scenarios into integration.live; retire the eval-benchmark A/B
+- test: (agent) enforce that every write tool declares its capability
+- test: (agent) gate live Gemini specs behind RUN_LIVE
+
 ## [2026-07-30] - root@0.66.2, @flows/web@0.66.2, @flows/admin@0.40.2
 
 ### Bug Fixes
