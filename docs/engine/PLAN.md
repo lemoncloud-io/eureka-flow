@@ -1192,3 +1192,79 @@ lint 0 error / 51 warning · `nx build web`. 완료 판정은 grep — 모바일
   `loadGraph` 호출부만 맞췄고 그 후속은 안 옮겼다.
 - 신규 스펙은 슬라이스 01 의 5개뿐. 02 는 동작 보존이 목표인 재배선이라 red-green 신호가
   없다고 보고 안 썼다 — **disconnect+connect 원자 롤백만은 실제로 안 덮인다.**
+
+## 16. 노드 state 갭 — 목록이 아니라 fallback 이 문제였다 (`docs/engine-node-state`)
+
+배경 자료 2개가 이 절의 근거다. `node-state-model.md` = 지금 사실이 어떤지,
+`PLAN-node-state-completion.md` = 슬라이스 큐와 각 슬라이스의 판정.
+
+### 무엇이 문제였나
+
+서버 계약(`NodeStatusType`)은 멤버 8개를 선언하고 엔진 유니온은 5개다. 목록 차이로 보였고,
+그래서 처음 세운 플랜은 "유니온을 넓힌다"였다. **틀린 진단이었다.** 목록은 증상이고,
+같은 원인의 fallback 셋이 각각 조용히 틀리고 있었다.
+
+### S0 — 와이어가 진짜 뭘 싣는가 (판정: 안 싣는다, 다만 지워진 기능)
+
+서버 소스 레포(`eureka-flows-api` `develop@1efa791`)를 직접 읽었다. 소켓 노드 프레임을 만드는
+곳은 `transformer-graph.ts:1546` `asSocketNodeEvent` 하나뿐이고, state 는 5분기 삼항이 전부라
+와이어 어휘는 `{READY, RUNNING, COMPLETED, ERROR}`. `''`는 `stage === null` 이 필요한데
+`RunNodeStage` 에 `null` 이 없어 도달 불가. **엔진 유니온 5개가 오늘 와이어와 정확히 일치한다** —
+갭은 "선언 8 vs 도달가능 5"다.
+
+그런데 `SKIPPED` 는 한때 실렸다. `disabled` 노드를 그렇게 마킹했고, `b2093a9`
+"v0.26.227a cleanup"(2026-02-28)이 proxy → proxy-graph 이행 중 `disabled` 처리째로 지웠다.
+**예약어가 아니라 회귀한 기능이다.** 그래서 유니온 확장(S2)은 취소가 아니라 **보류** —
+취소하면 기능이 돌아올 때 같은 조사를 다시 한다. 착수 조건 2개를 배경 문서에 적어뒀다.
+
+이 판정이 뒤집은 것 하나: flow-mcp 의 `RANK_AS`/`TERMINAL_STATES` 는 죽은 보정이 아니라
+**예약된 계약에 대한 방어**다. 원래 "엔진이 규칙을 가지면 지운다" 목록이었는데 유지 목록이 됐다.
+
+### S1 — 고친 것 (`ef04806`)
+
+1. **`shouldUpdateState` 의 `-1` 센티넬.** 랭크 못 하는 state 를 `-1` 로 두면 한 값이
+   동시에 들어올 수도 없고(`-1 >= 2`) 지켜지지도 않는(`x >= -1`) 상태가 된다. 이제 랭크
+   불가면 last-write — flow-mcp 가 밖에서 하던 걸 안으로 들였다. 랭크 판정은 `in` 이 아니라
+   `isNodeState` 로 한다(`in` 은 프로토타입 체인을 타서 `'toString'` 이 랭크로 통과했다).
+2. **`statePatch(undefined)` 가 노드 state 를 지우고 있었다.** `{ state, status: state }` 는
+   값이 `undefined` 여도 **키를 만들고**, `applyRuntime` 은 얕은 병합이라 그 키가 노드 것을
+   덮는다. 파서가 state 를 떨군 프레임이 정확히 그 모양이므로, **엔진이 모르는 state 는
+   무시되는 게 아니라 노드를 비웠다.** `executionStats` 도 같은 구조였다.
+3. **`runSession` 에 우선순위 가드가 없었다.** 리듀서의 Rule 1 은 high-water mark 를 프레임
+   자신의 id 에 거는데 포트 프레임은 state 를 **부모**에 쓴다 — 커서 둘에 타깃 하나라 서로를
+   정렬하지 못하고, 늦은 포트 프레임이 COMPLETED 를 되돌렸다. 가드 권위는 그래프가 아니라
+   **세션이 쓴 것**이다(`written` 맵). `reset()` 이 그걸 비우므로 "리셋하면 이전 run 의 state 는
+   더는 기준이 아니다"가 유지된다 — 그래프에서 읽는 첫 구현은 기존 리셋 테스트가 잡았다.
+4. **`getEffectiveState` 가 `isNodeState` 에 위임.** 두 번째 화이트리스트(`VALID_STATES`)를
+   지웠다. 오늘 기준 **완전한 no-op** 이고(옛 Set 으로 되돌려도 새 스펙이 green), 그 테스트는
+   동작이 아니라 **두 목록이 갈라지는 것**을 잡는 드리프트 가드다.
+
+2번과 3번은 플랜에 없었다 — S1 을 구현하다 나왔고, 같은 원인의 다른 얼굴이라 같은 슬라이스에
+넣었다.
+
+**게이트**: engine 302(288+14) · flows 26 · socket 22 · web 199 · `tsc -b --force` exit 0 ·
+lint 0 error / 55 warning · `nx build web` green. **수정 4개를 각각 되돌려 red 확인.**
+
+### S3 — 기록한 곳
+
+- `libs/engine/src/types.ts` — `@note ... also includes` 한 줄이 결정 기록으로 바뀌었다:
+  왜 5개인지, `SKIPPED` 가 왜 예약어가 아닌지, 모르는 state 가 어떻게 처리되는지
+- `GUIDE.md` / `GUIDE.ko.md` — **`shouldUpdateState` 언급이 0건이었다.** npm 소비자에게
+  세션이 뭘 보장하고, 소켓 밖에서 state 를 쓸 때 뭘 직접 해야 하는지(가드 호출 + 키 생략)를
+  적었다. 둘 다 고쳤다
+- `node-state-model.md` §2 에 "이 절은 배포물 0.1.0 기준" 단서 — 소스가 S1 에서 달라졌다
+
+### 안 한 것 / 남은 것
+
+- **S2 · S2b · S4 보류.** 유니온 확장, 터미널 계약(`isTerminal` 이 `COMPLETED|ERROR` 둘로
+  박혀 있어 SKIPPED 노드는 `waitForNode` 를 안 깨운다), 그리고 배포. 착수 조건은 배경 문서
+- **S1 자체의 semver 판단이 남았다.** 배포된 `shouldUpdateState` 의 관찰 가능한 동작이
+  바뀌었다(랭크 불가 state 에서 false → true). flow-mcp 는 영향 없다 — `acceptsState` 가
+  `RANKED_STATES` 검사에서 먼저 빠져나가 엔진 함수를 아예 안 부른다
+- **모바일은 리듀서를 아예 안 탄다.** `useMobileSocketSync` 에 `reduceNodeEvent`·시퀀스 커서·
+  `shouldUpdateState` 0건, `if (state) applyRuntime` 손코딩이 전부다. 미모델링 state 는
+  `dispatchSocketFrame` 이 엔진 파서를 쓰는 덕에 데스크톱과 똑같이 걸러지지만 **순서 규칙은
+  하나도 없다.** S1 가드가 안 닿는다(붙일 자리가 없다) — 모바일을 리듀서 위로 올리는 게
+  맞는 수정이고 별 슬라이스다
+- **프로덕션 배포 버전 미확인.** 로컬 develop 0.26.621d, 이 레포가 설치한 타입 패키지
+  0.26.609. S2 착수 전에는 실측으로 한 번 확인할 것

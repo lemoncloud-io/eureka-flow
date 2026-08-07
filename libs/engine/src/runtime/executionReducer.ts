@@ -1,14 +1,30 @@
+import { isNodeState } from '../types';
+
 import type { NodeState } from '../types';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 /** Node state priority. Higher is more final; ERROR outranks COMPLETED because a terminal
  *  failure must not be overwritten by a late success message. */
-const STATE_PRIORITY: Record<string, number> = { IDLE: 0, READY: 1, RUNNING: 2, COMPLETED: 3, ERROR: 4 };
+const STATE_PRIORITY: Record<NodeState, number> = { IDLE: 0, READY: 1, RUNNING: 2, COMPLETED: 3, ERROR: 4 };
 
-const priority = (state?: string): number => STATE_PRIORITY[state ?? ''] ?? -1;
-
-/** Whether a server state is final enough to replace what is on screen. */
-export const shouldUpdateState = (current?: string, server?: string): boolean => priority(server) >= priority(current);
+/**
+ * Whether a server state is final enough to replace what is on screen.
+ *
+ * The server's `NodeStatusType` declares members this union does not model, so a state the
+ * table cannot rank is a case, not an impossibility. It used to rank `-1`, which was worse
+ * than either answer: `-1 >= 2` refused the unknown state on the way in, and `x >= -1`
+ * let anything overwrite it once it was there — the one state that could never arrive and
+ * could always be buried. Unrankable states now take last-write, which is what the client
+ * did before this table existed and what flow-mcp had to rebuild outside the engine when
+ * it hit this (`RANK_AS` in `ws-client.ts`).
+ */
+export const shouldUpdateState = (current?: string, server?: string): boolean => {
+    // `''` is the contract's spelling of "no state" — there is nothing to write.
+    if (!server) return false;
+    if (!current) return true;
+    if (!isNodeState(current) || !isNodeState(server)) return true;
+    return STATE_PRIORITY[server] >= STATE_PRIORITY[current];
+};
 
 /** What the client has seen for one node or port, so a late frame can be recognised. */
 export interface StreamCursor {
@@ -188,16 +204,27 @@ export const reduceNodeEvent = (
         effects.push({
             type: 'apply',
             nodeId,
-            patch: { ...statePatch('ERROR'), error, errorMessage: error } as Partial<NodeData>,
+            // Same omit rule as `statePatch`: an ERROR frame before `final` carries no text,
+            // and sending `error: undefined` would erase whatever the fetch just filled in.
+            patch: {
+                ...statePatch('ERROR'),
+                ...(error === undefined ? {} : { error, errorMessage: error }),
+            } as Partial<NodeData>,
         });
         effects.push({ type: 'notify', level: 'error', nodeId, message: error });
         return { state: next, effects };
     }
 
+    // Same rule as `statePatch`: a key holding `undefined` erases, so stats the event does
+    // not carry are left out rather than sent as nothing.
+    const stats = executionStats(event, now);
     effects.push({
         type: 'apply',
         nodeId,
-        patch: { ...statePatch(event.state), executionStats: executionStats(event, now) } as Partial<NodeData>,
+        patch: {
+            ...statePatch(event.state),
+            ...(stats === undefined ? {} : { executionStats: stats }),
+        } as Partial<NodeData>,
     });
 
     if (event.state === 'COMPLETED') effects.push({ type: 'notify', level: 'success', nodeId });
@@ -211,9 +238,15 @@ export const reduceNodeEvent = (
  *
  * Exported so a caller carrying out a `reset-node` writes the pair the same way the
  * reducer does. Two spellings of "this node is IDLE" is how the twin outlives its retirement.
+ *
+ * No state means **no keys**, not keys holding `undefined`. `applyRuntime` merges with
+ * `{ ...node, ...patch }`, so a present-but-undefined `state` erases the node's own — and
+ * a frame whose state the parser dropped (any state this union does not model) arrives
+ * exactly that way. Omitting is the difference between "nothing to say" and "it is now
+ * nothing".
  */
 export const statePatch = (state?: NodeState): Partial<NodeData> =>
-    ({ state, status: state }) as unknown as Partial<NodeData>;
+    (state === undefined ? {} : { state, status: state }) as unknown as Partial<NodeData>;
 
 const executionStats = (event: NodeEvent, now: () => number): NodeData['executionStats'] => {
     const { state, progress } = event;

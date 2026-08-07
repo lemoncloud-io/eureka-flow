@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-07-30] - root@0.66.2, @flows/web@0.66.2, @flows/admin@0.40.2
+
+### Bug Fixes
+
+- (engine) 가드가 재로드를 모르는 것과, ERROR 프레임이 error 를 지우는 것
+- (engine) 모르는 state가 노드를 지우거나 늦은 프레임이 되돌리지 않게
+
+### Documentation
+
+- (engine) §15 참조 오타와 과한 단정 하나
+- (engine) state 갭의 결정을 기록한다 — PLAN §16, types.ts, GUIDE 양쪽
+- (engine) 모바일 행을 §5에 나눠 적는다 — 리듀서를 안 탄다
+- (engine) 와이어는 SKIPPED를 안 싣는다 — 슬라이스 0 판정
+- (engine) the state model as it is, and a plan for the gap
+
 ## [2026-07-30] - root@0.66.1, @flows/web@0.66.1, @flows/admin@0.40.1
 
 ### Documentation
