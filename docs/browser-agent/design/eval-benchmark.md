@@ -5,7 +5,9 @@
 > [context-strategy-and-composition.md](./context-strategy-and-composition.md),
 > [architecture.md · the hybrid writer layer](./architecture.md#the-hybrid-writer-layer). The two-design A/B
 > below is kept as the record of _how_ that was decided, not a live gate; with edge + locator retired the
-> fan-out arm is now degenerate.
+> fan-out arm is now degenerate. The live A/B spec (`eval-benchmark.live.spec.ts`) has since been **retired** —
+> its scenario ladder and cost/time metering now run as the single-design live eval in
+> `integration.live.spec.ts` ([harness-scenarios.md](./harness-scenarios.md)).
 >
 > A **design-agnostic** benchmark: one fixed ladder of scenarios (simple → complex), each verified by code,
 > run identically against **two agent designs** so we can compare their **correctness** on the same footing.
@@ -18,7 +20,7 @@
 > (`libs/agent/src/llm/llmGateway.ts`), and the fixture graph + catalog
 > (`libs/agent/src/__tests__/harness/fixtures.ts`). Behavior & the loop: **[harness-spec.md](./harness-spec.md)**;
 > how we verify a single design: **[harness-scenarios.md](./harness-scenarios.md)**; types:
-> **[harness-interfaces.md](./harness-interfaces.md)**. Last updated 2026-08-03.
+> **[harness-interfaces.md](./harness-interfaces.md)**. Last updated 2026-08-07.
 
 ---
 

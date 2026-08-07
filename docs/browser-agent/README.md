@@ -94,7 +94,7 @@ its own, so `nx test` and CI never trigger them.
     RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts
 
     # one scenario by name
-    RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts -t A1
+    RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts -t T4.build-pipeline
 
     # a single specialist's eval
     RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/builder.live.spec.ts
@@ -107,11 +107,12 @@ its own, so `nx test` and CI never trigger them.
 
     ```bash
     RUN_LIVE=1 GEMINI_MODEL=gemini-2.5-pro npx vitest run .../integration.live.spec.ts
-    RUN_LIVE=1 LIVE_VERBOSE=1 npx vitest run .../integration.live.spec.ts -t A1     # truncated turns
-    RUN_LIVE=1 LIVE_VERBOSE=full npx vitest run .../integration.live.spec.ts -t A1  # verbatim
+    RUN_LIVE=1 LIVE_VERBOSE=1 npx vitest run .../integration.live.spec.ts -t T4.build-pipeline  # echo the full transcript
     ```
 
-Without `RUN_LIVE` (or without a key), every live spec skips and the suite stays offline.
+Every live run also auto-saves its scorecard + full transcript + per-scenario token/cost to the gitignored
+`bench-runs/` dir (override with `BENCH_OUT`). Without `RUN_LIVE` (or without a key), every live spec skips and
+the suite stays offline.
 
 ## Reading order
 

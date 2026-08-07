@@ -14,7 +14,7 @@ import type { LlmGateway } from '../../llm/llmGateway';
 import type { AgentGrant } from '../../permissions';
 import type { SessionState } from '../../session/session';
 
-/** Per-agent fake-gateway scripts, keyed by agentType (e.g. `orchestrator`, `locator`, `edge`, `builder`, `single-output-generator`, or a generic block type). */
+/** Per-agent fake-gateway scripts, keyed by agentType (e.g. `orchestrator`, `builder`, `single-output-generator`, or a generic block type). */
 export type FakeScript = Record<string, FakeScriptStep[]>;
 
 export interface ScenarioInput {
@@ -37,10 +37,10 @@ export interface ScenarioInput {
     /** Catalog override; defaults to the fixture catalog. */
     catalog?: CatalogLookup;
     /**
-     * Specialist roster the orchestrator may `spawn` into. OMIT for the default (shipped hybrid) roster. The
-     * historical eval-benchmark (eval-benchmark.md) is the one caller that sets it — swapping the roster is how
-     * it ran the SAME scenario against the two designs it compared. A pure passthrough: `createOrchestratorAgent`
-     * already accepts a `roster` and falls back to the default when it is absent.
+     * Specialist roster the orchestrator may `spawn` into. OMIT for the default (shipped hybrid) roster — the
+     * live eval and every shipped path do. A pure passthrough (`createOrchestratorAgent` already accepts a
+     * `roster` and falls back to the default when it is absent): the DI seam a future eval can use to swap the
+     * roster under an otherwise-identical scenario.
      */
     roster?: AgentRoster;
 }

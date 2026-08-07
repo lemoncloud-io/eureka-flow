@@ -10,8 +10,9 @@
 
 All under `libs/agent/src/__tests__/harness/`, each scenario over the **smallest graph it needs** (or the
 shared `fixtures.ts` graph where a realistic multi-node canvas matters — see below). Every suite has a
-**deterministic** variant (`.spec.ts`, always runs — fake `LlmGateway`, exact oracle, no key/network) and a
-**live** variant (`.live.spec.ts` — real function-calling Gemini; opt-in via `describe.skipIf(SKIP_LIVE)`
+**deterministic** variant (`.spec.ts`, always runs — fake `LlmGateway`, exact oracle, no key/network); the **builder** and **integration** suites additionally have a
+**live** variant (`.live.spec.ts` — real function-calling Gemini; the per-agent block/generator suites are
+deterministic-only), opt-in via `describe.skipIf(SKIP_LIVE)`
 where `SKIP_LIVE = !GEMINI_API_KEY || !RUN_LIVE`, so a key alone is not enough — `RUN_LIVE` must be set too;
 the model chooses the calls, so a miss is a real signal, not a broken test). Live cases are
 independent and selectable (`vitest run <file> -t <name>`), so a representative subset runs without the whole
@@ -28,7 +29,8 @@ matrix.
   production outcome but not a test target, see below). The live variant checks only the outcome + graph oracle.
 - **Support** — `runScenario.ts` (the orchestrator runner + the test-only outcome re-ask), `fixtures.ts` (the
   shared 4-node graph for the integration cases, plus the fixture catalog and `nodeById`), `turnOutcome.ts`
-  (the eval-only `TurnOutcome` + `parseOutcome`), `verboseGateway.ts`.
+  (the eval-only `TurnOutcome` + `parseOutcome`), and `metering.ts` (the token/cost tap the live eval
+  composes with its transcript recorder).
 
 The per-agent roster + coverage map is [agents/README.md](../agents/README.md).
 
