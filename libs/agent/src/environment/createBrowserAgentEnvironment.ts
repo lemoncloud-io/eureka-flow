@@ -1,7 +1,8 @@
 import { createAgentEnvironment } from './createAgentEnvironment';
-import { createBrowserAgentStorage } from './storage/BrowserAgentStorage';
+import { createBrowserAgentStorage } from '../storage';
 
-import type { AgentEnvironmentSupportable, AgentStorageSupportable, AgentTraceReporterSupportable } from './types';
+import type { AgentEnvironmentSupportable, AgentTraceReporterSupportable } from './types';
+import type { AgentStorageSupportable } from '../storage';
 
 export interface BrowserAgentEnvironmentOptions {
     /** Override the default localStorage-backed storage (e.g. a different namespace). */

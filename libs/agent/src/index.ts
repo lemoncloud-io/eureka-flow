@@ -4,6 +4,7 @@
  * roster (canvas seam, tools, session, agents).
  */
 export * from './environment';
+export * from './storage';
 export * from './http';
 export * from './llm';
 export * from './catalog';

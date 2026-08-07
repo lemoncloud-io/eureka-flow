@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { createBrowserAgentEnvironment } from '../../environment/createBrowserAgentEnvironment';
 import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
-import { createMemoryAgentStorage } from '../../environment/storage/MemoryAgentStorage';
 import { BufferAgentTraceReporter } from '../../environment/trace/traceReporters';
+import { createMemoryAgentStorage } from '../../storage/MemoryAgentStorage';
 
 describe('createVirtualAgentEnvironment', () => {
     it('has runtime node-virtual', () => {

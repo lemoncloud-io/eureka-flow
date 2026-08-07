@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { createBrowserAgentStorage } from '../../../environment/storage/BrowserAgentStorage';
+import { createBrowserAgentStorage } from '../../storage/BrowserAgentStorage';
 
-import type { WebStorageLike } from '../../../environment/storage/BrowserAgentStorage';
+import type { WebStorageLike } from '../../storage/BrowserAgentStorage';
 
 /** Minimal in-memory WebStorageLike so the browser implementation runs without jsdom. */
 const createFakeWebStorage = (): WebStorageLike & { dump(): Record<string, string> } => {

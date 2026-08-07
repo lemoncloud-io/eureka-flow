@@ -1,6 +1,6 @@
 import { assertStorageKey, parseStoredJson, serializeJson } from './json';
 
-import type { AgentStorageSupportable } from '../types';
+import type { AgentStorageSupportable } from './types';
 
 export interface MemoryAgentStorageOptions {
     /** Pre-seeded raw entries (already-serialized JSON strings), mainly for tests. */

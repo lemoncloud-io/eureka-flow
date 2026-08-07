@@ -1,4 +1,4 @@
-import { errorMessage } from '../../utils/errors';
+import { errorMessage } from '../utils/errors';
 
 /** Shared storage helpers: key guard and JSON (de)serialization that fails loudly with the key. */
 

@@ -1,5 +1,7 @@
 /** Browser Agent environment contract: the agent's only window onto the outside world. */
 
+import type { AgentStorageSupportable } from '../storage';
+
 export type AgentRuntime = 'browser' | 'node-virtual';
 
 /** Forbidden capabilities, each typed literal `false` so an implementation that allows one fails to compile. */
@@ -9,20 +11,6 @@ export interface AgentEnvironmentCapabilities {
     readonly allowFileSystem: false;
     readonly allowArbitraryNetwork: false;
     readonly allowArbitraryScriptExecution: false;
-}
-
-/** The agent's only sanctioned path to persistent state. Keys are strings, values are JSON; JSON errors reject loudly with the offending key. */
-export interface AgentStorageSupportable {
-    /** Read and parse a JSON value; resolves null when the key is absent. Rejects on corrupt JSON. */
-    getJson<T>(key: string): Promise<T | null>;
-    /** Serialize and store a JSON value. Rejects when the value cannot be serialized. */
-    setJson<T>(key: string, value: T): Promise<void>;
-    /** Remove a single key (no-op when absent). */
-    remove(key: string): Promise<void>;
-    /** List stored keys that start with the given prefix ('' lists all). */
-    listKeys(prefix: string): Promise<string[]>;
-    /** Optional: remove keys matching the prefix, or all of the agent's keys when omitted. */
-    clear?(prefix?: string): Promise<void>;
 }
 
 export type AgentTraceLevel = 'debug' | 'info' | 'warn' | 'error';

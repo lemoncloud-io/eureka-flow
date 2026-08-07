@@ -1,7 +1,8 @@
 import { createAgentEnvironment } from './createAgentEnvironment';
-import { createMemoryAgentStorage } from './storage/MemoryAgentStorage';
+import { createMemoryAgentStorage } from '../storage';
 
-import type { AgentEnvironmentSupportable, AgentStorageSupportable, AgentTraceReporterSupportable } from './types';
+import type { AgentEnvironmentSupportable, AgentTraceReporterSupportable } from './types';
+import type { AgentStorageSupportable } from '../storage';
 
 export interface VirtualAgentEnvironmentOptions {
     /** Override the default in-memory storage (e.g. pre-seeded for a test). */

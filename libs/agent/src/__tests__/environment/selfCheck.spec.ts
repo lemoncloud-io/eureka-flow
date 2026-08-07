@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
 import { runAgentEnvironmentSelfCheck } from '../../environment/selfCheck';
-import { createMemoryAgentStorage } from '../../environment/storage/MemoryAgentStorage';
 import { BufferAgentTraceReporter } from '../../environment/trace/traceReporters';
+import { createMemoryAgentStorage } from '../../storage/MemoryAgentStorage';
 
 describe('runAgentEnvironmentSelfCheck', () => {
     it('passes on a healthy virtual environment and cleans up its probe key', async () => {

@@ -1,11 +1,7 @@
 import { AGENT_ENVIRONMENT_CAPABILITIES } from './types';
 
-import type {
-    AgentEnvironmentSupportable,
-    AgentRuntime,
-    AgentStorageSupportable,
-    AgentTraceReporterSupportable,
-} from './types';
+import type { AgentEnvironmentSupportable, AgentRuntime, AgentTraceReporterSupportable } from './types';
+import type { AgentStorageSupportable } from '../storage';
 
 interface AgentEnvironmentInput {
     runtime: AgentRuntime;

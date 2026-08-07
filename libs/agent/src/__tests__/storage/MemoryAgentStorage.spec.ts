@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createMemoryAgentStorage } from '../../../environment/storage/MemoryAgentStorage';
+import { createMemoryAgentStorage } from '../../storage/MemoryAgentStorage';
 
 describe('createMemoryAgentStorage', () => {
     it('round-trips JSON values through set/get', async () => {

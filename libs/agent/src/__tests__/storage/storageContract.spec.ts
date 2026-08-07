@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { createBrowserAgentStorage } from '../../../environment/storage/BrowserAgentStorage';
-import { createMemoryAgentStorage } from '../../../environment/storage/MemoryAgentStorage';
+import { createBrowserAgentStorage } from '../../storage/BrowserAgentStorage';
+import { createMemoryAgentStorage } from '../../storage/MemoryAgentStorage';
 
-import type { WebStorageLike } from '../../../environment/storage/BrowserAgentStorage';
-import type { AgentStorageSupportable } from '../../../environment/types';
+import type { WebStorageLike } from '../../storage/BrowserAgentStorage';
+import type { AgentStorageSupportable } from '../../storage/types';
 
 /**
  * The shared storage contract: one set of expectations executed against BOTH

@@ -1,6 +1,6 @@
 import { assertStorageKey, parseStoredJson, serializeJson } from './json';
 
-import type { AgentStorageSupportable } from '../types';
+import type { AgentStorageSupportable } from './types';
 
 /** The subset of the DOM Storage API the browser storage needs; injectable for tests. */
 export interface WebStorageLike {
