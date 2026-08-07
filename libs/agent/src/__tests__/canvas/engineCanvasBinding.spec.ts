@@ -153,6 +153,12 @@ describe('createEngineCanvasBinding', () => {
             binding.updateNode(GEN, { label: 'Renamed' });
             expect(changed).toHaveLength(1);
         });
+
+        it('opens no transaction for an empty patch — no undo step that reverts to nothing', () => {
+            expect(engine.canUndo()).toBe(false);
+            binding.updateNode(GEN, {});
+            expect(engine.canUndo()).toBe(false);
+        });
     });
 
     describe('run state is not an edit', () => {

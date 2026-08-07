@@ -32,7 +32,7 @@ export interface SessionStore {
     save(state: SessionState): void;
 }
 
-const emptySession = (flowId: string): SessionState => ({ flowId, messages: [], phase: 'idle' });
+export const emptySession = (flowId: string): SessionState => ({ flowId, messages: [], phase: 'idle' });
 
 /**
  * A process-memory {@link SessionStore} — the default for tests and Node runs. The browser app

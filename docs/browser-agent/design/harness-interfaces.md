@@ -1,11 +1,12 @@
 # Flow-agent harness — interfaces
 
-> The **new** TypeScript surface for the harness (move / config / rename). Specialists edit the **live
-> `CanvasBinding` directly** via `updateNode`. Types in `code font` with no declaration here (`Graph`, `XY`,
-> `NodeData`, `EdgeData`, `ToolProvider`, `AgentGrant`, `BaseAgent`, `FakeScriptStep`, …) are **reused
-> as-is** from `@flows/agent` / `@flows/flows` / `@lemoncloud/eureka-flows-api`.
+> The **new** TypeScript surface for the harness (move / config / rename / add-delete node / connect-disconnect
+> edge). Specialists edit the **live `CanvasBinding` directly** — a node edit via `updateNode`, a structural
+> edit via `addNode` / `deleteNode` / `addEdge` / `deleteEdge`. Types in `code font` with no declaration here
+> (`Graph`, `XY`, `NodeData`, `EdgeData`, `ToolProvider`, `AgentGrant`, `BaseAgent`, `FakeScriptStep`, …) are
+> **reused as-is** from `@flows/agent` / `@flows/flows` / `@lemoncloud/eureka-flows-api`.
 >
-> Behavior & the loop: **[harness-spec.md](./harness-spec.md)**. How we verify: **[harness-scenarios.md](./harness-scenarios.md)**. Last updated 2026-07-28.
+> Behavior & the loop: **[harness-spec.md](./harness-spec.md)**. How we verify: **[harness-scenarios.md](./harness-scenarios.md)**. Last updated 2026-08-02.
 
 ---
 
@@ -17,9 +18,13 @@ classDiagram
 
     %% ── live canvas · tools · catalog ─────────────────────────────
     class CanvasBinding {
-        <<reused · config-widened>>
+        <<reused · config- + structure-widened>>
         +readGraph() Graph
         +updateNode(id, NodePatch) void
+        +addNode(type, XY) NewNode
+        +deleteNode(id) void
+        +addEdge(EdgeSpec) NewEdge
+        +deleteEdge(id) void
     }
     class ToolProvider {
         <<reused>>
@@ -30,7 +35,7 @@ classDiagram
         <<interface>>
         +has(type) boolean
         +schema(type) BlockSchema
-        +search(query) List~CatalogHit~
+        +search(query) List~BlockSchema~
     }
 
     %% ── delegation · spawn + roster ───────────────────────────────
@@ -75,8 +80,8 @@ classDiagram
         refused
     }
 
-    ToolProvider ..> CanvasBinding : node read/move/config edit live
-    ToolProvider ..> CatalogLookup : catalog_search · describe_block · describe_node
+    ToolProvider ..> CanvasBinding : node read/move/config/structure edit live
+    ToolProvider ..> CatalogLookup : catalog_search · describe_node
     ToolProvider ..> AgentRoster : list_agents reads
     ToolProvider ..> SubAgentRunner : spawn delegates to
 
@@ -93,20 +98,32 @@ classDiagram
 
 ## 1 · The edit space
 
-The harness emits three kinds of node edit, each applied **directly to the live canvas** via
-`CanvasBinding.updateNode` (§6):
+The harness emits two families of edit, each applied **directly to the live canvas** through the
+`CanvasBinding` (§6). **Node edits** patch one existing node via `updateNode`; **structural edits** change the
+set of nodes or edges via the id-returning `addNode` / `addEdge` and the void `deleteNode` / `deleteEdge`.
 
 - **move** `{ nodeId, position: XY }` — absolute result position (`updateNode({ position })`).
 - **set_properties** `{ nodeId, config }` — merged over the node's existing config (`updateNode({ config })`).
 - **rename** `{ nodeId, label }` — `''` clears the override (`updateNode({ label })`).
+- **add_node** `{ type, position, config? }` — create with the block's default config, optionally merged with
+  `config` in one call (`addNode` → `{ id }`, then `updateNode({ config })` when `config` is given).
+- **delete_node** `{ nodeId }` — remove the node; its edges cascade (`deleteNode`).
+- **connect_nodes** `{ sourceNodeId, sourcePortId, targetNodeId, targetPortId }` — add a validated edge
+  (`addEdge` → `{ id }`).
+- **disconnect_edge** `{ edgeId }` — remove one edge (`deleteEdge`).
 
-Capability per edit: `set_properties` / `rename` → `canEditConfig`; `move` → `canModifyCanvas` — enforced by
-each tool's `requires` gate in the executor.
+Capability per edit: `set_properties` / `rename` → `canEditConfig`; `move` and the structural
+`add_node` / `delete_node` / `connect_nodes` / `disconnect_edge` → `canModifyCanvas` (flows defines it as
+"add/delete nodes, connect edges" — _not_ flows' `canEditStructure`, which is rename/publish metadata) —
+enforced by each tool's `requires` gate in the executor.
 
 ## 2 · Reads reflect the live canvas
 
-Specialists and the orchestrator edit the **live `CanvasBinding` directly** via `updateNode`, and reads
-(`list_nodes` / `describe_node`) reflect the live canvas including edits made this turn.
+Specialists and the orchestrator edit the **live `CanvasBinding` directly** (`updateNode` for a node patch;
+`addNode` / `deleteNode` / `addEdge` / `deleteEdge` for structure), and reads (`list_nodes` / `describe_node`
+/ `list_edges`) reflect the live canvas including edits made this turn — so a node created by a block agent
+is visible to the builder that wires it, and an id returned by `addNode` / `addEdge` names a node/edge the
+next read will show.
 
 ## 3 · Tools
 
@@ -114,45 +131,106 @@ Specialists and the orchestrator edit the **live `CanvasBinding` directly** via 
 // Tool convention: a `list_*` / `*_search` tool returns a COMPACT shape (ids + labels, no config/schema);
 // a paired `describe_*` returns the FULL detail for ONE item. Lists stay cheap; detail is pulled on demand.
 
-// NODE READ — over the live CanvasBinding: list_nodes (compact) + describe_node (its detail companion).
-// ONE provider, carried by every node-reading agent (locator, property, orchestrator).
-declare function createNodeReadToolProvider(binding: CanvasBinding, catalog: CatalogLookup): ToolProvider;
-//   list_nodes()              → { nodes: NodeLocation[] }        // COMPACT: id, type, label, position — reuses listNodeLocations
-//   describe_node({ nodeId }) → { type, currentConfig, schema }  // DETAIL: current config + block schema + a select's options
+// Tools are self-named VALUES. Each is a CanvasTool: its `def` (the SINGLE source of its name + optional
+// `requires`) and a `build` that binds it to the live deps, yielding its handler. The model every mature
+// agent SDK uses (LangChain's `tools: [a, b]`, the Vercel AI SDK's tool objects). An agent assembles its
+// toolset by LISTING the tool values it carries — selection is by IDENTITY, never by string:
+//   - rename/delete a tool → an unresolved import at every use (a compile error the compiler/linter/IDE flag);
+//   - a tool's name lives once, in `def.name` — there is no second registry key to keep in sync;
+//   - only the tools an agent lists are ever built.
+// Still MCP-shaped: a list of self-describing named tools IS `tools/list`; `dispatch` IS `tools/call`.
+type ToolHandler = (call: ToolCall) => ToolResult | Promise<ToolResult>;
+interface CanvasTool {
+    def: ToolDef; // name + parameters + optional `requires`
+    build(deps: CanvasToolDeps): ToolHandler; // bind to the live canvas; called once when an agent assembles its toolset
+}
+interface CanvasToolDeps {
+    binding: CanvasBinding;
+    catalog: CatalogLookup;
+    searchType?: string; // if set, scopes `search_nodes` to ONE block type (a block agent passes its own); ignored by others
+}
+// Compose the tools an agent carries into ONE ToolProvider, binding each to `deps`; routes by `def.name`.
+// Throws on a duplicate name in one toolset (a wiring mistake). Selection is the tool VALUE list — no strings.
+declare function toolset(deps: CanvasToolDeps, tools: CanvasTool[]): ToolProvider;
+// Each domain exports its tool values + an all-of-domain bundle: NODE_TOOLS, EDGE_TOOLS, CATALOG_TOOLS.
 
-// CATALOG — search (compact) + describe_block (detail). Never dumps the catalog.
-declare function createCatalogToolProvider(catalog: CatalogLookup): ToolProvider;
+// The tools each domain provides — name → shape → effect. Reads carry no capability; writes name theirs.
+// NODE reads:
+//   list_nodes()              → { nodes: NodeLocation[] }         // COMPACT: id, type, label, position
+//   describe_node({ nodeId }) → { type, currentConfig, schema }   // DETAIL: current config + block schema + a select's options
+//   search_nodes({ query? })  → { nodes: NodeLocation[] }         // COMPACT; matches id/label/type; opts.searchType (if set) restricts to that type
+//   get_graph()               → { graph }                         // the WHOLE canvas (nodes + edges) — the on-demand pull
+// NODE writes:
+//   move_node({ nodeId, by|to })          [canModifyCanvas] → updateNode({ position })
+//   set_properties({ nodeId, config })    [canEditConfig]   → updateNode({ config })   // MERGED; rejects bad value/type/unknown key/missing node
+//   rename({ nodeId, label })             [canEditConfig]   → updateNode({ label })    // '' clears; a SEPARATE tool (builder-only labeling)
+//   add_node({ type, position, config? }) [canModifyCanvas] → addNode (+ updateNode)   // config validated FIRST (bad ⇒ nothing added); rejects unknown type; no wiring
+//   delete_node({ nodeId })               [canModifyCanvas] → deleteNode               // edges CASCADE; rejects missing node
+interface AddNodeInput {
+    type: string;
+    position: XY;
+    config?: Record<string, unknown>; // OPTIONAL initial config — merged over defaults, validated like set_properties
+}
+interface DeleteNodeInput {
+    nodeId: string;
+}
+
+// EDGE (validation — ports · type-compat · cycle · input-free — lives in the handler, BEFORE any binding write):
+//   list_edges()                → { edges: EdgeSummary[] }        // COMPACT edge list — the palette for disconnect
+//   connect_nodes({ … })        [canModifyCanvas] → binding.addEdge(spec) → { edgeId } // rejects (names the occupying edge) if the input is occupied
+//   disconnect_edge({ edgeId }) [canModifyCanvas] → binding.deleteEdge(edgeId)         // rejects unknown edge
+interface ConnectNodesInput {
+    sourceNodeId: string;
+    sourcePortId: string; // an OUTPUT port on the source
+    targetNodeId: string;
+    targetPortId: string; // an INPUT port on the target
+}
+interface DisconnectEdgeInput {
+    edgeId: string;
+}
+interface EdgeSummary {
+    edgeId: string;
+    sourceNodeId: string;
+    sourcePortId: string;
+    targetNodeId: string;
+    targetPortId: string;
+}
+
+// CATALOG — catalog_search returns each matching block type's FULL schema (ports + config fields). Never dumps the catalog.
+//   catalog_search({ query }) → { hits: BlockSchema[] } // each hit a type's FULL schema (type, label, ports, config fields)
 interface CatalogSearchInput {
     query: string;
 }
-interface DescribeBlockInput {
-    type: string;
+
+// Who carries what — the composition is now the tool-VALUE list an agent lists, not a provider per operation:
+//   orchestrator → toolset({binding,catalog},            [LIST_NODES, DESCRIBE_NODE, GET_GRAPH, CATALOG_SEARCH])          // read/plan only
+//   builder      → toolset({binding,catalog},            [LIST_NODES, DESCRIBE_NODE, CATALOG_SEARCH, ADD_NODE, …, MOVE_NODE, GET_GRAPH]) + use_skill
+//   block agent  → toolset({binding,catalog,searchType}, [SEARCH_NODES, DESCRIBE_NODE, SET_PROPERTIES])                    // configure-only
+
+// DISCOVER + DELEGATE stay BESPOKE providers — they close over the roster/runner, not a binding+catalog:
+declare function createAgentDirectoryToolProvider(roster: AgentRoster): ToolProvider; // §4 · list_agents → { agents: AgentCard[] }
+declare function createSpawnToolProvider(runner: SubAgentRunner, binding: CanvasBinding): ToolProvider; // §4 · spawn
+// spawn takes NO grant arg — each child runs under its OWN fixed grant; the user's permissions gate it at the executor.
+```
+
+### Skills — progressively-disclosed playbooks (a separate capability)
+
+Skills are **not** how the shipped agents assemble their tools — the orchestrator and specialists list their
+tool values via `toolset` (above). A skill is a named, described **playbook** an agent loads **on demand**: the
+in-process port of Claude Code Agent Skills, carried by the composition `builder` (§4) — the shipped agent
+that loads them on demand — **not** the block specialists, which just list their tool values. Full
+design: **[design/skills.md](./skills.md)**.
+
+```ts
+// libs/agent/src/skills — inert playbook DATA + one tool that realizes progressive disclosure.
+interface Skill {
+    name: string; // selection key — the `use_skill` argument
+    description: string; // LEVEL 1 — always in context; WHAT + WHEN (the trigger the model matches)
+    instructions: string; // LEVEL 2 — the playbook body, loaded ON DEMAND (never in context until then)
 }
-interface CatalogHit {
-    type: string;
-    label: string;
-    summary: string;
-}
-//   catalog_search({ query }) → { hits: CatalogHit[] }  // COMPACT: lexical shortlist (type, label, summary)
-//   describe_block({ type })  → { schema: BlockSchema } // DETAIL: one block's full schema (fields + a select's enum)
-
-// NODE MOVE (write: position) — LOCATOR carries this over the live binding:
-declare function createNodeMoveToolProvider(binding: CanvasBinding): ToolProvider;
-//   move_node({ nodeId, by | to })  // sync dispatch validates, then binding.updateNode({ position })
-//                                    // applies the move straight to the live canvas.
-
-// NODE CONFIG (write: config/label) — PROPERTY carries this over the live binding (reads via node read above).
-declare function createNodeConfigToolProvider(binding: CanvasBinding, catalog: CatalogLookup): ToolProvider;
-//   set_properties({ nodeId, config }) → binding.updateNode({ config }) // MERGED; rejects bad value/type/unknown key/missing node
-//   rename({ nodeId, label })          → binding.updateNode({ label })  // '' clears the label; rejects missing node
-
-// DISCOVER — orchestrator only. The roster is a registry (data), never enumerated in the persona.
-declare function createAgentDirectoryToolProvider(roster: AgentRoster): ToolProvider; // §4
-//   list_agents() → { agents: AgentCard[] } // COMPACT: each specialist's type + one-line capability
-
-// DELEGATE — orchestrator only.
-declare function createSpawnToolProvider(runner: SubAgentRunner, binding: CanvasBinding): ToolProvider; // §4
-// NO grant arg — each child runs under its OWN fixed grant; the user's permissions gate it at the executor.
+declare function createUseSkillToolProvider(skills: Skill[]): ToolProvider;
+//   use_skill's description embeds the name+description INDEX (always sent); its `name` param is an enum of the skill names.
+//   use_skill({ name }) → { name, instructions }   // the body enters the transcript on demand; unknown name → error
 ```
 
 ## 4 · `spawn` — sub-agents over the live binding
@@ -184,7 +262,7 @@ interface SpawnInput {
 type SpawnResult = { children: SpawnChildResult[] };
 
 // Grants are TWO layers and neither is set at spawn: (1) each agent's OWN fixed grant, declared by the
-// developer in its constructor (locator {canModifyCanvas}, property {canEditConfig}); (2) `userPermissions`,
+// developer in its constructor; (2) `userPermissions`,
 // the flow-role ceiling the FRONTEND derives (@flows/flows `getPermissions(role)` → `toAgentGrant`) and
 // threads in. The executor gates each required-capability tool on BOTH. No `clampGrant`, no `roleGrant`.
 ```
@@ -202,8 +280,8 @@ interface AgentCard {
 // One specialist registration — everything both list_agents and spawn need, so registering an agent
 // is a one-liner with NO prompt edit. There is NO per-registration grant: a specialist is bounded by the
 // tools it carries + its OWN fixed grant (set in its constructor), with the user ceiling enforced at the
-// executor. `create` builds the specialist's OWN BaseAgent subclass (LocatorAgent / PropertyAgent) — no
-// generic shell; each is a concrete agent, so `create` just forwards the base deps below.
+// executor. `create` builds the specialist's OWN BaseAgent subclass (BuilderAgent / BlockAgent) — each a
+// concrete agent, so `create` just forwards the base deps below (a BlockAgent also closes over its blockType).
 type SpecialistTurnDeps = BaseAgentDeps; // exactly the shared per-turn deps — no extra fields
 // = { gateway, storage, flowId, maxIterations?, binding, catalog, userPermissions } where:
 //   binding        — the LIVE canvas the child reads and edits directly
@@ -211,7 +289,7 @@ type SpecialistTurnDeps = BaseAgentDeps; // exactly the shared per-turn deps —
 //   userPermissions — the user's flow-role ceiling (viewer ⇒ no edits — R2); the child's OWN grant is
 //                     fixed in its constructor, NOT supplied here
 interface AgentRegistration {
-    type: string; // spawn key, e.g. 'locator' — also the AgentCard.type
+    type: string; // spawn key, e.g. 'builder' — also the AgentCard.type
     summary: string; // the one-line capability the card shows
     create(deps: SpecialistTurnDeps): Agent; // build the concrete specialist agent, bound to the live canvas
 }
@@ -222,24 +300,76 @@ interface AgentRoster {
 }
 declare function createAgentRoster(registrations: AgentRegistration[]): AgentRoster;
 
-// the roster's entries (type · the concrete agent `create` builds):
+// the roster's EXPLICIT entries (type · the concrete agent `create` builds):
 {
-    type: 'locator';
-} // create → createLocatorAgent({ binding, catalog, … })  — carries move_node
+    type: 'single-output-generator';
+} // create → createSingleOutputGeneratorAgent({ binding, catalog, … })     — named block specialist (BlockAgent + AI persona)
 {
-    type: 'property';
-} // create → createPropertyAgent({ binding, catalog, … }) — carries set_properties + rename
+    type: 'builder';
+} // create → createBuilderAgent({ binding, catalog, … })       — COMPOSITION specialist: full toolset + use_skill(SEED_SKILLS)
+
+// GENERIC BLOCK FALLBACK — not a registration. The sub-agent runner resolves an agentType the roster does
+// not carry: if `catalog.has(agentType)`, it builds a generic BlockAgent(agentType) on the fly (configures
+// that block's nodes via set_properties); otherwise the spawn fails "no specialist". So
+// `agentType: 'buffer'` → generic BlockAgent('buffer'); `agentType: 'single-output-generator'` → the
+// registered single-output-generator specialist (explicit wins). list_agents shows only the explicit entries above.
+//   resolveAgent = roster.get(agentType) ?? genericBlockRegistration(agentType, catalog)   // in createSubAgentRunner
+
+// The builder owns all graph-shape work (add/delete/wire/move/label); block agents only configure.
+```
+
+**The registration set _is_ the roster.** The orchestrator, its tools and the loop never change; a deployment
+exposes specialists purely by which it registers. The shipped roster is the **hybrid** — the **builder**
+(structure) + the **block agents** (content)
+([architecture.md · the hybrid writer layer](./architecture.md#the-hybrid-writer-layer)). `list_agents` returns
+exactly the exposed set, so the orchestrator discovers its roster at runtime rather than hardcoding it.
+
+```mermaid
+flowchart LR
+    RA["AgentRoster<br/>registry behind list_agents + spawn"]
+    subgraph HY["the hybrid roster"]
+        direction TB
+        B["builder → BuilderAgent<br/>+ use_skill(SEED_SKILLS) · STRUCTURE"]
+        G["single-output-generator → BlockAgent · CONTENT"]
+        F["«fallback» any catalog type → BlockAgent(type) · CONTENT"]
+    end
+    RA --> HY
+    HY -. "create(deps) → subclass of BaseAgent «reused»" .-> BASE["BaseAgent"]
+```
+
+### The Builder — a composition specialist (consumer of skills)
+
+The **composition** specialist: the orchestrator plans a multi-block build and spawns it; it builds the whole
+(sub-)flow itself. It introduces **no new types** — it is a `BaseAgent` subclass that lists the FULL editing
+toolset (the §3 read / config / rename / structure / edge / move + catalog tool values) plus `use_skill`, under
+grant `{ canModifyCanvas, canEditConfig }`. A **leaf** sub-turn (no `spawn`, no nesting). Its deps are exactly the
+shared per-turn deps; the seed playbooks are wired internally from `SEED_SKILLS`, so the skill source can evolve
+([skills.md](./skills.md)) with **no change to this consumer**.
+
+```ts
+// libs/agent/src/agents/builderAgent.ts
+export type BuilderAgentDeps = BaseAgentDeps; // no extra fields — SEED_SKILLS wired internally
+export declare class BuilderAgent extends BaseAgent {
+    constructor(deps: BuilderAgentDeps);
+    // tools = [ toolset({ binding, catalog }, [
+    //             LIST_NODES, DESCRIBE_NODE, CATALOG_SEARCH, ADD_NODE, DELETE_NODE, SET_PROPERTIES,
+    //             RENAME, LIST_EDGES, CONNECT_NODES, DISCONNECT_EDGE, MOVE_NODE, GET_GRAPH ]),
+    //           createUseSkillToolProvider(SEED_SKILLS) (use_skill) ]
+    // grant = { canModifyCanvas, canEditConfig }; buildContextMessages seeds the live node list.
+}
+export declare const createBuilderAgent: (deps: BuilderAgentDeps) => Agent;
+export declare const BUILDER_SYSTEM_PROMPT: string;
 ```
 
 ## 5 · Catalog types
 
-Read by `catalog_search` / `describe_block`, `describe_node`, and `set_properties` validation.
+Read by `catalog_search`, `describe_node`, and `set_properties` validation.
 
 ```ts
 interface CatalogLookup {
     has(type: string): boolean;
     schema(type: string): BlockSchema | undefined;
-    search(query: string): CatalogHit[];
+    search(query: string): BlockSchema[]; // each hit is that type's FULL schema (ports + config fields)
 }
 interface BlockSchema {
     type: string;
@@ -255,18 +385,36 @@ interface BlockSchema {
 
 ```ts
 // SHIPPED — the whole seam between agent code and the graph on screen, over the FlowEngine that owns it.
-// `updateNode` is widened to carry config, so one method applies every edit the harness emits — move →
-// position · rename → label · set_properties → config — straight to the live canvas.
+// `updateNode` patches ONE existing node (move → position · rename → label · set_properties → config); the
+// structural primitives change the SET of nodes/edges. Each is one `engine.transact` — applied immediately,
+// checkpointed for undo, part of the next save — and gated on its capability. `addNode`/`addEdge` RETURN the
+// new id so a compound turn can reference what it just created; `deleteNode` cascades the node's edges.
 interface CanvasBinding {
     readGraph(): Graph; // live structural read of the current canvas graph
-    updateNode(id: string, patch: NodePatch): void; // SYNCHRONOUS, applied immediately (frontend-only)
+    updateNode(id: string, patch: NodePatch): void; // node patch — canModifyCanvas / canEditConfig per field
+    addNode(type: string, position: XY): { id: string }; // create with the block's defaultConfig — canModifyCanvas
+    deleteNode(id: string): void; // remove node + cascade its edges — canModifyCanvas
+    addEdge(spec: EdgeSpec): { id: string }; // append one (pre-validated) edge, returning its id — canModifyCanvas
+    deleteEdge(id: string): void; // remove one edge by id — canModifyCanvas
 }
 interface NodePatch {
     label?: string; // '' / falsy clears a custom label
     position?: XY; // replaces the node's position whole
     config?: Record<string, string>; // MERGED over the node's existing config
 }
+interface EdgeSpec {
+    sourceNodeId: string;
+    sourcePortId: string;
+    targetNodeId: string;
+    targetPortId: string;
+}
 ```
+
+The binding is a **thin mechanical seam**: it applies the edit, checkpoints, and gates on the capability — it
+does **not** judge whether an edit is sensible. Semantic validation lives in the tools: config against the
+catalog in `set_properties`, and port-existence + type-compat + no-cycle in `connect_nodes` (§3). So `addEdge`
+trusts a spec the tool already validated, exactly as `updateNode` trusts a config the tool already merged and
+checked.
 
 ## 7 · `TurnOutcome` — the eval's parsed outcome shape
 
@@ -307,8 +455,8 @@ interface ScenarioInput {
 }
 declare function runScenario(input: ScenarioInput): Promise<TurnResult>;
 
-// One fake gateway per agent (keyed by agentType) — see impl-notes for why.
-type FakeScript = Record<string, FakeScriptStep[]>; // 'orchestrator' | 'locator' | 'property' → scripted turns
+// One fake gateway per agent (keyed by agentType) so each sub-agent's script stays isolated.
+type FakeScript = Record<string, FakeScriptStep[]>; // keyed by agentType → one scripted gateway per agent
 ```
 
 **Test-only re-ask + honest errors.** The orchestrator ends its turn with a plain-text reply (production is

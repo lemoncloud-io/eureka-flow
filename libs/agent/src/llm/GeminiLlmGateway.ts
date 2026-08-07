@@ -4,22 +4,43 @@ import type { AgentEnvironmentSupportable } from '../environment';
 import type { HttpRequestSupportable } from '../http';
 import type { ChatRequest, Chunk, JsonSchema, LlmGateway, LlmGatewayCapabilities, ToolDef } from './llmGateway';
 
+/** Generation parameters applied to every request. */
+export interface GeminiGenerationConfig {
+    temperature?: number;
+    maxOutputTokens?: number;
+    thinkingBudget?: number;
+}
+
+/**
+ * Transient-throttle retry. Rate-limited Developer keys reject bursts with 429/503; backing off and retrying
+ * lets a multi-call agent turn ride through instead of failing. Applies only to retryable HTTP statuses; other
+ * errors still throw at once.
+ */
+export interface GeminiRetryConfig {
+    /** Total HTTP attempts per request (1 = no retry). Default 4. */
+    maxAttempts?: number;
+    /** Base backoff in ms; grows exponentially (base·2^(n−1)) with jitter, capped. Default 1000. */
+    baseDelayMs?: number;
+}
+
 export interface GeminiLlmGatewayOptions {
     /** Provides tracing, time, and cancellation. */
     environment: AgentEnvironmentSupportable;
     /** HTTP port. */
     http: HttpRequestSupportable;
-    /** Gemini API key; sent as the x-goog-api-key header, never traced. */
+    /** Gemini Developer API key; sent as the x-goog-api-key header, never traced. */
     apiKey: string;
     /** Defaults to gemini-2.5-flash. */
     model?: string;
     /** Override to route through a backend proxy. */
     baseUrl?: string;
     /** Optional generation parameters applied to every request. */
-    generation?: { temperature?: number; maxOutputTokens?: number; thinkingBudget?: number };
+    generation?: GeminiGenerationConfig;
+    /** Optional transient-throttle (429/503) retry-with-backoff; defaults to 4 attempts, 1s base. */
+    retry?: GeminiRetryConfig;
 }
 
-/** The Gemini gateway: the shared contract plus provider/model identity. */
+/** The Gemini gateway backed by the Developer API: the shared contract plus provider/model identity. */
 export interface GeminiLlmGateway extends LlmGateway {
     readonly capabilities: LlmGatewayCapabilities;
     readonly provider: 'gemini';
@@ -30,7 +51,7 @@ const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
 const ERROR_BODY_SNIPPET_LENGTH = 200;
 
-/** A provider/proxy could echo request data back; scrub the key before it reaches an error. */
+/** A provider/proxy could echo request data back; scrub the api key before it reaches an error. */
 const redactText = (value: string, secret: string): string =>
     secret.length > 0 ? value.split(secret).join('[redacted]') : value;
 
@@ -77,7 +98,7 @@ const toResponseObject = (content: string | null): Record<string, unknown> => {
 const toGeminiParameters = (schema: JsonSchema): JsonSchema => schema;
 
 /** Map the provider-neutral request onto Gemini's generateContent shape (tool `name` recovered from prior `toolCalls` by id). */
-const toGeminiRequest = (req: ChatRequest, generation?: GeminiLlmGatewayOptions['generation']) => {
+const toGeminiRequest = (req: ChatRequest, generation?: GeminiGenerationConfig) => {
     const nameByCallId = new Map<string, string>();
     for (const message of req.messages) {
         for (const call of message.toolCalls ?? []) {
@@ -88,6 +109,19 @@ const toGeminiRequest = (req: ChatRequest, generation?: GeminiLlmGatewayOptions[
     const systemTexts: string[] = [];
     const contents: GeminiContent[] = [];
 
+    // Append a part to the open trailing user turn, or start a new one. Gemini wants alternating roles and
+    // requires a model turn's N functionCalls to be answered by N functionResponses in a SINGLE user turn — so
+    // consecutive user-side parts coalesce into one content: parallel tool results become one turn, and any
+    // trailing user text turn that follows the results rides that same turn as an extra text part.
+    const appendUserPart = (part: GeminiPart) => {
+        const last = contents[contents.length - 1];
+        if (last?.role === 'user') {
+            last.parts.push(part);
+        } else {
+            contents.push({ role: 'user', parts: [part] });
+        }
+    };
+
     for (const message of req.messages) {
         if (message.role === 'system') {
             systemTexts.push(message.content ?? '');
@@ -95,10 +129,7 @@ const toGeminiRequest = (req: ChatRequest, generation?: GeminiLlmGatewayOptions[
         }
         if (message.role === 'tool') {
             const name = (message.toolCallId ? nameByCallId.get(message.toolCallId) : undefined) ?? 'tool';
-            contents.push({
-                role: 'user',
-                parts: [{ functionResponse: { name, response: toResponseObject(message.content) } }],
-            });
+            appendUserPart({ functionResponse: { name, response: toResponseObject(message.content) } });
             continue;
         }
         if (message.role === 'assistant') {
@@ -111,7 +142,7 @@ const toGeminiRequest = (req: ChatRequest, generation?: GeminiLlmGatewayOptions[
             contents.push({ role: 'model', parts: parts.length > 0 ? parts : [{ text: '' }] });
             continue;
         }
-        contents.push({ role: 'user', parts: [{ text: message.content ?? '' }] });
+        appendUserPart({ text: message.content ?? '' });
     }
 
     const generationConfig = {
@@ -145,15 +176,33 @@ const toGeminiRequest = (req: ChatRequest, generation?: GeminiLlmGatewayOptions[
 
 interface GeminiResponse {
     candidates?: Array<{ content?: { parts?: GeminiPart[] }; finishReason?: string }>;
-    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+    usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        totalTokenCount?: number;
+        cachedContentTokenCount?: number;
+    };
     promptFeedback?: { blockReason?: string };
 }
 
-/** LlmGateway backed by Gemini's generateContent API with function-calling; non-streaming under the hood, response `functionCall`s surface as {@link Chunk} `toolCall`s. */
+/**
+ * LlmGateway backed by the Gemini Developer API (x-goog-api-key → generativelanguage.googleapis.com). Body
+ * build → request loop (with 429/503 retry) → response parse → usageMetadata mapping → chunk yield.
+ * Function-calling; non-streaming under the hood — response `functionCall`s surface as {@link Chunk} `toolCall`s.
+ */
 export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): GeminiLlmGateway => {
-    const { environment, http, apiKey } = options;
+    const { environment, http, generation, retry } = options;
     const model = options.model ?? DEFAULT_MODEL;
     const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
+    const apiKey = options.apiKey;
+    const url = `${baseUrl}/v1beta/models/${model}:generateContent`;
+
+    // Transient-throttle retry: rate-limited Developer keys reject bursts with 429/503. Back off and retry the
+    // SAME request so a multi-call agent turn rides through. Other errors throw.
+    const RETRYABLE_STATUS = new Set([429, 503]);
+    const maxHttpAttempts = Math.max(1, retry?.maxAttempts ?? 4);
+    const baseDelayMs = retry?.baseDelayMs ?? 1000;
+    const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
     const trace = environment.traceReporter;
 
     // Gemini returns no tool-call ids; synthesize a stable one so the agent loop can correlate results.
@@ -162,7 +211,9 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
 
     async function* chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk> {
         const startedAt = environment.now();
-        const body = toGeminiRequest(req, options.generation);
+        const body = toGeminiRequest(req, generation);
+        const headers = { 'x-goog-api-key': apiKey };
+        const secrets = [apiKey];
 
         trace?.debug('llm.gemini.request', {
             model,
@@ -179,17 +230,28 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
         let cleanStop = false;
 
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-            const response = await http.request({
-                method: 'POST',
-                url: `${baseUrl}/v1beta/models/${model}:generateContent`,
-                headers: { 'x-goog-api-key': apiKey },
-                body,
-                ...(opts?.signal ? { signal: opts.signal } : {}),
-            });
+            const send = () =>
+                http.request({ method: 'POST', url, headers, body, ...(opts?.signal ? { signal: opts.signal } : {}) });
+            // Send, then retry 429/503 with exponential backoff + jitter (capped) until it succeeds or attempts run out.
+            let response = await send();
+            for (
+                let httpAttempt = 1;
+                httpAttempt < maxHttpAttempts &&
+                !response.ok &&
+                RETRYABLE_STATUS.has(response.status) &&
+                !opts?.signal?.aborted;
+                httpAttempt += 1
+            ) {
+                const backoffMs =
+                    Math.min(baseDelayMs * 2 ** (httpAttempt - 1), 15_000) + Math.floor(Math.random() * 250);
+                trace?.debug('llm.gemini.retry', { model, status: response.status, httpAttempt, backoffMs });
+                await sleep(backoffMs);
+                response = await send();
+            }
 
             if (!response.ok) {
                 const errorBody = await response.text().catch(() => '');
-                const safeBody = redactText(errorBody, apiKey);
+                const safeBody = secrets.reduce((acc, secret) => redactText(acc, secret), errorBody);
 
                 trace?.error('llm.gemini.error', { model, status: response.status });
                 throw new Error(
@@ -233,6 +295,10 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
                   ...(usageMeta.candidatesTokenCount !== undefined
                       ? { outputTokens: usageMeta.candidatesTokenCount }
                       : {}),
+                  ...(usageMeta.totalTokenCount !== undefined ? { totalTokens: usageMeta.totalTokenCount } : {}),
+                  ...(usageMeta.cachedContentTokenCount !== undefined
+                      ? { cachedTokens: usageMeta.cachedContentTokenCount }
+                      : {}),
               }
             : undefined;
 
@@ -259,10 +325,5 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
         yield { done: true, ...(usage ? { usage } : {}) };
     }
 
-    return {
-        capabilities: { toolCalls: true },
-        provider: 'gemini',
-        model,
-        chat,
-    };
+    return { capabilities: { toolCalls: true }, chat, provider: 'gemini', model };
 };

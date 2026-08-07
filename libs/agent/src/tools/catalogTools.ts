@@ -1,16 +1,19 @@
-import { toolErr as err, toolOk as ok, toolUnknown } from './types';
+import { toolOk as ok } from './types';
 
-import type { CatalogLookup } from '../catalog';
-import type { ToolCall, ToolProvider, ToolResult } from './types';
+import type { CanvasTool } from './toolset';
+import type { ToolCall, ToolResult } from './types';
 import type { ToolDef } from '../llm/llmGateway';
 
-/** Tools over the block catalog (block *types*, not canvas nodes): `catalog_search` returns a compact shortlist, `describe_block` returns one type's full schema. Never dumps the catalog. */
+/** The one tool over the block catalog (block *types*, not canvas nodes): `catalog_search` returns each matching type's FULL schema — ports and config fields included. Never dumps the whole catalog. */
 
 const CATALOG_SEARCH_DEF: ToolDef = {
     name: 'catalog_search',
     description:
-        'Search the block catalog for types matching a query. Returns a compact shortlist ' +
-        '(type, label, one-line summary) — never the full schema. Use describe_block for detail.',
+        'Search the block catalog for the types matching a query. Each match comes back as its FULL schema — the ' +
+        'type and label, its PORTS (input/output port ids, for wiring), and its config fields (with a select ' +
+        'field’s allowed values). This is the one place to look a block type up: search it ONCE and reuse the ' +
+        'ports and fields across every node of that type — no separate describe step. To inspect a node already ' +
+        'on the canvas (its current config/ports), use describe_node instead.',
     parameters: {
         type: 'object',
         properties: { query: { type: 'string', description: 'What to look for, e.g. "text input" or "delay".' } },
@@ -18,34 +21,14 @@ const CATALOG_SEARCH_DEF: ToolDef = {
     },
 };
 
-const DESCRIBE_BLOCK_DEF: ToolDef = {
-    name: 'describe_block',
-    description:
-        'Describe one block type in detail: its full schema — required config fields and a select ' +
-        "field's allowed values. Use it to learn the valid options before choosing a config value.",
-    parameters: {
-        type: 'object',
-        properties: { type: { type: 'string', description: 'The block type, e.g. "single-output-generator".' } },
-        required: ['type'],
-    },
+/** The single catalog tool — matching block types come back as full schemas (ports + fields). Never dumps the catalog. */
+export const CATALOG_SEARCH: CanvasTool = {
+    def: CATALOG_SEARCH_DEF,
+    build:
+        ({ catalog }) =>
+        (call: ToolCall): ToolResult =>
+            ok(call, { hits: catalog.search((call.args as { query: string }).query) }),
 };
 
-/** CATALOG provider: `catalog_search` (compact) + `describe_block` (detail). Never dumps the catalog. */
-export const createCatalogToolProvider = (catalog: CatalogLookup): ToolProvider => ({
-    listTools: () => [CATALOG_SEARCH_DEF, DESCRIBE_BLOCK_DEF],
-    dispatch: (call: ToolCall): ToolResult => {
-        if (call.name === 'catalog_search') {
-            const { query } = call.args as { query: string };
-            return ok(call, { hits: catalog.search(query) });
-        }
-        if (call.name === 'describe_block') {
-            const { type } = call.args as { type: string };
-            const schema = catalog.schema(type);
-            if (!schema) {
-                return err(call, `unknown block type "${type}"`);
-            }
-            return ok(call, { schema });
-        }
-        return toolUnknown(call);
-    },
-});
+/** Every catalog tool (just `catalog_search`) — the bundle for callers that want the whole catalog surface. */
+export const CATALOG_TOOLS: CanvasTool[] = [CATALOG_SEARCH];

@@ -178,6 +178,85 @@ describe('createGeminiLlmGateway', () => {
         ]);
     });
 
+    it('groups parallel tool results into ONE user content (response count must match the model turn)', async () => {
+        // A model turn with N functionCalls must be answered by a single user turn with N functionResponses
+        // (the response-part count must match the call-part count). So two parallel calls come back grouped
+        // into one user turn, not split across two.
+        const http = new ScriptedHttpRequest([{ json: geminiReply('done') }]);
+
+        await drain(
+            createGateway(http).chat({
+                messages: [
+                    { role: 'user', content: 'add two' },
+                    {
+                        role: 'assistant',
+                        content: null,
+                        toolCalls: [
+                            { id: 'c1', name: 'add_node', args: '{"type":"a"}' },
+                            { id: 'c2', name: 'add_node', args: '{"type":"b"}' },
+                        ],
+                    },
+                    { role: 'tool', content: '{"nodeId":"n1"}', toolCallId: 'c1' },
+                    { role: 'tool', content: '{"nodeId":"n2"}', toolCallId: 'c2' },
+                ],
+                tools: [{ name: 'add_node', description: 'add', parameters: { type: 'object' } }],
+            })
+        );
+
+        expect((http.requests[0].body as Record<string, unknown>)['contents']).toEqual([
+            { role: 'user', parts: [{ text: 'add two' }] },
+            {
+                role: 'model',
+                parts: [
+                    { functionCall: { name: 'add_node', args: { type: 'a' } } },
+                    { functionCall: { name: 'add_node', args: { type: 'b' } } },
+                ],
+            },
+            {
+                role: 'user',
+                parts: [
+                    { functionResponse: { name: 'add_node', response: { nodeId: 'n1' } } },
+                    { functionResponse: { name: 'add_node', response: { nodeId: 'n2' } } },
+                ],
+            },
+        ]);
+    });
+
+    it('coalesces a trailing user turn into the tool-result content (role alternation is preserved)', async () => {
+        // A trailing user text turn that follows the tool results must merge into the SAME user content
+        // (functionResponse parts + a text part), preserving role alternation (no two consecutive user
+        // contents) and the response-count invariant.
+        const http = new ScriptedHttpRequest([{ json: geminiReply('done') }]);
+
+        await drain(
+            createGateway(http).chat({
+                messages: [
+                    { role: 'user', content: 'add one' },
+                    {
+                        role: 'assistant',
+                        content: null,
+                        toolCalls: [{ id: 'c1', name: 'add_node', args: '{"type":"a"}' }],
+                    },
+                    { role: 'tool', content: '{"nodeId":"n1"}', toolCallId: 'c1' },
+                    { role: 'user', content: 'Current canvas: n1' },
+                ],
+                tools: [{ name: 'add_node', description: 'add', parameters: { type: 'object' } }],
+            })
+        );
+
+        expect((http.requests[0].body as Record<string, unknown>)['contents']).toEqual([
+            { role: 'user', parts: [{ text: 'add one' }] },
+            { role: 'model', parts: [{ functionCall: { name: 'add_node', args: { type: 'a' } } }] },
+            {
+                role: 'user',
+                parts: [
+                    { functionResponse: { name: 'add_node', response: { nodeId: 'n1' } } },
+                    { text: 'Current canvas: n1' },
+                ],
+            },
+        ]);
+    });
+
     it('streams a response functionCall as a toolCall chunk (synthesized id), then done', async () => {
         const args = { nodeId: 'n1', by: { dx: 20, dy: 0 } };
         const http = new ScriptedHttpRequest([
@@ -202,13 +281,14 @@ describe('createGeminiLlmGateway', () => {
         ]);
     });
 
-    it('throws on non-ok responses with the status but never the API key', async () => {
-        const http = new ScriptedHttpRequest([{ status: 429, text: 'rate limited' }]);
+    it('throws on a non-retryable non-ok response with the status but never the API key', async () => {
+        // 400 is not retryable (unlike 429/503), so it throws on the first response — the immediate-throw path.
+        const http = new ScriptedHttpRequest([{ status: 400, text: 'bad request' }]);
         const trace = new BufferAgentTraceReporter();
 
         const attempt = drain(createGateway(http, trace).chat(userSays('q')));
 
-        await expect(attempt).rejects.toThrow(/status 429.*rate limited/);
+        await expect(attempt).rejects.toThrow(/status 400.*bad request/);
         await attempt.catch((error: Error) => expect(error.message).not.toContain(API_KEY));
         expect(trace.entries.some(entry => entry.level === 'error')).toBe(true);
         expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);

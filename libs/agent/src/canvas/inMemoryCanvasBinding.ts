@@ -1,15 +1,38 @@
-import type { CanvasBinding, Graph, NodePatch } from './canvasBinding';
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { CanvasBinding, EdgeSpec, Graph, NodePatch, XY } from './canvasBinding';
+import type { EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 
-/** In-memory {@link CanvasBinding} over a plain {@link Graph} — the reference binding for tests and Node runs; `updateNode` mirrors the engine binding. */
+/**
+ * In-memory {@link CanvasBinding} over a plain {@link Graph} — the reference binding for tests and Node runs.
+ * Mirrors the engine binding's mechanics: `updateNode` merges config; `deleteNode` cascades edges;
+ * `addEdge` appends one edge. Ids are minted from monotonic counters (deterministic
+ * for tests); the engine binding uses the engine's own `ops`. Structural writes seed no default
+ * config here (the block registry is a desktop concern) — a created node starts with `config: {}`.
+ */
 export const createInMemoryCanvasBinding = (initial?: Graph): CanvasBinding => {
-    let graph: Graph = initial ?? { nodes: [], edges: [] };
+    let nodeSeq = 0;
+    let edgeSeq = 0;
+
+    // Every live edge must carry a stable id — list_edges, disconnect_edge, and delete_node's dropped-edge
+    // report all key on it — so mint one for any seeded edge missing one, mirroring the desktop store where
+    // newEdgeId() always runs. (EdgeData.id is optional; '' means "to create".)
+    const withEdgeIds = (g: Graph): Graph => ({
+        ...g,
+        edges: g.edges.map(edge => (edge.id ? edge : { ...edge, id: `e_${(edgeSeq += 1)}` })),
+    });
+
+    let graph: Graph = withEdgeIds(initial ?? { nodes: [], edges: [] });
 
     return {
         // Fresh wrapper each call so callers mutating the returned arrays can't corrupt the store.
         readGraph: () => ({ nodes: [...graph.nodes], edges: [...graph.edges] }),
 
         updateNode: (id: string, patch: NodePatch) => {
+            // Mirror the engine binding: an empty patch is a no-op (it opens no transaction there), and an
+            // unknown id fails loudly rather than silently doing nothing — the engine throws NODE_NOT_FOUND,
+            // so a spec written against this reference binding sees the same failure instead of a false pass.
+            if (patch.label === undefined && !patch.position && !patch.config) return;
+            if (!graph.nodes.some(n => n.id === id)) throw new Error(`No node with id ${id}`);
+
             graph = {
                 ...graph,
                 nodes: graph.nodes.map(node => {
@@ -31,6 +54,34 @@ export const createInMemoryCanvasBinding = (initial?: Graph): CanvasBinding => {
                     return next;
                 }),
             };
+        },
+
+        addNode: (type: string, position: XY): { id: string } => {
+            const id = `n_${(nodeSeq += 1)}`;
+            const node: NodeData = { id, type, position: { x: position.x, y: position.y }, config: {} };
+            graph = { ...graph, nodes: [...graph.nodes, node] };
+            return { id };
+        },
+
+        deleteNode: (id: string) => {
+            graph = {
+                nodes: graph.nodes.filter(n => n.id !== id),
+                // Cascade: drop every edge that touches the removed node.
+                edges: graph.edges.filter(e => e.sourceNodeId !== id && e.targetNodeId !== id),
+            };
+        },
+
+        addEdge: (spec: EdgeSpec): { id: string } => {
+            // Append only: the caller (edge tool) has already validated the target input is free — the binding
+            // never displaces an existing edge (a would-be occupied-input connect is rejected in the tool).
+            const id = `e_${(edgeSeq += 1)}`;
+            const edge: EdgeData = { id, ...spec };
+            graph = { ...graph, edges: [...graph.edges, edge] };
+            return { id };
+        },
+
+        deleteEdge: (id: string) => {
+            graph = { ...graph, edges: graph.edges.filter(e => e.id !== id) };
         },
     };
 };

@@ -1,9 +1,10 @@
+import { createBlockAgent } from './blockAgent';
 import { createInMemorySessionStore } from '../session/session';
 import { errorMessage } from '../utils/errors';
 
+import type { AgentRegistration, AgentRoster } from './roster';
 import type { CanvasBinding } from '../canvas/canvasBinding';
 import type { CatalogLookup } from '../catalog';
-import type { AgentRoster } from './roster';
 import type { LlmGateway } from '../llm/llmGateway';
 import type { AgentGrant } from '../permissions';
 import type { SessionState } from '../session/session';
@@ -32,6 +33,24 @@ export type SpawnResult = { children: SpawnChildResult[] };
 export interface SubAgentRunner {
     fanOut(specs: SpawnChildSpec[], binding: CanvasBinding, signal?: AbortSignal): Promise<SpawnChildResult[]>;
 }
+
+/**
+ * Resolve an `agentType` the roster does not explicitly carry to a GENERIC block agent, if the type is a real
+ * catalog block. This is the hybrid roster's fallback: named specialists (the builder, the generator) are
+ * explicit registrations; every other catalog block type gets a `BlockAgent(type)` synthesized on the fly.
+ * Returns `undefined` for a non-block type, so the runner's "no specialist" failure path is unchanged.
+ */
+const genericBlockRegistration = (type: string, catalog: CatalogLookup): AgentRegistration | undefined => {
+    if (!catalog.has(type)) {
+        return undefined;
+    }
+    const label = catalog.schema(type)?.label ?? type;
+    return {
+        type,
+        summary: `block agent for ${label}: configure a ${type} node`,
+        create: deps => createBlockAgent({ ...deps, blockType: type }),
+    };
+};
 
 /** The last pure-text assistant message — a child's summary back to the orchestrator. */
 const lastAssistantText = (state: SessionState | null): string | undefined => {
@@ -69,7 +88,9 @@ export const createSubAgentRunner = (deps: SubAgentRunnerDeps): SubAgentRunner =
         binding: CanvasBinding,
         signal?: AbortSignal
     ): Promise<SpawnChildResult> => {
-        const registration = roster.get(spec.agentType);
+        // A named registration wins; otherwise fall back to a generic block agent when the agentType is a
+        // real catalog block type.
+        const registration = roster.get(spec.agentType) ?? genericBlockRegistration(spec.agentType, catalog);
         if (!registration) {
             return { ok: false, summary: `no specialist of type "${spec.agentType}" is available` };
         }

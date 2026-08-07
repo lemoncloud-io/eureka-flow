@@ -6,6 +6,7 @@ import { createFakeGateway } from '../../llm/fakeGateway';
 import { createInMemorySessionStore } from '../../session/session';
 
 import type { TurnOutcome } from './turnOutcome';
+import type { AgentRoster } from '../../agents/roster';
 import type { CanvasBinding, Graph } from '../../canvas/canvasBinding';
 import type { CatalogLookup } from '../../catalog';
 import type { FakeScriptStep } from '../../llm/fakeGateway';
@@ -13,7 +14,7 @@ import type { LlmGateway } from '../../llm/llmGateway';
 import type { AgentGrant } from '../../permissions';
 import type { SessionState } from '../../session/session';
 
-/** Per-agent fake-gateway scripts, keyed by agentType (`orchestrator` | `locator` | `property`). */
+/** Per-agent fake-gateway scripts, keyed by agentType (e.g. `orchestrator`, `builder`, `single-output-generator`, or a generic block type). */
 export type FakeScript = Record<string, FakeScriptStep[]>;
 
 export interface ScenarioInput {
@@ -25,16 +26,23 @@ export interface ScenarioInput {
     /** Per-agent fake-gateway scripts; OMIT (and pass `makeGateway`) for a real-model run. */
     script?: FakeScript;
     /**
-     * Real-model override: build the {@link LlmGateway} for a given agentType (`orchestrator` |
-     * `locator` | `property`). When provided, it replaces the scripted fake gateway for every agent —
+     * Real-model override: build the {@link LlmGateway} for a given agentType. When provided, it replaces
+     * the scripted fake gateway for every agent —
      * this is how a live run (e.g. a tool-capable Gemini gateway) drives the whole turn. Returning the
      * same instance for all agents is fine; each `chat()` call is independent.
      */
     makeGateway?: (agentType: string) => LlmGateway;
-    /** Dispatch mode for sub-agents — for the serial≡parallel proof (A4). Default parallel. */
+    /** Dispatch mode for sub-agents — parallel barrier (default) or serial; passed through to the sub-agent runner. */
     mode?: 'parallel' | 'serial';
     /** Catalog override; defaults to the fixture catalog. */
     catalog?: CatalogLookup;
+    /**
+     * Specialist roster the orchestrator may `spawn` into. OMIT for the default (shipped hybrid) roster — the
+     * live eval and every shipped path do. A pure passthrough (`createOrchestratorAgent` already accepts a
+     * `roster` and falls back to the default when it is absent): the DI seam a future eval can use to swap the
+     * roster under an otherwise-identical scenario.
+     */
+    roster?: AgentRoster;
 }
 
 export interface TurnResult {
@@ -105,6 +113,7 @@ export const runScenario = async (input: ScenarioInput): Promise<TurnResult> => 
         catalog,
         userPermissions,
         mode: input.mode,
+        roster: input.roster, // undefined ⇒ createDefaultRoster(); the historical benchmark passes a roster here
     });
 
     // A turn that threw is recorded by BaseAgent.send as `phase: 'error'` and NOT rethrown; surface it here

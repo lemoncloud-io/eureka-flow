@@ -10,15 +10,32 @@ generate-API gateway).
 You talk to the **Panel**, which drives the **orchestrator** — the main agent that owns the turn. The
 orchestrator runs a think/act loop — ask the **LlmGateway**, run tool calls through the one
 **ToolExecutor** (which checks permissions), repeat until the model is done — but carries no write tools
-of its own: it delegates edits by spawning **specialist** sub-agents (locator = move, property =
-config/rename) that reach the live canvas through a single shared seam, the **CanvasBinding**. The
-persisted **SessionState** is what the Panel renders from.
+of its own: it delegates edits by spawning **specialist** sub-agents, split by the **kind of work** — it hands
+the whole **structure** (add · wire · label · lay out) to the composition **builder**, and fans each node's
+**content** (config) out to the **block agents** (one per block type) — that reach the live canvas through a
+single shared seam, the **CanvasBinding**. The persisted **SessionState** is what the Panel renders from.
 
 ```
 Panel → Orchestrator → LlmGateway (think)
-                     → spawn → Specialists (locator / property)
+                     → spawn → Specialists (builder · block agents per type)
                                  → ToolExecutor → tools → CanvasBinding → live canvas (act)
                      → SessionState → Panel (render)
+```
+
+**One hybrid writer layer, one foundation.** The orchestrator, loop, tools and permission model are the same
+however the editing gets done; the orchestrator splits each request by the **kind of work** — the whole
+**structure** to one **builder** (full toolset + `use_skill` playbooks), each node's **content** to the **block
+agents** in parallel. This hybrid is what the [eval-benchmark](design/eval-benchmark.md) settled by comparing
+two earlier candidates (pure fan-out vs one all-doing builder); the findings are in
+[design/context-strategy-and-composition.md](design/context-strategy-and-composition.md).
+
+```mermaid
+flowchart LR
+    Panel[Panel] --> Orch["Orchestrator<br/>plan · route · no write tools"]
+    Orch -->|"structure · one plan"| B["builder<br/>add · wire · label · lay out + use_skill(SEED_SKILLS)"]
+    Orch -->|"content · in parallel"| BA["block agents ×N<br/>configure (content)"]
+    B --> CB[("CanvasBinding<br/>live canvas")]
+    BA --> CB
 ```
 
 The full model — components, the turn loop, interfaces, permissions — is in
@@ -34,13 +51,16 @@ The full model — components, the turn loop, interfaces, permissions — is in
 
 **[agents/](agents/)** — the concrete agents.
 
-The **orchestrator** is the entry agent the Panel talks to; it delegates every edit to two specialists —
-the **locator** (move) and the **property** (config/rename) — which it spawns over the shared
-CanvasBinding. The orchestrator and property models are covered in the design docs (start with
-[architecture.md](design/architecture.md)); the locator has its own SPEC:
+The **orchestrator** is the entry agent the Panel talks to; it holds no write tools and delegates every edit
+to the specialists it spawns over the shared CanvasBinding. The orchestrator model is covered in the design
+docs (start with [architecture.md](design/architecture.md)); the full roster + coverage lives in
+**[agents/README.md](agents/README.md)**:
 
-- [locator.md](agents/locator.md) — the **locator specialist** (move): a thin shipped-status
-  page; its behavior is specified canonically in the harness docs (`design/harness-*`).
+- **The composition builder** — the orchestrator hands it the whole **structure** and it builds the (sub-)flow
+  itself (add · wire · label · lay out), pulling on-demand playbooks via `use_skill`. Spec: [builder.md](agents/builder.md).
+- **Block agents** — one per block type; the orchestrator routes each node's **content** (config) to
+  them. A block that earns domain knowledge gets a named specialist (e.g. [single-output-generator.md](agents/single-output-generator.md));
+  every other type is served by a generic [blockAgent.md](agents/blockAgent.md) synthesized from the catalog.
 
 **[foundations/](foundations/)** — shared infrastructure, both built.
 
@@ -48,9 +68,55 @@ CanvasBinding. The orchestrator and property models are covered in the design do
   cancellation).
 - [llm-gateway.md](foundations/llm-gateway.md) — the `LlmGateway` contract + Gemini provider + HTTP port.
 
+## Running the live evals
+
+The `@flows/agent` suite is deterministic and offline by default — `yarn nx test @flows/agent` scripts
+every tool call through a fake gateway and makes no network calls. The **live evals** hand the
+orchestrator and its specialists a real function-calling Gemini gateway and check only the outcome + the
+graph oracle, so the model itself decides the tool calls (a case can legitimately fail when the model
+misbehaves — that is the signal).
+
+Live specs are **opt-in**: they run only when `RUN_LIVE` is set. A key in `.env.local` is _not_ enough on
+its own, so `nx test` and CI never trigger them.
+
+1. Put your key in the repo-root `.env.local` (gitignored) — the specs load it on import, so no inline
+   prefix is needed:
+
+    ```
+    GEMINI_API_KEY=...
+    # optional: GEMINI_MODEL=gemini-2.5-pro   (defaults to gemini-2.5-flash)
+    ```
+
+2. Run with `RUN_LIVE=1`:
+
+    ```bash
+    # orchestrator + specialists, end-to-end (the harness scenarios)
+    RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts
+
+    # one scenario by name
+    RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/integration.live.spec.ts -t T4.build-pipeline
+
+    # a single specialist's eval
+    RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/harness/scenarios/builder.live.spec.ts
+
+    # headless smoke test (real key/HTTP/Node path); the offline control case runs without RUN_LIVE
+    RUN_LIVE=1 npx vitest run libs/agent/src/__tests__/headless-gemini.smoke.spec.ts
+    ```
+
+    A bigger model or the per-turn chat log:
+
+    ```bash
+    RUN_LIVE=1 GEMINI_MODEL=gemini-2.5-pro npx vitest run .../integration.live.spec.ts
+    RUN_LIVE=1 LIVE_VERBOSE=1 npx vitest run .../integration.live.spec.ts -t T4.build-pipeline  # echo the full transcript
+    ```
+
+Every live run also auto-saves its scorecard + full transcript + per-scenario token/cost to the gitignored
+`bench-runs/` dir (override with `BENCH_OUT`). Without `RUN_LIVE` (or without a key), every live spec skips and
+the suite stays offline.
+
 ## Reading order
 
 New here? Read **[design/architecture.md](design/architecture.md)** (the shared model, including the
-orchestrator that owns the turn), then the locator specialist it spawns,
-**[agents/locator.md](agents/locator.md)**; for the shared infra, the two
+orchestrator that owns the turn), then the composition specialist it spawns,
+**[agents/builder.md](agents/builder.md)**; for the shared infra, the two
 **[foundations/](foundations/)** docs. Package overview: [`libs/agent/README.md`](../../libs/agent/README.md).

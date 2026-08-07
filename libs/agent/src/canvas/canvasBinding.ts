@@ -13,10 +13,33 @@ export interface NodePatch {
 /** The live canvas graph: the canonical `WorkflowState` (`{ nodes, edges }`), aliased to track that shape. */
 export type Graph = WorkflowState;
 
-/** The single seam between agent code and the graph on screen: `createEngineCanvasBinding` over the owning `FlowEngine`, or `createInMemoryCanvasBinding` for tests and Node runs. Nothing here is React-aware. */
+/** The four endpoint fields of an edge — `EdgeData` minus its binding-assigned `id`. */
+export interface EdgeSpec {
+    sourceNodeId: string;
+    sourcePortId: string;
+    targetNodeId: string;
+    targetPortId: string;
+}
+
+/**
+ * The single seam between agent code and the graph on screen: `createEngineCanvasBinding` over the owning
+ * `FlowEngine`, or `createInMemoryCanvasBinding` for tests and Node runs. Nothing here is React-aware.
+ *
+ * Every write is mechanical — the binding applies what it is given and never judges whether an edit is
+ * sensible. All validation (a config value, a port's existence/type, a would-be cycle, an occupied input)
+ * lives in the tools, so a write that reaches the binding has already been validated.
+ */
 export interface CanvasBinding {
     /** Live structural read of the current canvas graph. */
     readGraph(): Graph;
     /** Edit one node's label / position / config, applied immediately (frontend-only). */
     updateNode(id: string, patch: NodePatch): void;
+    /** Create a node of `type` at `position` seeded with the block's default config; returns the new id. */
+    addNode(type: string, position: XY): { id: string };
+    /** Remove a node and cascade every edge that touches it. */
+    deleteNode(id: string): void;
+    /** Append one edge and return its new id. The caller validates first (the edge tool rejects an occupied input), so the binding never displaces an existing edge. */
+    addEdge(spec: EdgeSpec): { id: string };
+    /** Remove one edge by id. */
+    deleteEdge(id: string): void;
 }

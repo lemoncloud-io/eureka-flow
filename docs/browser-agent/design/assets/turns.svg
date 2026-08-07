@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 330" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<rect width="660" height="330" fill="#ffffff"/>
+<text x="66" y="27" font-size="16" font-weight="700" fill="#2a2f33">Round-trips</text>
+<text x="66" y="45" font-size="11" fill="#6b747a">Σ over the T4+ ladder, N=3 · lower is better</text>
+<rect x="464" y="16" width="11" height="11" rx="2" fill="#158b7c"/>
+<text x="480" y="26" font-size="11.5" fill="#2a2f33">builder</text>
+<rect x="560" y="16" width="11" height="11" rx="2" fill="#c1783b"/>
+<text x="576" y="26" font-size="11.5" fill="#2a2f33">fan-out</text>
+<line x1="66" y1="278.0" x2="638" y2="278.0" stroke="#e6e9ea" stroke-width="1"/>
+<text x="57" y="282.0" font-size="10" fill="#6b747a" text-anchor="end">0</text>
+<line x1="66" y1="223.5" x2="638" y2="223.5" stroke="#e6e9ea" stroke-width="1"/>
+<text x="57" y="227.5" font-size="10" fill="#6b747a" text-anchor="end">45</text>
+<line x1="66" y1="169.0" x2="638" y2="169.0" stroke="#e6e9ea" stroke-width="1"/>
+<text x="57" y="173.0" font-size="10" fill="#6b747a" text-anchor="end">90</text>
+<line x1="66" y1="114.5" x2="638" y2="114.5" stroke="#e6e9ea" stroke-width="1"/>
+<text x="57" y="118.5" font-size="10" fill="#6b747a" text-anchor="end">135</text>
+<line x1="66" y1="60.0" x2="638" y2="60.0" stroke="#e6e9ea" stroke-width="1"/>
+<text x="57" y="64.0" font-size="10" fill="#6b747a" text-anchor="end">180</text>
+<line x1="66" y1="278.0" x2="638" y2="278.0" stroke="#6b747a" stroke-width="1.2"/>
+<rect x="107.0" y="175.1" width="49.6" height="102.9" rx="2.5" fill="#158b7c"/>
+<text x="131.8" y="169.1" font-size="10.5" font-weight="600" fill="#158b7c" text-anchor="middle">85</text>
+<rect x="166.1" y="106.0" width="49.6" height="172.0" rx="2.5" fill="#c1783b"/>
+<text x="190.9" y="100.0" font-size="10.5" font-weight="600" fill="#c1783b" text-anchor="middle">142</text>
+<text x="161.3" y="297.0" font-size="12.5" fill="#2a2f33" text-anchor="middle">head</text>
+<rect x="297.7" y="194.4" width="49.6" height="83.6" rx="2.5" fill="#158b7c"/>
+<text x="322.4" y="188.4" font-size="10.5" font-weight="600" fill="#158b7c" text-anchor="middle">69</text>
+<rect x="356.8" y="98.8" width="49.6" height="179.2" rx="2.5" fill="#c1783b"/>
+<text x="381.6" y="92.8" font-size="10.5" font-weight="600" fill="#c1783b" text-anchor="middle">148</text>
+<text x="352.0" y="297.0" font-size="12.5" fill="#2a2f33" text-anchor="middle">tail</text>
+<rect x="488.3" y="188.4" width="49.6" height="89.6" rx="2.5" fill="#158b7c"/>
+<text x="513.1" y="182.4" font-size="10.5" font-weight="600" fill="#158b7c" text-anchor="middle">74</text>
+<rect x="547.4" y="77.0" width="49.6" height="201.0" rx="2.5" fill="#c1783b"/>
+<text x="572.2" y="71.0" font-size="10.5" font-weight="600" fill="#c1783b" text-anchor="middle">166</text>
+<text x="542.7" y="297.0" font-size="12.5" fill="#2a2f33" text-anchor="middle">pull</text>
+</svg>

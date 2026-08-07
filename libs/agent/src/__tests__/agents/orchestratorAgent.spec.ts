@@ -21,13 +21,14 @@ const scripts = (): Record<string, FakeScriptStep[]> => ({
             toolCalls: [
                 {
                     name: 'spawn',
-                    args: { children: [{ agentType: 'locator', task: `move ${IDS.txt} right by 20px` }] },
+                    args: { children: [{ agentType: 'builder', task: `move ${IDS.txt} right by 20px` }] },
                 },
             ],
         },
         { text: 'Moved the input right by 20px.' },
     ],
-    locator: [
+    // A move is structural, so it routes to the builder (edge/locator are retired).
+    builder: [
         { toolCalls: [{ name: 'move_node', args: { nodeId: IDS.txt, by: { dx: 20, dy: 0 } } }] },
         { text: 'moved' },
     ],
@@ -82,6 +83,6 @@ describe('createOrchestratorAgent — one agent drives the whole turn', () => {
         await agent.send('and again');
         const messages = deps.storage.load(FLOW_ID)?.messages ?? [];
         expect(messages.length).toBeGreaterThan(afterFirst);
-        expect(messages[0].content).toBe('nudge the input right'); // turn-1 history preserved
+        expect(messages[0].content).toContain('nudge the input right'); // turn-1 history preserved (Approach 3 prepends the starting graph)
     });
 });

@@ -3,9 +3,9 @@
 ## 1. Summary
 
 The LLM access layer is now one shared contract, reconciled between the gateway work
-and the locator-agent design: `LlmGateway.chat()` — provider-neutral chat messages and
+and the agent design: `LlmGateway.chat()` — provider-neutral chat messages and
 tool definitions in, an async stream of `Chunk`s (text deltas, tool-call arg deltas, a
-final `done`) out. `BaseAgent`/`LocatorAgent` and the `ToolExecutor` consume exactly this
+final `done`) out. `BaseAgent` and the `ToolExecutor` consume exactly this
 contract; the fake gateway proves the tool-call path deterministically; Gemini 2.5 Flash
 is the first HTTP provider behind it, with function-calling.
 
@@ -54,7 +54,7 @@ sequenceDiagram
     Agent->>Agent: accumulate deltas → parse ToolCall
     Agent->>EX: dispatch(agentConfig, toolCall, userPermissions)
     EX->>EX: route by name → validate args → check both gates (grant + user role)
-    EX->>CV: e.g. move_node → node move tool provider (`createNodeMoveToolProvider`) → updateNode(position)
+    EX->>CV: e.g. move_node → the MOVE_NODE tool's handler → updateNode(position)
     CV-->>EX: ToolResult
     EX-->>Agent: ToolResult (fed back as a tool message)
 ```
@@ -63,9 +63,9 @@ Verified deterministically (no real provider): a scripted fake-gateway response 
 `move_node { nodeId, by: { dx: 10, dy: 0 } }` flows through the executor and moves the
 text-input node 10px right — the meeting's verification case — and the same call is
 denied when the agent lacks the `canModifyCanvas` grant. The shipped tool set now spans
-node read (`list_nodes` + `describe_node`), move (`move_node`), and config
-(`set_properties` + `rename`), plus the orchestrator's catalog, `list_agents`, and `spawn`
-tools; property/rename tools are no longer a later slice.
+node read (`list_nodes` + `describe_node`), move (`move_node`), config
+(`set_properties`), and rename (`rename`), plus the orchestrator's catalog, `list_agents`, and
+`spawn` tools; property/rename tools are no longer a later slice.
 
 ## 4. Implementations
 
@@ -158,7 +158,7 @@ model answer, because no real receiver exists yet to prove that leg.
 
 - Unit + integration tests pass in `libs/agent` (environment, storage contract, http port,
   gemini gateway incl. function-calling, self-check, canvas tools, executor, orchestrator /
-  locator / property, spawn + roster, and the scenario harness) and in `apps/web` (includes
+  block agents / builder, spawn + roster, and the scenario harness) and in `apps/web` (includes
   the Generate API gateway's fake-only suite and the real-browser Environment verification tests).
 - Typecheck, `nx build agent`, and `nx build web` pass on this branch.
 - **The default suite makes no live provider call** — Gemini and the Generate API gateway are

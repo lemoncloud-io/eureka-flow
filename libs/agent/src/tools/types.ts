@@ -20,6 +20,9 @@ export interface ToolProvider {
     dispatch(call: ToolCall): ToolResult | Promise<ToolResult>;
 }
 
+/** A bound tool's body: runs one call and returns its result. The unit `dispatch` routes to. */
+export type ToolHandler = (call: ToolCall) => ToolResult | Promise<ToolResult>;
+
 /** The single tool engine for a session; the acting agent (tools + grant) is passed per call. */
 export interface ToolExecutor {
     /** The agent's providers' tools, unioned into the model's tool defs. */

@@ -138,9 +138,25 @@ export abstract class BaseAgent implements Agent {
         this.config = { ...base, ...(deps.config ?? {}), tools: base.tools };
     }
 
-    /** Per-turn dynamic context injected as system message(s) after the persona, recomputed each iteration. */
+    /**
+     * Static per-turn context injected right after the persona — recomputed each iteration. A SHORT-lived
+     * specialist (2–3 turns) puts its live canvas here: re-sending it each turn is cheap and it cannot amortize
+     * a get_graph pull. A LONG-lived agent (builder / orchestrator) keeps this stable — roster or schema only —
+     * and seeds the volatile canvas ONCE via {@link initialUserPreamble}, then pulls on demand, so its growing
+     * transcript stays a cacheable prefix.
+     */
     protected buildContextMessages(): ChatMessage[] {
         return [];
+    }
+
+    /**
+     * Prepended once to the first user message of a fresh conversation — the initial state an agent is handed
+     * up front (seed-once + pull). Default none: a long-lived top-level agent (builder / orchestrator) seeds the
+     * starting graph here and then pulls fresh state via get_graph; a short-lived block specialist carries no
+     * get_graph and instead re-seeds its type-scoped canvas each turn via buildContextMessages.
+     */
+    protected initialUserPreamble(): string {
+        return '';
     }
 
     /** Hook fired at each turn's start with its abort signal; a subclass that spawns children forwards it. */
@@ -181,7 +197,6 @@ export abstract class BaseAgent implements Agent {
         assistantMsg: Message,
         state: SessionState
     ): void {
-        // Patch the recorded tool call's status on the assistant message (matched by id).
         const recorded = assistantMsg.toolCalls?.find(c => c.id === tc.id);
         if (recorded) {
             recorded.status = result.ok ? 'ok' : 'error';
@@ -217,7 +232,11 @@ export abstract class BaseAgent implements Agent {
         }
         this.onTurnSignal(signal);
 
-        state.messages.push({ id: this.nextId('u'), role: 'user', content: text, ts: this.stamp() });
+        // Seed the initial state into the first user message of a fresh conversation; later turns pull current
+        // state via get_graph, so the transcript stays append-only.
+        const preamble = state.messages.length === 0 ? this.initialUserPreamble() : '';
+        const userContent = preamble ? `${preamble}\n\n${text}` : text;
+        state.messages.push({ id: this.nextId('u'), role: 'user', content: userContent, ts: this.stamp() });
         state.phase = 'thinking';
         state.error = undefined;
         storage.save(state);

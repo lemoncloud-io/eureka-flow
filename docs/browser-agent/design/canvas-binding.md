@@ -3,12 +3,15 @@
 > How the agent reaches the graph on screen. The **contract** lives in code
 > (`libs/agent/src/canvas/canvasBinding.ts`) and is summarized in
 > [architecture.md](architecture.md#canvasbinding--the-seam); this page is the _how_. Shipped
-> implementation: [`engineCanvasBinding.ts`](../../../libs/agent/src/canvas/engineCanvasBinding.ts).
+> implementation: [`engineCanvasBinding.ts`](../../../libs/agent/src/canvas/engineCanvasBinding.ts). Last updated 2026-08-02.
 
-`readGraph` + `updateNode` are the whole contract, shared by the orchestrator and its specialists.
-The [locator agent](../agents/locator.md) uses it to find a node and move it (`position`); the
-property specialist uses the same `updateNode` to rename (`label`) and set config (`config`). So the
-contract is move + rename + config — `NodePatch` is `{ label?, position?, config? }`.
+`readGraph` + `updateNode` + the structural primitives (`addNode` / `deleteNode` / `addEdge` / `deleteEdge`)
+are the whole contract, shared by the orchestrator and its specialists. A
+[block agent](../agents/blockAgent.md) uses `updateNode` to set config (`config`); the
+[builder](../agents/builder.md) uses all of them — `updateNode` to move (`position`) and rename (`label`),
+`addNode` / `deleteNode` to create or remove nodes, and `addEdge` / `deleteEdge` to wire them. So
+the contract is a node patch (`NodePatch` = `{ label?, position?, config? }`) plus four structural
+primitives — `addNode`/`addEdge` return the new id, `deleteNode` cascades the node's edges.
 
 ## One binding, every runtime
 
@@ -29,13 +32,17 @@ the engine makes unnecessary:
 
 ## Grounded primitives
 
-| Need                      | Primitive                                                                            | Where                          |
-| ------------------------- | ------------------------------------------------------------------------------------ | ------------------------------ |
-| read nodes                | `engine.getGraph()` → `{ nodes, edges }`                                             | `engineCanvasBinding.ts`       |
-| edit one node (immediate) | `engine.transact(label, ops => ops.updateNode(id, patch))` — one call, one undo step | `engineCanvasBinding.ts`       |
-| the name field            | `NodeData.customLabel`, falling back to the block's definition label                 | `NodeBlock.tsx`                |
-| position                  | `NodeData.position` (`{ x, y }`)                                                     | `@lemoncloud/eureka-flows-api` |
-| the engine to reach       | the `engine` the screen owns, passed to `<FlowAgentPanel engine={engine} />`         | `FlowEditorPage.tsx`           |
+| Need                      | Primitive                                                                                                                                                                              | Where                          |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| read nodes                | `engine.getGraph()` → `{ nodes, edges }`                                                                                                                                               | `engineCanvasBinding.ts`       |
+| edit one node (immediate) | `engine.transact(label, ops => ops.updateNode(id, patch))` — one call, one undo step                                                                                                   | `engineCanvasBinding.ts`       |
+| add a node                | `engine.transact(label, ops => ops.addNode({ type, position }))` — the engine seeds `{ ...defaultConfig }` and returns the new id                                                      | `engineCanvasBinding.ts`       |
+| delete a node             | `ops.removeNodes([id])` — drops the node **and** every edge touching it (cascade) in one transaction                                                                                   | `engineCanvasBinding.ts`       |
+| add / delete an edge      | `ops.connect(spec)` (returns the id; refuses cycle / incompatible ports / duplicate) / `ops.disconnect([id])`                                                                          | `engineCanvasBinding.ts`       |
+| connection validity       | `arePortTypesCompatible(sourceType, targetType)` + `wouldCreateCycle(edges, source, target)` (self-loops included), in the engine core and shared by the `edge` tool and `ops.connect` | `libs/engine/src/core/`        |
+| the name field            | `NodeData.customLabel`, falling back to the block's definition label                                                                                                                   | `NodeBlock.tsx`                |
+| position                  | `NodeData.position` (`{ x, y }`)                                                                                                                                                       | `@lemoncloud/eureka-flows-api` |
+| the engine to reach       | the `engine` the screen owns, passed to `<FlowAgentPanel engine={engine} />`                                                                                                           | `FlowEditorPage.tsx`           |
 
 ## Three things the source makes concrete
 
@@ -52,8 +59,16 @@ the engine makes unnecessary:
 - **The write is an edit, never runtime.** It goes through `engine.transact`, so it checkpoints for
   undo exactly like a user drag and travels in the next save body. Contrast `engine.applyRuntime`,
   which carries run state outside history and is dropped by `toSnapshot` — an agent edit must never
-  take that path. The history label follows what the patch touched:
-  `agent:move` / `agent:rename` / `agent:config`.
+  take that path. The history label follows what the patch or structural edit touched:
+  `agent:move` / `agent:rename` / `agent:config` / `agent:add-node` / `agent:delete-node` /
+  `agent:add-edge` / `agent:delete-edge`.
+
+- **Structural writes are one transaction each**, so an add / delete is undoable like a user action.
+  `deleteNode` leans on `ops.removeNodes`, which drops the node **and** cascades its edges in one
+  update, so the binding never hand-removes edges first. `addNode`/`addEdge` return the new id the
+  agent references next — the engine seeds `addNode` defaults from the block registry. `addEdge`
+  forwards to `ops.connect` as a plain append: the `edge` tool has already rejected an occupied
+  target input, so `ops.connect` never has an existing edge to displace here.
 
 ## Permissions live in the executor, not here
 
@@ -75,8 +90,8 @@ against a real `createFlowEngine()` — config merge, label clear, undo per edit
 history label, runtime fields surviving an edit, and the loud failure on a bad id.
 
 End to end: in a DEV build, once the flow has an id, `FlowEditorPage` mounts `FlowAgentPanel`, which
-builds this binding over the page's engine and drives the orchestrator (which spawns the
-locator/property specialists), handing the transcript to the pure right-docked `<AgentPanel>` view. A
+builds this binding over the page's engine and drives the orchestrator (which spawns its specialists),
+handing the transcript to the pure right-docked `<AgentPanel>` view. A
 chat command like "move Fetch 10px right" flows agent → `updateNode` → `engine.transact` → the mirror
 → the canvas re-renders, with no server write.
 

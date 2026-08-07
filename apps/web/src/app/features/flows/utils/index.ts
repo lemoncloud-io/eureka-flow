@@ -134,7 +134,8 @@ export type {
     GenerateRequestBody,
     GenerateResponse,
 } from './createGenerateApiLlmGateway';
-export { createBlockCatalogLookup } from './createBlockCatalogLookup';
+// Promoted into @flows/agent so the browser panel and the local terminal build the catalog identically.
+export { createBlockCatalogLookup } from '@flows/agent';
 
 // ============================================================
 // Input File Upload Utilities
