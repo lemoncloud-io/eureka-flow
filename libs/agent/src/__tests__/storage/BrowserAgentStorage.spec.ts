@@ -51,7 +51,7 @@ describe('createBrowserAgentStorage', () => {
 
         await storage.setJson('a', 1);
         await storage.setJson('b', 2);
-        await storage.clear?.();
+        await storage.clear();
 
         expect(webStorage.dump()).toEqual({ unrelated_app_key: 'precious' });
     });
@@ -62,7 +62,7 @@ describe('createBrowserAgentStorage', () => {
 
         await storage.setJson('session:a', 1);
         await storage.setJson('config', 2);
-        await storage.clear?.('session:');
+        await storage.clear('session:');
 
         await expect(storage.listKeys('')).resolves.toEqual(['config']);
     });

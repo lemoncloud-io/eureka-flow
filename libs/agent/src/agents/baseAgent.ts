@@ -60,7 +60,7 @@ const safeJsonParse = (raw: string): unknown => {
 /** Drain a chat stream into accumulated text + parsed tool calls. */
 const collect = async (stream: AsyncIterable<Chunk>): Promise<CollectedResponse> => {
     let text = '';
-    const order: string[] = [];
+    // Map keeps first-insertion order, so tool calls stay in emission order without a parallel array.
     const acc = new Map<string, { name: string; rawArgs: string }>();
 
     for await (const chunk of stream) {
@@ -73,7 +73,6 @@ const collect = async (stream: AsyncIterable<Chunk>): Promise<CollectedResponse>
             if (existing) {
                 existing.rawArgs += argsDelta;
             } else {
-                order.push(id);
                 acc.set(id, { name, rawArgs: argsDelta });
             }
         }
@@ -81,10 +80,7 @@ const collect = async (stream: AsyncIterable<Chunk>): Promise<CollectedResponse>
 
     return {
         text,
-        toolCalls: order.map(id => {
-            const { name, rawArgs } = acc.get(id) as { name: string; rawArgs: string };
-            return { id, name, args: safeJsonParse(rawArgs), rawArgs };
-        }),
+        toolCalls: [...acc].map(([id, { name, rawArgs }]) => ({ id, name, args: safeJsonParse(rawArgs), rawArgs })),
     };
 };
 

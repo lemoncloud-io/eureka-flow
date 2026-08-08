@@ -14,7 +14,6 @@ const parentPath = (flowPath: string): string | null => {
  */
 export const toTraceTree = (records: TraceRecord[]): TraceNode | null => {
     const nodes = new Map<string, TraceNode>();
-    const order: string[] = [];
 
     for (const record of records) {
         const flowPath = String(record.context.flowPath ?? '');
@@ -28,15 +27,14 @@ export const toTraceTree = (records: TraceRecord[]): TraceNode | null => {
                 children: [],
             };
             nodes.set(flowPath, node);
-            order.push(flowPath);
         }
         node.records.push(record);
     }
 
+    // Map iterates in first-insertion order, so this preserves emission order without a parallel array.
     let root: TraceNode | null = null;
-    for (const flowPath of order) {
-        const node = nodes.get(flowPath) as TraceNode;
-        const pp = parentPath(flowPath);
+    for (const node of nodes.values()) {
+        const pp = parentPath(node.flowPath);
         const parent = pp !== null ? nodes.get(pp) : undefined;
         if (parent) {
             parent.children.push(node);

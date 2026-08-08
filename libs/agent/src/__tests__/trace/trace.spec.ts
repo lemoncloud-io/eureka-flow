@@ -85,6 +85,21 @@ describe('sinks', () => {
         expect(rec.fields.model).toBe('x');
     });
 
+    it('redactingSink recurses into arrays so secret keys nested in array elements are redacted', () => {
+        const inner = memorySink();
+        const tracer = createTracer(redactingSink(inner), () => 0);
+        // The shape baseAgent emits for `message` events: fields.toolCalls is an array of { name, args }.
+        tracer.emit({
+            name: 'tool.call',
+            fields: { toolCalls: [{ name: 'http', args: { url: 'u', apiKey: 'sk-1' } }] },
+        });
+
+        const toolCalls = inner.records[0].fields.toolCalls as Array<{ name: string; args: Record<string, unknown> }>;
+        expect(toolCalls[0].args.apiKey).toBe('[redacted]');
+        expect(toolCalls[0].args.url).toBe('u');
+        expect(toolCalls[0].name).toBe('http');
+    });
+
     it('fanoutSink delivers each record to every sink', () => {
         const a = memorySink();
         const b = memorySink();

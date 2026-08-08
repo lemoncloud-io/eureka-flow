@@ -107,7 +107,7 @@ export const useAgentSession = ({
             },
             getPhase: () => current?.phase ?? null,
         };
-    }, [flowId, storage, tracer, createAgent]);
+    }, [flowId, storage, createAgent]);
 
     // `send` is blocked until this instance's transcript has been read; flipped true by the hydration effect below.
     const [hydrated, setHydrated] = useState(false);

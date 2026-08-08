@@ -49,10 +49,10 @@ describe('createMemoryAgentStorage', () => {
         await storage.setJson('session:a', 1);
         await storage.setJson('config', 2);
 
-        await storage.clear?.('session:');
+        await storage.clear('session:');
         await expect(storage.listKeys('')).resolves.toEqual(['config']);
 
-        await storage.clear?.();
+        await storage.clear();
         await expect(storage.listKeys('')).resolves.toEqual([]);
     });
 

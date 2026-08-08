@@ -8,6 +8,6 @@ export interface AgentStorage {
     remove(key: string): Promise<void>;
     /** List stored keys that start with the given prefix ('' lists all). */
     listKeys(prefix: string): Promise<string[]>;
-    /** Optional: remove keys matching the prefix, or all of the agent's keys when omitted. */
-    clear?(prefix?: string): Promise<void>;
+    /** Remove keys matching the prefix, or all of the agent's keys when omitted. */
+    clear(prefix?: string): Promise<void>;
 }

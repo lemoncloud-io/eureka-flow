@@ -40,7 +40,7 @@ export interface Tracer {
 export interface TraceRecord {
     ts: number;
     name: string;
-    level: string;
+    level: 'debug' | 'info' | 'warn' | 'error'; // the TraceEvent.level union — a record always carries a resolved level
     context: TraceContext; // accumulated across child() calls
     fields: Record<string, unknown>;
 }

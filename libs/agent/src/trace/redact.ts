@@ -6,16 +6,21 @@ const SECRET_KEY_PATTERN = /key|token|secret|password|credential|authorization/i
 const REDACTED = '[redacted]';
 const MAX_DEPTH = 3;
 
+/** Redact one value: arrays are transparent (mapped element-wise), plain objects recurse (depth-bounded). */
+const redactValue = (value: unknown, depth: number): unknown => {
+    if (Array.isArray(value)) {
+        return value.map(item => redactValue(item, depth));
+    }
+    if (depth > 1 && value !== null && typeof value === 'object') {
+        return redactObject(value as Record<string, unknown>, depth - 1);
+    }
+    return value;
+};
+
 const redactObject = (json: Record<string, unknown>, depth = MAX_DEPTH): Record<string, unknown> => {
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(json)) {
-        if (SECRET_KEY_PATTERN.test(key)) {
-            out[key] = REDACTED;
-        } else if (depth > 1 && value !== null && typeof value === 'object' && !Array.isArray(value)) {
-            out[key] = redactObject(value as Record<string, unknown>, depth - 1);
-        } else {
-            out[key] = value;
-        }
+        out[key] = SECRET_KEY_PATTERN.test(key) ? REDACTED : redactValue(value, depth);
     }
     return out;
 };

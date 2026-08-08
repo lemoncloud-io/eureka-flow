@@ -1,4 +1,4 @@
-import { createGeminiLlmGateway } from './GeminiLlmGateway';
+import { DEFAULT_MODEL, createGeminiLlmGateway } from './GeminiLlmGateway';
 import { createFetchHttpRequest } from '../http/FetchHttpRequest';
 
 import type { GeminiGenerationConfig } from './GeminiLlmGateway';
@@ -20,8 +20,8 @@ export interface LiveGatewayConfig {
     generation?: GeminiGenerationConfig;
 }
 
-/** The model a live run targets: GEMINI_MODEL override, else gemini-2.5-flash. */
-export const liveModel = (): string => process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+/** The model a live run targets: GEMINI_MODEL override, else the gateway's DEFAULT_MODEL. */
+export const liveModel = (): string => process.env.GEMINI_MODEL ?? DEFAULT_MODEL;
 
 /** Which provider {@link resolveLiveGateway} would pick from the current env — for scorecard/log labelling. */
 export const liveProvider = (): 'gemini' | 'none' => (process.env.GEMINI_API_KEY ? 'gemini' : 'none');

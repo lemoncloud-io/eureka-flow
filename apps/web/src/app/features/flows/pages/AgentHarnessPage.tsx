@@ -12,6 +12,9 @@ import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const HARNESS_FLOW_ID = 'agent-harness';
 const TEXT_INPUT_NODE: NodeData = { id: 'text-1', type: 'text-input', position: { x: 100, y: 200 } };
+// Stable identity: an inline literal would be a new object each render, and the 250ms poll below would
+// otherwise rebuild (and abort) the agent on every tick.
+const HARNESS_PERMISSIONS = { canModifyCanvas: true, canEditConfig: true };
 
 /**
  * Dev-only harness route (`/dev/agent-harness`) for real-browser verification of the
@@ -48,7 +51,7 @@ export const AgentHarnessPage = () => {
         catalog,
         storage,
         tracer,
-        userPermissions: { canModifyCanvas: true, canEditConfig: true },
+        userPermissions: HARNESS_PERMISSIONS,
     });
 
     // The in-memory binding has no subscription; poll it (and the trace surfaces)

@@ -1,7 +1,7 @@
 import { isPlainObject } from '../utils/json';
 
 import type { HttpRequestSupportable } from '../http';
-import type { ChatRequest, Chunk, JsonSchema, LlmGateway, LlmGatewayCapabilities, ToolDef } from './llmGateway';
+import type { ChatRequest, Chunk, LlmGateway, LlmGatewayCapabilities, ToolDef } from './llmGateway';
 
 /** Generation parameters applied to every request. */
 export interface GeminiGenerationConfig {
@@ -44,7 +44,8 @@ export interface GeminiLlmGateway extends LlmGateway {
     readonly model: string;
 }
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+/** The default Gemini model — single-sourced here and reused by resolveLiveGateway's env fallback. */
+export const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
 const ERROR_BODY_SNIPPET_LENGTH = 200;
 
@@ -90,9 +91,6 @@ const toResponseObject = (content: string | null): Record<string, unknown> => {
         return { result: content };
     }
 };
-
-/** Our `ToolDef.parameters` is already an OpenAPI-subset JSON Schema; Gemini's functionDeclarations accept it as-is. */
-const toGeminiParameters = (schema: JsonSchema): JsonSchema => schema;
 
 /** Map the provider-neutral request onto Gemini's generateContent shape (tool `name` recovered from prior `toolCalls` by id). */
 const toGeminiRequest = (req: ChatRequest, generation?: GeminiGenerationConfig) => {
@@ -161,7 +159,8 @@ const toGeminiRequest = (req: ChatRequest, generation?: GeminiGenerationConfig) 
                           functionDeclarations: req.tools.map((tool: ToolDef) => ({
                               name: tool.name,
                               description: tool.description,
-                              parameters: toGeminiParameters(tool.parameters),
+                              // ToolDef.parameters is already an OpenAPI-subset JSON Schema; Gemini accepts it as-is.
+                              parameters: tool.parameters,
                           })),
                       },
                   ],
@@ -209,20 +208,12 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
     async function* chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk> {
         const body = toGeminiRequest(req, generation);
         const headers = { 'x-goog-api-key': apiKey };
-        const secrets = [apiKey];
+        const send = () =>
+            http.request({ method: 'POST', url, headers, body, ...(opts?.signal ? { signal: opts.signal } : {}) });
 
-        // Retry a degenerate empty response (thinking-only / MAX_TOKENS, no parts) once; HTTP errors throw immediately.
-        // An empty candidate that finished STOP and was not blocked is a legitimate empty turn — fall through, don't retry/throw.
-        const MAX_ATTEMPTS = 2;
-        let payload: GeminiResponse | undefined;
-        let parts: GeminiPart[] | undefined;
-        let emptyReason = 'no candidates';
-        let cleanStop = false;
-
-        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-            const send = () =>
-                http.request({ method: 'POST', url, headers, body, ...(opts?.signal ? { signal: opts.signal } : {}) });
-            // Send, then retry 429/503 with exponential backoff + jitter (capped) until it succeeds or attempts run out.
+        // One transport round-trip: send, retry 429/503 with capped exponential backoff + jitter, throw on a
+        // non-retryable failure (api key scrubbed from the error body), and parse the JSON payload.
+        const requestOnce = async (): Promise<GeminiResponse> => {
             let response = await send();
             for (
                 let httpAttempt = 1;
@@ -237,17 +228,27 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
                 await sleep(backoffMs);
                 response = await send();
             }
-
             if (!response.ok) {
                 const errorBody = await response.text().catch(() => '');
-                const safeBody = secrets.reduce((acc, secret) => redactText(acc, secret), errorBody);
-
+                const safeBody = redactText(errorBody, apiKey);
                 throw new Error(
                     `Gemini request failed with status ${response.status}: ${safeBody.slice(0, ERROR_BODY_SNIPPET_LENGTH)}`
                 );
             }
+            return (await response.json()) as GeminiResponse;
+        };
 
-            payload = (await response.json()) as GeminiResponse;
+        // Retry a degenerate empty response (thinking-only / MAX_TOKENS, no parts) once; HTTP errors throw inside
+        // requestOnce. An empty candidate that finished STOP and was not blocked is a legitimate empty turn — fall
+        // through, don't retry/throw.
+        const MAX_EMPTY_RESPONSE_ATTEMPTS = 2;
+        let payload: GeminiResponse | undefined;
+        let parts: GeminiPart[] | undefined;
+        let emptyReason = 'no candidates';
+        let cleanStop = false;
+
+        for (let attempt = 1; attempt <= MAX_EMPTY_RESPONSE_ATTEMPTS; attempt += 1) {
+            payload = await requestOnce();
             parts = payload.candidates?.[0]?.content?.parts;
             if (parts && parts.length > 0) break;
 
@@ -263,7 +264,7 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
 
         if (!cleanStop && (!parts || parts.length === 0)) {
             throw new Error(
-                `Gemini response contained no content parts after ${MAX_ATTEMPTS} attempt(s) (reason: ${emptyReason})`
+                `Gemini response contained no content parts after ${MAX_EMPTY_RESPONSE_ATTEMPTS} attempt(s) (reason: ${emptyReason})`
             );
         }
 
