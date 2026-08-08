@@ -26,20 +26,20 @@ export const toGraphDiff = (records: TraceRecord[], runId: string): GraphDiff =>
 };
 
 const diff = (before: GraphSnapshot, after: GraphSnapshot) => {
-    const b = new Map(before.nodes.map(n => [n.id, n]));
-    const a = new Map(after.nodes.map(n => [n.id, n]));
+    const beforeNodes = new Map(before.nodes.map(n => [n.id, n]));
+    const afterNodes = new Map(after.nodes.map(n => [n.id, n]));
 
-    const addedNodes = [...a.keys()].filter(id => !b.has(id));
-    const removedNodes = [...b.keys()].filter(id => !a.has(id));
-    const changedNodes = [...a.keys()].filter(
-        id => b.has(id) && JSON.stringify(b.get(id)) !== JSON.stringify(a.get(id))
+    const addedNodes = [...afterNodes.keys()].filter(id => !beforeNodes.has(id));
+    const removedNodes = [...beforeNodes.keys()].filter(id => !afterNodes.has(id));
+    const changedNodes = [...afterNodes.keys()].filter(
+        id => beforeNodes.has(id) && JSON.stringify(beforeNodes.get(id)) !== JSON.stringify(afterNodes.get(id))
     );
 
     const edgeIds = (g: GraphSnapshot): Set<string> => new Set(g.edges.map(e => String(e.id ?? '')).filter(Boolean));
-    const be = edgeIds(before);
-    const ae = edgeIds(after);
-    const addedEdges = [...ae].filter(id => !be.has(id));
-    const removedEdges = [...be].filter(id => !ae.has(id));
+    const beforeEdges = edgeIds(before);
+    const afterEdges = edgeIds(after);
+    const addedEdges = [...afterEdges].filter(id => !beforeEdges.has(id));
+    const removedEdges = [...beforeEdges].filter(id => !afterEdges.has(id));
 
     return { addedNodes, removedNodes, changedNodes, addedEdges, removedEdges };
 };

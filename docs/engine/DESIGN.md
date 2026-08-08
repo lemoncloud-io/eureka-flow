@@ -61,7 +61,7 @@
 포크의 `libs/agent`(@flows/agent)는 포트/어댑터 스타일이 일관되고 테스트도 충실하다:
 
 - **LlmGateway** — 유일한 LLM 출구. Gemini/OpenAI/fake 구현, 스트리밍 + tool call 청크, capabilities 선언
-- **HttpRequestSupportable** — fetch 기반 HTTP 포트 (테스트용 scripted 구현 포함)
+- **HttpClient** — fetch 기반 HTTP 포트 (테스트용 scripted 구현 포함)
 - **AgentEnvironment** — 런타임 경계: storage(localStorage/memory), trace, clock, abort. 금지 capability를 `false` 리터럴 타입으로 컴파일 타임에 봉인
 - **ToolExecutor** — 툴 콜 단일 관문: 라우팅 → 스키마 검증 → grant 체크 → 디스패치. `FlowPermissions`의 컴파일 가드된 부분집합(`Capability`)으로 권한 연동
 - **BaseAgent** — think/act 루프, 세션 영속화, abort

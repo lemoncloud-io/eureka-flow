@@ -34,8 +34,8 @@ export const toTraceTree = (records: TraceRecord[]): TraceNode | null => {
     // Map iterates in first-insertion order, so this preserves emission order without a parallel array.
     let root: TraceNode | null = null;
     for (const node of nodes.values()) {
-        const pp = parentPath(node.flowPath);
-        const parent = pp !== null ? nodes.get(pp) : undefined;
+        const parentFlowPath = parentPath(node.flowPath);
+        const parent = parentFlowPath !== null ? nodes.get(parentFlowPath) : undefined;
         if (parent) {
             parent.children.push(node);
         } else if (!root) {

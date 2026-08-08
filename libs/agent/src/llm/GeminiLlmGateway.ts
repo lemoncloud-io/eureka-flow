@@ -1,6 +1,6 @@
 import { isPlainObject } from '../utils/json';
 
-import type { HttpRequestSupportable } from '../http';
+import type { HttpClient } from '../http';
 import type { ChatRequest, Chunk, LlmGateway, LlmGatewayCapabilities, ToolDef } from './llmGateway';
 
 /** Generation parameters applied to every request. */
@@ -24,7 +24,7 @@ export interface GeminiRetryConfig {
 
 export interface GeminiLlmGatewayOptions {
     /** HTTP port. */
-    http: HttpRequestSupportable;
+    http: HttpClient;
     /** Gemini Developer API key; sent as the x-goog-api-key header, never traced. */
     apiKey: string;
     /** Defaults to gemini-2.5-flash. */
@@ -81,7 +81,7 @@ const parseArgsObject = (raw: string | undefined): Record<string, unknown> => {
 };
 
 /** A tool result's `content` is a JSON string; Gemini's `functionResponse.response` must be an object. */
-const toResponseObject = (content: string | null): Record<string, unknown> => {
+const toFunctionResponseObject = (content: string | null): Record<string, unknown> => {
     if (content === null || content === '') return { result: '' };
     try {
         const parsed = JSON.parse(content);
@@ -124,7 +124,7 @@ const toGeminiRequest = (req: ChatRequest, generation?: GeminiGenerationConfig) 
         }
         if (message.role === 'tool') {
             const name = (message.toolCallId ? nameByCallId.get(message.toolCallId) : undefined) ?? 'tool';
-            appendUserPart({ functionResponse: { name, response: toResponseObject(message.content) } });
+            appendUserPart({ functionResponse: { name, response: toFunctionResponseObject(message.content) } });
             continue;
         }
         if (message.role === 'assistant') {

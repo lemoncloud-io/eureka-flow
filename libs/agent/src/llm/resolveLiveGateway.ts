@@ -43,7 +43,7 @@ export const resolveLiveGateway = ({ model, generation }: LiveGatewayConfig = {}
                   ...(Number.isFinite(retryBaseMs) ? { baseDelayMs: retryBaseMs } : {}),
               }
             : undefined;
-    const gen = { ...(generation ? { generation } : {}), ...(retry ? { retry } : {}) };
+    const generationAndRetry = { ...(generation ? { generation } : {}), ...(retry ? { retry } : {}) };
 
-    return createGeminiLlmGateway({ http, apiKey, model: resolvedModel, ...gen });
+    return createGeminiLlmGateway({ http, apiKey, model: resolvedModel, ...generationAndRetry });
 };

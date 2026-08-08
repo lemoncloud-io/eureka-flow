@@ -1,4 +1,4 @@
-import type { HttpRequestInput, HttpRequestSupportable, HttpResponse } from './types';
+import type { HttpClient, HttpRequestInput, HttpResponse } from './types';
 
 export interface ScriptedHttpResponseInit {
     /** Defaults to 200. */
@@ -11,7 +11,7 @@ export interface ScriptedHttpResponseInit {
 }
 
 /** Test double for the HTTP port: replies with scripted responses in order, records every request, and throws past the end of the script. */
-export class ScriptedHttpRequest implements HttpRequestSupportable {
+export class ScriptedHttpRequest implements HttpClient {
     readonly requests: HttpRequestInput[] = [];
     private readonly script: ScriptedHttpResponseInit[];
 

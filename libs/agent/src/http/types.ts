@@ -22,6 +22,6 @@ export interface HttpResponse {
     text(): Promise<string>;
 }
 
-export interface HttpRequestSupportable {
+export interface HttpClient {
     request(input: HttpRequestInput): Promise<HttpResponse>;
 }

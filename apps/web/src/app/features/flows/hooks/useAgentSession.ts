@@ -17,7 +17,7 @@ const sanitizePersisted = (state: SessionState): SessionState =>
 interface AgentInstance {
     agent: Agent;
     /** Re-enable state writes. Called on mount to survive StrictMode's remount. */
-    arm: () => void;
+    enableWrites: () => void;
     /** Stop the agent and silence its late `save` writes. Called on replace/unmount. */
     dispose: () => void;
     /** Read the persisted session and apply it if nothing has happened yet. Always resolves (read errors swallowed). */
@@ -85,7 +85,7 @@ export const useAgentSession = ({
         const agent = createAgent(sessionStore);
         return {
             agent,
-            arm: () => {
+            enableWrites: () => {
                 alive = true;
             },
             dispose: () => {
@@ -125,7 +125,7 @@ export const useAgentSession = ({
     // is silenced+aborted before an in-flight chunk can clobber the new panel via `setSession`.
     // `arm()` on setup re-enables writes so this survives StrictMode's mount→unmount→remount.
     useLayoutEffect(() => {
-        instance.arm();
+        instance.enableWrites();
         return instance.dispose;
     }, [instance]);
 

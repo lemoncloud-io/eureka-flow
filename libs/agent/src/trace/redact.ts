@@ -17,9 +17,9 @@ const redactValue = (value: unknown, depth: number): unknown => {
     return value;
 };
 
-const redactObject = (json: Record<string, unknown>, depth = MAX_DEPTH): Record<string, unknown> => {
+const redactObject = (obj: Record<string, unknown>, depth = MAX_DEPTH): Record<string, unknown> => {
     const out: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(json)) {
+    for (const [key, value] of Object.entries(obj)) {
         out[key] = SECRET_KEY_PATTERN.test(key) ? REDACTED : redactValue(value, depth);
     }
     return out;

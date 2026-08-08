@@ -25,7 +25,7 @@ export interface AgentPorts {
  * discards trace events (NoopTracer). Lives for the page's lifetime — StrictMode's remount cannot silence it.
  */
 export const useAgentPorts = (): AgentPorts => {
-    const handle = useMemo<AgentPorts>(() => {
+    const ports = useMemo<AgentPorts>(() => {
         const storage = createBrowserAgentStorage();
         const buffer = import.meta.env.DEV ? memorySink() : null;
         const tracer = buffer ? createTracer(redactingSink(buffer)) : NoopTracer;
@@ -43,11 +43,11 @@ export const useAgentPorts = (): AgentPorts => {
         if (!import.meta.env.DEV) {
             return undefined;
         }
-        (window as unknown as Record<string, unknown>)['__flowAgentTrace'] = handle.getTraceEntries;
+        (window as unknown as Record<string, unknown>)['__flowAgentTrace'] = ports.getTraceEntries;
         return () => {
             delete (window as unknown as Record<string, unknown>)['__flowAgentTrace'];
         };
-    }, [handle]);
+    }, [ports]);
 
-    return handle;
+    return ports;
 };

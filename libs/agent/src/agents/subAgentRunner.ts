@@ -23,7 +23,8 @@ export interface SpawnChildSpec {
 
 /** What a child reports back — its final summary + whether the sub-turn ran to completion. */
 export interface SpawnChildResult {
-    ok: boolean;
+    /** The sub-turn RAN TO COMPLETION (phase !== 'error') — NOT that the edit succeeded. Read `summary` to judge success/partial/refused. */
+    completed: boolean;
     summary: string;
 }
 
@@ -81,7 +82,7 @@ export interface SubAgentRunnerDeps {
     gatewayFor: (agentType: string) => LlmGateway;
     flowId: string;
     /** Dispatch mode: parallel barrier fan-out (default) or serial. */
-    mode?: 'parallel' | 'serial';
+    dispatchMode?: 'parallel' | 'serial';
     maxIterations?: number;
     /** The current user's flow-role ceiling; forwarded to every child so the executor gates on it (R2). */
     userPermissions: AgentGrant;
@@ -91,7 +92,7 @@ export interface SubAgentRunnerDeps {
 
 /** Build a {@link SubAgentRunner}: each child gets its own isolated storage + flowId, its own gateway, and its own fixed grant, with `userPermissions` riding along for the executor to gate on (R2). */
 export const createSubAgentRunner = (deps: SubAgentRunnerDeps): SubAgentRunner => {
-    const { roster, catalog, gatewayFor, flowId, mode = 'parallel', maxIterations, userPermissions } = deps;
+    const { roster, catalog, gatewayFor, flowId, dispatchMode = 'parallel', maxIterations, userPermissions } = deps;
     let spawnSeq = 0;
     const nextSpawnId = deps.nextSpawnId ?? (() => (spawnSeq += 1));
 
@@ -105,7 +106,7 @@ export const createSubAgentRunner = (deps: SubAgentRunnerDeps): SubAgentRunner =
         // real catalog block type.
         const registration = roster.get(spec.agentType) ?? genericBlockRegistration(spec.agentType, catalog);
         if (!registration) {
-            return { ok: false, summary: `no specialist of type "${spec.agentType}" is available` };
+            return { completed: false, summary: `no specialist of type "${spec.agentType}" is available` };
         }
 
         // Bind the child's identity: a run-monotonic instance id, and a flowPath that nests under the parent —
@@ -147,19 +148,18 @@ export const createSubAgentRunner = (deps: SubAgentRunnerDeps): SubAgentRunner =
         try {
             await child.send(spec.task, { signal });
         } catch (err) {
-            return { ok: false, summary: errorMessage(err) };
+            return { completed: false, summary: errorMessage(err) };
         }
         const state = storage.load(childFlowId);
         return {
-            // ok = the sub-turn completed, not "the edit succeeded"; the orchestrator reads the summary to judge partial/refused.
-            ok: state?.phase !== 'error',
+            completed: state?.phase !== 'error',
             summary: lastAssistantText(state) ?? '(sub-agent returned no summary)',
         };
     };
 
     return {
         fanOut: async (specs, binding, signal, parentTracer = NoopTracer) => {
-            if (mode === 'serial') {
+            if (dispatchMode === 'serial') {
                 const results: SpawnChildResult[] = [];
                 for (const spec of specs) {
                     results.push(await runOne(spec, binding, signal, parentTracer));

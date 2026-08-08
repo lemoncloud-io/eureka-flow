@@ -112,7 +112,7 @@ export const runScenario = async (input: ScenarioInput): Promise<TurnResult> => 
         binding: live,
         catalog,
         userPermissions,
-        mode: input.mode,
+        dispatchMode: input.mode,
         roster: input.roster, // undefined ⇒ createDefaultRoster(); the historical benchmark passes a roster here
     });
 

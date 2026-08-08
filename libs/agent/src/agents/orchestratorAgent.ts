@@ -89,7 +89,7 @@ export interface OrchestratorAgentDeps extends BaseAgentDeps {
     /** Per-child gateway; defaults to the orchestrator's own gateway (fine for a stateless real model). */
     gatewayFor?: (agentType: string) => LlmGateway;
     /** Sub-agent dispatch — parallel barrier fan-out (default) or serial. */
-    mode?: 'parallel' | 'serial';
+    dispatchMode?: 'parallel' | 'serial';
 }
 
 /**
@@ -131,7 +131,7 @@ export class OrchestratorAgent extends BaseAgent {
             roster,
             catalog: deps.catalog,
             flowId: deps.flowId,
-            mode: deps.mode,
+            dispatchMode: deps.dispatchMode,
             maxIterations: deps.maxIterations,
             gatewayFor: deps.gatewayFor ?? (() => deps.gateway),
             userPermissions: deps.userPermissions,
