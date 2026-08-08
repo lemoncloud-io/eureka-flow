@@ -5,7 +5,7 @@ import { useWebSocketStore } from '@flows/socket';
 
 import { AgentPanel } from '../components/AgentPanel';
 import { useAgent } from '../hooks/useAgent';
-import { useAgentHost } from '../hooks/useAgentHost';
+import { useAgentPorts } from '../hooks/useAgentPorts';
 import { createGenerateApiLlmGateway } from '../utils';
 
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
@@ -18,7 +18,7 @@ const HARNESS_PERMISSIONS = { canModifyCanvas: true, canEditConfig: true };
 
 /**
  * Dev-only harness route (`/dev/agent-harness`) for real-browser verification of the
- * host-backed **orchestrator** flow. It mounts the real AgentPanel over an in-memory canvas
+ * **orchestrator** flow. It mounts the real AgentPanel over an in-memory canvas
  * and drives it through the backend-proxied {@link createGenerateApiLlmGateway} (result over the
  * flow socket), while session state persists through BrowserAgentStorage and lifecycle events hit
  * the tracer.
@@ -29,7 +29,7 @@ const HARNESS_PERMISSIONS = { canModifyCanvas: true, canEditConfig: true };
  * the run is wired but not yet functional end-to-end.
  */
 export const AgentHarnessPage = () => {
-    const { storage, tracer, getTraceEntries } = useAgentHost();
+    const { storage, tracer, getTraceEntries } = useAgentPorts();
 
     const binding = useMemo(() => createInMemoryCanvasBinding({ nodes: [{ ...TEXT_INPUT_NODE }], edges: [] }), []);
     const catalog = useMemo(() => createCatalogLookup([]), []);

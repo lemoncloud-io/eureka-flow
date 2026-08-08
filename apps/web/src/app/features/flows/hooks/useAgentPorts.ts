@@ -10,7 +10,7 @@ export interface AgentTraceEntrySnapshot {
     ts: number;
 }
 
-export interface AgentHostHandle {
+export interface AgentPorts {
     /** Per-flow session persistence (localStorage, `flow_mosaic_agent_` namespace). */
     storage: AgentStorage;
     /** The tracer injected into the agent; every run event flows through it. */
@@ -20,12 +20,12 @@ export interface AgentHostHandle {
 }
 
 /**
- * One agent host per editor page: a localStorage-backed persistence port and a tracer. Dev keeps a redacted
- * in-memory buffer so a real-browser run's trace is assertable; production discards trace events (NoopTracer).
- * Lives for the page's lifetime — StrictMode's remount cannot silence it.
+ * The agent's browser-side ports, assembled once per editor page: a localStorage-backed persistence port and
+ * a tracer. Dev keeps a redacted in-memory buffer so a real-browser run's trace is assertable; production
+ * discards trace events (NoopTracer). Lives for the page's lifetime — StrictMode's remount cannot silence it.
  */
-export const useAgentHost = (): AgentHostHandle => {
-    const handle = useMemo<AgentHostHandle>(() => {
+export const useAgentPorts = (): AgentPorts => {
+    const handle = useMemo<AgentPorts>(() => {
         const storage = createBrowserAgentStorage();
         const buffer = import.meta.env.DEV ? memorySink() : null;
         const tracer = buffer ? createTracer(redactingSink(buffer)) : NoopTracer;
