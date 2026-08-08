@@ -5,7 +5,7 @@ import { useWebSocketStore } from '@flows/socket';
 
 import { AgentPanel } from '../components/AgentPanel';
 import { useAgent } from '../hooks/useAgent';
-import { useAgentEnvironment } from '../hooks/useAgentEnvironment';
+import { useAgentHost } from '../hooks/useAgentHost';
 import { createGenerateApiLlmGateway } from '../utils';
 
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
@@ -15,18 +15,18 @@ const TEXT_INPUT_NODE: NodeData = { id: 'text-1', type: 'text-input', position: 
 
 /**
  * Dev-only harness route (`/dev/agent-harness`) for real-browser verification of the
- * environment-backed **orchestrator** flow. It mounts the real AgentPanel over an in-memory canvas
+ * host-backed **orchestrator** flow. It mounts the real AgentPanel over an in-memory canvas
  * and drives it through the backend-proxied {@link createGenerateApiLlmGateway} (result over the
  * flow socket), while session state persists through BrowserAgentStorage and lifecycle events hit
- * the trace reporter.
+ * the tracer.
  *
- * Everything below the panel is read-only observability rendered by the app itself: the live node
- * position, the environment storage keys (read through the storage port), and the trace event
- * stream (messages only). The generate receiver + tool calls are pending in the socket layer, so
+ * Everything below the panel is a read-only trace surface rendered by the app itself: the live node
+ * position, the storage keys (read through the storage port), and the trace event
+ * stream (event names only). The generate receiver + tool calls are pending in the socket layer, so
  * the run is wired but not yet functional end-to-end.
  */
 export const AgentHarnessPage = () => {
-    const { storage, tracer, getTraceEntries } = useAgentEnvironment();
+    const { storage, tracer, getTraceEntries } = useAgentHost();
 
     const binding = useMemo(() => createInMemoryCanvasBinding({ nodes: [{ ...TEXT_INPUT_NODE }], edges: [] }), []);
     const catalog = useMemo(() => createCatalogLookup([]), []);
@@ -51,7 +51,7 @@ export const AgentHarnessPage = () => {
         userPermissions: { canModifyCanvas: true, canEditConfig: true },
     });
 
-    // The in-memory binding has no subscription; poll it (and the observability surfaces)
+    // The in-memory binding has no subscription; poll it (and the trace surfaces)
     // a few times per second — plenty for a dev harness.
     const [, setTick] = useState(0);
     const [storageKeys, setStorageKeys] = useState<string[]>([]);
@@ -67,12 +67,12 @@ export const AgentHarnessPage = () => {
     }, [storage]);
 
     const node = binding.readGraph().nodes[0];
-    const traceMessages = getTraceEntries().map(entry => `${entry.level}:${entry.message}`);
+    const traceMessages = getTraceEntries().map(entry => `${entry.level}:${entry.event}`);
 
     return (
         <div style={{ display: 'flex', height: '100vh' }}>
             <div style={{ flex: 1, padding: 24, fontFamily: 'monospace', overflow: 'auto' }}>
-                <h1 style={{ fontSize: 18, marginBottom: 12 }}>Agent Environment Harness (dev only)</h1>
+                <h1 style={{ fontSize: 18, marginBottom: 12 }}>Agent Host Harness (dev only)</h1>
                 <p style={{ marginBottom: 8 }}>
                     Scenario: ask the orchestrator to move the text input right. Drives the backend Generate API gateway
                     (result over the flow socket); tool calls are pending in the socket layer.
@@ -81,7 +81,7 @@ export const AgentHarnessPage = () => {
                     node position: x={node.position.x}, y={node.position.y}
                 </p>
                 <p data-testid="storage-keys" style={{ marginBottom: 8 }}>
-                    environment storage keys: {storageKeys.length === 0 ? '(none yet)' : storageKeys.join(', ')}
+                    storage keys: {storageKeys.length === 0 ? '(none yet)' : storageKeys.join(', ')}
                 </p>
                 <div data-testid="trace-events">
                     <p>trace events ({traceMessages.length}):</p>

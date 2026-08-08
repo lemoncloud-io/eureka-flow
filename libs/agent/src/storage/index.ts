@@ -1,4 +1,4 @@
-export type { AgentStorageSupportable } from './types';
+export type { AgentStorage } from './types';
 
 export { createMemoryAgentStorage } from './MemoryAgentStorage';
 export type { MemoryAgentStorageOptions } from './MemoryAgentStorage';

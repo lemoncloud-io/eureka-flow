@@ -13,9 +13,9 @@ import type { Tracer } from '../trace';
 /**
  * The single shared {@link ToolExecutor}: a required-capability tool runs only if both the agent's fixed
  * `grant` and the caller's `userPermissions` allow it. `dispatch` never throws. It emits `tool.call` before
- * and `tool.result` after every dispatch via the `tracer` accessor (default no-op).
+ * and `tool.result` after every dispatch via the `getTracer` accessor (default no-op).
  */
-export const createToolExecutor = (tracer: () => Tracer = () => NoopTracer): ToolExecutor => {
+export const createToolExecutor = (getTracer: () => Tracer = () => NoopTracer): ToolExecutor => {
     const indexTools = async (
         agent: AgentConfig
     ): Promise<{ defs: ToolDef[]; byName: Map<string, { def: ToolDef; provider: ToolProvider }> }> => {
@@ -69,7 +69,7 @@ export const createToolExecutor = (tracer: () => Tracer = () => NoopTracer): Too
         listTools: async (agent: AgentConfig) => (await indexTools(agent)).defs,
 
         dispatch: async (agent: AgentConfig, call: ToolCall, userPermissions: AgentGrant): Promise<ToolResult> => {
-            const t = tracer();
+            const t = getTracer();
             t.emit({ name: TOOL_CALL, fields: { toolCallId: call.id, name: call.name, args: call.args } });
             const result = await route(agent, call, userPermissions);
             t.emit({

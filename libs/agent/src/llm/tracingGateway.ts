@@ -5,14 +5,18 @@ import type { Tracer } from '../trace';
 
 /**
  * A per-agent {@link LlmGateway} decorator: emits `llm.request` before a chat() and `llm.response` after,
- * re-yielding every chunk unchanged (a pure pass-through observer). `tracer` is an accessor, not a fixed
+ * re-yielding every chunk unchanged (a pure pass-through observer). `getTracer` is an accessor, not a fixed
  * tracer, so per-turn context advances without re-wrapping — mirroring the `() => signalHolder.current`
  * idiom already used for the abort signal. `now` is injected for deterministic duration in tests.
  */
-export const tracingGateway = (inner: LlmGateway, tracer: () => Tracer, now: () => number = Date.now): LlmGateway => ({
+export const tracingGateway = (
+    inner: LlmGateway,
+    getTracer: () => Tracer,
+    now: () => number = Date.now
+): LlmGateway => ({
     capabilities: inner.capabilities,
     async *chat(req, opts): AsyncIterable<Chunk> {
-        const t = tracer();
+        const t = getTracer();
         t.emit({ name: LLM_REQUEST, fields: { messageCount: req.messages.length, toolCount: req.tools.length } });
 
         const startedAt = now();

@@ -132,21 +132,21 @@ export abstract class BaseAgent implements Agent {
 
     /** The identity-bound tracer (runId/agent id/flowPath), the base for each turn's context-bound child. */
     private readonly identityTracer: Tracer;
-    /** Holds the in-flight turn's tracer (identity + turn); read by the wrapped gateway/executor and by children. */
-    private readonly turn: { current: Tracer };
+    /** Holds this agent's in-flight turn tracer (identity + turn); read by its own wrapped gateway/executor. */
+    private readonly turnTracerHolder: { current: Tracer };
 
     /** @param base the subclass's persona defaults + fixed tools; `deps.config` overrides everything but `tools`. */
     constructor(deps: BaseAgentDeps, base: AgentConfig) {
         this.identityTracer = deps.tracer ?? NoopTracer;
-        this.turn = { current: this.identityTracer };
+        this.turnTracerHolder = { current: this.identityTracer };
         // Self-wrap: llm.* and tool.* carry the agent's identity + turn via the holder accessor, no re-wrapping.
-        this.gateway = tracingGateway(deps.gateway, () => this.turn.current);
+        this.gateway = tracingGateway(deps.gateway, () => this.turnTracerHolder.current);
         this.storage = deps.storage;
         this.flowId = deps.flowId;
         this.binding = deps.binding;
         this.catalog = deps.catalog;
         this.userPermissions = deps.userPermissions;
-        this.executor = deps.executor ?? createToolExecutor(() => this.turn.current);
+        this.executor = deps.executor ?? createToolExecutor(() => this.turnTracerHolder.current);
         this.maxIterations = deps.maxIterations ?? DEFAULT_MAX_ITERATIONS;
         this.config = { ...base, ...(deps.config ?? {}), tools: base.tools };
     }
@@ -185,11 +185,6 @@ export abstract class BaseAgent implements Agent {
         return Date.now();
     }
 
-    /** The in-flight turn's tracer — a subclass forwards it to spawned children (see the orchestrator). */
-    protected currentTracer(): Tracer {
-        return this.turn.current;
-    }
-
     /** Fired whenever the in-flight turn's tracer advances; a subclass that spawns children republishes it. */
     protected onTurnTracer(_tracer: Tracer): void {
         // default: no children to forward to
@@ -201,13 +196,13 @@ export abstract class BaseAgent implements Agent {
     }
 
     private setTurnTracer(tracer: Tracer): void {
-        this.turn.current = tracer;
+        this.turnTracerHolder.current = tracer;
         this.onTurnTracer(tracer);
     }
 
     /** Emit the appended message as a `message` event on the current turn tracer (the readable transcript). */
     private emitMessage(msg: Message): void {
-        this.turn.current.emit({
+        this.turnTracerHolder.current.emit({
             name: MESSAGE,
             fields: {
                 role: msg.role,
@@ -297,7 +292,7 @@ export abstract class BaseAgent implements Agent {
         this.emitMessage(userMsg);
 
         const finishTurn = (name: string, extra: Record<string, unknown> = {}): void => {
-            this.turn.current.emit({ name, fields: { graph: this.binding.readGraph(), ...extra } });
+            this.turnTracerHolder.current.emit({ name, fields: { graph: this.binding.readGraph(), ...extra } });
         };
 
         try {
@@ -310,7 +305,7 @@ export abstract class BaseAgent implements Agent {
                 }
 
                 this.setTurnTracer(runTracer.child({ turn: i }));
-                this.turn.current.emit({ name: TURN_STEP, fields: { turn: i } });
+                this.turnTracerHolder.current.emit({ name: TURN_STEP, fields: { turn: i } });
 
                 const chatMessages: ChatMessage[] = [
                     { role: 'system', content: config.systemPrompt },

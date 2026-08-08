@@ -1,4 +1,4 @@
-/** The observability port the agent core depends on: bind context once, emit structured events. */
+/** The trace port the agent core depends on: bind context once, emit structured events. */
 
 export type TraceLevel = 'debug' | 'info' | 'warn' | 'error';
 

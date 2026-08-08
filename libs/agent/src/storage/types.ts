@@ -1,5 +1,5 @@
 /** The agent's sanctioned path to persistent state. Keys are strings, values are JSON; JSON errors reject loudly with the offending key. */
-export interface AgentStorageSupportable {
+export interface AgentStorage {
     /** Read and parse a JSON value; resolves null when the key is absent. Rejects on corrupt JSON. */
     getJson<T>(key: string): Promise<T | null>;
     /** Serialize and store a JSON value. Rejects when the value cannot be serialized. */

@@ -66,7 +66,7 @@ export const App = () => {
                 <Route path="/processes/:id/apply" element={<LegacyApplyRedirect />} />
 
                 {/* Builder routes */}
-                {/* Dev-only harness: real-browser verification of the environment-backed agent flow. */}
+                {/* Dev-only harness: real-browser verification of the host-backed agent flow. */}
                 {import.meta.env.DEV && <Route path="/dev/agent-harness" element={<AgentHarnessPage />} />}
                 <Route path="/flows" element={<PublicFlowsPage />} />
                 <Route path="/editor" element={<FlowEditorRouter />} />

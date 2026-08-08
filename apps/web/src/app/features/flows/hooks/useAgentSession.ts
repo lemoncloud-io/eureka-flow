@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import type { Agent, AgentStorageSupportable, SessionState, SessionStore, Tracer } from '@flows/agent';
+import type { Agent, AgentStorage, SessionState, SessionStore, Tracer } from '@flows/agent';
 
-/** The narrow persistence slice this hook needs — just the two JSON ops, per ISP. */
-type SessionPersistence = Pick<AgentStorageSupportable, 'getJson' | 'setJson'>;
+/** The narrow storage slice this hook needs — just the two JSON ops, per ISP. */
+type SessionStoragePort = Pick<AgentStorage, 'getJson' | 'setJson'>;
 
 // Per-flow session persistence through the injected storage port (survives reload).
 // Best-effort: storage errors are swallowed, and a stale `thinking` phase is cleared so the panel isn't stuck.
@@ -28,12 +28,12 @@ interface AgentInstance {
 
 export interface UseAgentSessionArgs {
     flowId: string;
-    /** Session persistence port (survives reload). */
-    persistence: SessionPersistence;
+    /** Session storage port (survives reload). */
+    storage: SessionStoragePort;
     /** Tracer for run-lifecycle events (agent.run.start/done/error). */
     tracer: Tracer;
     /** Build the agent over the hook's {@link SessionStore}. Wrap in `useCallback` so it's stable per (flowId + agent inputs). */
-    createAgent: (storage: SessionStore) => Agent;
+    createAgent: (sessionStore: SessionStore) => Agent;
 }
 
 export interface UseAgentSessionResult {
@@ -44,21 +44,21 @@ export interface UseAgentSessionResult {
 
 /**
  * The generic React binding shared by every in-browser agent: owns a per-flow session store
- * (persisted through the Agent Environment, survives reload) and re-renders on every `save`
+ * (persisted through the injected storage port, survives reload) and re-renders on every `save`
  * (Panel emits `send` → agent writes SessionState → store → Panel). The agent it drives is the
  * caller's choice via `createAgent`; nothing here is locator-specific. `send` is gated on async
  * hydration, and the outgoing agent is aborted + silenced on flow switch / unmount.
  */
 export const useAgentSession = ({
     flowId,
-    persistence,
+    storage,
     tracer,
     createAgent,
 }: UseAgentSessionArgs): UseAgentSessionResult => {
     const [session, setSession] = useState<SessionState | null>(null);
 
     const instance = useMemo<AgentInstance>(() => {
-        // The agent's working copy; hydrated asynchronously from the environment storage below.
+        // The agent's working copy; hydrated asynchronously from the injected storage port below.
         let current: SessionState | null = null;
         // `alive` gates state writes: a disposed agent's late `save` can't touch the new flow's session.
         let alive = true;
@@ -67,7 +67,7 @@ export const useAgentSession = ({
             ...s,
             messages: s.messages.map(m => ({ ...m, toolCalls: m.toolCalls?.map(tc => ({ ...tc })) })),
         });
-        const storage: SessionStore = {
+        const sessionStore: SessionStore = {
             load: () => current,
             create: id => {
                 current = { flowId: id, messages: [], phase: 'idle' };
@@ -76,13 +76,13 @@ export const useAgentSession = ({
             save: s => {
                 current = s;
                 // Real run data through the injected storage port (best-effort, like before).
-                void persistence.setJson(keyFor(s.flowId), s).catch(() => undefined);
+                void storage.setJson(keyFor(s.flowId), s).catch(() => undefined);
                 if (alive) {
                     setSession(snapshot(s));
                 }
             },
         };
-        const agent = createAgent(storage);
+        const agent = createAgent(sessionStore);
         return {
             agent,
             arm: () => {
@@ -95,7 +95,7 @@ export const useAgentSession = ({
             // Applied only while live and nothing has produced state yet; invoked from an effect (pure memo through StrictMode).
             hydrate: async () => {
                 try {
-                    const persisted = await persistence.getJson<SessionState>(keyFor(flowId));
+                    const persisted = await storage.getJson<SessionState>(keyFor(flowId));
                     if (alive && current === null && persisted) {
                         const restored = sanitizePersisted(persisted);
                         current = restored;
@@ -107,7 +107,7 @@ export const useAgentSession = ({
             },
             getPhase: () => current?.phase ?? null,
         };
-    }, [flowId, persistence, tracer, createAgent]);
+    }, [flowId, storage, tracer, createAgent]);
 
     // `send` is blocked until this instance's transcript has been read; flipped true by the hydration effect below.
     const [hydrated, setHydrated] = useState(false);

@@ -1,6 +1,6 @@
 import { assertStorageKey, parseStoredJson, serializeJson } from './json';
 
-import type { AgentStorageSupportable } from './types';
+import type { AgentStorage } from './types';
 
 /** The subset of the DOM Storage API the browser storage needs; injectable for tests. */
 export interface WebStorageLike {
@@ -37,8 +37,8 @@ const resolveWebStorage = (provided?: WebStorageLike): WebStorageLike => {
     return globalStorage;
 };
 
-/** AgentStorageSupportable backed by localStorage; all keys live under a namespace prefix. */
-export const createBrowserAgentStorage = (options: BrowserAgentStorageOptions = {}): AgentStorageSupportable => {
+/** AgentStorage backed by localStorage; all keys live under a namespace prefix. */
+export const createBrowserAgentStorage = (options: BrowserAgentStorageOptions = {}): AgentStorage => {
     const webStorage = resolveWebStorage(options.webStorage);
     const namespace = options.keyPrefix ?? DEFAULT_KEY_PREFIX;
 

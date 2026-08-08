@@ -25,7 +25,7 @@ The design is chosen to satisfy these; any change must keep them.
 - **Interface segregation.** `Tracer` is two methods (`emit`, `child`); `TraceSink` is one required (`write`). No consumer sees a member it does not use. (Contrast the removed reporter's `log/debug/info/warn/error/flush/close`.)
 - **Null Object.** `NoopTracer` is the default value of every `tracer` dep. No agent ever writes `if (tracer)`; tracing is always safe-on.
 - **Single responsibility — split three ways.** (a) `Tracer` _binds context_, `TraceSink` _transports_ — never the same object. (b) _Identity-binding_ (the spawner), _turn-binding_ (the loop), and _wrapping_ (the agent) are three responsibilities in three places, so none is overloaded.
-- **Open/closed.** New event kinds and new sinks need no change to agents. Decorators (`tracingGateway`, `observableCanvasBinding`) add instrumentation without editing the wrapped code.
+- **Open/closed.** New event kinds and new sinks need no change to agents. Decorators (`tracingGateway`, `tracingCanvasBinding`) add instrumentation without editing the wrapped code.
 - **DRY / Rule of Three.** One emit path. `BaseAgent` self-wraps its deps once, so every current and future subclass is instrumented identically — no per-agent duplication.
 - **YAGNI.** No OTel SDK, no live spans, no diff engine, no non-file sinks now (see _Deferred_).
 - **Structured logging with bound context** (the pino / OpenTelemetry idiom). `child(context)` is the propagation mechanism; field names follow the OTel GenAI semantic conventions for later portability to a real trace viewer.
@@ -42,7 +42,7 @@ trace/
   redact.ts         redact(record)
   project/          toTraceTree, toTranscripts, toGraphDiff
 llm/tracingGateway.ts               LlmGateway decorator  → llm.*
-canvas/observableCanvasBinding.ts   CanvasBinding decorator → canvas.mutate
+canvas/tracingCanvasBinding.ts   CanvasBinding decorator → canvas.mutate
 ```
 
 ```mermaid
@@ -56,7 +56,7 @@ flowchart TD
     subgraph TAPS["Per-agent taps, each carrying the agent Tracer"]
         TG["tracingGateway emits llm.request, llm.response"]
         TE["toolExecutor emits tool.call, tool.result"]
-        OB["observableCanvasBinding emits canvas.mutate"]
+        OB["tracingCanvasBinding emits canvas.mutate"]
         LP["BaseAgent loop emits message, turn.start, turn.done"]
     end
 
@@ -74,20 +74,20 @@ flowchart TD
 The tracer is threaded exactly like the existing abort signal (`signalHolder` / `onTurnSignal` in `orchestratorAgent.ts`) — a per-turn holder, published by the loop, read by the spawn seam. Three responsibilities:
 
 1. **The spawner binds identity** (who am I). Identity is known by the creator, not the agent. `runOne` mints `agentId = agentType#N`, builds `childTracer = parentTracer.child({ agent name, agent id, flowPath })`, emits `agent.spawn`/`agent.return`, and injects `childTracer` into the child's deps. The root (orchestrator) binds its own identity at construction and mints `runId` per `send()`.
-2. **The agent self-wraps its deps** (in the `BaseAgent` constructor), through a `() => Tracer` accessor pointing at a per-agent holder — so the turn number can advance without re-wrapping: `tracingGateway(deps.gateway, get)`, `observableCanvasBinding(deps.binding, get)`, `createToolExecutor({ registry, tracer: get })`.
+2. **The agent self-wraps its deps** (in the `BaseAgent` constructor), through a `() => Tracer` accessor pointing at a per-agent holder — so the turn number can advance without re-wrapping: `tracingGateway(deps.gateway, get)`, `tracingCanvasBinding(deps.binding, get)`, `createToolExecutor({ registry, tracer: get })`.
 3. **The loop advances turn** — each iteration sets `holder.current = identity.child({ turn: i })` and emits `turn.*`. The spawn provider reads `() => holder.current` and passes it into `runner.fanOut`, where `runOne` (responsibility 1) recurses.
 
 The **tracer tree mirrors the agent tree** — that is what makes attribution fall out for free.
 
 ### Seams
 
-| Emits                          | Plugged into                                    | File                                    |
-| ------------------------------ | ----------------------------------------------- | --------------------------------------- |
-| `llm.request` / `llm.response` | `tracingGateway` decorator (per agent)          | new `llm/tracingGateway.ts`             |
-| `tool.call` / `tool.result`    | `toolExecutor.dispatch`                         | `tools/toolExecutor.ts`                 |
-| `message`, `turn.*`            | `BaseAgent` send-loop                           | `agents/baseAgent.ts`                   |
-| `canvas.mutate`                | `observableCanvasBinding` decorator (per agent) | new `canvas/observableCanvasBinding.ts` |
-| `agent.spawn` / `agent.return` | `subAgentRunner.runOne`                         | `agents/subAgentRunner.ts`              |
+| Emits                          | Plugged into                                 | File                                 |
+| ------------------------------ | -------------------------------------------- | ------------------------------------ |
+| `llm.request` / `llm.response` | `tracingGateway` decorator (per agent)       | new `llm/tracingGateway.ts`          |
+| `tool.call` / `tool.result`    | `toolExecutor.dispatch`                      | `tools/toolExecutor.ts`              |
+| `message`, `turn.*`            | `BaseAgent` send-loop                        | `agents/baseAgent.ts`                |
+| `canvas.mutate`                | `tracingCanvasBinding` decorator (per agent) | new `canvas/tracingCanvasBinding.ts` |
+| `agent.spawn` / `agent.return` | `subAgentRunner.runOne`                      | `agents/subAgentRunner.ts`           |
 
 ## Concurrency
 
@@ -120,7 +120,7 @@ Identical core; only the sink adapter differs.
 | Reused (unchanged)                                       | New                                                                   |
 | -------------------------------------------------------- | --------------------------------------------------------------------- |
 | `LlmGateway`, `CanvasBinding`, `ToolExecutor` interfaces | `trace/` module (tracer, sinks, projectors)                           |
-| `BaseAgent` loop shape, `runOne` spawn flow              | `tracingGateway`, `observableCanvasBinding` decorators                |
+| `BaseAgent` loop shape, `runOne` spawn flow              | `tracingGateway`, `tracingCanvasBinding` decorators                   |
 | `signalHolder` / `onTurnSignal` idiom (mirrored)         | `tracer` dep on `BaseAgentDeps` / `SubAgentRunnerDeps`; `nextSpawnId` |
 
 ## Deferred (YAGNI)

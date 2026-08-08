@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { createInMemoryCanvasBinding } from '../../canvas/inMemoryCanvasBinding';
-import { observableCanvasBinding } from '../../canvas/observableCanvasBinding';
+import { tracingCanvasBinding } from '../../canvas/tracingCanvasBinding';
 import { createTracer, memorySink } from '../../trace';
 
-describe('observableCanvasBinding', () => {
+describe('tracingCanvasBinding', () => {
     it('emits canvas.mutate on addNode with the created id, and passes the id through', () => {
         const sink = memorySink();
-        const binding = observableCanvasBinding(createInMemoryCanvasBinding(), () => createTracer(sink, () => 0));
+        const binding = tracingCanvasBinding(createInMemoryCanvasBinding(), () => createTracer(sink, () => 0));
 
         const { id } = binding.addNode('http_request', { x: 10, y: 20 });
 
@@ -18,7 +18,7 @@ describe('observableCanvasBinding', () => {
 
     it('emits one canvas.mutate per mutating call, none for readGraph', () => {
         const sink = memorySink();
-        const binding = observableCanvasBinding(createInMemoryCanvasBinding(), () => createTracer(sink, () => 0));
+        const binding = tracingCanvasBinding(createInMemoryCanvasBinding(), () => createTracer(sink, () => 0));
 
         const { id } = binding.addNode('http_request', { x: 0, y: 0 });
         binding.updateNode(id, { label: 'Fetch' });

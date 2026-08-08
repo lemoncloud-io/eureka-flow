@@ -1,14 +1,14 @@
 import { assertStorageKey, parseStoredJson, serializeJson } from './json';
 
-import type { AgentStorageSupportable } from './types';
+import type { AgentStorage } from './types';
 
 export interface MemoryAgentStorageOptions {
     /** Pre-seeded raw entries (already-serialized JSON strings), mainly for tests. */
     seed?: Record<string, string>;
 }
 
-/** In-memory AgentStorageSupportable (Map-backed) for the 'node-virtual' test runtime. Not for production persistence. */
-export const createMemoryAgentStorage = (options: MemoryAgentStorageOptions = {}): AgentStorageSupportable => {
+/** In-memory AgentStorage (Map-backed) for the 'node-virtual' test runtime. Not for production persistence. */
+export const createMemoryAgentStorage = (options: MemoryAgentStorageOptions = {}): AgentStorage => {
     const values = new Map<string, string>(Object.entries(options.seed ?? {}));
 
     return {

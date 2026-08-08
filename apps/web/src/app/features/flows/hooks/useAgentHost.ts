@@ -2,20 +2,20 @@ import { useEffect, useMemo } from 'react';
 
 import { NoopTracer, createBrowserAgentStorage, createTracer, memorySink, redactingSink } from '@flows/agent';
 
-import type { AgentStorageSupportable, TraceRecord, Tracer } from '@flows/agent';
+import type { AgentStorage, TraceRecord, Tracer } from '@flows/agent';
 
 export interface AgentTraceEntrySnapshot {
     level: string;
-    message: string;
+    event: string;
     ts: number;
 }
 
 export interface AgentHostHandle {
     /** Per-flow session persistence (localStorage, `flow_mosaic_agent_` namespace). */
-    storage: AgentStorageSupportable;
+    storage: AgentStorage;
     /** The tracer injected into the agent; every run event flows through it. */
     tracer: Tracer;
-    /** Dev/test observability: snapshot of the buffered records (level + event name + ts, redacted). Empty in prod. */
+    /** Dev/test trace snapshot: level + event name + ts (redacted). Empty in prod. */
     getTraceEntries: () => AgentTraceEntrySnapshot[];
 }
 
@@ -24,7 +24,7 @@ export interface AgentHostHandle {
  * in-memory buffer so a real-browser run's trace is assertable; production discards trace events (NoopTracer).
  * Lives for the page's lifetime — StrictMode's remount cannot silence it.
  */
-export const useAgentEnvironment = (): AgentHostHandle => {
+export const useAgentHost = (): AgentHostHandle => {
     const handle = useMemo<AgentHostHandle>(() => {
         const storage = createBrowserAgentStorage();
         const buffer = import.meta.env.DEV ? memorySink() : null;
@@ -34,7 +34,7 @@ export const useAgentEnvironment = (): AgentHostHandle => {
             storage,
             tracer,
             getTraceEntries: () =>
-                buffer ? buffer.records.map((r: TraceRecord) => ({ level: r.level, message: r.name, ts: r.ts })) : [],
+                buffer ? buffer.records.map((r: TraceRecord) => ({ level: r.level, event: r.name, ts: r.ts })) : [],
         };
     }, []);
 

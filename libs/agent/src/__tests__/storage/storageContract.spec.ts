@@ -4,18 +4,18 @@ import { createBrowserAgentStorage } from '../../storage/BrowserAgentStorage';
 import { createMemoryAgentStorage } from '../../storage/MemoryAgentStorage';
 
 import type { WebStorageLike } from '../../storage/BrowserAgentStorage';
-import type { AgentStorageSupportable } from '../../storage/types';
+import type { AgentStorage } from '../../storage/types';
 
 /**
  * The shared storage contract: one set of expectations executed against BOTH
  * implementations. This is the proof behind "same interface, same semantics" — memory
  * (node-virtual) and localStorage-backed (browser) storage must be indistinguishable
- * through AgentStorageSupportable.
+ * through AgentStorage.
  */
 interface StorageContractHarness {
-    create(): AgentStorageSupportable;
+    create(): AgentStorage;
     /** Plant a raw non-JSON value behind the interface, as real storage corruption would. */
-    createWithCorruptEntry(key: string, raw: string): AgentStorageSupportable;
+    createWithCorruptEntry(key: string, raw: string): AgentStorage;
 }
 
 const createFakeWebStorage = (): WebStorageLike => {

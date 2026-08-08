@@ -107,11 +107,11 @@ Both take a `() => Tracer` **accessor** (not a fixed tracer) so per-turn context
 
 ```ts
 // llm/tracingGateway.ts
-export const tracingGateway = (inner: LlmGateway, tracer: () => Tracer): LlmGateway;
+export const tracingGateway = (inner: LlmGateway, getTracer: () => Tracer): LlmGateway;
 //   emits llm.request { model, messageCount } before, llm.response { model, durationMs, usage } after.
 
-// canvas/observableCanvasBinding.ts
-export const observableCanvasBinding = (inner: CanvasBinding, tracer: () => Tracer): CanvasBinding;
+// canvas/tracingCanvasBinding.ts
+export const tracingCanvasBinding = (inner: CanvasBinding, getTracer: () => Tracer): CanvasBinding;
 //   each mutating method: apply on inner, then emit canvas.mutate { op, nodeId? , edgeId? }.
 //   readGraph passes straight through.
 ```
@@ -138,7 +138,7 @@ interface ToolExecutorDeps { registry: /* unchanged */; tracer?: () => Tracer } 
 //   this.turn = { current: this.identity };            // holder — mirrors signalHolder
 //   const get = () => this.turn.current;
 //   this.gateway  = tracingGateway(deps.gateway, get);
-//   this.binding  = observableCanvasBinding(deps.binding, get);
+//   this.binding  = tracingCanvasBinding(deps.binding, get);
 //   this.executor = deps.executor ?? createToolExecutor({ registry, tracer: get });
 
 // agents/subAgentRunner.ts — SubAgentRunnerDeps gains:

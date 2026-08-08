@@ -3,8 +3,7 @@ import type { TraceContext, Tracer } from './tracer';
 
 /**
  * Build a {@link Tracer} over a {@link TraceSink}. `child` accumulates context immutably (child keys win),
- * and `now` — the only thing tracing ever needed from the old environment — is injected (default Date.now)
- * so runs are deterministic in tests.
+ * and `now` is injected (default Date.now) so runs are deterministic in tests.
  */
 export const createTracer = (sink: TraceSink, now: () => number = Date.now, context: TraceContext = {}): Tracer => ({
     emit: ({ name, level = 'debug', fields = {} }) => sink.write({ ts: now(), name, level, context, fields }),

@@ -7,7 +7,7 @@ import { useAgentSession } from './useAgentSession';
 import type { UseAgentSessionResult } from './useAgentSession';
 import type {
     AgentGrant,
-    AgentStorageSupportable,
+    AgentStorage,
     CanvasBinding,
     CatalogLookup,
     LlmGateway,
@@ -22,7 +22,7 @@ interface UseAgentArgs {
     /** The block catalog behind the read/config tools (build with `createBlockCatalogLookup`). */
     catalog: CatalogLookup;
     /** Session persistence port (survives reload). */
-    storage: AgentStorageSupportable;
+    storage: AgentStorage;
     /** Tracer injected into the orchestrator + used for run-lifecycle events. */
     tracer: Tracer;
     /** The current user's permissions — the flow role projected via `toAgentGrant`. The executor gates
@@ -63,5 +63,5 @@ export const useAgent = ({
             }),
         [gateway, binding, flowId, catalog, userPermissions, tracer, gatewayFor]
     );
-    return useAgentSession({ flowId, persistence: storage, tracer, createAgent });
+    return useAgentSession({ flowId, storage, tracer, createAgent });
 };

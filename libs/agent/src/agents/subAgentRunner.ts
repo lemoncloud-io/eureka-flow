@@ -1,5 +1,5 @@
 import { createBlockAgent } from './blockAgent';
-import { observableCanvasBinding } from '../canvas/observableCanvasBinding';
+import { tracingCanvasBinding } from '../canvas/tracingCanvasBinding';
 import { createInMemorySessionStore } from '../session/session';
 import { AGENT_RETURN, AGENT_SPAWN, NoopTracer } from '../trace';
 import { errorMessage } from '../utils/errors';
@@ -126,7 +126,7 @@ export const createSubAgentRunner = (deps: SubAgentRunnerDeps): SubAgentRunner =
             flowId: childFlowId,
             maxIterations,
             // Wrap the shared binding so the child's canvas edits emit canvas.mutate attributed to it.
-            binding: observableCanvasBinding(binding, () => childTracer),
+            binding: tracingCanvasBinding(binding, () => childTracer),
             catalog,
             userPermissions,
             tracer: childTracer,
