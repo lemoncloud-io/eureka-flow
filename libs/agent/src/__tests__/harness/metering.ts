@@ -12,11 +12,11 @@ import type { Chunk, LlmGateway } from '../../llm/llmGateway';
 export interface TokenTotals {
     /** Σ usage.inputTokens (promptTokenCount) across calls — re-sent history included (that IS the bill, §3.1). */
     inputTokens: number;
-    /** Σ usage.cachedTokens (cachedContentTokenCount) — input served from the implicit cache (§3.1). */
+    /** Σ usage.cachedInputTokens (cachedContentTokenCount) — input served from the implicit cache (§3.1). */
     cachedTokens: number;
-    /** Σ (totalTokens − inputTokens) per call — visible output + thinking (derive, so thinking is counted, §3.1). */
+    /** Σ (providerTotalTokens − inputTokens) per call — visible output + thinking (derive, so thinking is counted, §3.1). */
     outputTokens: number;
-    /** Σ usage.totalTokens (totalTokenCount) — the stable, cache-independent ground-truth axis (§3.1). */
+    /** Σ usage.providerTotalTokens (totalTokenCount) — the stable, cache-independent ground-truth axis (§3.1). */
     totalTokens: number;
     /** Count of chat() calls in the turn. */
     roundTrips: number;
@@ -52,10 +52,10 @@ export const createMeter = (): Meter => {
         addUsage(u: Chunk['usage']): void {
             if (!u) return;
             const input = u.inputTokens ?? 0;
-            // Fall back to input + output only when a provider omits the total; otherwise trust totalTokens.
-            const total = u.totalTokens ?? input + (u.outputTokens ?? 0);
+            // Fall back to input + output only when a provider omits the total; otherwise trust providerTotalTokens.
+            const total = u.providerTotalTokens ?? input + (u.outputTokens ?? 0);
             inputTokens += input;
-            cachedTokens += u.cachedTokens ?? 0;
+            cachedTokens += u.cachedInputTokens ?? 0;
             totalTokens += total;
             // Derive output = total − prompt so thinking is included (not the visible outputTokens field, §3.1).
             outputTokens += Math.max(0, total - input);

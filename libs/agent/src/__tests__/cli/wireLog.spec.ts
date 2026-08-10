@@ -55,7 +55,10 @@ describe('createWireLog', () => {
     it('logs one token-accounting line per model call, tagged with the agent, and passes chunks through', async () => {
         const path = tmpFile('b.log');
         const wire = createWireLog(path);
-        const inner = gatewayOf([{ text: 'hi' }, { usage: { totalTokens: 42, cachedTokens: 10 }, done: true }]);
+        const inner = gatewayOf([
+            { text: 'hi' },
+            { usage: { providerTotalTokens: 42, cachedInputTokens: 10 }, done: true },
+        ]);
 
         const chunks = await drain(
             wire.gateway(inner).chat({ messages: [], tools: [{ name: 'spawn', description: '', parameters: {} }] })
@@ -64,6 +67,21 @@ describe('createWireLog', () => {
         expect(chunks.map(c => c.text ?? '').join('')).toBe('hi'); // transparent
         // `spawn` in the toolset ⇒ orchestrator; the token usage is the real-backend proof.
         expect(readLog(path)).toContain('⟐ #1 orchestrator · in=? out=? total=42 cached=10');
+    });
+
+    it('falls back to "?" / 0 when a real usage object omits providerTotalTokens/cachedInputTokens', async () => {
+        const path = tmpFile('b2.log');
+        const wire = createWireLog(path);
+        // A usage object IS present (unlike the "no backend call" case below) but the provider
+        // didn't report a total or a cache figure — the ?? fallbacks on line 90 must render '?'/0,
+        // never throw or log "no backend call" (that path is only for a wholly absent `usage`).
+        const inner = gatewayOf([{ text: 'hi' }, { usage: { inputTokens: 5, outputTokens: 3 }, done: true }]);
+
+        await drain(
+            wire.gateway(inner).chat({ messages: [], tools: [{ name: 'spawn', description: '', parameters: {} }] })
+        );
+
+        expect(readLog(path)).toContain('⟐ #1 orchestrator · in=5 out=3 total=? cached=0');
     });
 
     it('marks a fake gateway (no usage) as no backend call', async () => {
