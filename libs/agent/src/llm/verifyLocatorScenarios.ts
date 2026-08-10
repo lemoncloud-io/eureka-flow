@@ -1,9 +1,9 @@
-import { LOCATOR_SYSTEM_PROMPT } from '../agents/locatorAgent';
 import { createInMemoryCanvasBinding } from '../canvas/inMemoryCanvasBinding';
 import { applyMove, directionToDelta } from '../canvas/moveSemantics';
 import { createCatalogLookup } from '../catalog';
-import { createNodeMoveToolProvider, createNodeReadToolProvider, renderNodeContext } from '../tools/nodeTools';
+import { LIST_NODES, MOVE_NODE, renderNodeContext } from '../tools/nodeTools';
 import { createToolExecutor } from '../tools/toolExecutor';
+import { toolset } from '../tools/toolset';
 
 import type { AgentConfig } from '../agent';
 import type { ChatMessage, Chunk, LlmGateway } from './llmGateway';
@@ -13,7 +13,8 @@ import type { AgentGrant } from '../permissions';
 import type { ToolCall, ToolResult } from '../tools/types';
 
 // No blocks are ever described in these scenarios — every scenario only calls list_nodes and/or
-// move_node — so an empty catalog is sufficient for the read provider's describe_node tool.
+// move_node, neither of which reads the catalog — so an empty one merely satisfies `toolset`'s
+// `CanvasToolDeps` shape.
 const emptyCatalog = createCatalogLookup([]);
 
 // This harness verifies the agent's own fixed `grant`, not the user-permission ceiling the
@@ -28,9 +29,10 @@ const VERIFY_USER_PERMISSIONS: AgentGrant = {
 
 /**
  * A tool-*selection* scenario matrix, using only the two tools that actually exist
- * (`list_nodes`, `move_node`) — real `LOCATOR_SYSTEM_PROMPT`/node-context rendering, real
- * `ToolExecutor`, real `CanvasBinding`. This is a broader sibling of the single fixed scenario in
- * `verifyProviderToolCall.ts`; this module is the one to extend as more scenarios are added.
+ * (`list_nodes`, `move_node`) — this module's own `LOCATOR_SYSTEM_PROMPT` (see below) plus real
+ * node-context rendering, real `ToolExecutor`, real `CanvasBinding`. This is a broader sibling of
+ * the single fixed scenario in `verifyProviderToolCall.ts`; this module is the one to extend as
+ * more scenarios are added.
  *
  * Every scenario here is single-turn (gateway → `ToolExecutor`). Multi-step flows (`list_nodes` →
  * `move_node` in one conversation) need a second `gateway.chat()` call with the first turn's tool
@@ -168,12 +170,38 @@ interface MultiTurnOnlyScenarioDefinition {
     hideInitialNodeContext: boolean;
 }
 
+/**
+ * The retired `LocatorAgent`'s persona (see `agents/registrations.ts`: the structural-agents
+ * refactor folded node-moving into the `builder`, which carries a much broader plan-executing
+ * prompt and toolset). This benchmark deliberately keeps its own copy, byte-identical to the
+ * original, rather than substituting `BUILDER_SYSTEM_PROMPT`: the scenario matrix below (e.g.
+ * `NO_TOOL_REFUSAL`'s "delete has no matching tool") depends on a narrow persona restricted to
+ * exactly `list_nodes`/`move_node` — the builder's full editing toolset would change what several
+ * scenarios are actually testing, not just how they're phrased.
+ */
+const LOCATOR_SYSTEM_PROMPT = [
+    'You are the Locator agent for a visual flow editor. Your ONLY job is to relocate existing nodes — change',
+    'their position, nothing else. If asked for anything else (adding, deleting, renaming, connecting, or',
+    'reconfiguring a node), briefly say you can only move nodes.',
+    '',
+    'How to work:',
+    '- Move a node only by the exact amount, or to the exact destination, you were given. Never invent a distance',
+    '  or target: if the task gives no clear amount or destination, move nothing and report what you need.',
+    '- Identify the node the task means from the ones you can see, matching against each node’s label and type.',
+    '  Match on meaning, not exact text: ignore case, and treat spaces, hyphens, and underscores as',
+    '  interchangeable (so "text input" matches a `text-input` type). If none matches, move nothing and say you',
+    '  could not find it (you may list what you can see). If more than one matches, do not guess — ask which one,',
+    '  listing the candidates.',
+    '- Move one node at a time; for several, move each in turn.',
+    '- After moving, briefly confirm what you moved and its new position.',
+].join('\n');
+
 const buildConfig = (binding: CanvasBinding): AgentConfig => ({
     id: 'locator-scenario-verify',
     description: 'Moves existing nodes on the canvas.',
     systemPrompt: LOCATOR_SYSTEM_PROMPT,
     grant: { canModifyCanvas: true },
-    tools: [createNodeReadToolProvider(binding, emptyCatalog), createNodeMoveToolProvider(binding)],
+    tools: [toolset({ binding, catalog: emptyCatalog }, [LIST_NODES, MOVE_NODE])],
 });
 
 const drain = async (stream: AsyncIterable<Chunk>): Promise<Chunk[]> => {
@@ -767,7 +795,8 @@ const MOVE_NAMED_NODE_WITHOUT_ID: MultiTurnOnlyScenarioDefinition = {
             // dispatch succeeds, but the named target itself never reaches the expected position.
             return {
                 pass: false,
-                error: `named node moved to (${after?.x},${after?.y}), expected ` +
+                error:
+                    `named node moved to (${after?.x},${after?.y}), expected ` +
                     `(${MOVE_NAMED_NODE_EXPECTED.x},${MOVE_NAMED_NODE_EXPECTED.y})`,
             };
         }
@@ -789,7 +818,9 @@ const MULTI_TURN_ONLY_SCENARIOS: readonly MultiTurnOnlyScenarioDefinition[] = [M
 /** Exported so callers outside this module (e.g. `realMultiTurnLocatorScenarios.spec.ts`'s
  * `LIVE_MULTI_TURN_SCENARIOS` id validation) can accept a multi-turn-only id without importing
  * `MULTI_TURN_ONLY_SCENARIOS` itself or duplicating its id list. */
-export const MULTI_TURN_ONLY_SCENARIO_IDS: readonly MultiTurnOnlyScenarioId[] = MULTI_TURN_ONLY_SCENARIOS.map(s => s.id);
+export const MULTI_TURN_ONLY_SCENARIO_IDS: readonly MultiTurnOnlyScenarioId[] = MULTI_TURN_ONLY_SCENARIOS.map(
+    s => s.id
+);
 
 /** Scenario lookup for {@link runMultiTurnLocatorScenario} only — checks the single-turn `SCENARIOS`
  * catalog first (so every existing scenario id still resolves exactly as before), then falls back
@@ -967,7 +998,12 @@ export const runMultiTurnLocatorScenario = async (
     const maxTurns = options?.maxTurns ?? DEFAULT_MAX_TURNS;
     const scenario = findAnyScenario(scenarioId);
     const binding = createInMemoryCanvasBinding({
-        nodes: scenario.seedNodes.map(n => ({ id: n.id, type: n.type, position: { ...n.position }, customLabel: n.label })),
+        nodes: scenario.seedNodes.map(n => ({
+            id: n.id,
+            type: n.type,
+            position: { ...n.position },
+            customLabel: n.label,
+        })),
         edges: [],
     });
     const executor = createToolExecutor();
@@ -1042,10 +1078,22 @@ export const runMultiTurnLocatorScenario = async (
         // Append the real assistant tool-call + tool-result message pair before the next turn —
         // same shape BaseAgent.send() persists (assistant `toolCalls[].args` is the raw JSON
         // string, not the parsed value; see `mapTranscript`/`recordToolResult` in baseAgent.ts).
+        // `thoughtSignature` must ride along verbatim when the gateway captured one — Gemini's
+        // "thinking" models reject the replayed functionCall with a 400 without it (see
+        // `ChatMessage.toolCalls`'s doc in llmGateway.ts); it stays absent for every other provider.
         transcript.push({
             role: 'assistant',
             content: null,
-            toolCalls: [{ id: toolCall.id, name: toolCall.name, args: toolCallChunk.argsDelta }],
+            toolCalls: [
+                {
+                    id: toolCall.id,
+                    name: toolCall.name,
+                    args: toolCallChunk.argsDelta,
+                    ...(toolCallChunk.thoughtSignature !== undefined
+                        ? { thoughtSignature: toolCallChunk.thoughtSignature }
+                        : {}),
+                },
+            ],
         });
         transcript.push({
             role: 'tool',
@@ -1054,7 +1102,13 @@ export const runMultiTurnLocatorScenario = async (
         });
 
         const positionsAfter = snapshotPositions(binding);
-        const { pass, error } = scenario.check({ toolCall, dispatchResult, positionsBefore, positionsAfter, textPresent });
+        const { pass, error } = scenario.check({
+            toolCall,
+            dispatchResult,
+            positionsBefore,
+            positionsAfter,
+            textPresent,
+        });
         const continuable = !pass && isContinuableLookup(toolCall, dispatchResult);
 
         turns.push({

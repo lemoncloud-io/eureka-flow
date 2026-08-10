@@ -1,14 +1,16 @@
 import { createInMemoryCanvasBinding } from '../canvas/inMemoryCanvasBinding';
 import { createCatalogLookup } from '../catalog';
-import { createNodeMoveToolProvider, createNodeReadToolProvider } from '../tools/nodeTools';
+import { LIST_NODES, MOVE_NODE } from '../tools/nodeTools';
 import { createToolExecutor } from '../tools/toolExecutor';
+import { toolset } from '../tools/toolset';
 
 import type { AgentConfig } from '../agent';
 import type { Chunk, LlmGateway } from './llmGateway';
 import type { AgentGrant } from '../permissions';
 
 // No blocks are ever described in this Scope-A verification — the model is only expected to
-// call move_node — so an empty catalog is sufficient for the read provider's describe_node tool.
+// call move_node, which doesn't read the catalog — so an empty one merely satisfies `toolset`'s
+// `CanvasToolDeps` shape.
 const emptyCatalog = createCatalogLookup([]);
 
 /**
@@ -66,13 +68,15 @@ export const verifyMoveNodeToolCall = async (gateway: LlmGateway): Promise<Verif
         id: 'locator-verify',
         description: 'moves nodes on the canvas',
         systemPrompt: 'You move nodes on a visual canvas by calling the provided tools.',
-        tools: [createNodeReadToolProvider(binding, emptyCatalog), createNodeMoveToolProvider(binding)],
+        tools: [toolset({ binding, catalog: emptyCatalog }, [LIST_NODES, MOVE_NODE])],
         grant: { canModifyCanvas: true },
     };
 
     try {
         // Seed the node list so the model can call move_node in one turn — no multi-turn
-        // tool-result round-trip. Mirrors LocatorAgent's per-turn context injection.
+        // tool-result round-trip. Mirrors the retired LocatorAgent's per-turn context injection
+        // (see verifyLocatorScenarios.ts's LOCATOR_SYSTEM_PROMPT doc for why this harness keeps
+        // that narrow persona/toolset rather than the builder's much broader one).
         const chunks = await drain(
             gateway.chat({
                 messages: [

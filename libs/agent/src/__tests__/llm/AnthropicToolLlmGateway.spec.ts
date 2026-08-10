@@ -6,6 +6,7 @@ import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
 import { createAnthropicToolLlmGateway } from '../../llm/AnthropicToolLlmGateway';
 import { PRICING_CONFIG_VERSION, estimateCost, getModelPricing } from '../../llm/pricing';
 
+import type { HttpRequestSupportable } from '../../http';
 import type { Chunk } from '../../llm/llmGateway';
 
 const API_KEY = 'test-anthropic-key';
@@ -99,6 +100,30 @@ describe('createAnthropicToolLlmGateway', () => {
         expect(body['max_tokens']).toBe(256);
     });
 
+    it('includes temperature on the request when generation.temperature is configured', async () => {
+        const http = new ScriptedHttpRequest([{ json: anthropicText('hi') }]);
+        const gateway = createAnthropicToolLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: API_KEY,
+            generation: { temperature: 0.4 },
+        });
+
+        await drain(gateway.chat(userSays('hello')));
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body['temperature']).toBe(0.4);
+    });
+
+    it('omits temperature entirely from the request when generation.temperature is not configured', async () => {
+        const http = new ScriptedHttpRequest([{ json: anthropicText('hi') }]);
+
+        await drain(createGateway(http).chat(userSays('hello')));
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body).not.toHaveProperty('temperature');
+    });
+
     it('maps ToolDef into tools[].input_schema, passing the lowercase JSON Schema through unchanged', async () => {
         const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
 
@@ -167,12 +192,32 @@ describe('createAnthropicToolLlmGateway', () => {
         expect(body).not.toHaveProperty('tools');
     });
 
+    it('maps a system message with null content to an empty string rather than dropping it or sending "null"', async () => {
+        const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+
+        await drain(
+            createGateway(http).chat({
+                messages: [
+                    { role: 'system', content: null },
+                    { role: 'user', content: 'q' },
+                ],
+                tools: [],
+            })
+        );
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body['system']).toBe('');
+    });
+
     it('yields a text chunk then a done chunk carrying usage', async () => {
         const http = new ScriptedHttpRequest([{ json: anthropicText('the answer') }]);
 
         const chunks = await drain(createGateway(http).chat(userSays('q')));
 
-        expect(chunks).toEqual([{ text: 'the answer' }, { done: true, usage: withAnthropicCost({ inputTokens: 12, outputTokens: 34 }) }]);
+        expect(chunks).toEqual([
+            { text: 'the answer' },
+            { done: true, usage: withAnthropicCost({ inputTokens: 12, outputTokens: 34 }) },
+        ]);
     });
 
     it('parses a tool_use block into a toolCall chunk (input object → JSON string argsDelta)', async () => {
@@ -295,6 +340,47 @@ describe('createAnthropicToolLlmGateway', () => {
                 role: 'user',
                 content: [{ type: 'tool_result', tool_use_id: 'toolu_01abc', content: '{"ok":true}' }],
             });
+        });
+
+        it('maps a tool-result message with no toolCallId or content to empty-string fallbacks, never a literal "undefined" on the wire', async () => {
+            const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+
+            await drain(
+                createGateway(http).chat({
+                    messages: [
+                        { role: 'user', content: 'go' },
+                        { role: 'tool', content: null },
+                    ],
+                    tools: [],
+                })
+            );
+
+            const body = http.requests[0].body as Record<string, unknown>;
+            const messages = body['messages'] as Array<Record<string, unknown>>;
+            expect(messages[1]).toEqual({
+                role: 'user',
+                content: [{ type: 'tool_result', tool_use_id: '', content: '' }],
+            });
+        });
+
+        it('maps an assistant message with no tool calls through the plain content mapping, falling back to empty string when content is null', async () => {
+            // toolCalls is undefined (not just empty) here, so this is not a tool-call turn at all —
+            // it must fall through to the same plain user/assistant mapping every other role uses.
+            const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+
+            await drain(
+                createGateway(http).chat({
+                    messages: [
+                        { role: 'user', content: 'go' },
+                        { role: 'assistant', content: null },
+                    ],
+                    tools: [],
+                })
+            );
+
+            const body = http.requests[0].body as Record<string, unknown>;
+            const messages = body['messages'] as Array<Record<string, unknown>>;
+            expect(messages[1]).toEqual({ role: 'assistant', content: '' });
         });
 
         it('produces the correct multi-turn body shape for a full multi-turn round trip (system + user + assistant tool_use + tool_result)', async () => {
@@ -449,7 +535,10 @@ describe('createAnthropicToolLlmGateway', () => {
             const chunks = await drain(gateway.chat(userSays('q')));
             const done = chunks.find(c => c.done);
 
-            expect(done?.usage?.estimatedCost).toBeCloseTo(pricing.cachedInputPerMillion + pricing.cacheWritePerMillion, 10);
+            expect(done?.usage?.estimatedCost).toBeCloseTo(
+                pricing.cachedInputPerMillion + pricing.cacheWritePerMillion,
+                10
+            );
             expect(done?.usage?.cacheWriteTtl).toBe('5m');
         });
 
@@ -605,7 +694,7 @@ describe('createAnthropicToolLlmGateway', () => {
             });
         });
 
-        it('leaves providerTotalTokens undefined — Anthropic\'s Messages API reports no raw total, never computed locally', async () => {
+        it("leaves providerTotalTokens undefined — Anthropic's Messages API reports no raw total, never computed locally", async () => {
             const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
 
             const chunks = await drain(createGateway(http).chat(userSays('q')));
@@ -652,6 +741,62 @@ describe('createAnthropicToolLlmGateway', () => {
         expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
     });
 
+    it('passes an error body through verbatim (no redaction) when apiKey is empty — nothing to scrub', async () => {
+        // Guards the redactText early-return itself: without it, `value.split('').join(...)` would
+        // splice '[redacted]' between every single character of the body, mangling it completely.
+        const http = new ScriptedHttpRequest([{ status: 403, text: 'no secret in this error body' }]);
+        const gateway = createAnthropicToolLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: '',
+        });
+
+        await expect(drain(gateway.chat(userSays('q')))).rejects.toThrow(
+            'Anthropic request failed with status 403: no secret in this error body'
+        );
+    });
+
+    it('falls back to an empty string when reading the non-ok response body itself fails (response.text() rejects)', async () => {
+        const http: HttpRequestSupportable = {
+            request: async () => ({
+                status: 500,
+                ok: false,
+                headers: {},
+                json: async () => {
+                    throw new Error('should not be called on the error path');
+                },
+                text: async () => {
+                    throw new Error('body stream errored');
+                },
+            }),
+        };
+        const trace = new BufferAgentTraceReporter();
+        const gateway = createAnthropicToolLlmGateway({
+            environment: createVirtualAgentEnvironment({ traceReporter: trace }),
+            http,
+            apiKey: API_KEY,
+        });
+
+        await expect(drain(gateway.chat(userSays('q')))).rejects.toThrow('Anthropic request failed with status 500: ');
+        expect(trace.entries.some(entry => entry.level === 'error')).toBe(true);
+    });
+
+    it('defaults a tool_use block missing `input` to {} and reports no token counts when usage is a bare empty object', async () => {
+        // A single deliberately minimal/degenerate response exercising several "field absent"
+        // fallbacks at once: the tool_use content block carries no `input` field at all, and the
+        // usage object is present but empty (no input_tokens/output_tokens/cache fields).
+        const http = new ScriptedHttpRequest([
+            { json: { content: [{ type: 'tool_use', id: 'toolu_x', name: 'no_input_tool' }], usage: {} } },
+        ]);
+
+        const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+        expect(chunks).toEqual([
+            { toolCall: { id: 'toolu_x', name: 'no_input_tool', argsDelta: '{}' } },
+            { done: true, usage: { estimatedCost: null } },
+        ]);
+    });
+
     it('throws when the response has no content blocks', async () => {
         const http = new ScriptedHttpRequest([{ json: { content: [] } }]);
 
@@ -670,11 +815,28 @@ describe('createAnthropicToolLlmGateway', () => {
         expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
     });
 
+    it('omits usage and includes actualModel on the traced response entry when the response has no usage but does report a model', async () => {
+        // trace?.debug(...) short-circuits its whole argument list when no trace reporter is
+        // configured, so the object literal carrying these two ternaries is only ever evaluated
+        // when a real reporter is wired — this test is what actually exercises both of them.
+        const http = new ScriptedHttpRequest([
+            { json: { content: [{ type: 'text', text: 'hi' }], model: 'claude-haiku-4-5-20251001' } },
+        ]);
+        const trace = new BufferAgentTraceReporter();
+
+        await drain(createGateway(http, trace).chat(userSays('q')));
+
+        const responseEntry = trace.entries.find(entry => entry.message === 'llm.anthropic.response');
+        expect(responseEntry?.json).not.toHaveProperty('usage');
+        expect(responseEntry?.json?.['actualModel']).toBe('claude-haiku-4-5-20251001');
+    });
 });
 
 describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
     it('a text response with a valid top-level model reports it as actualModel on the done chunk', async () => {
-        const http = new ScriptedHttpRequest([{ json: { ...anthropicText('hi'), model: 'claude-haiku-4-5-20251001' } }]);
+        const http = new ScriptedHttpRequest([
+            { json: { ...anthropicText('hi'), model: 'claude-haiku-4-5-20251001' } },
+        ]);
 
         const chunks = await drain(createGateway(http).chat(userSays('q')));
 
@@ -684,7 +846,12 @@ describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
 
     it('a tool-call response with a valid top-level model reports it as actualModel on the done chunk', async () => {
         const http = new ScriptedHttpRequest([
-            { json: { ...anthropicToolUse('toolu_01abc', 'move_node', { nodeId: 'text-1' }), model: 'claude-sonnet-5-20260815' } },
+            {
+                json: {
+                    ...anthropicToolUse('toolu_01abc', 'move_node', { nodeId: 'text-1' }),
+                    model: 'claude-sonnet-5-20260815',
+                },
+            },
         ]);
 
         const chunks = await drain(createGateway(http).chat(userSays('move it')));
@@ -710,7 +877,11 @@ describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
             gateway.chat({
                 messages: [
                     { role: 'user', content: 'go' },
-                    { role: 'assistant', content: null, toolCalls: [{ id: 'toolu_1', name: 'list_nodes', args: '{}' }] },
+                    {
+                        role: 'assistant',
+                        content: null,
+                        toolCalls: [{ id: 'toolu_1', name: 'list_nodes', args: '{}' }],
+                    },
                     { role: 'tool', content: '{"nodes":[]}', toolCallId: 'toolu_1' },
                 ],
                 tools: [],
@@ -745,7 +916,14 @@ describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
     });
 
     it('reporting actualModel changes nothing else about text/tool-call/usage/error parsing (no regression)', async () => {
-        const http = new ScriptedHttpRequest([{ json: { ...anthropicToolUse('toolu_1', 'move_node', { nodeId: 'text-1' }), model: 'claude-haiku-4-5-20251001' } }]);
+        const http = new ScriptedHttpRequest([
+            {
+                json: {
+                    ...anthropicToolUse('toolu_1', 'move_node', { nodeId: 'text-1' }),
+                    model: 'claude-haiku-4-5-20251001',
+                },
+            },
+        ]);
 
         const chunks = await drain(createGateway(http).chat(userSays('move it')));
 
@@ -760,7 +938,9 @@ describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
     });
 
     it('requestedModel (the gateway’s own `model`) and actualModel stay independently reported and can differ', async () => {
-        const http = new ScriptedHttpRequest([{ json: { ...anthropicText('hi'), model: 'claude-haiku-4-5-20251001' } }]);
+        const http = new ScriptedHttpRequest([
+            { json: { ...anthropicText('hi'), model: 'claude-haiku-4-5-20251001' } },
+        ]);
         const gateway = createGateway(http);
 
         expect(gateway.model).toBe('claude-haiku-4-5'); // the bare alias requested

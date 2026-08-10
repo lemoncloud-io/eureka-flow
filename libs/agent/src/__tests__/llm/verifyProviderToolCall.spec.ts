@@ -103,4 +103,20 @@ describe('verifyMoveNodeToolCall', () => {
         expect(result.error).toBeDefined();
         expect(result.error!.length).toBeLessThanOrEqual(200);
     });
+
+    it('stringifies a thrown non-Error value from the gateway (e.g. a plain string)', async () => {
+        const gateway: LlmGateway = {
+            capabilities: { toolCalls: true },
+            // eslint-disable-next-line require-yield -- intentionally throws before any yield
+            async *chat(): AsyncIterable<Chunk> {
+                throw 'plain string thrown, not an Error';
+            },
+        };
+
+        const result = await verifyMoveNodeToolCall(gateway);
+
+        expect(result.pass).toBe(false);
+        expect(result.toolCallName).toBeNull();
+        expect(result.error).toBe('plain string thrown, not an Error');
+    });
 });
