@@ -24,8 +24,14 @@ export interface ToolDef {
 export interface ChatMessage {
     role: 'system' | 'user' | 'assistant' | 'tool';
     content: string | null;
-    /** Present on assistant messages that call tools; `args` is the raw JSON string. */
-    toolCalls?: { id: string; name: string; args: string }[];
+    /** Present on assistant messages that call tools; `args` is the raw JSON string.
+     * `thoughtSignature` is an opaque, provider-specific continuation token — currently only
+     * Gemini's "thinking" model family (3.x, and sometimes `gemini-2.5-flash-lite`) populates it;
+     * every other provider leaves it undefined. It must be replayed back verbatim on this exact
+     * tool call when it appears again in a later request, or Gemini rejects the call with a 400
+     * ("Function call is missing a thought_signature..."; see GeminiToolLlmGateway.ts). Never
+     * inspect or transform its contents — treat it as an opaque blob to round-trip. */
+    toolCalls?: { id: string; name: string; args: string; thoughtSignature?: string }[];
     /** Present on tool-result messages: the id of the assistant tool call it answers. */
     toolCallId?: string;
 }
@@ -111,7 +117,12 @@ export interface UsageInfo {
 /** A streamed fragment: text delta and/or a tool-call arg delta, and/or done. */
 export interface Chunk {
     text?: string;
-    toolCall?: { id: string; name: string; argsDelta: string };
+    /** `thoughtSignature` — see `ChatMessage.toolCalls`'s doc; a gateway that receives one from the
+     * provider on this exact call sets it here so `collect()` can carry it into the persisted
+     * message for later replay. Every chunk carrying the same `id` should repeat the same
+     * `thoughtSignature` if the provider only sends it once — `collect()` keeps the first
+     * non-undefined value it sees per id. */
+    toolCall?: { id: string; name: string; argsDelta: string; thoughtSignature?: string };
     done?: boolean;
     /** Optional token/cost accounting, emitted with the final (`done`) chunk when the provider
      * reports it. Supersedes an earlier, less detailed inline shape (`totalTokens`/`cachedTokens`)

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
 import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
 import { createAnthropicToolLlmGateway } from '../../llm/AnthropicToolLlmGateway';
+import { createGeminiToolLlmGateway } from '../../llm/GeminiToolLlmGateway';
 import { accumulateExtendedUsage, wrapGatewayWithUsageCapture } from '../../llm/verificationMetrics';
 import { LOCATOR_SCENARIOS, runMultiTurnLocatorScenario } from '../../llm/verifyLocatorScenarios';
 
@@ -38,7 +39,10 @@ const scriptedGateway = (responses: (Chunk[] | Error)[]): { gateway: LlmGateway;
 describe('runMultiTurnLocatorScenario: direct move', () => {
     it('succeeds in one turn via the expected tool, strategy=direct', async () => {
         const { gateway } = scriptedGateway([
-            [{ toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } }, { done: true }],
+            [
+                { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+                { done: true },
+            ],
         ]);
         const result = await runMultiTurnLocatorScenario(gateway, 'move-node-right');
         expect(result.taskOutcome).toBe('success');
@@ -53,7 +57,10 @@ describe('runMultiTurnLocatorScenario: lookup-first completion', () => {
     it('completes on turn 2 after a list_nodes lookup, strategy=lookup-first', async () => {
         const { gateway, requests } = scriptedGateway([
             [{ toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } }, { done: true }],
-            [{ toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } }, { done: true }],
+            [
+                { toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+                { done: true },
+            ],
         ]);
         const result = await runMultiTurnLocatorScenario(gateway, 'move-node-right');
         expect(result.taskOutcome).toBe('success');
@@ -67,7 +74,10 @@ describe('runMultiTurnLocatorScenario: lookup-first completion', () => {
     it('feeds a real assistant tool-call + tool-result message pair back for the second request', async () => {
         const { gateway, requests } = scriptedGateway([
             [{ toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } }, { done: true }],
-            [{ toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } }, { done: true }],
+            [
+                { toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+                { done: true },
+            ],
         ]);
         await runMultiTurnLocatorScenario(gateway, 'move-node-right');
 
@@ -150,7 +160,10 @@ describe('runMultiTurnLocatorScenario: positionsBefore/positionsAfter are presen
     // MultiTurnTaskOutcome values, not just the provider-error case above.
     it('success', async () => {
         const { gateway } = scriptedGateway([
-            [{ toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } }, { done: true }],
+            [
+                { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+                { done: true },
+            ],
         ]);
         const result = await runMultiTurnLocatorScenario(gateway, 'move-node-right');
         expect(result.taskOutcome).toBe('success');
@@ -211,7 +224,10 @@ describe('runMultiTurnLocatorScenario: text-only scenarios', () => {
 describe('runMultiTurnLocatorScenario: wrong tool', () => {
     it('does not become success merely because the wrong tool call is understandable; strategy=other', async () => {
         const { gateway } = scriptedGateway([
-            [{ toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":0,"dy":0}}' } }, { done: true }],
+            [
+                { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":0,"dy":0}}' } },
+                { done: true },
+            ],
         ]);
         // no-tool-refusal expects a text refusal, not any tool call. A wrong non-list_nodes tool
         // call is neither lookup-first, text-only, nor (since it fails) direct — it's `other`.
@@ -223,7 +239,10 @@ describe('runMultiTurnLocatorScenario: wrong tool', () => {
     it('a non-list_nodes wrong tool does not earn a second turn', async () => {
         const { gateway, requests } = scriptedGateway([
             [{ toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } }, { done: true }],
-            [{ toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } }, { done: true }],
+            [
+                { toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+                { done: true },
+            ],
         ]);
         // selective-multi-node expects the http node to move; moving text-1 is simply wrong, not a lookup.
         const result = await runMultiTurnLocatorScenario(gateway, 'selective-multi-node');
@@ -236,7 +255,10 @@ describe('runMultiTurnLocatorScenario: wrong tool', () => {
 describe('runMultiTurnLocatorScenario: completionMode — orthogonal to strategy', () => {
     it('direct tool-action success: strategy=direct, completionMode=tool-action', async () => {
         const { gateway } = scriptedGateway([
-            [{ toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } }, { done: true }],
+            [
+                { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+                { done: true },
+            ],
         ]);
         const result = await runMultiTurnLocatorScenario(gateway, 'move-node-right');
         expect(result.taskOutcome).toBe('success');
@@ -247,7 +269,16 @@ describe('runMultiTurnLocatorScenario: completionMode — orthogonal to strategy
     it('lookup-first tool-action success: strategy=lookup-first, completionMode=tool-action (move-named-node-without-id)', async () => {
         const { gateway } = scriptedGateway([
             [{ toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } }, { done: true }],
-            [{ toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"node-a17","by":{"dx":100,"dy":0}}' } }, { done: true }],
+            [
+                {
+                    toolCall: {
+                        id: 'c2',
+                        name: 'move_node',
+                        argsDelta: '{"nodeId":"node-a17","by":{"dx":100,"dy":0}}',
+                    },
+                },
+                { done: true },
+            ],
         ]);
         const result = await runMultiTurnLocatorScenario(gateway, 'move-named-node-without-id');
         expect(result.taskOutcome).toBe('success');
@@ -311,7 +342,9 @@ describe('runMultiTurnLocatorScenario: completionMode — orthogonal to strategy
         // success with a genuine lookup-action ROUND TRIP — isSuccessfulLookupActionRoundTrip
         // (multiTurnVerificationMetrics.ts) requires a LATER, non-list_nodes tool call too, which
         // this attempt's toolSequence (['list_nodes']) never has.
-        const { gateway } = scriptedGateway([[{ toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } }, { done: true }]]);
+        const { gateway } = scriptedGateway([
+            [{ toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } }, { done: true }],
+        ]);
         const result = await runMultiTurnLocatorScenario(gateway, 'list-nodes-read-only');
         expect(result.taskOutcome).toBe('success');
         expect(result.strategy).toBe('lookup-first');
@@ -333,7 +366,16 @@ describe('runMultiTurnLocatorScenario: move-named-node-without-id (multi-turn-on
     it('lookup-first success: list_nodes then move_node with the discovered id — exact transcript verification', async () => {
         const { gateway, requests } = scriptedGateway([
             [{ toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } }, { done: true }],
-            [{ toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"node-a17","by":{"dx":100,"dy":0}}' } }, { done: true }],
+            [
+                {
+                    toolCall: {
+                        id: 'c2',
+                        name: 'move_node',
+                        argsDelta: '{"nodeId":"node-a17","by":{"dx":100,"dy":0}}',
+                    },
+                },
+                { done: true },
+            ],
         ]);
         const result = await runMultiTurnLocatorScenario(gateway, 'move-named-node-without-id');
 
@@ -382,7 +424,9 @@ describe('runMultiTurnLocatorScenario: move-named-node-without-id (multi-turn-on
         });
         expect(secondMessages[3].role).toBe('tool');
         expect(secondMessages[3].toolCallId).toBe('c1');
-        const listNodesResult = JSON.parse(secondMessages[3].content as string) as { nodes: { id: string; label?: string }[] };
+        const listNodesResult = JSON.parse(secondMessages[3].content as string) as {
+            nodes: { id: string; label?: string }[];
+        };
         expect(listNodesResult.nodes.map(n => ({ id: n.id, label: n.label }))).toEqual(
             expect.arrayContaining([{ id: 'node-a17', label: 'Login' }])
         );
@@ -440,7 +484,16 @@ describe('runMultiTurnLocatorScenario: move-named-node-without-id (multi-turn-on
         const { gateway } = scriptedGateway([
             // A guessed, human-readable id (never actually assigned to any seeded node) instead of
             // the real opaque id `node-a17`.
-            [{ toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"login-button","by":{"dx":100,"dy":0}}' } }, { done: true }],
+            [
+                {
+                    toolCall: {
+                        id: 'c1',
+                        name: 'move_node',
+                        argsDelta: '{"nodeId":"login-button","by":{"dx":100,"dy":0}}',
+                    },
+                },
+                { done: true },
+            ],
         ]);
         const result = await runMultiTurnLocatorScenario(gateway, 'move-named-node-without-id');
 
@@ -460,7 +513,16 @@ describe('runMultiTurnLocatorScenario: move-named-node-without-id (multi-turn-on
         const { gateway } = scriptedGateway([
             // Moves the "Sign up" distractor instead of the named "Login" target — a real, existing
             // node id, so dispatch succeeds; the strict check must still fail this.
-            [{ toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"node-b42","by":{"dx":100,"dy":0}}' } }, { done: true }],
+            [
+                {
+                    toolCall: {
+                        id: 'c1',
+                        name: 'move_node',
+                        argsDelta: '{"nodeId":"node-b42","by":{"dx":100,"dy":0}}',
+                    },
+                },
+                { done: true },
+            ],
         ]);
         const result = await runMultiTurnLocatorScenario(gateway, 'move-named-node-without-id');
 
@@ -477,7 +539,7 @@ describe('runMultiTurnLocatorScenario: move-named-node-without-id (multi-turn-on
         expect(result.turns[0].continuationReason).toBeUndefined();
     });
 
-    it('a text-only response fails: no tool call can ever satisfy this scenario\'s check', async () => {
+    it("a text-only response fails: no tool call can ever satisfy this scenario's check", async () => {
         const { gateway } = scriptedGateway([[{ text: 'The Login button is at (200, 300).' }, { done: true }]]);
         const result = await runMultiTurnLocatorScenario(gateway, 'move-named-node-without-id');
 
@@ -486,6 +548,36 @@ describe('runMultiTurnLocatorScenario: move-named-node-without-id (multi-turn-on
         expect(result.toolSequence).toEqual([]);
         expect(result.error).toContain('did not emit a structured tool call');
         expect(result.positionsAfter).toEqual(result.positionsBefore);
+    });
+});
+
+describe('runMultiTurnLocatorScenario: error handling', () => {
+    it('stringifies a thrown non-Error value from the gateway (e.g. a plain string)', async () => {
+        const gateway: LlmGateway = {
+            capabilities: { toolCalls: true },
+            // eslint-disable-next-line require-yield -- intentionally throws before any yield
+            async *chat(): AsyncIterable<Chunk> {
+                throw 'plain string thrown, not an Error';
+            },
+        };
+        const result = await runMultiTurnLocatorScenario(gateway, 'move-node-right');
+        expect(result.taskOutcome).toBe('provider-error');
+        expect(result.error).toBe('plain string thrown, not an Error');
+    });
+
+    it('throws for an unknown scenario id (single-turn AND multi-turn-only catalogs both miss it)', async () => {
+        const gateway: LlmGateway = {
+            capabilities: { toolCalls: true },
+            async *chat(): AsyncIterable<Chunk> {
+                yield { done: true };
+            },
+        };
+        await expect(
+            runMultiTurnLocatorScenario(
+                gateway,
+                'not-a-real-scenario' as unknown as Parameters<typeof runMultiTurnLocatorScenario>[1]
+            )
+        ).rejects.toThrow(/unknown locator scenario id/);
     });
 });
 
@@ -533,7 +625,12 @@ describe('runMultiTurnLocatorScenario + a real Anthropic gateway (offline, scrip
             {
                 json: {
                     content: [
-                        { type: 'tool_use', id: 'toolu_2', name: 'move_node', input: { nodeId: 'node-a17', by: { dx: 100, dy: 0 } } },
+                        {
+                            type: 'tool_use',
+                            id: 'toolu_2',
+                            name: 'move_node',
+                            input: { nodeId: 'node-a17', by: { dx: 100, dy: 0 } },
+                        },
                     ],
                     stop_reason: 'tool_use',
                     usage: { input_tokens: 260, output_tokens: 25 },
@@ -567,7 +664,16 @@ describe('runMultiTurnLocatorScenario + a real Anthropic gateway (offline, scrip
         expect(http.requests).toHaveLength(2);
         interface AnthropicWireMessage {
             role: string;
-            content: string | Array<{ type: string; id?: string; name?: string; input?: unknown; tool_use_id?: string; content?: string }>;
+            content:
+                | string
+                | Array<{
+                      type: string;
+                      id?: string;
+                      name?: string;
+                      input?: unknown;
+                      tool_use_id?: string;
+                      content?: string;
+                  }>;
         }
         const secondBody = http.requests[1].body as { messages: AnthropicWireMessage[] };
         const assistantIdx = secondBody.messages.findIndex(m => m.role === 'assistant');
@@ -576,7 +682,9 @@ describe('runMultiTurnLocatorScenario + a real Anthropic gateway (offline, scrip
         expect(assistantContent).toEqual([{ type: 'tool_use', id: 'toolu_1', name: 'list_nodes', input: {} }]);
         const toolResultMsg = secondBody.messages[assistantIdx + 1];
         expect(toolResultMsg.role).toBe('user');
-        const toolResultBlock = (toolResultMsg.content as Array<{ type: string; tool_use_id?: string; content?: string }>)[0];
+        const toolResultBlock = (
+            toolResultMsg.content as Array<{ type: string; tool_use_id?: string; content?: string }>
+        )[0];
         expect(toolResultBlock.type).toBe('tool_result');
         expect(toolResultBlock.tool_use_id).toBe('toolu_1');
         // The real list_nodes dispatch result (containing the discovered node) is what was actually
@@ -610,7 +718,14 @@ describe('runMultiTurnLocatorScenario + a real Anthropic gateway (offline, scrip
         const http = new ScriptedHttpRequest([
             {
                 json: {
-                    content: [{ type: 'tool_use', id: 'toolu_1', name: 'move_node', input: { nodeId: 'login-button', by: { dx: 100, dy: 0 } } }],
+                    content: [
+                        {
+                            type: 'tool_use',
+                            id: 'toolu_1',
+                            name: 'move_node',
+                            input: { nodeId: 'login-button', by: { dx: 100, dy: 0 } },
+                        },
+                    ],
                     stop_reason: 'tool_use',
                     usage: { input_tokens: 150, output_tokens: 15 },
                 },
@@ -628,5 +743,138 @@ describe('runMultiTurnLocatorScenario + a real Anthropic gateway (offline, scrip
         expect(result.taskOutcome).toBe('failure');
         expect(result.completionMode).toBe('none');
         expect(result.error).toContain('no node with id "login-button" exists');
+    });
+});
+
+// =================================================================================================
+// runMultiTurnLocatorScenario wired to a REAL createGeminiToolLlmGateway, over a scripted (no
+// network) HTTP layer — the Gemini sibling of the Anthropic section above, and specifically the
+// offline regression net for the `thoughtSignature` round trip: Gemini's "thinking" model family
+// (3.x) rejects a turn-2 request with a 400 ("Function call is missing a thought_signature in
+// functionCall parts.") unless the exact opaque signature it issued with turn 1's functionCall is
+// replayed on that same functionCall part. This is exactly the live failure the multi-turn matrix
+// exposed on 2026-08-07 — the runner used to rebuild the assistant tool-call message without the
+// captured signature (verifyLocatorScenarios.ts's transcript push), which no gateway-level unit
+// test could catch.
+// =================================================================================================
+
+describe('runMultiTurnLocatorScenario + a real Gemini gateway (offline, scripted HTTP — zero network): thoughtSignature round trip', () => {
+    /** A canned Gemini functionCall reply; `thoughtSignature` rides on the functionCall PART (never
+     * a separate part), exactly where Gemini's wire format puts it. */
+    const geminiFunctionCallReply = (name: string, args: unknown, thoughtSignature?: string) => ({
+        candidates: [
+            {
+                content: {
+                    parts: [
+                        {
+                            functionCall: { name, args },
+                            ...(thoughtSignature !== undefined ? { thoughtSignature } : {}),
+                        },
+                    ],
+                },
+            },
+        ],
+        usageMetadata: { promptTokenCount: 20, candidatesTokenCount: 8 },
+    });
+
+    const createGeminiGateway = (http: ScriptedHttpRequest) =>
+        createGeminiToolLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: 'test-gemini-key',
+        });
+
+    interface GeminiWireContent {
+        role: string;
+        parts: Array<Record<string, unknown>>;
+    }
+
+    it("replays turn 1's exact thoughtSignature on the matching turn-2 functionCall part, functionResponse following it", async () => {
+        const http = new ScriptedHttpRequest([
+            { json: geminiFunctionCallReply('list_nodes', {}, 'opaque-sig-turn1') },
+            {
+                json: geminiFunctionCallReply(
+                    'move_node',
+                    { nodeId: 'node-a17', by: { dx: 100, dy: 0 } },
+                    'opaque-sig-turn2'
+                ),
+            },
+        ]);
+
+        const result = await runMultiTurnLocatorScenario(createGeminiGateway(http), 'move-named-node-without-id');
+
+        // The lookup-required scenario genuinely completes — these four are exactly what the live
+        // runner persists as MultiTurnLiveRecord.outcome / strategy / requestedToolSequence /
+        // finalStateCorrect (the last being `taskOutcome === 'success'`, i.e. the strict final
+        // canvas check passed; see realMultiTurnLocatorScenarios.spec.ts's record construction).
+        expect(result.taskOutcome).toBe('success');
+        expect(result.strategy).toBe('lookup-first');
+        expect(result.completionMode).toBe('tool-action');
+        expect(result.turnCount).toBe(2);
+        expect(result.toolSequence).toEqual(['list_nodes', 'move_node']);
+        // Strict final canvas state: the named node moved exactly +100x, distractors untouched.
+        expect(result.positionsBefore['node-a17']).toEqual({ x: 200, y: 300 });
+        expect(result.positionsAfter['node-a17']).toEqual({ x: 300, y: 300 });
+        expect(result.positionsAfter['node-b42']).toEqual(result.positionsBefore['node-b42']);
+        expect(result.positionsAfter['node-c88']).toEqual(result.positionsBefore['node-c88']);
+
+        expect(http.requests).toHaveLength(2);
+
+        // Turn-1 request carries no signature anywhere — a signature only ever originates FROM a
+        // provider response; it is never fabricated locally.
+        const firstBodySerialized = JSON.stringify(http.requests[0].body);
+        expect(firstBodySerialized).not.toContain('thoughtSignature');
+        expect(firstBodySerialized).not.toContain('opaque-sig');
+
+        // Turn-2 request: user prompt, then the model-role functionCall part replaying the EXACT
+        // turn-1 signature, then the functionResponse user turn immediately following it.
+        const secondBody = http.requests[1].body as { contents: GeminiWireContent[] };
+        expect(secondBody.contents).toHaveLength(3);
+        expect(secondBody.contents[1]).toEqual({
+            role: 'model',
+            parts: [{ functionCall: { name: 'list_nodes', args: {} }, thoughtSignature: 'opaque-sig-turn1' }],
+        });
+        const followUp = secondBody.contents[2];
+        expect(followUp.role).toBe('user');
+        expect(followUp.parts).toHaveLength(1);
+        const responsePart = followUp.parts[0] as { functionResponse?: { name: string; response: unknown } };
+        expect(responsePart.functionResponse?.name).toBe('list_nodes');
+        // The real list_nodes dispatch data (containing the discovered node) rode along.
+        expect(JSON.stringify(responsePart)).toContain('node-a17');
+
+        // The signature never leaks onto unrelated parts: the replayed functionCall part is the
+        // ONLY place in the whole turn-2 request a thoughtSignature key appears, and the only
+        // signature VALUE present is the one the provider issued on turn 1.
+        const secondBodySerialized = JSON.stringify(secondBody);
+        expect(secondBodySerialized.split('"thoughtSignature"').length - 1).toBe(1);
+        expect(secondBodySerialized).toContain('opaque-sig-turn1');
+        expect(secondBodySerialized).not.toContain('opaque-sig-turn2');
+
+        // Never exposed in the human-facing result (which is what every report/CSV/JSONL/dashboard
+        // serializes from): no signature key or value anywhere in the scenario result.
+        const resultSerialized = JSON.stringify(result);
+        expect(resultSerialized).not.toContain('thoughtSignature');
+        expect(resultSerialized).not.toContain('opaque-sig');
+    });
+
+    it('omits thoughtSignature end-to-end when the provider never issued one (non-thinking Gemini models stay unchanged)', async () => {
+        const http = new ScriptedHttpRequest([
+            { json: geminiFunctionCallReply('list_nodes', {}) },
+            { json: geminiFunctionCallReply('move_node', { nodeId: 'node-a17', by: { dx: 100, dy: 0 } }) },
+        ]);
+
+        const result = await runMultiTurnLocatorScenario(createGeminiGateway(http), 'move-named-node-without-id');
+
+        expect(result.taskOutcome).toBe('success');
+        expect(result.strategy).toBe('lookup-first');
+        expect(result.toolSequence).toEqual(['list_nodes', 'move_node']);
+        // Nothing fabricated: the key never appears in either request.
+        expect(JSON.stringify(http.requests[0].body)).not.toContain('thoughtSignature');
+        expect(JSON.stringify(http.requests[1].body)).not.toContain('thoughtSignature');
+        const secondBody = http.requests[1].body as { contents: GeminiWireContent[] };
+        expect(secondBody.contents[1]).toEqual({
+            role: 'model',
+            parts: [{ functionCall: { name: 'list_nodes', args: {} } }],
+        });
     });
 });

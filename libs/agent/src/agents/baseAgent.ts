@@ -31,12 +31,15 @@ export interface BaseAgentDeps {
     config?: Partial<Omit<AgentConfig, 'tools'>>;
 }
 
-/** One tool call drained from the stream: parsed `args` plus the `rawArgs` we persist. */
+/** One tool call drained from the stream: parsed `args` plus the `rawArgs` we persist.
+ * `thoughtSignature` — see `ChatMessage.toolCalls`'s doc in `llmGateway.ts`; opaque, only Gemini's
+ * "thinking" models currently populate it. */
 export interface CollectedToolCall {
     id: string;
     name: string;
     args: unknown;
     rawArgs: string;
+    thoughtSignature?: string;
 }
 
 export interface CollectedResponse {
@@ -61,20 +64,24 @@ const safeJsonParse = (raw: string): unknown => {
 export const collect = async (stream: AsyncIterable<Chunk>): Promise<CollectedResponse> => {
     let text = '';
     const order: string[] = [];
-    const acc = new Map<string, { name: string; rawArgs: string }>();
+    const acc = new Map<string, { name: string; rawArgs: string; thoughtSignature?: string }>();
 
     for await (const chunk of stream) {
         if (chunk.text) {
             text += chunk.text;
         }
         if (chunk.toolCall) {
-            const { id, name, argsDelta } = chunk.toolCall;
+            const { id, name, argsDelta, thoughtSignature } = chunk.toolCall;
             const existing = acc.get(id);
             if (existing) {
                 existing.rawArgs += argsDelta;
+                // Keep the first non-undefined signature seen for this id — a gateway that sends
+                // it once (Gemini does, on the chunk carrying the call) should never have it
+                // clobbered by a later argsDelta-only chunk for the same id.
+                existing.thoughtSignature ??= thoughtSignature;
             } else {
                 order.push(id);
-                acc.set(id, { name, rawArgs: argsDelta });
+                acc.set(id, { name, rawArgs: argsDelta, thoughtSignature });
             }
         }
     }
@@ -82,8 +89,18 @@ export const collect = async (stream: AsyncIterable<Chunk>): Promise<CollectedRe
     return {
         text,
         toolCalls: order.map(id => {
-            const { name, rawArgs } = acc.get(id) as { name: string; rawArgs: string };
-            return { id, name, args: safeJsonParse(rawArgs), rawArgs };
+            const { name, rawArgs, thoughtSignature } = acc.get(id) as {
+                name: string;
+                rawArgs: string;
+                thoughtSignature?: string;
+            };
+            return {
+                id,
+                name,
+                args: safeJsonParse(rawArgs),
+                rawArgs,
+                ...(thoughtSignature !== undefined ? { thoughtSignature } : {}),
+            };
         }),
     };
 };
@@ -98,7 +115,12 @@ const mapTranscript = (messages: Message[]): ChatMessage[] => {
             chat.push({
                 role: 'assistant',
                 content: msg.content ?? null,
-                toolCalls: msg.toolCalls.map(tc => ({ id: tc.id, name: tc.name, args: tc.args })),
+                toolCalls: msg.toolCalls.map(tc => ({
+                    id: tc.id,
+                    name: tc.name,
+                    args: tc.args,
+                    ...(tc.thoughtSignature !== undefined ? { thoughtSignature: tc.thoughtSignature } : {}),
+                })),
             });
         } else {
             chat.push({ role: msg.role, content: msg.content ?? null });
@@ -283,6 +305,7 @@ export abstract class BaseAgent implements Agent {
                             name: tc.name,
                             args: tc.rawArgs,
                             status: 'ok',
+                            ...(tc.thoughtSignature !== undefined ? { thoughtSignature: tc.thoughtSignature } : {}),
                         })),
                         ts: this.stamp(),
                     };

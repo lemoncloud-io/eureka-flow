@@ -95,6 +95,12 @@ interface GeminiContentPart {
     text?: string;
     functionCall?: { name: string; args: unknown };
     functionResponse?: { name: string; response: unknown };
+    /** Required by Gemini's "thinking" model family (3.x, and sometimes gemini-2.5-flash-lite) on
+     * every replayed `functionCall` part — omitting it on a call that originally had one causes a
+     * 400 ("Function call is missing a thought_signature..."; confirmed live, 2026-08-07; see
+     * ai.google.dev/gemini-api/docs/thought-signatures). Opaque; never generated locally, only
+     * ever round-tripped from a prior response. */
+    thoughtSignature?: string;
 }
 
 interface GeminiContent {
@@ -174,7 +180,10 @@ const toGeminiToolRequest = (req: ChatRequest, generation?: GeminiToolLlmGateway
                 parts.push({ text: message.content });
             }
             for (const call of message.toolCalls ?? []) {
-                parts.push({ functionCall: { name: call.name, args: JSON.parse(call.args) } });
+                parts.push({
+                    functionCall: { name: call.name, args: JSON.parse(call.args) },
+                    ...(call.thoughtSignature !== undefined ? { thoughtSignature: call.thoughtSignature } : {}),
+                });
             }
             contents.push({ role: 'model', parts });
             continue;
@@ -207,7 +216,9 @@ interface GeminiSafetyRating {
 }
 
 interface GeminiCandidate {
-    content?: { parts?: Array<{ text?: string; functionCall?: { name: string; args?: unknown } }> };
+    content?: {
+        parts?: Array<{ text?: string; functionCall?: { name: string; args?: unknown }; thoughtSignature?: string }>;
+    };
     /** Why generation stopped for this candidate, e.g. `STOP`, `SAFETY`, `MAX_TOKENS`, `RECITATION`. */
     finishReason?: string;
     safetyRatings?: GeminiSafetyRating[];
@@ -266,9 +277,7 @@ const toUsageInfo = (metadata: GeminiUsageMetadata | undefined, model: string): 
     const promptTokenCount = metadata.promptTokenCount;
     const cachedContentTokenCount = metadata.cachedContentTokenCount;
     const inputTokens =
-        promptTokenCount !== undefined
-            ? Math.max(promptTokenCount - (cachedContentTokenCount ?? 0), 0)
-            : undefined;
+        promptTokenCount !== undefined ? Math.max(promptTokenCount - (cachedContentTokenCount ?? 0), 0) : undefined;
 
     const usage: UsageInfo = {
         ...(inputTokens !== undefined ? { inputTokens } : {}),
@@ -372,13 +381,17 @@ export const createGeminiToolLlmGateway = (options: GeminiToolLlmGatewayOptions)
         }
 
         let text = '';
-        const functionCalls: Array<{ name: string; args: unknown }> = [];
+        const functionCalls: Array<{ name: string; args: unknown; thoughtSignature?: string }> = [];
         for (const part of parts) {
             if (part.text) {
                 text += part.text;
             }
             if (part.functionCall) {
-                functionCalls.push({ name: part.functionCall.name, args: part.functionCall.args ?? {} });
+                functionCalls.push({
+                    name: part.functionCall.name,
+                    args: part.functionCall.args ?? {},
+                    ...(part.thoughtSignature !== undefined ? { thoughtSignature: part.thoughtSignature } : {}),
+                });
             }
         }
 
@@ -400,7 +413,14 @@ export const createGeminiToolLlmGateway = (options: GeminiToolLlmGatewayOptions)
         let callSeq = 0;
         for (const call of functionCalls) {
             callSeq += 1;
-            yield { toolCall: { id: `gemini-call-${callSeq}`, name: call.name, argsDelta: JSON.stringify(call.args) } };
+            yield {
+                toolCall: {
+                    id: `gemini-call-${callSeq}`,
+                    name: call.name,
+                    argsDelta: JSON.stringify(call.args),
+                    ...(call.thoughtSignature !== undefined ? { thoughtSignature: call.thoughtSignature } : {}),
+                },
+            };
         }
         yield { done: true, ...(usage ? { usage } : {}) };
     }

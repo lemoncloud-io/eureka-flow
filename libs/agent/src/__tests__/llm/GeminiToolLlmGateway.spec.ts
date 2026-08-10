@@ -7,10 +7,12 @@ import { BufferAgentTraceReporter } from '../../environment/trace/traceReporters
 import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
 import { createGeminiToolLlmGateway } from '../../llm/GeminiToolLlmGateway';
 import { PRICING_CONFIG_VERSION, estimateCost, getModelPricing } from '../../llm/pricing';
-import { createNodeMoveToolProvider, createNodeReadToolProvider } from '../../tools/nodeTools';
+import { LIST_NODES, MOVE_NODE } from '../../tools/nodeTools';
 import { createToolExecutor } from '../../tools/toolExecutor';
+import { toolset } from '../../tools/toolset';
 
 import type { AgentConfig } from '../../agent';
+import type { HttpRequestSupportable } from '../../http';
 import type { Chunk } from '../../llm/llmGateway';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
@@ -138,6 +140,81 @@ describe('createGeminiToolLlmGateway', () => {
         ]);
     });
 
+    it("recursively converts an array-typed parameter's items schema, not just properties (schema.items branch)", async () => {
+        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+
+        await drain(
+            createGateway(http).chat({
+                messages: [{ role: 'user', content: 'tag it' }],
+                tools: [
+                    {
+                        name: 'tag_node',
+                        description: 'tag a node',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                tags: { type: 'array', items: { type: 'string' } },
+                            },
+                        },
+                    },
+                ],
+            })
+        );
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body['tools']).toEqual([
+            {
+                functionDeclarations: [
+                    {
+                        name: 'tag_node',
+                        description: 'tag a node',
+                        parameters: {
+                            type: 'OBJECT',
+                            properties: { tags: { type: 'ARRAY', items: { type: 'STRING' } } },
+                        },
+                    },
+                ],
+            },
+        ]);
+    });
+
+    it("leaves an untyped (or unrecognized-type) schema field's `type` untouched — the uppercase-type conversion only applies to known JSON-Schema types", async () => {
+        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+
+        await drain(
+            createGateway(http).chat({
+                messages: [{ role: 'user', content: 'pick one' }],
+                tools: [
+                    {
+                        name: 'pick_option',
+                        description: 'pick from an enum with no declared type',
+                        parameters: {
+                            type: 'object',
+                            properties: {
+                                // No `type` field at all — valid JSON Schema (enum implies the type),
+                                // but `toGeminiSchema` must not crash or invent an uppercase type for it.
+                                choice: { enum: ['a', 'b'] },
+                            },
+                        },
+                    },
+                ],
+            })
+        );
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body['tools']).toEqual([
+            {
+                functionDeclarations: [
+                    {
+                        name: 'pick_option',
+                        description: 'pick from an enum with no declared type',
+                        parameters: { type: 'OBJECT', properties: { choice: { enum: ['a', 'b'] } } },
+                    },
+                ],
+            },
+        ]);
+    });
+
     it('maps system messages to systemInstruction and omits tools when none are given', async () => {
         const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
 
@@ -156,12 +233,56 @@ describe('createGeminiToolLlmGateway', () => {
         expect(body).not.toHaveProperty('tools');
     });
 
+    it('maps a system message with null content to an empty string rather than dropping it or sending "null"', async () => {
+        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+
+        await drain(
+            createGateway(http).chat({
+                messages: [
+                    { role: 'system', content: null },
+                    { role: 'user', content: 'q' },
+                ],
+                tools: [],
+            })
+        );
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body['systemInstruction']).toEqual({ parts: [{ text: '' }] });
+    });
+
+    it('omits generationConfig entirely from the request when no generation options are configured', async () => {
+        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+
+        await drain(createGateway(http).chat(userSays('q')));
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body).not.toHaveProperty('generationConfig');
+    });
+
+    it('maps generation.temperature and generation.maxOutputTokens into generationConfig when configured', async () => {
+        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+        const gateway = createGeminiToolLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: API_KEY,
+            generation: { temperature: 0.3, maxOutputTokens: 128 },
+        });
+
+        await drain(gateway.chat(userSays('q')));
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body['generationConfig']).toEqual({ temperature: 0.3, maxOutputTokens: 128 });
+    });
+
     it('yields a text chunk then a done chunk carrying usage', async () => {
         const http = new ScriptedHttpRequest([{ json: geminiText('the answer') }]);
 
         const chunks = await drain(createGateway(http).chat(userSays('q')));
 
-        expect(chunks).toEqual([{ text: 'the answer' }, { done: true, usage: withGeminiCost({ inputTokens: 12, outputTokens: 34 }) }]);
+        expect(chunks).toEqual([
+            { text: 'the answer' },
+            { done: true, usage: withGeminiCost({ inputTokens: 12, outputTokens: 34 }) },
+        ]);
     });
 
     it('parses a functionCall part into a toolCall chunk (args object → JSON string argsDelta)', async () => {
@@ -181,6 +302,21 @@ describe('createGeminiToolLlmGateway', () => {
             },
             { done: true, usage: withGeminiCost({ inputTokens: 20, outputTokens: 8 }) },
         ]);
+    });
+
+    it('defaults functionCall args to an empty object when the response omits args entirely', async () => {
+        const http = new ScriptedHttpRequest([
+            {
+                json: {
+                    candidates: [{ content: { parts: [{ functionCall: { name: 'list_nodes' } }] } }],
+                    usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 2 },
+                },
+            },
+        ]);
+
+        const chunks = await drain(createGateway(http).chat(userSays('list them')));
+
+        expect(chunks[0]).toEqual({ toolCall: { id: 'gemini-call-1', name: 'list_nodes', argsDelta: '{}' } });
     });
 
     describe('multi-turn request-mapping', () => {
@@ -266,6 +402,115 @@ describe('createGeminiToolLlmGateway', () => {
             });
         });
 
+        it('defaults a tool-result message with null content to an empty object payload', async () => {
+            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+
+            await drain(
+                createGateway(http).chat({
+                    messages: [
+                        { role: 'user', content: 'move it' },
+                        {
+                            role: 'assistant',
+                            content: null,
+                            toolCalls: [{ id: 'c1', name: 'move_node', args: '{}' }],
+                        },
+                        { role: 'tool', content: null, toolCallId: 'c1' },
+                    ],
+                    tools: [],
+                })
+            );
+
+            const body = http.requests[0].body as Record<string, unknown>;
+            const contents = body['contents'] as Array<Record<string, unknown>>;
+            expect(contents[2]).toEqual({
+                role: 'user',
+                parts: [{ functionResponse: { name: 'move_node', response: {} } }],
+            });
+        });
+
+        it('wraps unparsable tool-result content in { content } rather than throwing (functionResponse payload fallback)', async () => {
+            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+
+            await drain(
+                createGateway(http).chat({
+                    messages: [
+                        { role: 'user', content: 'move it' },
+                        {
+                            role: 'assistant',
+                            content: null,
+                            toolCalls: [{ id: 'c1', name: 'move_node', args: '{}' }],
+                        },
+                        { role: 'tool', content: 'not valid json', toolCallId: 'c1' },
+                    ],
+                    tools: [],
+                })
+            );
+
+            const body = http.requests[0].body as Record<string, unknown>;
+            const contents = body['contents'] as Array<Record<string, unknown>>;
+            expect(contents[2]).toEqual({
+                role: 'user',
+                parts: [{ functionResponse: { name: 'move_node', response: { content: 'not valid json' } } }],
+            });
+        });
+
+        it('wraps a tool-result content that parses to a JSON primitive (not an object) in { content }', async () => {
+            // Valid JSON that parses successfully but yields a primitive, not an object — a
+            // different path from the JSON.parse-throws case: this one takes the ternary's other
+            // branch inside the try, never reaching the catch at all.
+            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+
+            await drain(
+                createGateway(http).chat({
+                    messages: [
+                        { role: 'user', content: 'move it' },
+                        {
+                            role: 'assistant',
+                            content: null,
+                            toolCalls: [{ id: 'c1', name: 'move_node', args: '{}' }],
+                        },
+                        { role: 'tool', content: '"just a string"', toolCallId: 'c1' },
+                    ],
+                    tools: [],
+                })
+            );
+
+            const body = http.requests[0].body as Record<string, unknown>;
+            const contents = body['contents'] as Array<Record<string, unknown>>;
+            expect(contents[2]).toEqual({
+                role: 'user',
+                parts: [{ functionResponse: { name: 'move_node', response: { content: 'just a string' } } }],
+            });
+        });
+
+        it('throws when a tool-result message has no toolCallId at all — not just no match', async () => {
+            const gateway = createGateway(new ScriptedHttpRequest());
+
+            await expect(
+                drain(gateway.chat({ messages: [{ role: 'tool', content: '{}' }], tools: [] }))
+            ).rejects.toThrow(/no matching function-call name found for toolCallId ""/);
+        });
+
+        it('maps an assistant message with no tool calls through the plain content mapping, falling back to empty text when content is null', async () => {
+            // toolCalls is undefined (not just empty) here, so this is not a tool-call turn at all —
+            // it must fall through to the same plain user/assistant mapping every other role uses.
+            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+
+            await drain(
+                createGateway(http).chat({
+                    messages: [
+                        { role: 'user', content: 'go' },
+                        { role: 'assistant', content: null },
+                    ],
+                    tools: [],
+                })
+            );
+
+            const body = http.requests[0].body as Record<string, unknown>;
+            const contents = body['contents'] as Array<Record<string, unknown>>;
+            expect(contents[1]).toEqual({ role: 'model', parts: [{ text: '' }] });
+        });
+
         it('produces the correct multi-turn body shape for a full multi-turn round trip (system + user + model functionCall + user functionResponse)', async () => {
             const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
 
@@ -292,6 +537,107 @@ describe('createGeminiToolLlmGateway', () => {
                 { role: 'model', parts: [{ functionCall: { name: 'list_nodes', args: {} } }] },
                 { role: 'user', parts: [{ functionResponse: { name: 'list_nodes', response: { nodes: [] } } }] },
             ]);
+        });
+
+        it('replays thoughtSignature on a functionCall part when the assistant tool-call carries one', async () => {
+            // Gemini's "thinking" model family (3.x, and sometimes gemini-2.5-flash-lite) rejects a
+            // replayed functionCall part that omits thoughtSignature with a 400 — confirmed live,
+            // 2026-08-07 (see GeminiToolLlmGateway.ts's GeminiContentPart doc).
+            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+
+            await drain(
+                createGateway(http).chat({
+                    messages: [
+                        { role: 'user', content: 'go' },
+                        {
+                            role: 'assistant',
+                            content: null,
+                            toolCalls: [
+                                { id: 'c1', name: 'list_nodes', args: '{}', thoughtSignature: 'opaque-sig-abc' },
+                            ],
+                        },
+                        { role: 'tool', content: '{"nodes":[]}', toolCallId: 'c1' },
+                    ],
+                    tools: [],
+                })
+            );
+
+            const body = http.requests[0].body as Record<string, unknown>;
+            const contents = body['contents'] as Array<Record<string, unknown>>;
+            expect(contents[1]).toEqual({
+                role: 'model',
+                parts: [{ functionCall: { name: 'list_nodes', args: {} }, thoughtSignature: 'opaque-sig-abc' }],
+            });
+        });
+
+        it('omits thoughtSignature on a replayed functionCall part when the assistant tool-call never had one', async () => {
+            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+
+            await drain(
+                createGateway(http).chat({
+                    messages: [
+                        { role: 'user', content: 'go' },
+                        { role: 'assistant', content: null, toolCalls: [{ id: 'c1', name: 'list_nodes', args: '{}' }] },
+                        { role: 'tool', content: '{"nodes":[]}', toolCallId: 'c1' },
+                    ],
+                    tools: [],
+                })
+            );
+
+            const body = http.requests[0].body as Record<string, unknown>;
+            const contents = body['contents'] as Array<Record<string, unknown>>;
+            const modelPart = (contents[1]['parts'] as Array<Record<string, unknown>>)[0];
+            expect(modelPart).not.toHaveProperty('thoughtSignature');
+        });
+
+        it('keeps distinct thoughtSignatures on their own functionCall parts — never merged, swapped, or spread to a signature-less sibling', async () => {
+            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+
+            await drain(
+                createGateway(http).chat({
+                    messages: [
+                        { role: 'user', content: 'go' },
+                        {
+                            role: 'assistant',
+                            content: null,
+                            toolCalls: [
+                                { id: 'c1', name: 'list_nodes', args: '{}', thoughtSignature: 'opaque-sig-first' },
+                                {
+                                    id: 'c2',
+                                    name: 'move_node',
+                                    args: '{"nodeId":"text-1"}',
+                                    thoughtSignature: 'opaque-sig-second',
+                                },
+                                { id: 'c3', name: 'list_nodes', args: '{}' },
+                            ],
+                        },
+                        { role: 'tool', content: '{"nodes":[]}', toolCallId: 'c1' },
+                        { role: 'tool', content: '{"ok":true}', toolCallId: 'c2' },
+                        { role: 'tool', content: '{"nodes":[]}', toolCallId: 'c3' },
+                    ],
+                    tools: [],
+                })
+            );
+
+            const body = http.requests[0].body as Record<string, unknown>;
+            const contents = body['contents'] as Array<Record<string, unknown>>;
+            expect(contents[1]).toEqual({
+                role: 'model',
+                parts: [
+                    { functionCall: { name: 'list_nodes', args: {} }, thoughtSignature: 'opaque-sig-first' },
+                    {
+                        functionCall: { name: 'move_node', args: { nodeId: 'text-1' } },
+                        thoughtSignature: 'opaque-sig-second',
+                    },
+                    { functionCall: { name: 'list_nodes', args: {} } },
+                ],
+            });
+            // No signature ever lands on an unrelated part — the functionResponse user turns stay clean.
+            for (const content of contents.slice(2)) {
+                for (const part of content['parts'] as Array<Record<string, unknown>>) {
+                    expect(part).not.toHaveProperty('thoughtSignature');
+                }
+            }
         });
 
         it('throws a clear error — not a silent guess — when a tool-result toolCallId has no matching assistant tool-call entry earlier in the request', async () => {
@@ -351,6 +697,94 @@ describe('createGeminiToolLlmGateway', () => {
                 { done: true, usage: withGeminiCost({ inputTokens: 20, outputTokens: 8 }) },
             ]);
         });
+
+        it('captures thoughtSignature from a functionCall response part onto the yielded toolCall chunk', async () => {
+            const http = new ScriptedHttpRequest([
+                {
+                    json: {
+                        candidates: [
+                            {
+                                content: {
+                                    parts: [
+                                        {
+                                            functionCall: { name: 'move_node', args: { nodeId: 'text-1' } },
+                                            thoughtSignature: 'opaque-sig-xyz',
+                                        },
+                                    ],
+                                },
+                            },
+                        ],
+                        usageMetadata: { promptTokenCount: 20, candidatesTokenCount: 8 },
+                    },
+                },
+            ]);
+
+            const chunks = await drain(createGateway(http).chat(followUpRequest()));
+
+            expect(chunks[0]).toEqual({
+                toolCall: {
+                    id: 'gemini-call-1',
+                    name: 'move_node',
+                    argsDelta: '{"nodeId":"text-1"}',
+                    thoughtSignature: 'opaque-sig-xyz',
+                },
+            });
+        });
+
+        it('omits thoughtSignature on the yielded toolCall chunk when the response part never had one', async () => {
+            const http = new ScriptedHttpRequest([{ json: geminiFunctionCall('move_node', { nodeId: 'text-1' }) }]);
+
+            const chunks = await drain(createGateway(http).chat(followUpRequest()));
+
+            expect(chunks[0]).toEqual({
+                toolCall: { id: 'gemini-call-1', name: 'move_node', argsDelta: '{"nodeId":"text-1"}' },
+            });
+        });
+
+        it('captures distinct thoughtSignatures from parallel functionCall parts onto their own toolCall chunks', async () => {
+            const http = new ScriptedHttpRequest([
+                {
+                    json: {
+                        candidates: [
+                            {
+                                content: {
+                                    parts: [
+                                        {
+                                            functionCall: { name: 'list_nodes', args: {} },
+                                            thoughtSignature: 'opaque-sig-first',
+                                        },
+                                        {
+                                            functionCall: { name: 'move_node', args: { nodeId: 'text-1' } },
+                                            thoughtSignature: 'opaque-sig-second',
+                                        },
+                                    ],
+                                },
+                            },
+                        ],
+                        usageMetadata: { promptTokenCount: 20, candidatesTokenCount: 8 },
+                    },
+                },
+            ]);
+
+            const chunks = await drain(createGateway(http).chat(followUpRequest()));
+
+            expect(chunks[0]).toEqual({
+                toolCall: {
+                    id: 'gemini-call-1',
+                    name: 'list_nodes',
+                    argsDelta: '{}',
+                    thoughtSignature: 'opaque-sig-first',
+                },
+            });
+            expect(chunks[1]).toEqual({
+                toolCall: {
+                    id: 'gemini-call-2',
+                    name: 'move_node',
+                    argsDelta: '{"nodeId":"text-1"}',
+                    thoughtSignature: 'opaque-sig-second',
+                },
+            });
+        });
     });
 
     describe('usage/cost mapping', () => {
@@ -382,7 +816,11 @@ describe('createGeminiToolLlmGateway', () => {
                 {
                     json: {
                         candidates: [{ content: { parts: [{ text: 'ok' }] } }],
-                        usageMetadata: { promptTokenCount: 100, cachedContentTokenCount: 150, candidatesTokenCount: 10 },
+                        usageMetadata: {
+                            promptTokenCount: 100,
+                            cachedContentTokenCount: 150,
+                            candidatesTokenCount: 10,
+                        },
                     },
                 },
             ]);
@@ -477,7 +915,8 @@ describe('createGeminiToolLlmGateway', () => {
             const done = chunks.find(c => c.done);
 
             const pricing = getModelPricing('gemini', 'gemini-2.5-flash');
-            if (!pricing?.cachedInputPerMillion) throw new Error('expected gemini-2.5-flash pricing with a cached rate');
+            if (!pricing?.cachedInputPerMillion)
+                {throw new Error('expected gemini-2.5-flash pricing with a cached rate');}
             const expected =
                 0.7 * pricing.inputPerMillion +
                 0.3 * pricing.cachedInputPerMillion +
@@ -487,6 +926,27 @@ describe('createGeminiToolLlmGateway', () => {
 
             expect(done?.usage?.estimatedCost).toBeCloseTo(expected, 10);
             expect(done?.usage?.costSource).toBe('estimated');
+        });
+
+        it('omits usage entirely from the done chunk when the response reports no usageMetadata at all', async () => {
+            const http = new ScriptedHttpRequest([
+                { json: { candidates: [{ content: { parts: [{ text: 'ok' }] } }] } },
+            ]);
+
+            const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+            expect(chunks).toEqual([{ text: 'ok' }, { done: true }]);
+        });
+
+        it('reports only estimatedCost: null when usageMetadata is present but empty — every token field left undefined, not fabricated', async () => {
+            const http = new ScriptedHttpRequest([
+                { json: { candidates: [{ content: { parts: [{ text: 'ok' }] } }], usageMetadata: {} } },
+            ]);
+
+            const chunks = await drain(createGateway(http).chat(userSays('q')));
+            const done = chunks.find(c => c.done);
+
+            expect(done?.usage).toEqual({ estimatedCost: null });
         });
 
         it('returns estimatedCost: null (not a fabricated 0) for an unregistered model, while still reporting tokens', async () => {
@@ -519,7 +979,9 @@ describe('createGeminiToolLlmGateway', () => {
 
         await drain(gateway.chat(userSays('q')));
 
-        expect(http.requests[0].url).toBe('https://proxy.example.com/gemini/v1beta/models/gemini-2.5-pro:generateContent');
+        expect(http.requests[0].url).toBe(
+            'https://proxy.example.com/gemini/v1beta/models/gemini-2.5-pro:generateContent'
+        );
     });
 
     it('passes the abort signal through to the HTTP port', async () => {
@@ -541,6 +1003,44 @@ describe('createGeminiToolLlmGateway', () => {
         await attempt.catch((error: Error) => expect(error.message).not.toContain(API_KEY));
         expect(trace.entries.some(entry => entry.level === 'error')).toBe(true);
         expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
+    });
+
+    it('passes an error body through verbatim (no redaction) when apiKey is empty — nothing to scrub', async () => {
+        // Guards the redactText early-return itself: without it, `value.split('').join(...)` would
+        // splice '[redacted]' between every single character of the body, mangling it completely.
+        const http = new ScriptedHttpRequest([{ status: 403, text: 'no secret in this error body' }]);
+        const gateway = createGeminiToolLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: '',
+        });
+
+        await expect(drain(gateway.chat(userSays('q')))).rejects.toThrow(
+            'Gemini request failed with status 403: no secret in this error body'
+        );
+    });
+
+    it('falls back to an empty string when reading the non-ok response body itself fails (response.text() rejects)', async () => {
+        const http: HttpRequestSupportable = {
+            request: async () => ({
+                status: 500,
+                ok: false,
+                headers: {},
+                json: async () => {
+                    throw new Error('should not be called on the error path');
+                },
+                text: async () => {
+                    throw new Error('body stream errored');
+                },
+            }),
+        };
+        const gateway = createGeminiToolLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: API_KEY,
+        });
+
+        await expect(drain(gateway.chat(userSays('q')))).rejects.toThrow('Gemini request failed with status 500: ');
     });
 
     it('throws when the response has no candidates, with no diagnostic metadata to show', async () => {
@@ -626,6 +1126,19 @@ describe('createGeminiToolLlmGateway', () => {
         expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
     });
 
+    it('omits usage from the traced response entry when the response has no usageMetadata at all', async () => {
+        // trace?.debug(...) short-circuits its whole argument list when no trace reporter is
+        // configured, so the object literal carrying this ternary is only evaluated when a real
+        // reporter is wired — this test is what actually exercises its "no usage" branch.
+        const http = new ScriptedHttpRequest([{ json: { candidates: [{ content: { parts: [{ text: 'hi' }] } }] } }]);
+        const trace = new BufferAgentTraceReporter();
+
+        await drain(createGateway(http, trace).chat(userSays('q')));
+
+        const responseEntry = trace.entries.find(entry => entry.message === 'llm.gemini.response');
+        expect(responseEntry?.json).not.toHaveProperty('usage');
+    });
+
     // The full offline chain: a canned Gemini functionCall flows through the gateway's parsing
     // into a Chunk.toolCall, then through the real ToolExecutor + canvas tools, moving the node.
     it('canned functionCall response drives ToolExecutor to move the node (100,200) -> (200,200)', async () => {
@@ -633,10 +1146,7 @@ describe('createGeminiToolLlmGateway', () => {
             nodes: [makeNode('text-1', 100, 200, { type: 'text-input' })],
             edges: [],
         });
-        const provider = [
-            createNodeReadToolProvider(binding, createCatalogLookup([])),
-            createNodeMoveToolProvider(binding),
-        ];
+        const provider = [toolset({ binding, catalog: createCatalogLookup([]) }, [LIST_NODES, MOVE_NODE])];
         const executor = createToolExecutor();
         const config: AgentConfig = {
             id: 'locator-test',
@@ -669,5 +1179,4 @@ describe('createGeminiToolLlmGateway', () => {
         expect(result.ok).toBe(true);
         expect(binding.readGraph().nodes[0].position).toEqual({ x: 200, y: 200 });
     });
-
 });
