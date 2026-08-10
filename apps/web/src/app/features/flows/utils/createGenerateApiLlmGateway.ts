@@ -28,8 +28,8 @@ import type { ChatMessage, ChatRequest, Chunk, LlmGateway, ToolDef } from '@flow
 
 /** Structural stand-in for the eventual real receiver (e.g. `ProxyTransportReceiver`). */
 export interface GenerateReceiver<T> {
-    /** Registers interest for `requestId`, runs `fire` (the HTTP POST), resolves with the reassembled result. */
-    wait(requestId: string, fire: () => Promise<unknown>): Promise<T>;
+    /** Registers interest for a connection ID or request ID (tool calls), then runs the HTTP trigger. */
+    wait(correlationId: string, fire: () => Promise<unknown>): Promise<T>;
 }
 
 export interface GenerateContent {
@@ -41,7 +41,7 @@ export interface GenerateContent {
 }
 
 export interface GenerateRequestBody {
-    requestId: string;
+    requestId?: string;
     model: string;
     prompt: string | { type?: string; content: string | GenerateContent | GenerateContent[] };
     system?: string;
@@ -105,7 +105,7 @@ const defaultPost: GeneratePostFn = (url, body, config) => api.post(url, body, c
 
 const toGenerateRequestBody = (
     req: ChatRequest,
-    requestId: string,
+    requestId: string | undefined,
     model: string,
     generation?: { temperature?: number },
     toolCalls?: boolean
@@ -126,7 +126,7 @@ const toGenerateRequestBody = (
               };
 
     return {
-        requestId,
+        ...(requestId ? { requestId } : {}),
         model,
         prompt,
         ...(systemTexts.length > 0 ? { system: systemTexts.join('\n\n') } : {}),
@@ -151,8 +151,17 @@ export const createGenerateApiLlmGateway = (options: CreateGenerateApiLlmGateway
     async function* chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk> {
         const { isConnected, connectionId, generateReceiver } = getConnection();
 
-        if (connectionId && !isConnected) {
+        if (!toolCalls && !isConnected) {
             throw new Error('Generate API gateway unavailable: the flow socket is not connected');
+        }
+        if (!toolCalls && !connectionId) {
+            throw new Error('Generate API gateway unavailable: no connectionId (socket not ready yet)');
+        }
+        if (toolCalls && connectionId && !isConnected) {
+            throw new Error('Generate API gateway unavailable: the flow socket is not connected');
+        }
+        if (!toolCalls && !generateReceiver) {
+            throw new Error('Generate API gateway unavailable: no generate receiver registered on the socket');
         }
         if (!toolCalls && req.tools.length > 0) {
             throw new Error(`${TEXT_ONLY}: tool definitions are not supported`);
@@ -164,7 +173,7 @@ export const createGenerateApiLlmGateway = (options: CreateGenerateApiLlmGateway
             throw new Error(`${TEXT_ONLY}: tool messages are not supported`);
         }
 
-        const requestId = crypto.randomUUID();
+        const requestId = toolCalls ? crypto.randomUUID() : undefined;
         const body = toGenerateRequestBody(req, requestId, model, generation, toolCalls);
 
         const _request = async (): Promise<GenerateResponse> => {
@@ -178,7 +187,7 @@ export const createGenerateApiLlmGateway = (options: CreateGenerateApiLlmGateway
             if (!generateReceiver) {
                 throw new Error('Generate API gateway unavailable: no generate receiver registered on the socket');
             }
-            return generateReceiver.wait(requestId, async () => {
+            return generateReceiver.wait(requestId ?? connectionId, async () => {
                 await post(endpointPath, body, {
                     params: { connection: connectionId, transport: 1 },
                     ...(opts?.signal ? { signal: opts.signal } : {}),
@@ -199,7 +208,7 @@ export const createGenerateApiLlmGateway = (options: CreateGenerateApiLlmGateway
             throw new Error(`${TEXT_ONLY}: response content is not text (image/object output)`);
         }
 
-        if (content) yield { text: content };
+        if (content || !toolCalls) yield { text: content };
         for (const toolCall of response.toolCalls ?? []) {
             yield {
                 toolCall: {

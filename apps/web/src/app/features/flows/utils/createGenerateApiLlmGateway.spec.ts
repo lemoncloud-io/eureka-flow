@@ -20,11 +20,11 @@ const READY_CONNECTION: GenerateConnectionSnapshot = {
 /** A fake receiver: runs `fire` (the POST), then resolves/rejects with a scripted result. */
 const makeFakeReceiver = (
     resolveWith: GenerateResponse | (() => Promise<GenerateResponse>)
-): { receiver: GenerateReceiver<GenerateResponse>; waits: { requestId: string }[] } => {
-    const waits: { requestId: string }[] = [];
+): { receiver: GenerateReceiver<GenerateResponse>; waits: { correlationId: string }[] } => {
+    const waits: { correlationId: string }[] = [];
     const receiver: GenerateReceiver<GenerateResponse> = {
-        wait: async (requestId, fire) => {
-            waits.push({ requestId });
+        wait: async (correlationId, fire) => {
+            waits.push({ correlationId });
             await fire();
             return typeof resolveWith === 'function' ? resolveWith() : resolveWith;
         },
@@ -70,10 +70,32 @@ describe('createGenerateApiLlmGateway', () => {
             await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/not connected/);
         });
 
-        it('uses the HTTP response when connectionId is missing', async () => {
+        it('preserves the legacy error when connectionId is missing', async () => {
             const post = vi.fn().mockResolvedValue({ data: textResponse('http') });
             const gateway = createGateway(
                 { connection: { isConnected: false, connectionId: null, generateReceiver: null } },
+                post
+            );
+
+            await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/not connected/);
+            expect(post).not.toHaveBeenCalled();
+        });
+
+        it('preserves the legacy no-connectionId error after the socket reports connected', async () => {
+            const post = vi.fn();
+            const gateway = createGateway(
+                { connection: { isConnected: true, connectionId: null, generateReceiver: null } },
+                post
+            );
+
+            await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/no connectionId/);
+            expect(post).not.toHaveBeenCalled();
+        });
+
+        it('uses the HTTP response for tool calls when connectionId is missing', async () => {
+            const post = vi.fn().mockResolvedValue({ data: textResponse('http') });
+            const gateway = createGateway(
+                { toolCalls: true, connection: { isConnected: false, connectionId: null, generateReceiver: null } },
                 post
             );
 
@@ -179,8 +201,8 @@ describe('createGenerateApiLlmGateway', () => {
         it('calls the receiver before post (receiver wraps the trigger) and posts to /runs/0/generate', async () => {
             const order: string[] = [];
             const receiver: GenerateReceiver<GenerateResponse> = {
-                wait: async (requestId, fire) => {
-                    order.push(`wait:${requestId}`);
+                wait: async (correlationId, fire) => {
+                    order.push(`wait:${correlationId}`);
                     await fire();
                     return textResponse('ok');
                 },
@@ -192,9 +214,9 @@ describe('createGenerateApiLlmGateway', () => {
 
             await drain(gateway.chat(userSays('hi')));
 
-            expect(order).toEqual([expect.stringMatching(/^wait:/), 'post']);
+            expect(order).toEqual(['wait:conn-1', 'post']);
             expect(post.mock.calls[0][0]).toBe('/runs/0/generate');
-            expect(post.mock.calls[0][1].requestId).toBe(order[0].slice('wait:'.length));
+            expect(post.mock.calls[0][1]).not.toHaveProperty('requestId');
         });
 
         it('includes connection and transport=1 in post params', async () => {
@@ -267,6 +289,16 @@ describe('createGenerateApiLlmGateway', () => {
             expect(chunks).toEqual([{ text: 'ok' }, { done: true }]);
         });
 
+        it('preserves an empty text chunk in legacy mode', async () => {
+            const { receiver } = makeFakeReceiver(textResponse(''));
+            const gateway = createGateway(
+                { connection: { generateReceiver: receiver } },
+                vi.fn().mockResolvedValue(undefined)
+            );
+
+            expect(await drain(gateway.chat(userSays('hi')))).toEqual([{ text: '' }, { done: true }]);
+        });
+
         it('throws a text-only error when output.content is an object (image result)', async () => {
             const { receiver } = makeFakeReceiver({ output: { content: { data: 'data:image/png;base64,abc' } } });
             const gateway = createGateway(
@@ -289,7 +321,7 @@ describe('createGenerateApiLlmGateway', () => {
     });
 
     it('sends tools through run generate and emits returned tool calls when enabled', async () => {
-        const { receiver } = makeFakeReceiver({
+        const { receiver, waits } = makeFakeReceiver({
             output: { content: '' },
             toolCalls: [{ id: 'call-1', name: 'move_node', args: { nodeId: 'n1' } }],
         });
@@ -305,6 +337,7 @@ describe('createGenerateApiLlmGateway', () => {
         expect(gateway.capabilities).toEqual({ toolCalls: true });
         expect(post.mock.calls[0][0]).toBe('/runs/0/generate');
         expect(post.mock.calls[0][1]).toMatchObject({ messages: request.messages, tools: request.tools });
+        expect(waits).toEqual([{ correlationId: post.mock.calls[0][1].requestId }]);
         expect(chunks).toEqual([
             { toolCall: { id: 'call-1', name: 'move_node', argsDelta: '{"nodeId":"n1"}' } },
             { done: true },

@@ -48,7 +48,7 @@ export class ToolSocketConnectionAdapter implements ToolSocketConnection {
 }
 
 /** Connects only LLM/tool JSONTransport traffic to the configured Chatic socket API. */
-export const useToolSocketConnection = (): ToolSocketConnection => {
+export const useToolSocketConnection = (enabled = true): ToolSocketConnection => {
     const apiKey = useWebCoreStore(state => state.apiKey);
     const connection = useMemo(() => new ToolSocketConnectionAdapter(), []);
     const tokenProvider = useCallback(async (): Promise<string | null> => apiKey || null, [apiKey]);
@@ -56,7 +56,7 @@ export const useToolSocketConnection = (): ToolSocketConnection => {
         endpoint: TOOL_WS_ENDPOINT,
         tokenProvider,
         messageParser: parseToolSocketMessage,
-        enabled: !!apiKey && !!TOOL_WS_ENDPOINT,
+        enabled: enabled && !!apiKey && !!TOOL_WS_ENDPOINT,
         logPrefix: '[ToolSocket]',
     });
 
