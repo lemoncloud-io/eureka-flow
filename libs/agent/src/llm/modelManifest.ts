@@ -81,8 +81,15 @@ const OPENROUTER_MODELS_API_SOURCE = 'OpenRouter public Models API (GET https://
  * OpenRouter, so an OpenRouter-sourced id is a direct confirmation for that gateway, not an
  * inference.
  */
-const DIRECT_OPENAI_DOCS_SOURCE = 'developers.openai.com/api/docs/models/{id} — exact id, status, and function_calling support confirmed directly, 2026-08-04';
-const DIRECT_GEMINI_DOCS_SOURCE = 'ai.google.dev/gemini-api/docs/models — exact id and stable/preview status confirmed directly, 2026-08-04';
+const DIRECT_OPENAI_DOCS_SOURCE =
+    'developers.openai.com/api/docs/models/{id} — exact id, status, and function_calling support confirmed directly, 2026-08-04';
+const DIRECT_GEMINI_DOCS_SOURCE =
+    'ai.google.dev/gemini-api/docs/models — exact id and stable/preview status confirmed directly, 2026-08-04';
+/** A live call to the provider's own model-list endpoint using this repo's real API key — stronger
+ * than a docs page (docs can lag a launch) and stronger than OpenRouter's mirror (a third party).
+ * Used for the four OpenAI and three Gemini models added 2026-08-07. */
+const DIRECT_OPENAI_LIVE_API_SOURCE = "a live call to OpenAI's own GET /v1/models endpoint, 2026-08-07";
+const DIRECT_GEMINI_LIVE_API_SOURCE = "a live call to Google's own GET /v1beta/models endpoint, 2026-08-07";
 
 /** Keyed by `${providerId}:${requestedModel}`. Every model in `PROVIDER_REGISTRY` must have an
  * entry here — enforced by `modelManifest.spec.ts` — so a newly registered model can never be
@@ -90,8 +97,17 @@ const DIRECT_GEMINI_DOCS_SOURCE = 'ai.google.dev/gemini-api/docs/models — exac
 const DISCOVERY: Record<string, DiscoveryMeta> = {
     'openai:gpt-4o-mini': { discoverySource: PROVIDER_DOCS_SOURCE, discoveryTimestamp: '2026-01-01' },
     'openai:gpt-4.1-mini': { discoverySource: PROVIDER_DOCS_SOURCE, discoveryTimestamp: '2026-01-01' },
-    'openai:gpt-5-mini': { discoverySource: "eureka-flows-api's own live model catalog (GET /runs/0/models)", discoveryTimestamp: '2026-01-01' },
+    'openai:gpt-5-mini': {
+        discoverySource: "eureka-flows-api's own live model catalog (GET /runs/0/models)",
+        discoveryTimestamp: '2026-01-01',
+    },
     'openai:gpt-4.1': { discoverySource: DIRECT_OPENAI_DOCS_SOURCE, discoveryTimestamp: '2026-08-04' },
+    'openai:gpt-5.5': { discoverySource: DIRECT_OPENAI_LIVE_API_SOURCE, discoveryTimestamp: '2026-08-07' },
+    // sol/terra/luna are parallel candidates, not a tier ladder — none is marked `preview: true`
+    // since OpenAI's own /v1/models listing gives no preview/experimental marker for any of them.
+    'openai:gpt-5.6-sol': { discoverySource: DIRECT_OPENAI_LIVE_API_SOURCE, discoveryTimestamp: '2026-08-07' },
+    'openai:gpt-5.6-terra': { discoverySource: DIRECT_OPENAI_LIVE_API_SOURCE, discoveryTimestamp: '2026-08-07' },
+    'openai:gpt-5.6-luna': { discoverySource: DIRECT_OPENAI_LIVE_API_SOURCE, discoveryTimestamp: '2026-08-07' },
 
     'gemini:gemini-2.5-flash': { discoverySource: PROVIDER_DOCS_SOURCE, discoveryTimestamp: '2026-01-01' },
     'gemini:gemini-2.5-pro': { discoverySource: PROVIDER_DOCS_SOURCE, discoveryTimestamp: '2026-01-01' },
@@ -101,18 +117,80 @@ const DISCOVERY: Record<string, DiscoveryMeta> = {
         preview: true,
     },
     'gemini:gemini-2.5-flash-lite': { discoverySource: DIRECT_GEMINI_DOCS_SOURCE, discoveryTimestamp: '2026-08-04' },
-    'gemini:gemini-3.1-pro-preview': { discoverySource: DIRECT_GEMINI_DOCS_SOURCE, discoveryTimestamp: '2026-08-04', preview: true },
+    'gemini:gemini-3.1-pro-preview': {
+        discoverySource: DIRECT_GEMINI_DOCS_SOURCE,
+        discoveryTimestamp: '2026-08-04',
+        preview: true,
+    },
+    'gemini:gemini-3.5-flash': { discoverySource: DIRECT_GEMINI_LIVE_API_SOURCE, discoveryTimestamp: '2026-08-07' },
+    'gemini:gemini-3.5-flash-lite': {
+        discoverySource: DIRECT_GEMINI_LIVE_API_SOURCE,
+        discoveryTimestamp: '2026-08-07',
+    },
+    'gemini:gemini-3.6-flash': { discoverySource: DIRECT_GEMINI_LIVE_API_SOURCE, discoveryTimestamp: '2026-08-07' },
 
-    'openrouter:openrouter/free': { discoverySource: "OpenRouter's own free-router documentation", discoveryTimestamp: '2026-01-01' },
-    'openrouter:openai/gpt-4o-mini': { discoverySource: OPENROUTER_MODELS_API_SOURCE, discoveryTimestamp: '2026-01-01' },
-    'openrouter:google/gemini-2.5-flash': { discoverySource: OPENROUTER_MODELS_API_SOURCE, discoveryTimestamp: '2026-08-04' },
-    'openrouter:anthropic/claude-haiku-4.5': { discoverySource: OPENROUTER_MODELS_API_SOURCE, discoveryTimestamp: '2026-08-04' },
-    'openrouter:openai/gpt-oss-20b:free': { discoverySource: OPENROUTER_MODELS_API_SOURCE, discoveryTimestamp: '2026-08-04' },
-    'openrouter:meta-llama/llama-3.3-70b-instruct': { discoverySource: OPENROUTER_MODELS_API_SOURCE, discoveryTimestamp: '2026-08-04' },
-    'openrouter:deepseek/deepseek-chat-v3.1': { discoverySource: OPENROUTER_MODELS_API_SOURCE, discoveryTimestamp: '2026-08-04' },
+    'openrouter:openrouter/free': {
+        discoverySource: "OpenRouter's own free-router documentation",
+        discoveryTimestamp: '2026-01-01',
+    },
+    'openrouter:openai/gpt-4o-mini': {
+        discoverySource: OPENROUTER_MODELS_API_SOURCE,
+        discoveryTimestamp: '2026-01-01',
+    },
+    'openrouter:google/gemini-2.5-flash': {
+        discoverySource: OPENROUTER_MODELS_API_SOURCE,
+        discoveryTimestamp: '2026-08-04',
+    },
+    'openrouter:anthropic/claude-haiku-4.5': {
+        discoverySource: OPENROUTER_MODELS_API_SOURCE,
+        discoveryTimestamp: '2026-08-04',
+    },
+    'openrouter:openai/gpt-oss-20b:free': {
+        discoverySource: OPENROUTER_MODELS_API_SOURCE,
+        discoveryTimestamp: '2026-08-04',
+    },
+    'openrouter:meta-llama/llama-3.3-70b-instruct': {
+        discoverySource: OPENROUTER_MODELS_API_SOURCE,
+        discoveryTimestamp: '2026-08-04',
+    },
+    'openrouter:deepseek/deepseek-chat-v3.1': {
+        discoverySource: OPENROUTER_MODELS_API_SOURCE,
+        discoveryTimestamp: '2026-08-04',
+    },
+    // Anthropic models reachable only via OpenRouter (no ANTHROPIC_API_KEY available) — see
+    // providerRegistry.ts's OPENROUTER_ENTRY note: a pass here verifies OpenRouter's routing to
+    // Claude, not a direct-provider Anthropic call.
+    'openrouter:anthropic/claude-sonnet-5': {
+        discoverySource: OPENROUTER_MODELS_API_SOURCE,
+        discoveryTimestamp: '2026-08-07',
+    },
+    'openrouter:anthropic/claude-opus-5': {
+        discoverySource: OPENROUTER_MODELS_API_SOURCE,
+        discoveryTimestamp: '2026-08-07',
+    },
+    'openrouter:google/gemini-3.6-flash': {
+        discoverySource: OPENROUTER_MODELS_API_SOURCE,
+        discoveryTimestamp: '2026-08-07',
+    },
+    // Presence confirmed by the user directly, NOT by this codebase independently re-querying
+    // OpenRouter's public Models API the way every other `openrouter:*` entry above was — a
+    // deliberately weaker provenance than OPENROUTER_MODELS_API_SOURCE, named explicitly so it's
+    // never mistaken for an independently-verified discovery. Upgrade this source string once an
+    // offline-safe (or live, with approval) check against the public Models API confirms it directly.
+    'openrouter:anthropic/claude-fable-5': {
+        discoverySource:
+            "user-reported: confirmed present in OpenRouter's catalog by the user directly (not yet independently re-checked by this codebase)",
+        discoveryTimestamp: '2026-08-07',
+    },
 
-    'deepseek:deepseek-v4-flash': { discoverySource: "DeepSeek's own migration notice (api-docs.deepseek.com)", discoveryTimestamp: '2026-01-01' },
-    'deepseek:deepseek-v4-pro': { discoverySource: "DeepSeek's own migration notice (api-docs.deepseek.com)", discoveryTimestamp: '2026-01-01' },
+    'deepseek:deepseek-v4-flash': {
+        discoverySource: "DeepSeek's own migration notice (api-docs.deepseek.com)",
+        discoveryTimestamp: '2026-01-01',
+    },
+    'deepseek:deepseek-v4-pro': {
+        discoverySource: "DeepSeek's own migration notice (api-docs.deepseek.com)",
+        discoveryTimestamp: '2026-01-01',
+    },
 
     'qwen:qwen-turbo': { discoverySource: "Alibaba Cloud Model Studio's own docs", discoveryTimestamp: '2026-01-01' },
     'qwen:qwen-plus': { discoverySource: "Alibaba Cloud Model Studio's own docs", discoveryTimestamp: '2026-01-01' },
@@ -128,7 +206,10 @@ const DISCOVERY: Record<string, DiscoveryMeta> = {
     },
 
     'glm:glm-4.5-flash': { discoverySource: "Z.ai's own API reference", discoveryTimestamp: '2026-01-01' },
-    'glm:glm-4.6': { discoverySource: 'general web search (lower confidence — not confirmed against Z.ai API reference)', discoveryTimestamp: '2026-01-01' },
+    'glm:glm-4.6': {
+        discoverySource: 'general web search (lower confidence — not confirmed against Z.ai API reference)',
+        discoveryTimestamp: '2026-01-01',
+    },
 };
 
 const statusForModel = (entry: ProviderModelEntry, model: string, isDynamicRoute: boolean): ModelManifestStatus => {
@@ -162,7 +243,9 @@ export const buildModelManifest = (): ModelManifestEntry[] => {
                 benchmarkEnabled: meta.benchmarkEnabled ?? true,
                 productionCandidate: meta.productionCandidate ?? true,
                 status: statusForModel(entry, model, isDynamicRoute),
-                ...(entry.status === 'blocked' ? { skipReason: `provider status is "blocked": ${entry.notes ?? ''}` } : {}),
+                ...(entry.status === 'blocked'
+                    ? { skipReason: `provider status is "blocked": ${entry.notes ?? ''}` }
+                    : {}),
             });
         }
     }

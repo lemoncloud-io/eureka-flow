@@ -7,10 +7,12 @@ import { BufferAgentTraceReporter } from '../../environment/trace/traceReporters
 import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
 import { createOpenAiLlmGateway } from '../../llm/OpenAiLlmGateway';
 import { PRICING_CONFIG_VERSION, estimateCost, getModelPricing } from '../../llm/pricing';
-import { createNodeMoveToolProvider, createNodeReadToolProvider } from '../../tools/nodeTools';
+import { LIST_NODES, MOVE_NODE } from '../../tools/nodeTools';
 import { createToolExecutor } from '../../tools/toolExecutor';
+import { toolset } from '../../tools/toolset';
 
 import type { AgentConfig } from '../../agent';
+import type { HttpRequestSupportable } from '../../http';
 import type { Chunk } from '../../llm/llmGateway';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
@@ -139,6 +141,68 @@ describe('createOpenAiLlmGateway', () => {
         expect(body['tool_choice']).toBe('auto');
     });
 
+    it('maps a tool-result message with null content to an empty string rather than null', async () => {
+        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+
+        await drain(
+            createGateway(http).chat({
+                messages: [
+                    { role: 'user', content: 'go' },
+                    { role: 'assistant', content: null, toolCalls: [{ id: 'c1', name: 'move_node', args: '{}' }] },
+                    { role: 'tool', content: null, toolCallId: 'c1' },
+                ],
+                tools: [],
+            })
+        );
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        const messages = body['messages'] as Array<Record<string, unknown>>;
+        expect(messages[2]).toEqual({ role: 'tool', content: '', tool_call_id: 'c1' });
+    });
+
+    it('maps a plain (non-tool, non-tool-call) message with null content through as null on the wire, never coerced to a string', async () => {
+        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+
+        await drain(createGateway(http).chat({ messages: [{ role: 'user', content: null }], tools: [] }));
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body['messages']).toEqual([{ role: 'user', content: null }]);
+    });
+
+    it('never forwards a thoughtSignature to OpenAI — the request body stays byte-identical to a signature-less replay', async () => {
+        // `thoughtSignature` is a Gemini-only continuation token (see ChatMessage.toolCalls's doc
+        // in llmGateway.ts). A transcript that passed through a Gemini turn can legitimately carry
+        // one on the shared ChatMessage shape; the OpenAI wire mapping must drop it entirely.
+        const buildRequest = (thoughtSignature?: string) => ({
+            messages: [
+                { role: 'user' as const, content: 'go' },
+                {
+                    role: 'assistant' as const,
+                    content: null,
+                    toolCalls: [
+                        {
+                            id: 'c1',
+                            name: 'list_nodes',
+                            args: '{}',
+                            ...(thoughtSignature !== undefined ? { thoughtSignature } : {}),
+                        },
+                    ],
+                },
+                { role: 'tool' as const, content: '{"nodes":[]}', toolCallId: 'c1' },
+            ],
+            tools: [],
+        });
+        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }, { json: openAiText('ok') }]);
+        const gateway = createGateway(http);
+
+        await drain(gateway.chat(buildRequest('opaque-sig-abc')));
+        await drain(gateway.chat(buildRequest()));
+
+        expect(JSON.stringify(http.requests[0].body)).toBe(JSON.stringify(http.requests[1].body));
+        expect(JSON.stringify(http.requests[0].body)).not.toContain('opaque-sig-abc');
+        expect(JSON.stringify(http.requests[0].body)).not.toContain('thoughtSignature');
+    });
+
     it('omits tools and tool_choice when the request carries no tools', async () => {
         const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
 
@@ -165,15 +229,45 @@ describe('createOpenAiLlmGateway', () => {
         expect(body['max_tokens']).toBe(64);
     });
 
+    it('sends reasoning_effort only when explicitly configured', async () => {
+        // Needed for OpenAI's gpt-5.6 family, which rejects a tools-bearing /v1/chat/completions
+        // request unless reasoning_effort is explicitly 'none' (confirmed live, 2026-08-07) — every
+        // other model has no such requirement, so this must stay opt-in, never a default.
+        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+        const gateway = createOpenAiLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: API_KEY,
+            generation: { reasoningEffort: 'none' },
+        });
+
+        await drain(gateway.chat(userSays('q')));
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body['reasoning_effort']).toBe('none');
+    });
+
+    it('omits reasoning_effort when not configured', async () => {
+        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+
+        await drain(createGateway(http).chat(userSays('q')));
+
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body).not.toHaveProperty('reasoning_effort');
+    });
+
     it('yields a text chunk then a done chunk carrying usage', async () => {
         const http = new ScriptedHttpRequest([{ json: openAiText('the answer') }]);
 
         const chunks = await drain(createGateway(http).chat(userSays('q')));
 
-        expect(chunks).toEqual([{ text: 'the answer' }, { done: true, usage: withOpenAiCost({ inputTokens: 12, outputTokens: 34 }) }]);
+        expect(chunks).toEqual([
+            { text: 'the answer' },
+            { done: true, usage: withOpenAiCost({ inputTokens: 12, outputTokens: 34 }) },
+        ]);
     });
 
-    it('carries the response body\'s model as actualModel on the done chunk when the provider reports it', async () => {
+    it("carries the response body's model as actualModel on the done chunk when the provider reports it", async () => {
         // Matters most through OpenRouter, where a route like `openrouter/free` can be served by
         // a different underlying model than requested — never assumed equal to the request's model.
         const http = new ScriptedHttpRequest([
@@ -231,7 +325,28 @@ describe('createOpenAiLlmGateway', () => {
         expect((http.requests[0].body as Record<string, unknown>)['model']).toBe('openai/gpt-4o-mini');
     });
 
+    it('omits usage entirely from the done chunk when the response reports no usage at all', async () => {
+        const http = new ScriptedHttpRequest([
+            { json: { choices: [{ message: { role: 'assistant', content: 'hi' } }] } },
+        ]);
+
+        const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+        expect(chunks).toEqual([{ text: 'hi' }, { done: true }]);
+    });
+
     describe('usage/cost mapping', () => {
+        it('reports only estimatedCost: null when the response provides a bare empty usage object — every token field left undefined, not fabricated', async () => {
+            const http = new ScriptedHttpRequest([
+                { json: { choices: [{ message: { role: 'assistant', content: 'ok' } }], usage: {} } },
+            ]);
+
+            const chunks = await drain(createGateway(http).chat(userSays('q')));
+            const done = chunks.find(c => c.done);
+
+            expect(done?.usage).toEqual({ estimatedCost: null });
+        });
+
         it('subtracts prompt_tokens_details.cached_tokens from prompt_tokens for inputTokens — never double-counted', async () => {
             const http = new ScriptedHttpRequest([
                 {
@@ -409,7 +524,7 @@ describe('createOpenAiLlmGateway', () => {
             expect(done?.usage?.costSource).toBe('estimated');
         });
 
-        it('prefers OpenRouter\'s provider-reported usage.cost over a local estimate', async () => {
+        it("prefers OpenRouter's provider-reported usage.cost over a local estimate", async () => {
             const http = new ScriptedHttpRequest([
                 {
                     json: {
@@ -527,6 +642,44 @@ describe('createOpenAiLlmGateway', () => {
         expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
     });
 
+    it('passes an error body through verbatim (no redaction) when apiKey is empty — nothing to scrub', async () => {
+        // Guards the redactText early-return itself: without it, `value.split('').join(...)` would
+        // splice '[redacted]' between every single character of the body, mangling it completely.
+        const http = new ScriptedHttpRequest([{ status: 403, text: 'no secret in this error body' }]);
+        const gateway = createOpenAiLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: '',
+        });
+
+        await expect(drain(gateway.chat(userSays('q')))).rejects.toThrow(
+            'OpenAI request failed with status 403: no secret in this error body'
+        );
+    });
+
+    it('falls back to an empty string when reading the non-ok response body itself fails (response.text() rejects)', async () => {
+        const http: HttpRequestSupportable = {
+            request: async () => ({
+                status: 500,
+                ok: false,
+                headers: {},
+                json: async () => {
+                    throw new Error('should not be called on the error path');
+                },
+                text: async () => {
+                    throw new Error('body stream errored');
+                },
+            }),
+        };
+        const gateway = createOpenAiLlmGateway({
+            environment: createVirtualAgentEnvironment(),
+            http,
+            apiKey: API_KEY,
+        });
+
+        await expect(drain(gateway.chat(userSays('q')))).rejects.toThrow('OpenAI request failed with status 500: ');
+    });
+
     it('throws when the response has no choices', async () => {
         const http = new ScriptedHttpRequest([{ json: { choices: [] } }]);
 
@@ -545,6 +698,21 @@ describe('createOpenAiLlmGateway', () => {
         expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
     });
 
+    it('omits usage from the traced response entry when the response has no usage at all', async () => {
+        // trace?.debug(...) short-circuits its whole argument list when no trace reporter is
+        // configured, so the object literal carrying this ternary is only evaluated when a real
+        // reporter is wired — this test is what actually exercises its "no usage" branch.
+        const http = new ScriptedHttpRequest([
+            { json: { choices: [{ message: { role: 'assistant', content: 'hi' } }] } },
+        ]);
+        const trace = new BufferAgentTraceReporter();
+
+        await drain(createGateway(http, trace).chat(userSays('q')));
+
+        const responseEntry = trace.entries.find(entry => entry.message === 'llm.openai.response');
+        expect(responseEntry?.json).not.toHaveProperty('usage');
+    });
+
     // The full offline chain: a canned OpenAI tool-call response flows through the gateway's
     // parsing into a Chunk.toolCall, then through the real ToolExecutor + canvas tools, and
     // moves the node — the same bar the real env-gated test proves against a live provider,
@@ -554,10 +722,7 @@ describe('createOpenAiLlmGateway', () => {
             nodes: [makeNode('text-1', 100, 200, { type: 'text-input' })],
             edges: [],
         });
-        const provider = [
-            createNodeReadToolProvider(binding, createCatalogLookup([])),
-            createNodeMoveToolProvider(binding),
-        ];
+        const provider = [toolset({ binding, catalog: createCatalogLookup([]) }, [LIST_NODES, MOVE_NODE])];
         const executor = createToolExecutor();
         const config: AgentConfig = {
             id: 'locator-test',

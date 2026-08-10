@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
     buildModelManifest,
@@ -6,6 +6,27 @@ import {
     formatModelManifestCsv,
     formatModelManifestJson,
 } from '../../llm/modelManifest';
+
+import type { ProviderModelEntry } from '../../llm/providerRegistry';
+
+/** A minimal synthetic registry entry, matching the pattern `multiTurnRunSelection.spec.ts` uses —
+ * never the real `PROVIDER_REGISTRY` — so these mocked-registry tests below exercise exactly the
+ * `buildModelManifest` branch under test without depending on today's real model catalog (which
+ * has no `offlineVerified: false` or `status: 'blocked'` entry to reach these branches with). */
+const syntheticEntry = (overrides: Partial<ProviderModelEntry> = {}): ProviderModelEntry => ({
+    providerId: 'openai',
+    displayName: 'OpenAI',
+    gatewayType: 'openai-compatible',
+    models: ['gpt-4o-mini'],
+    defaultModel: 'gpt-4o-mini',
+    apiKeyEnv: 'OPENAI_API_KEY',
+    supportsToolCalls: true,
+    supportsMultiTurnToolResults: true,
+    status: 'implemented',
+    offlineVerified: true,
+    realVerifiedModels: [],
+    ...overrides,
+});
 
 describe('buildModelManifest', () => {
     it('builds a manifest row for every model in PROVIDER_REGISTRY without throwing', () => {
@@ -52,6 +73,92 @@ describe('buildModelManifest', () => {
         const manifest = buildModelManifest();
         const gpt4oMini = manifest.find(m => m.provider === 'openai' && m.requestedModel === 'gpt-4o-mini');
         expect(gpt4oMini?.status).toBe('live-verified');
+    });
+
+    it('registers anthropic/claude-fable-5 (openrouter) with a distinct, honestly-weaker discovery source than the other openrouter:* entries, and status offline-verified (not live-verified — no live run has happened yet)', () => {
+        const manifest = buildModelManifest();
+        const fable = manifest.find(
+            m => m.provider === 'openrouter' && m.requestedModel === 'anthropic/claude-fable-5'
+        );
+        expect(fable).toBeDefined();
+        expect(fable?.kind).toBe('fixed');
+        expect(fable?.status).toBe('offline-verified');
+        // Every other openrouter:* entry cites OpenRouter's own public Models API as its discovery
+        // source (an independent, live-checkable claim) — Fable's is deliberately labeled
+        // "user-reported" instead, since this codebase has not yet independently re-confirmed it the
+        // same way. The two must never read as equally strong.
+        expect(fable?.discoverySource).toMatch(/user-reported/i);
+        const opus = manifest.find(m => m.provider === 'openrouter' && m.requestedModel === 'anthropic/claude-opus-5');
+        expect(opus?.discoverySource).not.toMatch(/user-reported/i);
+    });
+});
+
+describe('buildModelManifest: branches unreachable through the real PROVIDER_REGISTRY (mocked registry)', () => {
+    // Every real registry entry today is offlineVerified: true and status is never 'blocked' — so
+    // statusForModel's 'configured' fallback and the status==='blocked' skipReason branch can only
+    // be reached by substituting a synthetic registry. `vi.doMock` + a fresh dynamic `import()` per
+    // test (rather than a file-level `vi.mock`) keeps every other test in this file working against
+    // the real, unmocked PROVIDER_REGISTRY via its already-evaluated static import at the top.
+    beforeEach(() => {
+        vi.resetModules();
+    });
+
+    it('statusForModel falls back to "configured" for a model that is not a dynamic route, not real-verified, and not offline-verified', async () => {
+        vi.doMock('../../llm/providerRegistry', () => ({
+            PROVIDER_REGISTRY: [syntheticEntry({ offlineVerified: false, realVerifiedModels: [] })],
+        }));
+        const { buildModelManifest: mockedBuildModelManifest } = await import('../../llm/modelManifest');
+
+        const manifest = mockedBuildModelManifest();
+        expect(manifest).toHaveLength(1);
+        expect(manifest[0].status).toBe('configured');
+    });
+
+    it('throws when a registered model has no matching DISCOVERY entry', async () => {
+        vi.doMock('../../llm/providerRegistry', () => ({
+            PROVIDER_REGISTRY: [
+                syntheticEntry({
+                    providerId: 'totally-unknown-provider',
+                    models: ['totally-unknown-model'],
+                    defaultModel: 'totally-unknown-model',
+                }),
+            ],
+        }));
+        const { buildModelManifest: mockedBuildModelManifest } = await import('../../llm/modelManifest');
+
+        expect(() => mockedBuildModelManifest()).toThrow(
+            'modelManifest: no discovery metadata registered for "totally-unknown-provider:totally-unknown-model" — add one to DISCOVERY'
+        );
+    });
+
+    it('populates skipReason from notes when a provider entry has status "blocked" with notes set', async () => {
+        vi.doMock('../../llm/providerRegistry', () => ({
+            PROVIDER_REGISTRY: [syntheticEntry({ status: 'blocked', notes: 'account suspended pending review' })],
+        }));
+        const { buildModelManifest: mockedBuildModelManifest } = await import('../../llm/modelManifest');
+
+        const manifest = mockedBuildModelManifest();
+        expect(manifest[0].skipReason).toBe('provider status is "blocked": account suspended pending review');
+    });
+
+    it('populates skipReason with an empty notes fallback when a "blocked" provider entry has no notes at all', async () => {
+        vi.doMock('../../llm/providerRegistry', () => ({
+            PROVIDER_REGISTRY: [syntheticEntry({ status: 'blocked', notes: undefined })],
+        }));
+        const { buildModelManifest: mockedBuildModelManifest } = await import('../../llm/modelManifest');
+
+        const manifest = mockedBuildModelManifest();
+        expect(manifest[0].skipReason).toBe('provider status is "blocked": ');
+    });
+
+    it('a non-"blocked" status never adds a skipReason at all', async () => {
+        vi.doMock('../../llm/providerRegistry', () => ({
+            PROVIDER_REGISTRY: [syntheticEntry({ status: 'planned' })],
+        }));
+        const { buildModelManifest: mockedBuildModelManifest } = await import('../../llm/modelManifest');
+
+        const manifest = mockedBuildModelManifest();
+        expect(manifest[0].skipReason).toBeUndefined();
     });
 });
 

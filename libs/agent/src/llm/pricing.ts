@@ -127,6 +127,34 @@ const GEMINI_PRICING: Record<string, ModelPricing> = {
             '2026-08-04 — preview model id, pricing may change or the model may be retired without ' +
             "notice; sourced from OpenRouter's mirror, not Google's pricing page directly.",
     },
+    'gemini-3.5-flash': {
+        currency: 'USD',
+        inputPerMillion: 1.5,
+        outputPerMillion: 9.0,
+        source:
+            "OpenRouter's public Models API (GET https://openrouter.ai/api/v1/models), fetched " +
+            "2026-08-07 — sourced from OpenRouter's mirror, not Google's pricing page directly; no " +
+            'cached-input rate reported by that source for this model, so cachedInputPerMillion is ' +
+            'omitted rather than guessed.',
+    },
+    'gemini-3.5-flash-lite': {
+        currency: 'USD',
+        inputPerMillion: 0.3,
+        outputPerMillion: 2.5,
+        source:
+            "OpenRouter's public Models API (GET https://openrouter.ai/api/v1/models), fetched " +
+            "2026-08-07 — sourced from OpenRouter's mirror, not Google's pricing page directly; no " +
+            'cached-input rate reported by that source for this model.',
+    },
+    'gemini-3.6-flash': {
+        currency: 'USD',
+        inputPerMillion: 1.5,
+        outputPerMillion: 7.5,
+        source:
+            "OpenRouter's public Models API (GET https://openrouter.ai/api/v1/models), fetched " +
+            "2026-08-07 — sourced from OpenRouter's mirror, not Google's pricing page directly; no " +
+            'cached-input rate reported by that source for this model.',
+    },
 };
 
 /**
@@ -140,8 +168,11 @@ const GEMINI_PRICING: Record<string, ModelPricing> = {
  * `isCacheWriteAmbiguous` treats any nonzero `cache_write_tokens` as making the cost calculation
  * ambiguous and returns `estimatedCost: null` before this table is ever consulted for that
  * bucket — so a rate here would never actually be used, and isn't configured to avoid implying
- * otherwise. None of the three OpenAI models registered in `providerRegistry.ts` as of this
- * writing are GPT-5.6+; this only becomes relevant if one is added.
+ * otherwise. As of 2026-08-07, `providerRegistry.ts` DOES register three GPT-5.6 models
+ * (gpt-5.6-sol/terra/luna) — this is exactly the case the paragraph above anticipated: a rate is
+ * still provided below for their non-cache-write buckets, but any call that reports a nonzero
+ * `cache_write_tokens` for one of them will still come back `estimatedCost: null` via
+ * `isCacheWriteAmbiguous`, not a wrong number computed from the billing-bug-affected bucket.
  */
 const OPENAI_PRICING: Record<string, ModelPricing> = {
     'gpt-4o-mini': {
@@ -174,6 +205,47 @@ const OPENAI_PRICING: Record<string, ModelPricing> = {
             "OpenRouter's public Models API (GET https://openrouter.ai/api/v1/models), fetched " +
             "2026-08-04 — a cross-provider mirror of OpenAI's own rate, not OpenAI's pricing page " +
             'directly; re-verify against developers.openai.com/api/docs/pricing before trusting at scale.',
+    },
+    // gpt-5.5 and gpt-5.6-sol are priced identically ($5/$30 per 1M) per OpenRouter's mirror —
+    // not an error, both rows genuinely report the same rate. gpt-5.6-terra and gpt-5.6-luna are
+    // each roughly 5x and 50x cheaper than gpt-5.6-sol respectively; OpenAI's own catalog gives no
+    // tier semantics for the sol/terra/luna names (see providerRegistry.ts's OPENAI_ENTRY comment),
+    // so this spread is reported as observed, not explained.
+    'gpt-5.5': {
+        currency: 'USD',
+        inputPerMillion: 5.0,
+        outputPerMillion: 30.0,
+        source:
+            "OpenRouter's public Models API (GET https://openrouter.ai/api/v1/models), fetched " +
+            '2026-08-07 — not yet listed on developers.openai.com/api/docs/pricing at fetch time; ' +
+            're-verify there once published.',
+    },
+    'gpt-5.6-sol': {
+        currency: 'USD',
+        inputPerMillion: 5.0,
+        outputPerMillion: 30.0,
+        source:
+            "OpenRouter's public Models API (GET https://openrouter.ai/api/v1/models), fetched " +
+            '2026-08-07 — not yet listed on developers.openai.com/api/docs/pricing at fetch time; ' +
+            're-verify there once published.',
+    },
+    'gpt-5.6-terra': {
+        currency: 'USD',
+        inputPerMillion: 1.0,
+        outputPerMillion: 6.0,
+        source:
+            "OpenRouter's public Models API (GET https://openrouter.ai/api/v1/models), fetched " +
+            '2026-08-07 — not yet listed on developers.openai.com/api/docs/pricing at fetch time; ' +
+            're-verify there once published.',
+    },
+    'gpt-5.6-luna': {
+        currency: 'USD',
+        inputPerMillion: 0.1,
+        outputPerMillion: 0.6,
+        source:
+            "OpenRouter's public Models API (GET https://openrouter.ai/api/v1/models), fetched " +
+            '2026-08-07 — not yet listed on developers.openai.com/api/docs/pricing at fetch time; ' +
+            're-verify there once published.',
     },
 };
 

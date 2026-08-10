@@ -40,8 +40,12 @@ export interface OpenAiLlmGatewayOptions {
     model?: string;
     /** Override to point at OpenRouter (`https://openrouter.ai/api/v1`) or a proxy. Defaults to the OpenAI API. */
     baseUrl?: string;
-    /** Optional generation parameters applied to every request. */
-    generation?: { temperature?: number; maxOutputTokens?: number };
+    /** Optional generation parameters applied to every request. `reasoningEffort` is sent as
+     * `reasoning_effort` only when set — needed for OpenAI's gpt-5.6 family, which (per OpenAI's
+     * own error, confirmed 2026-08-07) rejects a `tools`-bearing /v1/chat/completions request
+     * outright unless `reasoning_effort` is explicitly `'none'`; every other model this codebase
+     * talks to has no such requirement, so this is opt-in, never a hardcoded default. */
+    generation?: { temperature?: number; maxOutputTokens?: number; reasoningEffort?: string };
 }
 
 /** The OpenAI gateway: the shared contract plus provider/model identity. Tool-capable. */
@@ -103,6 +107,7 @@ const toOpenAiRequestBody = (req: ChatRequest, model: string, generation?: OpenA
     ...(req.tools.length > 0 ? { tools: req.tools.map(toOpenAiTool), tool_choice: 'auto' } : {}),
     ...(generation?.temperature !== undefined ? { temperature: generation.temperature } : {}),
     ...(generation?.maxOutputTokens !== undefined ? { max_tokens: generation.maxOutputTokens } : {}),
+    ...(generation?.reasoningEffort !== undefined ? { reasoning_effort: generation.reasoningEffort } : {}),
 });
 
 interface OpenAiUsage {

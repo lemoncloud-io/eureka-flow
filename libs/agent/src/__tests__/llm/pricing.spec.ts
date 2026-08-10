@@ -182,7 +182,8 @@ describe('estimateCost', () => {
 
     it('returns null for a call whose prompt size crosses a configured long-context threshold, rather than silently applying the wrong tier', () => {
         const pricing = getModelPricing('gemini', 'gemini-2.5-pro');
-        if (!pricing?.longContextThresholdTokens) throw new Error('expected gemini-2.5-pro to have a long-context threshold');
+        if (!pricing?.longContextThresholdTokens)
+            {throw new Error('expected gemini-2.5-pro to have a long-context threshold');}
 
         const atThreshold = estimateCost('gemini', 'gemini-2.5-pro', {
             inputTokens: pricing.longContextThresholdTokens,
@@ -199,7 +200,8 @@ describe('estimateCost', () => {
 
     it('counts cachedInputTokens toward the long-context threshold, since it is still prompt size', () => {
         const pricing = getModelPricing('gemini', 'gemini-2.5-pro');
-        if (!pricing?.longContextThresholdTokens) throw new Error('expected gemini-2.5-pro to have a long-context threshold');
+        if (!pricing?.longContextThresholdTokens)
+            {throw new Error('expected gemini-2.5-pro to have a long-context threshold');}
 
         const cost = estimateCost('gemini', 'gemini-2.5-pro', {
             inputTokens: pricing.longContextThresholdTokens - 100,
@@ -207,6 +209,26 @@ describe('estimateCost', () => {
             outputTokens: 100,
         });
         expect(cost).toBeNull();
+    });
+
+    it('treats a completely absent inputTokens as 0 when checking the long-context threshold — cachedInputTokens alone can still trip it', () => {
+        const pricing = getModelPricing('gemini', 'gemini-2.5-pro');
+        if (!pricing?.longContextThresholdTokens)
+            {throw new Error('expected gemini-2.5-pro to have a long-context threshold');}
+
+        // inputTokens is entirely absent (not just 0) — promptSize must fall back to 0 for it, so
+        // cachedInputTokens alone determines whether the threshold is crossed.
+        const overThreshold = estimateCost('gemini', 'gemini-2.5-pro', {
+            cachedInputTokens: pricing.longContextThresholdTokens + 1,
+            outputTokens: 100,
+        });
+        expect(overThreshold).toBeNull();
+
+        const underThreshold = estimateCost('gemini', 'gemini-2.5-pro', {
+            cachedInputTokens: pricing.longContextThresholdTokens - 1,
+            outputTokens: 100,
+        });
+        expect(underThreshold).not.toBeNull();
     });
 
     it('does not apply a long-context guard to a model with no configured threshold', () => {

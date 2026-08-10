@@ -1,4 +1,7 @@
-import { DEFAULT_MAX_TOKENS as ANTHROPIC_DEFAULT_MAX_TOKENS, createAnthropicToolLlmGateway } from './AnthropicToolLlmGateway';
+import {
+    DEFAULT_MAX_TOKENS as ANTHROPIC_DEFAULT_MAX_TOKENS,
+    createAnthropicToolLlmGateway,
+} from './AnthropicToolLlmGateway';
 import { createGeminiToolLlmGateway } from './GeminiToolLlmGateway';
 import { createOpenAiLlmGateway } from './OpenAiLlmGateway';
 
@@ -124,7 +127,10 @@ export const deriveGenerationConfiguration = (
                 temperature,
                 topP: { status: 'provider-default' },
                 topK: { status: 'provider-default' },
-                maxOutputTokens: { status: 'explicit', value: generation?.maxOutputTokens ?? ANTHROPIC_DEFAULT_MAX_TOKENS },
+                maxOutputTokens: {
+                    status: 'explicit',
+                    value: generation?.maxOutputTokens ?? ANTHROPIC_DEFAULT_MAX_TOKENS,
+                },
                 reasoningEffort: { status: 'unsupported' },
             };
         case 'gemini-native':
@@ -137,7 +143,9 @@ export const deriveGenerationConfiguration = (
             };
         default: {
             const exhaustiveCheck: never = gatewayType;
-            throw new Error(`deriveGenerationConfiguration: no derivation for gatewayType "${String(exhaustiveCheck)}"`);
+            throw new Error(
+                `deriveGenerationConfiguration: no derivation for gatewayType "${String(exhaustiveCheck)}"`
+            );
         }
     }
 };
@@ -173,6 +181,18 @@ export interface ProviderModelEntry {
      * `realLocatorScenarios.spec.ts`'s `DEFAULT_REAL_TEST_TIMEOUT_MS`).
      */
     realTestTimeoutMs?: number;
+    /**
+     * Per-model generation parameters a model REQUIRES to function at all — not a general
+     * sampling/tuning knob (this registry deliberately never configures those; see
+     * `deriveGenerationConfiguration`'s doc), but a targeted fix for a specific model's own hard
+     * requirement. Keyed by exact model id within this entry's `models`. Only `openai-compatible`
+     * gateways currently consume this (see `createGatewayForEntry`) — added 2026-08-07 for
+     * OpenAI's gpt-5.6 family, which rejects any `tools`-bearing /v1/chat/completions request
+     * unless `reasoning_effort` is explicitly `'none'` (confirmed via a live diagnostic call, not
+     * guessed — see OPENAI_ENTRY's models comment). Absent for every model that has no such
+     * requirement.
+     */
+    requiredGenerationOverrides?: Record<string, { reasoningEffort?: string }>;
     supportsToolCalls: boolean;
     /** Can this gateway map a tool-result message back into the provider's follow-up-turn format? */
     supportsMultiTurnToolResults: boolean;
@@ -202,10 +222,42 @@ const OPENAI_ENTRY: ProviderModelEntry = {
     // (developers.openai.com/api/docs/models/gpt-4.1): exact id `gpt-4.1`, current (default
     // snapshot gpt-4.1-2025-04-14), directly callable via Chat Completions/Assistants/Batch. This
     // is a direct-provider confirmation, not an OpenRouter-namespace inference.
-    models: ['gpt-4o-mini', 'gpt-4.1-mini', 'gpt-5-mini', 'gpt-4.1'],
+    // gpt-5.5, gpt-5.6-sol, gpt-5.6-terra, and gpt-5.6-luna added 2026-08-07 — all four confirmed
+    // directly against OpenAI's own live `GET /v1/models` endpoint (not an OpenRouter mirror) using
+    // this repo's own OPENAI_API_KEY: real, currently-listed ids, not guesses. The three gpt-5.6
+    // variants (sol/terra/luna) are NOT a mini/pro tier spread like this registry's other entries —
+    // OpenAI's own listing gives no tier semantics for the three names, so all three are registered
+    // as parallel, equally-unverified candidates rather than picking one. Per-1M pricing (sourced
+    // from OpenRouter's public Models API as a cross-provider mirror, fetched 2026-08-07, since none
+    // of the four appear on developers.openai.com/api/docs/pricing yet) spreads roughly 50x across
+    // the three 5.6 variants (luna cheapest, sol priced the same as gpt-5.5) — see pricing.ts.
+    // Realistically reasoning-heavier than the existing four models; realTestTimeoutMs raised below.
+    models: [
+        'gpt-4o-mini',
+        'gpt-4.1-mini',
+        'gpt-5-mini',
+        'gpt-4.1',
+        'gpt-5.5',
+        'gpt-5.6-sol',
+        'gpt-5.6-terra',
+        'gpt-5.6-luna',
+    ],
     defaultModel: 'gpt-4o-mini',
     apiKeyEnv: 'OPENAI_API_KEY',
     modelEnvOverride: 'OPENAI_TEST_MODEL',
+    // Default (30s) observed as tight for reasoning-heavier models elsewhere in this registry (see
+    // GEMINI_ENTRY's gemini-2.5-pro timeout in the 2026-08-04 full-matrix run) — raised for this
+    // entry now that it includes four newer, likely reasoning-capable gpt-5.5/5.6 candidates.
+    realTestTimeoutMs: 60_000,
+    // Fix for the 2026-08-07 finding (see models comment above and OPENAI_ENTRY's notes below):
+    // gpt-5.6-sol/terra/luna reject any tool-calling /v1/chat/completions request unless
+    // reasoning_effort is explicitly 'none' — confirmed via a live diagnostic call, not guessed.
+    // Applied only to these three; every other OpenAI model is unaffected (omitted from this map).
+    requiredGenerationOverrides: {
+        'gpt-5.6-sol': { reasoningEffort: 'none' },
+        'gpt-5.6-terra': { reasoningEffort: 'none' },
+        'gpt-5.6-luna': { reasoningEffort: 'none' },
+    },
     supportsToolCalls: true,
     // Message-mapping code handles role:'tool' and assistant tool_calls natively, offline-verified
     // (OpenAiLlmGateway.spec.ts). Real-key-verified 2026-08-06: gpt-4o-mini and gpt-5-mini both
@@ -214,7 +266,22 @@ const OPENAI_ENTRY: ProviderModelEntry = {
     supportsMultiTurnToolResults: true,
     status: 'implemented',
     offlineVerified: true,
-    realVerifiedModels: ['gpt-4o-mini', 'gpt-5-mini'],
+    // 2026-08-07 full-matrix live run (realLocatorScenarios.spec.ts, all 11 scenarios): gpt-4.1
+    // (10/11 accepted), gpt-4.1-mini (10/11), gpt-5.5 (11/11) all confirmed working live —
+    // added alongside gpt-4o-mini/gpt-5-mini above. gpt-5.6-sol/terra/luna initially failed 0/11
+    // (see notes below for the diagnosed cause); after the requiredGenerationOverrides fix above,
+    // a targeted re-run confirmed all three at 11/11, 11/11, and 11/11 respectively (sol/terra/luna)
+    // — added here only after that live re-confirmation, not merely because the fix was written.
+    realVerifiedModels: [
+        'gpt-4o-mini',
+        'gpt-5-mini',
+        'gpt-4.1',
+        'gpt-4.1-mini',
+        'gpt-5.5',
+        'gpt-5.6-sol',
+        'gpt-5.6-terra',
+        'gpt-5.6-luna',
+    ],
     notes:
         'OpenAI-wire-compatible — OpenRouter (see OPENROUTER_ENTRY) already reuses this same ' +
         'gateway via a baseUrl override. DeepSeek/Qwen could too, but are not registered yet. ' +
@@ -224,7 +291,25 @@ const OPENAI_ENTRY: ProviderModelEntry = {
         'genuine multi-turn list_nodes → move_node round trip) through this same provider-native ' +
         'path. gpt-4.1 (full, non-mini tier) added 2026-08-04 for capability-tier breadth per the ' +
         "model-manifest benchmark target — see `modelManifest.ts`; confirmed directly against OpenAI's " +
-        "own docs (not just OpenRouter's mirrored catalog), but not yet real-key-verified.",
+        "own docs (not just OpenRouter's mirrored catalog), but not yet real-key-verified. " +
+        'gpt-5.5 and the three gpt-5.6 variants (sol/terra/luna) added 2026-08-07, confirmed present ' +
+        "via a live call to OpenAI's own /v1/models endpoint. Real-key-verified the same day: " +
+        'gpt-5.5 passed 11/11 scenarios (real-verified above). gpt-5.6-sol/terra/luna FAILED 0/11 ' +
+        '— every attempt returned a provider-error at ~200-300ms (fails before any tokens are ' +
+        "generated). Root-caused via two isolated diagnostic calls (not guessed): OpenAI's Chat " +
+        "Completions endpoint rejects this model family's tool-calling requests outright — " +
+        '\'"Function tools with reasoning_effort are not supported for gpt-5.6-sol in ' +
+        '/v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to ' +
+        "'none'.\"' (verbatim OpenAI error, param: reasoning_effort). This codebase's " +
+        'OpenAiLlmGateway.ts calls /v1/chat/completions and never sends reasoning_effort at all, so ' +
+        'every gpt-5.6 tool-calling call hits this rejection unconditionally — a genuine gateway/' +
+        "model-family incompatibility, not an access or quota problem (the same key's non-tool " +
+        'chat completions to gpt-5.6-sol succeed normally). FIXED 2026-08-07 via ' +
+        "requiredGenerationOverrides above (reasoning_effort: 'none' for these three models only) " +
+        '— the minimal, additive fix (no /v1/responses migration needed). CONFIRMED via a targeted ' +
+        'live re-run the same day (OPENAI_TEST_MODEL=gpt-5.6-sol / -terra / -luna, one at a time): ' +
+        '11/11, 11/11, and 11/11 accepted respectively — all three now genuinely real-key-verified, ' +
+        'not just patched. See realVerifiedModels above.',
 };
 
 const GEMINI_ENTRY: ProviderModelEntry = {
@@ -247,10 +332,30 @@ const GEMINI_ENTRY: ProviderModelEntry = {
     // gemini-3.1-pro-preview is a newer, larger, explicitly "-preview"-suffixed candidate — same
     // upstream-rename/retire risk called out for gemini-3-flash-preview above; label as
     // preview-only in any benchmark report.
-    models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash-preview', 'gemini-2.5-flash-lite', 'gemini-3.1-pro-preview'],
+    // gemini-3.5-flash, gemini-3.5-flash-lite, and gemini-3.6-flash added 2026-08-07 — confirmed
+    // directly against Google's own live `GET /v1beta/models` endpoint using this repo's own
+    // GEMINI_API_KEY (all three listed with `generateContent` in supportedGenerationMethods, not a
+    // guess). All three are stable (non-"-preview") ids, unlike gemini-3-flash-preview/
+    // gemini-3.1-pro-preview above. Per-1M pricing sourced from OpenRouter's public Models API as a
+    // cross-provider mirror (fetched 2026-08-07) — same sourcing caveat as gemini-2.5-flash-lite/
+    // gemini-3.1-pro-preview above; re-verify against ai.google.dev before trusting at scale.
+    models: [
+        'gemini-2.5-flash',
+        'gemini-2.5-pro',
+        'gemini-3-flash-preview',
+        'gemini-2.5-flash-lite',
+        'gemini-3.1-pro-preview',
+        'gemini-3.5-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-3.6-flash',
+    ],
     defaultModel: 'gemini-2.5-flash',
     apiKeyEnv: 'GEMINI_API_KEY',
     modelEnvOverride: 'GEMINI_TEST_MODEL',
+    // Raised from the harness default (30s) — the 2026-08-04 full-matrix run already saw one
+    // gemini-2.5-pro timeout at the default, and this entry now includes three more recent-
+    // generation candidates whose latency profile is unproven.
+    realTestTimeoutMs: 60_000,
     supportsToolCalls: true,
     // Maps tool-result/assistant-tool-call messages into functionResponse/functionCall parts,
     // correlated by function name (recovered from the earlier assistant tool-call message —
@@ -260,7 +365,21 @@ const GEMINI_ENTRY: ProviderModelEntry = {
     supportsMultiTurnToolResults: true,
     status: 'implemented',
     offlineVerified: true,
-    realVerifiedModels: ['gemini-2.5-flash'],
+    // 2026-08-07 full-matrix live run (realLocatorScenarios.spec.ts, all 11 scenarios): every
+    // registered Gemini model was confirmed working live — gemini-2.5-pro, gemini-3-flash-preview,
+    // gemini-2.5-flash-lite, gemini-3.1-pro-preview, gemini-3.5-flash, gemini-3.5-flash-lite, and
+    // gemini-3.6-flash all reached 11/11 accepted (pass + known-variance), alongside the
+    // already-verified gemini-2.5-flash. This is the first real-key run for six of these seven.
+    realVerifiedModels: [
+        'gemini-2.5-flash',
+        'gemini-2.5-pro',
+        'gemini-3-flash-preview',
+        'gemini-2.5-flash-lite',
+        'gemini-3.1-pro-preview',
+        'gemini-3.5-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-3.6-flash',
+    ],
     notes:
         'Real-key runs have also observed a lookup-first target-resolution tool-choice variance ' +
         'and a one-off "no candidates" provider error (see provider-tool-calling.md §9); neither ' +
@@ -273,8 +392,13 @@ const GEMINI_ENTRY: ProviderModelEntry = {
         'to upstream rename/retirement given the -preview suffix. gemini-2.5-flash-lite ' +
         '(stable, cheapest 2.5-gen tier) and gemini-3.1-pro-preview (newer, preview-suffixed) ' +
         'added 2026-08-04 for benchmark breadth per `modelManifest.ts`; both confirmed directly ' +
-        'against ai.google.dev/gemini-api/docs/models (not just OpenRouter\'s mirrored catalog), ' +
-        'not yet real-key-verified through this native path.',
+        "against ai.google.dev/gemini-api/docs/models (not just OpenRouter's mirrored catalog). " +
+        'gemini-3.5-flash, gemini-3.5-flash-lite, and gemini-3.6-flash added 2026-08-07, confirmed ' +
+        "present via a live call to Google's own /v1beta/models endpoint; all three are stable " +
+        '(non-preview) ids. All eight models in this entry — including gemini-2.5-pro, which ' +
+        'previously timed out once at the 30s default and is why realTestTimeoutMs above was ' +
+        'raised — passed 11/11 accepted in the 2026-08-07 full-matrix live run; see ' +
+        'realVerifiedModels above for the complete, now-current list.',
 };
 
 const OPENROUTER_ENTRY: ProviderModelEntry = {
@@ -302,6 +426,34 @@ const OPENROUTER_ENTRY: ProviderModelEntry = {
     //   - meta-llama/llama-3.3-70b-instruct, deepseek/deepseek-chat-v3.1 — added for
     //     upstream-provider diversity within the OpenRouter benchmark pool.
     // None of the five are yet real-key-verified through this path.
+    //
+    // Three more added 2026-08-07, all confirmed present in the same live OpenRouter Models API
+    // fetch with `tools` in `supported_parameters`:
+    //   - anthropic/claude-sonnet-5, anthropic/claude-opus-5 — routes to Claude with no
+    //     ANTHROPIC_API_KEY required; this is the only path in this repo that can real-key-verify
+    //     Claude tool-calling at all right now, since ANTHROPIC_ENTRY has no key available. A pass
+    //     here verifies OpenRouter's routing to these models, not a direct-provider Anthropic call —
+    //     do not conflate the two when reporting results.
+    //   - google/gemini-3.6-flash — newest stable Gemini tier, added here for a cross-path
+    //     comparison against the same model registered directly in GEMINI_ENTRY.
+    // None of the three are yet real-key-verified through this path either.
+    //
+    // anthropic/claude-fable-5 added 2026-08-07 for the Fable/Opus/Sonnet/Haiku four-model runtime
+    // comparison — routed through this SAME OpenRouter entry (not a new gateway) specifically so
+    // provider/route conditions stay identical across all four models being compared; mixing a
+    // direct-Anthropic Fable call with OpenRouter-routed Opus/Sonnet/Haiku results would confound
+    // "model difference" with "route difference". Presence on OpenRouter confirmed by the user
+    // directly (not yet independently re-checked by this codebase against OpenRouter's public
+    // Models API the way the other entries above were — see DISCOVERY in modelManifest.ts for the
+    // exact provenance distinction). Uses the same OpenAI-compatible request shape as every other
+    // OPENROUTER_ENTRY model (see supportsToolCalls/supportsMultiTurnToolResults below) — no
+    // Fable-specific generation override is registered because none is needed: this gateway never
+    // sends `temperature`/`top_p`/`top_k` or an explicit `thinking` config unless a
+    // `requiredGenerationOverrides` entry sets one (see OPENAI_ENTRY's gpt-5.6-* entries for the
+    // pattern), and Fable's documented API differences (thinking always-on, no prefill, no
+    // temperature/top_p/top_k) only bite when a caller explicitly sends one of those — this one
+    // never does. NOT yet real-key-verified — absent from realVerifiedModels below until a live run
+    // confirms it.
     models: [
         'openrouter/free',
         'openai/gpt-4o-mini',
@@ -310,6 +462,10 @@ const OPENROUTER_ENTRY: ProviderModelEntry = {
         'openai/gpt-oss-20b:free',
         'meta-llama/llama-3.3-70b-instruct',
         'deepseek/deepseek-chat-v3.1',
+        'anthropic/claude-sonnet-5',
+        'anthropic/claude-opus-5',
+        'google/gemini-3.6-flash',
+        'anthropic/claude-fable-5',
     ],
     // openrouter/free is a dynamic route (may serve a different underlying model per call, see
     // Chunk.actualModel) — never a fixed model identity. Flagged here so a benchmark/manifest
@@ -333,16 +489,41 @@ const OPENROUTER_ENTRY: ProviderModelEntry = {
     // OpenRouter model or upstream provider it might route to.
     status: 'implemented',
     offlineVerified: true,
-    realVerifiedModels: ['openrouter/free'],
+    // 2026-08-07 full-matrix live run (realLocatorScenarios.spec.ts, all 11 scenarios): every
+    // registered OpenRouter entry produced at least one accepted (pass or known-variance) result,
+    // so every one is now real-verified at some level — accepted counts vary a lot, see below and
+    // the generated report for exact per-model numbers; this field records "confirmed working live
+    // at all", not "100% pass", matching openrouter/free's own pre-existing precedent.
+    realVerifiedModels: [
+        'openrouter/free',
+        'openai/gpt-4o-mini',
+        'google/gemini-2.5-flash',
+        'anthropic/claude-haiku-4.5',
+        'openai/gpt-oss-20b:free',
+        'meta-llama/llama-3.3-70b-instruct',
+        'deepseek/deepseek-chat-v3.1',
+        'anthropic/claude-sonnet-5',
+        'anthropic/claude-opus-5',
+        'google/gemini-3.6-flash',
+    ],
     notes:
         'Reuses createOpenAiLlmGateway via baseUrl — zero new gateway code. Real-key run ' +
         '(OPENROUTER_TEST_MODEL=openrouter/free): 8/8 accepted (5 strict pass, 3 known-variance, 0 ' +
         "fail, 0 timeout). openrouter/free is OpenRouter's free router and may route to different " +
         "underlying models over time, so this verifies that route's current behavior, not a fixed " +
-        'model identity or every OpenRouter model — see dynamicRouteModels above. The other six ' +
-        'entries (openai/gpt-4o-mini plus the five added 2026-08-04: google/gemini-2.5-flash, ' +
-        'anthropic/claude-haiku-4.5, openai/gpt-oss-20b:free, meta-llama/llama-3.3-70b-instruct, ' +
-        'deepseek/deepseek-chat-v3.1) are all fixed model identities and untested candidates.',
+        'model identity or every OpenRouter model — see dynamicRouteModels above. ' +
+        '2026-08-07 full-matrix live run, accepted/11 per model: openai/gpt-4o-mini 11, ' +
+        'anthropic/claude-opus-5 11, anthropic/claude-sonnet-5 11, meta-llama/llama-3.3-70b-instruct ' +
+        '11, google/gemini-3.6-flash 11, google/gemini-2.5-flash 10, anthropic/claude-haiku-4.5 10, ' +
+        'deepseek/deepseek-chat-v3.1 10, openai/gpt-oss-20b:free 7 (roughest result — 4 ' +
+        "provider-errors, matching this free-tier model's previously observed flakiness). " +
+        "anthropic/claude-sonnet-5 and anthropic/claude-opus-5 are this repo's only currently-" +
+        'available path to a real-key Claude tool-calling verification, since no ANTHROPIC_API_KEY ' +
+        'exists here — both are now genuinely real-key-verified, but strictly as "Claude via ' +
+        'OpenRouter", never conflate with an Anthropic-direct result (ANTHROPIC_ENTRY below is still ' +
+        'entirely unverified). anthropic/claude-fable-5 registered 2026-08-07 for the four-model ' +
+        'Fable/Opus/Sonnet/Haiku runtime comparison, deliberately via this same OpenRouter path so ' +
+        'route conditions match the other three exactly — NOT yet real-key-verified.',
 };
 
 const DEEPSEEK_ENTRY: ProviderModelEntry = {
@@ -491,11 +672,11 @@ const ANTHROPIC_ENTRY: ProviderModelEntry = {
         'single-turn tool calling and multi-turn tool-result mapping are implemented and ' +
         'offline-verified; NOT yet real-key-verified by this repo — no ANTHROPIC_API_KEY used. Do ' +
         'not mark real-verified until an actual key run confirms this live. RESOLVED 2026-08-04: ' +
-        "the bare \"claude-haiku-4-5\" used here is confirmed, via Anthropic's own official docs " +
+        'the bare "claude-haiku-4-5" used here is confirmed, via Anthropic\'s own official docs ' +
         '(platform.claude.com/docs/en/about-claude/models/overview), to be the documented "Claude ' +
         'API alias" for this model — a convenience pointer that resolves to the pinned snapshot ' +
         '`claude-haiku-4-5-20251001`. Both ids are valid; this entry keeping the bare alias is a ' +
-        'deliberate choice (matches this file\'s not-pinning-dated-snapshots convention elsewhere), ' +
+        "deliberate choice (matches this file's not-pinning-dated-snapshots convention elsewhere), " +
         'not an unconfirmed guess. The prior lower-confidence, search-sourced doubt about this id is ' +
         'superseded by this primary-source confirmation. claude-sonnet-5 added 2026-08-04 as the ' +
         'old/new-tier spread this entry previously lacked; equally unverified pending a real key.',
@@ -582,14 +763,17 @@ export const createGatewayForEntry = (entry: ProviderModelEntry, options: Create
     const { apiKey, model, environment, http } = options;
 
     switch (entry.gatewayType) {
-        case 'openai-compatible':
+        case 'openai-compatible': {
+            const generation = entry.requiredGenerationOverrides?.[model];
             return createOpenAiLlmGateway({
                 environment,
                 http,
                 apiKey,
                 model,
                 ...(entry.baseUrl ? { baseUrl: entry.baseUrl } : {}),
+                ...(generation ? { generation } : {}),
             });
+        }
         case 'gemini-native':
             return createGeminiToolLlmGateway({
                 environment,

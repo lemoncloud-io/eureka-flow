@@ -2,10 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
 import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
-import { PROVIDER_REGISTRY, createGatewayForEntry, deriveGenerationConfiguration, resolveModelsToRun } from '../../llm/providerRegistry';
+import { planMultiTurnModelSelection } from '../../llm/multiTurnRunSelection';
+import { getModelPricing } from '../../llm/pricing';
+import {
+    PROVIDER_REGISTRY,
+    createGatewayForEntry,
+    deriveGenerationConfiguration,
+    resolveModelsToRun,
+} from '../../llm/providerRegistry';
 
 import type { Chunk } from '../../llm/llmGateway';
-import type { ProviderModelEntry, ProviderStatus } from '../../llm/providerRegistry';
+import type { GatewayType, ProviderModelEntry, ProviderStatus } from '../../llm/providerRegistry';
 
 const VALID_STATUSES: ProviderStatus[] = ['implemented', 'planned', 'blocked'];
 
@@ -49,15 +56,27 @@ describe('PROVIDER_REGISTRY', () => {
         });
     });
 
-    it('OpenRouter is implemented and real-verified for openrouter/free specifically, not every model', () => {
+    it('OpenRouter is implemented and real-verified for openrouter/free, plus every other model as of the 2026-08-07 full-matrix live run', () => {
         const entry = findEntry('openrouter');
 
         expect(entry.status).toBe('implemented');
         expect(entry.offlineVerified).toBe(true);
-        expect(entry.realVerifiedModels).toEqual(['openrouter/free']);
-        // openai/gpt-4o-mini stays a registered-but-unverified candidate.
+        expect(entry.realVerifiedModels).toEqual([
+            'openrouter/free',
+            'openai/gpt-4o-mini',
+            'google/gemini-2.5-flash',
+            'anthropic/claude-haiku-4.5',
+            'openai/gpt-oss-20b:free',
+            'meta-llama/llama-3.3-70b-instruct',
+            'deepseek/deepseek-chat-v3.1',
+            'anthropic/claude-sonnet-5',
+            'anthropic/claude-opus-5',
+            'google/gemini-3.6-flash',
+        ]);
+        // openai/gpt-4o-mini is now a real-verified model too (2026-08-07 full-matrix live run),
+        // not merely a registered candidate — this used to be the untested case this test guarded.
         expect(entry.models).toContain('openai/gpt-4o-mini');
-        expect(entry.realVerifiedModels).not.toContain('openai/gpt-4o-mini');
+        expect(entry.realVerifiedModels).toContain('openai/gpt-4o-mini');
     });
 
     describe('DeepSeek entry (planned, offline-wired only — no real-key run yet)', () => {
@@ -311,6 +330,15 @@ describe('PROVIDER_REGISTRY', () => {
     );
 
     it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
+        '%s: requiredGenerationOverrides only names models that are actually in models',
+        (_providerId, entry) => {
+            for (const overriddenModel of Object.keys(entry.requiredGenerationOverrides ?? {})) {
+                expect(entry.models).toContain(overriddenModel);
+            }
+        }
+    );
+
+    it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
         '%s: status "implemented" implies offlineVerified is true',
         (_providerId, entry) => {
             if (entry.status === 'implemented') {
@@ -347,6 +375,42 @@ describe('PROVIDER_REGISTRY', () => {
         expect(http.requests).toHaveLength(1);
         expect(http.requests[0].url).toBe('https://api.openai.com/v1/chat/completions');
         expect(http.requests[0].body).toMatchObject({ model: 'gpt-4.1-mini' });
+    });
+
+    it('createGatewayForEntry applies requiredGenerationOverrides for gpt-5.6-sol (reasoning_effort fix)', async () => {
+        const entry = findEntry('openai');
+        const http = new ScriptedHttpRequest([
+            { json: { choices: [{ message: { content: 'hi' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } },
+        ]);
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-openai-key',
+            model: 'gpt-5.6-sol',
+            environment: createVirtualAgentEnvironment(),
+            http,
+        });
+
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+        expect(http.requests[0].body).toMatchObject({ model: 'gpt-5.6-sol', reasoning_effort: 'none' });
+    });
+
+    it('createGatewayForEntry does NOT apply a generation override for a model that has none (gpt-4o-mini)', async () => {
+        const entry = findEntry('openai');
+        const http = new ScriptedHttpRequest([
+            { json: { choices: [{ message: { content: 'hi' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } },
+        ]);
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-openai-key',
+            model: 'gpt-4o-mini',
+            environment: createVirtualAgentEnvironment(),
+            http,
+        });
+
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+        expect(http.requests[0].body).not.toHaveProperty('reasoning_effort');
     });
 
     it('createGatewayForEntry builds a real Gemini gateway (gemini-native) hitting generativelanguage.googleapis.com', async () => {
@@ -390,6 +454,167 @@ describe('PROVIDER_REGISTRY', () => {
         expect(http.requests[0].url).not.toContain('test-openrouter-key');
         expect(http.requests[0].headers?.['authorization']).toBe('Bearer test-openrouter-key');
         expect(http.requests[0].body).toMatchObject({ model: 'openrouter/free' });
+    });
+
+    it('createGatewayForEntry builds the gemini-native gateway against a custom baseUrl when the entry carries one (the real GEMINI_ENTRY never does, so this branch needs a synthetic entry)', async () => {
+        // GEMINI_ENTRY (the only gemini-native registry entry) never sets baseUrl, so the
+        // `entry.baseUrl ? { baseUrl: entry.baseUrl } : {}` TRUE branch inside the gemini-native
+        // case is otherwise unreachable through the real registry — construct a synthetic entry
+        // (a copy of the real one with baseUrl added) to exercise it.
+        const entry: ProviderModelEntry = { ...findEntry('gemini'), baseUrl: 'https://gemini-proxy.example.com' };
+        const http = new ScriptedHttpRequest([{ json: { candidates: [{ content: { parts: [{ text: 'hi' }] } }] } }]);
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-gemini-key',
+            model: entry.defaultModel,
+            environment: createVirtualAgentEnvironment(),
+            http,
+        });
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+        expect(http.requests).toHaveLength(1);
+        expect(http.requests[0].url).toBe(
+            `https://gemini-proxy.example.com/v1beta/models/${entry.defaultModel}:generateContent`
+        );
+        expect(http.requests[0].url).not.toContain('generativelanguage.googleapis.com');
+    });
+
+    it('createGatewayForEntry falls back to the default Anthropic baseUrl when the entry has none (the real ANTHROPIC_ENTRY always sets one, so this branch needs a synthetic entry)', async () => {
+        // ANTHROPIC_ENTRY (the only anthropic-native registry entry) always sets baseUrl, so the
+        // `entry.baseUrl ? { baseUrl: entry.baseUrl } : {}` FALSE branch inside the anthropic-native
+        // case is otherwise unreachable through the real registry — construct a synthetic entry
+        // (a copy of the real one with baseUrl removed) to exercise it.
+        const entry: ProviderModelEntry = { ...findEntry('anthropic'), baseUrl: undefined };
+        const http = new ScriptedHttpRequest([{ json: { content: [{ type: 'text', text: 'hi' }] } }]);
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-anthropic-key',
+            model: entry.defaultModel,
+            environment: createVirtualAgentEnvironment(),
+            http,
+        });
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+        expect(http.requests).toHaveLength(1);
+        expect(http.requests[0].url).toBe('https://api.anthropic.com/v1/messages');
+    });
+
+    it('createGatewayForEntry throws the exhaustiveness-guard error for a gatewayType outside the known union — never silently falls through', () => {
+        // Same reasoning as deriveGenerationConfiguration's own exhaustiveness guard: no valid
+        // GatewayType can reach this branch, so a synthetic entry with an invalid gatewayType
+        // (forced through the type system) is the only way to exercise the runtime guard itself.
+        const entry: ProviderModelEntry = {
+            ...findEntry('openai'),
+            gatewayType: 'made-up-gateway-type' as unknown as GatewayType,
+        };
+
+        expect(() =>
+            createGatewayForEntry(entry, {
+                apiKey: 'test-key',
+                model: entry.defaultModel,
+                environment: createVirtualAgentEnvironment(),
+                http: new ScriptedHttpRequest([]),
+            })
+        ).toThrow('providerRegistry: no gateway dispatcher for gatewayType "made-up-gateway-type"');
+    });
+});
+
+describe('anthropic/claude-fable-5 registration (OpenRouter route, added for the four-Claude-model runtime comparison)', () => {
+    it('is present in OPENROUTER_ENTRY.models alongside every pre-existing model — nothing was removed', () => {
+        const entry = findEntry('openrouter');
+        expect(entry.models).toContain('anthropic/claude-fable-5');
+        // The 10 models this entry carried before Fable was added — asserted individually (not via
+        // a single toEqual on the whole array) so this test fails on an accidental removal without
+        // being coupled to array order or to any future model this entry gains.
+        for (const preExisting of [
+            'openrouter/free',
+            'openai/gpt-4o-mini',
+            'google/gemini-2.5-flash',
+            'anthropic/claude-haiku-4.5',
+            'openai/gpt-oss-20b:free',
+            'meta-llama/llama-3.3-70b-instruct',
+            'deepseek/deepseek-chat-v3.1',
+            'anthropic/claude-sonnet-5',
+            'anthropic/claude-opus-5',
+            'google/gemini-3.6-flash',
+        ]) {
+            expect(entry.models).toContain(preExisting);
+        }
+    });
+
+    it('is NOT in realVerifiedModels — no live call has verified it yet', () => {
+        const entry = findEntry('openrouter');
+        expect(entry.realVerifiedModels).not.toContain('anthropic/claude-fable-5');
+    });
+
+    it('carries no Fable-specific generation override — this gateway never sends temperature/top_p/thinking regardless', () => {
+        const entry = findEntry('openrouter');
+        expect(entry.requiredGenerationOverrides?.['anthropic/claude-fable-5']).toBeUndefined();
+    });
+
+    it('planMultiTurnModelSelection, run against the REAL registry, selects exactly this one pair for an exact provider+model filter — never a substring match onto claude-opus-5/claude-sonnet-5', () => {
+        const selection = planMultiTurnModelSelection({
+            registry: PROVIDER_REGISTRY,
+            providerFilter: 'openrouter',
+            modelFilter: 'anthropic/claude-fable-5',
+            resolveModelsToRun: entry => resolveModelsToRun(entry, undefined),
+        });
+        expect(selection.pairs).toHaveLength(1);
+        expect(selection.pairs[0].model).toBe('anthropic/claude-fable-5');
+        expect(selection.pairs[0].entry.providerId).toBe('openrouter');
+    });
+
+    it('createGatewayForEntry dispatches with the exact model string, same OpenRouter baseUrl, no leaked generation params, and passes tool definitions through unchanged', async () => {
+        const entry = findEntry('openrouter');
+        const http = new ScriptedHttpRequest([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
+        const tools = [
+            {
+                name: 'move_node',
+                description: 'move a node',
+                parameters: {
+                    type: 'object' as const,
+                    properties: { nodeId: { type: 'string' as const } },
+                    required: ['nodeId'],
+                },
+            },
+        ];
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-openrouter-key',
+            model: 'anthropic/claude-fable-5',
+            environment: createVirtualAgentEnvironment(),
+            http,
+        });
+
+        // Same gateway shape as every other OpenRouter model — createOpenAiLlmGateway, zero new code.
+        expect(gateway.capabilities).toEqual({ toolCalls: true });
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools }));
+
+        expect(http.requests).toHaveLength(1);
+        expect(http.requests[0].url).toBe('https://openrouter.ai/api/v1/chat/completions');
+        expect(http.requests[0].headers?.['authorization']).toBe('Bearer test-openrouter-key');
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body).toMatchObject({ model: 'anthropic/claude-fable-5' });
+        // No Fable-specific metadata (reasoning_effort, temperature, top_p, thinking) leaks into the
+        // shared OpenAI-compatible request shape — this gateway simply never sets any of these
+        // unless a generation option is explicitly passed, which createGatewayForEntry does not do
+        // here.
+        expect(body).not.toHaveProperty('reasoning_effort');
+        expect(body).not.toHaveProperty('temperature');
+        expect(body).not.toHaveProperty('top_p');
+        expect(body).not.toHaveProperty('thinking');
+        // Tool definitions pass through the same generic mapping as every other OpenRouter model —
+        // no Fable-specific tool-shape transformation exists or is needed.
+        expect(body['tools']).toEqual([
+            {
+                type: 'function',
+                function: { name: 'move_node', description: 'move a node', parameters: tools[0].parameters },
+            },
+        ]);
+    });
+
+    it("getModelPricing returns null for anthropic/claude-fable-5 via openrouter — cost must come from OpenRouter's own provider-reported usage.cost, never a fabricated local estimate", () => {
+        expect(getModelPricing('openrouter', 'anthropic/claude-fable-5')).toBeNull();
     });
 });
 
@@ -442,16 +667,21 @@ describe('Old/new model-version compatibility (Part B)', () => {
         }
     );
 
-    it('newest-generation additions do not silently replace defaultModel or realVerifiedModels', () => {
+    it('newest-generation additions do not silently replace defaultModel or drop an existing realVerifiedModels entry', () => {
         // Adding a newer-generation model id to a provider's models[] must never move that
-        // provider's defaultModel, nor silently drop an existing realVerifiedModels entry.
-        // gpt-5-mini joined gpt-4o-mini here 2026-08-06 after a genuine real-key multi-turn round
-        // trip (realMultiTurnLocatorScenarios.spec.ts, move-named-node-without-id) — an actual
-        // verification, not a default-model change.
+        // provider's defaultModel, nor silently drop an existing realVerifiedModels entry. Checked
+        // via containment (not exact-array equality) on purpose: realVerifiedModels legitimately
+        // grows every time a new real-key run adds more verified models (most recently the
+        // 2026-08-07 full-matrix live run, which added gpt-4.1/gpt-4.1-mini/gpt-5.5 for OpenAI and
+        // all seven remaining Gemini models) — an exact-array assertion would force an update to
+        // this test on every honest new verification, which is exactly the kind of test-maintenance
+        // tax that would tempt someone into skipping it. What must never regress is the anchor
+        // entries below silently disappearing.
         expect(findEntry('openai').defaultModel).toBe('gpt-4o-mini');
-        expect(findEntry('openai').realVerifiedModels).toEqual(['gpt-4o-mini', 'gpt-5-mini']);
+        expect(findEntry('openai').realVerifiedModels).toContain('gpt-4o-mini');
+        expect(findEntry('openai').realVerifiedModels).toContain('gpt-5-mini');
         expect(findEntry('gemini').defaultModel).toBe('gemini-2.5-flash');
-        expect(findEntry('gemini').realVerifiedModels).toEqual(['gemini-2.5-flash']);
+        expect(findEntry('gemini').realVerifiedModels).toContain('gemini-2.5-flash');
     });
 });
 
@@ -505,13 +735,13 @@ describe('deriveGenerationConfiguration', () => {
         expect(config.maxOutputTokens).toEqual({ status: 'explicit', value: 2048 });
     });
 
-    it('anthropic-native: top_k is provider-default (Anthropic\'s Messages API documents it), NOT unsupported — the opposite of OpenAI', () => {
+    it("anthropic-native: top_k is provider-default (Anthropic's Messages API documents it), NOT unsupported — the opposite of OpenAI", () => {
         const config = deriveGenerationConfiguration('anthropic-native');
         expect(config.topK).toEqual({ status: 'provider-default' });
         expect(config.topK.status).not.toBe('unsupported');
     });
 
-    it('anthropic-native: reasoningEffort is unsupported — Claude\'s extended thinking is a different, token-budget mechanism this gateway never sends', () => {
+    it("anthropic-native: reasoningEffort is unsupported — Claude's extended thinking is a different, token-budget mechanism this gateway never sends", () => {
         const config = deriveGenerationConfiguration('anthropic-native');
         expect(config.reasoningEffort).toEqual({ status: 'unsupported' });
     });
@@ -540,5 +770,16 @@ describe('deriveGenerationConfiguration', () => {
         const config = deriveGenerationConfiguration('anthropic-native');
         const roundTripped = JSON.parse(JSON.stringify(config));
         expect(roundTripped).toEqual(config);
+    });
+
+    it('throws the exhaustiveness-guard error for a gatewayType outside the known union — never silently falls through', () => {
+        // No valid GatewayType can reach this branch (enforced at compile time by the `never`
+        // exhaustiveCheck) — this deliberately forces an invalid value through the type system to
+        // prove the runtime guard itself fires with the documented message, in case a future
+        // gatewayType is added to the union without a matching case here.
+        const invalidGatewayType = 'made-up-gateway-type' as unknown as GatewayType;
+        expect(() => deriveGenerationConfiguration(invalidGatewayType)).toThrow(
+            'deriveGenerationConfiguration: no derivation for gatewayType "made-up-gateway-type"'
+        );
     });
 });
