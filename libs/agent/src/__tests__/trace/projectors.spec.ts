@@ -105,4 +105,32 @@ describe('trace projectors', () => {
         expect(diff.addedEdges).toEqual([]);
         expect(diff.removedEdges).toEqual([e1]);
     });
+
+    it('toGraphDiff: omitting runId gives the cumulative session delta across turns', () => {
+        const sink = memorySink();
+        const tracer = createTracer(sink);
+        const root = (runId: string) =>
+            tracer.child({
+                runId,
+                'gen_ai.agent.name': 'orchestrator',
+                'gen_ai.agent.id': 'orchestrator',
+                flowPath: 'flow', // constant root flowPath across turns, as in a live session
+            });
+        const a = { id: 'a', type: 'input-text' };
+        const b = { id: 'b', type: 'buffer' };
+
+        const t1 = root('run-1');
+        t1.emit({ name: TURN_START, fields: { graph: { nodes: [], edges: [] } } });
+        t1.emit({ name: TURN_DONE, fields: { graph: { nodes: [a], edges: [] } } });
+        const t2 = root('run-2');
+        t2.emit({ name: TURN_START, fields: { graph: { nodes: [a], edges: [] } } });
+        t2.emit({ name: TURN_DONE, fields: { graph: { nodes: [a, b], edges: [] } } });
+
+        const cumulative = toGraphDiff(sink.records); // no runId → first turn's before → last turn's after
+        expect(cumulative.runId).toBe('session');
+        expect(cumulative.addedNodes).toEqual([a, b]);
+
+        const turn2 = toGraphDiff(sink.records, 'run-2'); // just that turn's delta
+        expect(turn2.addedNodes).toEqual([b]);
+    });
 });

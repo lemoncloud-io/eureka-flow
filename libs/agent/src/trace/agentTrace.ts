@@ -2,15 +2,16 @@ import { NoopTracer, createTracer } from './createTracer';
 import { toGraphDiff, toTraceTree, toTranscripts } from './project';
 import { memorySink, redactingSink } from './sinks';
 
-import type { AgentTranscript, GraphDiff, TraceNode } from './project';
+import type { AgentTranscript, GraphDiffProjection, TraceNode } from './project';
 import type { TraceRecord } from './sink';
 import type { Tracer } from './tracer';
 
-/** The three read-time views of one request's record stream. */
+/** The three read-time views of a run's record stream. */
 export interface TraceProjections {
     transcripts: AgentTranscript[];
     tree: TraceNode | null;
-    diff: GraphDiff | null;
+    /** The graph delta as one cumulative whole-session view plus one per turn. */
+    diff: GraphDiffProjection;
 }
 
 /** A tracer plus the ways to read back what it captured. */
@@ -23,7 +24,7 @@ export interface AgentTrace {
     project: () => TraceProjections;
 }
 
-const EMPTY: TraceProjections = { transcripts: [], tree: null, diff: null };
+const EMPTY: TraceProjections = { transcripts: [], tree: null, diff: { cumulative: null, perTurn: [] } };
 
 /**
  * The ONE place any entry point (web, scenario harness, terminal) turns a "should we trace?" flag into a
@@ -43,14 +44,21 @@ export const createAgentTrace = (enabled: boolean): AgentTrace => {
     // Redact secret-looking fields at the sink boundary, then keep the redacted records in memory to project.
     const buffer = memorySink();
     const tracer = createTracer(redactingSink(buffer));
-    const runId = (): string => String(buffer.records.find(r => r.context.runId)?.context.runId ?? 'run-1');
     return {
         tracer,
         records: () => buffer.records,
-        project: () => ({
-            transcripts: toTranscripts(buffer.records),
-            tree: toTraceTree(buffer.records),
-            diff: buffer.records.length ? toGraphDiff(buffer.records, runId()) : null,
-        }),
+        project: () => {
+            const records = buffer.records;
+            // Turn order = first-seen order of each runId (the root mints run-1, run-2, … per send()).
+            const runIds = [...new Set(records.map(r => String(r.context.runId ?? '')).filter(Boolean))];
+            return {
+                transcripts: toTranscripts(records),
+                tree: toTraceTree(records),
+                diff: {
+                    cumulative: records.length ? toGraphDiff(records) : null,
+                    perTurn: runIds.map(runId => toGraphDiff(records, runId)),
+                },
+            };
+        },
     };
 };

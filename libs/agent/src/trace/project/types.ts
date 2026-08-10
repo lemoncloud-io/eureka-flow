@@ -46,8 +46,9 @@ export interface EdgeChange {
     targetPortId: string;
 }
 
-/** The before/after delta of one user request. Each change self-describes (node type, edge endpoints) — not just a count. */
+/** The before/after delta of one user request (or the whole session). Each change self-describes (node type, edge endpoints) — not just a count. */
 export interface GraphDiff {
+    /** The turn this delta covers, or `'session'` for the cumulative whole-session delta. */
     runId: string;
     before: GraphSnapshot;
     after: GraphSnapshot;
@@ -56,4 +57,12 @@ export interface GraphDiff {
     changedNodes: NodeChange[];
     addedEdges: EdgeChange[];
     removedEdges: EdgeChange[];
+}
+
+/** The graph delta viewed two ways: the whole session as one delta, plus one delta per turn. */
+export interface GraphDiffProjection {
+    /** First turn's `before` → last turn's `after` — the net change across the whole session. Null when nothing was captured. */
+    cumulative: GraphDiff | null;
+    /** One delta per turn (runId), in turn order. */
+    perTurn: GraphDiff[];
 }

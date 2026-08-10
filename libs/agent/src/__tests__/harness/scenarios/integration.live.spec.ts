@@ -53,7 +53,7 @@ import { outcomeText } from '../turnOutcome';
 import type { Graph } from '../../../canvas/canvasBinding';
 import type { ChatMessage, ChatRequest, Chunk, LlmGateway } from '../../../llm/llmGateway';
 import type { AgentGrant } from '../../../permissions';
-import type { AgentTrace, EdgeChange, NodeChange, TraceNode, TraceProjections } from '../../../trace';
+import type { AgentTrace, EdgeChange, GraphDiff, NodeChange, TraceNode, TraceProjections } from '../../../trace';
 import type { TurnCost } from '../metering';
 import type { TurnOutcome } from '../turnOutcome';
 
@@ -170,15 +170,9 @@ const renderTree = (p: TraceProjections, out: string[]): void => {
     else out.push('  (no records)');
 };
 
-// 3/3 · the canvas delta — names WHICH nodes/edges were added/removed/changed (with node type + edge endpoints),
+// One graph delta — names WHICH nodes/edges were added/removed/changed (with node type + edge endpoints),
 // not just how many.
-const renderDiff = (p: TraceProjections, out: string[]): void => {
-    out.push('', '════════════ trace · 3/3 · GRAPH DIFF (canvas before → after) ════════════');
-    if (!p.diff) {
-        out.push('  (no diff)');
-        return;
-    }
-    const d = p.diff;
+const renderOneDiff = (heading: string, d: GraphDiff, out: string[]): void => {
     const nodeLine = (sign: string, n: NodeChange): string => `    ${sign} node ${n.id} (${n.type || '?'})`;
     const edgeLine = (sign: string, e: EdgeChange): string =>
         `    ${sign} edge ${e.id || '?'}: ${e.sourceNodeId}:${e.sourcePortId} → ${e.targetNodeId}:${e.targetPortId}`;
@@ -190,9 +184,20 @@ const renderDiff = (p: TraceProjections, out: string[]): void => {
         ...d.removedEdges.map(e => edgeLine('-', e)),
     ];
     out.push(
-        `  totals: ${d.before.nodes.length}n/${d.before.edges.length}e → ${d.after.nodes.length}n/${d.after.edges.length}e`
+        `${heading}  totals: ${d.before.nodes.length}n/${d.before.edges.length}e → ${d.after.nodes.length}n/${d.after.edges.length}e`
     );
     out.push(...(rows.length ? rows : ['    (no structural change)']));
+};
+
+// 3/3 · the canvas delta — the cumulative whole-session delta on top, then one delta per turn.
+const renderDiff = (p: TraceProjections, out: string[]): void => {
+    out.push('', '════════════ trace · 3/3 · GRAPH DIFF (canvas before → after) ════════════');
+    if (!p.diff.cumulative) {
+        out.push('  (no diff)');
+        return;
+    }
+    renderOneDiff('  cumulative (whole session) ·', p.diff.cumulative, out);
+    for (const turn of p.diff.perTurn) renderOneDiff(`  ${turn.runId} ·`, turn, out);
 };
 
 const renderProjections = (p: TraceProjections): string => {

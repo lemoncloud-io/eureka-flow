@@ -11,7 +11,7 @@ One legible record of a multi-agent run, answering three questions:
 
 1. **Chat history** — every message (user / assistant / tool-call / tool-result) for **every** agent.
 2. **Attribution** — which agent did what, was asked what, returned what — including orchestrator↔specialist handoffs.
-3. **Graph delta** — canvas state before and after each user request, naming which nodes (id + type) and edges (source → target) were added / removed / changed.
+3. **Graph delta** — the canvas before → after, both as a cumulative whole-session delta and one per turn, naming which nodes (id + type) and edges (source → target) were added / removed / changed.
 
 ## Core idea — emit once, derive every view
 
@@ -155,11 +155,11 @@ window.__flowAgentProjections(); // { transcripts, tree, diff }
 
 One record stream, three read-time views (`trace/project/`):
 
-| View            | Projector       | Reads as                                                                                                                                |
-| --------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Transcripts** | `toTranscripts` | one chat per agent instance — every user / assistant / tool turn, verbatim (never truncated), tool calls inline.                        |
-| **Trace tree**  | `toTraceTree`   | the agent call tree (who spawned whom), each node tagged with its per-event-type record counts.                                         |
-| **Graph diff**  | `toGraphDiff`   | the canvas before → after, **naming which** nodes (`id (type)`) and edges (`source:port → target:port`) were added / removed / changed. |
+| View            | Projector       | Reads as                                                                                                                                                                       |
+| --------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Transcripts** | `toTranscripts` | one chat per agent instance — every user / assistant / tool turn, verbatim (never truncated), tool calls inline.                                                               |
+| **Trace tree**  | `toTraceTree`   | the agent call tree (who spawned whom), each node tagged with its per-event-type record counts.                                                                                |
+| **Graph diff**  | `toGraphDiff`   | the canvas before → after — a **cumulative** whole-session delta plus one **per turn** — **naming which** nodes (`id (type)`) and edges (`source:port → target:port`) changed. |
 
 In the node harness these render to the end of `*.transcript.log` under three `trace · N/3` headers.
 

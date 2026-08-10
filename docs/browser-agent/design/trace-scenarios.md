@@ -32,12 +32,13 @@ Verification for [trace-spec.md](./trace-spec.md) / [trace-interfaces.md](./trac
 
 ## Unit — projectors (pure, over a fixed record list)
 
-| #   | Given a hand-written `TraceRecord[]`                                               | Oracle                                                                                                                                                                                 |
-| --- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1  | orchestrator + one builder, interleaved                                            | `toTraceTree` → root `orchestrator` with one child `builder#1` nested by `flowPath`; file order preserved                                                                              |
-| P2  | a builder's `message` records (user, assistant+toolCalls, tool, assistant)         | `toTranscripts` → one `AgentTranscript`; `chat` in `user → assistant(+toolCalls) → tool → assistant` order; `tool` paired to its call by `toolCallId`; **no raw id appears in `text`** |
-| P3  | root `turn.start` graph `{nodes:[]}` + final root `turn.done` graph `{nodes:[n9]}` | `toGraphDiff` → `addedNodes:[{id:'n9',type:…}]` (self-describing, not just an id), others empty; an added/removed edge carries its four endpoints; `before`/`after` intact             |
-| P4  | records from two agents with **distinct** `gen_ai.agent.id`                        | `toTranscripts` → two transcripts; nothing merged                                                                                                                                      |
+| #   | Given a hand-written `TraceRecord[]`                                               | Oracle                                                                                                                                                                                                       |
+| --- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1  | orchestrator + one builder, interleaved                                            | `toTraceTree` → root `orchestrator` with one child `builder#1` nested by `flowPath`; file order preserved                                                                                                    |
+| P2  | a builder's `message` records (user, assistant+toolCalls, tool, assistant)         | `toTranscripts` → one `AgentTranscript`; `chat` in `user → assistant(+toolCalls) → tool → assistant` order; `tool` paired to its call by `toolCallId`; **no raw id appears in `text`**                       |
+| P3  | root `turn.start` graph `{nodes:[]}` + final root `turn.done` graph `{nodes:[n9]}` | `toGraphDiff` → `addedNodes:[{id:'n9',type:…}]` (self-describing, not just an id), others empty; an added/removed edge carries its four endpoints; `before`/`after` intact                                   |
+| P4  | records from two agents with **distinct** `gen_ai.agent.id`                        | `toTranscripts` → two transcripts; nothing merged                                                                                                                                                            |
+| P5  | two turns on one root (`run-1` empty→[a], `run-2` [a]→[a,b])                       | `toGraphDiff(records)` (no runId) → cumulative `addedNodes:[a,b]`, `runId:'session'`; `toGraphDiff(records,'run-2')` → just `[b]`; `createAgentTrace.project().diff = { cumulative, perTurn:[run-1,run-2] }` |
 
 ## Integration — real runs through `memorySink`
 

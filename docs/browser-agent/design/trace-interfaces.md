@@ -191,11 +191,13 @@ export interface AgentTranscript { agentType: string; agentId: string; flowPath:
 export interface NodeChange { id: string; type: string; }                                  // "which node" + its block type
 export interface EdgeChange { id: string; sourceNodeId: string; sourcePortId: string;        // "which edge" as source → target,
     targetNodeId: string; targetPortId: string; }                                            //   not an opaque id
-export interface GraphDiff { runId: string; before: Graph; after: Graph;                     // each change self-describes,
-    addedNodes: NodeChange[]; removedNodes: NodeChange[]; changedNodes: NodeChange[];         //   not just a count
-    addedEdges: EdgeChange[]; removedEdges: EdgeChange[]; }
+export interface GraphDiff { runId: string; before: Graph; after: Graph;                     // runId, or 'session' for the
+    addedNodes: NodeChange[]; removedNodes: NodeChange[]; changedNodes: NodeChange[];         //   cumulative diff; each change
+    addedEdges: EdgeChange[]; removedEdges: EdgeChange[]; }                                   //   self-describes, not a count
+export interface GraphDiffProjection { cumulative: GraphDiff | null; perTurn: GraphDiff[]; }  // whole session + one per turn
 
 export const toTraceTree   = (records: TraceRecord[]): TraceNode;               // nest by flowPath prefix; keep file order
 export const toTranscripts = (records: TraceRecord[]): AgentTranscript[];       // ONE per gen_ai.agent.id; fold `message` records
-export const toGraphDiff   = (records: TraceRecord[], runId: string): GraphDiff; // ROOT turn.start vs final root turn.done
+export const toGraphDiff   = (records: TraceRecord[], runId?: string): GraphDiff; // ROOT turn.start vs final root turn.done;
+                                                                                  //   omit runId ⇒ cumulative whole-session delta
 ```

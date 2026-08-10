@@ -9,20 +9,21 @@ const EMPTY: GraphSnapshot = { nodes: [], edges: [] };
 const isRoot = (record: TraceRecord): boolean => !String(record.context.flowPath ?? '').includes(':');
 
 /**
- * Project the before/after canvas delta of one request from the ROOT turn boundary: the first root
- * `turn.start` snapshot vs the last root `turn.done`/`turn.error` snapshot for that `runId`. Per-sub-agent
- * snapshots are deliberately ignored (they overlap on the shared concurrent binding); the request-level
+ * Project the before/after canvas delta from the ROOT turn boundaries: the first root `turn.start`
+ * snapshot vs the last root `turn.done`/`turn.error` snapshot. Pass a `runId` for ONE turn's delta; omit
+ * it for the cumulative whole-session delta (the first turn's `before` → the last turn's `after`).
+ * Per-sub-agent snapshots are deliberately ignored (they overlap on the shared concurrent binding); the
  * delta lives only at the root.
  */
-export const toGraphDiff = (records: TraceRecord[], runId: string): GraphDiff => {
-    const forRun = records.filter(r => r.context.runId === runId && isRoot(r));
-    const start = forRun.find(r => r.name === TURN_START && r.fields.graph);
-    const ends = forRun.filter(r => (r.name === TURN_DONE || r.name === TURN_ERROR) && r.fields.graph);
+export const toGraphDiff = (records: TraceRecord[], runId?: string): GraphDiff => {
+    const roots = records.filter(r => isRoot(r) && (runId === undefined || r.context.runId === runId));
+    const start = roots.find(r => r.name === TURN_START && r.fields.graph);
+    const ends = roots.filter(r => (r.name === TURN_DONE || r.name === TURN_ERROR) && r.fields.graph);
 
     const before = (start?.fields.graph as GraphSnapshot) ?? EMPTY;
     const after = (ends.length ? (ends[ends.length - 1].fields.graph as GraphSnapshot) : undefined) ?? EMPTY;
 
-    return { runId, before, after, ...diff(before, after) };
+    return { runId: runId ?? 'session', before, after, ...diff(before, after) };
 };
 
 /** Coerce a snapshot field (typed `unknown` — the snapshot is structural) to a string, treating null/undefined as empty. */
