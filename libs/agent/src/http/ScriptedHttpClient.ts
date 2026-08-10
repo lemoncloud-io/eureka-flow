@@ -11,7 +11,7 @@ export interface ScriptedHttpResponseInit {
 }
 
 /** Test double for the HTTP port: replies with scripted responses in order, records every request, and throws past the end of the script. */
-export class ScriptedHttpRequest implements HttpClient {
+export class ScriptedHttpClient implements HttpClient {
     readonly requests: HttpRequestInput[] = [];
     private readonly script: ScriptedHttpResponseInit[];
 
@@ -25,7 +25,7 @@ export class ScriptedHttpRequest implements HttpClient {
         const next = this.script.shift();
 
         if (!next) {
-            throw new Error(`ScriptedHttpRequest: no scripted response for ${input.method} ${input.url}`);
+            throw new Error(`ScriptedHttpClient: no scripted response for ${input.method} ${input.url}`);
         }
 
         const status = next.status ?? 200;

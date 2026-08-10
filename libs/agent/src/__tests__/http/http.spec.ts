@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createFetchHttpRequest } from '../../http/FetchHttpRequest';
-import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
+import { createFetchHttpClient } from '../../http/FetchHttpClient';
+import { ScriptedHttpClient } from '../../http/ScriptedHttpClient';
 
 const createFetchResponse = (status: number, body: unknown, headers: Record<string, string> = {}) =>
     new Response(JSON.stringify(body), { status, headers });
 
-describe('createFetchHttpRequest', () => {
+describe('createFetchHttpClient', () => {
     it('encodes JSON bodies and sets the content type', async () => {
         const fetchFn = vi.fn().mockResolvedValue(createFetchResponse(200, { ok: true }));
-        const http = createFetchHttpRequest({ fetchFn });
+        const http = createFetchHttpClient({ fetchFn });
 
         await http.request({ method: 'POST', url: 'https://api.test/v1', body: { hello: 'world' } });
 
@@ -22,7 +22,7 @@ describe('createFetchHttpRequest', () => {
 
     it('lets caller headers win over the default content type and skips body for GET', async () => {
         const fetchFn = vi.fn().mockResolvedValue(createFetchResponse(200, null));
-        const http = createFetchHttpRequest({ fetchFn });
+        const http = createFetchHttpClient({ fetchFn });
 
         await http.request({
             method: 'POST',
@@ -42,7 +42,7 @@ describe('createFetchHttpRequest', () => {
         const fetchFn = vi
             .fn()
             .mockResolvedValue(createFetchResponse(404, { error: 'missing' }, { 'x-request-id': 'r1' }));
-        const http = createFetchHttpRequest({ fetchFn });
+        const http = createFetchHttpClient({ fetchFn });
 
         const response = await http.request({ method: 'GET', url: 'https://api.test/v1' });
 
@@ -54,7 +54,7 @@ describe('createFetchHttpRequest', () => {
 
     it('passes the abort signal through to fetch', async () => {
         const fetchFn = vi.fn().mockResolvedValue(createFetchResponse(200, null));
-        const http = createFetchHttpRequest({ fetchFn });
+        const http = createFetchHttpClient({ fetchFn });
         const controller = new AbortController();
 
         await http.request({ method: 'GET', url: 'https://api.test/v1', signal: controller.signal });
@@ -63,9 +63,9 @@ describe('createFetchHttpRequest', () => {
     });
 });
 
-describe('ScriptedHttpRequest', () => {
+describe('ScriptedHttpClient', () => {
     it('replies with scripted responses in order and records requests', async () => {
-        const http = new ScriptedHttpRequest([{ json: { first: true } }, { status: 500, text: 'boom' }]);
+        const http = new ScriptedHttpClient([{ json: { first: true } }, { status: 500, text: 'boom' }]);
 
         const first = await http.request({ method: 'GET', url: 'https://api.test/1' });
         const second = await http.request({ method: 'POST', url: 'https://api.test/2', body: { b: 1 } });
@@ -79,7 +79,7 @@ describe('ScriptedHttpRequest', () => {
     });
 
     it('fails loudly when the script is exhausted', async () => {
-        const http = new ScriptedHttpRequest();
+        const http = new ScriptedHttpClient();
 
         await expect(http.request({ method: 'GET', url: 'https://api.test/1' })).rejects.toThrow(
             /no scripted response/

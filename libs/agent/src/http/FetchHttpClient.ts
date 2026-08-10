@@ -1,14 +1,14 @@
 import type { HttpClient, HttpResponse } from './types';
 
-export interface FetchHttpRequestOptions {
+export interface FetchHttpClientOptions {
     /** Injectable fetch for tests; defaults to the global fetch bound to globalThis. */
     fetchFn?: typeof fetch;
 }
 
-/** HTTP port implementation backed by the global `fetch`. */
-export const createFetchHttpRequest = (options: FetchHttpRequestOptions = {}): HttpClient => {
+/** {@link HttpClient} backed by the global `fetch`. */
+export const createFetchHttpClient = (options: FetchHttpClientOptions = {}): HttpClient => {
     if (!options.fetchFn && typeof globalThis.fetch !== 'function') {
-        throw new Error('createFetchHttpRequest: no global fetch available; pass options.fetchFn');
+        throw new Error('createFetchHttpClient: no global fetch available; pass options.fetchFn');
     }
 
     const fetchFn = options.fetchFn ?? globalThis.fetch.bind(globalThis);
