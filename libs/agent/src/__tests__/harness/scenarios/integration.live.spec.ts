@@ -53,6 +53,7 @@ import { outcomeText } from '../turnOutcome';
 import type { Graph } from '../../../canvas/canvasBinding';
 import type { ChatMessage, ChatRequest, Chunk, LlmGateway } from '../../../llm/llmGateway';
 import type { AgentGrant } from '../../../permissions';
+import type { AgentTrace, EdgeChange, NodeChange, TraceNode, TraceProjections } from '../../../trace';
 import type { TurnCost } from '../metering';
 import type { TurnOutcome } from '../turnOutcome';
 
@@ -69,6 +70,7 @@ const gateway = resolveLiveGateway({
 const SKIP_LIVE = !gateway || !process.env.RUN_LIVE;
 const N = Math.max(1, Number(process.env.BENCH_N ?? '1')); // runs per scenario; smoke default 1
 const VERBOSE = !!process.env.LIVE_VERBOSE; // ALSO echo the transcript to the console (it is ALWAYS saved to file)
+const TRACE = !!process.env.AGENT_TRACE; // ALSO capture the structured trace and render the 3 projections per run
 const TIMEOUT_MS = 240_000 * N; // a live multi-agent turn (+ the outcome re-ask) is several round-trips
 // Ease rate-limit (429) pressure: pause after each scenario. Off by default (0); set e.g. BENCH_PAUSE_MS=3000
 // if a run starts hitting the Developer API's per-minute limit.
@@ -127,6 +129,80 @@ const recordingGateway = (inner: LlmGateway, label: string): LlmGateway => {
     };
 };
 
+// ── the three trace projections (rendered per run ONLY when AGENT_TRACE is set) ─────────────────────
+// Nothing here truncates: a trace is for reading the WHOLE conversation, so every message/arg prints verbatim.
+const asText = (v: unknown): string => (typeof v === 'string' ? v : JSON.stringify(v));
+/** Prefix every physical line of a (possibly multi-line) block, so a long untrimmed message stays visually inside its turn. */
+const gutter = (text: string, prefix: string): string[] => text.split('\n').map(line => `${prefix}${line}`);
+
+// 1/3 · one chat per agent instance. A continuous `┃` gutter groups each agent's block; numbered `[n] ROLE`
+// headers with a blank gutter line between them make each user/assistant/tool turn its own visible unit.
+const renderTranscripts = (p: TraceProjections, out: string[]): void => {
+    out.push('', '════════════ trace · 1/3 · TRANSCRIPTS (chat per agent instance) ════════════');
+    if (!p.transcripts.length) {
+        out.push('  (no records)');
+        return;
+    }
+    for (const t of p.transcripts) {
+        out.push('', `┏━ agent: ${t.agentType || '(root)'} · ${t.agentId}`);
+        t.chat.forEach((e, i) => {
+            out.push('┃'); // blank gutter line separates one turn from the next
+            const label = e.role === 'tool' ? `TOOL ◂ (result of ${e.toolCallId ?? '?'})` : `${e.role.toUpperCase()} ▸`;
+            out.push(`┃ [${i + 1}] ${label}`);
+            if (e.text) out.push(...gutter(e.text, '┃     '));
+            for (const c of e.toolCalls ?? []) out.push(...gutter(`→ calls ${c.name}(${asText(c.args)})`, '┃     '));
+        });
+        out.push(`┗━ end: ${t.agentType || '(root)'} · ${t.agentId}`);
+    }
+};
+
+// 2/3 · the agent call tree (who spawned whom), each node tagged with its per-event-type record counts.
+const renderTree = (p: TraceProjections, out: string[]): void => {
+    out.push('', '════════════ trace · 2/3 · TRACE TREE (who spawned whom) ════════════');
+    const walk = (n: TraceNode, d: number): void => {
+        const counts = new Map<string, number>();
+        for (const r of n.records) counts.set(r.name, (counts.get(r.name) ?? 0) + 1);
+        const summary = [...counts].map(([k, v]) => `${k}×${v}`).join(' ');
+        out.push(`  ${'  '.repeat(d)}▸ ${n.agentType || '(root)'} · ${n.agentId}  [${n.records.length}: ${summary}]`);
+        n.children.forEach(c => walk(c, d + 1));
+    };
+    if (p.tree) walk(p.tree, 0);
+    else out.push('  (no records)');
+};
+
+// 3/3 · the canvas delta — names WHICH nodes/edges were added/removed/changed (with node type + edge endpoints),
+// not just how many.
+const renderDiff = (p: TraceProjections, out: string[]): void => {
+    out.push('', '════════════ trace · 3/3 · GRAPH DIFF (canvas before → after) ════════════');
+    if (!p.diff) {
+        out.push('  (no diff)');
+        return;
+    }
+    const d = p.diff;
+    const nodeLine = (sign: string, n: NodeChange): string => `    ${sign} node ${n.id} (${n.type || '?'})`;
+    const edgeLine = (sign: string, e: EdgeChange): string =>
+        `    ${sign} edge ${e.id || '?'}: ${e.sourceNodeId}:${e.sourcePortId} → ${e.targetNodeId}:${e.targetPortId}`;
+    const rows = [
+        ...d.addedNodes.map(n => nodeLine('+', n)),
+        ...d.removedNodes.map(n => nodeLine('-', n)),
+        ...d.changedNodes.map(n => nodeLine('~', n)),
+        ...d.addedEdges.map(e => edgeLine('+', e)),
+        ...d.removedEdges.map(e => edgeLine('-', e)),
+    ];
+    out.push(
+        `  totals: ${d.before.nodes.length}n/${d.before.edges.length}e → ${d.after.nodes.length}n/${d.after.edges.length}e`
+    );
+    out.push(...(rows.length ? rows : ['    (no structural change)']));
+};
+
+const renderProjections = (p: TraceProjections): string => {
+    const out: string[] = [];
+    renderTranscripts(p, out);
+    renderTree(p, out);
+    renderDiff(p, out);
+    return out.join('\n');
+};
+
 // ── the run adapter — the ONE shipped design (default hybrid roster), metered + recorded ────────────
 interface RunInput {
     objective: string;
@@ -139,6 +215,7 @@ interface RunResult {
     committed: boolean;
     cost: TurnCost; // the turn's summed token counts + list/effective $
     elapsedMs: number; // wall-clock latency of the whole run() (secondary, noisy axis)
+    trace: AgentTrace; // structured trace capture (real records + 3 projections when AGENT_TRACE is set)
 }
 
 /** Run one objective live over the shipped roster; every agent's gateway is metered INSIDE the recorder. */
@@ -146,7 +223,7 @@ const runOnce = async ({ objective, initialGraph, userPermissions }: RunInput): 
     // A fresh Meter per run() — every agent's gateway writes into it, so totals are the whole-turn sum.
     const meter = createMeter();
     const started = performance.now();
-    const { outcome, graph, committed } = await runScenario({
+    const { outcome, graph, committed, trace } = await runScenario({
         objective,
         initialGraph,
         userPermissions,
@@ -156,7 +233,7 @@ const runOnce = async ({ objective, initialGraph, userPermissions }: RunInput): 
     });
     const elapsedMs = performance.now() - started;
     const totals = meter.totals();
-    return { outcome, graph, committed, cost: { ...totals, ...price(totals, model) }, elapsedMs };
+    return { outcome, graph, committed, cost: { ...totals, ...price(totals, model) }, elapsedMs, trace };
 };
 
 // ── oracle helpers — pure over Graph ─────────────────────────────────────────────────────────────
@@ -249,8 +326,9 @@ const SCENARIOS: Scenario[] = [
         oracle: r => {
             const gen = findNode(r.graph, IDS.gen);
             if (!gen) return { pass: false, note: 'generator node missing' };
-            if (gen.config?.temperature !== '0.2')
-                {return { pass: false, note: `temperature=${gen.config?.temperature}` };}
+            if (gen.config?.temperature !== '0.2') {
+                return { pass: false, note: `temperature=${gen.config?.temperature}` };
+            }
             if (gen.config?.model !== 'gemini-2.5-flash') {
                 return { pass: false, note: `model not preserved (=${gen.config?.model})` };
             }
@@ -319,8 +397,9 @@ const SCENARIOS: Scenario[] = [
         oracle: r => {
             const g = r.graph;
             if (!edgeExists(g, IDS.txt, IDS.gen)) return { pass: false, note: 'input not wired to the generator' };
-            if (edgeExists(g, IDS.buf, IDS.gen))
-                {return { pass: false, note: 'buffer still occupies the generator input' };}
+            if (edgeExists(g, IDS.buf, IDS.gen)) {
+                return { pass: false, note: 'buffer still occupies the generator input' };
+            }
             return { pass: r.committed };
         },
     },
@@ -368,8 +447,9 @@ const SCENARIOS: Scenario[] = [
             if (!embedsTypedPath(g, ['single-output-generator', 'buffer', 'output-preview'])) {
                 return { pass: false, note: 'buffer is not on the generator→preview path' };
             }
-            if (edgeExists(g, IDS.gen, IDS.prev))
-                {return { pass: false, note: 'direct generator→preview edge still present' };}
+            if (edgeExists(g, IDS.gen, IDS.prev)) {
+                return { pass: false, note: 'direct generator→preview edge still present' };
+            }
             return { pass: r.committed };
         },
     },
@@ -417,8 +497,9 @@ const SCENARIOS: Scenario[] = [
             const prev = findNode(r.graph, IDS.prev);
             if (!gen) return { pass: false, note: 'generator missing' };
             if (gen.config?.model !== 'gemini-2.5-pro') return { pass: false, note: `model=${gen.config?.model}` };
-            if (gen.config?.temperature !== '0.9')
-                {return { pass: false, note: `temperature=${gen.config?.temperature}` };}
+            if (gen.config?.temperature !== '0.9') {
+                return { pass: false, note: `temperature=${gen.config?.temperature}` };
+            }
             if (!prev) return { pass: false, note: 'preview missing' };
             if (prev.customLabel !== 'Final Output') return { pass: false, note: `preview label=${prev.customLabel}` };
             return { pass: r.committed };
@@ -457,8 +538,9 @@ const SCENARIOS: Scenario[] = [
         expect: 'applied',
         oracle: r => {
             const g = r.graph;
-            if (countType(g, 'input-text') < 2)
-                {return { pass: false, note: `fewer than 2 inputs (=${countType(g, 'input-text')})` };}
+            if (countType(g, 'input-text') < 2) {
+                return { pass: false, note: `fewer than 2 inputs (=${countType(g, 'input-text')})` };
+            }
             if (countType(g, 'single-output-generator') < 2) return { pass: false, note: 'fewer than 2 generators' };
             if (countType(g, 'output-preview') < 2) return { pass: false, note: 'fewer than 2 previews' };
             const inputs = idsOfType(g, 'input-text');
@@ -468,8 +550,9 @@ const SCENARIOS: Scenario[] = [
             const complete = gens.filter(
                 gen => inputs.some(inp => reaches(g, inp, gen)) && prevs.some(p => reaches(g, gen, p))
             );
-            if (complete.length < 2)
-                {return { pass: false, note: `fewer than 2 complete pipelines (=${complete.length})` };}
+            if (complete.length < 2) {
+                return { pass: false, note: `fewer than 2 complete pipelines (=${complete.length})` };
+            }
             return { pass: r.committed };
         },
     },
@@ -567,6 +650,8 @@ describe.skipIf(SKIP_LIVE)(
                         rec(
                             `── result: outcome=${r.outcome.status} committed=${r.committed} · ${fmtTok(r.cost.totalTokens)} tok · ${r.cost.roundTrips} rt · ${fmtSec(r.elapsedMs)} → ${v.pass ? 'PASS' : `MISS (${v.note ?? 'oracle failed'})`} ──`
                         );
+                        // AGENT_TRACE: append the 3 structured projections for this run to the saved transcript.
+                        if (TRACE) rec(renderProjections(r.trace.project()));
                         if (!v.pass || statusTag) {
                             notes.push(`${line} · "${outcomeText(r.outcome).replace(/\s+/g, ' ').slice(0, 100)}"`);
                         }

@@ -178,10 +178,20 @@ export class OrchestratorAgent extends BaseAgent {
         this.tracerHolder.current = tracer;
     }
 
-    /** Mint one runId per user request — the root correlation key every descendant event inherits. */
+    /**
+     * Bind the ROOT identity and mint one runId per request. Identity (agent name/id `orchestrator`, and
+     * `flowPath = this flow's id`) is what lets the record stream project without any per-caller wiring:
+     * spawned children nest under `${flowId}:${agentId}`, so the root must carry `flowPath = flowId` for the
+     * tree to link and the diff to root. NoopTracer ignores all of it, so it costs nothing when tracing is off.
+     */
     protected override beginRunContext(): TraceContext {
         this.runSeq += 1;
-        return { runId: `run-${this.runSeq}` };
+        return {
+            runId: `run-${this.runSeq}`,
+            'gen_ai.agent.name': 'orchestrator',
+            'gen_ai.agent.id': 'orchestrator',
+            flowPath: this.flowId,
+        };
     }
 
     protected override buildContextMessages(): ChatMessage[] {

@@ -31,14 +31,29 @@ export interface GraphSnapshot {
     edges: Array<{ id?: string } & Record<string, unknown>>;
 }
 
-/** The before/after delta of one user request. */
+/** A node that entered/left/changed across the request — id plus the block `type`, so "which node" reads without a snapshot lookup. */
+export interface NodeChange {
+    id: string;
+    type: string;
+}
+
+/** An edge that entered/left across the request — id plus its four endpoints, so "which edge" reads as `source → target`, not an opaque id. */
+export interface EdgeChange {
+    id: string;
+    sourceNodeId: string;
+    sourcePortId: string;
+    targetNodeId: string;
+    targetPortId: string;
+}
+
+/** The before/after delta of one user request. Each change self-describes (node type, edge endpoints) — not just a count. */
 export interface GraphDiff {
     runId: string;
     before: GraphSnapshot;
     after: GraphSnapshot;
-    addedNodes: string[];
-    removedNodes: string[];
-    changedNodes: string[];
-    addedEdges: string[];
-    removedEdges: string[];
+    addedNodes: NodeChange[];
+    removedNodes: NodeChange[];
+    changedNodes: NodeChange[];
+    addedEdges: EdgeChange[];
+    removedEdges: EdgeChange[];
 }

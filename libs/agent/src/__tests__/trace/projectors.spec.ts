@@ -75,12 +75,34 @@ describe('trace projectors', () => {
         expect(root?.children[0].flowPath).toBe('r42:builder#1');
     });
 
-    it('toGraphDiff: root before/after delta = the added node', () => {
+    it('toGraphDiff: root before/after delta = the added node, self-describing (id + type)', () => {
         const diff = toGraphDiff(records, 'r42');
         expect(diff.before.nodes).toEqual([]);
         expect(diff.after.nodes).toEqual([{ id: 'n9', type: 'http_request' }]);
-        expect(diff.addedNodes).toEqual(['n9']);
+        expect(diff.addedNodes).toEqual([{ id: 'n9', type: 'http_request' }]);
         expect(diff.removedNodes).toEqual([]);
         expect(diff.changedNodes).toEqual([]);
+    });
+
+    it('toGraphDiff: added/removed edges carry their endpoints, not just a count', () => {
+        const sink = memorySink();
+        const root = createTracer(sink).child({
+            runId: 'r7',
+            'gen_ai.agent.name': 'orchestrator',
+            'gen_ai.agent.id': 'orchestrator',
+            flowPath: 'r7',
+        });
+        const nodes = [
+            { id: 'a', type: 'input-text' },
+            { id: 'b', type: 'output-preview' },
+        ];
+        const e1 = { id: 'e1', sourceNodeId: 'a', sourcePortId: 'out', targetNodeId: 'b', targetPortId: 'in' };
+        root.emit({ name: TURN_START, fields: { turn: 0, graph: { nodes, edges: [e1] } } });
+        root.emit({ name: TURN_DONE, fields: { turn: 0, graph: { nodes, edges: [] } } });
+
+        const diff = toGraphDiff(sink.records, 'r7');
+        expect(diff.addedNodes).toEqual([]);
+        expect(diff.addedEdges).toEqual([]);
+        expect(diff.removedEdges).toEqual([e1]);
     });
 });

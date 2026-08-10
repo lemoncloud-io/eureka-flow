@@ -188,8 +188,12 @@ export interface ChatEntry {          // role-labelled, tool calls inline; ids s
 }
 export interface AgentTranscript { agentType: string; agentId: string; flowPath: string; chat: ChatEntry[]; }
 
-export interface GraphDiff { runId: string; before: Graph; after: Graph;
-    addedNodes: string[]; removedNodes: string[]; changedNodes: string[]; addedEdges: string[]; removedEdges: string[]; }
+export interface NodeChange { id: string; type: string; }                                  // "which node" + its block type
+export interface EdgeChange { id: string; sourceNodeId: string; sourcePortId: string;        // "which edge" as source → target,
+    targetNodeId: string; targetPortId: string; }                                            //   not an opaque id
+export interface GraphDiff { runId: string; before: Graph; after: Graph;                     // each change self-describes,
+    addedNodes: NodeChange[]; removedNodes: NodeChange[]; changedNodes: NodeChange[];         //   not just a count
+    addedEdges: EdgeChange[]; removedEdges: EdgeChange[]; }
 
 export const toTraceTree   = (records: TraceRecord[]): TraceNode;               // nest by flowPath prefix; keep file order
 export const toTranscripts = (records: TraceRecord[]): AgentTranscript[];       // ONE per gen_ai.agent.id; fold `message` records

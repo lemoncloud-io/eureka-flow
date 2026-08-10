@@ -85,6 +85,6 @@ describe('orchestrator tracing (end-to-end via memorySink)', () => {
 
         // View 3 — graph diff: the input node moved (position changed) across the request.
         const diff = toGraphDiff(records, 'run-1');
-        expect(diff.changedNodes).toContain(IDS.txt);
+        expect(diff.changedNodes.map(n => n.id)).toContain(IDS.txt);
     });
 });

@@ -11,7 +11,7 @@ One legible record of a multi-agent run, answering three questions:
 
 1. **Chat history** — every message (user / assistant / tool-call / tool-result) for **every** agent.
 2. **Attribution** — which agent did what, was asked what, returned what — including orchestrator↔specialist handoffs.
-3. **Graph delta** — canvas state before and after each user request.
+3. **Graph delta** — canvas state before and after each user request, naming which nodes (id + type) and edges (source → target) were added / removed / changed.
 
 ## Core idea — emit once, derive every view
 
