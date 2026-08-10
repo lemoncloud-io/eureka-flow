@@ -100,6 +100,19 @@ describe('sinks', () => {
         expect(toolCalls[0].name).toBe('http');
     });
 
+    it('redactingSink recurses deep enough to redact a secret in a graph-snapshot node config', () => {
+        const inner = memorySink();
+        const tracer = createTracer(redactingSink(inner), () => 0);
+        // The shape baseAgent emits for turn.start/turn.done: fields.graph = { nodes:[{ id, type, config }], edges }.
+        tracer.emit({
+            name: 'turn.start',
+            fields: { graph: { nodes: [{ id: 'n1', type: 'http', config: { apiKey: 'sk-live-xyz' } }], edges: [] } },
+        });
+
+        const graph = inner.records[0].fields.graph as { nodes: Array<{ config: Record<string, unknown> }> };
+        expect(graph.nodes[0].config.apiKey).toBe('[redacted]');
+    });
+
     it('fanoutSink delivers each record to every sink', () => {
         const a = memorySink();
         const b = memorySink();

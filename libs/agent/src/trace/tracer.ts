@@ -13,7 +13,7 @@ export interface TraceContext {
     'gen_ai.agent.name'?: string;
     /** This INSTANCE: 'orchestrator' (singleton) or 'builder#3' (fresh per spawn) — for attribution. */
     'gen_ai.agent.id'?: string;
-    /** The instance-id tree, e.g. 'run-42:builder#3' — the parent→child path. */
+    /** The instance-id tree (parent→child path): the flowId for the root, `'<flowId>:builder#3'` for a child. */
     flowPath?: string;
     /** Think/act loop index within an agent. */
     turn?: number;

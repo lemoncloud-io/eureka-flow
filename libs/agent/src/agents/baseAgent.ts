@@ -136,6 +136,7 @@ export abstract class BaseAgent implements Agent {
         this.identityTracer = deps.tracer ?? NoopTracer;
         this.turnTracerHolder = { current: this.identityTracer };
         // Self-wrap: llm.* and tool.* carry the agent's identity + turn via the holder accessor, no re-wrapping.
+        // (The canvas binding is wrapped upstream at injection — see subAgentRunner — so the child's tools see it too.)
         this.gateway = tracingGateway(deps.gateway, () => this.turnTracerHolder.current);
         this.storage = deps.storage;
         this.flowId = deps.flowId;

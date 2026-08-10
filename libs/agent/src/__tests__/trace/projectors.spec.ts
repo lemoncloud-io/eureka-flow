@@ -75,6 +75,23 @@ describe('trace projectors', () => {
         expect(root?.children[0].flowPath).toBe('r42:builder#1');
     });
 
+    it('toTraceTree ignores context-less lifecycle records (empty flowPath) when choosing the root', () => {
+        const sink = memorySink();
+        const tracer = createTracer(sink);
+        tracer.emit({ name: 'agent.run.start', fields: {} }); // web lifecycle event on the bare tracer: no flowPath
+        const root = tracer.child({
+            runId: 'r1',
+            'gen_ai.agent.name': 'orchestrator',
+            'gen_ai.agent.id': 'orchestrator',
+            flowPath: 'flow',
+        });
+        root.emit({ name: TURN_START, fields: { graph: { nodes: [], edges: [] } } });
+
+        const tree = toTraceTree(sink.records);
+        expect(tree?.agentId).toBe('orchestrator'); // not a phantom '' lifecycle root
+        expect(tree?.flowPath).toBe('flow');
+    });
+
     it('toGraphDiff: root before/after delta = the added node, self-describing (id + type)', () => {
         const diff = toGraphDiff(records, 'r42');
         expect(diff.before.nodes).toEqual([]);

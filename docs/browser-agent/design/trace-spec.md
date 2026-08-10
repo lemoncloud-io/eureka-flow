@@ -2,7 +2,6 @@
 
 **Status:** design · **Branch:** `feat/agent-observability` (from `develop`)
 **Assumption:** the `environment/` module is removed. This feature is **self-contained** — it defines its own logging port, sinks, and clock, and depends on nothing in `environment/`. Former environment duties unrelated to tracing (session storage, the gateway's clock) are out of scope here.
-**Companion docs:** [interfaces](./trace-interfaces.md) (exact types) · [scenarios](./trace-scenarios.md) (oracles).
 **Grounded in:** `agents/{baseAgent,subAgentRunner,orchestratorAgent}.ts`, `tools/toolExecutor.ts`, `canvas/{canvasBinding,engineCanvasBinding}.ts`, `llm/llmGateway.ts`.
 
 ## Purpose
@@ -69,12 +68,121 @@ flowchart TD
     PROJ --> DIFF["graph delta"]
 ```
 
+## Interfaces (exact types)
+
+TypeScript, `libs/agent/src`.
+
+### The port — what the agent core depends on
+
+```ts
+// trace/tracer.ts
+export interface TraceContext {
+    runId?: string; // one per user request (root key)
+    'gen_ai.agent.name'?: string; // persona TYPE: 'orchestrator' | 'builder' | block type
+    'gen_ai.agent.id'?: string; // INSTANCE: 'orchestrator' (singleton) | 'builder#3' (per spawn)
+    flowPath?: string; // instance-id tree; root = flowId, child = '<flowId>:builder#3'
+    turn?: number; // think/act loop index
+    [k: string]: unknown; // open for event-specific extension
+}
+export interface TraceEvent {
+    name: string;
+    level?: 'debug' | 'info' | 'warn' | 'error'; // default 'debug'
+    fields?: Record<string, unknown>;
+}
+export interface Tracer {
+    emit(event: TraceEvent): void;
+    child(context: TraceContext): Tracer; // NEW tracer stamping `context` on every event
+}
+```
+
+### The sink boundary + factory + sinks
+
+```ts
+// trace/sink.ts
+export interface TraceRecord {
+    ts: number;
+    name: string;
+    level: 'debug' | 'info' | 'warn' | 'error';
+    context: TraceContext; // accumulated across child() calls
+    fields: Record<string, unknown>;
+}
+export interface TraceSink {
+    write(record: TraceRecord): void; // synchronous append — order is authoritative
+    flush?(): void;
+}
+
+// trace/createTracer.ts
+export const createTracer = (sink: TraceSink, now?: () => number, context?: TraceContext): Tracer;
+export const NoopTracer: Tracer; // does nothing; its children do nothing — the default `tracer` dep
+
+// trace/sinks.ts + trace/redact.ts
+export const memorySink = (): TraceSink & { records: TraceRecord[] };
+export const jsonlSink = (write: (line: string) => void): TraceSink;
+export const redactingSink = (inner: TraceSink): TraceSink; // sanitize secret-looking keys at the boundary
+export const fanoutSink = (...sinks: TraceSink[]): TraceSink;
+export const redact = (record: TraceRecord): TraceRecord; // deep copy; key|token|secret|password|... → '[redacted]'
+```
+
+### The seams — decorators + executor
+
+Each takes a `() => Tracer` accessor (not a fixed tracer) so per-turn context advances without re-wrapping — mirroring the `() => signalHolder.current` idiom in `orchestratorAgent.ts`.
+
+```ts
+export const tracingGateway = (inner: LlmGateway, getTracer: () => Tracer): LlmGateway; // llm.request before, llm.response after
+export const tracingCanvasBinding = (inner: CanvasBinding, getTracer: () => Tracer): CanvasBinding; // canvas.mutate per mutating method; readGraph passes through
+export const createToolExecutor = (getTracer?: () => Tracer): ToolExecutor; // default () => NoopTracer; tool.call / tool.result around dispatch
+```
+
+### Event vocabulary
+
+Context is on every record; the table lists each event's `fields`.
+
+| `name`                     | level       | `fields`                                       |
+| -------------------------- | ----------- | ---------------------------------------------- |
+| `llm.request`              | debug       | `messageCount`, `toolCount`                    |
+| `llm.response`             | debug       | `durationMs`, `usage`, `toolCallCount`         |
+| `llm.error`                | error       | `durationMs`, `reason`                         |
+| `tool.call`                | debug       | `toolCallId`, `name`, `args`                   |
+| `tool.result`              | debug       | `toolCallId`, `ok`, `data?`, `error?`          |
+| `message`                  | debug       | `role`, `content`, `toolCalls?`, `toolCallId?` |
+| `canvas.mutate`            | debug       | `op`, `nodeId?`, `edgeId?`                     |
+| `agent.spawn`              | info        | `agentType`, `task`                            |
+| `agent.return`             | info        | `agentType`, `completed`, `summary`            |
+| `turn.start`               | debug       | `turn`, `graph?` (root only)                   |
+| `turn.step`                | debug       | `turn`                                         |
+| `turn.done` / `turn.error` | debug/error | `turn`, `graph?` (root only), `error?`         |
+
+### Projectors + the trace bundle — pure, read-time
+
+```ts
+// trace/project/*.ts — input is TraceRecord[]; nothing runs during a turn.
+export interface TraceNode { agentType: string; agentId: string; flowPath: string; records: TraceRecord[]; children: TraceNode[]; }
+export interface ChatEntry { role: 'user' | 'assistant' | 'tool'; text: string; toolCalls?: Array<{ name: string; args: unknown }>; toolCallId?: string; }
+export interface AgentTranscript { agentType: string; agentId: string; flowPath: string; chat: ChatEntry[]; }
+export interface NodeChange { id: string; type: string; } // "which node" + its block type
+export interface EdgeChange { id: string; sourceNodeId: string; sourcePortId: string; targetNodeId: string; targetPortId: string; } // "which edge" as source → target
+export interface GraphSnapshot { nodes: Array<{ id: string } & Record<string, unknown>>; edges: Array<{ id?: string } & Record<string, unknown>>; } // structural canvas snapshot (no engine coupling)
+export interface GraphDiff { runId: string; before: GraphSnapshot; after: GraphSnapshot; // runId, or 'session' for the cumulative diff
+    addedNodes: NodeChange[]; removedNodes: NodeChange[]; changedNodes: NodeChange[];
+    addedEdges: EdgeChange[]; removedEdges: EdgeChange[]; } // each change self-describes, not a count
+export interface GraphDiffProjection { cumulative: GraphDiff | null; perTurn: GraphDiff[]; } // whole session + one per turn
+
+export const toTraceTree   = (records: TraceRecord[]): TraceNode | null;         // nest by flowPath prefix; keep file order
+export const toTranscripts = (records: TraceRecord[]): AgentTranscript[];        // ONE per gen_ai.agent.id; fold `message` records
+export const toGraphDiff   = (records: TraceRecord[], runId?: string): GraphDiff; // omit runId ⇒ cumulative whole-session delta
+
+// trace/agentTrace.ts — the one switch that turns a flag into a ready-to-inject tracer + read-back
+export interface TraceProjections { transcripts: AgentTranscript[]; tree: TraceNode | null; diff: GraphDiffProjection; }
+export interface AgentTrace { tracer: Tracer; records: () => TraceRecord[]; project: () => TraceProjections; }
+export const createAgentTrace = (enabled: boolean): AgentTrace; // enabled=false ⇒ NoopTracer + empty projections
+```
+
 ## How it plugs in — create → child → inject → wrap
 
 The tracer is threaded exactly like the existing abort signal (`signalHolder` / `onTurnSignal` in `orchestratorAgent.ts`) — a per-turn holder, published by the loop, read by the spawn seam. Three responsibilities:
 
 1. **The spawner binds identity** (who am I). Identity is known by the creator, not the agent. `runOne` mints `agentId = agentType#N`, builds `childTracer = parentTracer.child({ agent name, agent id, flowPath })`, emits `agent.spawn`/`agent.return`, and injects `childTracer` into the child's deps. The root (orchestrator) binds its own identity at construction and mints `runId` per `send()`.
-2. **The agent self-wraps its deps** (in the `BaseAgent` constructor), through a `() => Tracer` accessor pointing at a per-agent holder — so the turn number can advance without re-wrapping: `tracingGateway(deps.gateway, get)`, `tracingCanvasBinding(deps.binding, get)`, `createToolExecutor({ registry, tracer: get })`.
+2. **The agent self-wraps its gateway + executor** (in the `BaseAgent` constructor) through a `() => Tracer` accessor pointing at a per-agent holder, so the turn number advances without re-wrapping: `tracingGateway(deps.gateway, get)`, `createToolExecutor(get)`. The **canvas binding is wrapped one level up, at injection by the spawner** — `tracingCanvasBinding(deps.binding, () => childTracer)` in `subAgentRunner` — because the child's edit tools capture `deps.binding` directly, so wrapping there covers both the tools and the agent's own reads. (The write-free orchestrator is constructed directly, so its binding stays unwrapped — it emits no `canvas.mutate`.)
 3. **The loop advances turn** — each iteration sets `holder.current = identity.child({ turn: i })` and emits `turn.*`. The spawn provider reads `() => holder.current` and passes it into `runner.fanOut`, where `runOne` (responsibility 1) recurses.
 
 The **tracer tree mirrors the agent tree** — that is what makes attribution fall out for free.
@@ -91,7 +199,7 @@ The **tracer tree mirrors the agent tree** — that is what makes attribution fa
 
 ## Concurrency
 
-Sub-agents run concurrently on the shared canvas (`Promise.all` in `orchestratorAgent.ts:186` and `subAgentRunner.ts:132`). Attribution holds because:
+Sub-agents run concurrently on the shared canvas (`Promise.all` in `orchestratorAgent.ts` / `subAgentRunner.ts`). Attribution holds because:
 
 - **Per-agent wrapping.** Each agent has its own tracer + its own gateway/binding wrappers, so events are attributed by construction, not by timing.
 - **Attribution, not adjacency.** Every record self-identifies via bound context + `toolCallId`; projectors never rely on line order or timestamps to pair events.
@@ -100,13 +208,13 @@ Sub-agents run concurrently on the shared canvas (`Promise.all` in `orchestrator
 
 ## Runtime compatibility (web + terminal)
 
-Identical core; only the sink adapter differs.
+Identical core, decorators, projectors, **and sink** — every entry point builds the same `createAgentTrace(enabled)` (a `redactingSink` over a `memorySink`). Only two things differ per runtime: the enable-flag source and how the projections are read back. (`jsonlSink`/`fanoutSink` exist as building blocks but are not part of the default `createAgentTrace` wiring.)
 
-| Layer                            | Terminal (node)                  | Web (browser)                                                    |
-| -------------------------------- | -------------------------------- | ---------------------------------------------------------------- |
-| Tracer · decorators · projectors | shared                           | shared                                                           |
-| Sink                             | `jsonlSink(write → append file)` | `fanoutSink(memorySink(), localStorageSink)` for the reactive UI |
-| View                             | printed                          | React components                                                 |
+| Layer                                   | Terminal (node)                     | Web (browser)                                   |
+| --------------------------------------- | ----------------------------------- | ----------------------------------------------- |
+| Tracer · decorators · projectors · sink | shared (`createAgentTrace`)         | shared (`createAgentTrace`)                     |
+| Enable flag                             | `AGENT_TRACE`                       | DEV, or `?trace=1` / `localStorage.agentTrace`  |
+| Read-back                               | projections rendered to the run log | `window.__flowAgentProjections()` (dev tooling) |
 
 ## Using it — turn tracing on, read the projections
 
@@ -144,7 +252,7 @@ npx nx test @flows/agent -- projectors
 
 ### Web (browser)
 
-On automatically in dev builds; in any build (including a deploy) opt in at runtime with `?trace=1` in the URL or `localStorage.agentTrace = '1'` (see `useAgentPorts.ts`). When on, read the live capture from the console:
+On automatically in dev builds; in any build (including a deploy) opt in at runtime with `?trace=1` in the URL or `localStorage.agentTrace = '1'` (see `useAgentTrace.ts`). When on, read the live capture from the console:
 
 ```js
 window.__flowAgentTrace(); // the redacted record stream (level · event · ts)

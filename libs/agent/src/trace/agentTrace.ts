@@ -32,7 +32,7 @@ const EMPTY: TraceProjections = { transcripts: [], tree: null, diff: { cumulativ
  * `enabled` from its own runtime's flag (node: `AGENT_TRACE`; web: DEV or a `?trace=1`/localStorage toggle) —
  * the flag SOURCE is per-runtime, the capture + projection is identical everywhere.
  *
- * The root identity is bound by the orchestrator itself (see its `beginRunContext`), so nothing here needs to
+ * The root identity is bound by the orchestrator itself, so nothing here needs to
  * know the flow id — injecting `tracer` is all it takes for the projections to attribute correctly.
  *
  * `enabled === false` returns {@link NoopTracer} and empty projections — the production default, zero cost.

@@ -1,7 +1,7 @@
 /**
  * Headless (Node, no DOM) smoke test for the flow agent against a REAL Gemini key.
  *
- * Repo vitest env is `environment: 'node'` (libs/agent/vite.config.mts:13), so this is a
+ * Repo vitest env is `environment: 'node'`, so this is a
  * plain spec — no new tooling. The two REAL-KEY cases are OPT-IN: they run only when RUN_LIVE is set (a
  * key in .env.local is not enough), so `nx test` and CI skip them. The offline CONTROL (case 3) always
  * runs. Exercise the real-key path with:
@@ -88,9 +88,9 @@ describe('flow agent headless (Node, no DOM) with a real Gemini key', () => {
         expect(text.trim().length).toBeGreaterThan(0);
     });
 
-    // ── 2. REAL KEY — real Gemini gateway drives the builder end-to-end (a–f) → node moves ──
+    // ── 2. REAL KEY — real Gemini gateway drives the builder end-to-end → node moves ──
     // A real function-calling round-trip, so this is opt-in via RUN_LIVE (see SKIP_LIVE).
-    it.skipIf(SKIP_LIVE)('drives the builder with the real Gemini gateway (a–f) → node moves, phase done', async () => {
+    it.skipIf(SKIP_LIVE)('drives the builder with the real Gemini gateway → node moves, phase done', async () => {
         const http = createFetchHttpRequest();
         const gateway = createGeminiLlmGateway({
             http,

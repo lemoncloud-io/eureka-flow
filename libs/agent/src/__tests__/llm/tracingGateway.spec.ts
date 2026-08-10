@@ -7,7 +7,7 @@ import type { Chunk, LlmGateway } from '../../llm/llmGateway';
 
 const fakeGateway = (chunks: Chunk[]): LlmGateway => ({
     capabilities: { toolCalls: true },
-     
+
     async *chat(): AsyncIterable<Chunk> {
         for (const chunk of chunks) {
             yield chunk;
@@ -43,5 +43,26 @@ describe('tracingGateway', () => {
     it('preserves the inner gateway capabilities', () => {
         const gateway = tracingGateway(fakeGateway([]), () => createTracer(memorySink()));
         expect(gateway.capabilities).toEqual({ toolCalls: true });
+    });
+
+    it('emits llm.error (level error) and rethrows when the inner gateway throws', async () => {
+        const sink = memorySink();
+        const boom: LlmGateway = {
+            capabilities: { toolCalls: true },
+            // eslint-disable-next-line require-yield
+            async *chat(): AsyncIterable<Chunk> {
+                throw new Error('network down');
+            },
+        };
+        const gateway = tracingGateway(boom, () => createTracer(sink, () => 0));
+
+        const drain = async () => {
+            for await (const chunk of gateway.chat({ messages: [], tools: [] })) void chunk;
+        };
+        await expect(drain()).rejects.toThrow('network down');
+
+        expect(sink.records.map(r => r.name)).toEqual(['llm.request', 'llm.error']);
+        expect(sink.records[1].level).toBe('error');
+        expect(sink.records[1].fields).toMatchObject({ reason: 'Error' });
     });
 });

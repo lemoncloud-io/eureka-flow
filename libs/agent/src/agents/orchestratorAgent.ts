@@ -114,7 +114,7 @@ export const ORCHESTRATOR_MAX_ITERATIONS = 16;
 
 /**
  * The main agent: a `BaseAgent` subclass with no write tools of its own, wiring read + catalog + list_agents
- * + spawn. Overrides `runToolCalls` (concurrent dispatch) and `buildContextMessages` (seed nodes + roster).
+ * + spawn. Overrides `runToolCalls` (concurrent dispatch) and `buildContextMessages` (seed node + edge context).
  */
 export class OrchestratorAgent extends BaseAgent {
     private readonly roster: AgentRoster;

@@ -123,13 +123,13 @@ export const useAgentSession = ({
 
     // A *layout* effect on purpose: cleanup runs before paint, so on a flow switch the outgoing agent
     // is silenced+aborted before an in-flight chunk can clobber the new panel via `setSession`.
-    // `arm()` on setup re-enables writes so this survives StrictMode's mount→unmount→remount.
+    // `enableWrites()` on setup re-enables writes so this survives StrictMode's mount→unmount→remount.
     useLayoutEffect(() => {
         instance.enableWrites();
         return instance.dispose;
     }, [instance]);
 
-    // Hydrate after arm (passive effect), then open the `send` gate. `cancelled` keeps a superseded
+    // Hydrate after enableWrites (passive effect), then open the `send` gate. `cancelled` keeps a superseded
     // instance's read from flipping the gate; `hydrate` always resolves, so the gate always opens.
     useEffect(() => {
         let cancelled = false;

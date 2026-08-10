@@ -84,13 +84,13 @@ export interface SubAgentRunnerDeps {
     /** Dispatch mode: parallel barrier fan-out (default) or serial. */
     dispatchMode?: 'parallel' | 'serial';
     maxIterations?: number;
-    /** The current user's flow-role ceiling; forwarded to every child so the executor gates on it (R2). */
+    /** The current user's flow-role ceiling; forwarded to every child so the executor gates on it. */
     userPermissions: AgentGrant;
     /** Run-monotonic instance-id source for `gen_ai.agent.id` (e.g. builder#3); default a private counter. */
     nextSpawnId?: () => number;
 }
 
-/** Build a {@link SubAgentRunner}: each child gets its own isolated storage + flowId, its own gateway, and its own fixed grant, with `userPermissions` riding along for the executor to gate on (R2). */
+/** Build a {@link SubAgentRunner}: each child gets its own isolated storage + flowId, its own gateway, and its own fixed grant, with `userPermissions` riding along for the executor to gate on. */
 export const createSubAgentRunner = (deps: SubAgentRunnerDeps): SubAgentRunner => {
     const { roster, catalog, gatewayFor, flowId, dispatchMode = 'parallel', maxIterations, userPermissions } = deps;
     let spawnSeq = 0;
@@ -126,7 +126,7 @@ export const createSubAgentRunner = (deps: SubAgentRunnerDeps): SubAgentRunner =
             storage,
             flowId: childFlowId,
             maxIterations,
-            // Wrap the shared binding so the child's canvas edits emit canvas.mutate attributed to it.
+            // Wrap the shared binding at injection so BOTH the child's tools and its reads emit canvas.mutate attributed to it.
             binding: tracingCanvasBinding(binding, () => childTracer),
             catalog,
             userPermissions,

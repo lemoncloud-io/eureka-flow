@@ -13,7 +13,7 @@ export const createTracer = (sink: TraceSink, now: () => number = Date.now, cont
 /** The default for every `tracer` dep: does nothing, and its children do nothing (Null Object). */
 export const NoopTracer: Tracer = {
     emit: () => {
-        // intentionally empty — the no-op sink
+        // intentionally empty
     },
     child: () => NoopTracer,
 };

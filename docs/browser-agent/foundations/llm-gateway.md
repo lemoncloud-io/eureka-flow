@@ -156,10 +156,10 @@ model answer, because no real receiver exists yet to prove that leg.
 
 ## 8. Verification status (honest scope)
 
-- Unit + integration tests pass in `libs/agent` (environment, storage contract, http port,
-  gemini gateway incl. function-calling, self-check, canvas tools, executor, orchestrator /
-  block agents / builder, spawn + roster, and the scenario harness) and in `apps/web` (includes
-  the Generate API gateway's fake-only suite and the real-browser Environment verification tests).
+- Unit + integration tests pass in `libs/agent` (storage contract, http port,
+  gemini gateway incl. function-calling, canvas tools, executor, orchestrator /
+  block agents / builder, spawn + roster, and the scenario harness) and in `apps/web`
+  (the Generate API gateway's fake-only suite).
 - Typecheck, `nx build agent`, and `nx build web` pass on this branch.
 - **The default suite makes no live provider call** — Gemini and the Generate API gateway are
   exercised against scripted/fake responses. A **gated** live spec (`scenarios.live.spec.ts`,

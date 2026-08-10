@@ -26,7 +26,7 @@ export const liveModel = (): string => process.env.GEMINI_MODEL ?? DEFAULT_MODEL
 /** Which provider {@link resolveLiveGateway} would pick from the current env — for scorecard/log labelling. */
 export const liveProvider = (): 'gemini' | 'none' => (process.env.GEMINI_API_KEY ? 'gemini' : 'none');
 
-/** Resolve the real gateway from the environment (see the module doc); undefined = no credential. */
+/** Resolve the real gateway from the environment; undefined = no credential. */
 export const resolveLiveGateway = ({ model, generation }: LiveGatewayConfig = {}): LlmGateway | undefined => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return undefined;

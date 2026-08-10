@@ -17,6 +17,7 @@ export const toTraceTree = (records: TraceRecord[]): TraceNode | null => {
 
     for (const record of records) {
         const flowPath = String(record.context.flowPath ?? '');
+        if (!flowPath) continue; // context-less lifecycle records (e.g. web agent.run.*) are not agent nodes
         let node = nodes.get(flowPath);
         if (!node) {
             node = {
