@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from 'react';
 
-import { createAgentTrace, createBrowserAgentStorage } from '@flows/agent';
+import { createAgentTrace } from '@flows/agent';
 
-import type { AgentStorage, TraceProjections, Tracer } from '@flows/agent';
+import type { TraceProjections, Tracer } from '@flows/agent';
 
 export interface AgentTraceEntrySnapshot {
     level: string;
@@ -10,9 +10,8 @@ export interface AgentTraceEntrySnapshot {
     ts: number;
 }
 
-export interface AgentPorts {
-    /** Per-flow session persistence (localStorage, `flow_mosaic_agent_` namespace). */
-    storage: AgentStorage;
+/** The observability port for one editor page: the tracer to inject, plus read-back of what it captured. */
+export interface AgentTracing {
     /** The tracer injected into the agent; every run event flows through it (NoopTracer when tracing is off). */
     tracer: Tracer;
     /** Dev/test trace snapshot: level + event name + ts (redacted). Empty when tracing is off. */
@@ -47,16 +46,14 @@ const traceEnabled = (): boolean => {
 };
 
 /**
- * One agent host per editor page: a localStorage-backed persistence port and a tracer. When tracing is on
- * (see {@link traceEnabled}) the tracer captures a redacted record stream the run projects 3 ways; otherwise
- * it is a NoopTracer. Lives for the page's lifetime — StrictMode's remount cannot silence it.
+ * One tracer per editor page. When tracing is on (see {@link traceEnabled}) it captures a redacted record
+ * stream the run projects 3 ways; otherwise it is a NoopTracer. Lives for the page's lifetime — StrictMode's
+ * remount cannot silence it. Persistence is a separate concern (see `useAgentStorage`).
  */
-export const useAgentPorts = (): AgentPorts => {
-    const ports = useMemo<AgentPorts>(() => {
-        const storage = createBrowserAgentStorage();
+export const useAgentTrace = (): AgentTracing => {
+    const tracing = useMemo<AgentTracing>(() => {
         const trace = createAgentTrace(traceEnabled());
         return {
-            storage,
             tracer: trace.tracer,
             getTraceEntries: () => trace.records().map(r => ({ level: r.level, event: r.name, ts: r.ts })),
             getProjections: () => trace.project(),
@@ -69,13 +66,13 @@ export const useAgentPorts = (): AgentPorts => {
             return undefined;
         }
         const win = window as unknown as Record<string, unknown>;
-        win['__flowAgentTrace'] = ports.getTraceEntries;
-        win['__flowAgentProjections'] = ports.getProjections;
+        win['__flowAgentTrace'] = tracing.getTraceEntries;
+        win['__flowAgentProjections'] = tracing.getProjections;
         return () => {
             delete win['__flowAgentTrace'];
             delete win['__flowAgentProjections'];
         };
-    }, [ports]);
+    }, [tracing]);
 
-    return ports;
+    return tracing;
 };

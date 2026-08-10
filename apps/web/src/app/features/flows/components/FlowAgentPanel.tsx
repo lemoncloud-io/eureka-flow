@@ -6,7 +6,8 @@ import { useWebSocketStore } from '@flows/socket';
 
 import { AgentPanel } from './AgentPanel';
 import { useAgent } from '../hooks/useAgent';
-import { useAgentPorts } from '../hooks/useAgentPorts';
+import { useAgentStorage } from '../hooks/useAgentStorage';
+import { useAgentTrace } from '../hooks/useAgentTrace';
 import { createBlockCatalogLookup, createGenerateApiLlmGateway } from '../utils';
 
 import type { FlowEngine } from '@flows/engine';
@@ -33,7 +34,8 @@ export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelPr
     // Reads cannot lag a projection that pauses mid-drag; edits land in `transact`, so they
     // checkpoint for undo like a user drag.
     const binding = useMemo(() => createEngineCanvasBinding(engine), [engine]);
-    const { storage, tracer } = useAgentPorts();
+    const storage = useAgentStorage();
+    const { tracer } = useAgentTrace();
     // Backend Generate API gateway; the model's answer returns over the flow socket. Connection state
     // is read fresh on every chat() call (a reconnect issues a new id), never cached. The agent wraps this
     // gateway with its own tracing decorator, so no app-side trace wrapper is needed here.

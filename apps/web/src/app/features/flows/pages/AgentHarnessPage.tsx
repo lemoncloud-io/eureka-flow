@@ -5,7 +5,8 @@ import { useWebSocketStore } from '@flows/socket';
 
 import { AgentPanel } from '../components/AgentPanel';
 import { useAgent } from '../hooks/useAgent';
-import { useAgentPorts } from '../hooks/useAgentPorts';
+import { useAgentStorage } from '../hooks/useAgentStorage';
+import { useAgentTrace } from '../hooks/useAgentTrace';
 import { createGenerateApiLlmGateway } from '../utils';
 
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
@@ -29,7 +30,8 @@ const HARNESS_PERMISSIONS = { canModifyCanvas: true, canEditConfig: true };
  * the run is wired but not yet functional end-to-end.
  */
 export const AgentHarnessPage = () => {
-    const { storage, tracer, getTraceEntries } = useAgentPorts();
+    const storage = useAgentStorage();
+    const { tracer, getTraceEntries } = useAgentTrace();
 
     const binding = useMemo(() => createInMemoryCanvasBinding({ nodes: [{ ...TEXT_INPUT_NODE }], edges: [] }), []);
     const catalog = useMemo(() => createCatalogLookup([]), []);
