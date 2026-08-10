@@ -1,15 +1,24 @@
 import { createJSONTransport } from 'lemon-model';
 
-import { useWebSocketStore } from '@flows/socket';
-
 import type { GenerateReceiver, GenerateResponse } from './createGenerateApiLlmGateway';
 import type { ToolCall, ToolResult } from '@flows/agent';
-import type { JSONTransport, NetworkMessageHandler, NetworkSupportable } from 'lemon-model';
+import type { WebSocketMessage } from '@flows/socket';
+import type { JSONTransport, NetworkMessageHandler, NetworkSupportable, SocketReadyState } from 'lemon-model';
 
 type GenerateTransportPayload = GenerateResponse & { requestId: string };
 type ToolTransportPayload = ToolResult & { requestId: string };
 type TransportPayload = GenerateTransportPayload | ToolTransportPayload;
 type Pending<T> = { resolve: (value: T) => void; reject: (error: unknown) => void };
+
+export interface ToolSocketConnectionSnapshot {
+    isConnected: boolean;
+    connectionId: string | null;
+}
+
+export interface ToolSocketConnection {
+    getSnapshot(): ToolSocketConnectionSnapshot;
+    subscribe(subscriber: (message: WebSocketMessage) => void): () => void;
+}
 
 export interface FlowJSONTransportReceiver {
     generateReceiver: GenerateReceiver<GenerateResponse>;
@@ -34,35 +43,51 @@ export const dispatchAsyncTool = async (
     return options.receiver.waitTool(requestId, () => options.fire({ requestId, toolCallId: call.id, connectionId }));
 };
 
-/** Reassembles JSONTransport packets already carried by the app's single socket worker. */
-class FlowJSONTransportReceiverAdapter implements FlowJSONTransportReceiver {
+class ReceiveOnlyToolSocketNetwork implements NetworkSupportable {
     private readonly messageHandlers = new Set<NetworkMessageHandler>();
-    private readonly generateWaits = new Map<string, Pending<GenerateResponse>>();
-    private readonly toolWaits = new Map<string, Pending<ToolResult>>();
-    private transport?: JSONTransport<TransportPayload>;
-    private unsubscribe?: () => void;
 
-    private readonly network: NetworkSupportable = {
-        get readyState() {
-            return useWebSocketStore.getState().isConnected ? 'open' : 'closed';
-        },
-        send: () => {
-            throw new Error('Browser JSON transport receiver is receive-only');
-        },
-        onMessage: handler => {
-            this.messageHandlers.add(handler);
-            return () => this.messageHandlers.delete(handler);
-        },
-        onError: () => () => undefined,
-        close: () => undefined,
-    };
+    public constructor(private readonly connection: ToolSocketConnection) {}
 
-    private readonly forwardSocketMessage = (message: { data: unknown }): void => {
+    public get readyState(): SocketReadyState {
+        return this.connection.getSnapshot().isConnected ? 'open' : 'closed';
+    }
+
+    public send(): void {
+        throw new Error('Browser JSON transport receiver is receive-only');
+    }
+
+    public onMessage(handler: NetworkMessageHandler): () => void {
+        this.messageHandlers.add(handler);
+        return (): void => {
+            this.messageHandlers.delete(handler);
+        };
+    }
+
+    public onError(): () => void {
+        return (): void => undefined;
+    }
+
+    public readonly close = (): void => undefined;
+
+    public readonly receive = (message: WebSocketMessage): void => {
         const packet = message.data as { type?: string };
         if (!packet?.type?.startsWith('json:')) return;
         const raw = JSON.stringify(packet);
         this.messageHandlers.forEach(handler => handler(raw));
     };
+}
+
+/** Reassembles JSONTransport packets carried only by the tool socket connection. */
+class FlowJSONTransportReceiverAdapter implements FlowJSONTransportReceiver {
+    private readonly generateWaits = new Map<string, Pending<GenerateResponse>>();
+    private readonly toolWaits = new Map<string, Pending<ToolResult>>();
+    private readonly network: ReceiveOnlyToolSocketNetwork;
+    private transport?: JSONTransport<TransportPayload>;
+    private unsubscribe?: () => void;
+
+    public constructor(private readonly connection: ToolSocketConnection) {
+        this.network = new ReceiveOnlyToolSocketNetwork(connection);
+    }
 
     private readonly resolvePayload = (payload: TransportPayload): void => {
         if ('toolCallId' in payload && 'ok' in payload) {
@@ -103,7 +128,7 @@ class FlowJSONTransportReceiverAdapter implements FlowJSONTransportReceiver {
         if (this.transport) return this.close;
         this.transport = createJSONTransport<TransportPayload>(this.network);
         this.transport.onMessage(this.resolvePayload);
-        this.unsubscribe = useWebSocketStore.getState().subscribe(this.forwardSocketMessage);
+        this.unsubscribe = this.connection.subscribe(this.network.receive);
         return this.close;
     }
 
@@ -115,4 +140,5 @@ class FlowJSONTransportReceiverAdapter implements FlowJSONTransportReceiver {
     };
 }
 
-export const createFlowJSONTransportReceiver = (): FlowJSONTransportReceiver => new FlowJSONTransportReceiverAdapter();
+export const createFlowJSONTransportReceiver = (connection: ToolSocketConnection): FlowJSONTransportReceiver =>
+    new FlowJSONTransportReceiverAdapter(connection);

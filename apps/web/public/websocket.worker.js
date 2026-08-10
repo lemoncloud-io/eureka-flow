@@ -137,11 +137,12 @@ const connectWebSocket = config => {
             const data = JSON.parse(event.data);
 
             // Handle connection info response
-            if (data.action === 'info' && data.data?.id) {
-                connectionId = data.data.connectionId || null;
+            const info = data.data ?? data.payload;
+            if (data.action === 'info' && info?.id) {
+                connectionId = info.connectionId || null;
                 self.postMessage({
                     type: 'connectionId',
-                    id: data.data.id,
+                    id: info.id,
                     connectionId,
                 });
                 return;
