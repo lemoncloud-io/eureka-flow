@@ -1,7 +1,7 @@
 # LLM Tool-Calling Production Readiness — Current Source of Truth
 
-**As of commit `3b31a90` (plus this review's uncommitted changes) on branch
-`leon/llm-verification-monitoring`, run 2026-08-04.** This document supersedes any contradictory
+**As of commit `3b31a90` (plus this review's uncommitted changes), run 2026-08-04.**
+This document supersedes any contradictory
 architecture/status claims elsewhere — where an older doc still says something different, treat
 this document as current and the other as historical (marked as such below, not deleted).
 
@@ -43,7 +43,7 @@ is expected to implement an equivalent mapping server-side (see §2).
 - The browser never sends an arbitrary provider base URL or arbitrary authorization header — only
   a `provider`/`requestedModel` string pair, checked server-side against an allowlist (see the
   contract doc, §5/§7-9) that this repo does not enforce client-side.
-- Session auth (`x-api-key`) is the *only* auth mechanism `createEurekaToolCallLlmGateway` uses —
+- Session auth (`x-api-key`) is the _only_ auth mechanism `createEurekaToolCallLlmGateway` uses —
   inherited from `@flows/web-core`'s shared Axios client, not reinvented.
 - `createEurekaToolCallLlmGateway.contract.spec.ts` asserts, against a real (scripted) HTTP
   boundary, that no request body ever contains anything resembling an API key or bearer token.
@@ -56,11 +56,11 @@ depends on this by accident (falls back to the existing text-only socket gateway
 
 ## 3. Gateway responsibilities
 
-| Layer | Owns | Never does |
-|---|---|---|
-| `createEurekaToolCallLlmGateway` (browser) | Request serialization, response validation, error typing, `AbortSignal`, capability declaration | Hold/send a provider key, pick an arbitrary endpoint/base URL, retry, parse provider-native wire formats |
-| eureka-flows-api (server, not built) | Auth check, provider/model allowlist, provider-native request/response mapping, retry/timeout, secret storage, usage/cost/actualModel normalization | Trust an unlisted provider/model, leak a key or raw provider error body |
-| `ToolExecutor` (`libs/agent`) | Tool-name allowlist, arg schema validation, capability gate (agent grant AND user permission ceiling), safe dispatch | Execute based on model-claimed text, trust an unvalidated tool name/args |
+| Layer                                      | Owns                                                                                                                                                | Never does                                                                                               |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `createEurekaToolCallLlmGateway` (browser) | Request serialization, response validation, error typing, `AbortSignal`, capability declaration                                                     | Hold/send a provider key, pick an arbitrary endpoint/base URL, retry, parse provider-native wire formats |
+| eureka-flows-api (server, not built)       | Auth check, provider/model allowlist, provider-native request/response mapping, retry/timeout, secret storage, usage/cost/actualModel normalization | Trust an unlisted provider/model, leak a key or raw provider error body                                  |
+| `ToolExecutor` (`libs/agent`)              | Tool-name allowlist, arg schema validation, capability gate (agent grant AND user permission ceiling), safe dispatch                                | Execute based on model-claimed text, trust an unvalidated tool name/args                                 |
 
 ## 4. Tool-execution responsibilities
 
@@ -77,15 +77,15 @@ unintended second dispatch.
 
 `libs/agent/src/llm/modelManifest.ts` (built on `providerRegistry.ts`). As of 2026-08-04:
 
-| Provider | Fixed models | Dynamic routes | Discovery source |
-|---|---|---|---|
-| OpenAI | 4 (`gpt-4o-mini`, `gpt-4.1-mini`, `gpt-5-mini`, `gpt-4.1`) | — | provider docs / eureka's own model catalog / OpenRouter Models API (cross-corroboration) |
-| Gemini | 5 (`gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3-flash-preview`*, `gemini-2.5-flash-lite`, `gemini-3.1-pro-preview`*) | — | same as above (`*` = preview) |
-| OpenRouter | 6 (`openai/gpt-4o-mini`, `google/gemini-2.5-flash`, `anthropic/claude-haiku-4.5`, `openai/gpt-oss-20b:free`, `meta-llama/llama-3.3-70b-instruct`, `deepseek/deepseek-chat-v3.1`) | 1 (`openrouter/free`) | OpenRouter public Models API (`GET https://openrouter.ai/api/v1/models`, no auth) |
-| DeepSeek | 2 (planned, offline-wired only) | — | DeepSeek's own migration notice |
-| Qwen | 3 (planned, offline-wired only) | — | Alibaba Cloud Model Studio docs |
-| Anthropic | 2 (`claude-haiku-4-5`, `claude-sonnet-5`; planned, offline-wired only) | — | Anthropic's own pricing/models pages |
-| GLM (Z.ai) | 2 (planned, offline-wired only) | — | Z.ai's own API reference / general web search (lower confidence) |
+| Provider   | Fixed models                                                                                                                                                                     | Dynamic routes        | Discovery source                                                                         |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------- |
+| OpenAI     | 4 (`gpt-4o-mini`, `gpt-4.1-mini`, `gpt-5-mini`, `gpt-4.1`)                                                                                                                       | —                     | provider docs / eureka's own model catalog / OpenRouter Models API (cross-corroboration) |
+| Gemini     | 5 (`gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-3-flash-preview`_, `gemini-2.5-flash-lite`, `gemini-3.1-pro-preview`_)                                                          | —                     | same as above (`*` = preview)                                                            |
+| OpenRouter | 6 (`openai/gpt-4o-mini`, `google/gemini-2.5-flash`, `anthropic/claude-haiku-4.5`, `openai/gpt-oss-20b:free`, `meta-llama/llama-3.3-70b-instruct`, `deepseek/deepseek-chat-v3.1`) | 1 (`openrouter/free`) | OpenRouter public Models API (`GET https://openrouter.ai/api/v1/models`, no auth)        |
+| DeepSeek   | 2 (planned, offline-wired only)                                                                                                                                                  | —                     | DeepSeek's own migration notice                                                          |
+| Qwen       | 3 (planned, offline-wired only)                                                                                                                                                  | —                     | Alibaba Cloud Model Studio docs                                                          |
+| Anthropic  | 2 (`claude-haiku-4-5`, `claude-sonnet-5`; planned, offline-wired only)                                                                                                           | —                     | Anthropic's own pricing/models pages                                                     |
+| GLM (Z.ai) | 2 (planned, offline-wired only)                                                                                                                                                  | —                     | Z.ai's own API reference / general web search (lower confidence)                         |
 
 Meets the benchmark-breadth target (>=4 OpenAI, >=5 Gemini, >=6 fixed OpenRouter, `openrouter/free`
 tracked separately) — enforced as a regression guard by `modelManifest.spec.ts`. `openrouter/free`
@@ -103,7 +103,7 @@ A model may be marked **QUALIFIED** only when all of the following are true: (1)
 qualification run actually executed against it in this or a prior dated session; (2) the positive
 scenario matrix passed; (3) negative-control behavior was acceptable; (4) no severe malformed-tool
 -call issue remains; (5) usage and `actualModel` were captured correctly; (6) the production
-browser E2E (layer E, §7) passed through a *deployed* eureka-flows-api; (7) no provider key was
+browser E2E (layer E, §7) passed through a _deployed_ eureka-flows-api; (7) no provider key was
 ever exposed to the browser.
 
 States: `QUALIFIED` · `CONDITIONAL` · `FAILED` · `NOT RUN` · `UNAVAILABLE` · `PREVIEW ONLY` ·
@@ -117,13 +117,13 @@ E2E has ever run against a deployed endpoint.
 
 ## 7. Test layers (with exact paths)
 
-| Layer | Purpose | Files |
-|---|---|---|
-| A. Unit | Agent control flow, scoring, metrics, chart, tool-selection logic — `FakeGateway`/scripted allowed | `libs/agent/src/__tests__/llm/{verificationMetrics,verifyLocatorScenarios,verifyProviderToolCall,modelManifest,classifyRealProviderResult,pricing}.spec.ts`, `libs/agent/src/__tests__/agents/*.spec.ts` |
-| B. Provider adapter contract | Request construction/response parsing per provider, scripted HTTP | `libs/agent/src/__tests__/llm/{OpenAiLlmGateway,GeminiToolLlmGateway,AnthropicToolLlmGateway,providerRegistry}.spec.ts` |
-| C. eureka-flows-api browser contract | Real HTTP boundary (local scripted server), never `FakeGateway` | `apps/web/src/app/features/flows/utils/createEurekaToolCallLlmGateway.contract.spec.ts` |
-| D. Live-provider qualification | Real gateways, real HTTP, real models, env-gated per provider key | `libs/agent/src/__tests__/llm/{realLocatorScenarios,realProviderToolCall}.spec.ts` |
-| E. Production browser E2E | Deploy-gated, real browser → deployed backend → real provider → canvas | `apps/web/src/app/features/flows/utils/browserToolCalling.production.e2e.spec.ts` — **placeholder only, always skipped; no Playwright/E2E framework exists in this repo yet** |
+| Layer                                | Purpose                                                                                            | Files                                                                                                                                                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Unit                              | Agent control flow, scoring, metrics, chart, tool-selection logic — `FakeGateway`/scripted allowed | `libs/agent/src/__tests__/llm/{verificationMetrics,verifyLocatorScenarios,verifyProviderToolCall,modelManifest,classifyRealProviderResult,pricing}.spec.ts`, `libs/agent/src/__tests__/agents/*.spec.ts` |
+| B. Provider adapter contract         | Request construction/response parsing per provider, scripted HTTP                                  | `libs/agent/src/__tests__/llm/{OpenAiLlmGateway,GeminiToolLlmGateway,AnthropicToolLlmGateway,providerRegistry}.spec.ts`                                                                                  |
+| C. eureka-flows-api browser contract | Real HTTP boundary (local scripted server), never `FakeGateway`                                    | `apps/web/src/app/features/flows/utils/createEurekaToolCallLlmGateway.contract.spec.ts`                                                                                                                  |
+| D. Live-provider qualification       | Real gateways, real HTTP, real models, env-gated per provider key                                  | `libs/agent/src/__tests__/llm/{realLocatorScenarios,realProviderToolCall}.spec.ts`                                                                                                                       |
+| E. Production browser E2E            | Deploy-gated, real browser → deployed backend → real provider → canvas                             | `apps/web/src/app/features/flows/utils/browserToolCalling.production.e2e.spec.ts` — **placeholder only, always skipped; no Playwright/E2E framework exists in this repo yet**                            |
 
 ## 8. Live evidence
 
