@@ -24,7 +24,12 @@ const entry = (overrides: Partial<ProviderModelEntry> = {}): ProviderModelEntry 
 });
 
 const OPENAI = entry();
-const GEMINI = entry({ providerId: 'gemini', displayName: 'Gemini', apiKeyEnv: 'GEMINI_API_KEY', models: ['gemini-2.5-flash', 'gemini-2.5-pro'] });
+const GEMINI = entry({
+    providerId: 'gemini',
+    displayName: 'Gemini',
+    apiKeyEnv: 'GEMINI_API_KEY',
+    models: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+});
 const REGISTRY = [OPENAI, GEMINI];
 const resolveModelsToRun = (e: ProviderModelEntry): readonly string[] => e.models;
 
@@ -158,6 +163,24 @@ describe('planMultiTurnModelSelection: invalid model rejection before any gatewa
                 resolveModelsToRun,
             })
         ).toThrow(/unknown model "gemini-2\.5-pro"/);
+    });
+
+    it('reports the "(none match LIVE_MULTI_TURN_PROVIDER_FILTER)" fallback, not an empty list, when the provider filter itself matches zero registry entries', () => {
+        // providerFilter matches no entry at all, so selectableEntries is empty and validModels
+        // stays empty too — [...validModels].join(', ') is '' (falsy), which must fall back to the
+        // explicit "(none match...)" message rather than throwing with an empty "valid models: "
+        // list. The existing "lists the actually-valid models" test above only covers the case
+        // where validModels is non-empty; this is the deliberately-empty-validModels case.
+        expect(() =>
+            planMultiTurnModelSelection({
+                registry: REGISTRY,
+                providerFilter: 'no-such-provider',
+                modelFilter: 'gpt-4o-mini',
+                resolveModelsToRun,
+            })
+        ).toThrow(
+            'LIVE_MULTI_TURN_MODEL_FILTER has an unknown model "gpt-4o-mini" for the selected provider(s) — valid models: (none match LIVE_MULTI_TURN_PROVIDER_FILTER)'
+        );
     });
 });
 

@@ -29,7 +29,12 @@ import type { MultiTurnVerificationReport } from './multiTurnVerificationMetrics
  */
 
 const escapeHtml = (value: string): string =>
-    value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 
 /**
  * Serializes `value` for safe embedding inside `<script type="application/json">...</script>`.
@@ -72,6 +77,8 @@ body {
 }
 h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
 h2 { font-size: 1.05rem; margin: 0 0 0.25rem; }
+.chart-body h3 { font-size: 0.85rem; font-weight: 600; margin: 0.85rem 0 0.35rem; color: #6b7280; }
+.chart-body h3:first-child { margin-top: 0; }
 .meta { color: #6b7280; font-size: 0.9rem; margin-top: 0; }
 .hint { color: #6b7280; font-size: 0.85rem; margin: 0 0 0.75rem; }
 fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; margin: 0; }
@@ -244,6 +251,25 @@ const CLIENT_JS = `
     records.forEach(function (r) {
       var key = modelKey(r);
       if (!map[key]) { map[key] = { key: key, provider: r.provider, requestedModel: r.requestedModel, actualModels: {}, records: [] }; order.push(key); }
+      map[key].records.push(r);
+      if (r.actualModel) map[key].actualModels[r.actualModel] = true;
+    });
+    return order.map(function (k) { return map[k]; });
+  }
+
+  // Scenario-level views: same grouping shape as groupByModel, one level finer (provider + model +
+  // scenarioId — matching multiTurnVerificationMetrics.ts's scenarioGroupKey). groupStats below is
+  // dimension-agnostic (it only ever reads group.records), so scenario-level rows reuse the exact
+  // same median/P90/cost math as the model-level charts — never a second, drifting implementation.
+  function groupByModelScenario(records) {
+    var map = {};
+    var order = [];
+    records.forEach(function (r) {
+      var key = modelKey(r) + '\\u0000' + r.scenarioId;
+      if (!map[key]) {
+        map[key] = { key: key, provider: r.provider, requestedModel: r.requestedModel, scenarioId: r.scenarioId, actualModels: {}, records: [] };
+        order.push(key);
+      }
       map[key].records.push(r);
       if (r.actualModel) map[key].actualModels[r.actualModel] = true;
     });
@@ -458,6 +484,41 @@ const CLIENT_JS = `
     });
   }
 
+  // ---- chart 4c: scenario-level latency & cost ----------------------------------------------------
+  // The model-level charts above already narrow to whatever the scenario filter currently selects —
+  // this section is the dedicated scenario-level VIEW: one row per (model, scenario) pair, using the
+  // exact same groupStats() math (median/P90 elapsed, cost-per-success, cost coverage) as chart 2/3,
+  // never a second, independently-computed statistic that could drift from the model-level one.
+  function renderScenarioStats(records) {
+    var body = document.querySelector('#chart-scenario-stats .chart-body');
+    body.innerHTML = '';
+    var groups = groupByModelScenario(records);
+    if (groups.length === 0) { body.appendChild(h('p', { 'class': 'no-data' }, 'No attempts match the current filters.')); return; }
+
+    var rows = groups.map(function (g) { return { group: g, stats: groupStats(g) }; });
+
+    body.appendChild(h('h3', {}, 'Latency by scenario'));
+    var maxElapsed = Math.max.apply(null, rows.map(function (r) { return Math.max(r.stats.medianElapsedMs || 0, r.stats.p90ElapsedMs || 0); }).concat([1]));
+    rows.forEach(function (r) {
+      var label = r.group.provider + ' / ' + r.group.requestedModel + ' \\u2014 ' + r.group.scenarioId;
+      renderScaledBarsRow(body, label, 'coverage ' + r.stats.elapsedCoverage, [
+        { value: r.stats.medianElapsedMs, color: 'var(--lookup-first)', label: 'median' },
+        { value: r.stats.p90ElapsedMs, color: 'var(--other)', label: 'p90' }
+      ], maxElapsed, fmtMs);
+    });
+
+    body.appendChild(h('h3', {}, 'Cost by scenario'));
+    var maxCost = Math.max.apply(null, rows.map(function (r) { return Math.max(r.stats.costPerSuccessfulTask || 0, r.stats.averageKnownCostPerPricedAttempt || 0); }).concat([0.000001]));
+    rows.forEach(function (r) {
+      var label = r.group.provider + ' / ' + r.group.requestedModel + ' \\u2014 ' + r.group.scenarioId;
+      var coverageLabel = 'cost coverage ' + (fmtPct(r.stats.costCoverageRate) || 'n/a') + (r.stats.costPartial ? ' (partial)' : '');
+      renderScaledBarsRow(body, label, coverageLabel, [
+        { value: r.stats.costPerSuccessfulTask, color: 'var(--success)', label: 'cost/success' },
+        { value: r.stats.averageKnownCostPerPricedAttempt, color: 'var(--lookup-first)', label: 'avg/priced' }
+      ], maxCost, fmtCost);
+    });
+  }
+
   // ---- chart 5: attempt-level scatter -------------------------------------------------------------
   function renderScatter(records) {
     var body = document.querySelector('#chart-scatter .chart-body');
@@ -526,6 +587,7 @@ const CLIENT_JS = `
     renderCost(groups);
     renderStrategy(groups);
     renderCompletionMode(groups);
+    renderScenarioStats(records);
     renderScatter(records);
   }
 
@@ -591,6 +653,12 @@ export const buildMultiTurnDashboardHtml = (report: MultiTurnVerificationReport)
   <section id="chart-completion-mode" class="chart-section" aria-label="Completion-mode comparison">
     <h2>4b. Completion-mode comparison</h2>
     <p class="hint">How a SUCCESSFUL run's terminal turn completed — via a tool call ("tool-action") or via text ("text-response") — plus every incomplete (non-success) attempt. Orthogonal to strategy above: a lookup-first run can complete either way. "Successful lookup-action round trips" counts only a lookup-first, tool-action success whose tool sequence has a real acting tool call AFTER the initial list_nodes — never a bare list_nodes-only or a lookup-then-text success.</p>
+    <div class="chart-body"></div>
+  </section>
+
+  <section id="chart-scenario-stats" class="chart-section" aria-label="Scenario-level latency and cost">
+    <h2>4c. Scenario-level latency &amp; cost</h2>
+    <p class="hint">The same median/P90 elapsed and cost statistics as sections 2 and 3, computed one level finer — per (model, scenario) pair instead of per model — so scenario filtering and this view always agree. Missing cost/latency data is never shown as zero.</p>
     <div class="chart-body"></div>
   </section>
 

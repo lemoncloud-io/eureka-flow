@@ -11,16 +11,15 @@ import {
     formatMultiTurnRecordsCsv,
     formatMultiTurnRecordsJsonl,
     formatMultiTurnRecordsMarkdownDetails,
+    formatMultiTurnScenarioMarkdownTable,
     isSuccessfulLookupActionRoundTrip,
     mean,
     median,
     p90NearestRank,
+    resolveEffectiveCost,
     successRate,
 } from '../../llm/multiTurnVerificationMetrics';
-import {
-    accumulateExtendedUsage,
-    aggregateVerificationMetrics,
-} from '../../llm/verificationMetrics';
+import { accumulateExtendedUsage, aggregateVerificationMetrics } from '../../llm/verificationMetrics';
 
 import type { MultiTurnLiveRecord, MultiTurnRunManifest } from '../../llm/multiTurnVerificationMetrics';
 import type { CapturedCallInfo, VerificationRunRecord } from '../../llm/verificationMetrics';
@@ -88,6 +87,21 @@ describe('statistics helpers', () => {
         expect(costPerSuccessfulTask(12.5, 0)).toBeNull();
         expect(costPerSuccessfulTask(null, 0)).toBeNull();
         expect(costPerSuccessfulTask(10, 2)).toBe(5);
+    });
+});
+
+describe("resolveEffectiveCost: the multi-turn mirror of verificationMetrics.ts's private effectiveCost", () => {
+    it('prefers providerReportedCost when present', () => {
+        expect(resolveEffectiveCost({ providerReportedCost: 0.01, estimatedCost: 0.5 })).toBe(0.01);
+    });
+
+    it('falls back to a genuine numeric estimatedCost when providerReportedCost is absent', () => {
+        expect(resolveEffectiveCost({ estimatedCost: 0.002 })).toBe(0.002);
+    });
+
+    it('returns undefined when neither is usable — including an explicit null estimatedCost (unknown pricing)', () => {
+        expect(resolveEffectiveCost({})).toBeUndefined();
+        expect(resolveEffectiveCost({ estimatedCost: null })).toBeUndefined();
     });
 });
 
@@ -209,10 +223,34 @@ describe('isSuccessfulLookupActionRoundTrip: the exact four-part definition', ()
 
     it('aggregateMultiTurnByModel.successfulLookupActionRoundTrips matches the sum of the predicate over the group', () => {
         const records: MultiTurnLiveRecord[] = [
-            makeRecord({ attempt: 1, outcome: 'success', strategy: 'lookup-first', completionMode: 'tool-action', requestedToolSequence: ['list_nodes', 'move_node'] }),
-            makeRecord({ attempt: 2, outcome: 'success', strategy: 'lookup-first', completionMode: 'text-response', requestedToolSequence: ['list_nodes'] }),
-            makeRecord({ attempt: 3, outcome: 'success', strategy: 'lookup-first', completionMode: 'tool-action', requestedToolSequence: ['list_nodes'] }),
-            makeRecord({ attempt: 4, outcome: 'success', strategy: 'direct', completionMode: 'tool-action', requestedToolSequence: ['move_node'] }),
+            makeRecord({
+                attempt: 1,
+                outcome: 'success',
+                strategy: 'lookup-first',
+                completionMode: 'tool-action',
+                requestedToolSequence: ['list_nodes', 'move_node'],
+            }),
+            makeRecord({
+                attempt: 2,
+                outcome: 'success',
+                strategy: 'lookup-first',
+                completionMode: 'text-response',
+                requestedToolSequence: ['list_nodes'],
+            }),
+            makeRecord({
+                attempt: 3,
+                outcome: 'success',
+                strategy: 'lookup-first',
+                completionMode: 'tool-action',
+                requestedToolSequence: ['list_nodes'],
+            }),
+            makeRecord({
+                attempt: 4,
+                outcome: 'success',
+                strategy: 'direct',
+                completionMode: 'tool-action',
+                requestedToolSequence: ['move_node'],
+            }),
         ];
         const [summary] = aggregateMultiTurnByModel(records);
         expect(summary.successfulLookupActionRoundTrips).toBe(1);
@@ -355,7 +393,14 @@ describe('aggregateMultiTurnByModel: the three partial-data flags are independen
     it('normalized totalTokens missing while providerTotalTokens and cost are complete affects ONLY basicTokenDataPartial', () => {
         const records = [
             makeRecord({ attempt: 1, totalTokens: 150, providerTotalTokens: 200, effectiveCost: 0.01 }),
-            makeRecord({ attempt: 2, inputTokens: null, outputTokens: null, totalTokens: null, providerTotalTokens: 200, effectiveCost: 0.01 }),
+            makeRecord({
+                attempt: 2,
+                inputTokens: null,
+                outputTokens: null,
+                totalTokens: null,
+                providerTotalTokens: 200,
+                effectiveCost: 0.01,
+            }),
         ];
         const [summary] = aggregateMultiTurnByModel(records);
         expect(summary.basicTokenDataPartial).toBe(true);
@@ -444,14 +489,233 @@ describe('Markdown table: each partial-data marker is applied independently', ()
     });
 });
 
+describe('formatMultiTurnModelSummaryMarkdownTable: rateCell renders "n/a" for a null rate', () => {
+    it('shows n/a rather than a fabricated percentage when a rate field is null', () => {
+        // successRate() never actually returns null for a non-empty group (taskAttempts is always
+        // >= 1), so this constructs the edge case directly against the formatter's own declared
+        // type (`number | null`) rather than trying to coax the aggregator into producing one —
+        // the formatter must still render this honestly if it's ever handed one (e.g. a
+        // hand-edited or future-schema summary read back from a report file).
+        const [summary] = aggregateMultiTurnByModel([makeRecord()]);
+        const table = formatMultiTurnModelSummaryMarkdownTable([{ ...summary, finalSuccessRate: null }]);
+        const dataRow = table.split('\n')[2];
+        expect(dataRow).toContain('n/a');
+    });
+});
+
 describe('aggregateMultiTurnByModel: requested vs. actual model', () => {
     it('requestedModel and actualModel stay distinct fields, never conflated', () => {
-        const records = [makeRecord({ requestedModel: 'openrouter/free', actualModel: 'meta-llama/llama-3.3-70b-instruct' })];
+        const records = [
+            makeRecord({ requestedModel: 'openrouter/free', actualModel: 'meta-llama/llama-3.3-70b-instruct' }),
+        ];
         const [summary] = aggregateMultiTurnByModel(records);
         expect(summary.requestedModel).toBe('openrouter/free');
         // The model-level summary groups by requestedModel; actualModel is a per-record detail
         // preserved on the raw record (verified below), not folded into the summary's identity.
         expect(records[0].actualModel).toBe('meta-llama/llama-3.3-70b-instruct');
+    });
+});
+
+describe('aggregateMultiTurnByScenario: latency (P90 nearest-rank)', () => {
+    it('p90ElapsedMs matches p90NearestRank directly, over ALL attempts regardless of outcome', () => {
+        const elapsed = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000];
+        const records: MultiTurnLiveRecord[] = elapsed.map((ms, i) =>
+            makeRecord({
+                attempt: i + 1,
+                elapsedMs: ms,
+                // Mix outcomes deliberately — latency counts every attempt, success or not.
+                outcome: i % 3 === 0 ? 'failure' : 'success',
+            })
+        );
+        const [summary] = aggregateMultiTurnByScenario(records);
+        expect(summary.p90ElapsedMs).toBe(p90NearestRank(elapsed));
+        expect(summary.p90ElapsedMs).toBe(900); // rank ceil(0.9*10)=9th smallest, 1-indexed
+        expect(summary.medianElapsedMs).toBe(median(elapsed));
+    });
+});
+
+describe('aggregateMultiTurnByScenario: cost coverage', () => {
+    it('full cost coverage: every attempt priced — costDataPartial false, all cost figures known', () => {
+        const records: MultiTurnLiveRecord[] = [
+            makeRecord({ attempt: 1, outcome: 'success', effectiveCost: 0.001 }),
+            makeRecord({ attempt: 2, outcome: 'success', effectiveCost: 0.002 }),
+            makeRecord({ attempt: 3, outcome: 'failure', effectiveCost: 0.0005 }),
+        ];
+        const [summary] = aggregateMultiTurnByScenario(records);
+        expect(summary.pricedAttemptCount).toBe(3);
+        expect(summary.costCoverageRate).toBe(1);
+        expect(summary.costDataPartial).toBe(false);
+        expect(summary.totalKnownCost).toBeCloseTo(0.0035, 10);
+        expect(summary.averageKnownCostPerPricedAttempt).toBeCloseTo(0.0035 / 3, 10);
+        // costPerSuccessfulTask = totalKnownCost / successCount (2 successes), NOT / pricedAttemptCount.
+        expect(summary.costPerSuccessfulTask).toBeCloseTo(0.0035 / 2, 10);
+    });
+
+    it('partial cost coverage: some attempts unpriced — missing cost is never treated as 0', () => {
+        const records: MultiTurnLiveRecord[] = [
+            makeRecord({ attempt: 1, outcome: 'success', effectiveCost: 0.001 }),
+            makeRecord({ attempt: 2, outcome: 'success', effectiveCost: undefined }),
+            makeRecord({ attempt: 3, outcome: 'success', effectiveCost: 0.003 }),
+        ];
+        const [summary] = aggregateMultiTurnByScenario(records);
+        expect(summary.pricedAttemptCount).toBe(2);
+        expect(summary.costDataPartial).toBe(true);
+        expect(summary.costCoverageRate).toBeCloseTo(2 / 3, 10);
+        // Sum of ONLY the two priced attempts — the unpriced one is excluded, never averaged in as 0.
+        expect(summary.totalKnownCost).toBeCloseTo(0.004, 10);
+        expect(summary.averageKnownCostPerPricedAttempt).toBeCloseTo(0.002, 10);
+        // costPerSuccessfulTask divides by ALL 3 successes, even though only 2 are priced — this is
+        // the documented "known cost only" convention, matching the model-level summary exactly.
+        expect(summary.costPerSuccessfulTask).toBeCloseTo(0.004 / 3, 10);
+    });
+
+    it('no cost data at all: every total/average field is null, never a guessed 0 — but costCoverageRate is a real 0, not null (attempts > 0)', () => {
+        const records: MultiTurnLiveRecord[] = [
+            makeRecord({ attempt: 1, outcome: 'success', effectiveCost: undefined }),
+            makeRecord({ attempt: 2, outcome: 'success', effectiveCost: undefined }),
+        ];
+        const [summary] = aggregateMultiTurnByScenario(records);
+        expect(summary.pricedAttemptCount).toBe(0);
+        expect(summary.totalKnownCost).toBeNull();
+        expect(summary.averageKnownCostPerPricedAttempt).toBeNull();
+        expect(summary.costPerSuccessfulTask).toBeNull();
+        expect(summary.costCoverageRate).toBe(0);
+        expect(summary.costDataPartial).toBe(true);
+    });
+
+    it('zero successful tasks: costPerSuccessfulTask is null even when cost data exists — nothing to divide by', () => {
+        const records: MultiTurnLiveRecord[] = [
+            makeRecord({ attempt: 1, outcome: 'failure', effectiveCost: 0.001 }),
+            makeRecord({ attempt: 2, outcome: 'provider-error', effectiveCost: 0.002 }),
+        ];
+        const [summary] = aggregateMultiTurnByScenario(records);
+        expect(summary.pricedAttemptCount).toBe(2);
+        expect(summary.totalKnownCost).toBeCloseTo(0.003, 10);
+        // Cost data IS fully known here — only the successCount denominator is zero.
+        expect(summary.costDataPartial).toBe(false);
+        expect(summary.costPerSuccessfulTask).toBeNull();
+    });
+});
+
+describe('aggregateMultiTurnByScenario: multiple models sharing the same scenario', () => {
+    it('never merges across models — one summary per (provider, model, scenarioId), each with its own stats', () => {
+        const records: MultiTurnLiveRecord[] = [
+            makeRecord({
+                requestedModel: 'gpt-4o-mini',
+                scenarioId: 'move-node-right',
+                attempt: 1,
+                elapsedMs: 100,
+                effectiveCost: 0.0001,
+            }),
+            makeRecord({
+                requestedModel: 'gpt-4o-mini',
+                scenarioId: 'move-node-right',
+                attempt: 2,
+                elapsedMs: 200,
+                effectiveCost: 0.0002,
+            }),
+            makeRecord({
+                requestedModel: 'gpt-5-mini',
+                scenarioId: 'move-node-right',
+                attempt: 1,
+                elapsedMs: 5000,
+                effectiveCost: 0.01,
+            }),
+        ];
+        const summaries = aggregateMultiTurnByScenario(records);
+        expect(summaries).toHaveLength(2);
+
+        const gpt4o = summaries.find(s => s.requestedModel === 'gpt-4o-mini');
+        const gpt5 = summaries.find(s => s.requestedModel === 'gpt-5-mini');
+        expect(gpt4o?.attempts).toBe(2);
+        expect(gpt4o?.medianElapsedMs).toBe(150);
+        expect(gpt4o?.totalKnownCost).toBeCloseTo(0.0003, 10);
+
+        expect(gpt5?.attempts).toBe(1);
+        expect(gpt5?.medianElapsedMs).toBe(5000);
+        expect(gpt5?.totalKnownCost).toBeCloseTo(0.01, 10);
+
+        // Neither model's stats leak into the other's — gpt-4o-mini's fast/cheap attempts never
+        // pull gpt-5-mini's slow/expensive one down (or vice versa).
+        expect(gpt4o?.medianElapsedMs).not.toBe(gpt5?.medianElapsedMs);
+    });
+});
+
+describe('aggregateMultiTurnByScenario: sorts by scenarioId when provider and requestedModel tie', () => {
+    it('two scenarios under the same (provider, model) sort by scenarioId, not left in encounter order', () => {
+        const records: MultiTurnLiveRecord[] = [
+            makeRecord({ scenarioId: 'zebra-scenario', attempt: 1 }),
+            makeRecord({ scenarioId: 'alpha-scenario', attempt: 1 }),
+        ];
+        const summaries = aggregateMultiTurnByScenario(records);
+        expect(summaries.map(s => s.scenarioId)).toEqual(['alpha-scenario', 'zebra-scenario']);
+    });
+});
+
+describe('aggregateMultiTurnByModel is unaffected by the scenario-level cost/latency additions', () => {
+    it('model-level aggregation semantics and output shape are unchanged', () => {
+        const records: MultiTurnLiveRecord[] = [
+            makeRecord({ attempt: 1, outcome: 'success', strategy: 'direct', effectiveCost: 0.001 }),
+            makeRecord({ attempt: 2, outcome: 'failure', strategy: 'other', effectiveCost: undefined }),
+        ];
+        const [summary] = aggregateMultiTurnByModel(records);
+        // Every pre-existing model-level field is still present and computed the same way.
+        expect(summary.taskAttempts).toBe(2);
+        expect(summary.successes).toBe(1);
+        expect(summary.pricedAttemptCount).toBe(1);
+        expect(summary.costDataPartial).toBe(true);
+        expect(summary.costPerSuccessfulTask).toBeCloseTo(0.001, 10);
+        // Model-level summaries have no scenarioId at all — confirms this is genuinely the
+        // unmodified model-level shape, not accidentally merged with the scenario-level one.
+        expect(summary).not.toHaveProperty('scenarioId');
+    });
+});
+
+describe('formatMultiTurnScenarioMarkdownTable: latency and cost columns', () => {
+    it('includes readable P90/cost columns and the exact known values, with no partial marker when coverage is full', () => {
+        const records: MultiTurnLiveRecord[] = [
+            makeRecord({ attempt: 1, outcome: 'success', elapsedMs: 100, effectiveCost: 0.001 }),
+            makeRecord({ attempt: 2, outcome: 'success', elapsedMs: 200, effectiveCost: 0.002 }),
+        ];
+        const summaries = aggregateMultiTurnByScenario(records);
+        const table = formatMultiTurnScenarioMarkdownTable(summaries);
+
+        expect(table).toContain('P90 elapsed');
+        expect(table).toContain('Priced attempts');
+        expect(table).toContain('Cost coverage');
+        expect(table).toContain('Total known cost');
+        expect(table).toContain('Avg known cost/priced attempt');
+        expect(table).toContain('Cost/success');
+        expect(table).toContain('2/2'); // priced attempts column
+        expect(table).not.toContain('‡');
+        expect(table).not.toMatch(/cost data partial/i);
+    });
+
+    it('marks every cost cell with ‡ when costDataPartial is true, and explains the marker in a footnote', () => {
+        const records: MultiTurnLiveRecord[] = [
+            makeRecord({ attempt: 1, outcome: 'success', effectiveCost: 0.001 }),
+            makeRecord({ attempt: 2, outcome: 'success', effectiveCost: undefined }),
+        ];
+        const summaries = aggregateMultiTurnByScenario(records);
+        const table = formatMultiTurnScenarioMarkdownTable(summaries);
+
+        expect(table).toContain('1/2'); // priced attempts column
+        expect(table).toMatch(/‡/);
+        expect(table.toLowerCase()).toContain('cost data partial');
+    });
+
+    it('shows "n/a" rather than a guessed number when there is no cost data at all', () => {
+        const records: MultiTurnLiveRecord[] = [
+            makeRecord({ attempt: 1, outcome: 'success', effectiveCost: undefined }),
+        ];
+        const summaries = aggregateMultiTurnByScenario(records);
+        const table = formatMultiTurnScenarioMarkdownTable(summaries);
+        const dataRow = table.split('\n')[2];
+        expect(dataRow).toContain('n/a');
+    });
+
+    it('reports "no scenario attempts" rather than an empty/misleading table when nothing was recorded', () => {
+        expect(formatMultiTurnScenarioMarkdownTable([])).toMatch(/no live multi-turn scenario attempts/i);
     });
 });
 
@@ -551,7 +815,12 @@ describe('final canvas-state evidence (positionsBefore/positionsAfter/finalState
     });
 
     it('CSV emits an empty cell (never a fabricated {}) for a timeout record with no position data at all', () => {
-        const timedOut = makeRecord({ outcome: 'timeout', finalStateCorrect: false, positionsBefore: undefined, positionsAfter: undefined });
+        const timedOut = makeRecord({
+            outcome: 'timeout',
+            finalStateCorrect: false,
+            positionsBefore: undefined,
+            positionsAfter: undefined,
+        });
         const csv = formatMultiTurnRecordsCsv([timedOut]);
         const lines = csv.split('\n');
         const header = parseCsvRow(lines[0]);
@@ -593,7 +862,12 @@ describe('trace stepStatus/continuationReason survive CSV/JSONL serialization', 
         turnCount: 2,
         requestedToolSequence: ['list_nodes', 'move_node'],
         turns: [
-            turn({ turn: 1, toolCallName: 'list_nodes', stepStatus: 'continued', continuationReason: 'task not complete after list_nodes' }),
+            turn({
+                turn: 1,
+                toolCallName: 'list_nodes',
+                stepStatus: 'continued',
+                continuationReason: 'task not complete after list_nodes',
+            }),
             turn({ turn: 2, toolCallName: 'move_node' }),
         ],
     });
@@ -636,7 +910,12 @@ describe('buildMultiTurnVerificationReport: one consolidated report across multi
     // function is called exactly once on it — never once per model, never merged from separate
     // per-model artifact directories.
     const gpt4oMiniRecord = makeRecord({ requestedModel: 'gpt-4o-mini', attempt: 1 });
-    const gpt5MiniRecord = makeRecord({ requestedModel: 'gpt-5-mini', attempt: 1, strategy: 'lookup-first', turnCount: 2 });
+    const gpt5MiniRecord = makeRecord({
+        requestedModel: 'gpt-5-mini',
+        attempt: 1,
+        strategy: 'lookup-first',
+        turnCount: 2,
+    });
     const report = buildMultiTurnVerificationReport([gpt4oMiniRecord, gpt5MiniRecord], '2026-08-06T00:00:00.000Z');
 
     it('records contains one entry per attempt, from both models, in one array', () => {
@@ -659,16 +938,37 @@ describe('buildMultiTurnVerificationReport: one consolidated report across multi
         const jsonl = formatMultiTurnRecordsJsonl(report.records);
         const lines = jsonl.split('\n');
         expect(lines).toHaveLength(2);
-        expect(lines.map(l => (JSON.parse(l) as MultiTurnLiveRecord).requestedModel).sort()).toEqual(['gpt-4o-mini', 'gpt-5-mini']);
+        expect(lines.map(l => (JSON.parse(l) as MultiTurnLiveRecord).requestedModel).sort()).toEqual([
+            'gpt-4o-mini',
+            'gpt-5-mini',
+        ]);
     });
 });
 
 describe('formatMultiTurnCompletionModeMarkdownTable', () => {
     it('is a table SEPARATE from the strategy/model-summary table, with its own tool-action/text-response/incomplete/round-trip columns', () => {
         const records: MultiTurnLiveRecord[] = [
-            makeRecord({ attempt: 1, outcome: 'success', strategy: 'direct', completionMode: 'tool-action', requestedToolSequence: ['move_node'] }),
-            makeRecord({ attempt: 2, outcome: 'success', strategy: 'lookup-first', completionMode: 'text-response', requestedToolSequence: ['list_nodes'] }),
-            makeRecord({ attempt: 3, outcome: 'failure', strategy: 'other', completionMode: 'none', requestedToolSequence: [] }),
+            makeRecord({
+                attempt: 1,
+                outcome: 'success',
+                strategy: 'direct',
+                completionMode: 'tool-action',
+                requestedToolSequence: ['move_node'],
+            }),
+            makeRecord({
+                attempt: 2,
+                outcome: 'success',
+                strategy: 'lookup-first',
+                completionMode: 'text-response',
+                requestedToolSequence: ['list_nodes'],
+            }),
+            makeRecord({
+                attempt: 3,
+                outcome: 'failure',
+                strategy: 'other',
+                completionMode: 'none',
+                requestedToolSequence: [],
+            }),
         ];
         const [summary] = aggregateMultiTurnByModel(records);
         const table = formatMultiTurnCompletionModeMarkdownTable([summary]);
@@ -710,17 +1010,61 @@ describe('formatMultiTurnRecordsMarkdownDetails: attempt-level Markdown details'
     it('reports "no attempts" for an empty record set, never a header-only table presented as data', () => {
         expect(formatMultiTurnRecordsMarkdownDetails([])).toMatch(/no live multi-turn task attempts/i);
     });
+
+    it('falls back to n/a / (none) / n/a for actualModel, an empty tool sequence, and a missing effectiveCost', () => {
+        const records: MultiTurnLiveRecord[] = [
+            makeRecord({
+                actualModel: undefined,
+                requestedToolSequence: [],
+                effectiveCost: undefined,
+            }),
+        ];
+        const details = formatMultiTurnRecordsMarkdownDetails(records);
+        const dataRow = details.split('\n')[2];
+        expect(dataRow).toContain('n/a'); // actualModel absent
+        expect(dataRow).toContain('(none)'); // empty requestedToolSequence
+        // Two distinct 'n/a' occurrences: actualModel and effectiveCost both fall back to it.
+        expect((dataRow.match(/n\/a/g) ?? []).length).toBe(2);
+    });
 });
 
 describe('existing reports remain otherwise compatible after adding completionMode', () => {
     it('formatMultiTurnRecordsCsv only ADDS the completionMode column — every pre-existing column is still present', () => {
         const originalColumns = [
-            'provider', 'providerId', 'requestedModel', 'actualModel', 'scenarioId', 'attempt', 'repetitions',
-            'maxTurns', 'outcome', 'strategy', 'turnCount', 'requestedToolSequence', 'turns', 'positionsBefore',
-            'positionsAfter', 'finalStateCorrect', 'startedAt', 'endedAt', 'elapsedMs', 'inputTokens',
-            'cachedInputTokens', 'cacheWriteInputTokens', 'cacheWriteTtl', 'outputTokens', 'reasoningTokens',
-            'toolUseInputTokens', 'providerTotalTokens', 'totalTokens', 'providerReportedCost', 'estimatedCost',
-            'effectiveCost', 'costSource', 'pricingVersion', 'error',
+            'provider',
+            'providerId',
+            'requestedModel',
+            'actualModel',
+            'scenarioId',
+            'attempt',
+            'repetitions',
+            'maxTurns',
+            'outcome',
+            'strategy',
+            'turnCount',
+            'requestedToolSequence',
+            'turns',
+            'positionsBefore',
+            'positionsAfter',
+            'finalStateCorrect',
+            'startedAt',
+            'endedAt',
+            'elapsedMs',
+            'inputTokens',
+            'cachedInputTokens',
+            'cacheWriteInputTokens',
+            'cacheWriteTtl',
+            'outputTokens',
+            'reasoningTokens',
+            'toolUseInputTokens',
+            'providerTotalTokens',
+            'totalTokens',
+            'providerReportedCost',
+            'estimatedCost',
+            'effectiveCost',
+            'costSource',
+            'pricingVersion',
+            'error',
         ];
         const header = formatMultiTurnRecordsCsv([makeRecord()]).split('\n')[0].split(',');
         for (const column of originalColumns) {
@@ -792,7 +1136,10 @@ describe('MultiTurnRunManifest.requestedModels', () => {
         };
         expect(manifest.requestedModels).toEqual(['gpt-4o-mini', 'gpt-5-mini']);
         // Round-trips through JSON exactly (this is what run-manifest.json actually persists).
-        expect((JSON.parse(JSON.stringify(manifest)) as MultiTurnRunManifest).requestedModels).toEqual(['gpt-4o-mini', 'gpt-5-mini']);
+        expect((JSON.parse(JSON.stringify(manifest)) as MultiTurnRunManifest).requestedModels).toEqual([
+            'gpt-4o-mini',
+            'gpt-5-mini',
+        ]);
     });
 });
 
@@ -814,7 +1161,7 @@ describe('formatGenerationConfigurationMarkdown', () => {
         expect(table).not.toMatch(/provider-default \(\d/);
     });
 
-    it('shows the exact value for an explicit cell — e.g. anthropic\'s always-explicit maxOutputTokens', () => {
+    it("shows the exact value for an explicit cell — e.g. anthropic's always-explicit maxOutputTokens", () => {
         const table = formatGenerationConfigurationMarkdown({
             anthropic: {
                 temperature: { status: 'provider-default' },

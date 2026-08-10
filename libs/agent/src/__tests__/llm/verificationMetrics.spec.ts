@@ -112,7 +112,9 @@ describe('wrapGatewayWithUsageCapture', () => {
     });
 
     it('prefers providerReportedCost when present, still captures it verbatim', async () => {
-        const chunks: Chunk[] = [{ done: true, usage: { providerReportedCost: 0.00042, costSource: 'provider-reported' } }];
+        const chunks: Chunk[] = [
+            { done: true, usage: { providerReportedCost: 0.00042, costSource: 'provider-reported' } },
+        ];
         let captured: CapturedCallInfo | undefined;
         const wrapped = wrapGatewayWithUsageCapture(scriptedGateway(chunks), usage => {
             captured = usage;
@@ -134,6 +136,31 @@ describe('wrapGatewayWithUsageCapture', () => {
 
         expect(captured).toHaveProperty('estimatedCost');
         expect(captured?.estimatedCost).toBeNull();
+    });
+
+    it('captures cacheWriteTtl, pricingVersion, and actualModel from the chunk stream', async () => {
+        const chunks: Chunk[] = [
+            {
+                done: true,
+                usage: {
+                    inputTokens: 10,
+                    outputTokens: 4,
+                    cacheWriteInputTokens: 2,
+                    cacheWriteTtl: '1h',
+                    pricingVersion: '2026-07-31',
+                },
+                actualModel: 'openai/gpt-4o-mini-2026-01-01',
+            },
+        ];
+        let captured: CapturedCallInfo | undefined;
+        const wrapped = wrapGatewayWithUsageCapture(scriptedGateway(chunks), usage => {
+            captured = usage;
+        });
+        await drain(wrapped.chat({ messages: [], tools: [] }));
+
+        expect(captured?.cacheWriteTtl).toBe('1h');
+        expect(captured?.pricingVersion).toBe('2026-07-31');
+        expect(captured?.actualModel).toBe('openai/gpt-4o-mini-2026-01-01');
     });
 
     it('preserves capabilities from the wrapped gateway', () => {
@@ -223,6 +250,34 @@ describe('accumulateExtendedUsage (multi-turn accumulation)', () => {
 
         expect(combined).not.toHaveProperty('estimatedCost');
         expect(combined).not.toHaveProperty('costSource');
+    });
+
+    it('accumulates cacheWriteInputTokens and providerTotalTokens across calls, and reports a single cacheWriteTtl/pricingVersion when every call agrees', () => {
+        const combined = accumulateExtendedUsage([
+            {
+                inputTokens: 10,
+                outputTokens: 5,
+                totalTokens: 15,
+                cacheWriteInputTokens: 20,
+                providerTotalTokens: 100,
+                cacheWriteTtl: '5m',
+                pricingVersion: '2026-07-31',
+            },
+            {
+                inputTokens: 8,
+                outputTokens: 6,
+                totalTokens: 14,
+                cacheWriteInputTokens: 30,
+                providerTotalTokens: 140,
+                cacheWriteTtl: '5m',
+                pricingVersion: '2026-07-31',
+            },
+        ]);
+
+        expect(combined.cacheWriteInputTokens).toBe(50);
+        expect(combined.providerTotalTokens).toBe(240);
+        expect(combined.cacheWriteTtl).toBe('5m');
+        expect(combined.pricingVersion).toBe('2026-07-31');
     });
 
     it('returns all-null/absent for an empty list, matching accumulateUsage', () => {
@@ -318,6 +373,22 @@ describe('aggregateVerificationMetrics', () => {
         expect(aggregateVerificationMetrics([])).toEqual([]);
     });
 
+    it('computes totalTokens from outputTokens alone when the whole group has no inputTokens at all', () => {
+        const records: VerificationRunRecord[] = [record({ inputTokens: null, outputTokens: 5, totalTokens: null })];
+        const [aggregate] = aggregateVerificationMetrics(records);
+        expect(aggregate.totalInputTokens).toBeNull();
+        expect(aggregate.totalOutputTokens).toBe(5);
+        expect(aggregate.totalTokens).toBe(5);
+    });
+
+    it('computes totalTokens from inputTokens alone when the whole group has no outputTokens at all', () => {
+        const records: VerificationRunRecord[] = [record({ inputTokens: 7, outputTokens: null, totalTokens: null })];
+        const [aggregate] = aggregateVerificationMetrics(records);
+        expect(aggregate.totalOutputTokens).toBeNull();
+        expect(aggregate.totalInputTokens).toBe(7);
+        expect(aggregate.totalTokens).toBe(7);
+    });
+
     describe('cost aggregation', () => {
         it('sums totalCost across the group and computes avgCostPerScenario', () => {
             const records: VerificationRunRecord[] = [
@@ -332,7 +403,12 @@ describe('aggregateVerificationMetrics', () => {
 
         it('prefers providerReportedCost over estimatedCost per record when summing', () => {
             const records: VerificationRunRecord[] = [
-                record({ scenarioId: 'a', providerReportedCost: 0.01, estimatedCost: 0.5, costSource: 'provider-reported' }),
+                record({
+                    scenarioId: 'a',
+                    providerReportedCost: 0.01,
+                    estimatedCost: 0.5,
+                    costSource: 'provider-reported',
+                }),
             ];
             const [aggregate] = aggregateVerificationMetrics(records);
             expect(aggregate.totalCost).toBeCloseTo(0.01, 10);
@@ -427,8 +503,18 @@ describe('aggregateVerificationMetrics', () => {
 
         it('reports every distinct pricingVersion among estimated-cost records — mixing after a rate update is never silently combined', () => {
             const records: VerificationRunRecord[] = [
-                record({ scenarioId: 'a', estimatedCost: 0.001, costSource: 'estimated', pricingVersion: '2026-07-31' }),
-                record({ scenarioId: 'b', estimatedCost: 0.002, costSource: 'estimated', pricingVersion: '2026-09-01' }),
+                record({
+                    scenarioId: 'a',
+                    estimatedCost: 0.001,
+                    costSource: 'estimated',
+                    pricingVersion: '2026-07-31',
+                }),
+                record({
+                    scenarioId: 'b',
+                    estimatedCost: 0.002,
+                    costSource: 'estimated',
+                    pricingVersion: '2026-09-01',
+                }),
             ];
             const [aggregate] = aggregateVerificationMetrics(records);
             expect(aggregate.distinctPricingVersions).toEqual(['2026-07-31', '2026-09-01']);
@@ -589,6 +675,25 @@ describe('formatTokenDiagnosticsTable', () => {
         const table = formatTokenDiagnosticsTable([]);
         expect(table.toLowerCase()).toContain('no token diagnostics');
     });
+
+    it('marks the uncached input/output cells with * when tokensIncomplete, lists the cache-write TTL, and appends the unknown-TTL footnote', () => {
+        const records: VerificationRunRecord[] = [
+            record({
+                scenarioId: 'a',
+                inputTokens: 10,
+                outputTokens: 5,
+                cacheWriteInputTokens: 50,
+                cacheWriteTtl: 'unknown',
+                estimatedCost: null,
+            }),
+            record({ scenarioId: 'b', inputTokens: null, outputTokens: null, totalTokens: null }),
+        ];
+        const table = formatTokenDiagnosticsTable(aggregateVerificationMetrics(records));
+        expect(table).toContain('10*');
+        expect(table).toContain('5*');
+        expect(table).toContain('unknown');
+        expect(table).toContain('no determinable');
+    });
 });
 
 describe('formatCostRanking', () => {
@@ -622,6 +727,16 @@ describe('formatCostRanking', () => {
         const ranking = formatCostRanking(aggregates);
         expect(ranking.toLowerCase()).toContain('no model has a cost figure');
     });
+
+    it('marks a ranked-but-partially-priced row with * and adds the incomplete-cost footnote', () => {
+        const records: VerificationRunRecord[] = [
+            record({ scenarioId: 'a', estimatedCost: 0.001, costSource: 'estimated' }),
+            record({ scenarioId: 'b' }), // no cost figure at all -> costIncomplete, but totalCost is still defined (0.001)
+        ];
+        const ranking = formatCostRanking(aggregateVerificationMetrics(records));
+        expect(ranking).toContain('$0.0010*');
+        expect(ranking).toContain('at least one scenario for that model has no cost figure');
+    });
 });
 
 describe('buildVerificationMetricsReport', () => {
@@ -634,6 +749,15 @@ describe('buildVerificationMetricsReport', () => {
         expect(report.records).toBe(records);
         expect(report.aggregates).toHaveLength(1);
         expect(report.aggregates[0].provider).toBe('OpenAI');
+    });
+
+    it('uses the real system clock by default when `now` is not provided', () => {
+        const before = Date.now();
+        const report = buildVerificationMetricsReport([record({})]);
+        const after = Date.now();
+        const parsed = Date.parse(report.generatedAt);
+        expect(parsed).toBeGreaterThanOrEqual(before);
+        expect(parsed).toBeLessThanOrEqual(after);
     });
 });
 
@@ -662,7 +786,11 @@ describe('aggregateByActualModel', () => {
 
     it('openrouter/free resolves to one named actual model', () => {
         const records = [
-            record({ provider: 'OpenRouter', model: 'openrouter/free', actualModel: 'meta-llama/llama-3.3-70b-instruct:free' }),
+            record({
+                provider: 'OpenRouter',
+                model: 'openrouter/free',
+                actualModel: 'meta-llama/llama-3.3-70b-instruct:free',
+            }),
         ];
         const aggregates = aggregateByActualModel(records);
         expect(aggregates).toHaveLength(1);
@@ -673,8 +801,22 @@ describe('aggregateByActualModel', () => {
 
     it('one route resolving to two different actual models across calls produces two separate aggregates, never combined', () => {
         const records = [
-            record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'a', actualModel: 'model-a', inputTokens: 100, outputTokens: 10 }),
-            record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'b', actualModel: 'model-b', inputTokens: 200, outputTokens: 20 }),
+            record({
+                provider: 'OpenRouter',
+                model: 'openrouter/free',
+                scenarioId: 'a',
+                actualModel: 'model-a',
+                inputTokens: 100,
+                outputTokens: 10,
+            }),
+            record({
+                provider: 'OpenRouter',
+                model: 'openrouter/free',
+                scenarioId: 'b',
+                actualModel: 'model-b',
+                inputTokens: 200,
+                outputTokens: 20,
+            }),
         ];
         const aggregates = aggregateByActualModel(records);
         expect(aggregates).toHaveLength(2);
@@ -705,6 +847,28 @@ describe('aggregateByActualModel', () => {
 
     it('returns an empty array for an empty input', () => {
         expect(aggregateByActualModel([])).toEqual([]);
+    });
+
+    it('computes totalTokens from outputTokens alone when a (route, actual model) group has no inputTokens at all', () => {
+        const records = [record({ provider: 'A', model: 'x', inputTokens: null, outputTokens: 9, totalTokens: null })];
+        const aggregates = aggregateByActualModel(records);
+        expect(aggregates[0].totalInputTokens).toBeNull();
+        expect(aggregates[0].totalOutputTokens).toBe(9);
+        expect(aggregates[0].totalTokens).toBe(9);
+    });
+
+    it('sorts by actualModel, treating an unresolved (undefined) actualModel as before any named one on either side of the comparison', () => {
+        // Three same-(provider, requestedModel) aggregates fed in an order ('bravo', unresolved,
+        // 'alpha') deliberately chosen to exercise the actualModel comparator with the undefined
+        // side landing in BOTH comparator argument positions across the sort — not just one, which
+        // would leave the `(b.actualModel ?? '')` fallback (as opposed to `a`'s) untested.
+        const records = [
+            record({ provider: 'A', model: 'openrouter/x', scenarioId: 'bravo', actualModel: 'bravo-model' }),
+            record({ provider: 'A', model: 'openrouter/x', scenarioId: 'unresolved-call', actualModel: undefined }),
+            record({ provider: 'A', model: 'openrouter/x', scenarioId: 'alpha', actualModel: 'alpha-model' }),
+        ];
+        const aggregates = aggregateByActualModel(records);
+        expect(aggregates.map(a => a.actualModel)).toEqual([undefined, 'alpha-model', 'bravo-model']);
     });
 });
 
@@ -763,7 +927,12 @@ describe('buildElapsedVsTokensChart', () => {
 
     it('produces the same point ids, coordinates, and SVG in the same order across repeated calls with the same records', () => {
         const records = [
-            record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'a', actualModel: 'anthropic/claude-haiku-4.5' }),
+            record({
+                provider: 'OpenRouter',
+                model: 'openrouter/free',
+                scenarioId: 'a',
+                actualModel: 'anthropic/claude-haiku-4.5',
+            }),
             record({ provider: 'Gemini', model: 'gemini-2.5-pro', scenarioId: 'b', elapsedMs: 500 }),
         ];
         const first = buildElapsedVsTokensChart(records);
@@ -781,8 +950,24 @@ describe('buildElapsedVsTokensChart', () => {
     });
 
     it('gives a route resolving to two different actual models two separate points, never one averaged point', () => {
-        const a = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'a', actualModel: 'model-a', inputTokens: 100, outputTokens: 0, elapsedMs: 100 });
-        const b = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'b', actualModel: 'model-b', inputTokens: 900, outputTokens: 0, elapsedMs: 900 });
+        const a = record({
+            provider: 'OpenRouter',
+            model: 'openrouter/free',
+            scenarioId: 'a',
+            actualModel: 'model-a',
+            inputTokens: 100,
+            outputTokens: 0,
+            elapsedMs: 100,
+        });
+        const b = record({
+            provider: 'OpenRouter',
+            model: 'openrouter/free',
+            scenarioId: 'b',
+            actualModel: 'model-b',
+            inputTokens: 900,
+            outputTokens: 0,
+            elapsedMs: 900,
+        });
         const { mermaidSource, tableMarkdown, plotted } = buildElapsedVsTokensChart([a, b]);
         expect(plotted).toHaveLength(2);
         expect(mermaidSource).toContain('M01: [0.00, 0.00]');
@@ -792,8 +977,18 @@ describe('buildElapsedVsTokensChart', () => {
     });
 
     it('labels an unresolved route call explicitly in the table — never guesses it onto a resolved model — while the chart stays a plain opaque id', () => {
-        const resolved = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'a', actualModel: 'model-a' });
-        const unresolvedCall = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'b', actualModel: undefined });
+        const resolved = record({
+            provider: 'OpenRouter',
+            model: 'openrouter/free',
+            scenarioId: 'a',
+            actualModel: 'model-a',
+        });
+        const unresolvedCall = record({
+            provider: 'OpenRouter',
+            model: 'openrouter/free',
+            scenarioId: 'b',
+            actualModel: undefined,
+        });
         const { mermaidSource, tableMarkdown, plotted } = buildElapsedVsTokensChart([resolved, unresolvedCall]);
         expect(plotted).toHaveLength(2);
         expect(mermaidPointLines(mermaidSource)).toHaveLength(2);
@@ -905,8 +1100,18 @@ describe('buildElapsedVsTokensChart', () => {
     });
 
     it('unresolved labels containing parentheses never reach the Mermaid source — only the opaque id does', () => {
-        const resolved = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'a', actualModel: 'model-a' });
-        const unresolvedCall = record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'b', actualModel: undefined });
+        const resolved = record({
+            provider: 'OpenRouter',
+            model: 'openrouter/free',
+            scenarioId: 'a',
+            actualModel: 'model-a',
+        });
+        const unresolvedCall = record({
+            provider: 'OpenRouter',
+            model: 'openrouter/free',
+            scenarioId: 'b',
+            actualModel: undefined,
+        });
         const { mermaidSource, tableMarkdown } = buildElapsedVsTokensChart([resolved, unresolvedCall]);
         expect(mermaidSource).not.toMatch(/[()]/);
         expect(tableMarkdown).toContain('unresolved'); // still present, in the table only
@@ -931,6 +1136,42 @@ describe('buildElapsedVsTokensChart', () => {
         expect(tableMarkdown).toContain('excluded from the chart');
         expect(tableMarkdown).toContain('B no-tokens');
         expect(mermaidSource).not.toMatch(/no-tokens.*\[0\.00, 0\.00\]/); // never silently plotted at 0
+    });
+
+    it('labels an excluded aggregate by its actual model when resolved, or by "(unresolved)" when the route has evidence of one but this call lacks it', () => {
+        // modelLabel's three branches: actualModel present (used directly), unresolved (labeled
+        // "<requestedModel> (unresolved)"), and the fixed-model fallback — already covered by other
+        // tests. This one specifically targets the first two branches via EXCLUDED (no-token-usage)
+        // aggregates, which is the only place modelLabel is actually invoked (the excluded-note).
+        const plotted = record({
+            provider: 'A',
+            model: 'openrouter/x',
+            scenarioId: 'has-tokens',
+            actualModel: 'model-a',
+            inputTokens: 10,
+            outputTokens: 0,
+        });
+        const excludedResolved = record({
+            provider: 'A',
+            model: 'openrouter/x',
+            scenarioId: 'excluded-resolved',
+            actualModel: 'model-b',
+            inputTokens: null,
+            outputTokens: null,
+        });
+        const excludedUnresolved = record({
+            provider: 'A',
+            model: 'openrouter/x',
+            scenarioId: 'excluded-unresolved',
+            actualModel: undefined,
+            inputTokens: null,
+            outputTokens: null,
+        });
+        const { tableMarkdown, excluded } = buildElapsedVsTokensChart([plotted, excludedResolved, excludedUnresolved]);
+
+        expect(excluded).toHaveLength(2);
+        expect(tableMarkdown).toContain('A model-b');
+        expect(tableMarkdown).toContain('A openrouter/x (unresolved)');
     });
 
     it('returns an honest empty-state message, not an empty chart, when nothing is plottable', () => {
@@ -1029,14 +1270,29 @@ describe('buildElapsedVsTokensChart', () => {
 describe('buildElapsedVsTokensChart — SVG output', () => {
     it('renders a well-formed SVG document with the correct point count and no raw model text', () => {
         const records = [
-            record({ provider: 'Gemini', model: 'gemini-2.5-flash', scenarioId: 'a', elapsedMs: 500, inputTokens: 100, outputTokens: 0 }),
-            record({ provider: 'OpenRouter', model: 'openrouter/free', scenarioId: 'b', actualModel: 'anthropic/claude-haiku-4.5', elapsedMs: 900, inputTokens: 300, outputTokens: 0 }),
+            record({
+                provider: 'Gemini',
+                model: 'gemini-2.5-flash',
+                scenarioId: 'a',
+                elapsedMs: 500,
+                inputTokens: 100,
+                outputTokens: 0,
+            }),
+            record({
+                provider: 'OpenRouter',
+                model: 'openrouter/free',
+                scenarioId: 'b',
+                actualModel: 'anthropic/claude-haiku-4.5',
+                elapsedMs: 900,
+                inputTokens: 300,
+                outputTokens: 0,
+            }),
         ];
         const { svg, plotted } = buildElapsedVsTokensChart(records);
         expect(svg.startsWith('<svg')).toBe(true);
         expect(svg.trim().endsWith('</svg>')).toBe(true);
         expect(svg).toContain('<circle');
-        expect((svg.match(/<circle/g) ?? [])).toHaveLength(plotted.length);
+        expect(svg.match(/<circle/g) ?? []).toHaveLength(plotted.length);
         expect(svg).toContain('>M01<');
         expect(svg).toContain('>M02<');
         expect(svg).not.toContain('gemini-2.5-flash');
@@ -1051,8 +1307,22 @@ describe('buildElapsedVsTokensChart — SVG output', () => {
 
     it('produces the same point ids/order as mermaidSource — the two representations cannot diverge because both come from the same points array', () => {
         const records = [
-            record({ provider: 'A', model: 'slow', scenarioId: 'a', elapsedMs: 1000, inputTokens: 1000, outputTokens: 0 }),
-            record({ provider: 'A', model: 'fast', scenarioId: 'b', elapsedMs: 100, inputTokens: 100, outputTokens: 0 }),
+            record({
+                provider: 'A',
+                model: 'slow',
+                scenarioId: 'a',
+                elapsedMs: 1000,
+                inputTokens: 1000,
+                outputTokens: 0,
+            }),
+            record({
+                provider: 'A',
+                model: 'fast',
+                scenarioId: 'b',
+                elapsedMs: 100,
+                inputTokens: 100,
+                outputTokens: 0,
+            }),
         ];
         const { mermaidSource, svg } = buildElapsedVsTokensChart(records);
         const idsInMermaid = mermaidPointLines(mermaidSource).map(l => l.trim().split(':')[0]);
@@ -1103,9 +1373,7 @@ describe('mergeVerificationRecords', () => {
 
     it('tags every record with sourceGeneratedAt so a merge is never silent about which session produced it', () => {
         const merged = mergeVerificationRecords(previousReport, [openRouterRecordOld], '2026-07-30T10:00:00.000Z');
-        expect(merged.every(r => typeof r.sourceGeneratedAt === 'string' && r.sourceGeneratedAt.length > 0)).toBe(
-            true
-        );
+        expect(merged.every(r => typeof r.sourceGeneratedAt === 'string' && r.sourceGeneratedAt.length > 0)).toBe(true);
     });
 
     it('adds a genuinely new (provider, model) pair without dropping anything already committed', () => {
@@ -1122,6 +1390,21 @@ describe('mergeVerificationRecords', () => {
         const merged = mergeVerificationRecords(undefined, [openRouterRecordOld], '2026-07-30T10:00:00.000Z');
         expect(merged).toHaveLength(1);
         expect(merged[0].sourceGeneratedAt).toBe('2026-07-30T10:00:00.000Z');
+    });
+
+    it('falls back to newGeneratedAt for carried-forward records when a malformed/legacy previous report lacks its own generatedAt', () => {
+        // Simulates reading a corrupted or pre-this-field committed report off disk: `records` is
+        // present (so there IS something to carry forward) but `generatedAt` itself is missing —
+        // a real possibility for a hand-edited or older-format JSON artifact, not something the
+        // TS type would allow constructing normally, hence the cast.
+        const malformedPrevious = {
+            costCurrency: 'USD',
+            aggregates: [],
+            records: [geminiRecord],
+        } as unknown as VerificationMetricsReport;
+        const merged = mergeVerificationRecords(malformedPrevious, [], '2026-08-10T00:00:00.000Z');
+        expect(merged).toHaveLength(1);
+        expect(merged[0].sourceGeneratedAt).toBe('2026-08-10T00:00:00.000Z');
     });
 });
 
@@ -1155,7 +1438,11 @@ describe('formatVerificationRecordsCsv', () => {
 
     it('emits one data row per record, preserving canonical model ids exactly', () => {
         const csv = formatVerificationRecordsCsv([
-            record({ provider: 'OpenRouter', model: 'openrouter/free', actualModel: 'meta-llama/llama-3.3-70b-instruct:free' }),
+            record({
+                provider: 'OpenRouter',
+                model: 'openrouter/free',
+                actualModel: 'meta-llama/llama-3.3-70b-instruct:free',
+            }),
         ]);
         const rows = csv.split('\n');
         expect(rows).toHaveLength(2);
@@ -1169,7 +1456,9 @@ describe('formatVerificationRecordsCsv', () => {
     });
 
     it('emits an empty cell (never a fabricated 0) for a missing optional usage field', () => {
-        const csv = formatVerificationRecordsCsv([record({ inputTokens: null, outputTokens: null, reasoningTokens: undefined })]);
+        const csv = formatVerificationRecordsCsv([
+            record({ inputTokens: null, outputTokens: null, reasoningTokens: undefined }),
+        ]);
         const [header, row] = csv.split('\n');
         const cols = header.split(',');
         const cells = row.split(',');
@@ -1180,6 +1469,18 @@ describe('formatVerificationRecordsCsv', () => {
     it('quote-escapes a field containing a comma', () => {
         const csv = formatVerificationRecordsCsv([record({ scenarioId: 'a, b' })]);
         expect(csv).toContain('"a, b"');
+    });
+
+    it('emits the literal boolean string for argsValid/dispatchOk/canvasStateCorrect when present, never an empty cell', () => {
+        const csv = formatVerificationRecordsCsv([
+            record({ argsValid: true, dispatchOk: false, canvasStateCorrect: true }),
+        ]);
+        const [header, row] = csv.split('\n');
+        const cols = header.split(',');
+        const cells = row.split(',');
+        expect(cells[cols.indexOf('argsValid')]).toBe('true');
+        expect(cells[cols.indexOf('dispatchOk')]).toBe('false');
+        expect(cells[cols.indexOf('canvasStateCorrect')]).toBe('true');
     });
 });
 

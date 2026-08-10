@@ -2,7 +2,12 @@ import { COST_CURRENCY } from './pricing';
 
 import type { GenerationConfiguration, GenerationParameterValue } from './providerRegistry';
 import type { ExtendedUsageInfo, UsageTotals } from './verificationMetrics';
-import type { MultiTurnCompletionMode, MultiTurnStrategy, MultiTurnTaskOutcome, MultiTurnTurnTrace } from './verifyLocatorScenarios';
+import type {
+    MultiTurnCompletionMode,
+    MultiTurnStrategy,
+    MultiTurnTaskOutcome,
+    MultiTurnTurnTrace,
+} from './verifyLocatorScenarios';
 import type { XY } from '../canvas/canvasBinding';
 
 /**
@@ -278,7 +283,8 @@ export interface MultiTurnModelSummary {
     costPerSuccessfulTask: number | null;
 }
 
-const groupKey = (provider: string, providerId: string, model: string): string => `${provider}::${providerId}::${model}`;
+const groupKey = (provider: string, providerId: string, model: string): string =>
+    `${provider}::${providerId}::${model}`;
 
 const definedValues = <T>(group: readonly T[], pick: (r: T) => number | undefined): number[] =>
     group.map(pick).filter((v): v is number => v !== undefined);
@@ -422,12 +428,46 @@ export interface MultiTurnScenarioSummary {
     providerErrorCount: number;
     timeoutCount: number;
     maxTurnsCount: number;
+    /** Over ALL attempts in this (provider, model, scenario) group, regardless of outcome — same
+     * "every attempt counts toward latency" convention as the model-level summary. */
     medianElapsedMs: number | null;
+    /** Nearest-rank P90 — see {@link p90NearestRank}'s own doc for the exact method. Over ALL
+     * attempts, exactly like `medianElapsedMs` above. */
+    p90ElapsedMs: number | null;
     averageTurns: number | null;
+    // --- Cost (effectiveCost: providerReportedCost preferred, else a genuine numeric estimate) ---
+    // Same semantics as MultiTurnModelSummary's cost block: missing cost is never treated as 0.
+    /** Sum of {@link MultiTurnLiveRecord.effectiveCost} over attempts in this group that report
+     * one — "known" cost, not claiming to cover every attempt. `null` when NO attempt in the group
+     * has any cost figure at all (never a fabricated 0). */
+    totalKnownCost: number | null;
+    /** Mean of `effectiveCost` over attempts that report one — denominator is `pricedAttemptCount`,
+     * NOT `attempts` (an unpriced attempt is excluded entirely, never averaged in as a 0). */
+    averageKnownCostPerPricedAttempt: number | null;
+    /** How many attempts in this group reported an `effectiveCost` at all — the denominator behind
+     * both cost averages above, and the numerator of `costCoverageRate`. */
+    pricedAttemptCount: number;
+    /** `pricedAttemptCount / attempts` — what fraction of attempts have ANY cost figure. `null`
+     * only for an empty group. */
+    costCoverageRate: number | null;
+    /** `true` when `pricedAttemptCount < attempts` — i.e. at least one attempt in this group is
+     * missing cost data. */
+    costDataPartial: boolean;
+    /** `totalKnownCost / successCount` — see {@link costPerSuccessfulTask}. `null` with zero
+     * successes (nothing to divide by) or when `totalKnownCost` itself is `null` (no cost data
+     * captured at all) — never a guessed number for either case. */
+    costPerSuccessfulTask: number | null;
 }
 
-const scenarioGroupKey = (provider: string, model: string, scenarioId: string): string => `${provider}::${model}::${scenarioId}`;
+const scenarioGroupKey = (provider: string, model: string, scenarioId: string): string =>
+    `${provider}::${model}::${scenarioId}`;
 
+/** Groups {@link MultiTurnLiveRecord}s by (provider, requestedModel, scenarioId) and computes the
+ * scenario-level summary — task G's second table. Mirrors `aggregateMultiTurnByModel`'s latency/
+ * cost semantics exactly (same helpers: `median`, `p90NearestRank`, `definedValues`,
+ * `costPerSuccessfulTask`) — never fabricates a total/average field: each stays `null` unless at
+ * least one record in the group actually reported the underlying value. Model-level aggregation
+ * (`aggregateMultiTurnByModel`) is untouched by this function. */
 export const aggregateMultiTurnByScenario = (records: readonly MultiTurnLiveRecord[]): MultiTurnScenarioSummary[] => {
     const groups = new Map<string, MultiTurnLiveRecord[]>();
     for (const record of records) {
@@ -440,21 +480,35 @@ export const aggregateMultiTurnByScenario = (records: readonly MultiTurnLiveReco
     const summaries: MultiTurnScenarioSummary[] = [];
     for (const group of groups.values()) {
         const { provider, requestedModel, scenarioId } = group[0];
+        const attempts = group.length;
         const successes = group.filter(r => r.outcome === 'success').length;
+        const elapsedValues = group.map(r => r.elapsedMs);
+
+        const costValues = definedValues(group, r => r.effectiveCost);
+        const pricedAttemptCount = costValues.length;
+        const totalKnownCost = pricedAttemptCount > 0 ? costValues.reduce((sum, v) => sum + v, 0) : null;
+
         summaries.push({
             provider,
             requestedModel,
             scenarioId,
-            attempts: group.length,
-            successRate: successRate(successes, group.length),
+            attempts,
+            successRate: successRate(successes, attempts),
             directSuccessCount: group.filter(r => r.outcome === 'success' && r.strategy === 'direct').length,
             lookupFirstSuccessCount: group.filter(r => r.outcome === 'success' && r.strategy === 'lookup-first').length,
             failureCount: group.filter(r => r.outcome === 'failure').length,
             providerErrorCount: group.filter(r => r.outcome === 'provider-error').length,
             timeoutCount: group.filter(r => r.outcome === 'timeout').length,
             maxTurnsCount: group.filter(r => r.outcome === 'max-turns').length,
-            medianElapsedMs: median(group.map(r => r.elapsedMs)),
+            medianElapsedMs: median(elapsedValues),
+            p90ElapsedMs: p90NearestRank(elapsedValues),
             averageTurns: mean(group.map(r => r.turnCount)),
+            totalKnownCost,
+            averageKnownCostPerPricedAttempt: mean(costValues),
+            pricedAttemptCount,
+            costCoverageRate: successRate(pricedAttemptCount, attempts),
+            costDataPartial: pricedAttemptCount < attempts,
+            costPerSuccessfulTask: costPerSuccessfulTask(totalKnownCost, successes),
         });
     }
 
@@ -547,7 +601,7 @@ export const formatMultiTurnModelSummaryMarkdownTable = (summaries: readonly Mul
 
     const providerFootnote = summaries.some(s => s.providerTokenDataPartial)
         ? "\n\n`†` = provider-total token data partial — at least one attempt in that row's provider " +
-          "didn't report `providerTotalTokens` (or the call never completed). \"Avg provider tokens\" is " +
+          'didn\'t report `providerTotalTokens` (or the call never completed). "Avg provider tokens" is ' +
           'the mean over only the attempts that reported it — never mixed with, or filled in from, the ' +
           'normalized "Avg tokens" column above.'
         : '';
@@ -556,7 +610,7 @@ export const formatMultiTurnModelSummaryMarkdownTable = (summaries: readonly Mul
         ? '\n\n`‡` = cost data partial — at least one attempt in that row has no `effectiveCost` ' +
           '(unregistered pricing — see pricing.ts — or usage never captured). "Total known cost", "Avg ' +
           'known cost/priced attempt", and "Cost/success" are all computed from the `Priced attempts` ' +
-          'column\'s subset only — see that column and `Cost coverage` for exactly what fraction of ' +
+          "column's subset only — see that column and `Cost coverage` for exactly what fraction of " +
           'attempts they cover.'
         : '';
 
@@ -575,7 +629,8 @@ export const formatMultiTurnCompletionModeMarkdownTable = (summaries: readonly M
         return '_No live multi-turn task attempts recorded in this session._';
     }
 
-    const header = '| Provider | Model | Attempts | Tool-action successes | Text-response successes | Incomplete attempts | Successful lookup-action round trips |';
+    const header =
+        '| Provider | Model | Attempts | Tool-action successes | Text-response successes | Incomplete attempts | Successful lookup-action round trips |';
     const separator = '| --- | --- | ---: | ---: | ---: | ---: | ---: |';
     const rows = summaries.map(
         s =>
@@ -602,20 +657,42 @@ export const formatMultiTurnScenarioMarkdownTable = (summaries: readonly MultiTu
 
     const header =
         '| Provider | Model | Scenario | Attempts | Success rate | Direct | Lookup-first | Fail | ' +
-        'Provider-error | Timeout | Max-turns | Median elapsed | Avg turns |';
-    const separator = '| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |';
-    const rows = summaries.map(
-        s =>
+        'Provider-error | Timeout | Max-turns | Median elapsed | P90 elapsed | Avg turns | ' +
+        'Priced attempts | Cost coverage | Total known cost | Avg known cost/priced attempt | Cost/success |';
+    const separator =
+        '| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ' +
+        '---: | ---: | ---: | ---: | ---: |';
+    const rows = summaries.map(s => {
+        const costStar = s.costDataPartial ? '‡' : '';
+        return (
             `| ${s.provider} | ${s.requestedModel} | ${s.scenarioId} | ${s.attempts} | ${rateCell(s.successRate)} | ` +
             `${s.directSuccessCount} | ${s.lookupFirstSuccessCount} | ${s.failureCount} | ${s.providerErrorCount} | ` +
-            `${s.timeoutCount} | ${s.maxTurnsCount} | ${numCell(s.medianElapsedMs)}ms | ${numCell(s.averageTurns)} |`
-    );
-    return [header, separator, ...rows].join('\n');
+            `${s.timeoutCount} | ${s.maxTurnsCount} | ${numCell(s.medianElapsedMs)}ms | ${numCell(s.p90ElapsedMs)}ms | ` +
+            `${numCell(s.averageTurns)} | ${s.pricedAttemptCount}/${s.attempts} | ${rateCell(s.costCoverageRate)} | ` +
+            `${costCell(s.totalKnownCost)}${costStar} | ${costCell(s.averageKnownCostPerPricedAttempt)}${costStar} | ` +
+            `${costCell(s.costPerSuccessfulTask)}${costStar} |`
+        );
+    });
+
+    const p90Footnote =
+        '\n\n`P90 elapsed` uses the nearest-rank method: attempts sorted ascending, the value at rank ' +
+        '`ceil(0.9 * n)` (1-indexed) — always an actually-observed elapsed time, never interpolated.';
+
+    const costFootnote = summaries.some(s => s.costDataPartial)
+        ? '\n\n`‡` = cost data partial — at least one attempt for that scenario/model has no ' +
+          '`effectiveCost` (unregistered pricing — see pricing.ts — or usage never captured). ' +
+          '"Total known cost", "Avg known cost/priced attempt", and "Cost/success" are all computed ' +
+          "from the `Priced attempts` column's subset only — see that column and `Cost coverage` " +
+          'for exactly what fraction of attempts they cover.'
+        : '';
+
+    return [header, separator, ...rows].join('\n') + p90Footnote + costFootnote;
 };
 
 /** Mirrors `verificationMetrics.ts`'s private `csvEscape` (same shape, can't be imported). */
 const csvEscape = (value: string): string => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
-const numberOrEmpty = (value: number | null | undefined): string => (value === null || value === undefined ? '' : String(value));
+const numberOrEmpty = (value: number | null | undefined): string =>
+    value === null || value === undefined ? '' : String(value);
 
 /**
  * One row per task attempt — the exact-value companion to {@link formatMultiTurnModelSummaryMarkdownTable}.
@@ -751,7 +828,9 @@ const generationParameterCell = (p: GenerationParameterValue<number | string>): 
  * Never fabricates a numeric provider default: a `'provider-default'`/`'unsupported'` cell shows
  * only that word, never a guessed value.
  */
-export const formatGenerationConfigurationMarkdown = (config: Readonly<Record<string, GenerationConfiguration>>): string => {
+export const formatGenerationConfigurationMarkdown = (
+    config: Readonly<Record<string, GenerationConfiguration>>
+): string => {
     const providerIds = Object.keys(config);
     if (providerIds.length === 0) {
         return '_No generation configuration recorded._';
