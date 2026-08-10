@@ -108,6 +108,61 @@ Identical core; only the sink adapter differs.
 | Sink                             | `jsonlSink(write → append file)` | `fanoutSink(memorySink(), localStorageSink)` for the reactive UI |
 | View                             | printed                          | React components                                                 |
 
+## Using it — turn tracing on, read the projections
+
+Tracing is **one switch**: `createAgentTrace(enabled)` (`trace/agentTrace.ts`) turns a host's "should we trace?" flag into a ready-to-inject `Tracer` whose captured records read back as the three projections. `enabled === false` returns `NoopTracer` and empty projections — the production default, zero cost. Only the **flag source** is per-runtime; the capture and projection are identical everywhere.
+
+### Node (scenario harness / terminal)
+
+The flag is the `AGENT_TRACE` env var. In the live eval harness (`__tests__/harness/scenarios/integration.live.spec.ts`) setting it captures the run and **appends the three projections to the saved transcript**.
+
+```bash
+# One live scenario, traced. Needs GEMINI_API_KEY in repo-root .env.local (auto-loaded).
+AGENT_TRACE=1 RUN_LIVE=1 BENCH_OUT="$(pwd)/bench-runs" \
+  npx nx test @flows/agent --skip-nx-cache -- integration.live -t "T4.build-pipeline"
+
+# All scenarios, traced (drop the -t filter):
+AGENT_TRACE=1 RUN_LIVE=1 BENCH_OUT="$(pwd)/bench-runs" \
+  npx nx test @flows/agent --skip-nx-cache -- integration.live
+```
+
+| Env var                                     | Effect                                                                          |
+| ------------------------------------------- | ------------------------------------------------------------------------------- |
+| `RUN_LIVE=1`                                | **Required** to hit the real API; unset ⇒ the live suite stays offline/skipped. |
+| `AGENT_TRACE=1`                             | Capture the trace and render the three projections into the transcript.         |
+| `GEMINI_API_KEY`                            | In repo-root `.env.local` (loaded on import); or inline as a command prefix.    |
+| `BENCH_OUT=<dir>`                           | Where the run is written (default `<cwd>/bench-runs`).                          |
+| `GEMINI_MODEL` · `BENCH_N` · `LIVE_VERBOSE` | model override · runs per scenario · also stream the transcript to the console. |
+
+Each run writes `latest.{json,txt,transcript.log}` (plus a timestamped triple) under `BENCH_OUT`. With `AGENT_TRACE=1` the three projections are appended to the end of every `*.transcript.log`. Run via `nx test` (not bare `npx vitest`) so the workspace resolves `@flows/*` deps.
+
+The projectors are pure and need no key — exercise them offline:
+
+```bash
+npx nx test @flows/agent -- projectors
+```
+
+### Web (browser)
+
+On automatically in dev builds; in any build (including a deploy) opt in at runtime with `?trace=1` in the URL or `localStorage.agentTrace = '1'` (see `useAgentPorts.ts`). When on, read the live capture from the console:
+
+```js
+window.__flowAgentTrace(); // the redacted record stream (level · event · ts)
+window.__flowAgentProjections(); // { transcripts, tree, diff }
+```
+
+### The three projections
+
+One record stream, three read-time views (`trace/project/`):
+
+| View            | Projector       | Reads as                                                                                                                                |
+| --------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Transcripts** | `toTranscripts` | one chat per agent instance — every user / assistant / tool turn, verbatim (never truncated), tool calls inline.                        |
+| **Trace tree**  | `toTraceTree`   | the agent call tree (who spawned whom), each node tagged with its per-event-type record counts.                                         |
+| **Graph diff**  | `toGraphDiff`   | the canvas before → after, **naming which** nodes (`id (type)`) and edges (`source:port → target:port`) were added / removed / changed. |
+
+In the node harness these render to the end of `*.transcript.log` under three `trace · N/3` headers.
+
 ## Removing the environment — impact
 
 - The removed trace pieces map 1:1: `AgentTraceReporterSupportable → Tracer`, `NoopAgentTraceReporter → NoopTracer`, `BufferAgentTraceReporter → memorySink()`, `redactSecrets → redact` (used by `redactingSink`).
