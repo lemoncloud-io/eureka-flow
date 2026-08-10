@@ -53,6 +53,71 @@ describe('runMultiTurnLocatorScenario: direct move', () => {
     });
 });
 
+// Regression coverage for the batched-tool-call fix in the multi-turn runner: a single chat()
+// response can carry more than one Chunk.toolCall — the runner must dispatch every one of them,
+// in order, not just the first.
+describe('runMultiTurnLocatorScenario: batched multiple tool calls in one turn', () => {
+    it('a batched list_nodes + correct move_node in ONE turn succeeds without needing a second turn', async () => {
+        const { gateway } = scriptedGateway([
+            [
+                { toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } },
+                { toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+                { done: true },
+            ],
+        ]);
+        const result = await runMultiTurnLocatorScenario(gateway, 'move-node-right');
+        expect(result.taskOutcome).toBe('success');
+        expect(result.turnCount).toBe(1);
+        expect(result.toolSequence).toEqual(['list_nodes', 'move_node']);
+        expect(result.positionsAfter['text-1']).toEqual({ x: 300, y: 200 });
+        expect(result.turns[0].toolCalls).toEqual([
+            { name: 'list_nodes', argsValid: true, dispatchOk: true },
+            { name: 'move_node', argsValid: true, dispatchOk: true },
+        ]);
+    });
+
+    it('selective-multi-node fails when a batched second move_node call also mutates an untargeted node', async () => {
+        const { gateway } = scriptedGateway([
+            [
+                { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"http-1","by":{"dx":0,"dy":50}}' } },
+                { toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":10,"dy":0}}' } },
+                { done: true },
+            ],
+        ]);
+        const result = await runMultiTurnLocatorScenario(gateway, 'selective-multi-node');
+        expect(result.taskOutcome).toBe('failure');
+        expect(result.error).toBe('the untargeted text-input node was also moved');
+        expect(result.positionsAfter['http-1']).toEqual({ x: 300, y: 150 });
+        expect(result.positionsAfter['text-1']).not.toEqual(result.positionsBefore['text-1']);
+    });
+
+    it('two batched calls in a continuable turn: the transcript replays one assistant message with both calls, and one tool-result per call', async () => {
+        const { gateway, requests } = scriptedGateway([
+            [
+                { toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } },
+                { toolCall: { id: 'c2', name: 'list_nodes', argsDelta: '{}' } },
+                { done: true },
+            ],
+            [
+                { toolCall: { id: 'c3', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+                { done: true },
+            ],
+        ]);
+        const result = await runMultiTurnLocatorScenario(gateway, 'move-node-right');
+        expect(result.taskOutcome).toBe('success');
+        expect(result.turnCount).toBe(2);
+        expect(result.toolSequence).toEqual(['list_nodes', 'list_nodes', 'move_node']);
+        // Turn 1's batched pair is replayed into the SECOND request as one assistant message
+        // carrying both calls, followed by one tool-result message per call — never merged or
+        // silently dropped down to a single entry.
+        const secondRequest = requests[1];
+        const assistantMsg = secondRequest.messages.find(m => m.role === 'assistant' && (m.toolCalls?.length ?? 0) > 1);
+        expect(assistantMsg?.toolCalls?.map(tc => tc.id)).toEqual(['c1', 'c2']);
+        const toolResults = secondRequest.messages.filter(m => m.role === 'tool');
+        expect(toolResults.map(m => m.toolCallId)).toEqual(['c1', 'c2']);
+    });
+});
+
 describe('runMultiTurnLocatorScenario: lookup-first completion', () => {
     it('completes on turn 2 after a list_nodes lookup, strategy=lookup-first', async () => {
         const { gateway, requests } = scriptedGateway([
@@ -443,6 +508,7 @@ describe('runMultiTurnLocatorScenario: move-named-node-without-id (multi-turn-on
             dispatchOk: true,
             stepStatus: 'continued',
             continuationReason: 'task not complete after list_nodes',
+            toolCalls: [{ name: 'list_nodes', argsValid: true, dispatchOk: true }],
         });
         expect(result.turns[0].error).toBeUndefined();
         // Turn 2 (the completing move_node) has no error and no stepStatus either — it's simply done.
@@ -452,6 +518,7 @@ describe('runMultiTurnLocatorScenario: move-named-node-without-id (multi-turn-on
             textPresent: false,
             argsValid: true,
             dispatchOk: true,
+            toolCalls: [{ name: 'move_node', argsValid: true, dispatchOk: true }],
         });
         expect(result.turns[1].error).toBeUndefined();
         expect(result.turns[1].stepStatus).toBeUndefined();

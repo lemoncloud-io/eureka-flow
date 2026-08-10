@@ -345,6 +345,20 @@ export const createGeminiToolLlmGateway = (options: GeminiToolLlmGatewayOptions)
     const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
     const trace = environment.traceReporter;
 
+    // Gemini returns no tool-call ids; synthesize a stable one so the agent loop can correlate
+    // results — same approach as the text-only GeminiLlmGateway's `nextCallId`. Declared HERE, in
+    // the gateway-instance scope, not inside `chat()`: a fresh conversation turn calls `chat()`
+    // again on the SAME gateway instance, and a per-call-scoped counter would restart at 1 on every
+    // turn, producing the same id for two DIFFERENT calls across turns. `buildToolCallNameById`
+    // rebuilds its id→name map from the full transcript on every request, so a repeated id from an
+    // earlier turn silently overwrites that turn's real mapping — a later tool-result would then
+    // replay under the wrong function name. Monotonic for the lifetime of this gateway instance
+    // fixes that; it is never reset, and never shared across two separate `createGeminiToolLlmGateway`
+    // calls (each gets its own closure), so two independent gateways/sessions can each start at 1
+    // without colliding with each other.
+    let toolCallSeq = 0;
+    const nextToolCallId = (): string => `gemini-call-${(toolCallSeq += 1)}`;
+
     async function* chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk> {
         const startedAt = environment.now();
         const body = toGeminiToolRequest(req, options.generation);
@@ -409,13 +423,10 @@ export const createGeminiToolLlmGateway = (options: GeminiToolLlmGatewayOptions)
         if (text) {
             yield { text };
         }
-        // Gemini provides no call id; generate a turn-local one (collect() only needs turn uniqueness).
-        let callSeq = 0;
         for (const call of functionCalls) {
-            callSeq += 1;
             yield {
                 toolCall: {
-                    id: `gemini-call-${callSeq}`,
+                    id: nextToolCallId(),
                     name: call.name,
                     argsDelta: JSON.stringify(call.args),
                     ...(call.thoughtSignature !== undefined ? { thoughtSignature: call.thoughtSignature } : {}),

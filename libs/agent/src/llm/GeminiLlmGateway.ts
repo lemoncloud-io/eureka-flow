@@ -289,16 +289,28 @@ export const createGeminiLlmGateway = (options: GeminiLlmGatewayOptions): Gemini
         );
 
         const usageMeta = payload?.usageMetadata;
+        // Field names match the canonical UsageInfo shape (llmGateway.ts) — `providerTotalTokens`/
+        // `cachedInputTokens`, not `totalTokens`/`cachedTokens` — so every consumer (wireLog.ts,
+        // verificationMetrics.ts, metering.ts) actually receives them instead of silently falling
+        // back to an input+output-only total that omits Gemini's hidden thinking-token cost (see
+        // metering.ts's own `providerTotalTokens − inputTokens` derivation). `promptTokenCount`
+        // already INCLUDES the cached portion (Gemini's own context-caching docs), so it is
+        // subtracted here — mirrors GeminiToolLlmGateway.ts's `toUsageInfo`, this gateway's own
+        // tool-capable sibling, which already gets this mapping right.
+        const promptTokenCount = usageMeta?.promptTokenCount;
+        const cachedContentTokenCount = usageMeta?.cachedContentTokenCount;
+        const inputTokens =
+            promptTokenCount !== undefined ? Math.max(promptTokenCount - (cachedContentTokenCount ?? 0), 0) : undefined;
         const usage = usageMeta
             ? {
-                  ...(usageMeta.promptTokenCount !== undefined ? { inputTokens: usageMeta.promptTokenCount } : {}),
+                  ...(inputTokens !== undefined ? { inputTokens } : {}),
                   ...(usageMeta.candidatesTokenCount !== undefined
                       ? { outputTokens: usageMeta.candidatesTokenCount }
                       : {}),
-                  ...(usageMeta.totalTokenCount !== undefined ? { totalTokens: usageMeta.totalTokenCount } : {}),
-                  ...(usageMeta.cachedContentTokenCount !== undefined
-                      ? { cachedTokens: usageMeta.cachedContentTokenCount }
+                  ...(usageMeta.totalTokenCount !== undefined
+                      ? { providerTotalTokens: usageMeta.totalTokenCount }
                       : {}),
+                  ...(cachedContentTokenCount !== undefined ? { cachedInputTokens: cachedContentTokenCount } : {}),
               }
             : undefined;
 

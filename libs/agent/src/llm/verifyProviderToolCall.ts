@@ -1,5 +1,6 @@
 import { createInMemoryCanvasBinding } from '../canvas/inMemoryCanvasBinding';
 import { createCatalogLookup } from '../catalog';
+import { dispatchAllToolCalls, pickPrimaryToolCall } from './verifyLocatorScenarios';
 import { LIST_NODES, MOVE_NODE } from '../tools/nodeTools';
 import { createToolExecutor } from '../tools/toolExecutor';
 import { toolset } from '../tools/toolset';
@@ -48,6 +49,10 @@ export interface VerifyMoveNodeResult {
     positionAfter: { x: number; y: number };
     pass: boolean;
     error?: string;
+    /** Every tool call the model emitted this turn, in order — not just the one used for the
+     * pass/fail identity check above. Present whenever at least one tool call was made; absent
+     * (never an empty array) when the model made none. */
+    toolCalls?: { name: string; argsValid: boolean; dispatchOk?: boolean }[];
 }
 
 const drain = async (stream: AsyncIterable<Chunk>): Promise<Chunk[]> => {
@@ -91,60 +96,69 @@ export const verifyMoveNodeToolCall = async (gateway: LlmGateway): Promise<Verif
             })
         );
 
-        const toolCall = chunks.find(c => c.toolCall)?.toolCall;
-        if (!toolCall) {
+        // Dispatch EVERY tool call the model emitted this turn, in order — never just the first.
+        // `positionAfter` below reflects every one of them, so a second, unscored call that also
+        // mutated the node is never silently missed by a final-state check on a single position.
+        const dispatched = await dispatchAllToolCalls(chunks, executor, config, VERIFY_USER_PERMISSIONS);
+        const toolCallsVisibility = dispatched.length
+            ? {
+                  toolCalls: dispatched.map(d => ({
+                      name: d.name,
+                      argsValid: d.argsValid,
+                      ...(d.argsValid ? { dispatchOk: d.dispatchResult.ok } : {}),
+                  })),
+              }
+            : {};
+
+        const primary = pickPrimaryToolCall(dispatched);
+        if (!primary) {
             return {
                 toolCallName: null,
                 positionBefore: START_POSITION,
                 positionAfter: START_POSITION,
                 pass: false,
                 error: 'model did not emit a structured tool call',
+                ...toolCallsVisibility,
             };
         }
-        if (toolCall.name !== 'move_node') {
+        if (primary.name !== 'move_node') {
             return {
-                toolCallName: toolCall.name,
+                toolCallName: primary.name,
                 positionBefore: START_POSITION,
-                positionAfter: START_POSITION,
+                positionAfter: binding.readGraph().nodes[0].position,
                 pass: false,
-                error: `unexpected tool call: ${toolCall.name}`,
+                error: `unexpected tool call: ${primary.name}`,
+                ...toolCallsVisibility,
             };
         }
-
-        let args: unknown;
-        try {
-            args = JSON.parse(toolCall.argsDelta);
-        } catch {
+        if (!primary.argsValid) {
             return {
-                toolCallName: toolCall.name,
+                toolCallName: primary.name,
                 positionBefore: START_POSITION,
-                positionAfter: START_POSITION,
+                positionAfter: binding.readGraph().nodes[0].position,
                 pass: false,
                 error: 'tool call arguments were not valid JSON',
+                ...toolCallsVisibility,
             };
         }
 
-        const dispatchResult = await executor.dispatch(
-            config,
-            { id: toolCall.id, name: toolCall.name, args },
-            VERIFY_USER_PERMISSIONS
-        );
         const positionAfter = binding.readGraph().nodes[0].position;
         const movedCorrectly = positionAfter.x === EXPECTED_POSITION.x && positionAfter.y === EXPECTED_POSITION.y;
-        const pass = dispatchResult.ok && movedCorrectly;
+        const pass = primary.dispatchResult.ok && movedCorrectly;
 
         return {
-            toolCallName: toolCall.name,
+            toolCallName: primary.name,
             positionBefore: START_POSITION,
             positionAfter,
             pass,
             ...(pass
                 ? {}
                 : {
-                      error: dispatchResult.ok
+                      error: primary.dispatchResult.ok
                           ? `node moved to (${positionAfter.x},${positionAfter.y}), expected (${EXPECTED_POSITION.x},${EXPECTED_POSITION.y})`
-                          : dispatchResult.error,
+                          : primary.dispatchResult.error,
                   }),
+            ...toolCallsVisibility,
         };
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

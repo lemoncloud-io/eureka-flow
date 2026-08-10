@@ -26,6 +26,7 @@ describe('verifyMoveNodeToolCall', () => {
             positionBefore: { x: 100, y: 200 },
             positionAfter: { x: 200, y: 200 },
             pass: true,
+            toolCalls: [{ name: 'move_node', argsValid: true, dispatchOk: true }],
         });
     });
 

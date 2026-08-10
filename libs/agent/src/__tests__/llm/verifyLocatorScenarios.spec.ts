@@ -270,6 +270,127 @@ describe('runLocatorScenario: selective-multi-node', () => {
     });
 });
 
+// Regression coverage for the batched-tool-call fix: gateways emit one Chunk per distinct tool
+// call, and a single turn can legitimately contain more than one — the runner must dispatch every
+// one of them, in order, not just the first (see `dispatchAllToolCalls`/`pickPrimaryToolCall`).
+describe('runLocatorScenario: batched multiple tool calls in one turn', () => {
+    it('two valid tool calls (list_nodes then correct move_node) still passes', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } },
+            { toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'move-node-right');
+        expect(result.pass).toBe(true);
+        expect(result.toolCallName).toBe('move_node');
+        expect(result.toolCalls).toEqual([
+            { name: 'list_nodes', argsValid: true, dispatchOk: true },
+            { name: 'move_node', argsValid: true, dispatchOk: true },
+        ]);
+    });
+
+    it('a batched list_nodes + correct move_node is not incorrectly rejected on the list_nodes name', async () => {
+        // Before the fix, only the FIRST chunk's tool call was ever read — list_nodes here — so this
+        // exact case would have failed with "unexpected tool call: list_nodes" despite the model
+        // also correctly calling move_node in the same turn.
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'list_nodes', argsDelta: '{}' } },
+            { toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"http-1","by":{"dx":0,"dy":50}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'selective-multi-node');
+        expect(result.pass).toBe(true);
+        expect(result.error).toBeUndefined();
+    });
+
+    it('selective-multi-node fails when a second move_node call also mutates an untargeted node', async () => {
+        // Before the fix, only the first chunk (the correct http-1 move) was ever dispatched, so
+        // the second, erroneous text-1 move never happened and never showed up in positionsAfter —
+        // this exact regression could pass when it should fail.
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"http-1","by":{"dx":0,"dy":50}}' } },
+            { toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":10,"dy":0}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'selective-multi-node');
+        expect(result.pass).toBe(false);
+        expect(result.error).toBe('the untargeted text-input node was also moved');
+        // Both calls were genuinely dispatched — the failure comes from the scenario's own final-
+        // state policy, not from either individual dispatch failing.
+        expect(result.toolCalls).toEqual([
+            { name: 'move_node', argsValid: true, dispatchOk: true },
+            { name: 'move_node', argsValid: true, dispatchOk: true },
+        ]);
+        expect(result.positionsAfter['http-1']).toEqual({ x: 300, y: 150 });
+        expect(result.positionsAfter['text-1']).not.toEqual(result.positionsBefore['text-1']);
+    });
+
+    it('one valid + one executor-rejected call: the rejected one stays visible without blocking the valid one', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+            {
+                toolCall: {
+                    id: 'c2',
+                    name: 'move_node',
+                    argsDelta: '{"nodeId":"does-not-exist","by":{"dx":1,"dy":1}}',
+                },
+            },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'move-node-right');
+        expect(result.pass).toBe(true);
+        expect(result.toolCalls).toEqual([
+            { name: 'move_node', argsValid: true, dispatchOk: true },
+            { name: 'move_node', argsValid: true, dispatchOk: false },
+        ]);
+    });
+
+    it('one valid + one malformed-JSON call: the malformed one stays visible and is never silently dropped', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: 'not json' } },
+            { toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'move-node-right');
+        // The malformed call is picked as the primary (first non-list_nodes call), so the overall
+        // scenario fails on it — a model that emits invalid JSON at all has a real defect, even if
+        // a later call in the same turn would have succeeded on its own.
+        expect(result.pass).toBe(false);
+        expect(result.error).toBe('tool call arguments were not valid JSON');
+        expect(result.toolCalls).toEqual([
+            { name: 'move_node', argsValid: false },
+            { name: 'move_node', argsValid: true, dispatchOk: true },
+        ]);
+        // The second call still genuinely ran — final-state tracking is never silently skipped just
+        // because an earlier call in the same turn was malformed.
+        expect(result.positionsAfter['text-1']).toEqual({ x: 300, y: 200 });
+    });
+
+    it('preserves emission order in toolCalls regardless of which call is picked as primary', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+            { toolCall: { id: 'c2', name: 'list_nodes', argsDelta: '{}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'move-node-right');
+        expect(result.pass).toBe(true);
+        expect(result.toolCalls).toEqual([
+            { name: 'move_node', argsValid: true, dispatchOk: true },
+            { name: 'list_nodes', argsValid: true, dispatchOk: true },
+        ]);
+    });
+
+    it('single-call behavior is unchanged: exactly one tool call still round-trips with no toolCalls-array surprises', async () => {
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'move-node-right');
+        expect(result.pass).toBe(true);
+        expect(result.toolCalls).toEqual([{ name: 'move_node', argsValid: true, dispatchOk: true }]);
+    });
+});
+
 describe('runLocatorScenario: ambiguous-instruction', () => {
     it('passes when the model asks for clarification with no tool call', async () => {
         const gateway = fakeGateway([

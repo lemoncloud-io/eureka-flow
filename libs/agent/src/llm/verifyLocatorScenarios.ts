@@ -10,7 +10,7 @@ import type { ChatMessage, Chunk, LlmGateway } from './llmGateway';
 import type { CanvasBinding, XY } from '../canvas/canvasBinding';
 import type { Direction } from '../canvas/moveSemantics';
 import type { AgentGrant } from '../permissions';
-import type { ToolCall, ToolResult } from '../tools/types';
+import type { ToolCall, ToolExecutor, ToolResult } from '../tools/types';
 
 // No blocks are ever described in these scenarios — every scenario only calls list_nodes and/or
 // move_node, neither of which reads the catalog — so an empty one merely satisfies `toolset`'s
@@ -98,6 +98,13 @@ export interface LocatorScenarioResult {
      * either way — this is a reporting-only signal. Never set when `pass` is true.
      */
     providerError?: boolean;
+    /**
+     * Every tool call the model emitted this turn, in order — not just the one `check()` scored
+     * (see `pickPrimaryToolCall`). Present whenever at least one tool call was made; absent (never
+     * an empty array) when the model made none. Exists so a batched turn's full attempt list is
+     * always visible in scoring output, never silently collapsed to a single call.
+     */
+    toolCalls?: { name: string; argsValid: boolean; dispatchOk?: boolean }[];
 }
 
 /**
@@ -119,8 +126,16 @@ export interface LocatorScenarioKnownVariance {
 }
 
 interface ScenarioOutcome {
+    /** The primary call for single-call-oriented scoring — see `pickPrimaryToolCall`. Every
+     * existing `check()` below reads only this (and `dispatchResult`), so their logic is correct
+     * unchanged for the common 0-or-1-call case; `toolCalls` below is the full record. */
     toolCall: { id: string; name: string; args: unknown } | null;
     dispatchResult?: ToolResult;
+    /** Every tool call dispatched this turn, in order — always includes `toolCall` above when it
+     * is non-null. `positionsAfter` already reflects every one of these being dispatched, so a
+     * scenario like `selective-multi-node` correctly fails via its existing position checks alone
+     * when a second, unscored call also mutated the canvas. */
+    toolCalls: readonly DispatchedToolCall[];
     positionsBefore: Record<string, XY>;
     positionsAfter: Record<string, XY>;
     textPresent: boolean;
@@ -217,6 +232,112 @@ const snapshotPositions = (binding: CanvasBinding): Record<string, XY> =>
 
 const positionsEqual = (a: Record<string, XY>, b: Record<string, XY>): boolean =>
     JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * Accumulates every tool-call chunk emitted during one turn, in first-seen order, merging any
+ * `argsDelta` fragments that share an id — mirrors `BaseAgent.collect()`'s accumulation
+ * (`agents/baseAgent.ts`) exactly, but operates on an already-drained `Chunk[]` rather than a
+ * live stream, since every caller here already calls `drain()` first.
+ *
+ * Never just the first chunk with a `toolCall`: a provider gateway emits one `Chunk` per distinct
+ * tool call, so a single turn can legitimately contain more than one (e.g. a batched
+ * `list_nodes` + `move_node` response) — taking only the first silently drops every call after it.
+ */
+export const collectToolCallChunks = (
+    chunks: readonly Chunk[]
+): { id: string; name: string; argsDelta: string; thoughtSignature?: string }[] => {
+    const order: string[] = [];
+    const acc = new Map<string, { name: string; argsDelta: string; thoughtSignature?: string }>();
+    for (const chunk of chunks) {
+        if (!chunk.toolCall) continue;
+        const { id, name, argsDelta, thoughtSignature } = chunk.toolCall;
+        const existing = acc.get(id);
+        if (existing) {
+            existing.argsDelta += argsDelta;
+            existing.thoughtSignature ??= thoughtSignature;
+        } else {
+            order.push(id);
+            acc.set(id, { name, argsDelta, thoughtSignature });
+        }
+    }
+    return order.map(id => {
+        const entry = acc.get(id) as { name: string; argsDelta: string; thoughtSignature?: string };
+        return { id, ...entry };
+    });
+};
+
+/** One tool call attempted during a turn, after argument parsing and (if valid) dispatch. Never
+ * silently dropped: a call whose `argsDelta` fails to parse as JSON is still recorded here, with
+ * `argsValid: false` and a synthetic failed `dispatchResult` — it is never sent to the executor
+ * (there is nothing valid to dispatch), but it remains visible to every consumer of this array. */
+export interface DispatchedToolCall {
+    id: string;
+    name: string;
+    args: unknown;
+    /** The exact raw JSON string this call was made with — needed to replay the call verbatim
+     * into a multi-turn transcript, since the parsed `args` may reorder object keys on re-stringify. */
+    argsDelta: string;
+    argsValid: boolean;
+    dispatchResult: ToolResult;
+    thoughtSignature?: string;
+}
+
+/**
+ * Dispatches every tool call emitted during one turn, in order, through the real `ToolExecutor` —
+ * never just the first. Returns one {@link DispatchedToolCall} per call, in the same order the
+ * model emitted them, so ordering is preserved and every attempt (successful, rejected, or
+ * malformed) is visible to the caller rather than only the first being scored.
+ */
+export const dispatchAllToolCalls = async (
+    chunks: readonly Chunk[],
+    executor: ToolExecutor,
+    config: AgentConfig,
+    userPermissions: AgentGrant
+): Promise<DispatchedToolCall[]> => {
+    const calls = collectToolCallChunks(chunks);
+    const dispatched: DispatchedToolCall[] = [];
+    for (const call of calls) {
+        let args: unknown;
+        try {
+            args = JSON.parse(call.argsDelta);
+        } catch {
+            dispatched.push({
+                id: call.id,
+                name: call.name,
+                args: undefined,
+                argsDelta: call.argsDelta,
+                argsValid: false,
+                dispatchResult: { toolCallId: call.id, ok: false, error: 'tool call arguments were not valid JSON' },
+                ...(call.thoughtSignature !== undefined ? { thoughtSignature: call.thoughtSignature } : {}),
+            });
+            continue;
+        }
+        const toolCall: ToolCall = { id: call.id, name: call.name, args };
+        const dispatchResult = await executor.dispatch(config, toolCall, userPermissions);
+        dispatched.push({
+            id: call.id,
+            name: call.name,
+            args,
+            argsDelta: call.argsDelta,
+            argsValid: true,
+            dispatchResult,
+            ...(call.thoughtSignature !== undefined ? { thoughtSignature: call.thoughtSignature } : {}),
+        });
+    }
+    return dispatched;
+};
+
+/**
+ * Picks the single call most relevant to this module's single-call-oriented `check()` scoring: the
+ * first non-`list_nodes` call (a benign, non-mutating lookup should never be mistaken for the
+ * scenario's real action, and must not cause a batched `list_nodes` + real-action turn to be
+ * incorrectly rejected on the lookup's name alone), or the first call at all when every call was
+ * `list_nodes` or there is exactly one call. Returns `null` only when `calls` is empty — this keeps
+ * every existing `check()` function's single-call logic correct unchanged when a turn has 0 or 1
+ * calls, which is still the overwhelming majority of real turns.
+ */
+export const pickPrimaryToolCall = (calls: readonly DispatchedToolCall[]): DispatchedToolCall | null =>
+    calls.find(c => c.name !== 'list_nodes') ?? calls[0] ?? null;
 
 // --- Scenario 1: list_nodes read-only selection --------------------------------------------
 //
@@ -620,36 +741,26 @@ export const runLocatorScenario = async (
             })
         );
 
-        const toolCallChunk = chunks.find(c => c.toolCall)?.toolCall ?? null;
         const textPresent = chunks.some(c => typeof c.text === 'string' && c.text.length > 0);
 
-        let toolCall: { id: string; name: string; args: unknown } | null = null;
-        let dispatchResult: ToolResult | undefined;
-
-        if (toolCallChunk) {
-            let args: unknown;
-            try {
-                args = JSON.parse(toolCallChunk.argsDelta);
-            } catch {
-                return {
-                    scenarioId,
-                    pass: false,
-                    toolCallName: toolCallChunk.name,
-                    textPresent,
-                    positionsBefore,
-                    positionsAfter: positionsBefore,
-                    error: 'tool call arguments were not valid JSON',
-                    argsValid: false,
-                };
-            }
-            toolCall = { id: toolCallChunk.id, name: toolCallChunk.name, args };
-            dispatchResult = await executor.dispatch(config, toolCall, VERIFY_USER_PERMISSIONS);
-        }
+        // Dispatch EVERY tool call the model emitted this turn, in order — never just the first.
+        // `positionsAfter` below reflects the cumulative effect of all of them, so a scenario like
+        // `selective-multi-node` correctly fails if a second, unscored call also mutated the canvas.
+        const dispatched = await dispatchAllToolCalls(chunks, executor, config, VERIFY_USER_PERMISSIONS);
+        const primary = pickPrimaryToolCall(dispatched);
+        // Non-null whenever a call was made at all, even with invalid JSON args — its identity
+        // (name) still matters to check()'s "unexpected tool call" branches, and a synthetic
+        // dispatchResult below carries the specific "not valid JSON" message through the SAME
+        // `!dispatchResult.ok` branch every check() already has, rather than a generic "no tool
+        // call" message that would misreport what actually happened.
+        const toolCall = primary ? { id: primary.id, name: primary.name, args: primary.args } : null;
+        const dispatchResult = primary?.dispatchResult;
 
         const positionsAfter = snapshotPositions(binding);
         const { pass, path, error } = scenario.check({
             toolCall,
             dispatchResult,
+            toolCalls: dispatched,
             positionsBefore,
             positionsAfter,
             textPresent,
@@ -658,14 +769,26 @@ export const runLocatorScenario = async (
         return {
             scenarioId,
             pass,
-            toolCallName: toolCall?.name ?? null,
+            toolCallName: primary?.name ?? null,
             textPresent,
             positionsBefore,
             positionsAfter,
             ...(path ? { path } : {}),
             ...(error ? { error } : {}),
-            ...(toolCall ? { argsValid: true } : {}),
-            ...(dispatchResult ? { dispatchOk: dispatchResult.ok } : {}),
+            ...(primary ? { argsValid: primary.argsValid } : {}),
+            // `dispatchOk` reflects a REAL `ToolExecutor.dispatch` attempt only — never derived
+            // from the synthetic dispatchResult invalid-JSON args produce internally above, so it
+            // stays absent (not `false`) exactly when no dispatch was actually attempted.
+            ...(primary?.argsValid ? { dispatchOk: dispatchResult?.ok } : {}),
+            ...(dispatched.length > 0
+                ? {
+                      toolCalls: dispatched.map(d => ({
+                          name: d.name,
+                          argsValid: d.argsValid,
+                          ...(d.argsValid ? { dispatchOk: d.dispatchResult.ok } : {}),
+                      })),
+                  }
+                : {}),
         };
     } catch (err) {
         // Everything in the try block above is a real thrown error escaping gateway.chat() itself
@@ -873,6 +996,10 @@ export interface MultiTurnTurnTrace {
      * `list_nodes` lookup — see `stepStatus`/`continuationReason` for that case instead.
      */
     error?: string;
+    /** Every tool call the model emitted THIS turn, in order — not just the one `check()` scored
+     * (see `pickPrimaryToolCall`). Present whenever at least one tool call was made this turn;
+     * absent (never an empty array) when the model made none. */
+    toolCalls?: { name: string; argsValid: boolean; dispatchOk?: boolean }[];
 }
 
 export interface MultiTurnLocatorScenarioResult {
@@ -1048,12 +1175,15 @@ export const runMultiTurnLocatorScenario = async (
             return finalize('provider-error', message.slice(0, ERROR_MESSAGE_LIMIT));
         }
 
-        const toolCallChunk = chunks.find(c => c.toolCall)?.toolCall ?? null;
         const textPresent = chunks.some(c => typeof c.text === 'string' && c.text.length > 0);
 
-        if (!toolCallChunk) {
+        // Dispatch EVERY tool call the model emitted this turn, in order — never just the first.
+        const dispatched = await dispatchAllToolCalls(chunks, executor, config, VERIFY_USER_PERMISSIONS);
+
+        if (dispatched.length === 0) {
             const { pass, error } = scenario.check({
                 toolCall: null,
+                toolCalls: [],
                 positionsBefore,
                 positionsAfter: snapshotPositions(binding),
                 textPresent,
@@ -1062,49 +1192,46 @@ export const runMultiTurnLocatorScenario = async (
             return finalize(pass ? 'success' : 'failure', error);
         }
 
-        let args: unknown;
-        try {
-            args = JSON.parse(toolCallChunk.argsDelta);
-        } catch {
-            const error = 'tool call arguments were not valid JSON';
-            turns.push({ turn: turnNumber, toolCallName: toolCallChunk.name, textPresent, argsValid: false, error });
-            return finalize('failure', error);
+        // Every call this turn joins toolSequence in order — `isSuccessfulLookupActionRoundTrip`
+        // already treats this as a flat sequence, not one entry per turn, so a batched
+        // `list_nodes` + `move_node` turn is indistinguishable from the same two calls arriving on
+        // separate turns for lookup-first/genuine-roundtrip classification purposes.
+        for (const call of dispatched) {
+            toolSequence.push(call.name);
         }
 
-        const toolCall: ToolCall = { id: toolCallChunk.id, name: toolCallChunk.name, args };
-        const dispatchResult = await executor.dispatch(config, toolCall, VERIFY_USER_PERMISSIONS);
-        toolSequence.push(toolCall.name);
-
-        // Append the real assistant tool-call + tool-result message pair before the next turn —
-        // same shape BaseAgent.send() persists (assistant `toolCalls[].args` is the raw JSON
-        // string, not the parsed value; see `mapTranscript`/`recordToolResult` in baseAgent.ts).
-        // `thoughtSignature` must ride along verbatim when the gateway captured one — Gemini's
-        // "thinking" models reject the replayed functionCall with a 400 without it (see
-        // `ChatMessage.toolCalls`'s doc in llmGateway.ts); it stays absent for every other provider.
+        // Append the real assistant tool-call message (one entry per dispatched call, exactly as
+        // BaseAgent.send() would persist a multi-call turn) and one tool-result message per call —
+        // same shape `mapTranscript`/`recordToolResult` in baseAgent.ts produce. `thoughtSignature`
+        // rides along verbatim per call when the gateway captured one; Gemini's "thinking" models
+        // reject a replayed functionCall with a 400 without it — absent for every other provider.
         transcript.push({
             role: 'assistant',
             content: null,
-            toolCalls: [
-                {
-                    id: toolCall.id,
-                    name: toolCall.name,
-                    args: toolCallChunk.argsDelta,
-                    ...(toolCallChunk.thoughtSignature !== undefined
-                        ? { thoughtSignature: toolCallChunk.thoughtSignature }
-                        : {}),
-                },
-            ],
+            toolCalls: dispatched.map(call => ({
+                id: call.id,
+                name: call.name,
+                args: call.argsDelta,
+                ...(call.thoughtSignature !== undefined ? { thoughtSignature: call.thoughtSignature } : {}),
+            })),
         });
-        transcript.push({
-            role: 'tool',
-            content: toolResultToMessageContent(dispatchResult),
-            toolCallId: toolCall.id,
-        });
+        for (const call of dispatched) {
+            transcript.push({
+                role: 'tool',
+                content: toolResultToMessageContent(call.dispatchResult),
+                toolCallId: call.id,
+            });
+        }
+
+        const primary = pickPrimaryToolCall(dispatched) as DispatchedToolCall;
+        const toolCall: ToolCall = { id: primary.id, name: primary.name, args: primary.args };
+        const dispatchResult = primary.dispatchResult;
 
         const positionsAfter = snapshotPositions(binding);
         const { pass, error } = scenario.check({
             toolCall,
             dispatchResult,
+            toolCalls: dispatched,
             positionsBefore,
             positionsAfter,
             textPresent,
@@ -1115,8 +1242,15 @@ export const runMultiTurnLocatorScenario = async (
             turn: turnNumber,
             toolCallName: toolCall.name,
             textPresent,
-            argsValid: true,
-            dispatchOk: dispatchResult.ok,
+            argsValid: primary.argsValid,
+            // `dispatchOk` reflects a REAL `ToolExecutor.dispatch` attempt only — absent, not
+            // `false`, when args were invalid and dispatch was never actually attempted.
+            ...(primary.argsValid ? { dispatchOk: dispatchResult.ok } : {}),
+            toolCalls: dispatched.map(d => ({
+                name: d.name,
+                argsValid: d.argsValid,
+                ...(d.argsValid ? { dispatchOk: d.dispatchResult.ok } : {}),
+            })),
             // A continuable lookup's check() message (e.g. "unexpected tool call: list_nodes") is
             // never a real problem — it only means the task isn't done yet — so it's never surfaced
             // as `error` here; `error` is reserved for a terminal (non-continuable) failed check.

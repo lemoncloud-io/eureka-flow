@@ -787,6 +787,82 @@ describe('createGeminiToolLlmGateway', () => {
         });
     });
 
+    // Regression coverage: the tool-call id counter must be scoped to the GATEWAY INSTANCE, not to
+    // one `chat()` call — otherwise every turn restarts at `gemini-call-1`, and a later request's
+    // `buildToolCallNameById` (which scans the WHOLE accumulated transcript) has two different
+    // real calls sharing the same id, so the later one silently overwrites the earlier one's name
+    // in the map. A stale tool-result message from the earlier call would then replay under the
+    // WRONG function name.
+    describe('tool-call id uniqueness across sequential chat() calls on the same gateway', () => {
+        it('never reuses an id across 3 sequential turns on the same gateway instance', async () => {
+            const http = new ScriptedHttpRequest([
+                { json: geminiFunctionCall('list_nodes', {}) },
+                { json: geminiFunctionCall('move_node', { nodeId: 'text-1' }) },
+                { json: geminiFunctionCall('list_nodes', {}) },
+            ]);
+            const gateway = createGateway(http);
+
+            const turn1 = await drain(gateway.chat({ messages: [{ role: 'user', content: 'go' }], tools: [] }));
+            const call1 = turn1[0];
+            expect(call1).toEqual({ toolCall: { id: 'gemini-call-1', name: 'list_nodes', argsDelta: '{}' } });
+
+            const turn2 = await drain(
+                gateway.chat({
+                    messages: [
+                        { role: 'user', content: 'go' },
+                        {
+                            role: 'assistant',
+                            content: null,
+                            toolCalls: [{ id: 'gemini-call-1', name: 'list_nodes', args: '{}' }],
+                        },
+                        { role: 'tool', content: '{"nodes":[]}', toolCallId: 'gemini-call-1' },
+                    ],
+                    tools: [],
+                })
+            );
+            const call2 = turn2[0];
+            // Before the fix, this would ALSO be 'gemini-call-1' — colliding with turn 1's call.
+            expect(call2).toEqual({
+                toolCall: { id: 'gemini-call-2', name: 'move_node', argsDelta: '{"nodeId":"text-1"}' },
+            });
+
+            const turn3 = await drain(
+                gateway.chat({
+                    messages: [
+                        { role: 'user', content: 'go' },
+                        {
+                            role: 'assistant',
+                            content: null,
+                            toolCalls: [{ id: 'gemini-call-1', name: 'list_nodes', args: '{}' }],
+                        },
+                        { role: 'tool', content: '{"nodes":[]}', toolCallId: 'gemini-call-1' },
+                        {
+                            role: 'assistant',
+                            content: null,
+                            toolCalls: [{ id: 'gemini-call-2', name: 'move_node', args: '{"nodeId":"text-1"}' }],
+                        },
+                        { role: 'tool', content: '{"ok":true}', toolCallId: 'gemini-call-2' },
+                    ],
+                    tools: [],
+                })
+            );
+            const call3 = turn3[0];
+            expect(call3).toEqual({ toolCall: { id: 'gemini-call-3', name: 'list_nodes', argsDelta: '{}' } });
+
+            // The critical regression: turn 3's OWN outgoing request replays turn 1's and turn 2's
+            // tool results — each `functionResponse` must resolve to the call it actually answers,
+            // never overwritten by a later, differently-named call that happened to land on the
+            // same id under the old per-call-scoped counter.
+            const turn3Body = http.requests[2].body as Record<string, unknown>;
+            const turn3Contents = turn3Body['contents'] as Array<Record<string, unknown>>;
+            const functionResponseNames = turn3Contents
+                .flatMap(c => c['parts'] as Array<Record<string, unknown>>)
+                .filter(p => 'functionResponse' in p)
+                .map(p => (p['functionResponse'] as { name: string }).name);
+            expect(functionResponseNames).toEqual(['list_nodes', 'move_node']);
+        });
+    });
+
     describe('usage/cost mapping', () => {
         it('subtracts cachedContentTokenCount from promptTokenCount for inputTokens — never double-counted', async () => {
             const http = new ScriptedHttpRequest([
@@ -915,8 +991,9 @@ describe('createGeminiToolLlmGateway', () => {
             const done = chunks.find(c => c.done);
 
             const pricing = getModelPricing('gemini', 'gemini-2.5-flash');
-            if (!pricing?.cachedInputPerMillion)
-                {throw new Error('expected gemini-2.5-flash pricing with a cached rate');}
+            if (!pricing?.cachedInputPerMillion) {
+                throw new Error('expected gemini-2.5-flash pricing with a cached rate');
+            }
             const expected =
                 0.7 * pricing.inputPerMillion +
                 0.3 * pricing.cachedInputPerMillion +
