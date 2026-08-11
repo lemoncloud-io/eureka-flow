@@ -26,10 +26,10 @@ has its own [SPEC](../../docs/browser-agent/agents/locator.md).
 | Orchestrator                     | `src/agents/orchestratorAgent.ts` | The main agent: reads the canvas, discovers the specialist roster, and delegates every edit via `spawn`; ends the turn with a plain-text message (there is no `finish` tool — the eval re-asks for the outcome).                                       |
 | Session                          | `src/session/session.ts`          | `SessionState` the panel renders from + in-memory `SessionStore` (`createInMemorySessionStore`).                                                                                                                                                       |
 
-The package also hosts two shared subsystems used across agents — the **HTTP port** (`src/http/`) and
-the **Agent Environment** (`src/environment/`: storage, trace, self-check). See
+The package also hosts the shared subsystems used across agents, each its own module: the **HTTP port**
+(`src/http/`), **storage** (`src/storage/`) and **tracing** (`src/trace/`). See
 [llm-gateway.md](../../docs/browser-agent/design/llm-gateway.md) and
-[environment.md](../../docs/browser-agent/foundations/environment.md).
+[trace-spec.md](../../docs/browser-agent/design/trace-spec.md).
 
 ## Design notes
 

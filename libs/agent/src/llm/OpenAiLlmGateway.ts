@@ -1,8 +1,8 @@
 import { PRICING_CONFIG_VERSION, estimateCost } from './pricing';
 import { NoopTracer } from '../trace';
 
-import type { Tracer } from '../trace';
 import type { HttpClient } from '../http';
+import type { Tracer } from '../trace';
 import type {
     ChatMessage,
     ChatRequest,
@@ -17,7 +17,7 @@ import type {
  * OpenAI Chat Completions gateway — the first *tool-capable* real-provider gateway.
  *
  * eureka-flows-api's Generate endpoint is text-only and not designed for tool calling (see
- * docs/browser-agent/foundations/provider-tool-calling.md §1), so structured
+ * docs/browser-agent/design/provider-tool-calling.md §1), so structured
  * tool-call verification runs directly against provider APIs behind the shared
  * {@link LlmGateway} contract. This gateway declares `capabilities.toolCalls = true` and maps
  * `ToolDef` → OpenAI `tools` / parses `tool_calls` back into {@link Chunk} `toolCall`s.

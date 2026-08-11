@@ -50,6 +50,12 @@ export interface EdgeChange {
 export interface GraphDiff {
     /** The turn this delta covers, or `'session'` for the cumulative whole-session delta. */
     runId: string;
+    /**
+     * Whether a closing boundary (`turn.done`/`turn.error`) was captured. `false` means the turn is still in
+     * flight or was aborted: `after` mirrors `before` and the delta is empty because it is UNKNOWN, not because
+     * nothing changed.
+     */
+    settled: boolean;
     before: GraphSnapshot;
     after: GraphSnapshot;
     addedNodes: NodeChange[];

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { firstToolCall } from './chunks';
 import { createInMemoryCanvasBinding } from '../../canvas/inMemoryCanvasBinding';
 import { createCatalogLookup } from '../../catalog';
 import { ScriptedHttpClient } from '../../http/ScriptedHttpClient';
@@ -732,12 +733,14 @@ describe('createOpenAiLlmGateway', () => {
             })
         );
 
-        const toolCall = chunks.find(c => c.toolCall)?.toolCall;
-        expect(toolCall?.name).toBe('move_node');
+        // firstToolCall throws (naming what the stream held) when there is none, so it carries the presence
+        // assertion the `toolCall?.name` check used to imply and narrows the three reads below.
+        const toolCall = firstToolCall(chunks);
+        expect(toolCall.name).toBe('move_node');
 
         const result = await executor.dispatch(
             config,
-            { id: toolCall!.id, name: toolCall!.name, args: JSON.parse(toolCall!.argsDelta) },
+            { id: toolCall.id, name: toolCall.name, args: JSON.parse(toolCall.argsDelta) },
             { canModifyCanvas: true }
         );
 

@@ -1,8 +1,8 @@
 import { PRICING_CONFIG_VERSION, estimateCost } from './pricing';
 import { NoopTracer } from '../trace';
 
-import type { Tracer } from '../trace';
 import type { HttpClient } from '../http';
+import type { Tracer } from '../trace';
 import type {
     ChatMessage,
     ChatRequest,
@@ -20,7 +20,7 @@ import type {
  * Separate from the text-only {@link createGeminiLlmGateway} (which stays as-is): this one
  * declares `capabilities.toolCalls = true`, maps `ToolDef` → Gemini `functionDeclarations`,
  * and parses `candidate.content.parts[].functionCall` back into {@link Chunk} `toolCall`s.
- * See docs/browser-agent/foundations/provider-tool-calling.md §2 for the full mapping.
+ * See docs/browser-agent/design/provider-tool-calling.md §2 for the full mapping.
  *
  * Single-turn tool calling and multi-turn tool-result mapping are both implemented.
  * Gemini correlates a tool result to the call it answers by function **name** (`functionResponse.

@@ -113,6 +113,30 @@ describe('sinks', () => {
         expect(graph.nodes[0].config.apiKey).toBe('[redacted]');
     });
 
+    it('redactingSink FAILS CLOSED at the depth bound — a secret nested past it is dropped, never emitted verbatim', () => {
+        const inner = memorySink();
+        const tracer = createTracer(redactingSink(inner), () => 0);
+        // Far deeper than MAX_DEPTH (the count is deliberately way past it, so this holds if the bound moves):
+        // the redactor stops scanning here, so the subtree must not survive the cut.
+        let payload: Record<string, unknown> = { apiKey: 'sk-SECRET' };
+        for (let i = 0; i < 40; i++) payload = { nest: payload };
+        tracer.emit({ name: 'x', fields: payload });
+
+        const emitted = JSON.stringify(inner.records[0]);
+        expect(emitted).not.toContain('sk-SECRET');
+        expect(emitted).toContain('[depth-limited]');
+    });
+
+    it('redactingSink survives a self-referential array — the depth bound catches cycles through arrays too', () => {
+        const inner = memorySink();
+        const tracer = createTracer(redactingSink(inner), () => 0);
+        const cyclic: unknown[] = [];
+        cyclic.push(cyclic); // arrays must cost a depth level, or this recurses until RangeError
+
+        expect(() => tracer.emit({ name: 'x', fields: { cyclic } })).not.toThrow();
+        expect(JSON.stringify(inner.records[0])).toContain('[depth-limited]');
+    });
+
     it('fanoutSink delivers each record to every sink', () => {
         const a = memorySink();
         const b = memorySink();

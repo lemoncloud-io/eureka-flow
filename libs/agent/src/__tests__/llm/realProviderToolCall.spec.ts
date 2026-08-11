@@ -21,7 +21,7 @@ import type { UsageTotals } from '../../llm/verificationMetrics';
  * parsing/scoring logic, not the models' behavior.
  *
  * The verification scenario itself lives in `verifyMoveNodeToolCall`
- * (docs/browser-agent/foundations/provider-tool-calling.md) so there is exactly one
+ * (docs/browser-agent/design/provider-tool-calling.md) so there is exactly one
  * implementation of "ask the model to move the node, dispatch the result, check the position".
  *
  * Each `it` below logs its own elapsed time (measured at the call site, around

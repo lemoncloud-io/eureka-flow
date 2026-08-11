@@ -5,8 +5,8 @@ import {
 import { createGeminiToolLlmGateway } from './GeminiToolLlmGateway';
 import { createOpenAiLlmGateway } from './OpenAiLlmGateway';
 
-import type { Tracer } from '../trace';
 import type { HttpClient } from '../http';
+import type { Tracer } from '../trace';
 import type { LlmGateway } from './llmGateway';
 
 /**

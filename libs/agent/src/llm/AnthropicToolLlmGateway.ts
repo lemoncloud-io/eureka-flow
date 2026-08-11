@@ -1,8 +1,8 @@
 import { PRICING_CONFIG_VERSION, estimateCost } from './pricing';
 import { NoopTracer } from '../trace';
 
-import type { Tracer } from '../trace';
 import type { HttpClient } from '../http';
+import type { Tracer } from '../trace';
 import type {
     ChatMessage,
     ChatRequest,
@@ -21,7 +21,7 @@ import type {
  * a required `anthropic-version` header, `input_schema` instead of `parameters`, a required
  * `max_tokens`, a top-level `system` field instead of a `role: 'system'` message, and a response
  * `content` array mixing text and `tool_use` blocks instead of separate fields. See
- * docs/browser-agent/foundations/provider-tool-calling.md §2 for the full mapping.
+ * docs/browser-agent/design/provider-tool-calling.md §2 for the full mapping.
  *
  * Single-turn tool calling and multi-turn tool-result mapping are both implemented. Unlike Gemini
  * (which correlates tool results by function *name* and has no way to map `toolCallId`-keyed tool

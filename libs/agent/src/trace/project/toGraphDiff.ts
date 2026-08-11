@@ -14,16 +14,24 @@ const isRoot = (record: TraceRecord): boolean => !String(record.context.flowPath
  * it for the cumulative whole-session delta (the first turn's `before` → the last turn's `after`).
  * Per-sub-agent snapshots are deliberately ignored (they overlap on the shared concurrent binding); the
  * delta lives only at the root.
+ *
+ * A MISSING boundary yields an EMPTY delta, never a phantom one: a turn still in flight (or aborted before
+ * `turn.done`) has no `after` snapshot, and an absent snapshot is unknown, not empty — treating it as `EMPTY`
+ * would report every node on the canvas as deleted. Both boundaries fall back to the one that IS present, and
+ * `settled` records whether the closing boundary was seen at all.
  */
 export const toGraphDiff = (records: TraceRecord[], runId?: string): GraphDiff => {
     const roots = records.filter(r => isRoot(r) && (runId === undefined || r.context.runId === runId));
     const start = roots.find(r => r.name === TURN_START && r.fields.graph);
     const ends = roots.filter(r => (r.name === TURN_DONE || r.name === TURN_ERROR) && r.fields.graph);
 
-    const before = (start?.fields.graph as GraphSnapshot) ?? EMPTY;
-    const after = (ends.length ? (ends[ends.length - 1].fields.graph as GraphSnapshot) : undefined) ?? EMPTY;
+    const startGraph = start?.fields.graph as GraphSnapshot | undefined;
+    const endGraph = ends.length ? (ends[ends.length - 1].fields.graph as GraphSnapshot) : undefined;
 
-    return { runId: runId ?? 'session', before, after, ...diff(before, after) };
+    const before = startGraph ?? endGraph ?? EMPTY;
+    const after = endGraph ?? startGraph ?? EMPTY;
+
+    return { runId: runId ?? 'session', settled: endGraph !== undefined, before, after, ...diff(before, after) };
 };
 
 /** Coerce a snapshot field (typed `unknown` — the snapshot is structural) to a string, treating null/undefined as empty. */

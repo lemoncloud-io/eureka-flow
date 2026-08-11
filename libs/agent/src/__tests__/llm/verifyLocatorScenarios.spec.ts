@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { LOCATOR_SCENARIOS, runAllLocatorScenarios, runLocatorScenario } from '../../llm/verifyLocatorScenarios';
 
 import type { ChatRequest, Chunk, LlmGateway } from '../../llm/llmGateway';
-import type { LocatorScenarioResult } from '../../llm/verifyLocatorScenarios';
+import type { LocatorScenarioKnownVariance, LocatorScenarioResult } from '../../llm/verifyLocatorScenarios';
 
 /** A minimal fake gateway that ignores the request and streams a scripted response. */
 const fakeGateway = (chunks: Chunk[]): LlmGateway => ({
@@ -22,15 +22,30 @@ const baseResult: LocatorScenarioResult = {
     positionsAfter: {},
 };
 
+/**
+ * The documented variance allowance of one scenario (throws if the scenario or its allowance is absent — a
+ * test-only convenience). Throwing carries the presence assertion these specs used to make separately, and
+ * narrows away both `undefined`s, so the predicate reads without non-null assertions.
+ */
+const varianceOf = (scenarioId: string): LocatorScenarioKnownVariance => {
+    const scenario = LOCATOR_SCENARIOS.find(s => s.id === scenarioId);
+    if (!scenario) {
+        throw new Error(
+            `spec: no scenario "${scenarioId}" — registered: ${LOCATOR_SCENARIOS.map(s => s.id).join(', ')}`
+        );
+    }
+    if (!scenario.knownVariance) {
+        throw new Error(`spec: scenario "${scenarioId}" documents no knownVariance`);
+    }
+    return scenario.knownVariance;
+};
+
 describe('LOCATOR_SCENARIOS knownVariance predicates', () => {
     it('list-nodes-read-only: matches only "no tool call, non-empty text" — not a bare no-tool-call', () => {
-        const scenario = LOCATOR_SCENARIOS.find(s => s.id === 'list-nodes-read-only');
-        expect(scenario?.knownVariance).toBeDefined();
-        expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: null, textPresent: true })).toBe(true);
-        expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: null, textPresent: false })).toBe(false);
-        expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: 'move_node', textPresent: true })).toBe(
-            false
-        );
+        const variance = varianceOf('list-nodes-read-only');
+        expect(variance.matches({ ...baseResult, toolCallName: null, textPresent: true })).toBe(true);
+        expect(variance.matches({ ...baseResult, toolCallName: null, textPresent: false })).toBe(false);
+        expect(variance.matches({ ...baseResult, toolCallName: 'move_node', textPresent: true })).toBe(false);
     });
 
     const TARGET_RESOLUTION_SCENARIO_IDS = [
@@ -48,13 +63,10 @@ describe('LOCATOR_SCENARIOS knownVariance predicates', () => {
         '%s: shares the Gemini lookup-first target-resolution variance',
         scenarioId => {
             it('matches only "called list_nodes instead" — not any other wrong tool', () => {
-                const scenario = LOCATOR_SCENARIOS.find(s => s.id === scenarioId);
-                expect(scenario?.knownVariance).toBeDefined();
-                expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: 'list_nodes' })).toBe(true);
-                expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: null })).toBe(false);
-                expect(scenario!.knownVariance!.matches({ ...baseResult, toolCallName: 'some_other_tool' })).toBe(
-                    false
-                );
+                const variance = varianceOf(scenarioId);
+                expect(variance.matches({ ...baseResult, toolCallName: 'list_nodes' })).toBe(true);
+                expect(variance.matches({ ...baseResult, toolCallName: null })).toBe(false);
+                expect(variance.matches({ ...baseResult, toolCallName: 'some_other_tool' })).toBe(false);
             });
         }
     );
@@ -545,7 +557,7 @@ describe('runLocatorScenario: error handling', () => {
         const result = await runLocatorScenario(gateway, 'move-node-right');
         expect(result.pass).toBe(false);
         expect(result.error).toBeDefined();
-        expect(result.error!.length).toBeLessThanOrEqual(200);
+        expect(result.error?.length).toBeLessThanOrEqual(200);
     });
 
     it('stringifies a thrown non-Error value from the gateway (e.g. a plain string)', async () => {

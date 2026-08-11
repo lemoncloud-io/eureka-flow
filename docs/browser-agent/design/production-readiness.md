@@ -49,7 +49,7 @@ is expected to implement an equivalent mapping server-side (see §2).
   boundary, that no request body ever contains anything resembling an API key or bearer token.
 
 **eureka-flows-api dependency status: the tool-calling endpoint is NOT deployed.**
-`docs/browser-agent/foundations/eureka-tool-calling-endpoint-contract.md` is an implementation
+`docs/browser-agent/design/eureka-tool-calling-endpoint-contract.md` is an implementation
 contract for the eureka-flows-api backend team — it describes what to build, not something already
 live. `VITE_EUREKA_TOOL_CALL_ENDPOINT` is unset by default specifically so the browser app never
 depends on this by accident (falls back to the existing text-only socket gateway).
@@ -180,7 +180,7 @@ running with a real, funded key, and never assume a key being present is itself 
 
 **BLOCKED BY API DEPLOYMENT.** The single blocking dependency for any part of this architecture to
 be genuinely production-ready is eureka-flows-api's tool-calling endpoint
-(`docs/browser-agent/foundations/eureka-tool-calling-endpoint-contract.md`) going from
+(`docs/browser-agent/design/eureka-tool-calling-endpoint-contract.md`) going from
 "implementation contract" to "deployed and passing its own acceptance criteria (§24 of that
 doc)". Until then: `VITE_EUREKA_TOOL_CALL_ENDPOINT` must stay unset in every real deployment,
 layer E stays a skipped placeholder, and no model may be marked `QUALIFIED` regardless of its
@@ -188,7 +188,7 @@ provider-native live-verification history.
 
 ## Related documents
 
-- `docs/browser-agent/foundations/tool-calling-integration-handoff.md` — the consolidated
+- `docs/browser-agent/design/tool-calling-integration-handoff.md` — the consolidated
   engineering handoff for this work: architecture, implemented-vs-prototype-vs-proposed status,
   verification evidence, the proposed production flow, open technical decisions, a prioritized
   remaining-work checklist, and exact verification commands. Use that document as the primary
@@ -197,7 +197,7 @@ provider-native live-verification history.
 
 ## Historical documents
 
-- `docs/browser-agent/foundations/provider-tool-calling.md` — still accurate for what it covers
+- `docs/browser-agent/design/provider-tool-calling.md` — still accurate for what it covers
   (provider-native gateway wire mapping, `ToolExecutor` contract, offline/real-key test commands
   for `libs/agent`'s own verification harness); §10 there now points here for the browser/backend
   picture it didn't originally cover. Not superseded, just narrower in scope than this document.

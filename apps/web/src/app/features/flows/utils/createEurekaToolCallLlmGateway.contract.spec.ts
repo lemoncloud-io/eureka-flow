@@ -28,14 +28,14 @@ import type { Server } from 'node:http';
  * `fetch()` call — the request genuinely leaves the process and comes back over a real socket,
  * the same as it would against a deployed backend. Deliberately NOT `FakeGateway` and NOT a
  * `post` mock that returns canned data in memory without a network round trip — see
- * `docs/browser-agent/foundations/eureka-tool-calling-endpoint-contract.md` for why production
+ * `docs/browser-agent/design/eureka-tool-calling-endpoint-contract.md` for why production
  * acceptance tests must not rely on `FakeGateway` alone.
  *
  * The endpoint itself does not exist yet (see the gateway's own module doc) — this file proves
  * the gateway's side of the contract against a scripted stand-in server, not against the real
  * eureka-flows-api backend or a real provider. Real-provider qualification (layer D) already
  * exists in `libs/agent` as `realLocatorScenarios.spec.ts` / `realProviderToolCall.spec.ts`,
- * env-gated on a real provider key — see `docs/browser-agent/foundations/production-readiness.md`
+ * env-gated on a real provider key — see `docs/browser-agent/design/production-readiness.md`
  * for the full test-layer map. The real-*backend* proof (this browser gateway against a deployed
  * eureka-flows-api) is `browserToolCalling.production.e2e.spec.ts` (this same `utils/` directory)
  * — a deploy-gated placeholder today, not a passing end-to-end test, until that endpoint is

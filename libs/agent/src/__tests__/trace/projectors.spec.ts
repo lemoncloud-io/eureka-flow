@@ -150,4 +150,42 @@ describe('trace projectors', () => {
         const turn2 = toGraphDiff(sink.records, 'run-2'); // just that turn's delta
         expect(turn2.addedNodes).toEqual([b]);
     });
+
+    it('toGraphDiff: an in-flight turn (no turn.done) reports an EMPTY delta, not the whole canvas deleted', () => {
+        const sink = memorySink();
+        const root = createTracer(sink).child({
+            runId: 'r-live',
+            'gen_ai.agent.name': 'orchestrator',
+            'gen_ai.agent.id': 'orchestrator',
+            flowPath: 'flow',
+        });
+        const n1 = { id: 'n1', type: 'http' };
+        root.emit({ name: TURN_START, fields: { graph: { nodes: [n1], edges: [] } } });
+        // No turn.done/turn.error: the turn is still running (or was aborted). There is no `after` snapshot,
+        // and "unknown" must not be projected as "empty" — that would read as a canvas-wide delete.
+
+        const diff = toGraphDiff(sink.records, 'r-live');
+        expect(diff.settled).toBe(false);
+        expect(diff.removedNodes).toEqual([]);
+        expect(diff.addedNodes).toEqual([]);
+        expect(diff.changedNodes).toEqual([]);
+        expect(diff.after.nodes).toEqual([n1]); // mirrors `before` — the last state actually observed
+    });
+
+    it('toGraphDiff: a settled turn says so, so an empty delta is readable as "nothing changed"', () => {
+        const sink = memorySink();
+        const root = createTracer(sink).child({
+            runId: 'r-done',
+            'gen_ai.agent.name': 'orchestrator',
+            'gen_ai.agent.id': 'orchestrator',
+            flowPath: 'flow',
+        });
+        const graph = { nodes: [{ id: 'n1', type: 'http' }], edges: [] };
+        root.emit({ name: TURN_START, fields: { graph } });
+        root.emit({ name: TURN_DONE, fields: { graph } });
+
+        const diff = toGraphDiff(sink.records, 'r-done');
+        expect(diff.settled).toBe(true);
+        expect(diff.removedNodes).toEqual([]);
+    });
 });

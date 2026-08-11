@@ -61,7 +61,10 @@ const renderOneDiff = (heading: string, d: GraphDiff, out: string[]): void => {
     out.push(
         `${heading}  totals: ${d.before.nodes.length}n/${d.before.edges.length}e → ${d.after.nodes.length}n/${d.after.edges.length}e`
     );
-    out.push(...(rows.length ? rows : ['    (no structural change)']));
+    // An unsettled turn has no closing snapshot: say the delta is unknown rather than claim nothing changed.
+    out.push(
+        ...(rows.length ? rows : [d.settled ? '    (no structural change)' : '    (turn in flight — delta unknown)'])
+    );
 };
 
 // 3/3 · the canvas delta — the cumulative whole-session delta on top, then one delta per turn.

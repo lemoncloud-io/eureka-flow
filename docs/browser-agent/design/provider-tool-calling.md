@@ -235,17 +235,17 @@ browser app's own production gateway is a separate, app-layer piece:
 `FlowAgentPanel.tsx` behind the `VITE_EUREKA_TOOL_CALL_ENDPOINT` feature flag (off by default). It
 implements the same shared `LlmGateway` contract as every gateway in this document, but instead of
 calling a provider directly, it calls a single eureka-flows-api endpoint
-(`docs/browser-agent/foundations/eureka-tool-calling-endpoint-contract.md` — **not deployed**,
+(`docs/browser-agent/design/eureka-tool-calling-endpoint-contract.md` — **not deployed**,
 implementation contract only) which is meant to do the provider-native mapping described in §2
 server-side, using the same normalized `Chunk` shape as its response.
 
-See `docs/browser-agent/foundations/production-readiness.md` for the full architecture, the
+See `docs/browser-agent/design/production-readiness.md` for the full architecture, the
 model-manifest benchmark built on top of `providerRegistry.ts`, the qualification policy, and the
 current, dated status of every test layer (unit / provider-adapter contract / eureka-flows-api
 browser contract / live-provider qualification / production E2E) — that document is the current
 single source of truth for "is this production-ready", not this one.
 
-See `docs/browser-agent/foundations/tool-calling-integration-handoff.md` for the consolidated
+See `docs/browser-agent/design/tool-calling-integration-handoff.md` for the consolidated
 engineering handoff covering this same work end to end — architecture, implemented-vs-prototype
 status, verification evidence, the proposed production flow, open technical decisions, and a
 prioritized remaining-work checklist for whoever continues the backend integration.

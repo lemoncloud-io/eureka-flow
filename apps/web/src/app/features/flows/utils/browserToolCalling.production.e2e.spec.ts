@@ -5,7 +5,7 @@ import { describe, it } from 'vitest';
  * intended production path and its gates explicit and discoverable, not to exercise it — there is
  * no Playwright/Cypress (or any browser-automation) framework configured anywhere in this repo
  * today, and eureka-flows-api's tool-calling endpoint (see
- * `docs/browser-agent/foundations/eureka-tool-calling-endpoint-contract.md`) is not deployed.
+ * `docs/browser-agent/design/eureka-tool-calling-endpoint-contract.md`) is not deployed.
  * Setting up real browser-automation infra is future work, tracked separately — not attempted by
  * this file.
  *
@@ -23,7 +23,7 @@ import { describe, it } from 'vitest';
  *     → a recorded usage/cost/elapsed-time metric (`libs/agent/src/llm/verificationMetrics.ts`)
  *
  * Required gates before this can be a real, running, passing test (see
- * docs/browser-agent/foundations/production-readiness.md's qualification policy):
+ * docs/browser-agent/design/production-readiness.md's qualification policy):
  *
  *   1. A Playwright (or equivalent) config + an `nx` E2E target for `apps/web` — does not exist
  *      yet; a repo-level decision, not something to add silently alongside this placeholder.

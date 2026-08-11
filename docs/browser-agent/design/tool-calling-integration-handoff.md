@@ -92,7 +92,7 @@ Section 7 and Section 9.
 | Model manifest | `libs/agent/src/llm/modelManifest.ts` | Per-model benchmark metadata built on top of the registry: discovery source, fixed-vs-dynamic-route classification, stable-vs-preview. |
 | Browser Eureka gateway | `apps/web/src/app/features/flows/utils/createEurekaToolCallLlmGateway.ts` | Browser-side `LlmGateway` implementation that calls a single Eureka backend endpoint; contract-tested, not backend-verified. |
 | Existing Generate gateway | `apps/web/src/app/features/flows/utils/createGenerateApiLlmGateway.ts` | Existing, text-only integration with `eureka-flows-api`'s Generate endpoint, delivered over the flow WebSocket. Unaffected by this work. |
-| Proposed backend contract | `docs/browser-agent/foundations/eureka-tool-calling-endpoint-contract.md` | A written proposal for a tool-capable backend endpoint. **Not implemented server-side.** |
+| Proposed backend contract | `docs/browser-agent/design/eureka-tool-calling-endpoint-contract.md` | A written proposal for a tool-capable backend endpoint. **Not implemented server-side.** |
 | `eureka-flows-api` | Existing backend service (referenced as `@lemoncloud/eureka-flows-api` elsewhere in this repository) | Owns the existing Generate endpoint (Section 6) and, per the proposed contract, would own the tool-capable endpoint this work targets. |
 | `eureka-agents-api` | A separate backend service package (referenced as `@lemoncloud/eureka-agents-api` elsewhere in this repository, e.g. `libs/engine/README.md`) | Distinct from `eureka-flows-api`. This repository does not document what it currently owns with respect to tool-calling; see the boundary note below. |
 
@@ -148,7 +148,7 @@ each:
   exercised against a live multi-turn conversation — see Section 5).
 
 Provider-specific differences are documented inline in each gateway file and in
-`docs/browser-agent/foundations/provider-tool-calling.md` §2, including
+`docs/browser-agent/design/provider-tool-calling.md` §2, including
 Gemini's lack of a call-id concept (correlated by function name instead) and
 Anthropic's distinct auth-header/response-shape requirements.
 
@@ -288,10 +288,10 @@ passing assertions and must not be read as E2E coverage.
 
 | Document | Contents |
 |---|---|
-| `docs/browser-agent/foundations/provider-tool-calling.md` | Provider-native gateway wire mapping, `ToolExecutor` contract, the 11-scenario matrix, provider/model support table, usage/cost monitoring description, security notes on key handling, and known limitations. |
-| `docs/browser-agent/foundations/eureka-tool-calling-endpoint-contract.md` | A proposed request/response/error schema, allowlists, size limits, timeout/retry/cancellation expectations, and a backend acceptance checklist for a tool-capable Eureka endpoint. Explicitly labeled as a proposal for an endpoint that does not exist. |
-| `docs/browser-agent/foundations/production-readiness.md` | Current architecture, security boundary, model manifest summary, qualification policy, test-layer map, and known limitations, dated to a specific commit. |
-| `docs/browser-agent/foundations/tool-calling-integration-handoff.md` | This document. |
+| `docs/browser-agent/design/provider-tool-calling.md` | Provider-native gateway wire mapping, `ToolExecutor` contract, the 11-scenario matrix, provider/model support table, usage/cost monitoring description, security notes on key handling, and known limitations. |
+| `docs/browser-agent/design/eureka-tool-calling-endpoint-contract.md` | A proposed request/response/error schema, allowlists, size limits, timeout/retry/cancellation expectations, and a backend acceptance checklist for a tool-capable Eureka endpoint. Explicitly labeled as a proposal for an endpoint that does not exist. |
+| `docs/browser-agent/design/production-readiness.md` | Current architecture, security boundary, model manifest summary, qualification policy, test-layer map, and known limitations, dated to a specific commit. |
+| `docs/browser-agent/design/tool-calling-integration-handoff.md` | This document. |
 
 ## 5. Verification Evidence
 
@@ -366,7 +366,7 @@ HTTP response body. It authenticates via the same session `x-api-key`
 mechanism used elsewhere in the browser app; the backend, not the browser,
 holds any provider credential.
 
-Per `docs/browser-agent/foundations/provider-tool-calling.md` §1: the Generate
+Per `docs/browser-agent/design/provider-tool-calling.md` §1: the Generate
 endpoint is documented there as accepting a `tools` field without erroring,
 but not returning a structured tool call in any request shape tried during
 that investigation. This document treats that as an existing, documented
@@ -380,7 +380,7 @@ Stated plainly:
 - Structured tool-call support through the existing endpoint has **not been
   confirmed**.
 - The draft endpoint in
-  `docs/browser-agent/foundations/eureka-tool-calling-endpoint-contract.md` is
+  `docs/browser-agent/design/eureka-tool-calling-endpoint-contract.md` is
   a **proposal**. It is not a deployed backend endpoint, and no code in this
   repository calls it against a live server.
 
@@ -522,9 +522,9 @@ The following are unresolved engineering questions, not assignments:
 | `apps/web/src/app/features/flows/utils/browserToolCalling.production.e2e.spec.ts` | Production E2E placeholder | Explicit placeholder, always skipped | Requires a browser-automation framework (not present) and a deployed backend before it can be implemented. |
 | `apps/web/src/app/features/flows/utils/createGenerateApiLlmGateway.ts` | Existing, text-only Generate integration | Implemented, pre-dates this work | Default browser gateway; unaffected by this branch. |
 | `apps/web/src/app/features/flows/components/FlowAgentPanel.tsx` | Browser composition root selecting the active gateway | Implemented | Selects `createEurekaToolCallLlmGateway` only when `VITE_EUREKA_TOOL_CALL_ENDPOINT` is set. |
-| `docs/browser-agent/foundations/eureka-tool-calling-endpoint-contract.md` | Proposed backend contract | Proposal, not implemented server-side | Starting point for Section 8's open decisions. |
-| `docs/browser-agent/foundations/production-readiness.md` | Current architecture/status snapshot | Implemented, dated | Cross-reference for qualification policy and test-layer definitions. |
-| `docs/browser-agent/foundations/provider-tool-calling.md` | Provider-native gateway reference | Implemented | Describes the client-side mapping this backend work would need to mirror or reuse. |
+| `docs/browser-agent/design/eureka-tool-calling-endpoint-contract.md` | Proposed backend contract | Proposal, not implemented server-side | Starting point for Section 8's open decisions. |
+| `docs/browser-agent/design/production-readiness.md` | Current architecture/status snapshot | Implemented, dated | Cross-reference for qualification policy and test-layer definitions. |
+| `docs/browser-agent/design/provider-tool-calling.md` | Provider-native gateway reference | Implemented | Describes the client-side mapping this backend work would need to mirror or reuse. |
 
 ## 11. How to Run Verification
 
