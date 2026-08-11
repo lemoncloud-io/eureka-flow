@@ -62,3 +62,17 @@ export const nodesInRect = (nodes: GraphNode[], rect: CanvasRect, sizeOf: (node:
         })
         .map(node => node.id);
 };
+
+/**
+ * How far to shift a copied group so its top-left corner lands on `target`.
+ *
+ * One offset for the whole group, so the copy keeps the shape the user arranged. An
+ * empty payload shifts by nothing — there is no corner to line up.
+ */
+export const pasteOffsetTo = (copied: { position: CanvasPoint }[], target: CanvasPoint): CanvasPoint => {
+    if (copied.length === 0) return { x: 0, y: 0 };
+
+    const minX = Math.min(...copied.map(n => n.position.x));
+    const minY = Math.min(...copied.map(n => n.position.y));
+    return { x: target.x - minX, y: target.y - minY };
+};

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
 import type { EdgeView, RunContext, RunPortUpdate, TraceEntry } from '../types';
-import type { GraphEdge, GraphLike, GraphNode } from '@flows/engine';
+import type { ClipboardPayload, GraphEdge, GraphLike, GraphNode } from '@flows/engine';
 import type { DataPacket, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
 import type { StateCreator } from 'zustand';
 
@@ -61,8 +61,8 @@ interface CanvasState {
     // Flow Context
     flowId: string | null;
 
-    // Clipboard
-    clipboard: GraphNode | null;
+    // Clipboard — outlives a canvas remount, which a component-local ref could not
+    clipboard: ClipboardPayload | null;
 
     // Viewport
     viewport: Viewport;
@@ -102,7 +102,7 @@ interface CanvasState {
     setNodes: (nodes: GraphNode[] | ((prev: GraphNode[]) => GraphNode[])) => void;
     setConnections: (connections: GraphEdge[] | ((prev: GraphEdge[]) => GraphEdge[])) => void;
     setFlowId: (flowId: string | null) => void;
-    setClipboard: (node: GraphNode | null) => void;
+    setClipboard: (payload: ClipboardPayload | null) => void;
 
     // Actions - Viewport
     setViewport: (viewport: Viewport | ((prev: Viewport) => Viewport)) => void;
@@ -406,7 +406,8 @@ export const canvasStateCreator: StateCreator<CanvasState> = (set, _get) => ({
             viewport: DEFAULT_VIEWPORT,
             selectedNodeId: null,
             selectedConnectionId: null,
-            clipboard: null,
+            // The clipboard deliberately survives: copying in one flow and pasting into
+            // another is the reason it outlives the canvas in the first place.
             traceLogs: new Map(),
             nodeRuns: {},
             collapsedNodeIds: new Set(),

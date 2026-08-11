@@ -21,6 +21,7 @@ import {
     hydrateInputsFromUpstream,
     loadFlow,
     nodesInRect,
+    pasteOffsetTo,
     runFlow,
     runNode,
     shouldUpdateState,
@@ -55,7 +56,7 @@ import {
     getVisiblePorts,
 } from '../utils';
 
-import type { ClipboardPayload, FlowEngine } from '@flows/engine';
+import type { FlowEngine } from '@flows/engine';
 import type { FlowRole, GraphNode, GraphSnapshot, LoadFlowPortData, NodeState } from '@flows/flows';
 import type { NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
@@ -160,6 +161,11 @@ const CLICK_THRESHOLD = 5;
 
 /** World-space gap left between a node and one inserted beside it */
 const NEW_NODE_GAP = 80;
+
+const snapToGrid = (point: { x: number; y: number }) => ({
+    x: Math.round(point.x / GRID_SIZE) * GRID_SIZE,
+    y: Math.round(point.y / GRID_SIZE) * GRID_SIZE,
+});
 
 /** Touch port hit detection threshold in world coordinates */
 const TOUCH_PORT_HIT_THRESHOLD = 50;
@@ -279,9 +285,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const connections = useCanvasConnections();
         const setNodes = useCanvasStore(state => state.setNodes);
 
-        // Nothing renders from the copied payload, so it lives in a ref: holding it in
-        // state would re-render the whole canvas on Ctrl+C.
-        const clipboardRef = useRef<ClipboardPayload | null>(null);
         const [resizingNode, setResizingNode] = useState<{ nodeId: string; width: number } | null>(null);
 
         const executeNodeRef = useRef<(nodeId: string) => Promise<void> | undefined>(undefined);
@@ -413,6 +416,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             currentX: number;
             currentY: number;
         } | null>(null);
+
+        // Where the pointer last was over the canvas, in world coordinates. Null while it
+        // is elsewhere, which is what tells paste to fall back instead of guessing.
+        const lastCanvasPointRef = useRef<{ x: number; y: number } | null>(null);
 
         const portMouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -1719,6 +1726,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         }, [dragState, commitDrag, handleSelectionChange]);
 
         const handleMouseMove = (e: React.MouseEvent) => {
+            lastCanvasPointRef.current = screenToWorld(e.clientX, e.clientY);
+
             if (marquee) {
                 const world = screenToWorld(e.clientX, e.clientY);
                 setMarquee(prev => (prev ? { ...prev, currentX: world.x, currentY: world.y } : prev));
@@ -2045,16 +2054,26 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
                 if (isCtrlOrCmd && e.key.toLowerCase() === 'c') {
                     // The payload carries the edges running between the copied nodes, so a
-                    // pasted copy of a wired-up selection arrives wired up.
-                    if (selectedNodeIds.size > 0) clipboardRef.current = engine.copy([...selectedNodeIds]);
+                    // pasted copy of a wired-up selection arrives wired up. It goes to the
+                    // store rather than a local ref so it survives the canvas unmounting.
+                    if (selectedNodeIds.size > 0) {
+                        useCanvasStore.getState().setClipboard(engine.copy([...selectedNodeIds]));
+                    }
                 }
 
                 if (isCtrlOrCmd && e.key.toLowerCase() === 'v') {
-                    const payload = clipboardRef.current;
+                    // Read through getState: subscribing would put the clipboard in this
+                    // effect's deps and re-register the listener on every copy.
+                    const payload = useCanvasStore.getState().clipboard;
                     if (payload && payload.nodes.length > 0) {
-                        const pasted = engine.paste(payload, { x: 40, y: 40 });
-                        // Select all pasted nodes
-                        setSelectedNodeIds(new Set(pasted));
+                        // Land the copy under the pointer. Off-canvas (keyboard-only paste,
+                        // or the pointer over a panel) falls back to a visible nudge.
+                        const cursor = lastCanvasPointRef.current;
+                        const offset = cursor
+                            ? snapToGrid(pasteOffsetTo(payload.nodes, cursor))
+                            : { x: GRID_SIZE * 2, y: GRID_SIZE * 2 };
+                        const pasted = engine.paste(payload, offset);
+                        selectNodeIds(pasted);
                     }
                 }
 
@@ -2085,6 +2104,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             permissions.canModifyCanvas,
             commit,
             handleSelectionChange,
+            selectNodeIds,
         ]);
 
         // Pre-compute connected ports per node — avoids O(connections) per node per render
@@ -2120,6 +2140,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     ref={canvasRef}
                     className={`relative flex-1 bg-canvas overflow-hidden outline-none ${role === 'anonymous' ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                     onMouseMove={handleMouseMove}
+                    onMouseLeave={() => (lastCanvasPointRef.current = null)}
                     onMouseDown={handleCanvasMouseDown}
                     onContextMenu={handleCanvasContextMenu}
                     onTouchStart={handleCanvasTouchStart}

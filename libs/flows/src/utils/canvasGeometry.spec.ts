@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findNodeAtPoint, nodesInRect } from './canvasGeometry';
+import { findNodeAtPoint, nodesInRect, pasteOffsetTo } from './canvasGeometry';
 
 import type { GraphNode } from '../types';
 
@@ -64,5 +64,31 @@ describe('nodesInRect', () => {
 
     it('selects nothing for a zero-size rectangle — a click is not a selection box', () => {
         expect(nodesInRect(nodes, { x: 10, y: 10, width: 0, height: 0 }, size)).toEqual([]);
+    });
+});
+
+describe('pasteOffsetTo', () => {
+    const copied = [{ position: { x: 100, y: 200 } }, { position: { x: 400, y: 260 } }];
+
+    it('moves the top-left of the copied group onto the cursor', () => {
+        expect(pasteOffsetTo(copied, { x: 700, y: 700 })).toEqual({ x: 600, y: 500 });
+    });
+
+    it('keeps the group shape — the same offset applies to every node', () => {
+        const offset = pasteOffsetTo(copied, { x: 0, y: 0 });
+        const moved = copied.map(n => ({ x: n.position.x + offset.x, y: n.position.y + offset.y }));
+        expect(moved).toEqual([
+            { x: 0, y: 0 },
+            { x: 300, y: 60 },
+        ]);
+    });
+
+    it('measures from the top-left corner whatever order the nodes arrive in', () => {
+        const reversed = [...copied].reverse();
+        expect(pasteOffsetTo(reversed, { x: 700, y: 700 })).toEqual(pasteOffsetTo(copied, { x: 700, y: 700 }));
+    });
+
+    it('is a no-op offset for an empty payload', () => {
+        expect(pasteOffsetTo([], { x: 700, y: 700 })).toEqual({ x: 0, y: 0 });
     });
 });
