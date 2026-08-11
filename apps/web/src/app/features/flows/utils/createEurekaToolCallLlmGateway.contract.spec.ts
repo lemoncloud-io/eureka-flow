@@ -3,11 +3,12 @@ import { createServer } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+    LIST_NODES,
+    MOVE_NODE,
     createCatalogLookup,
     createInMemoryCanvasBinding,
-    createNodeMoveToolProvider,
-    createNodeReadToolProvider,
     createToolExecutor,
+    toolset,
 } from '@flows/agent';
 
 import {
@@ -355,7 +356,13 @@ describe('createEurekaToolCallLlmGateway — ToolExecutor + canvas integration (
             body: {
                 requestId: 'x',
                 chunks: [
-                    { toolCall: { id: 'call-1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}' } },
+                    {
+                        toolCall: {
+                            id: 'call-1',
+                            name: 'move_node',
+                            argsDelta: '{"nodeId":"text-1","by":{"dx":100,"dy":0}}',
+                        },
+                    },
                     { done: true, usage: { inputTokens: 20, outputTokens: 8 }, actualModel: 'gpt-4o-mini' },
                 ],
             },
@@ -387,7 +394,7 @@ describe('createEurekaToolCallLlmGateway — ToolExecutor + canvas integration (
             id: 'contract-test-agent',
             description: 'moves nodes on the canvas',
             systemPrompt: 'You move nodes on a visual canvas by calling the provided tools.',
-            tools: [createNodeReadToolProvider(binding, emptyCatalog), createNodeMoveToolProvider(binding)],
+            tools: [toolset({ binding, catalog: emptyCatalog }, [LIST_NODES, MOVE_NODE])],
             grant: { canModifyCanvas: true },
         };
         const dispatchResult = await executor.dispatch(
