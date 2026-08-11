@@ -87,7 +87,7 @@ export const createWireLog = (path: string): WireLog => {
                         yield chunk;
                     }
                     const u = usage
-                        ? `in=${usage.inputTokens ?? '?'} out=${usage.outputTokens ?? '?'} total=${usage.totalTokens ?? '?'} cached=${usage.cachedTokens ?? 0}`
+                        ? `in=${usage.inputTokens ?? '?'} out=${usage.outputTokens ?? '?'} total=${usage.providerTotalTokens ?? '?'} cached=${usage.cachedInputTokens ?? 0}`
                         : 'no backend call (fake gateway)';
                     append(`${stamp()} ⟐ #${n} ${role} · ${u}`);
                 } catch (err) {
