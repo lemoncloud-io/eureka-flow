@@ -256,7 +256,7 @@
         "failedToCopyLink": "링크 복사 실패",
         "confirmClearCanvas": "캔버스를 지우시겠습니까?",
         "canvasCleared": "캔버스가 지워졌습니다",
-        "autoLayoutApplied": "자동 정렬이 적용되었습니다",
+        "autoLayoutApplied": "자동 정렬 적용 (Cmd/Ctrl + Shift + L)",
         "exportedToJson": "JSON으로 내보내기 완료",
         "workflowImported": "워크플로우를 성공적으로 가져왔습니다",
         "invalidWorkflowFile": "유효하지 않은 워크플로우 파일",
@@ -434,7 +434,15 @@
                 },
                 "autoLayout": {
                     "label": "자동 정렬",
+                    "keys": ["Cmd/Ctrl", "Shift", "L"]
+                },
+                "selectAll": {
+                    "label": "전체 노드 선택",
                     "keys": ["Cmd/Ctrl", "A"]
+                },
+                "boxSelect": {
+                    "label": "범위 선택",
+                    "keys": ["Shift", "드래그"]
                 },
                 "delete": {
                     "label": "선택 항목 삭제",

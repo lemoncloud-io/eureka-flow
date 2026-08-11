@@ -256,7 +256,7 @@
         "failedToCopyLink": "Failed to copy link",
         "confirmClearCanvas": "Clear the canvas?",
         "canvasCleared": "Canvas cleared",
-        "autoLayoutApplied": "Auto-layout applied",
+        "autoLayoutApplied": "Auto-layout applied (Cmd/Ctrl + Shift + L)",
         "exportedToJson": "Exported to JSON",
         "workflowImported": "Workflow imported successfully",
         "invalidWorkflowFile": "Invalid workflow file",
@@ -434,7 +434,15 @@
                 },
                 "autoLayout": {
                     "label": "Auto layout",
+                    "keys": ["Cmd/Ctrl", "Shift", "L"]
+                },
+                "selectAll": {
+                    "label": "Select all nodes",
                     "keys": ["Cmd/Ctrl", "A"]
+                },
+                "boxSelect": {
+                    "label": "Box select",
+                    "keys": ["Shift", "Drag"]
                 },
                 "delete": {
                     "label": "Delete selected",

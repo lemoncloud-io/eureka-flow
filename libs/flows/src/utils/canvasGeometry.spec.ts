@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findNodeAtPoint } from './canvasGeometry';
+import { findNodeAtPoint, nodesInRect } from './canvasGeometry';
 
 import type { GraphNode } from '../types';
 
@@ -33,5 +33,36 @@ describe('findNodeAtPoint', () => {
 
     it('returns undefined for an empty graph', () => {
         expect(findNodeAtPoint([], { x: 0, y: 0 }, size)).toBeUndefined();
+    });
+});
+
+describe('nodesInRect', () => {
+    // 'a' sits at 0..200 x 0..100, 'b' at 300..500 x 300..400.
+    const nodes = [node('a', 0, 0), node('b', 300, 300)];
+
+    it('selects a node the rectangle fully contains', () => {
+        expect(nodesInRect(nodes, { x: -50, y: -50, width: 400, height: 300 }, size)).toEqual(['a']);
+    });
+
+    it('selects a node the rectangle only clips', () => {
+        expect(nodesInRect(nodes, { x: 150, y: 50, width: 100, height: 100 }, size)).toEqual(['a']);
+    });
+
+    it('skips a node the rectangle misses entirely', () => {
+        expect(nodesInRect(nodes, { x: 210, y: 0, width: 50, height: 50 }, size)).toEqual([]);
+    });
+
+    it('selects every node the rectangle spans, in graph order', () => {
+        expect(nodesInRect(nodes, { x: -10, y: -10, width: 600, height: 600 }, size)).toEqual(['a', 'b']);
+    });
+
+    it('treats a rectangle dragged up and to the left the same as one dragged down and right', () => {
+        const downRight = { x: 0, y: 0, width: 250, height: 150 };
+        const upLeft = { x: 250, y: 150, width: -250, height: -150 };
+        expect(nodesInRect(nodes, upLeft, size)).toEqual(nodesInRect(nodes, downRight, size));
+    });
+
+    it('selects nothing for a zero-size rectangle — a click is not a selection box', () => {
+        expect(nodesInRect(nodes, { x: 10, y: 10, width: 0, height: 0 }, size)).toEqual([]);
     });
 });

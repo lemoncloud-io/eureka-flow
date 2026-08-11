@@ -643,6 +643,9 @@ export const FlowEditorPage = () => {
                 canvasRef.current?.redo();
             } else if (key === 'a') {
                 e.preventDefault();
+                canvasRef.current?.selectAll();
+            } else if (key === 'l' && e.shiftKey) {
+                e.preventDefault();
                 canvasRef.current?.autoLayout();
                 handlersRef.current.showNotification(t('flowEditor.autoLayoutApplied'), 'success');
             }

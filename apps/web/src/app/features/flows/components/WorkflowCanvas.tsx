@@ -20,6 +20,7 @@ import {
     getPortData,
     hydrateInputsFromUpstream,
     loadFlow,
+    nodesInRect,
     runFlow,
     runNode,
     shouldUpdateState,
@@ -96,6 +97,8 @@ export interface WorkflowCanvasRef {
     redo: () => void;
     autoLayout: () => void;
     selectNode: (nodeId: string | null) => void;
+    /** Select every node on the canvas. */
+    selectAll: () => void;
     /** Execute a specific node by ID */
     executeNode: (nodeId: string) => Promise<void>;
     /** Update node from server data (used for socket node update notifications) */
@@ -402,6 +405,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             filterCleared?: boolean;
         } | null>(null);
 
+        // Shift-drag selection box, in world coordinates so it stays put while zooming.
+        // Shift is also what adds a node to the selection by click, so the box adds too.
+        const [marquee, setMarquee] = useState<{
+            startX: number;
+            startY: number;
+            currentX: number;
+            currentY: number;
+        } | null>(null);
+
         const portMouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
 
         // Ref to track latest connectionDraft for touch events (avoids stale closure)
@@ -512,6 +524,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 }
             },
             [onNodeSelect]
+        );
+
+        /**
+         * Select a whole set at once (marquee, select-all). The detail panel follows a
+         * single selection only, so it is told about the node just when there is one.
+         */
+        const selectNodeIds = useCallback(
+            (ids: string[]) => {
+                setSelectedNodeIds(new Set(ids));
+                setSelectedConnectionId(null);
+                onNodeSelect?.(ids.length === 1 ? ids[0] : null);
+            },
+            [onNodeSelect, setSelectedConnectionId]
         );
 
         const screenToWorld = useCallback((clientX: number, clientY: number) => {
@@ -782,6 +807,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     handleSelectionChange(nodeId);
                     if (nodeId) setSelectedConnectionId(null);
                 },
+                selectAll: () => selectNodeIds(nodes.map(n => n.id)),
                 autoLayout: () => {
                     if (!permissions.canModifyCanvas) return;
                     if (nodes.length === 0) return;
@@ -1477,6 +1503,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 return;
             }
 
+            // Shift-drag draws a selection box. Plain drag keeps panning, so the gesture
+            // people already have in their hands does not change under them.
+            if (e.button === 0 && e.shiftKey) {
+                setContextMenu(null);
+                const world = screenToWorld(e.clientX, e.clientY);
+                setMarquee({ startX: world.x, startY: world.y, currentX: world.x, currentY: world.y });
+                return;
+            }
+
             if (e.button === 0 || e.button === 1) {
                 setContextMenu(null);
                 setIsPanning(true);
@@ -1684,6 +1719,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         }, [dragState, commitDrag, handleSelectionChange]);
 
         const handleMouseMove = (e: React.MouseEvent) => {
+            if (marquee) {
+                const world = screenToWorld(e.clientX, e.clientY);
+                setMarquee(prev => (prev ? { ...prev, currentX: world.x, currentY: world.y } : prev));
+                return;
+            }
+
             if (isPanning) {
                 const dx = e.clientX - lastMousePosRef.current.x;
                 const dy = e.clientY - lastMousePosRef.current.y;
@@ -1723,6 +1764,24 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         const handleMouseUp = (e: React.MouseEvent) => {
             setIsPanning(false);
+
+            if (marquee) {
+                const covered = nodesInRect(
+                    nodes,
+                    {
+                        x: marquee.startX,
+                        y: marquee.startY,
+                        width: marquee.currentX - marquee.startX,
+                        height: marquee.currentY - marquee.startY,
+                    },
+                    nodeBounds
+                );
+                setMarquee(null);
+                // A box that caught nothing leaves the selection alone — treating it as
+                // "deselect everything" would punish a misaimed drag.
+                if (covered.length > 0) selectNodeIds([...new Set([...selectedNodeIds, ...covered])]);
+                return;
+            }
 
             if (dragState) commitDrag(dragState.initialPositions);
 
@@ -1960,10 +2019,27 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         useEffect(() => {
             const handleKeyDown = (e: KeyboardEvent) => {
-                if (!permissions.canModifyCanvas) return;
                 const target = e.target as HTMLElement;
                 const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
                 if (isInput) return;
+
+                // Escape only lets go of what is selected, so a viewer gets it too —
+                // gating it behind edit permission left them with no way to close a panel.
+                if (e.key === 'Escape') {
+                    if (connectionDraft) {
+                        setConnectionDraft(null);
+                        return;
+                    }
+                    if (marquee) {
+                        setMarquee(null);
+                        return;
+                    }
+                    handleSelectionChange(null);
+                    setSelectedConnectionId(null);
+                    return;
+                }
+
+                if (!permissions.canModifyCanvas) return;
 
                 const isCtrlOrCmd = e.ctrlKey || e.metaKey;
 
@@ -1995,15 +2071,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         setTooltip(null);
                     }
                 }
-
-                if (e.key === 'Escape') {
-                    if (connectionDraft) {
-                        setConnectionDraft(null);
-                        return;
-                    }
-                    handleSelectionChange(null);
-                    setSelectedConnectionId(null);
-                }
             };
 
             window.addEventListener('keydown', handleKeyDown);
@@ -2013,6 +2080,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             selectedNodeIds,
             selectedConnectionId,
             hoveredConnectionId,
+            connectionDraft,
+            marquee,
             permissions.canModifyCanvas,
             commit,
             handleSelectionChange,
@@ -2130,6 +2199,18 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             transform: `translate(${viewportRef.current.x}px, ${viewportRef.current.y}px) scale(${viewportRef.current.zoom})`,
                         }}
                     >
+                        {marquee && (
+                            <div
+                                className="absolute border border-primary bg-primary/10 pointer-events-none z-30"
+                                style={{
+                                    left: Math.min(marquee.startX, marquee.currentX),
+                                    top: Math.min(marquee.startY, marquee.currentY),
+                                    width: Math.abs(marquee.currentX - marquee.startX),
+                                    height: Math.abs(marquee.currentY - marquee.startY),
+                                }}
+                            />
+                        )}
+
                         <svg className="absolute overflow-visible top-0 left-0 w-full h-full">
                             {connections.map(conn => {
                                 const start = getPortPosition(conn.sourceNodeId, conn.sourcePortId, 'output');
