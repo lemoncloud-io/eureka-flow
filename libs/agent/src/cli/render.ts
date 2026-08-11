@@ -31,21 +31,80 @@ export interface Frame {
     rightScroll: number;
 }
 
-const clip = (s: string, width: number): string => (s.length <= width ? s : s.slice(0, Math.max(0, width - 1)) + '…');
-const padEnd = (s: string, width: number): string => s + ' '.repeat(Math.max(0, width - s.length));
+/**
+ * Terminal DISPLAY width of one code point — NOT `.length`. A row wider than the terminal soft-wraps its
+ * tail onto the next line's first column (under the neighbouring pane), so every clip/pad/wrap below measures
+ * columns: East-Asian and emoji code points take two, combining / zero-width marks take none, else one.
+ */
+const charWidth = (cp: number): number => {
+    if (
+        (cp >= 0x0300 && cp <= 0x036f) || // combining diacritical marks
+        (cp >= 0x200b && cp <= 0x200f) || // zero-width space / joiner / marks
+        (cp >= 0xfe00 && cp <= 0xfe0f) || // variation selectors
+        cp === 0xfeff
+    ) {
+        return 0;
+    }
+    if (
+        (cp >= 0x1100 && cp <= 0x115f) || // Hangul Jamo
+        (cp >= 0x2600 && cp <= 0x27bf) || // misc symbols + dingbats (emoji presentation)
+        (cp >= 0x2e80 && cp <= 0xa4cf) || // CJK radicals … Yi (ideographs, kana, jamo)
+        (cp >= 0xac00 && cp <= 0xd7a3) || // Hangul syllables
+        (cp >= 0xf900 && cp <= 0xfaff) || // CJK compatibility ideographs
+        (cp >= 0xfe30 && cp <= 0xfe4f) || // CJK compatibility forms
+        (cp >= 0xff00 && cp <= 0xff60) || // fullwidth forms
+        (cp >= 0xffe0 && cp <= 0xffe6) || // fullwidth signs
+        (cp >= 0x1f000 && cp <= 0x1fbff) || // emoji, pictographs, symbols
+        (cp >= 0x20000 && cp <= 0x3fffd) // CJK extension B and beyond
+    ) {
+        return 2;
+    }
+    return 1;
+};
 
-/** Wrap plain text to width, hard-breaking overlong runs; preserves blank lines. */
+/** Total display width (columns) of `s` — the count clip/pad/wrap and the layout must respect. */
+export const stringWidth = (s: string): number => {
+    let w = 0;
+    for (const ch of s) w += charWidth(ch.codePointAt(0) ?? 0);
+    return w;
+};
+
+/** Truncate `s` to at most `width` display columns, marking any cut with a `…` (itself one column). */
+const clip = (s: string, width: number): string => {
+    if (stringWidth(s) <= width) return s;
+    let out = '';
+    let w = 0;
+    for (const ch of s) {
+        const cw = charWidth(ch.codePointAt(0) ?? 0);
+        if (w + cw > width - 1) break; // keep one column for the ellipsis
+        out += ch;
+        w += cw;
+    }
+    return `${out}…`;
+};
+
+/** Pad `s` with spaces to exactly `width` display columns. */
+const padEnd = (s: string, width: number): string => s + ' '.repeat(Math.max(0, width - stringWidth(s)));
+
+/** Wrap plain text to `width` display columns, hard-breaking overlong runs; preserves blank lines. */
 const wrap = (text: string, width: number): string[] => {
     const out: string[] = [];
     for (const paragraph of text.split('\n')) {
-        let line = paragraph;
-        if (line === '') {
+        if (paragraph === '') {
             out.push('');
             continue;
         }
-        while (line.length > width) {
-            out.push(line.slice(0, width));
-            line = line.slice(width);
+        let line = '';
+        let w = 0;
+        for (const ch of paragraph) {
+            const cw = charWidth(ch.codePointAt(0) ?? 0);
+            if (w + cw > width) {
+                out.push(line);
+                line = '';
+                w = 0;
+            }
+            line += ch;
+            w += cw;
         }
         out.push(line);
     }
@@ -129,7 +188,8 @@ export const composeFrame = (state: SessionState | null, graph: Graph, options: 
     const cols = Math.max(40, options.columns);
     const bodyRows = Math.max(4, options.rows - 3); // 2 header rows + 1 input line reserved
     const leftW = Math.max(24, Math.floor(cols * 0.45));
-    const rightW = Math.max(20, cols - leftW - 3);
+    const rightW = Math.max(20, cols - leftW - 4); // -3 for the separator, -1 trailing margin: a full line must
+    // not sit on the terminal's last column, or a pending-wrap folds its tail under the left pane
     const sep = pc.dim(' │ ');
 
     const graphAll = JSON.stringify(graph, null, 2).split('\n');

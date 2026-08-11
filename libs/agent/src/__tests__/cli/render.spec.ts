@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { composeFrame } from '../../cli/render';
+import { composeFrame, stringWidth } from '../../cli/render';
 
 import type { Graph } from '../../canvas';
 import type { SessionState } from '../../session/session';
@@ -127,5 +127,37 @@ describe('composeFrame — chat header & scroll marker', () => {
 
         const chat = headerOf(composeFrame(null, { nodes: [], edges: [] }, { ...opts, activePane: 'chat' }).frame);
         expect(chat.split('CHAT')[1]).toContain('‹scroll›');
+    });
+});
+
+describe('composeFrame — wide characters never overflow the row', () => {
+    it('stringWidth counts East-Asian + emoji as 2, combining marks as 0', () => {
+        expect(stringWidth('abc')).toBe(3);
+        expect(stringWidth('가나')).toBe(4); // Hangul syllables: 2 columns each
+        expect(stringWidth('🚀')).toBe(2); // astral emoji
+        expect(stringWidth('é')).toBe(1); // 'é' is one column (a combining mark would add zero)
+    });
+
+    it('keeps every rendered row within the terminal width — wide chars in BOTH panes', () => {
+        // Each Hangul/emoji glyph is 2 display columns but 1 UTF-16 unit, so a `.length`-based clip lets a
+        // line occupy ~2× its budget and wrap its tail under the neighbouring pane — the reported bug.
+        const wide = `${'가나다라마바사아자차카타파하 '.repeat(6)}${'🚀🎉✅❌ '.repeat(6)}`.trim();
+        const state: SessionState = {
+            flowId: 'terminal',
+            phase: 'done',
+            messages: [{ id: 'a', role: 'assistant', content: wide, ts: 1 }],
+        };
+        // LEFT pane too: a node whose config carries Korean + emoji, serialized into the canvas JSON.
+        const graph: Graph = {
+            nodes: [{ id: 'n0', type: 'input-text', position: { x: 0, y: 0 }, config: { label: wide } }],
+            edges: [],
+        };
+
+        const frame = strip(composeFrame(state, graph, opts).frame);
+        for (const line of frame.split('\n')) {
+            expect(stringWidth(line)).toBeLessThanOrEqual(opts.columns); // no row exceeds the terminal
+        }
+        expect(frame).toContain('가나다라마바사'); // chat content (right pane) still rendered
+        expect(frame).toContain('input-text'); // canvas JSON (left pane) still rendered
     });
 });
