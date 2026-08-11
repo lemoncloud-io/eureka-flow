@@ -1,5 +1,42 @@
 # Changelog
 
+## [2026-08-11] - root@0.69.0, @flows/web@0.69.0, @flows/admin@0.43.0
+
+### Features
+
+- (agent) wire the terminal into the trace switch
+- (agent) project the graph diff as a cumulative session delta plus one per turn
+- (agent) single tracing switch with self-describing, verbatim projections
+- (agent) add the trace module + wire the agent core (Track 2a)
+
+### Bug Fixes
+
+- (agent) the PR review follow-ups — fail the redactor and the diff closed
+- (agent) repair eureka tool-call contract spec onto the toolset API
+- (agent) measure terminal panes by display width so wide chars don't overflow
+- (agent) redact secrets at any depth; consolidate trace docs + cleanup
+
+### Documentation
+
+- (agent) retire the locator/property specialist description
+- (agent) document how to turn tracing on and read the projections
+
+### Refactor
+
+- (web) remove the dev agent-harness page; move llm-gateway doc into design/
+- (agent) rename HTTP adapters to *HttpClient to match the HttpClient port
+- (web) split useAgentPorts into useAgentTrace + useAgentStorage
+- rename unclear names for fresh-reader clarity
+- (web) rename useAgentHost -> useAgentPorts
+- (agent) tighten types and simplify the trace/storage surface
+- (agent) clarify names across the trace/storage surface
+- (agent) remove the Agent Environment; migrate gateway + web to discrete ports (Track 2b)
+- (agent) extract storage into its own leaf module
+
+### Other
+
+- style: prettier the files this branch left unformatted
+
 ## [2026-08-11] - root@0.68.1, @flows/web@0.68.1, @flows/admin@0.42.1
 
 ### Other
