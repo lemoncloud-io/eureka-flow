@@ -671,8 +671,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     startY = centerY - 50 + (Math.random() * 40 - 20);
                 }
 
-                const snappedX = Math.round(startX / GRID_SIZE) * GRID_SIZE;
-                const snappedY = Math.round(startY / GRID_SIZE) * GRID_SIZE;
+                const { x: snappedX, y: snappedY } = snapToGrid({ x: startX, y: startY });
 
                 const feedsNewNode = !!(sourceNode && sourcePortId && targetPortId);
 
@@ -1080,14 +1079,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             nodes,
             connections,
             permissions,
-            flowId,
             undo,
             redo,
             engine,
             commit,
             selectedNodeId,
+            selectNodeIds,
             handleSelectionChange,
             blockRegistry,
+            connectionId,
+            updateViewport,
         ]);
 
         const executeNode = useCallback(
@@ -1434,10 +1435,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 commit('node:duplicate', ops => {
                     id = ops.addNode({
                         type: node.type,
-                        position: {
-                            x: Math.round((node.position.x + 40) / GRID_SIZE) * GRID_SIZE,
-                            y: Math.round((node.position.y + 40) / GRID_SIZE) * GRID_SIZE,
-                        },
+                        position: snapToGrid({ x: node.position.x + 40, y: node.position.y + 40 }),
                         config: node.config,
                         customLabel: node.customLabel ? `${node.customLabel} (copy)` : undefined,
                     });
@@ -1696,18 +1694,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         const initialPos = dragState.initialPositions.get(n.id);
                         if (!initialPos) return n;
 
-                        const rawX = initialPos.x + dx;
-                        const rawY = initialPos.y + dy;
-                        const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
-                        const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
-
-                        return { ...n, position: { x: snappedX, y: snappedY } };
+                        return { ...n, position: snapToGrid({ x: initialPos.x + dx, y: initialPos.y + dy }) };
                     })
                 );
 
                 lastTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
             },
-            [dragState, permissions.canDragNodes]
+            [dragState, permissions.canDragNodes, setNodes]
         );
 
         /**
@@ -1784,12 +1777,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         const initialPos = dragState.initialPositions.get(n.id);
                         if (!initialPos) return n;
 
-                        const rawX = initialPos.x + dx;
-                        const rawY = initialPos.y + dy;
-                        const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
-                        const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
-
-                        return { ...n, position: { x: snappedX, y: snappedY } };
+                        return { ...n, position: snapToGrid({ x: initialPos.x + dx, y: initialPos.y + dy }) };
                     })
                 );
             }

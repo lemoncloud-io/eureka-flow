@@ -434,13 +434,13 @@ export const FlowEditorPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps -- refs are stable, no need to trigger re-creation
     }, [isAutoSaveEnabled, saveCurrentFlow]);
 
-    const showNotification = (message: string, type: 'success' | 'error') => {
+    const showNotification = useCallback((message: string, type: 'success' | 'error') => {
         if (type === 'success') {
             toast.success(message);
         } else {
             toast.error(message);
         }
-    };
+    }, []);
 
     const handleSave = async () => {
         if (!canvasRef.current) return;
@@ -522,7 +522,7 @@ export const FlowEditorPage = () => {
         } catch {
             showNotification(t('flowEditor.failedToRunFlow', 'Failed to run flow'), 'error');
         }
-    }, [handleBeforeRun, t]);
+    }, [handleBeforeRun, showNotification, t]);
 
     const handleSelectionChange = (nodeId: string | null) => {
         updateUrl(currentFlowId, nodeId);
@@ -539,7 +539,7 @@ export const FlowEditorPage = () => {
                 showNotification(t('flowEditor.circularConnectionError'), 'error');
             }
         },
-        [t]
+        [showNotification, t]
     );
 
     const handleExportPng = async () => {
