@@ -68,6 +68,11 @@
         "run": "실행",
         "metadata": "이름변경·게시"
     },
+    "canvasMenu": {
+        "portFilter": "{{type}} 입력 가능",
+        "showAll": "전체 블록 보기",
+        "noCompatibleBlocks": "이 포트를 받을 수 있는 블록이 없습니다"
+    },
     "sidebar": {
         "library": "라이브러리",
         "libraryShort": "Lib",

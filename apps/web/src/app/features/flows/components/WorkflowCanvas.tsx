@@ -11,6 +11,7 @@ import {
     LAYOUT_CONFIG,
     PORT_LAYOUT,
     estimateNodeHeight,
+    findNodeAtPoint,
     flowStorage,
     getEffectiveState,
     getNode,
@@ -77,8 +78,15 @@ interface WorkflowStateWithLegacyEdges extends WorkflowState {
     connections?: WorkflowState['edges'];
 }
 
+/** The output port a new node should be wired to, when the caller already knows it. */
+export interface LinkSource {
+    nodeId: string;
+    portId: string;
+    portType: string;
+}
+
 export interface WorkflowCanvasRef {
-    addNode: (type: string, position?: { x: number; y: number }) => void;
+    addNode: (type: string, position?: { x: number; y: number }, source?: LinkSource) => void;
     getWorkflow: () => GraphSnapshot;
     /** Load workflow from server data. Fetches missing port data (data: null) via API. */
     loadWorkflow: (state: WorkflowStateWithPorts) => Promise<void>;
@@ -146,6 +154,9 @@ const MAX_ZOOM = 5;
 
 /** Mouse movement threshold (px) to distinguish click from drag */
 const CLICK_THRESHOLD = 5;
+
+/** World-space gap left between a node and one inserted beside it */
+const NEW_NODE_GAP = 80;
 
 /** Touch port hit detection threshold in world coordinates */
 const TOUCH_PORT_HIT_THRESHOLD = 50;
@@ -383,6 +394,12 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             screenY: number;
             worldX: number;
             worldY: number;
+            // Set when the menu came from a link dropped on empty canvas: the block list is
+            // filtered to what this port can feed, and picking one wires it up on the spot.
+            fromDraft?: { sourceNodeId: string; sourcePortId: string; sourceType: string };
+            // "Show all blocks" widens the list only. The draft stays, so a block picked
+            // afterwards is still wired to the port the user dragged from.
+            filterCleared?: boolean;
         } | null>(null);
 
         const portMouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -507,11 +524,20 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             };
         }, []);
 
+        /** A node's on-canvas box, measured the same way the canvas draws it. */
+        const nodeBounds = useCallback(
+            (node: GraphNode) => ({
+                width: getNodeWidth(node),
+                height: estimateNodeHeight(node, blockRegistry[node.type]),
+            }),
+            [blockRegistry]
+        );
+
         // eslint-disable-next-line @typescript-eslint/no-empty-function -- initialized before useImperativeHandle sets the real function
-        const addNodeRef = useRef<(type: string, position?: { x: number; y: number }) => void>(() => {});
+        const addNodeRef = useRef<WorkflowCanvasRef['addNode']>(() => {});
 
         useImperativeHandle(ref, () => {
-            const addNode = (type: string, position?: { x: number; y: number }) => {
+            const addNode = (type: string, position?: { x: number; y: number }, source?: LinkSource) => {
                 if (!permissions.canModifyCanvas) return;
 
                 const newDef = blockRegistry[type];
@@ -521,10 +547,21 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 let sourcePortId: string | undefined;
                 let targetPortId: string | undefined;
 
+                // A link dropped on empty canvas already says which port feeds the new node,
+                // so there is nothing to infer — the guesswork below is for the other paths.
+                if (source) {
+                    sourceNode = nodes.find(n => n.id === source.nodeId);
+                    const input = newDef.inputs.find(i => arePortTypesCompatible(source.portType, i.type));
+                    if (sourceNode && input) {
+                        sourcePortId = source.portId;
+                        targetPortId = input.id;
+                    }
+                }
+
                 // Auto-connect only when intent is clear:
                 // - 0-1 nodes: always auto-connect (obvious target)
                 // - 2+ nodes: only if a node is selected (explicit intent)
-                const shouldAutoConnect = nodes.length <= 1 || !!selectedNodeId;
+                const shouldAutoConnect = !source && (nodes.length <= 1 || !!selectedNodeId);
 
                 if (shouldAutoConnect && newDef.inputs.length > 0) {
                     const firstInput = newDef.inputs[0];
@@ -1704,6 +1741,30 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 }
             }
 
+            // Reaching here means the link was dragged past the click threshold and released
+            // outside any port — a port release never gets this far, PortItem stops it. Offer
+            // the blocks this port can feed instead of dropping the link on the floor.
+            if (connectionDraft && permissions.canModifyCanvas) {
+                const worldPos = screenToWorld(e.clientX, e.clientY);
+                // Released over a node's body rather than empty canvas: place the new node
+                // clear of it, or it would be born underneath the one it was dropped on.
+                const covered = findNodeAtPoint(nodes, worldPos, nodeBounds);
+                const insertAt = covered
+                    ? { x: covered.position.x + nodeBounds(covered).width + NEW_NODE_GAP, y: covered.position.y }
+                    : worldPos;
+                setContextMenu({
+                    screenX: e.clientX,
+                    screenY: e.clientY,
+                    worldX: insertAt.x,
+                    worldY: insertAt.y,
+                    fromDraft: {
+                        sourceNodeId: connectionDraft.sourceNodeId,
+                        sourcePortId: connectionDraft.sourcePortId,
+                        sourceType: connectionDraft.sourceType,
+                    },
+                });
+            }
+
             portMouseDownPosRef.current = null;
             setConnectionDraft(null);
         };
@@ -2326,10 +2387,23 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             screenX={contextMenu.screenX}
                             screenY={contextMenu.screenY}
                             onSelect={type => {
-                                addNodeRef.current(type, { x: contextMenu.worldX, y: contextMenu.worldY });
+                                const draft = contextMenu.fromDraft;
+                                addNodeRef.current(
+                                    type,
+                                    { x: contextMenu.worldX, y: contextMenu.worldY },
+                                    draft && {
+                                        nodeId: draft.sourceNodeId,
+                                        portId: draft.sourcePortId,
+                                        portType: draft.sourceType,
+                                    }
+                                );
                                 setContextMenu(null);
                             }}
                             onClose={handleCloseContextMenu}
+                            portTypeFilter={contextMenu.filterCleared ? undefined : contextMenu.fromDraft?.sourceType}
+                            onClearFilter={() =>
+                                setContextMenu(prev => (prev ? { ...prev, filterCleared: true } : prev))
+                            }
                         />
                     )}
                 </div>

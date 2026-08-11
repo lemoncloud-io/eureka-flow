@@ -3,11 +3,17 @@ import { useTranslation } from 'react-i18next';
 
 import { isOutputBlock } from '../consts';
 import { useBlockRegistry } from '../stores/useFlowsStore';
-import { blockMatchesQuery } from '../utils';
+import { blockAcceptsPortType, blockMatchesQuery } from '../utils';
 
-export const useBlockGroups = (searchQuery: string) => {
+interface BlockGroupOptions {
+    /** Keep only blocks that can receive a link dragged from a port of this type. */
+    acceptsPortType?: string;
+}
+
+export const useBlockGroups = (searchQuery: string, options?: BlockGroupOptions) => {
     const blockRegistry = useBlockRegistry();
     const { t } = useTranslation('blocks');
+    const acceptsPortType = options?.acceptsPortType;
 
     return useMemo(() => {
         const blocks = Object.entries(blockRegistry)
@@ -15,7 +21,8 @@ export const useBlockGroups = (searchQuery: string) => {
             .map(([, block]) => block);
 
         const query = searchQuery.toLowerCase().trim();
-        const filtered = query ? blocks.filter(b => blockMatchesQuery(t, b, query)) : blocks;
+        const matched = query ? blocks.filter(b => blockMatchesQuery(t, b, query)) : blocks;
+        const filtered = acceptsPortType ? matched.filter(b => blockAcceptsPortType(b, acceptsPortType)) : matched;
 
         return {
             inputs: filtered.filter(b => b.stereo === 'input' || (!b.stereo && b.type.startsWith('input-'))),
@@ -24,5 +31,5 @@ export const useBlockGroups = (searchQuery: string) => {
             ),
             outputs: filtered.filter(b => b.stereo === 'output' || (!b.stereo && isOutputBlock(b.type))),
         };
-    }, [blockRegistry, searchQuery, t]);
+    }, [blockRegistry, searchQuery, acceptsPortType, t]);
 };

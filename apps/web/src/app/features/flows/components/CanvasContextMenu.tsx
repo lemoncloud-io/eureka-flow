@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChevronRight, Search, X } from 'lucide-react';
+import { ChevronRight, Filter, Search, X } from 'lucide-react';
 
 import { BLOCK_CATEGORIES, BLOCK_CATEGORY_CONFIG, translateField, useBlockGroups } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
@@ -13,19 +13,33 @@ interface CanvasContextMenuProps {
     screenY: number;
     onSelect: (type: string) => void;
     onClose: () => void;
+    /**
+     * Port type the menu was opened from, when a dragged link landed on empty canvas.
+     * Narrows the list to blocks that link can actually feed; `onClearFilter` lets the
+     * user see everything again, so the filter never becomes a dead end.
+     */
+    portTypeFilter?: string;
+    onClearFilter?: () => void;
 }
 
 const MENU_WIDTH = 240;
 const MENU_MAX_HEIGHT = 360;
 const VIEWPORT_PADDING = 8;
 
-export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ screenX, screenY, onSelect, onClose }) => {
+export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
+    screenX,
+    screenY,
+    onSelect,
+    onClose,
+    portTypeFilter,
+    onClearFilter,
+}) => {
     const { t } = useTranslation(['flows', 'blocks']);
     const [searchQuery, setSearchQuery] = useState('');
     const menuRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    const blockGroups = useBlockGroups(searchQuery);
+    const blockGroups = useBlockGroups(searchQuery, { acceptsPortType: portTypeFilter });
 
     const adjustedX = Math.min(screenX, window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING);
     const adjustedY = Math.min(screenY, window.innerHeight - MENU_MAX_HEIGHT - VIEWPORT_PADDING);
@@ -97,6 +111,23 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ screenX, s
                 </div>
             </div>
 
+            {portTypeFilter && (
+                <div className="flex items-center gap-1.5 px-3 pt-1.5">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium">
+                        <Filter className="w-2.5 h-2.5" />
+                        {t('canvasMenu.portFilter', { type: portTypeFilter })}
+                    </span>
+                    {onClearFilter && (
+                        <button
+                            onClick={onClearFilter}
+                            className="text-[10px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                        >
+                            {t('canvasMenu.showAll')}
+                        </button>
+                    )}
+                </div>
+            )}
+
             {searchQuery && (
                 <div className="text-[10px] text-muted-foreground px-3 pt-1">
                     {totalResults === 0 ? t('sidebar.noResults') : t('sidebar.resultsCount', { count: totalResults })}
@@ -146,7 +177,9 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ screenX, s
                     );
                 })}
                 {totalResults === 0 && (
-                    <div className="text-center py-4 text-muted-foreground text-xs">{t('sidebar.noResults')}</div>
+                    <div className="text-center py-4 text-muted-foreground text-xs">
+                        {portTypeFilter ? t('canvasMenu.noCompatibleBlocks') : t('sidebar.noResults')}
+                    </div>
                 )}
             </div>
         </div>

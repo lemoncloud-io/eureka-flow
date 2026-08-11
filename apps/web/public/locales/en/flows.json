@@ -68,6 +68,11 @@
         "run": "Run",
         "metadata": "Rename/Publish"
     },
+    "canvasMenu": {
+        "portFilter": "Accepts {{type}}",
+        "showAll": "Show all blocks",
+        "noCompatibleBlocks": "No block accepts this port type"
+    },
     "sidebar": {
         "library": "Library",
         "libraryShort": "Lib",
