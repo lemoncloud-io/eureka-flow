@@ -407,4 +407,4 @@ Two subsystems under `@flows/agent` back any agent and are documented separately
 - **Storage + Trace ports** — session persistence and observability, standalone modules
   (`libs/agent/src/{storage,trace}`); the trace design is [design/trace-spec.md](./trace-spec.md).
 - **LlmGateway providers** — the contract plus the Gemini provider and HTTP port:
-  [foundations/llm-gateway.md](../foundations/llm-gateway.md).
+  [llm-gateway.md](./llm-gateway.md).

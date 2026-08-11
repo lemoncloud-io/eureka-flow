@@ -28,7 +28,7 @@ has its own [SPEC](../../docs/browser-agent/agents/locator.md).
 
 The package also hosts two shared subsystems used across agents — the **HTTP port** (`src/http/`) and
 the **Agent Environment** (`src/environment/`: storage, trace, self-check). See
-[llm-gateway.md](../../docs/browser-agent/foundations/llm-gateway.md) and
+[llm-gateway.md](../../docs/browser-agent/design/llm-gateway.md) and
 [environment.md](../../docs/browser-agent/foundations/environment.md).
 
 ## Design notes

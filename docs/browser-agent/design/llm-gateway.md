@@ -132,8 +132,7 @@ run-acceptance metadata to callers. Instead:
 - **Tested with fakes only** — a scripted `GenerateReceiver` and a spied `post` function.
   No real backend call is made in tests, and none has been made through this gateway code
   path (only through the throwaway smoke-test hooks used to gather the facts above).
-- **Now wired into the panel and the dev harness** — `FlowAgentPanel`
-  (`FlowAgentPanel.tsx`) and `AgentHarnessPage` (`/dev/agent-harness`) both construct this
+- **Now wired into the panel** — `FlowAgentPanel` (`FlowAgentPanel.tsx`) constructs this
   gateway to drive the orchestrator; its result arrives over the flow socket.
 
 **Do not claim this adapter is live end-to-end.** It is verified: (a) against the real
@@ -166,6 +165,5 @@ model answer, because no real receiver exists yet to prove that leg.
   skipped unless `GEMINI_API_KEY` is set) drives the real Gemini gateway end-to-end when run
   manually; the Generate API gateway still has no live receiver (§6). The real-API smoke testing
   that established §6's facts used throwaway dev-only hooks, not this gateway.
-- **No full editor E2E has been run.** `/dev/agent-harness` covers a manual real-browser
-  verification driving the orchestrator through `createGenerateApiLlmGateway`; a real
-  editor/E2E pass is a follow-up step.
+- **No full editor E2E has been run.** `FlowAgentPanel` drives the orchestrator through
+  `createGenerateApiLlmGateway` (DEV-gated in the editor); a real editor/E2E pass is a follow-up step.

@@ -974,9 +974,8 @@ export const FlowEditorPage = () => {
                     />
                 )}
             </div>
-            {/* Dev-only: the shipped gateway is the offline command parser, not a real LLM — keep it
-                out of production bundles until a network-backed gateway lands. Same gate as the
-                /dev/agent-harness route in app.tsx. */}
+            {/* Dev-only: the Generate API gateway has no socket-layer receiver yet, so keep the panel
+                out of production bundles until that lands. */}
             {import.meta.env.DEV && currentFlowId && (
                 <FlowAgentPanel engine={engine} flowId={currentFlowId} permissions={permissions} />
             )}

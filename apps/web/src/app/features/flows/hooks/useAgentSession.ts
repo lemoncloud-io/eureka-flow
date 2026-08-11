@@ -46,8 +46,8 @@ export interface UseAgentSessionResult {
  * The generic React binding shared by every in-browser agent: owns a per-flow session store
  * (persisted through the injected storage port, survives reload) and re-renders on every `save`
  * (Panel emits `send` → agent writes SessionState → store → Panel). The agent it drives is the
- * caller's choice via `createAgent`; nothing here is locator-specific. `send` is gated on async
- * hydration, and the outgoing agent is aborted + silenced on flow switch / unmount.
+ * caller's choice via `createAgent`. `send` is gated on async hydration, and the outgoing agent is
+ * aborted + silenced on flow switch / unmount.
  */
 export const useAgentSession = ({
     flowId,

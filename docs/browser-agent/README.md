@@ -64,7 +64,7 @@ docs (start with [architecture.md](design/architecture.md)); the full roster + c
 
 **[foundations/](foundations/)** — shared infrastructure.
 
-- [llm-gateway.md](foundations/llm-gateway.md) — the `LlmGateway` contract + Gemini provider + HTTP port.
+- [llm-gateway.md](design/llm-gateway.md) — the `LlmGateway` contract + Gemini provider + HTTP port.
 
 ## Running the live evals
 

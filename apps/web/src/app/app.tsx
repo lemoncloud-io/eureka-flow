@@ -8,7 +8,6 @@ import { isOAuthEnabled } from '@flows/web-core';
 import { AppsPage } from './features/apps';
 import { KeyCreationPage, KeySuccessPage, LoginPage, OAuthResponsePage } from './features/auth';
 import { PublicFlowsPage } from './features/flows';
-import { AgentHarnessPage } from './features/flows/pages/AgentHarnessPage';
 import { HomePage } from './features/home';
 import { PolicyPage } from './features/landing';
 import { FlowEditorRouter } from './features/mobile-editor';
@@ -66,8 +65,6 @@ export const App = () => {
                 <Route path="/processes/:id/apply" element={<LegacyApplyRedirect />} />
 
                 {/* Builder routes */}
-                {/* Dev-only harness: real-browser verification of the agent flow. */}
-                {import.meta.env.DEV && <Route path="/dev/agent-harness" element={<AgentHarnessPage />} />}
                 <Route path="/flows" element={<PublicFlowsPage />} />
                 <Route path="/editor" element={<FlowEditorRouter />} />
                 <Route path="/flows/:id" element={<FlowEditorRouter />} />
