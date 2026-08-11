@@ -1,5 +1,38 @@
 # Changelog
 
+## [2026-08-11] - root@0.68.0, @flows/web@0.68.0, @flows/admin@0.42.0
+
+### Features
+
+- (agent) add multi-turn verification metrics, dashboard, and reporting
+- (agent) extend provider registry with generation-parameter compatibility
+- (agent) add benchmark generation metadata and Anthropic support
+- (agent) add multi-turn LLM benchmark and dashboard
+- (agent,web) add tool-calling verification and Eureka integration groundwork
+- (agent) add provider-native HTTP tool calling and verification
+- (agent) add LLM verification usage, cost, and elapsed-time monitoring
+
+### Bug Fixes
+
+- (agent) dispatch every batched tool call, fix Gemini call-id reuse and usage field names
+- (agent) preserve Gemini thoughtSignature across multi-turn tool calls
+
+### Documentation
+
+- (agent) add LLM tool-calling production-readiness status
+
+### Refactor
+
+- (agent) rebuild locator verification scenarios against BaseAgent
+
+### Chores
+
+- (deps) align @vitest/coverage-v8 with installed vitest 4.x
+
+### Other
+
+- test: (agent) close coverage gaps in wireLog and metering fallbacks
+
 ## [2026-08-07] - root@0.67.1, @flows/web@0.67.1, @flows/admin@0.41.1
 
 ### Chores
