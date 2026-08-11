@@ -62,11 +62,10 @@ docs (start with [architecture.md](design/architecture.md)); the full roster + c
   them. A block that earns domain knowledge gets a named specialist (e.g. [single-output-generator.md](agents/single-output-generator.md));
   every other type is served by a generic [blockAgent.md](agents/blockAgent.md) synthesized from the catalog.
 
-**[foundations/](foundations/)** — shared infrastructure, both built.
+**Shared infrastructure** — in [design/](design/), alongside the design docs.
 
-- [environment.md](foundations/environment.md) — the runtime capability boundary (storage / trace / time /
-  cancellation).
-- [llm-gateway.md](foundations/llm-gateway.md) — the `LlmGateway` contract + Gemini provider + HTTP port.
+- [llm-gateway.md](design/llm-gateway.md) — the `LlmGateway` contract + Gemini provider + HTTP port.
+- [trace-spec.md](design/trace-spec.md) — the tracing switch, the sinks, and the three projections.
 
 ## Running the live evals
 
@@ -118,5 +117,6 @@ the suite stays offline.
 
 New here? Read **[design/architecture.md](design/architecture.md)** (the shared model, including the
 orchestrator that owns the turn), then the composition specialist it spawns,
-**[agents/builder.md](agents/builder.md)**; for the shared infra, the two
-**[foundations/](foundations/)** docs. Package overview: [`libs/agent/README.md`](../../libs/agent/README.md).
+**[agents/builder.md](agents/builder.md)**; for the shared infra,
+[design/llm-gateway.md](design/llm-gateway.md) and [design/trace-spec.md](design/trace-spec.md).
+Package overview: [`libs/agent/README.md`](../../libs/agent/README.md).

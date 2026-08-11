@@ -1,7 +1,8 @@
 import { PRICING_CONFIG_VERSION, estimateCost } from './pricing';
+import { NoopTracer } from '../trace';
 
-import type { AgentEnvironmentSupportable } from '../environment';
-import type { HttpRequestSupportable } from '../http';
+import type { HttpClient } from '../http';
+import type { Tracer } from '../trace';
 import type {
     ChatMessage,
     ChatRequest,
@@ -16,7 +17,7 @@ import type {
  * OpenAI Chat Completions gateway — the first *tool-capable* real-provider gateway.
  *
  * eureka-flows-api's Generate endpoint is text-only and not designed for tool calling (see
- * docs/browser-agent/foundations/provider-tool-calling.md §1), so structured
+ * docs/browser-agent/design/provider-tool-calling.md §1), so structured
  * tool-call verification runs directly against provider APIs behind the shared
  * {@link LlmGateway} contract. This gateway declares `capabilities.toolCalls = true` and maps
  * `ToolDef` → OpenAI `tools` / parses `tool_calls` back into {@link Chunk} `toolCall`s.
@@ -30,10 +31,12 @@ import type {
  */
 
 export interface OpenAiLlmGatewayOptions {
-    /** Provides tracing, time, and cancellation. */
-    environment: AgentEnvironmentSupportable;
     /** HTTP port. */
-    http: HttpRequestSupportable;
+    http: HttpClient;
+    /** Trace port; defaults to {@link NoopTracer}. Provider-specific request/response/error events. */
+    tracer?: Tracer;
+    /** Injectable clock for deterministic duration in tests; defaults to `Date.now`. */
+    now?: () => number;
     /** API key; sent as the `Authorization: Bearer` header, never traced. */
     apiKey: string;
     /** Defaults to `gpt-4o-mini` (a real, cheap, tool-capable OpenAI model). */
@@ -219,22 +222,22 @@ const toUsageInfo = (usage: OpenAiUsage | undefined, model: string, isDirectOpen
 
 /** LlmGateway backed by OpenAI's Chat Completions API; tool-capable (declares `toolCalls: true`). */
 export const createOpenAiLlmGateway = (options: OpenAiLlmGatewayOptions): OpenAiLlmGateway => {
-    const { environment, http, apiKey } = options;
+    const { http, apiKey } = options;
+    const tracer = options.tracer ?? NoopTracer;
+    const now = options.now ?? Date.now;
     const model = options.model ?? DEFAULT_MODEL;
     const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
     // Gates local cost estimation — see toUsageInfo's doc for why a baseUrl override (OpenRouter,
     // DeepSeek, Qwen, GLM) must never be priced against pricing.ts's OpenAI-only rates.
     const isDirectOpenAi = baseUrl === DEFAULT_BASE_URL;
-    const trace = environment.traceReporter;
 
     async function* chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk> {
-        const startedAt = environment.now();
+        const startedAt = now();
         const body = toOpenAiRequestBody(req, model, options.generation);
 
-        trace?.debug('llm.openai.request', {
-            model,
-            messageCount: req.messages.length,
-            toolCount: req.tools.length,
+        tracer.emit({
+            name: 'llm.openai.request',
+            fields: { model, messageCount: req.messages.length, toolCount: req.tools.length },
         });
 
         const response = await http.request({
@@ -249,7 +252,7 @@ export const createOpenAiLlmGateway = (options: OpenAiLlmGatewayOptions): OpenAi
             const errorBody = await response.text().catch(() => '');
             const safeBody = redactText(errorBody, apiKey);
 
-            trace?.error('llm.openai.error', { model, status: response.status });
+            tracer.emit({ name: 'llm.openai.error', level: 'error', fields: { model, status: response.status } });
             throw new Error(
                 `OpenAI request failed with status ${response.status}: ${safeBody.slice(0, ERROR_BODY_SNIPPET_LENGTH)}`
             );
@@ -259,20 +262,27 @@ export const createOpenAiLlmGateway = (options: OpenAiLlmGatewayOptions): OpenAi
         const message = payload.choices?.[0]?.message;
 
         if (!message) {
-            trace?.error('llm.openai.error', { model, status: response.status, reason: 'no choices' });
+            tracer.emit({
+                name: 'llm.openai.error',
+                level: 'error',
+                fields: { model, status: response.status, reason: 'no choices' },
+            });
             throw new Error('OpenAI response contained no choices');
         }
 
         const toolCalls = message.tool_calls ?? [];
         const usage = toUsageInfo(payload.usage, model, isDirectOpenAi);
 
-        trace?.debug('llm.openai.response', {
-            model,
-            status: response.status,
-            hasText: typeof message.content === 'string' && message.content.length > 0,
-            toolCallCount: toolCalls.length,
-            durationMs: environment.now() - startedAt,
-            ...(usage ? { usage } : {}),
+        tracer.emit({
+            name: 'llm.openai.response',
+            fields: {
+                model,
+                status: response.status,
+                hasText: typeof message.content === 'string' && message.content.length > 0,
+                toolCallCount: toolCalls.length,
+                durationMs: now() - startedAt,
+                ...(usage ? { usage } : {}),
+            },
         });
 
         // A tool-call turn legitimately has `content: null` — unlike the text-only gateways,

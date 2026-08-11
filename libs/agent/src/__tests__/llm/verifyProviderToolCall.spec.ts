@@ -102,7 +102,7 @@ describe('verifyMoveNodeToolCall', () => {
         expect(result.pass).toBe(false);
         expect(result.toolCallName).toBeNull();
         expect(result.error).toBeDefined();
-        expect(result.error!.length).toBeLessThanOrEqual(200);
+        expect(result.error?.length).toBeLessThanOrEqual(200);
     });
 
     it('stringifies a thrown non-Error value from the gateway (e.g. a plain string)', async () => {

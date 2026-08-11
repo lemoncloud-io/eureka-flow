@@ -44,6 +44,7 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
+import { renderProjections } from '../../../trace';
 import { GENERATOR_MODELS, IDS, makeInitialGraph } from '../fixtures';
 import { liveProvider, resolveLiveGateway } from '../liveGateway';
 import { createMeter, meteringGateway, price } from '../metering';
@@ -53,6 +54,7 @@ import { outcomeText } from '../turnOutcome';
 import type { Graph } from '../../../canvas/canvasBinding';
 import type { ChatMessage, ChatRequest, Chunk, LlmGateway } from '../../../llm/llmGateway';
 import type { AgentGrant } from '../../../permissions';
+import type { AgentTrace } from '../../../trace';
 import type { TurnCost } from '../metering';
 import type { TurnOutcome } from '../turnOutcome';
 
@@ -74,6 +76,7 @@ const liveGateway = (): LlmGateway => {
 };
 const N = Math.max(1, Number(process.env.BENCH_N ?? '1')); // runs per scenario; smoke default 1
 const VERBOSE = !!process.env.LIVE_VERBOSE; // ALSO echo the transcript to the console (it is ALWAYS saved to file)
+const TRACE = !!process.env.AGENT_TRACE; // ALSO capture the structured trace and render the 3 projections per run
 const TIMEOUT_MS = 240_000 * N; // a live multi-agent turn (+ the outcome re-ask) is several round-trips
 // Ease rate-limit (429) pressure: pause after each scenario. Off by default (0); set e.g. BENCH_PAUSE_MS=3000
 // if a run starts hitting the Developer API's per-minute limit.
@@ -132,6 +135,9 @@ const recordingGateway = (inner: LlmGateway, label: string): LlmGateway => {
     };
 };
 
+// The three projections render via the shared `renderProjections` (trace/renderProjections.ts) — the same
+// text the terminal prints. Appended per run below only when AGENT_TRACE is set.
+
 // ── the run adapter — the ONE shipped design (default hybrid roster), metered + recorded ────────────
 interface RunInput {
     objective: string;
@@ -144,6 +150,7 @@ interface RunResult {
     committed: boolean;
     cost: TurnCost; // the turn's summed token counts + list/effective $
     elapsedMs: number; // wall-clock latency of the whole run() (secondary, noisy axis)
+    trace: AgentTrace; // structured trace capture (real records + 3 projections when AGENT_TRACE is set)
 }
 
 /** Run one objective live over the shipped roster; every agent's gateway is metered INSIDE the recorder. */
@@ -151,7 +158,7 @@ const runOnce = async ({ objective, initialGraph, userPermissions }: RunInput): 
     // A fresh Meter per run() — every agent's gateway writes into it, so totals are the whole-turn sum.
     const meter = createMeter();
     const started = performance.now();
-    const { outcome, graph, committed } = await runScenario({
+    const { outcome, graph, committed, trace } = await runScenario({
         objective,
         initialGraph,
         userPermissions,
@@ -161,7 +168,7 @@ const runOnce = async ({ objective, initialGraph, userPermissions }: RunInput): 
     });
     const elapsedMs = performance.now() - started;
     const totals = meter.totals();
-    return { outcome, graph, committed, cost: { ...totals, ...price(totals, model) }, elapsedMs };
+    return { outcome, graph, committed, cost: { ...totals, ...price(totals, model) }, elapsedMs, trace };
 };
 
 // ── oracle helpers — pure over Graph ─────────────────────────────────────────────────────────────
@@ -254,8 +261,9 @@ const SCENARIOS: Scenario[] = [
         oracle: r => {
             const gen = findNode(r.graph, IDS.gen);
             if (!gen) return { pass: false, note: 'generator node missing' };
-            if (gen.config?.temperature !== '0.2')
-                {return { pass: false, note: `temperature=${gen.config?.temperature}` };}
+            if (gen.config?.temperature !== '0.2') {
+                return { pass: false, note: `temperature=${gen.config?.temperature}` };
+            }
             if (gen.config?.model !== 'gemini-2.5-flash') {
                 return { pass: false, note: `model not preserved (=${gen.config?.model})` };
             }
@@ -324,8 +332,9 @@ const SCENARIOS: Scenario[] = [
         oracle: r => {
             const g = r.graph;
             if (!edgeExists(g, IDS.txt, IDS.gen)) return { pass: false, note: 'input not wired to the generator' };
-            if (edgeExists(g, IDS.buf, IDS.gen))
-                {return { pass: false, note: 'buffer still occupies the generator input' };}
+            if (edgeExists(g, IDS.buf, IDS.gen)) {
+                return { pass: false, note: 'buffer still occupies the generator input' };
+            }
             return { pass: r.committed };
         },
     },
@@ -373,8 +382,9 @@ const SCENARIOS: Scenario[] = [
             if (!embedsTypedPath(g, ['single-output-generator', 'buffer', 'output-preview'])) {
                 return { pass: false, note: 'buffer is not on the generator→preview path' };
             }
-            if (edgeExists(g, IDS.gen, IDS.prev))
-                {return { pass: false, note: 'direct generator→preview edge still present' };}
+            if (edgeExists(g, IDS.gen, IDS.prev)) {
+                return { pass: false, note: 'direct generator→preview edge still present' };
+            }
             return { pass: r.committed };
         },
     },
@@ -422,8 +432,9 @@ const SCENARIOS: Scenario[] = [
             const prev = findNode(r.graph, IDS.prev);
             if (!gen) return { pass: false, note: 'generator missing' };
             if (gen.config?.model !== 'gemini-2.5-pro') return { pass: false, note: `model=${gen.config?.model}` };
-            if (gen.config?.temperature !== '0.9')
-                {return { pass: false, note: `temperature=${gen.config?.temperature}` };}
+            if (gen.config?.temperature !== '0.9') {
+                return { pass: false, note: `temperature=${gen.config?.temperature}` };
+            }
             if (!prev) return { pass: false, note: 'preview missing' };
             if (prev.customLabel !== 'Final Output') return { pass: false, note: `preview label=${prev.customLabel}` };
             return { pass: r.committed };
@@ -462,8 +473,9 @@ const SCENARIOS: Scenario[] = [
         expect: 'applied',
         oracle: r => {
             const g = r.graph;
-            if (countType(g, 'input-text') < 2)
-                {return { pass: false, note: `fewer than 2 inputs (=${countType(g, 'input-text')})` };}
+            if (countType(g, 'input-text') < 2) {
+                return { pass: false, note: `fewer than 2 inputs (=${countType(g, 'input-text')})` };
+            }
             if (countType(g, 'single-output-generator') < 2) return { pass: false, note: 'fewer than 2 generators' };
             if (countType(g, 'output-preview') < 2) return { pass: false, note: 'fewer than 2 previews' };
             const inputs = idsOfType(g, 'input-text');
@@ -473,8 +485,9 @@ const SCENARIOS: Scenario[] = [
             const complete = gens.filter(
                 gen => inputs.some(inp => reaches(g, inp, gen)) && prevs.some(p => reaches(g, gen, p))
             );
-            if (complete.length < 2)
-                {return { pass: false, note: `fewer than 2 complete pipelines (=${complete.length})` };}
+            if (complete.length < 2) {
+                return { pass: false, note: `fewer than 2 complete pipelines (=${complete.length})` };
+            }
             return { pass: r.committed };
         },
     },
@@ -572,6 +585,8 @@ describe.skipIf(SKIP_LIVE)(
                         rec(
                             `── result: outcome=${r.outcome.status} committed=${r.committed} · ${fmtTok(r.cost.totalTokens)} tok · ${r.cost.roundTrips} rt · ${fmtSec(r.elapsedMs)} → ${v.pass ? 'PASS' : `MISS (${v.note ?? 'oracle failed'})`} ──`
                         );
+                        // AGENT_TRACE: append the 3 structured projections for this run to the saved transcript.
+                        if (TRACE) rec(renderProjections(r.trace.project()));
                         if (!v.pass || statusTag) {
                             notes.push(`${line} · "${outcomeText(r.outcome).replace(/\s+/g, ' ').slice(0, 100)}"`);
                         }

@@ -1,19 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
+import { firstToolCall } from './chunks';
 import { createInMemoryCanvasBinding } from '../../canvas/inMemoryCanvasBinding';
 import { createCatalogLookup } from '../../catalog';
-import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
-import { BufferAgentTraceReporter } from '../../environment/trace/traceReporters';
-import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
+import { ScriptedHttpClient } from '../../http/ScriptedHttpClient';
 import { createOpenAiLlmGateway } from '../../llm/OpenAiLlmGateway';
 import { PRICING_CONFIG_VERSION, estimateCost, getModelPricing } from '../../llm/pricing';
 import { LIST_NODES, MOVE_NODE } from '../../tools/nodeTools';
 import { createToolExecutor } from '../../tools/toolExecutor';
 import { toolset } from '../../tools/toolset';
+import { createTracer, memorySink } from '../../trace';
 
 import type { AgentConfig } from '../../agent';
-import type { HttpRequestSupportable } from '../../http';
+import type { HttpClient } from '../../http';
 import type { Chunk } from '../../llm/llmGateway';
+import type { Tracer } from '../../trace';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const API_KEY = 'test-openai-key';
@@ -38,12 +39,8 @@ const openAiToolCall = (id: string, name: string, args: string) => ({
     usage: { prompt_tokens: 20, completion_tokens: 8 },
 });
 
-const createGateway = (http: ScriptedHttpRequest, traceReporter?: BufferAgentTraceReporter) =>
-    createOpenAiLlmGateway({
-        environment: createVirtualAgentEnvironment({ ...(traceReporter ? { traceReporter } : {}), now: () => 1000 }),
-        http,
-        apiKey: API_KEY,
-    });
+const createGateway = (http: ScriptedHttpClient, tracer?: Tracer) =>
+    createOpenAiLlmGateway({ http, ...(tracer ? { tracer } : {}), now: () => 1000, apiKey: API_KEY });
 
 /** Every offline test below uses the default model (`gpt-4o-mini`, registered/priced in
  * pricing.ts) with no baseUrl override (direct OpenAI), so every done chunk now also carries a
@@ -75,7 +72,7 @@ const makeNode = (id: string, x: number, y: number, extra: Partial<NodeData> = {
 
 describe('createOpenAiLlmGateway', () => {
     it('declares itself a tool-capable openai gateway with the default model', () => {
-        const gateway = createGateway(new ScriptedHttpRequest());
+        const gateway = createGateway(new ScriptedHttpClient());
 
         expect(gateway.capabilities).toEqual({ toolCalls: true });
         expect(gateway.provider).toBe('openai');
@@ -83,7 +80,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('authenticates via the Authorization header, never the URL, and posts to /chat/completions', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('hi') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('hi') }]);
 
         await drain(createGateway(http).chat(userSays('hello')));
 
@@ -95,7 +92,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('maps system/user/assistant/tool messages and tool definitions into the OpenAI request shape', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('ok') }]);
 
         await drain(
             createGateway(http).chat({
@@ -142,7 +139,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('maps a tool-result message with null content to an empty string rather than null', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('ok') }]);
 
         await drain(
             createGateway(http).chat({
@@ -161,7 +158,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('maps a plain (non-tool, non-tool-call) message with null content through as null on the wire, never coerced to a string', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('ok') }]);
 
         await drain(createGateway(http).chat({ messages: [{ role: 'user', content: null }], tools: [] }));
 
@@ -192,7 +189,7 @@ describe('createOpenAiLlmGateway', () => {
             ],
             tools: [],
         });
-        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }, { json: openAiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('ok') }, { json: openAiText('ok') }]);
         const gateway = createGateway(http);
 
         await drain(gateway.chat(buildRequest('opaque-sig-abc')));
@@ -204,7 +201,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('omits tools and tool_choice when the request carries no tools', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('ok') }]);
 
         await drain(createGateway(http).chat(userSays('q')));
 
@@ -214,9 +211,8 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('maps generation params into temperature and max_tokens', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('ok') }]);
         const gateway = createOpenAiLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
             generation: { temperature: 0.2, maxOutputTokens: 64 },
@@ -233,9 +229,8 @@ describe('createOpenAiLlmGateway', () => {
         // Needed for OpenAI's gpt-5.6 family, which rejects a tools-bearing /v1/chat/completions
         // request unless reasoning_effort is explicitly 'none' (confirmed live, 2026-08-07) — every
         // other model has no such requirement, so this must stay opt-in, never a default.
-        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('ok') }]);
         const gateway = createOpenAiLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
             generation: { reasoningEffort: 'none' },
@@ -248,7 +243,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('omits reasoning_effort when not configured', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('ok') }]);
 
         await drain(createGateway(http).chat(userSays('q')));
 
@@ -257,7 +252,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('yields a text chunk then a done chunk carrying usage', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('the answer') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('the answer') }]);
 
         const chunks = await drain(createGateway(http).chat(userSays('q')));
 
@@ -270,11 +265,10 @@ describe('createOpenAiLlmGateway', () => {
     it("carries the response body's model as actualModel on the done chunk when the provider reports it", async () => {
         // Matters most through OpenRouter, where a route like `openrouter/free` can be served by
         // a different underlying model than requested — never assumed equal to the request's model.
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { ...openAiText('ok'), model: 'meta-llama/llama-3.1-8b-instruct:free' } },
         ]);
         const gateway = createOpenAiLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
             model: 'openrouter/free',
@@ -288,7 +282,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('omits actualModel when the response body carries no model field — never fabricates one', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('ok') }]);
 
         const chunks = await drain(createGateway(http).chat(userSays('q')));
 
@@ -297,7 +291,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('parses a tool-call response (content null) into a toolCall chunk, no error on empty content', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: openAiToolCall('call_1', 'move_node', '{"nodeId":"text-1","by":{"dx":100,"dy":0}}') },
         ]);
 
@@ -310,9 +304,8 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('honors model and baseUrl overrides (the OpenRouter / proxy path)', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('ok') }]);
         const gateway = createOpenAiLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
             model: 'openai/gpt-4o-mini',
@@ -326,7 +319,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('omits usage entirely from the done chunk when the response reports no usage at all', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { choices: [{ message: { role: 'assistant', content: 'hi' } }] } },
         ]);
 
@@ -337,7 +330,7 @@ describe('createOpenAiLlmGateway', () => {
 
     describe('usage/cost mapping', () => {
         it('reports only estimatedCost: null when the response provides a bare empty usage object — every token field left undefined, not fabricated', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 { json: { choices: [{ message: { role: 'assistant', content: 'ok' } }], usage: {} } },
             ]);
 
@@ -348,7 +341,7 @@ describe('createOpenAiLlmGateway', () => {
         });
 
         it('subtracts prompt_tokens_details.cached_tokens from prompt_tokens for inputTokens — never double-counted', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         choices: [{ message: { role: 'assistant', content: 'ok' } }],
@@ -369,7 +362,7 @@ describe('createOpenAiLlmGateway', () => {
         });
 
         it('also subtracts prompt_tokens_details.cache_write_tokens from prompt_tokens', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         choices: [{ message: { role: 'assistant', content: 'ok' } }],
@@ -401,7 +394,7 @@ describe('createOpenAiLlmGateway', () => {
             // nonzero cache_write_tokens is treated as ambiguous for cost purposes — never
             // silently priced using an inclusion relationship OpenAI's own system has gotten
             // wrong in production.
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         choices: [{ message: { role: 'assistant', content: 'ok' } }],
@@ -428,7 +421,7 @@ describe('createOpenAiLlmGateway', () => {
         });
 
         it('still computes a normal estimatedCost when cache_write_tokens is absent or exactly 0 (the unambiguous case)', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         choices: [{ message: { role: 'assistant', content: 'ok' } }],
@@ -449,7 +442,7 @@ describe('createOpenAiLlmGateway', () => {
         });
 
         it('subtracts completion_tokens_details.reasoning_tokens from completion_tokens for outputTokens — never double-counted', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         choices: [{ message: { role: 'assistant', content: 'ok' } }],
@@ -470,7 +463,7 @@ describe('createOpenAiLlmGateway', () => {
         });
 
         it('clamps outputTokens to 0 rather than going negative if reasoning_tokens ever exceeded completion_tokens', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         choices: [{ message: { role: 'assistant', content: 'ok' } }],
@@ -490,7 +483,7 @@ describe('createOpenAiLlmGateway', () => {
         });
 
         it('passes providerTotalTokens through as the raw total_tokens, never recomputed locally', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         choices: [{ message: { role: 'assistant', content: 'ok' } }],
@@ -506,7 +499,7 @@ describe('createOpenAiLlmGateway', () => {
         });
 
         it('computes estimatedCost for a direct OpenAI call against pricing.ts', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         choices: [{ message: { role: 'assistant', content: 'ok' } }],
@@ -525,7 +518,7 @@ describe('createOpenAiLlmGateway', () => {
         });
 
         it("prefers OpenRouter's provider-reported usage.cost over a local estimate", async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         choices: [{ message: { role: 'assistant', content: 'ok' } }],
@@ -534,7 +527,6 @@ describe('createOpenAiLlmGateway', () => {
                 },
             ]);
             const gateway = createOpenAiLlmGateway({
-                environment: createVirtualAgentEnvironment(),
                 http,
                 apiKey: API_KEY,
                 model: 'openrouter/free',
@@ -551,7 +543,7 @@ describe('createOpenAiLlmGateway', () => {
         });
 
         it('treats a provider-reported cost of exactly 0 as a real, present value — distinct from no cost field at all', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         choices: [{ message: { role: 'assistant', content: 'ok' } }],
@@ -560,7 +552,6 @@ describe('createOpenAiLlmGateway', () => {
                 },
             ]);
             const gateway = createOpenAiLlmGateway({
-                environment: createVirtualAgentEnvironment(),
                 http,
                 apiKey: API_KEY,
                 model: 'openrouter/free',
@@ -578,7 +569,7 @@ describe('createOpenAiLlmGateway', () => {
         });
 
         it('never locally estimates cost for a baseUrl-overridden call with no provider-reported cost (OpenRouter/DeepSeek/Qwen/GLM all reuse this gateway, none share OpenAI pricing)', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         choices: [{ message: { role: 'assistant', content: 'ok' } }],
@@ -587,7 +578,6 @@ describe('createOpenAiLlmGateway', () => {
                 },
             ]);
             const gateway = createOpenAiLlmGateway({
-                environment: createVirtualAgentEnvironment(),
                 http,
                 apiKey: API_KEY,
                 model: 'openrouter/free',
@@ -605,9 +595,8 @@ describe('createOpenAiLlmGateway', () => {
         });
 
         it('returns estimatedCost: null (not a fabricated 0) for a direct-OpenAI call to an unregistered model', async () => {
-            const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: openAiText('ok') }]);
             const gateway = createOpenAiLlmGateway({
-                environment: createVirtualAgentEnvironment(),
                 http,
                 apiKey: API_KEY,
                 model: 'gpt-does-not-exist',
@@ -622,7 +611,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('passes the abort signal through to the HTTP port', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: openAiText('ok') }]);
         const controller = new AbortController();
 
         await drain(createGateway(http).chat(userSays('q'), { signal: controller.signal }));
@@ -631,23 +620,23 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('throws on non-ok responses with the status but never the API key, and traces the error', async () => {
-        const http = new ScriptedHttpRequest([{ status: 401, text: `invalid key ${API_KEY}` }]);
-        const trace = new BufferAgentTraceReporter();
+        const http = new ScriptedHttpClient([{ status: 401, text: `invalid key ${API_KEY}` }]);
+        const sink = memorySink();
+        const tracer = createTracer(sink);
 
-        const attempt = drain(createGateway(http, trace).chat(userSays('q')));
+        const attempt = drain(createGateway(http, tracer).chat(userSays('q')));
 
         await expect(attempt).rejects.toThrow(/status 401.*invalid key \[redacted\]/);
         await attempt.catch((error: Error) => expect(error.message).not.toContain(API_KEY));
-        expect(trace.entries.some(entry => entry.level === 'error')).toBe(true);
-        expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
+        expect(sink.records.some(entry => entry.level === 'error')).toBe(true);
+        expect(JSON.stringify(sink.records)).not.toContain(API_KEY);
     });
 
     it('passes an error body through verbatim (no redaction) when apiKey is empty — nothing to scrub', async () => {
         // Guards the redactText early-return itself: without it, `value.split('').join(...)` would
         // splice '[redacted]' between every single character of the body, mangling it completely.
-        const http = new ScriptedHttpRequest([{ status: 403, text: 'no secret in this error body' }]);
+        const http = new ScriptedHttpClient([{ status: 403, text: 'no secret in this error body' }]);
         const gateway = createOpenAiLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: '',
         });
@@ -658,7 +647,7 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('falls back to an empty string when reading the non-ok response body itself fails (response.text() rejects)', async () => {
-        const http: HttpRequestSupportable = {
+        const http: HttpClient = {
             request: async () => ({
                 status: 500,
                 ok: false,
@@ -672,7 +661,6 @@ describe('createOpenAiLlmGateway', () => {
             }),
         };
         const gateway = createOpenAiLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
         });
@@ -681,36 +669,38 @@ describe('createOpenAiLlmGateway', () => {
     });
 
     it('throws when the response has no choices', async () => {
-        const http = new ScriptedHttpRequest([{ json: { choices: [] } }]);
+        const http = new ScriptedHttpClient([{ json: { choices: [] } }]);
 
         await expect(drain(createGateway(http).chat(userSays('q')))).rejects.toThrow(/no choices/);
     });
 
     it('traces request and response without leaking the key', async () => {
-        const http = new ScriptedHttpRequest([{ json: openAiText('traced') }]);
-        const trace = new BufferAgentTraceReporter();
+        const http = new ScriptedHttpClient([{ json: openAiText('traced') }]);
+        const sink = memorySink();
+        const tracer = createTracer(sink);
 
-        await drain(createGateway(http, trace).chat(userSays('q')));
+        await drain(createGateway(http, tracer).chat(userSays('q')));
 
-        const messages = trace.entries.map(entry => entry.message);
+        const messages = sink.records.map(entry => entry.name);
         expect(messages).toContain('llm.openai.request');
         expect(messages).toContain('llm.openai.response');
-        expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
+        expect(JSON.stringify(sink.records)).not.toContain(API_KEY);
     });
 
     it('omits usage from the traced response entry when the response has no usage at all', async () => {
         // trace?.debug(...) short-circuits its whole argument list when no trace reporter is
         // configured, so the object literal carrying this ternary is only evaluated when a real
         // reporter is wired — this test is what actually exercises its "no usage" branch.
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { choices: [{ message: { role: 'assistant', content: 'hi' } }] } },
         ]);
-        const trace = new BufferAgentTraceReporter();
+        const sink = memorySink();
+        const tracer = createTracer(sink);
 
-        await drain(createGateway(http, trace).chat(userSays('q')));
+        await drain(createGateway(http, tracer).chat(userSays('q')));
 
-        const responseEntry = trace.entries.find(entry => entry.message === 'llm.openai.response');
-        expect(responseEntry?.json).not.toHaveProperty('usage');
+        const responseEntry = sink.records.find(entry => entry.name === 'llm.openai.response');
+        expect(responseEntry?.fields).not.toHaveProperty('usage');
     });
 
     // The full offline chain: a canned OpenAI tool-call response flows through the gateway's
@@ -732,7 +722,7 @@ describe('createOpenAiLlmGateway', () => {
             grant: { canModifyCanvas: true },
         };
 
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: openAiToolCall('call_1', 'move_node', '{"nodeId":"text-1","by":{"dx":100,"dy":0}}') },
         ]);
 
@@ -743,12 +733,14 @@ describe('createOpenAiLlmGateway', () => {
             })
         );
 
-        const toolCall = chunks.find(c => c.toolCall)?.toolCall;
-        expect(toolCall?.name).toBe('move_node');
+        // firstToolCall throws (naming what the stream held) when there is none, so it carries the presence
+        // assertion the `toolCall?.name` check used to imply and narrows the three reads below.
+        const toolCall = firstToolCall(chunks);
+        expect(toolCall.name).toBe('move_node');
 
         const result = await executor.dispatch(
             config,
-            { id: toolCall!.id, name: toolCall!.name, args: JSON.parse(toolCall!.argsDelta) },
+            { id: toolCall.id, name: toolCall.name, args: JSON.parse(toolCall.argsDelta) },
             { canModifyCanvas: true }
         );
 

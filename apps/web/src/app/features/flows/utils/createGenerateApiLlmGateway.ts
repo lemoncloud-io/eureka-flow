@@ -13,8 +13,8 @@ import type { ChatRequest, Chunk, LlmGateway } from '@flows/agent';
  * this gateway depends on a small local interface ({@link GenerateReceiver}) instead of
  * importing one — real socket wiring is a TODO once `libs/socket` grows one.
  *
- * Real-API smoke testing (see docs/browser-agent/foundations/llm-gateway.md) confirmed the
- * HTTP path works (ACK 200, inner `StatusCode: 202` = async acceptance) but **no WS result
+ * Real-API smoke testing confirmed the HTTP path works (ACK 200, inner `StatusCode: 202` =
+ * async acceptance) but **no WS result
  * frames were observed** in local dev. The inline ACK body is not the model's answer — an
  * empty `text`/`output.content` and the async-acceptance status rule that out — so this
  * gateway does not fall back to it. Until a real receiver is wired, `chat()` will hang

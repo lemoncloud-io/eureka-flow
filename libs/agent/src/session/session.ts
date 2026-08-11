@@ -39,7 +39,7 @@ export const emptySession = (flowId: string): SessionState => ({ flowId, message
 
 /**
  * A process-memory {@link SessionStore} — the default for tests and Node runs. The browser app
- * persists its session through the Agent Environment's storage port instead (see `useAgentSession`).
+ * persists its session through an injected storage port instead.
  */
 export const createInMemorySessionStore = (): SessionStore => {
     const sessions = new Map<string, SessionState>();

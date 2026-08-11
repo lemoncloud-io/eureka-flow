@@ -324,7 +324,7 @@ specialist finishes, not only at the end.
   `composeFrame` (clamped + echoed back), so the math is unit-tested; the handlers only nudge them and repaint.
 - **Meta commands** (view-local): `/pane`, `/top`, `/bottom`, `/keys`, `/graph` (writes
   full JSON to `./graph.json`), `/seed <file>`, `/save` (backend, or `<file>` local — see below), `/reset`,
-  `/verbose`, `/provider`, `/log`, `/help`, `/quit`; **Ctrl-C** → `abort()` mid-turn else quit; **Ctrl-D** →
+  `/verbose`, `/provider`, `/log`, `/trace`, `/help`, `/quit`; **Ctrl-C** → `abort()` mid-turn else quit; **Ctrl-D** →
   quit. `/reset` and `/seed` call `driver.reset(seed?)`.
 - **Backend wire log** — on by default, `agent-terminal.log` records four channels as one timeline:
   **chat** (the orchestrator transcript as `user` → `assistant` → tool-result turns, taken from the session so
@@ -335,6 +335,11 @@ specialist finishes, not only at the end.
   the backend-call proof), and, in connected mode, **flow-API** HTTP. The file is truncated at startup;
   `--log <file>` sets the path, `--no-log` disables, `/log` shows it. The chat channel is fed the session
   state; the others are transparent decorators over the gateway / `CanvasBinding` / `HttpPort`.
+- **Structured trace** (distinct from the wire log) — off by default; `--trace` or `AGENT_TRACE=1` injects the
+  shipped `createAgentTrace` tracer into the orchestrator (inherited by every spawned child). `/trace` and exit
+  write the three projections — transcripts · trace tree · graph diff — to `agent-terminal.trace.log`
+  (`--trace <file>` overrides), via the shared `trace/renderProjections`, identical to the eval harness. Where
+  the wire log is a raw per-call timeline, the trace is the projected, redacted record stream.
 - **Saving to the backend** — in connected mode the terminal persists the built flow the way the web's save
   button does: a single `repository.save()` (`POST /flows/:id/save`) that sends the whole graph. The server
   upserts nodes + edges by their client-minted ids (`upsertNodesV2` get-or-make), so a brand-new flow (`id 0`)

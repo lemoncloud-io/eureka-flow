@@ -12,6 +12,9 @@ export type {
 export { createFakeGateway } from './fakeGateway';
 export type { FakeGateway, FakeResponse, FakeScriptStep } from './fakeGateway';
 
+// Per-agent tracing decorator: emits llm.request/llm.response around chat(), pass-through otherwise.
+export { tracingGateway } from './tracingGateway';
+
 // Gemini provider (HTTP, text-only) — the Developer API (x-goog-api-key → generativelanguage.googleapis.com).
 export { createGeminiLlmGateway } from './GeminiLlmGateway';
 export type {

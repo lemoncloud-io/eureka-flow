@@ -7,6 +7,7 @@ import type { CatalogLookup } from '../catalog';
 import type { LlmGateway } from '../llm/llmGateway';
 import type { AgentGrant } from '../permissions';
 import type { SessionState } from '../session/session';
+import type { Tracer } from '../trace';
 
 /**
  * The terminal's driver: owns the observable session store + the orchestrator, drives one turn per `submit`,
@@ -40,6 +41,8 @@ export interface TerminalRunDeps {
     loadGraph?: (graph: Graph) => void;
     /** Session key; same value all turns = one conversation. Default `terminal`. */
     flowId?: string;
+    /** Tracer injected into the orchestrator (and inherited by every spawned child); omit ⇒ NoopTracer, no capture. */
+    tracer?: Tracer;
 }
 
 export const createTerminalRun = (deps: TerminalRunDeps): TerminalRun => {
@@ -62,6 +65,7 @@ export const createTerminalRun = (deps: TerminalRunDeps): TerminalRun => {
             binding: deps.binding,
             catalog: deps.catalog,
             userPermissions: deps.userPermissions,
+            tracer: deps.tracer,
         });
 
     let orchestrator = build();

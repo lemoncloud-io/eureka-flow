@@ -1,7 +1,8 @@
 import { PRICING_CONFIG_VERSION, estimateCost } from './pricing';
+import { NoopTracer } from '../trace';
 
-import type { AgentEnvironmentSupportable } from '../environment';
-import type { HttpRequestSupportable } from '../http';
+import type { HttpClient } from '../http';
+import type { Tracer } from '../trace';
 import type {
     ChatMessage,
     ChatRequest,
@@ -19,7 +20,7 @@ import type {
  * Separate from the text-only {@link createGeminiLlmGateway} (which stays as-is): this one
  * declares `capabilities.toolCalls = true`, maps `ToolDef` → Gemini `functionDeclarations`,
  * and parses `candidate.content.parts[].functionCall` back into {@link Chunk} `toolCall`s.
- * See docs/browser-agent/foundations/provider-tool-calling.md §2 for the full mapping.
+ * See docs/browser-agent/design/provider-tool-calling.md §2 for the full mapping.
  *
  * Single-turn tool calling and multi-turn tool-result mapping are both implemented.
  * Gemini correlates a tool result to the call it answers by function **name** (`functionResponse.
@@ -35,10 +36,12 @@ import type {
  */
 
 export interface GeminiToolLlmGatewayOptions {
-    /** Provides tracing, time, and cancellation. */
-    environment: AgentEnvironmentSupportable;
     /** HTTP port. */
-    http: HttpRequestSupportable;
+    http: HttpClient;
+    /** Trace port; defaults to {@link NoopTracer}. Provider-specific request/response/error events. */
+    tracer?: Tracer;
+    /** Injectable clock for deterministic duration in tests; defaults to `Date.now`. */
+    now?: () => number;
     /** Gemini API key; sent as the x-goog-api-key header, never traced. */
     apiKey: string;
     /** Defaults to gemini-2.5-flash. */
@@ -343,10 +346,11 @@ const describeGeminiFailure = (payload: GeminiToolResponse): string => {
 
 /** LlmGateway backed by Gemini's generateContent API with function calling; declares `toolCalls: true`. */
 export const createGeminiToolLlmGateway = (options: GeminiToolLlmGatewayOptions): GeminiToolLlmGateway => {
-    const { environment, http, apiKey } = options;
+    const { http, apiKey } = options;
+    const tracer = options.tracer ?? NoopTracer;
+    const now = options.now ?? Date.now;
     const model = options.model ?? DEFAULT_MODEL;
     const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
-    const trace = environment.traceReporter;
 
     // Gemini returns no tool-call ids; synthesize a stable one so the agent loop can correlate
     // results — same approach as the text-only GeminiLlmGateway's `nextCallId`. Declared HERE, in
@@ -363,10 +367,13 @@ export const createGeminiToolLlmGateway = (options: GeminiToolLlmGatewayOptions)
     const nextToolCallId = (): string => `gemini-call-${(toolCallSeq += 1)}`;
 
     async function* chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk> {
-        const startedAt = environment.now();
+        const startedAt = now();
         const body = toGeminiToolRequest(req, options.generation);
 
-        trace?.debug('llm.gemini.request', { model, messageCount: req.messages.length, toolCount: req.tools.length });
+        tracer.emit({
+            name: 'llm.gemini.request',
+            fields: { model, messageCount: req.messages.length, toolCount: req.tools.length },
+        });
 
         const response = await http.request({
             method: 'POST',
@@ -380,7 +387,7 @@ export const createGeminiToolLlmGateway = (options: GeminiToolLlmGatewayOptions)
             const errorBody = await response.text().catch(() => '');
             const safeBody = redactText(errorBody, apiKey);
 
-            trace?.error('llm.gemini.error', { model, status: response.status });
+            tracer.emit({ name: 'llm.gemini.error', level: 'error', fields: { model, status: response.status } });
             throw new Error(
                 `Gemini request failed with status ${response.status}: ${safeBody.slice(0, ERROR_BODY_SNIPPET_LENGTH)}`
             );
@@ -393,7 +400,11 @@ export const createGeminiToolLlmGateway = (options: GeminiToolLlmGatewayOptions)
             // Covers all four empty/unusable shapes uniformly: no candidates, missing `content`,
             // missing `content.parts`, or an empty `content.parts` array.
             const diagnostics = redactText(describeGeminiFailure(payload), apiKey).slice(0, DIAGNOSTIC_SNIPPET_LENGTH);
-            trace?.error('llm.gemini.error', { model, status: response.status, reason: 'no candidates', diagnostics });
+            tracer.emit({
+                name: 'llm.gemini.error',
+                level: 'error',
+                fields: { model, status: response.status, reason: 'no candidates', diagnostics },
+            });
             throw new Error(`Gemini response contained no candidates or no usable content parts (${diagnostics})`);
         }
 
@@ -414,13 +425,16 @@ export const createGeminiToolLlmGateway = (options: GeminiToolLlmGatewayOptions)
 
         const usage = toUsageInfo(payload.usageMetadata, model);
 
-        trace?.debug('llm.gemini.response', {
-            model,
-            status: response.status,
-            textLength: text.length,
-            toolCallCount: functionCalls.length,
-            durationMs: environment.now() - startedAt,
-            ...(usage ? { usage } : {}),
+        tracer.emit({
+            name: 'llm.gemini.response',
+            fields: {
+                model,
+                status: response.status,
+                textLength: text.length,
+                toolCallCount: functionCalls.length,
+                durationMs: now() - startedAt,
+                ...(usage ? { usage } : {}),
+            },
         });
 
         if (text) {

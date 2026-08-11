@@ -6,12 +6,13 @@ import { useAgentSession } from './useAgentSession';
 
 import type { UseAgentSessionResult } from './useAgentSession';
 import type {
-    AgentEnvironmentSupportable,
     AgentGrant,
+    AgentStorage,
     CanvasBinding,
     CatalogLookup,
     LlmGateway,
     SessionStore,
+    Tracer,
 } from '@flows/agent';
 
 interface UseAgentArgs {
@@ -20,8 +21,10 @@ interface UseAgentArgs {
     gateway: LlmGateway;
     /** The block catalog behind the read/config tools (build with `createBlockCatalogLookup`). */
     catalog: CatalogLookup;
-    /** The browser Agent Environment; session persistence and run tracing flow through it. */
-    environment: AgentEnvironmentSupportable;
+    /** Session persistence port (survives reload). */
+    storage: AgentStorage;
+    /** Tracer injected into the orchestrator + used for run-lifecycle events. */
+    tracer: Tracer;
     /** The current user's permissions — the flow role projected via `toAgentGrant`. The executor gates
      *  every specialist tool against it (viewer ⇒ no edits — R2); each agent keeps its own fixed grant. */
     userPermissions: AgentGrant;
@@ -41,22 +44,24 @@ export const useAgent = ({
     flowId,
     gateway,
     catalog,
-    environment,
+    storage,
+    tracer,
     userPermissions,
     gatewayFor,
 }: UseAgentArgs): UseAgentSessionResult => {
     const createAgent = useCallback(
-        (storage: SessionStore) =>
+        (sessionStore: SessionStore) =>
             createOrchestratorAgent({
                 gateway,
-                storage,
+                storage: sessionStore,
                 flowId,
                 binding,
                 catalog,
                 userPermissions,
+                tracer,
                 ...(gatewayFor ? { gatewayFor } : {}),
             }),
-        [gateway, binding, flowId, catalog, userPermissions, gatewayFor]
+        [gateway, binding, flowId, catalog, userPermissions, tracer, gatewayFor]
     );
-    return useAgentSession({ flowId, environment, createAgent });
+    return useAgentSession({ flowId, storage, tracer, createAgent });
 };

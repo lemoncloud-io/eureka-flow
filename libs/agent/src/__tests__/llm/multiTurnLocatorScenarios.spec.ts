@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
-import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
+import { ScriptedHttpClient } from '../../http/ScriptedHttpClient';
 import { createAnthropicToolLlmGateway } from '../../llm/AnthropicToolLlmGateway';
 import { createGeminiToolLlmGateway } from '../../llm/GeminiToolLlmGateway';
 import { accumulateExtendedUsage, wrapGatewayWithUsageCapture } from '../../llm/verificationMetrics';
@@ -678,7 +677,7 @@ describe('single-turn catalog is unaffected by the multi-turn-only scenario', ()
 
 describe('runMultiTurnLocatorScenario + a real Anthropic gateway (offline, scripted HTTP — zero network)', () => {
     it('completes the move-named-node-without-id lookup-action round trip through real Anthropic request/response mapping', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             {
                 json: {
                     content: [{ type: 'tool_use', id: 'toolu_1', name: 'list_nodes', input: {} }],
@@ -706,7 +705,6 @@ describe('runMultiTurnLocatorScenario + a real Anthropic gateway (offline, scrip
             },
         ]);
         const gateway = createAnthropicToolLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: 'test-anthropic-key',
             model: 'claude-haiku-4-5',
@@ -782,7 +780,7 @@ describe('runMultiTurnLocatorScenario + a real Anthropic gateway (offline, scrip
     });
 
     it('a genuine dispatch failure through the real Anthropic mapping still fails the strict check — never forced to success', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             {
                 json: {
                     content: [
@@ -799,7 +797,6 @@ describe('runMultiTurnLocatorScenario + a real Anthropic gateway (offline, scrip
             },
         ]);
         const gateway = createAnthropicToolLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: 'test-anthropic-key',
             model: 'claude-haiku-4-5',
@@ -844,9 +841,8 @@ describe('runMultiTurnLocatorScenario + a real Gemini gateway (offline, scripted
         usageMetadata: { promptTokenCount: 20, candidatesTokenCount: 8 },
     });
 
-    const createGeminiGateway = (http: ScriptedHttpRequest) =>
+    const createGeminiGateway = (http: ScriptedHttpClient) =>
         createGeminiToolLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: 'test-gemini-key',
         });
@@ -857,7 +853,7 @@ describe('runMultiTurnLocatorScenario + a real Gemini gateway (offline, scripted
     }
 
     it("replays turn 1's exact thoughtSignature on the matching turn-2 functionCall part, functionResponse following it", async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: geminiFunctionCallReply('list_nodes', {}, 'opaque-sig-turn1') },
             {
                 json: geminiFunctionCallReply(
@@ -925,7 +921,7 @@ describe('runMultiTurnLocatorScenario + a real Gemini gateway (offline, scripted
     });
 
     it('omits thoughtSignature end-to-end when the provider never issued one (non-thinking Gemini models stay unchanged)', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: geminiFunctionCallReply('list_nodes', {}) },
             { json: geminiFunctionCallReply('move_node', { nodeId: 'node-a17', by: { dx: 100, dy: 0 } }) },
         ]);

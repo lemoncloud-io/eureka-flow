@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
-import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
+import { ScriptedHttpClient } from '../../http/ScriptedHttpClient';
 import { planMultiTurnModelSelection } from '../../llm/multiTurnRunSelection';
 import { getModelPricing } from '../../llm/pricing';
 import {
@@ -106,12 +105,11 @@ describe('PROVIDER_REGISTRY', () => {
             'createGatewayForEntry dispatches through the OpenAI-compatible gateway to the DeepSeek ' +
                 'baseUrl, not the OpenAI default — and never touches the real network',
             async () => {
-                const http = new ScriptedHttpRequest([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
+                const http = new ScriptedHttpClient([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
 
                 const gateway = createGatewayForEntry(entry, {
                     apiKey: 'test-deepseek-key',
                     model: entry.defaultModel,
-                    environment: createVirtualAgentEnvironment(),
                     http,
                 });
 
@@ -119,7 +117,7 @@ describe('PROVIDER_REGISTRY', () => {
                 expect(gateway.capabilities).toEqual({ toolCalls: true });
                 await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
 
-                // ScriptedHttpRequest never touches the network; exactly one scripted call proves the
+                // ScriptedHttpClient never touches the network; exactly one scripted call proves the
                 // gateway made no additional/hidden requests either.
                 expect(http.requests).toHaveLength(1);
                 expect(http.requests[0].url).toBe('https://api.deepseek.com/chat/completions');
@@ -158,12 +156,11 @@ describe('PROVIDER_REGISTRY', () => {
             'createGatewayForEntry dispatches through the OpenAI-compatible gateway to the Qwen/DashScope ' +
                 'baseUrl, not the OpenAI default — and never touches the real network',
             async () => {
-                const http = new ScriptedHttpRequest([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
+                const http = new ScriptedHttpClient([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
 
                 const gateway = createGatewayForEntry(entry, {
                     apiKey: 'test-qwen-key',
                     model: entry.defaultModel,
-                    environment: createVirtualAgentEnvironment(),
                     http,
                 });
 
@@ -171,7 +168,7 @@ describe('PROVIDER_REGISTRY', () => {
                 expect(gateway.capabilities).toEqual({ toolCalls: true });
                 await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
 
-                // ScriptedHttpRequest never touches the network; exactly one scripted call proves the
+                // ScriptedHttpClient never touches the network; exactly one scripted call proves the
                 // gateway made no additional/hidden requests either.
                 expect(http.requests).toHaveLength(1);
                 expect(http.requests[0].url).toBe(
@@ -217,19 +214,18 @@ describe('PROVIDER_REGISTRY', () => {
             'createGatewayForEntry dispatches through the native Anthropic gateway to the Claude ' +
                 'baseUrl, not the OpenAI default — and never touches the real network',
             async () => {
-                const http = new ScriptedHttpRequest([{ json: { content: [{ type: 'text', text: 'hi' }] } }]);
+                const http = new ScriptedHttpClient([{ json: { content: [{ type: 'text', text: 'hi' }] } }]);
 
                 const gateway = createGatewayForEntry(entry, {
                     apiKey: 'test-anthropic-key',
                     model: entry.defaultModel,
-                    environment: createVirtualAgentEnvironment(),
                     http,
                 });
 
                 expect(gateway.capabilities).toEqual({ toolCalls: true });
                 await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
 
-                // ScriptedHttpRequest never touches the network; exactly one scripted call proves the
+                // ScriptedHttpClient never touches the network; exactly one scripted call proves the
                 // gateway made no additional/hidden requests either.
                 expect(http.requests).toHaveLength(1);
                 expect(http.requests[0].url).toBe('https://api.anthropic.com/v1/messages');
@@ -271,12 +267,11 @@ describe('PROVIDER_REGISTRY', () => {
             'createGatewayForEntry dispatches through the OpenAI-compatible gateway to the Z.ai ' +
                 'baseUrl, not the OpenAI default — and never touches the real network',
             async () => {
-                const http = new ScriptedHttpRequest([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
+                const http = new ScriptedHttpClient([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
 
                 const gateway = createGatewayForEntry(entry, {
                     apiKey: 'test-glm-key',
                     model: entry.defaultModel,
-                    environment: createVirtualAgentEnvironment(),
                     http,
                 });
 
@@ -284,7 +279,7 @@ describe('PROVIDER_REGISTRY', () => {
                 expect(gateway.capabilities).toEqual({ toolCalls: true });
                 await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
 
-                // ScriptedHttpRequest never touches the network; exactly one scripted call proves the
+                // ScriptedHttpClient never touches the network; exactly one scripted call proves the
                 // gateway made no additional/hidden requests either.
                 expect(http.requests).toHaveLength(1);
                 expect(http.requests[0].url).toBe('https://api.z.ai/api/paas/v4/chat/completions');
@@ -358,14 +353,13 @@ describe('PROVIDER_REGISTRY', () => {
 
     it('createGatewayForEntry builds a real OpenAI gateway (openai-compatible) hitting api.openai.com', async () => {
         const entry = findEntry('openai');
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { choices: [{ message: { content: 'hi' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } },
         ]);
 
         const gateway = createGatewayForEntry(entry, {
             apiKey: 'test-openai-key',
             model: 'gpt-4.1-mini',
-            environment: createVirtualAgentEnvironment(),
             http,
         });
 
@@ -379,14 +373,13 @@ describe('PROVIDER_REGISTRY', () => {
 
     it('createGatewayForEntry applies requiredGenerationOverrides for gpt-5.6-sol (reasoning_effort fix)', async () => {
         const entry = findEntry('openai');
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { choices: [{ message: { content: 'hi' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } },
         ]);
 
         const gateway = createGatewayForEntry(entry, {
             apiKey: 'test-openai-key',
             model: 'gpt-5.6-sol',
-            environment: createVirtualAgentEnvironment(),
             http,
         });
 
@@ -397,14 +390,13 @@ describe('PROVIDER_REGISTRY', () => {
 
     it('createGatewayForEntry does NOT apply a generation override for a model that has none (gpt-4o-mini)', async () => {
         const entry = findEntry('openai');
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { choices: [{ message: { content: 'hi' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } },
         ]);
 
         const gateway = createGatewayForEntry(entry, {
             apiKey: 'test-openai-key',
             model: 'gpt-4o-mini',
-            environment: createVirtualAgentEnvironment(),
             http,
         });
 
@@ -415,12 +407,11 @@ describe('PROVIDER_REGISTRY', () => {
 
     it('createGatewayForEntry builds a real Gemini gateway (gemini-native) hitting generativelanguage.googleapis.com', async () => {
         const entry = findEntry('gemini');
-        const http = new ScriptedHttpRequest([{ json: { candidates: [{ content: { parts: [{ text: 'hi' }] } }] } }]);
+        const http = new ScriptedHttpClient([{ json: { candidates: [{ content: { parts: [{ text: 'hi' }] } }] } }]);
 
         const gateway = createGatewayForEntry(entry, {
             apiKey: 'test-gemini-key',
             model: 'gemini-2.5-pro',
-            environment: createVirtualAgentEnvironment(),
             http,
         });
 
@@ -435,12 +426,11 @@ describe('PROVIDER_REGISTRY', () => {
 
     it("createGatewayForEntry passes OpenRouter's baseUrl through to the OpenAI-compatible gateway (not the default OpenAI URL)", async () => {
         const entry = findEntry('openrouter');
-        const http = new ScriptedHttpRequest([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
+        const http = new ScriptedHttpClient([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
 
         const gateway = createGatewayForEntry(entry, {
             apiKey: 'test-openrouter-key',
             model: 'openrouter/free',
-            environment: createVirtualAgentEnvironment(),
             http,
         });
 
@@ -462,12 +452,11 @@ describe('PROVIDER_REGISTRY', () => {
         // case is otherwise unreachable through the real registry — construct a synthetic entry
         // (a copy of the real one with baseUrl added) to exercise it.
         const entry: ProviderModelEntry = { ...findEntry('gemini'), baseUrl: 'https://gemini-proxy.example.com' };
-        const http = new ScriptedHttpRequest([{ json: { candidates: [{ content: { parts: [{ text: 'hi' }] } }] } }]);
+        const http = new ScriptedHttpClient([{ json: { candidates: [{ content: { parts: [{ text: 'hi' }] } }] } }]);
 
         const gateway = createGatewayForEntry(entry, {
             apiKey: 'test-gemini-key',
             model: entry.defaultModel,
-            environment: createVirtualAgentEnvironment(),
             http,
         });
         await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
@@ -485,12 +474,11 @@ describe('PROVIDER_REGISTRY', () => {
         // case is otherwise unreachable through the real registry — construct a synthetic entry
         // (a copy of the real one with baseUrl removed) to exercise it.
         const entry: ProviderModelEntry = { ...findEntry('anthropic'), baseUrl: undefined };
-        const http = new ScriptedHttpRequest([{ json: { content: [{ type: 'text', text: 'hi' }] } }]);
+        const http = new ScriptedHttpClient([{ json: { content: [{ type: 'text', text: 'hi' }] } }]);
 
         const gateway = createGatewayForEntry(entry, {
             apiKey: 'test-anthropic-key',
             model: entry.defaultModel,
-            environment: createVirtualAgentEnvironment(),
             http,
         });
         await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
@@ -512,8 +500,7 @@ describe('PROVIDER_REGISTRY', () => {
             createGatewayForEntry(entry, {
                 apiKey: 'test-key',
                 model: entry.defaultModel,
-                environment: createVirtualAgentEnvironment(),
-                http: new ScriptedHttpRequest([]),
+                http: new ScriptedHttpClient([]),
             })
         ).toThrow('providerRegistry: no gateway dispatcher for gatewayType "made-up-gateway-type"');
     });
@@ -566,7 +553,7 @@ describe('anthropic/claude-fable-5 registration (OpenRouter route, added for the
 
     it('createGatewayForEntry dispatches with the exact model string, same OpenRouter baseUrl, no leaked generation params, and passes tool definitions through unchanged', async () => {
         const entry = findEntry('openrouter');
-        const http = new ScriptedHttpRequest([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
+        const http = new ScriptedHttpClient([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
         const tools = [
             {
                 name: 'move_node',
@@ -582,7 +569,6 @@ describe('anthropic/claude-fable-5 registration (OpenRouter route, added for the
         const gateway = createGatewayForEntry(entry, {
             apiKey: 'test-openrouter-key',
             model: 'anthropic/claude-fable-5',
-            environment: createVirtualAgentEnvironment(),
             http,
         });
 

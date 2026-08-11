@@ -4,8 +4,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
-import { createFetchHttpRequest } from '../../http/FetchHttpRequest';
+import { createFetchHttpClient } from '../../http/FetchHttpClient';
 import { TIMEOUT_MARKER } from '../../llm/classifyRealProviderResult';
 import { buildMultiTurnDashboardHtml } from '../../llm/multiTurnDashboard';
 import { planMultiTurnModelSelection } from '../../llm/multiTurnRunSelection';
@@ -264,8 +263,7 @@ const runOneAttempt = async (
     const baseGateway = createGatewayForEntry(entry, {
         apiKey: process.env[entry.apiKeyEnv] as string,
         model,
-        environment: createVirtualAgentEnvironment(),
-        http: createFetchHttpRequest(),
+        http: createFetchHttpClient(),
     });
 
     // 2/3. The wrapper's onUsage callback may fire once per gateway.chat() call inside the

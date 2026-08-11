@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
-import { createFetchHttpRequest } from '../../http/FetchHttpRequest';
+import { createFetchHttpClient } from '../../http/FetchHttpClient';
 import { createGeminiToolLlmGateway } from '../../llm/GeminiToolLlmGateway';
 import { createOpenAiLlmGateway } from '../../llm/OpenAiLlmGateway';
 import { wrapGatewayWithUsageCapture } from '../../llm/verificationMetrics';
@@ -22,7 +21,7 @@ import type { UsageTotals } from '../../llm/verificationMetrics';
  * parsing/scoring logic, not the models' behavior.
  *
  * The verification scenario itself lives in `verifyMoveNodeToolCall`
- * (docs/browser-agent/foundations/provider-tool-calling.md) so there is exactly one
+ * (docs/browser-agent/design/provider-tool-calling.md) so there is exactly one
  * implementation of "ask the model to move the node, dispatch the result, check the position".
  *
  * Each `it` below logs its own elapsed time (measured at the call site, around
@@ -59,8 +58,7 @@ describe.runIf(LIVE_RUN_OPTED_IN && !!OPENAI_API_KEY)('OpenAI real tool-call ver
         scenarioStartedAt = Date.now();
         const gateway = wrapGatewayWithUsageCapture(
             createOpenAiLlmGateway({
-                environment: createVirtualAgentEnvironment(),
-                http: createFetchHttpRequest(),
+                http: createFetchHttpClient(),
                 apiKey: OPENAI_API_KEY as string,
                 ...(OPENAI_MODEL ? { model: OPENAI_MODEL } : {}),
             }),
@@ -82,8 +80,7 @@ describe.runIf(LIVE_RUN_OPTED_IN && !!GEMINI_API_KEY)('Gemini real tool-call ver
         scenarioStartedAt = Date.now();
         const gateway = wrapGatewayWithUsageCapture(
             createGeminiToolLlmGateway({
-                environment: createVirtualAgentEnvironment(),
-                http: createFetchHttpRequest(),
+                http: createFetchHttpClient(),
                 apiKey: GEMINI_API_KEY as string,
                 ...(GEMINI_MODEL ? { model: GEMINI_MODEL } : {}),
             }),

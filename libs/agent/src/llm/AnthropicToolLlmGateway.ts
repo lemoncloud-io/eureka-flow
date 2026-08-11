@@ -1,7 +1,8 @@
 import { PRICING_CONFIG_VERSION, estimateCost } from './pricing';
+import { NoopTracer } from '../trace';
 
-import type { AgentEnvironmentSupportable } from '../environment';
-import type { HttpRequestSupportable } from '../http';
+import type { HttpClient } from '../http';
+import type { Tracer } from '../trace';
 import type {
     ChatMessage,
     ChatRequest,
@@ -20,7 +21,7 @@ import type {
  * a required `anthropic-version` header, `input_schema` instead of `parameters`, a required
  * `max_tokens`, a top-level `system` field instead of a `role: 'system'` message, and a response
  * `content` array mixing text and `tool_use` blocks instead of separate fields. See
- * docs/browser-agent/foundations/provider-tool-calling.md §2 for the full mapping.
+ * docs/browser-agent/design/provider-tool-calling.md §2 for the full mapping.
  *
  * Single-turn tool calling and multi-turn tool-result mapping are both implemented. Unlike Gemini
  * (which correlates tool results by function *name* and has no way to map `toolCallId`-keyed tool
@@ -36,10 +37,12 @@ import type {
  */
 
 export interface AnthropicToolLlmGatewayOptions {
-    /** Provides tracing, time, and cancellation. */
-    environment: AgentEnvironmentSupportable;
     /** HTTP port. */
-    http: HttpRequestSupportable;
+    http: HttpClient;
+    /** Trace port; defaults to {@link NoopTracer}. Provider-specific request/response/error events. */
+    tracer?: Tracer;
+    /** Injectable clock for deterministic duration in tests; defaults to `Date.now`. */
+    now?: () => number;
     /** Anthropic API key; sent as the x-api-key header, never traced. */
     apiKey: string;
     /** Defaults to claude-haiku-4-5. */
@@ -274,10 +277,11 @@ const toUsageInfo = (
 
 /** LlmGateway backed by Anthropic's Messages API with tool use; declares `toolCalls: true`. */
 export const createAnthropicToolLlmGateway = (options: AnthropicToolLlmGatewayOptions): AnthropicToolLlmGateway => {
-    const { environment, http, apiKey } = options;
+    const { http, apiKey } = options;
+    const tracer = options.tracer ?? NoopTracer;
+    const now = options.now ?? Date.now;
     const model = options.model ?? DEFAULT_MODEL;
     const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
-    const trace = environment.traceReporter;
     // The single source of truth for cacheWriteTtl billing — see cacheControl's own doc for why
     // this, and never the response, decides which TTL a cache-write is priced under. Omitting
     // `ttl` while cacheControl is present requests Anthropic's documented default, which is '5m'.
@@ -286,13 +290,12 @@ export const createAnthropicToolLlmGateway = (options: AnthropicToolLlmGatewayOp
         : undefined;
 
     async function* chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk> {
-        const startedAt = environment.now();
+        const startedAt = now();
         const body = toAnthropicRequest(req, model, options.generation, options.cacheControl);
 
-        trace?.debug('llm.anthropic.request', {
-            model,
-            messageCount: req.messages.length,
-            toolCount: req.tools.length,
+        tracer.emit({
+            name: 'llm.anthropic.request',
+            fields: { model, messageCount: req.messages.length, toolCount: req.tools.length },
         });
 
         const response = await http.request({
@@ -307,7 +310,7 @@ export const createAnthropicToolLlmGateway = (options: AnthropicToolLlmGatewayOp
             const errorBody = await response.text().catch(() => '');
             const safeBody = redactText(errorBody, apiKey);
 
-            trace?.error('llm.anthropic.error', { model, status: response.status });
+            tracer.emit({ name: 'llm.anthropic.error', level: 'error', fields: { model, status: response.status } });
             throw new Error(
                 `Anthropic request failed with status ${response.status}: ${safeBody.slice(0, ERROR_BODY_SNIPPET_LENGTH)}`
             );
@@ -317,7 +320,11 @@ export const createAnthropicToolLlmGateway = (options: AnthropicToolLlmGatewayOp
         const content = payload.content;
 
         if (!content || content.length === 0) {
-            trace?.error('llm.anthropic.error', { model, status: response.status, reason: 'no content blocks' });
+            tracer.emit({
+                name: 'llm.anthropic.error',
+                level: 'error',
+                fields: { model, status: response.status, reason: 'no content blocks' },
+            });
             throw new Error('Anthropic response contained no content blocks');
         }
 
@@ -335,15 +342,18 @@ export const createAnthropicToolLlmGateway = (options: AnthropicToolLlmGatewayOp
         const usage = toUsageInfo(payload.usage, model, effectiveCacheWriteTtl);
         const actualModel = asNonEmptyString(payload.model);
 
-        trace?.debug('llm.anthropic.response', {
-            model,
-            status: response.status,
-            stopReason: payload.stop_reason,
-            textLength: text.length,
-            toolCallCount: toolUses.length,
-            durationMs: environment.now() - startedAt,
-            ...(usage ? { usage } : {}),
-            ...(actualModel !== undefined ? { actualModel } : {}),
+        tracer.emit({
+            name: 'llm.anthropic.response',
+            fields: {
+                model,
+                status: response.status,
+                stopReason: payload.stop_reason,
+                textLength: text.length,
+                toolCallCount: toolUses.length,
+                durationMs: now() - startedAt,
+                ...(usage ? { usage } : {}),
+                ...(actualModel !== undefined ? { actualModel } : {}),
+            },
         });
 
         if (text) {

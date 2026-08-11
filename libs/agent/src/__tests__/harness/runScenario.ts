@@ -4,6 +4,7 @@ import { createOrchestratorAgent } from '../../agents/orchestratorAgent';
 import { createInMemoryCanvasBinding } from '../../canvas/inMemoryCanvasBinding';
 import { createFakeGateway } from '../../llm/fakeGateway';
 import { createInMemorySessionStore } from '../../session/session';
+import { createAgentTrace } from '../../trace';
 
 import type { TurnOutcome } from './turnOutcome';
 import type { AgentRoster } from '../../agents/roster';
@@ -13,6 +14,7 @@ import type { FakeScriptStep } from '../../llm/fakeGateway';
 import type { LlmGateway } from '../../llm/llmGateway';
 import type { AgentGrant } from '../../permissions';
 import type { SessionState } from '../../session/session';
+import type { AgentTrace } from '../../trace';
 
 /** Per-agent fake-gateway scripts, keyed by agentType (e.g. `orchestrator`, `builder`, `single-output-generator`, or a generic block type). */
 export type FakeScript = Record<string, FakeScriptStep[]>;
@@ -54,6 +56,8 @@ export interface TurnResult {
     committed: boolean;
     /** Test affordance: read the live binding directly. */
     live: CanvasBinding;
+    /** Trace capture for this run. Real records + 3 projections when AGENT_TRACE is set; empty otherwise. */
+    trace: AgentTrace;
 }
 
 /** The eval's test-only re-ask: get the just-finished turn's outcome as a parseable JSON object. */
@@ -104,6 +108,8 @@ export const runScenario = async (input: ScenarioInput): Promise<TurnResult> => 
     const gatewayFor = input.makeGateway ?? ((agentType: string) => createFakeGateway(scriptFor(agentType)));
 
     const storage = createInMemorySessionStore();
+    // Tracing is a single switch: AGENT_TRACE on ⇒ a real tracer whose records project 3 ways; off ⇒ NoopTracer.
+    const trace = createAgentTrace(!!process.env.AGENT_TRACE);
     const orchestrator = createOrchestratorAgent({
         gateway: gatewayFor('orchestrator'),
         gatewayFor,
@@ -112,8 +118,9 @@ export const runScenario = async (input: ScenarioInput): Promise<TurnResult> => 
         binding: live,
         catalog,
         userPermissions,
-        mode: input.mode,
-        roster: input.roster, // undefined ⇒ createDefaultRoster(); the historical benchmark passes a roster here
+        dispatchMode: input.mode,
+        roster: input.roster, // undefined ⇒ createDefaultRoster()
+        tracer: trace.tracer,
     });
 
     // A turn that threw is recorded by BaseAgent.send as `phase: 'error'` and NOT rethrown; surface it here
@@ -141,5 +148,5 @@ export const runScenario = async (input: ScenarioInput): Promise<TurnResult> => 
     failIfErrored();
     const outcome = parseOutcome(lastAssistantText(storage.load(flowId)));
 
-    return { outcome, graph, committed, live };
+    return { outcome, graph, committed, live, trace };
 };

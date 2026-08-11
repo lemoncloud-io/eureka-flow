@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
-import { BufferAgentTraceReporter } from '../../environment/trace/traceReporters';
-import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
+import { ScriptedHttpClient } from '../../http/ScriptedHttpClient';
 import { createAnthropicToolLlmGateway } from '../../llm/AnthropicToolLlmGateway';
 import { PRICING_CONFIG_VERSION, estimateCost, getModelPricing } from '../../llm/pricing';
+import { createTracer, memorySink } from '../../trace';
 
-import type { HttpRequestSupportable } from '../../http';
+import type { HttpClient } from '../../http';
 import type { Chunk } from '../../llm/llmGateway';
+import type { Tracer } from '../../trace';
 
 const API_KEY = 'test-anthropic-key';
 
@@ -25,12 +25,8 @@ const anthropicToolUse = (id: string, name: string, input: unknown) => ({
     usage: { input_tokens: 20, output_tokens: 8 },
 });
 
-const createGateway = (http: ScriptedHttpRequest, traceReporter?: BufferAgentTraceReporter) =>
-    createAnthropicToolLlmGateway({
-        environment: createVirtualAgentEnvironment({ ...(traceReporter ? { traceReporter } : {}), now: () => 1000 }),
-        http,
-        apiKey: API_KEY,
-    });
+const createGateway = (http: ScriptedHttpClient, tracer?: Tracer) =>
+    createAnthropicToolLlmGateway({ http, ...(tracer ? { tracer } : {}), now: () => 1000, apiKey: API_KEY });
 
 /** Every offline test below uses the default model (`claude-haiku-4-5`, registered/priced in
  * pricing.ts), so every done chunk now also carries a computed `estimatedCost`/`costSource` —
@@ -55,7 +51,7 @@ const userSays = (content: string) => ({ messages: [{ role: 'user' as const, con
 
 describe('createAnthropicToolLlmGateway', () => {
     it('declares itself a tool-capable anthropic gateway with the default model', () => {
-        const gateway = createGateway(new ScriptedHttpRequest());
+        const gateway = createGateway(new ScriptedHttpClient());
 
         expect(gateway.capabilities).toEqual({ toolCalls: true });
         expect(gateway.provider).toBe('anthropic');
@@ -63,7 +59,7 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('posts to /v1/messages with x-api-key and anthropic-version headers (never Authorization)', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('hi') }]);
+        const http = new ScriptedHttpClient([{ json: anthropicText('hi') }]);
 
         await drain(createGateway(http).chat(userSays('hello')));
 
@@ -77,7 +73,7 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('always includes max_tokens, defaulting to 1024 when not specified', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('hi') }]);
+        const http = new ScriptedHttpClient([{ json: anthropicText('hi') }]);
 
         await drain(createGateway(http).chat(userSays('hello')));
 
@@ -86,9 +82,8 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('honors a generation.maxOutputTokens override instead of the default', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('hi') }]);
+        const http = new ScriptedHttpClient([{ json: anthropicText('hi') }]);
         const gateway = createAnthropicToolLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
             generation: { maxOutputTokens: 256 },
@@ -101,9 +96,8 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('includes temperature on the request when generation.temperature is configured', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('hi') }]);
+        const http = new ScriptedHttpClient([{ json: anthropicText('hi') }]);
         const gateway = createAnthropicToolLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
             generation: { temperature: 0.4 },
@@ -116,7 +110,7 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('omits temperature entirely from the request when generation.temperature is not configured', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('hi') }]);
+        const http = new ScriptedHttpClient([{ json: anthropicText('hi') }]);
 
         await drain(createGateway(http).chat(userSays('hello')));
 
@@ -125,7 +119,7 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('maps ToolDef into tools[].input_schema, passing the lowercase JSON Schema through unchanged', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
 
         await drain(
             createGateway(http).chat({
@@ -174,7 +168,7 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('maps system messages to a top-level `system` field and omits tools when none are given', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
 
         await drain(
             createGateway(http).chat({
@@ -193,7 +187,7 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('maps a system message with null content to an empty string rather than dropping it or sending "null"', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
 
         await drain(
             createGateway(http).chat({
@@ -210,7 +204,7 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('yields a text chunk then a done chunk carrying usage', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('the answer') }]);
+        const http = new ScriptedHttpClient([{ json: anthropicText('the answer') }]);
 
         const chunks = await drain(createGateway(http).chat(userSays('q')));
 
@@ -221,7 +215,7 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('parses a tool_use block into a toolCall chunk (input object → JSON string argsDelta)', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: anthropicToolUse('toolu_01abc', 'move_node', { nodeId: 'text-1', by: { dx: 100, dy: 0 } }) },
         ]);
 
@@ -240,7 +234,7 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('parses multiple content blocks: text followed by a tool_use in the same response', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             {
                 json: {
                     content: [
@@ -263,7 +257,7 @@ describe('createAnthropicToolLlmGateway', () => {
 
     describe('multi-turn request-mapping', () => {
         it('maps an assistant tool-call message into a tool_use content block, input parsed from the JSON args string', async () => {
-            const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -288,7 +282,7 @@ describe('createAnthropicToolLlmGateway', () => {
         });
 
         it('maps an assistant turn with both text and a tool call into a leading text block plus a tool_use block', async () => {
-            const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -316,7 +310,7 @@ describe('createAnthropicToolLlmGateway', () => {
         });
 
         it('maps a tool-result message into a user message carrying a tool_result block, correlated by tool_use_id', async () => {
-            const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -343,7 +337,7 @@ describe('createAnthropicToolLlmGateway', () => {
         });
 
         it('maps a tool-result message with no toolCallId or content to empty-string fallbacks, never a literal "undefined" on the wire', async () => {
-            const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -366,7 +360,7 @@ describe('createAnthropicToolLlmGateway', () => {
         it('maps an assistant message with no tool calls through the plain content mapping, falling back to empty string when content is null', async () => {
             // toolCalls is undefined (not just empty) here, so this is not a tool-call turn at all —
             // it must fall through to the same plain user/assistant mapping every other role uses.
-            const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -384,7 +378,7 @@ describe('createAnthropicToolLlmGateway', () => {
         });
 
         it('produces the correct multi-turn body shape for a full multi-turn round trip (system + user + assistant tool_use + tool_result)', async () => {
-            const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -427,7 +421,7 @@ describe('createAnthropicToolLlmGateway', () => {
         });
 
         it('parses a plain text response correctly', async () => {
-            const http = new ScriptedHttpRequest([{ json: anthropicText('Moved it.') }]);
+            const http = new ScriptedHttpClient([{ json: anthropicText('Moved it.') }]);
 
             const chunks = await drain(createGateway(http).chat(followUpRequest()));
 
@@ -438,7 +432,7 @@ describe('createAnthropicToolLlmGateway', () => {
         });
 
         it('parses a second tool_use response correctly', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 { json: anthropicToolUse('toolu_2', 'move_node', { nodeId: 'text-1', by: { dx: 0, dy: 50 } }) },
             ]);
 
@@ -458,9 +452,8 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('honors model and baseUrl overrides (the proxy path)', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
         const gateway = createAnthropicToolLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
             model: 'claude-opus-4-8',
@@ -479,7 +472,7 @@ describe('createAnthropicToolLlmGateway', () => {
             // Unlike Gemini/OpenAI, Anthropic's own input_tokens is ALREADY exclusive of both cache
             // fields (Anthropic's own docs: total input = cache_read + cache_creation + input_tokens)
             // — so, unlike those two gateways, NO subtraction happens here; this is a direct mapping.
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         content: [{ type: 'text', text: 'ok' }],
@@ -511,7 +504,7 @@ describe('createAnthropicToolLlmGateway', () => {
             // whole reason for keeping the two fields apart) would be pointless.
             expect(pricing.cachedInputPerMillion).not.toBe(pricing.cacheWritePerMillion);
 
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         content: [{ type: 'text', text: 'ok' }],
@@ -526,7 +519,6 @@ describe('createAnthropicToolLlmGateway', () => {
                 },
             ]);
             const gateway = createAnthropicToolLlmGateway({
-                environment: createVirtualAgentEnvironment(),
                 http,
                 apiKey: API_KEY,
                 cacheControl: { ttl: '5m' },
@@ -554,9 +546,8 @@ describe('createAnthropicToolLlmGateway', () => {
             });
 
             it('sends an explicit top-level cache_control with ttl on the outgoing request when configured', async () => {
-                const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+                const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
                 const gateway = createAnthropicToolLlmGateway({
-                    environment: createVirtualAgentEnvironment(),
                     http,
                     apiKey: API_KEY,
                     cacheControl: { ttl: '1h' },
@@ -569,7 +560,7 @@ describe('createAnthropicToolLlmGateway', () => {
             });
 
             it('omits cache_control entirely from the request when cacheControl is not configured — no caching requested at all', async () => {
-                const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+                const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
 
                 await drain(createGateway(http).chat(userSays('q')));
 
@@ -580,9 +571,8 @@ describe('createAnthropicToolLlmGateway', () => {
             it('prices cache-write tokens at the 5-minute rate when the gateway explicitly requested a 5m TTL', async () => {
                 const pricing = getModelPricing('anthropic', 'claude-haiku-4-5');
                 if (!pricing?.cacheWritePerMillion) throw new Error('expected a 5m cache-write rate');
-                const http = new ScriptedHttpRequest([{ json: cacheWriteUsage(1_000_000) }]);
+                const http = new ScriptedHttpClient([{ json: cacheWriteUsage(1_000_000) }]);
                 const gateway = createAnthropicToolLlmGateway({
-                    environment: createVirtualAgentEnvironment(),
                     http,
                     apiKey: API_KEY,
                     cacheControl: { ttl: '5m' },
@@ -607,9 +597,8 @@ describe('createAnthropicToolLlmGateway', () => {
                 }
                 expect(pricing.cacheWrite1hPerMillion).not.toBe(pricing.cacheWritePerMillion);
 
-                const http = new ScriptedHttpRequest([{ json: cacheWriteUsage(1_000_000) }]);
+                const http = new ScriptedHttpClient([{ json: cacheWriteUsage(1_000_000) }]);
                 const gateway = createAnthropicToolLlmGateway({
-                    environment: createVirtualAgentEnvironment(),
                     http,
                     apiKey: API_KEY,
                     cacheControl: { ttl: '1h' },
@@ -621,9 +610,8 @@ describe('createAnthropicToolLlmGateway', () => {
                 expect(done?.usage?.cacheWriteTtl).toBe('1h');
                 const costWith1h = done?.usage?.estimatedCost;
 
-                const http5m = new ScriptedHttpRequest([{ json: cacheWriteUsage(1_000_000) }]);
+                const http5m = new ScriptedHttpClient([{ json: cacheWriteUsage(1_000_000) }]);
                 const gateway5m = createAnthropicToolLlmGateway({
-                    environment: createVirtualAgentEnvironment(),
                     http: http5m,
                     apiKey: API_KEY,
                     cacheControl: { ttl: '5m' },
@@ -639,9 +627,8 @@ describe('createAnthropicToolLlmGateway', () => {
             it('treats an omitted ttl as the documented 5-minute default when caching is requested at all', async () => {
                 const pricing = getModelPricing('anthropic', 'claude-haiku-4-5');
                 if (!pricing?.cacheWritePerMillion) throw new Error('expected a 5m cache-write rate');
-                const http = new ScriptedHttpRequest([{ json: cacheWriteUsage(1_000_000) }]);
+                const http = new ScriptedHttpClient([{ json: cacheWriteUsage(1_000_000) }]);
                 const gateway = createAnthropicToolLlmGateway({
-                    environment: createVirtualAgentEnvironment(),
                     http,
                     apiKey: API_KEY,
                     cacheControl: {}, // no ttl specified — Anthropic's own documented default is 5m
@@ -658,11 +645,10 @@ describe('createAnthropicToolLlmGateway', () => {
             });
 
             it('returns estimatedCost: null when cache-write tokens are reported but no TTL was ever requested — never inferred from usage alone', async () => {
-                const http = new ScriptedHttpRequest([{ json: cacheWriteUsage(1_000_000) }]);
+                const http = new ScriptedHttpClient([{ json: cacheWriteUsage(1_000_000) }]);
                 // No cacheControl configured at all — this gateway never requested caching, so a
                 // cache-write appearing in the response has no request-side TTL to attribute it to.
                 const gateway = createAnthropicToolLlmGateway({
-                    environment: createVirtualAgentEnvironment(),
                     http,
                     apiKey: API_KEY,
                 });
@@ -676,9 +662,8 @@ describe('createAnthropicToolLlmGateway', () => {
             });
 
             it('does not let zero cache-write tokens block cost estimation, with or without a TTL configured', async () => {
-                const http = new ScriptedHttpRequest([{ json: cacheWriteUsage(0) }]);
+                const http = new ScriptedHttpClient([{ json: cacheWriteUsage(0) }]);
                 const gateway = createAnthropicToolLlmGateway({
-                    environment: createVirtualAgentEnvironment(),
                     http,
                     apiKey: API_KEY,
                     // No cacheControl — if 0 cache-write tokens incorrectly set cacheWriteTtl to
@@ -695,7 +680,7 @@ describe('createAnthropicToolLlmGateway', () => {
         });
 
         it("leaves providerTotalTokens undefined — Anthropic's Messages API reports no raw total, never computed locally", async () => {
-            const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
 
             const chunks = await drain(createGateway(http).chat(userSays('q')));
             const done = chunks.find(c => c.done);
@@ -704,9 +689,8 @@ describe('createAnthropicToolLlmGateway', () => {
         });
 
         it('returns estimatedCost: null (not a fabricated 0) for an unregistered model, while still reporting tokens', async () => {
-            const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
             const gateway = createAnthropicToolLlmGateway({
-                environment: createVirtualAgentEnvironment(),
                 http,
                 apiKey: API_KEY,
                 model: 'claude-does-not-exist',
@@ -721,7 +705,7 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('passes the abort signal through to the HTTP port', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: anthropicText('ok') }]);
         const controller = new AbortController();
 
         await drain(createGateway(http).chat(userSays('q'), { signal: controller.signal }));
@@ -730,23 +714,23 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('throws on non-ok responses with the status but never the API key, and traces the error', async () => {
-        const http = new ScriptedHttpRequest([{ status: 400, text: `bad key ${API_KEY}` }]);
-        const trace = new BufferAgentTraceReporter();
+        const http = new ScriptedHttpClient([{ status: 400, text: `bad key ${API_KEY}` }]);
+        const sink = memorySink();
+        const tracer = createTracer(sink);
 
-        const attempt = drain(createGateway(http, trace).chat(userSays('q')));
+        const attempt = drain(createGateway(http, tracer).chat(userSays('q')));
 
         await expect(attempt).rejects.toThrow(/status 400.*bad key \[redacted\]/);
         await attempt.catch((error: Error) => expect(error.message).not.toContain(API_KEY));
-        expect(trace.entries.some(entry => entry.level === 'error')).toBe(true);
-        expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
+        expect(sink.records.some(entry => entry.level === 'error')).toBe(true);
+        expect(JSON.stringify(sink.records)).not.toContain(API_KEY);
     });
 
     it('passes an error body through verbatim (no redaction) when apiKey is empty — nothing to scrub', async () => {
         // Guards the redactText early-return itself: without it, `value.split('').join(...)` would
         // splice '[redacted]' between every single character of the body, mangling it completely.
-        const http = new ScriptedHttpRequest([{ status: 403, text: 'no secret in this error body' }]);
+        const http = new ScriptedHttpClient([{ status: 403, text: 'no secret in this error body' }]);
         const gateway = createAnthropicToolLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: '',
         });
@@ -757,7 +741,7 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('falls back to an empty string when reading the non-ok response body itself fails (response.text() rejects)', async () => {
-        const http: HttpRequestSupportable = {
+        const http: HttpClient = {
             request: async () => ({
                 status: 500,
                 ok: false,
@@ -770,22 +754,23 @@ describe('createAnthropicToolLlmGateway', () => {
                 },
             }),
         };
-        const trace = new BufferAgentTraceReporter();
+        const sink = memorySink();
+        const tracer = createTracer(sink);
         const gateway = createAnthropicToolLlmGateway({
-            environment: createVirtualAgentEnvironment({ traceReporter: trace }),
             http,
+            tracer,
             apiKey: API_KEY,
         });
 
         await expect(drain(gateway.chat(userSays('q')))).rejects.toThrow('Anthropic request failed with status 500: ');
-        expect(trace.entries.some(entry => entry.level === 'error')).toBe(true);
+        expect(sink.records.some(entry => entry.level === 'error')).toBe(true);
     });
 
     it('defaults a tool_use block missing `input` to {} and reports no token counts when usage is a bare empty object', async () => {
         // A single deliberately minimal/degenerate response exercising several "field absent"
         // fallbacks at once: the tool_use content block carries no `input` field at all, and the
         // usage object is present but empty (no input_tokens/output_tokens/cache fields).
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { content: [{ type: 'tool_use', id: 'toolu_x', name: 'no_input_tool' }], usage: {} } },
         ]);
 
@@ -798,43 +783,45 @@ describe('createAnthropicToolLlmGateway', () => {
     });
 
     it('throws when the response has no content blocks', async () => {
-        const http = new ScriptedHttpRequest([{ json: { content: [] } }]);
+        const http = new ScriptedHttpClient([{ json: { content: [] } }]);
 
         await expect(drain(createGateway(http).chat(userSays('q')))).rejects.toThrow(/no content blocks/);
     });
 
     it('traces request and response without leaking the key', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('traced') }]);
-        const trace = new BufferAgentTraceReporter();
+        const http = new ScriptedHttpClient([{ json: anthropicText('traced') }]);
+        const sink = memorySink();
+        const tracer = createTracer(sink);
 
-        await drain(createGateway(http, trace).chat(userSays('q')));
+        await drain(createGateway(http, tracer).chat(userSays('q')));
 
-        const messages = trace.entries.map(entry => entry.message);
+        const messages = sink.records.map(entry => entry.name);
         expect(messages).toContain('llm.anthropic.request');
         expect(messages).toContain('llm.anthropic.response');
-        expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
+        expect(JSON.stringify(sink.records)).not.toContain(API_KEY);
     });
 
     it('omits usage and includes actualModel on the traced response entry when the response has no usage but does report a model', async () => {
         // trace?.debug(...) short-circuits its whole argument list when no trace reporter is
         // configured, so the object literal carrying these two ternaries is only ever evaluated
         // when a real reporter is wired — this test is what actually exercises both of them.
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { content: [{ type: 'text', text: 'hi' }], model: 'claude-haiku-4-5-20251001' } },
         ]);
-        const trace = new BufferAgentTraceReporter();
+        const sink = memorySink();
+        const tracer = createTracer(sink);
 
-        await drain(createGateway(http, trace).chat(userSays('q')));
+        await drain(createGateway(http, tracer).chat(userSays('q')));
 
-        const responseEntry = trace.entries.find(entry => entry.message === 'llm.anthropic.response');
-        expect(responseEntry?.json).not.toHaveProperty('usage');
-        expect(responseEntry?.json?.['actualModel']).toBe('claude-haiku-4-5-20251001');
+        const responseEntry = sink.records.find(entry => entry.name === 'llm.anthropic.response');
+        expect(responseEntry?.fields).not.toHaveProperty('usage');
+        expect(responseEntry?.fields?.['actualModel']).toBe('claude-haiku-4-5-20251001');
     });
 });
 
 describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
     it('a text response with a valid top-level model reports it as actualModel on the done chunk', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { ...anthropicText('hi'), model: 'claude-haiku-4-5-20251001' } },
         ]);
 
@@ -845,7 +832,7 @@ describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
     });
 
     it('a tool-call response with a valid top-level model reports it as actualModel on the done chunk', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             {
                 json: {
                     ...anthropicToolUse('toolu_01abc', 'move_node', { nodeId: 'text-1' }),
@@ -864,7 +851,7 @@ describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
     });
 
     it('a two-turn tool-result flow reports actualModel on BOTH turns’ done chunks — never lost across a round trip', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { ...anthropicToolUse('toolu_1', 'list_nodes', {}), model: 'claude-haiku-4-5-20251001' } },
             { json: { ...anthropicText('Moved it.'), model: 'claude-haiku-4-5-20251001' } },
         ]);
@@ -891,7 +878,7 @@ describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
     });
 
     it('a missing top-level model leaves actualModel undefined — never fabricated from the requested model', async () => {
-        const http = new ScriptedHttpRequest([{ json: anthropicText('hi') }]); // no `model` field at all
+        const http = new ScriptedHttpClient([{ json: anthropicText('hi') }]); // no `model` field at all
 
         const chunks = await drain(createGateway(http).chat(userSays('q')));
 
@@ -900,7 +887,7 @@ describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
     });
 
     it('an empty-string top-level model leaves actualModel undefined', async () => {
-        const http = new ScriptedHttpRequest([{ json: { ...anthropicText('hi'), model: '' } }]);
+        const http = new ScriptedHttpClient([{ json: { ...anthropicText('hi'), model: '' } }]);
 
         const chunks = await drain(createGateway(http).chat(userSays('q')));
 
@@ -908,7 +895,7 @@ describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
     });
 
     it('a non-string top-level model (malformed response) leaves actualModel undefined rather than throwing or coercing', async () => {
-        const http = new ScriptedHttpRequest([{ json: { ...anthropicText('hi'), model: 12345 } }]);
+        const http = new ScriptedHttpClient([{ json: { ...anthropicText('hi'), model: 12345 } }]);
 
         const chunks = await drain(createGateway(http).chat(userSays('q')));
 
@@ -916,7 +903,7 @@ describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
     });
 
     it('reporting actualModel changes nothing else about text/tool-call/usage/error parsing (no regression)', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             {
                 json: {
                     ...anthropicToolUse('toolu_1', 'move_node', { nodeId: 'text-1' }),
@@ -938,7 +925,7 @@ describe('createAnthropicToolLlmGateway: actualModel (payload.model)', () => {
     });
 
     it('requestedModel (the gateway’s own `model`) and actualModel stay independently reported and can differ', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { ...anthropicText('hi'), model: 'claude-haiku-4-5-20251001' } },
         ]);
         const gateway = createGateway(http);

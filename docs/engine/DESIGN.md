@@ -61,19 +61,20 @@
 포크의 `libs/agent`(@flows/agent)는 포트/어댑터 스타일이 일관되고 테스트도 충실하다:
 
 - **LlmGateway** — 유일한 LLM 출구. Gemini/OpenAI/fake 구현, 스트리밍 + tool call 청크, capabilities 선언
-- **HttpRequestSupportable** — fetch 기반 HTTP 포트 (테스트용 scripted 구현 포함)
-- **AgentEnvironment** — 런타임 경계: storage(localStorage/memory), trace, clock, abort. 금지 capability를 `false` 리터럴 타입으로 컴파일 타임에 봉인
+- **HttpClient** — fetch 기반 HTTP 포트 (테스트용 scripted 구현 포함)
+- **AgentStorage** — 세션 영속화 포트 (localStorage/memory 구현)
+- **Tracer** — 트레이스/관측 포트 (sink + projection). 과거 이 둘과 clock/abort를 하나로 묶던 AgentEnvironment 경계는 해체되어 이산 포트로 분리됨
 - **ToolExecutor** — 툴 콜 단일 관문: 라우팅 → 스키마 검증 → grant 체크 → 디스패치. `FlowPermissions`의 컴파일 가드된 부분집합(`Capability`)으로 권한 연동
 - **BaseAgent** — think/act 루프, 세션 영속화, abort
 
 그러나 "블랙박스 모델" 요구사항 기준의 구조적 한계:
 
-1. **그래프를 소유하지 않는다.** `CanvasBinding`은 `readGraph()` + `updateNode(id, {label, position})` 딱 두 개다. 진실의 원천은 여전히 React가 소유한 라이브 캔버스(`useCanvasStore` + `WorkflowCanvasRef`)이고, 에이전트는 그걸 원격 조작할 뿐이다. 지금의 "블랙박스"는 엔진이 아니라 **브라우저 캔버스에 기생하는 조작기**이며, 브라우저에서만 돌아가는 근본 이유가 이것이다.
-2. **구조 편집이 불가능하다.** 툴이 `list_nodes`, `move_node` 둘뿐 — 노드 추가/삭제, 엣지 연결/해제가 계약(`CanvasBinding`)에 없다.
+1. **그래프를 소유하지 않는다.** `CanvasBinding`은 `readGraph()` + 노드 조작(`updateNode`/`addNode`/`deleteNode`) + 엣지 조작(`addEdge`/`deleteEdge`)을 노출한다. 그러나 진실의 원천은 여전히 React가 소유한 라이브 캔버스(`useCanvasStore` + `WorkflowCanvasRef`)이고, 에이전트는 그걸 원격 조작할 뿐이다. 지금의 "블랙박스"는 엔진이 아니라 **브라우저 캔버스에 기생하는 조작기**이며, 브라우저에서만 돌아가는 근본 이유가 이것이다.
+2. **구조 편집은 갖췄다(초기 한계 해소).** 노드 `add_node`/`delete_node`, 엣지 `connect_nodes`/`disconnect_edge` 툴과 그에 대응하는 `CanvasBinding` 계약(`addNode`/`deleteNode`/`addEdge`/`deleteEdge`)이 모두 있다. 남은 한계는 편집 능력이 아니라 위 #1의 그래프 소유권이다 — 이 편집도 결국 브라우저 캔버스를 대상으로 한다.
 3. **헤드리스에는 히스토리가 없다.** 데스크톱 바인딩은 `WorkflowCanvasRef.updateNode`가 `saveCheckpoint()`를 불러 undo가 되지만, `createInMemoryCanvasBinding`에는 체크포인트 개념 자체가 없다. undo가 UI 레이어의 부수효과인 구조.
 4. **`node-virtual`은 테스트용 가상 런타임이다.** 진짜 Node/셸 프로덕션 경로가 아니다 — 세션 영속화는 localStorage(useAgentSession), LLM 키는 브라우저에서 직접, 백엔드 프록시 게이트웨이는 deferred. 서버 로딩/저장 연동도 없다.
 
-정리: 포크는 **에이전트 런타임(생각/행동 루프 + 포트들)** 은 잘 깔았는데, 그 에이전트가 딛고 설 **그래프 엔진이 없어서** 브라우저 캔버스를 그래프 대용으로 쓰고 있는 상태다. 포트들(Http/Storage/Llm/Environment/ToolExecutor)은 버리지 않고 엔진의 포트 계층으로 승격한다.
+정리: 포크는 **에이전트 런타임(생각/행동 루프 + 포트들)** 은 잘 깔았는데, 그 에이전트가 딛고 설 **그래프 엔진이 없어서** 브라우저 캔버스를 그래프 대용으로 쓰고 있는 상태다. 포트들(Http/Storage/Trace/Llm/ToolExecutor)은 버리지 않고 엔진의 포트 계층으로 승격한다.
 
 ---
 

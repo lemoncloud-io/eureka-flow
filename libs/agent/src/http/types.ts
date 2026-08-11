@@ -8,7 +8,7 @@ export interface HttpRequestInput {
     headers?: Record<string, string>;
     /** JSON-serializable request body; implementations encode it and set the content type. */
     body?: unknown;
-    /** Cancellation signal, typically from AgentEnvironmentSupportable.createAbortController(). */
+    /** Cancellation signal, typically an AbortController's signal. */
     signal?: AbortSignal;
 }
 
@@ -22,6 +22,6 @@ export interface HttpResponse {
     text(): Promise<string>;
 }
 
-export interface HttpRequestSupportable {
+export interface HttpClient {
     request(input: HttpRequestInput): Promise<HttpResponse>;
 }

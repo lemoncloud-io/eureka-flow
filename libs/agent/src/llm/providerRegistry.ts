@@ -5,8 +5,8 @@ import {
 import { createGeminiToolLlmGateway } from './GeminiToolLlmGateway';
 import { createOpenAiLlmGateway } from './OpenAiLlmGateway';
 
-import type { AgentEnvironmentSupportable } from '../environment';
-import type { HttpRequestSupportable } from '../http';
+import type { HttpClient } from '../http';
+import type { Tracer } from '../trace';
 import type { LlmGateway } from './llmGateway';
 
 /**
@@ -754,20 +754,23 @@ export const PROVIDER_REGISTRY: readonly ProviderModelEntry[] = [
 export interface CreateGatewayForEntryOptions {
     apiKey: string;
     model: string;
-    environment: AgentEnvironmentSupportable;
-    http: HttpRequestSupportable;
+    http: HttpClient;
+    /** Trace port forwarded to the built gateway; defaults to the gateway's NoopTracer when omitted. */
+    tracer?: Tracer;
+    /** Injectable clock forwarded to the built gateway; defaults to `Date.now` when omitted. */
+    now?: () => number;
 }
 
 /** Build the concrete gateway for a registry entry, dispatching on `gatewayType`. */
 export const createGatewayForEntry = (entry: ProviderModelEntry, options: CreateGatewayForEntryOptions): LlmGateway => {
-    const { apiKey, model, environment, http } = options;
+    const { apiKey, model, http, tracer, now } = options;
+    const shared = { http, ...(tracer ? { tracer } : {}), ...(now ? { now } : {}) };
 
     switch (entry.gatewayType) {
         case 'openai-compatible': {
             const generation = entry.requiredGenerationOverrides?.[model];
             return createOpenAiLlmGateway({
-                environment,
-                http,
+                ...shared,
                 apiKey,
                 model,
                 ...(entry.baseUrl ? { baseUrl: entry.baseUrl } : {}),
@@ -776,16 +779,14 @@ export const createGatewayForEntry = (entry: ProviderModelEntry, options: Create
         }
         case 'gemini-native':
             return createGeminiToolLlmGateway({
-                environment,
-                http,
+                ...shared,
                 apiKey,
                 model,
                 ...(entry.baseUrl ? { baseUrl: entry.baseUrl } : {}),
             });
         case 'anthropic-native':
             return createAnthropicToolLlmGateway({
-                environment,
-                http,
+                ...shared,
                 apiKey,
                 model,
                 ...(entry.baseUrl ? { baseUrl: entry.baseUrl } : {}),

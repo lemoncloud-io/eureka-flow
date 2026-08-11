@@ -22,7 +22,7 @@ const emptyCatalog = createCatalogLookup([]);
  *
  * Pure result-returning (no test-runner assertions) so the offline spec and the env-gated
  * real-key spec (`realProviderToolCall.spec.ts`) run identical verification logic — see
- * docs/browser-agent/foundations/provider-tool-calling.md §4.
+ * docs/browser-agent/design/provider-tool-calling.md §4.
  *
  * The `error` field is always a short, already-provider-redacted message (gateways redact API
  * keys from their own thrown errors) truncated defensively — never the raw prompt or the raw

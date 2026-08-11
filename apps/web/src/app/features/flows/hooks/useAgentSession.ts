@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import type { Agent, AgentEnvironmentSupportable, SessionState, SessionStore } from '@flows/agent';
+import type { Agent, AgentStorage, SessionState, SessionStore, Tracer } from '@flows/agent';
 
-// Per-flow session persistence through the Agent Environment's storage port (survives reload).
+/** The narrow storage slice this hook needs — just the two JSON ops, per ISP. */
+type SessionStoragePort = Pick<AgentStorage, 'getJson' | 'setJson'>;
+
+// Per-flow session persistence through the injected storage port (survives reload).
 // Best-effort: storage errors are swallowed, and a stale `thinking` phase is cleared so the panel isn't stuck.
 const SESSION_KEY_PREFIX = 'session:';
 const keyFor = (flowId: string): string => `${SESSION_KEY_PREFIX}${flowId}`;
@@ -14,7 +17,7 @@ const sanitizePersisted = (state: SessionState): SessionState =>
 interface AgentInstance {
     agent: Agent;
     /** Re-enable state writes. Called on mount to survive StrictMode's remount. */
-    arm: () => void;
+    enableWrites: () => void;
     /** Stop the agent and silence its late `save` writes. Called on replace/unmount. */
     dispose: () => void;
     /** Read the persisted session and apply it if nothing has happened yet. Always resolves (read errors swallowed). */
@@ -25,10 +28,12 @@ interface AgentInstance {
 
 export interface UseAgentSessionArgs {
     flowId: string;
-    /** The browser Agent Environment: session persistence flows through its storage port, run lifecycle through its trace reporter. */
-    environment: AgentEnvironmentSupportable;
+    /** Session storage port (survives reload). */
+    storage: SessionStoragePort;
+    /** Tracer for run-lifecycle events (agent.run.start/done/error). */
+    tracer: Tracer;
     /** Build the agent over the hook's {@link SessionStore}. Wrap in `useCallback` so it's stable per (flowId + agent inputs). */
-    createAgent: (storage: SessionStore) => Agent;
+    createAgent: (sessionStore: SessionStore) => Agent;
 }
 
 export interface UseAgentSessionResult {
@@ -39,16 +44,21 @@ export interface UseAgentSessionResult {
 
 /**
  * The generic React binding shared by every in-browser agent: owns a per-flow session store
- * (persisted through the Agent Environment, survives reload) and re-renders on every `save`
+ * (persisted through the injected storage port, survives reload) and re-renders on every `save`
  * (Panel emits `send` → agent writes SessionState → store → Panel). The agent it drives is the
- * caller's choice via `createAgent`; nothing here is locator-specific. `send` is gated on async
- * hydration, and the outgoing agent is aborted + silenced on flow switch / unmount.
+ * caller's choice via `createAgent`. `send` is gated on async hydration, and the outgoing agent is
+ * aborted + silenced on flow switch / unmount.
  */
-export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSessionArgs): UseAgentSessionResult => {
+export const useAgentSession = ({
+    flowId,
+    storage,
+    tracer,
+    createAgent,
+}: UseAgentSessionArgs): UseAgentSessionResult => {
     const [session, setSession] = useState<SessionState | null>(null);
 
     const instance = useMemo<AgentInstance>(() => {
-        // The agent's working copy; hydrated asynchronously from the environment storage below.
+        // The agent's working copy; hydrated asynchronously from the injected storage port below.
         let current: SessionState | null = null;
         // `alive` gates state writes: a disposed agent's late `save` can't touch the new flow's session.
         let alive = true;
@@ -57,7 +67,7 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
             ...s,
             messages: s.messages.map(m => ({ ...m, toolCalls: m.toolCalls?.map(tc => ({ ...tc })) })),
         });
-        const storage: SessionStore = {
+        const sessionStore: SessionStore = {
             load: () => current,
             create: id => {
                 current = { flowId: id, messages: [], phase: 'idle' };
@@ -65,17 +75,17 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
             },
             save: s => {
                 current = s;
-                // Real run data through the environment's storage port (best-effort, like before).
-                void environment.storage.setJson(keyFor(s.flowId), s).catch(() => undefined);
+                // Real run data through the injected storage port (best-effort, like before).
+                void storage.setJson(keyFor(s.flowId), s).catch(() => undefined);
                 if (alive) {
                     setSession(snapshot(s));
                 }
             },
         };
-        const agent = createAgent(storage);
+        const agent = createAgent(sessionStore);
         return {
             agent,
-            arm: () => {
+            enableWrites: () => {
                 alive = true;
             },
             dispose: () => {
@@ -85,7 +95,7 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
             // Applied only while live and nothing has produced state yet; invoked from an effect (pure memo through StrictMode).
             hydrate: async () => {
                 try {
-                    const persisted = await environment.storage.getJson<SessionState>(keyFor(flowId));
+                    const persisted = await storage.getJson<SessionState>(keyFor(flowId));
                     if (alive && current === null && persisted) {
                         const restored = sanitizePersisted(persisted);
                         current = restored;
@@ -97,7 +107,7 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
             },
             getPhase: () => current?.phase ?? null,
         };
-    }, [flowId, environment, createAgent]);
+    }, [flowId, storage, createAgent]);
 
     // `send` is blocked until this instance's transcript has been read; flipped true by the hydration effect below.
     const [hydrated, setHydrated] = useState(false);
@@ -113,13 +123,13 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
 
     // A *layout* effect on purpose: cleanup runs before paint, so on a flow switch the outgoing agent
     // is silenced+aborted before an in-flight chunk can clobber the new panel via `setSession`.
-    // `arm()` on setup re-enables writes so this survives StrictMode's mount→unmount→remount.
+    // `enableWrites()` on setup re-enables writes so this survives StrictMode's mount→unmount→remount.
     useLayoutEffect(() => {
-        instance.arm();
+        instance.enableWrites();
         return instance.dispose;
     }, [instance]);
 
-    // Hydrate after arm (passive effect), then open the `send` gate. `cancelled` keeps a superseded
+    // Hydrate after enableWrites (passive effect), then open the `send` gate. `cancelled` keeps a superseded
     // instance's read from flipping the gate; `hydrate` always resolves, so the gate always opens.
     useEffect(() => {
         let cancelled = false;
@@ -142,17 +152,17 @@ export const useAgentSession = ({ flowId, environment, createAgent }: UseAgentSe
             }
             // BaseAgent.send resolves after the whole turn (failures become session.error, not a reject),
             // so read the settled phase to tell done from errored. Only flowId + outcome are traced — never secrets.
-            const trace = environment.traceReporter;
-            trace?.info('agent.run.start', { flowId });
+            const runError = () => tracer.emit({ name: 'agent.run.error', level: 'error', fields: { flowId } });
+            tracer.emit({ name: 'agent.run.start', level: 'info', fields: { flowId } });
             void instance.agent.send(trimmed).then(
                 () =>
                     instance.getPhase() === 'error'
-                        ? trace?.error('agent.run.error', { flowId })
-                        : trace?.info('agent.run.done', { flowId }),
-                () => trace?.error('agent.run.error', { flowId })
+                        ? runError()
+                        : tracer.emit({ name: 'agent.run.done', level: 'info', fields: { flowId } }),
+                () => runError()
             );
         },
-        [instance, environment, flowId, hydrated]
+        [instance, tracer, flowId, hydrated]
     );
 
     const abort = useCallback(() => instance.agent.abort(), [instance]);

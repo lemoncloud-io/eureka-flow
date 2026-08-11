@@ -382,7 +382,7 @@ loop is one-way: Panel emits commands → the Agent writes `SessionState` → st
 
 `@flows/agent` ships an in-memory `SessionStore` via `createInMemorySessionStore` (the default for tests
 and Node runs); in the browser, `useAgentSession` builds a `SessionStore` whose writes and hydration
-persist through the Agent Environment's storage port (localStorage), so a transcript survives a reload.
+persist through an injected storage port (localStorage), so a transcript survives a reload.
 
 ## Grounding (what already exists)
 
@@ -404,7 +404,7 @@ New agent code lives in `libs/agent/src`, mirroring how `flows`/`socket` are str
 
 Two subsystems under `@flows/agent` back any agent and are documented separately:
 
-- **Agent Environment** — the runtime capability boundary (storage / trace / time / cancellation):
-  [foundations/environment.md](../foundations/environment.md).
+- **Storage + Trace ports** — session persistence and observability, standalone modules
+  (`libs/agent/src/{storage,trace}`); the trace design is [design/trace-spec.md](./trace-spec.md).
 - **LlmGateway providers** — the contract plus the Gemini provider and HTTP port:
-  [foundations/llm-gateway.md](../foundations/llm-gateway.md).
+  [llm-gateway.md](./llm-gateway.md).

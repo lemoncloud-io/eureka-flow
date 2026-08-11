@@ -95,7 +95,7 @@ handing the transcript to the pure right-docked `<AgentPanel>` view. A
 chat command like "move Fetch 10px right" flows agent → `updateNode` → `engine.transact` → the mirror
 → the canvas re-renders, with no server write.
 
-The panel is still `import.meta.env.DEV`-gated, matching the `/dev/agent-harness` route — not because
+The panel is still `import.meta.env.DEV`-gated — not because
 the gateway is an offline parser (it is now the backend-proxied `createGenerateApiLlmGateway`), but
 because that gateway's generate receiver does not exist in the socket layer yet, so the panel is
 wired rather than functional end to end.

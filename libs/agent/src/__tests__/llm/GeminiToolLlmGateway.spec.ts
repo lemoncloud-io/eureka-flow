@@ -1,19 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
+import { firstToolCall } from './chunks';
 import { createInMemoryCanvasBinding } from '../../canvas/inMemoryCanvasBinding';
 import { createCatalogLookup } from '../../catalog';
-import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
-import { BufferAgentTraceReporter } from '../../environment/trace/traceReporters';
-import { ScriptedHttpRequest } from '../../http/ScriptedHttpRequest';
+import { ScriptedHttpClient } from '../../http/ScriptedHttpClient';
 import { createGeminiToolLlmGateway } from '../../llm/GeminiToolLlmGateway';
 import { PRICING_CONFIG_VERSION, estimateCost, getModelPricing } from '../../llm/pricing';
 import { LIST_NODES, MOVE_NODE } from '../../tools/nodeTools';
 import { createToolExecutor } from '../../tools/toolExecutor';
 import { toolset } from '../../tools/toolset';
+import { createTracer, memorySink } from '../../trace';
 
 import type { AgentConfig } from '../../agent';
-import type { HttpRequestSupportable } from '../../http';
+import type { HttpClient } from '../../http';
 import type { Chunk } from '../../llm/llmGateway';
+import type { Tracer } from '../../trace';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 const API_KEY = 'test-gemini-key';
@@ -30,12 +31,8 @@ const geminiFunctionCall = (name: string, args: unknown) => ({
     usageMetadata: { promptTokenCount: 20, candidatesTokenCount: 8 },
 });
 
-const createGateway = (http: ScriptedHttpRequest, traceReporter?: BufferAgentTraceReporter) =>
-    createGeminiToolLlmGateway({
-        environment: createVirtualAgentEnvironment({ ...(traceReporter ? { traceReporter } : {}), now: () => 1000 }),
-        http,
-        apiKey: API_KEY,
-    });
+const createGateway = (http: ScriptedHttpClient, tracer?: Tracer) =>
+    createGeminiToolLlmGateway({ http, ...(tracer ? { tracer } : {}), now: () => 1000, apiKey: API_KEY });
 
 const drain = async (stream: AsyncIterable<Chunk>): Promise<Chunk[]> => {
     const chunks: Chunk[] = [];
@@ -67,7 +64,7 @@ const makeNode = (id: string, x: number, y: number, extra: Partial<NodeData> = {
 
 describe('createGeminiToolLlmGateway', () => {
     it('declares itself a tool-capable gemini gateway with the default model', () => {
-        const gateway = createGateway(new ScriptedHttpRequest());
+        const gateway = createGateway(new ScriptedHttpClient());
 
         expect(gateway.capabilities).toEqual({ toolCalls: true });
         expect(gateway.provider).toBe('gemini');
@@ -75,7 +72,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('authenticates via header, never the URL, and posts to generateContent', async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('hi') }]);
+        const http = new ScriptedHttpClient([{ json: geminiText('hi') }]);
 
         await drain(createGateway(http).chat(userSays('hello')));
 
@@ -89,7 +86,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('maps ToolDef into functionDeclarations with UPPERCASE schema types (recursively)', async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
         await drain(
             createGateway(http).chat({
@@ -141,7 +138,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it("recursively converts an array-typed parameter's items schema, not just properties (schema.items branch)", async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
         await drain(
             createGateway(http).chat({
@@ -179,7 +176,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it("leaves an untyped (or unrecognized-type) schema field's `type` untouched — the uppercase-type conversion only applies to known JSON-Schema types", async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
         await drain(
             createGateway(http).chat({
@@ -216,7 +213,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('maps system messages to systemInstruction and omits tools when none are given', async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
         await drain(
             createGateway(http).chat({
@@ -234,7 +231,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('maps a system message with null content to an empty string rather than dropping it or sending "null"', async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
         await drain(
             createGateway(http).chat({
@@ -251,7 +248,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('omits generationConfig entirely from the request when no generation options are configured', async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
         await drain(createGateway(http).chat(userSays('q')));
 
@@ -260,9 +257,8 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('maps generation.temperature and generation.maxOutputTokens into generationConfig when configured', async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
         const gateway = createGeminiToolLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
             generation: { temperature: 0.3, maxOutputTokens: 128 },
@@ -275,7 +271,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('yields a text chunk then a done chunk carrying usage', async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('the answer') }]);
+        const http = new ScriptedHttpClient([{ json: geminiText('the answer') }]);
 
         const chunks = await drain(createGateway(http).chat(userSays('q')));
 
@@ -286,7 +282,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('parses a functionCall part into a toolCall chunk (args object → JSON string argsDelta)', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: geminiFunctionCall('move_node', { nodeId: 'text-1', by: { dx: 100, dy: 0 } }) },
         ]);
 
@@ -305,7 +301,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('defaults functionCall args to an empty object when the response omits args entirely', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             {
                 json: {
                     candidates: [{ content: { parts: [{ functionCall: { name: 'list_nodes' } }] } }],
@@ -321,7 +317,7 @@ describe('createGeminiToolLlmGateway', () => {
 
     describe('multi-turn request-mapping', () => {
         it('maps an assistant tool-call message into a model-role functionCall part, args parsed from the JSON args string', async () => {
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -346,7 +342,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('maps an assistant turn with both text and a tool call into a leading text part plus a functionCall part', async () => {
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -374,7 +370,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('maps a tool-result message into a user-role functionResponse part, correlated by NAME recovered from the earlier assistant tool-call message', async () => {
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -403,7 +399,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('defaults a tool-result message with null content to an empty object payload', async () => {
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -429,7 +425,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('wraps unparsable tool-result content in { content } rather than throwing (functionResponse payload fallback)', async () => {
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -458,7 +454,7 @@ describe('createGeminiToolLlmGateway', () => {
             // Valid JSON that parses successfully but yields a primitive, not an object — a
             // different path from the JSON.parse-throws case: this one takes the ternary's other
             // branch inside the try, never reaching the catch at all.
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -484,7 +480,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('throws when a tool-result message has no toolCallId at all — not just no match', async () => {
-            const gateway = createGateway(new ScriptedHttpRequest());
+            const gateway = createGateway(new ScriptedHttpClient());
 
             await expect(
                 drain(gateway.chat({ messages: [{ role: 'tool', content: '{}' }], tools: [] }))
@@ -494,7 +490,7 @@ describe('createGeminiToolLlmGateway', () => {
         it('maps an assistant message with no tool calls through the plain content mapping, falling back to empty text when content is null', async () => {
             // toolCalls is undefined (not just empty) here, so this is not a tool-call turn at all —
             // it must fall through to the same plain user/assistant mapping every other role uses.
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -512,7 +508,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('produces the correct multi-turn body shape for a full multi-turn round trip (system + user + model functionCall + user functionResponse)', async () => {
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -543,7 +539,7 @@ describe('createGeminiToolLlmGateway', () => {
             // Gemini's "thinking" model family (3.x, and sometimes gemini-2.5-flash-lite) rejects a
             // replayed functionCall part that omits thoughtSignature with a 400 — confirmed live,
             // 2026-08-07 (see GeminiToolLlmGateway.ts's GeminiContentPart doc).
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -571,7 +567,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('omits thoughtSignature on a replayed functionCall part when the assistant tool-call never had one', async () => {
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -591,7 +587,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('keeps distinct thoughtSignatures on their own functionCall parts — never merged, swapped, or spread to a signature-less sibling', async () => {
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
 
             await drain(
                 createGateway(http).chat({
@@ -641,7 +637,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('throws a clear error — not a silent guess — when a tool-result toolCallId has no matching assistant tool-call entry earlier in the request', async () => {
-            const gateway = createGateway(new ScriptedHttpRequest());
+            const gateway = createGateway(new ScriptedHttpClient());
 
             await expect(
                 drain(
@@ -669,7 +665,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('parses a plain text response correctly', async () => {
-            const http = new ScriptedHttpRequest([{ json: geminiText('Moved it.') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('Moved it.') }]);
 
             const chunks = await drain(createGateway(http).chat(followUpRequest()));
 
@@ -680,7 +676,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('parses a second functionCall response correctly', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 { json: geminiFunctionCall('move_node', { nodeId: 'text-1', by: { dx: 0, dy: 50 } }) },
             ]);
 
@@ -699,7 +695,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('captures thoughtSignature from a functionCall response part onto the yielded toolCall chunk', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         candidates: [
@@ -732,7 +728,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('omits thoughtSignature on the yielded toolCall chunk when the response part never had one', async () => {
-            const http = new ScriptedHttpRequest([{ json: geminiFunctionCall('move_node', { nodeId: 'text-1' }) }]);
+            const http = new ScriptedHttpClient([{ json: geminiFunctionCall('move_node', { nodeId: 'text-1' }) }]);
 
             const chunks = await drain(createGateway(http).chat(followUpRequest()));
 
@@ -742,7 +738,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('captures distinct thoughtSignatures from parallel functionCall parts onto their own toolCall chunks', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         candidates: [
@@ -795,7 +791,7 @@ describe('createGeminiToolLlmGateway', () => {
     // WRONG function name.
     describe('tool-call id uniqueness across sequential chat() calls on the same gateway', () => {
         it('never reuses an id across 3 sequential turns on the same gateway instance', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 { json: geminiFunctionCall('list_nodes', {}) },
                 { json: geminiFunctionCall('move_node', { nodeId: 'text-1' }) },
                 { json: geminiFunctionCall('list_nodes', {}) },
@@ -865,7 +861,7 @@ describe('createGeminiToolLlmGateway', () => {
 
     describe('usage/cost mapping', () => {
         it('subtracts cachedContentTokenCount from promptTokenCount for inputTokens — never double-counted', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         candidates: [{ content: { parts: [{ text: 'ok' }] } }],
@@ -888,7 +884,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('clamps inputTokens to 0 rather than going negative if cachedContentTokenCount ever exceeded promptTokenCount', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         candidates: [{ content: { parts: [{ text: 'ok' }] } }],
@@ -908,7 +904,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('maps thoughtsTokenCount to reasoningTokens, kept separate from candidatesTokenCount (visible output)', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         candidates: [{ content: { parts: [{ text: 'ok' }] } }],
@@ -925,7 +921,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('maps toolUsePromptTokenCount to toolUseInputTokens WITHOUT folding it into inputTokens', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         candidates: [{ content: { parts: [{ text: 'ok' }] } }],
@@ -949,7 +945,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('passes providerTotalTokens through as the raw totalTokenCount, never recomputed locally', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         candidates: [{ content: { parts: [{ text: 'ok' }] } }],
@@ -972,7 +968,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('computes estimatedCost across every bucket (uncached + cached + output + reasoning + tool-use)', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 {
                     json: {
                         candidates: [{ content: { parts: [{ text: 'ok' }] } }],
@@ -1006,9 +1002,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('omits usage entirely from the done chunk when the response reports no usageMetadata at all', async () => {
-            const http = new ScriptedHttpRequest([
-                { json: { candidates: [{ content: { parts: [{ text: 'ok' }] } }] } },
-            ]);
+            const http = new ScriptedHttpClient([{ json: { candidates: [{ content: { parts: [{ text: 'ok' }] } }] } }]);
 
             const chunks = await drain(createGateway(http).chat(userSays('q')));
 
@@ -1016,7 +1010,7 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('reports only estimatedCost: null when usageMetadata is present but empty — every token field left undefined, not fabricated', async () => {
-            const http = new ScriptedHttpRequest([
+            const http = new ScriptedHttpClient([
                 { json: { candidates: [{ content: { parts: [{ text: 'ok' }] } }], usageMetadata: {} } },
             ]);
 
@@ -1027,9 +1021,8 @@ describe('createGeminiToolLlmGateway', () => {
         });
 
         it('returns estimatedCost: null (not a fabricated 0) for an unregistered model, while still reporting tokens', async () => {
-            const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+            const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
             const gateway = createGeminiToolLlmGateway({
-                environment: createVirtualAgentEnvironment(),
                 http,
                 apiKey: API_KEY,
                 model: 'gemini-does-not-exist',
@@ -1045,9 +1038,8 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('honors model and baseUrl overrides (the proxy path)', async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
         const gateway = createGeminiToolLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
             model: 'gemini-2.5-pro',
@@ -1062,7 +1054,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('passes the abort signal through to the HTTP port', async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('ok') }]);
+        const http = new ScriptedHttpClient([{ json: geminiText('ok') }]);
         const controller = new AbortController();
 
         await drain(createGateway(http).chat(userSays('q'), { signal: controller.signal }));
@@ -1071,23 +1063,23 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('throws on non-ok responses with the status but never the API key, and traces the error', async () => {
-        const http = new ScriptedHttpRequest([{ status: 400, text: `bad key ${API_KEY}` }]);
-        const trace = new BufferAgentTraceReporter();
+        const http = new ScriptedHttpClient([{ status: 400, text: `bad key ${API_KEY}` }]);
+        const sink = memorySink();
+        const tracer = createTracer(sink);
 
-        const attempt = drain(createGateway(http, trace).chat(userSays('q')));
+        const attempt = drain(createGateway(http, tracer).chat(userSays('q')));
 
         await expect(attempt).rejects.toThrow(/status 400.*bad key \[redacted\]/);
         await attempt.catch((error: Error) => expect(error.message).not.toContain(API_KEY));
-        expect(trace.entries.some(entry => entry.level === 'error')).toBe(true);
-        expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
+        expect(sink.records.some(entry => entry.level === 'error')).toBe(true);
+        expect(JSON.stringify(sink.records)).not.toContain(API_KEY);
     });
 
     it('passes an error body through verbatim (no redaction) when apiKey is empty — nothing to scrub', async () => {
         // Guards the redactText early-return itself: without it, `value.split('').join(...)` would
         // splice '[redacted]' between every single character of the body, mangling it completely.
-        const http = new ScriptedHttpRequest([{ status: 403, text: 'no secret in this error body' }]);
+        const http = new ScriptedHttpClient([{ status: 403, text: 'no secret in this error body' }]);
         const gateway = createGeminiToolLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: '',
         });
@@ -1098,7 +1090,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('falls back to an empty string when reading the non-ok response body itself fails (response.text() rejects)', async () => {
-        const http: HttpRequestSupportable = {
+        const http: HttpClient = {
             request: async () => ({
                 status: 500,
                 ok: false,
@@ -1112,7 +1104,6 @@ describe('createGeminiToolLlmGateway', () => {
             }),
         };
         const gateway = createGeminiToolLlmGateway({
-            environment: createVirtualAgentEnvironment(),
             http,
             apiKey: API_KEY,
         });
@@ -1121,7 +1112,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('throws when the response has no candidates, with no diagnostic metadata to show', async () => {
-        const http = new ScriptedHttpRequest([{ json: { candidates: [] } }]);
+        const http = new ScriptedHttpClient([{ json: { candidates: [] } }]);
 
         await expect(drain(createGateway(http).chat(userSays('q')))).rejects.toThrow(
             /no candidates or no usable content parts \(no diagnostic metadata present\)/
@@ -1129,7 +1120,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('surfaces promptFeedback.blockReason when candidates is empty', async () => {
-        const http = new ScriptedHttpRequest([{ json: { candidates: [], promptFeedback: { blockReason: 'SAFETY' } } }]);
+        const http = new ScriptedHttpClient([{ json: { candidates: [], promptFeedback: { blockReason: 'SAFETY' } } }]);
 
         await expect(drain(createGateway(http).chat(userSays('q')))).rejects.toThrow(
             /promptFeedback\.blockReason=SAFETY/
@@ -1137,13 +1128,13 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('surfaces a candidate finishReason when it has no usable content parts', async () => {
-        const http = new ScriptedHttpRequest([{ json: { candidates: [{ finishReason: 'SAFETY' }] } }]);
+        const http = new ScriptedHttpClient([{ json: { candidates: [{ finishReason: 'SAFETY' }] } }]);
 
         await expect(drain(createGateway(http).chat(userSays('q')))).rejects.toThrow(/finishReason=SAFETY/);
     });
 
     it('surfaces a candidate finishReason for a candidate with empty content.parts', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [] } }] } },
         ]);
 
@@ -1151,7 +1142,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('surfaces safety ratings safely as category:probability:blocked', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             {
                 json: {
                     candidates: [
@@ -1181,7 +1172,7 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('never leaks the API key through the no-candidates diagnostic error, even if the provider echoed it back', async () => {
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: { candidates: [], promptFeedback: { blockReason: `leaked ${API_KEY}` } } },
         ]);
 
@@ -1192,28 +1183,30 @@ describe('createGeminiToolLlmGateway', () => {
     });
 
     it('traces request and response without leaking the key', async () => {
-        const http = new ScriptedHttpRequest([{ json: geminiText('traced') }]);
-        const trace = new BufferAgentTraceReporter();
+        const http = new ScriptedHttpClient([{ json: geminiText('traced') }]);
+        const sink = memorySink();
+        const tracer = createTracer(sink);
 
-        await drain(createGateway(http, trace).chat(userSays('q')));
+        await drain(createGateway(http, tracer).chat(userSays('q')));
 
-        const messages = trace.entries.map(entry => entry.message);
+        const messages = sink.records.map(entry => entry.name);
         expect(messages).toContain('llm.gemini.request');
         expect(messages).toContain('llm.gemini.response');
-        expect(JSON.stringify(trace.entries)).not.toContain(API_KEY);
+        expect(JSON.stringify(sink.records)).not.toContain(API_KEY);
     });
 
     it('omits usage from the traced response entry when the response has no usageMetadata at all', async () => {
         // trace?.debug(...) short-circuits its whole argument list when no trace reporter is
         // configured, so the object literal carrying this ternary is only evaluated when a real
         // reporter is wired — this test is what actually exercises its "no usage" branch.
-        const http = new ScriptedHttpRequest([{ json: { candidates: [{ content: { parts: [{ text: 'hi' }] } }] } }]);
-        const trace = new BufferAgentTraceReporter();
+        const http = new ScriptedHttpClient([{ json: { candidates: [{ content: { parts: [{ text: 'hi' }] } }] } }]);
+        const sink = memorySink();
+        const tracer = createTracer(sink);
 
-        await drain(createGateway(http, trace).chat(userSays('q')));
+        await drain(createGateway(http, tracer).chat(userSays('q')));
 
-        const responseEntry = trace.entries.find(entry => entry.message === 'llm.gemini.response');
-        expect(responseEntry?.json).not.toHaveProperty('usage');
+        const responseEntry = sink.records.find(entry => entry.name === 'llm.gemini.response');
+        expect(responseEntry?.fields).not.toHaveProperty('usage');
     });
 
     // The full offline chain: a canned Gemini functionCall flows through the gateway's parsing
@@ -1233,7 +1226,7 @@ describe('createGeminiToolLlmGateway', () => {
             grant: { canModifyCanvas: true },
         };
 
-        const http = new ScriptedHttpRequest([
+        const http = new ScriptedHttpClient([
             { json: geminiFunctionCall('move_node', { nodeId: 'text-1', by: { dx: 100, dy: 0 } }) },
         ]);
 
@@ -1244,12 +1237,14 @@ describe('createGeminiToolLlmGateway', () => {
             })
         );
 
-        const toolCall = chunks.find(c => c.toolCall)?.toolCall;
-        expect(toolCall?.name).toBe('move_node');
+        // firstToolCall throws (naming what the stream held) when there is none, so it carries the presence
+        // assertion the `toolCall?.name` check used to imply and narrows the three reads below.
+        const toolCall = firstToolCall(chunks);
+        expect(toolCall.name).toBe('move_node');
 
         const result = await executor.dispatch(
             config,
-            { id: toolCall!.id, name: toolCall!.name, args: JSON.parse(toolCall!.argsDelta) },
+            { id: toolCall.id, name: toolCall.name, args: JSON.parse(toolCall.argsDelta) },
             { canModifyCanvas: true }
         );
 

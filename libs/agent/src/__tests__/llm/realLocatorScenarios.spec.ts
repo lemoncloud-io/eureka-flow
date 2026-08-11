@@ -3,8 +3,7 @@ import { join } from 'node:path';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { createVirtualAgentEnvironment } from '../../environment/createVirtualAgentEnvironment';
-import { createFetchHttpRequest } from '../../http/FetchHttpRequest';
+import { createFetchHttpClient } from '../../http/FetchHttpClient';
 import {
     TIMEOUT_MARKER,
     classifyGeminiFailureCategory,
@@ -30,11 +29,7 @@ import { LOCATOR_SCENARIOS, runLocatorScenario } from '../../llm/verifyLocatorSc
 
 import type { RealProviderOutcome } from '../../llm/classifyRealProviderResult';
 import type { LlmGateway } from '../../llm/llmGateway';
-import type {
-    CapturedCallInfo,
-    VerificationMetricsReport,
-    VerificationRunRecord,
-} from '../../llm/verificationMetrics';
+import type { CapturedCallInfo, VerificationMetricsReport, VerificationRunRecord } from '../../llm/verificationMetrics';
 import type { LocatorScenarioResult } from '../../llm/verifyLocatorScenarios';
 
 /**
@@ -70,8 +65,9 @@ const LIVE_PROVIDER_FILTER = process.env['LIVE_PROVIDER_FILTER'];
 /** Output directory for every generated artifact (Markdown/JSON/CSV/JSONL/run-manifest). Defaults
  * to this repo's existing in-tree path (unchanged behavior); set to an absolute path outside the
  * working tree to keep live-run output out of `git status` entirely — see
- * docs/browser-agent/foundations/production-readiness.md for example commands. */
-const METRICS_DIR = process.env['LIVE_METRICS_OUTPUT_DIR'] ?? join(__dirname, '../../../../../docs/browser-agent/verification-metrics');
+ * docs/browser-agent/design/production-readiness.md for example commands. */
+const METRICS_DIR =
+    process.env['LIVE_METRICS_OUTPUT_DIR'] ?? join(__dirname, '../../../../../docs/browser-agent/verification-metrics');
 const METRICS_MD_PATH = join(METRICS_DIR, 'latest.md');
 const METRICS_JSON_PATH = join(METRICS_DIR, 'latest.json');
 const METRICS_CSV_PATH = join(METRICS_DIR, 'latest.csv');
@@ -102,7 +98,7 @@ const CHART_SVG_PATH = join(METRICS_DIR, 'elapsed-vs-tokens.svg');
  * the real tool-result round-trip, a structurally different harness than this file's
  * single-`chat()`-call-per-scenario shape. This file's own matrix stays single-turn by design, not
  * because either provider can't do a second turn. See
- * docs/browser-agent/foundations/provider-tool-calling.md §4.
+ * docs/browser-agent/design/provider-tool-calling.md §4.
  *
  * Gemini has an observed lookup-first *target-resolution* strategy: given a prompt that requires
  * resolving a specific node, it may call `list_nodes` before committing to the scenario's expected
@@ -336,7 +332,12 @@ for (const entry of PROVIDER_REGISTRY) {
 
     for (const model of resolveModelsToRun(entry, overrideValue)) {
         if (providerSelected) {
-            PLANNED_PAIRS.push({ provider: entry.displayName, providerId: entry.providerId, model, keyPresent: !!apiKey });
+            PLANNED_PAIRS.push({
+                provider: entry.displayName,
+                providerId: entry.providerId,
+                model,
+                keyPresent: !!apiKey,
+            });
         }
         const willRun = LIVE_RUN_OPTED_IN && !!apiKey && providerSelected;
 
@@ -349,8 +350,7 @@ for (const entry of PROVIDER_REGISTRY) {
                     createGatewayForEntry(entry, {
                         apiKey: apiKey as string,
                         model,
-                        environment: createVirtualAgentEnvironment(),
-                        http: createFetchHttpRequest(),
+                        http: createFetchHttpClient(),
                     }),
                 entry.realTestTimeoutMs
             );
@@ -371,7 +371,11 @@ for (const entry of PROVIDER_REGISTRY) {
         console.log('  no (provider, model) pairs match the current filter');
     } else {
         for (const pair of PLANNED_PAIRS) {
-            const status = !LIVE_RUN_OPTED_IN ? 'skipped: opt-in not set' : pair.keyPresent ? 'WILL RUN' : `skipped: ${pair.providerId} key not set`;
+            const status = !LIVE_RUN_OPTED_IN
+                ? 'skipped: opt-in not set'
+                : pair.keyPresent
+                  ? 'WILL RUN'
+                  : `skipped: ${pair.providerId} key not set`;
             console.log(`  - ${pair.provider} (${pair.providerId}) / ${pair.model} — ${status}`);
         }
     }
@@ -385,7 +389,7 @@ for (const entry of PROVIDER_REGISTRY) {
 // once after every provider/model block in this file finishes. Writes the monitoring report only
 // when at least one scenario actually ran against a real key this run — an empty
 // ALL_METRIC_RECORDS (no keys set) means nothing is written, not an empty/placeholder file. See
-// docs/browser-agent/foundations/provider-tool-calling.md §6 for the reporting semantics.
+// docs/browser-agent/design/provider-tool-calling.md §6 for the reporting semantics.
 afterAll(() => {
     if (ALL_METRIC_RECORDS.length === 0) {
         console.log('\n[verificationMetrics] no real-key scenarios ran this session — no artifact written.');
@@ -454,7 +458,12 @@ afterAll(() => {
         runLiveProviderTestsOptedIn: LIVE_RUN_OPTED_IN,
         liveProviderFilter: LIVE_PROVIDER_FILTER ?? null,
         scenarioCount: LOCATOR_SCENARIOS.length,
-        attemptedThisSession: ALL_METRIC_RECORDS.map(r => ({ provider: r.provider, model: r.model, scenarioId: r.scenarioId, outcome: r.outcome })),
+        attemptedThisSession: ALL_METRIC_RECORDS.map(r => ({
+            provider: r.provider,
+            model: r.model,
+            scenarioId: r.scenarioId,
+            outcome: r.outcome,
+        })),
         sourceSessions: sessions,
     };
 
@@ -477,7 +486,9 @@ afterAll(() => {
     console.log(
         `\n[verificationMetrics] wrote ${METRICS_MD_PATH}, ${METRICS_JSON_PATH}, ${METRICS_CSV_PATH}, ` +
             `${METRICS_JSONL_PATH}, ${RUN_MANIFEST_PATH}` +
-            (chart.points.length > 0 ? `, ${CHART_MMD_PATH}, and ${CHART_SVG_PATH}` : ' (no chart data to write this run)')
+            (chart.points.length > 0
+                ? `, ${CHART_MMD_PATH}, and ${CHART_SVG_PATH}`
+                : ' (no chart data to write this run)')
     );
     console.table(aggregates);
 });

@@ -37,7 +37,7 @@ const VERIFY_USER_PERMISSIONS: AgentGrant = {
  * Every scenario here is single-turn (gateway → `ToolExecutor`). Multi-step flows (`list_nodes` →
  * `move_node` in one conversation) need a second `gateway.chat()` call with the first turn's tool
  * result fed back in — deliberately not attempted by this matrix, which exercises exactly one
- * call per scenario. See docs/browser-agent/foundations/provider-tool-calling.md §4.
+ * call per scenario. See docs/browser-agent/design/provider-tool-calling.md §4.
  */
 
 const ERROR_MESSAGE_LIMIT = 200;

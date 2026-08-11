@@ -9,6 +9,7 @@ import { composeFrame } from './render';
 import { createTerminalRun } from './terminalRun';
 import { createWireLog } from './wireLog';
 import { liveModel, liveProvider, resolveLiveGateway } from '../llm/resolveLiveGateway';
+import { createAgentTrace, renderProjections } from '../trace';
 import { errorMessage } from '../utils/errors';
 
 import type { Graph } from '../canvas';
@@ -52,7 +53,7 @@ const FAKE_REPLY =
     '[--fake] No model wired — I can read the canvas but not build. Set GEMINI_API_KEY (or drop --fake) to build for real.';
 
 const HELP =
-    'scroll ‹scroll› pane: mouse wheel / ↑↓ / PgUp PgDn / /top /bottom · /pane switch canvas⇄chat · /save (backend, or <f> local) /graph /seed <f> /reset /verbose /provider /keys /log /quit · Ctrl-C aborts';
+    'scroll ‹scroll› pane: mouse wheel / ↑↓ / PgUp PgDn / /top /bottom · /pane switch canvas⇄chat · /save (backend, or <f> local) /graph /seed <f> /reset /verbose /provider /keys /log /trace /quit · Ctrl-C aborts';
 const SCROLL_HINT = 'scroll the ‹scroll› pane: mouse wheel or ↑/↓ · /pane switches · /help';
 
 const main = async (): Promise<void> => {
@@ -96,12 +97,25 @@ const main = async (): Promise<void> => {
     const binding = wire ? wire.binding(stack.binding) : stack.binding;
     if (seedFile) stack.engine.loadGraph(JSON.parse(readFileSync(seedFile, 'utf8')) as Graph);
 
+    // Structured trace (off by default): --trace or AGENT_TRACE captures the run; `/trace` and exit write the
+    // three projections (the same views the eval harness renders). `--trace <file>` overrides the path.
+    const traceOn = hasFlag('--trace') || !!process.env.AGENT_TRACE;
+    const traceFileArg = flagValue('--trace');
+    const tracePath = traceFileArg && !traceFileArg.startsWith('--') ? traceFileArg : 'agent-terminal.trace.log';
+    const trace = createAgentTrace(traceOn);
+    const writeTrace = (): string | null => {
+        if (!traceOn) return null;
+        writeFileSync(resolve(tracePath), `${renderProjections(trace.project())}\n`);
+        return tracePath;
+    };
+
     const run = createTerminalRun({
         gateway,
         binding,
         catalog: stack.catalog,
         userPermissions: { canModifyCanvas: true, canEditConfig: true },
         loadGraph: graph => stack.engine.loadGraph(graph),
+        tracer: trace.tracer,
     });
     if (wire) run.onChange(state => wire.chat(state)); // stream the transcript into the log as chat turns
 
@@ -145,6 +159,8 @@ const main = async (): Promise<void> => {
         }
         wire?.note('once complete');
         if (wire) process.stdout.write(`\n[wire log → ${wire.path}]\n`);
+        const tracedOnce = writeTrace();
+        if (tracedOnce) process.stdout.write(`[trace projections → ${tracedOnce}]\n`);
         return;
     }
 
@@ -152,7 +168,14 @@ const main = async (): Promise<void> => {
     const out = process.stdout;
     let lastState: SessionState | null = run.getState();
     let lastGraph: Graph = run.getGraph();
-    let notice = wire ? `backend log → ${logPath} · ${SCROLL_HINT}` : SCROLL_HINT; // shown until the first turn/command
+    // shown until the first turn/command
+    let notice = [
+        wire ? `backend log → ${logPath}` : '',
+        traceOn ? `trace on → /trace writes ${tracePath}` : '',
+        SCROLL_HINT,
+    ]
+        .filter(Boolean)
+        .join(' · ');
     let busy = false;
     let userAborted = false; // Ctrl-C during a turn — BaseAgent still collapses it to phase 'done', so we track it here
     let leftScroll = 0; // lines scrolled up from the bottom in each pane (0 = live tail)
@@ -266,6 +289,8 @@ const main = async (): Promise<void> => {
         quitting = true;
         wire?.note('session end');
         out.write('\x1b[?1007l\x1b[?1049l'); // leave alternate-scroll + alt screen
+        const tracedTo = writeTrace();
+        if (tracedTo) out.write(`\n[trace projections → ${tracedTo}]\n`);
         rl.close();
         process.exit(code);
     };
@@ -288,6 +313,11 @@ const main = async (): Promise<void> => {
             case '/log':
                 notice = wire ? `wire log → ${wire.path}` : 'logging off (--no-log)';
                 return true;
+            case '/trace': {
+                const path = writeTrace();
+                notice = path ? `trace projections → ${path}` : 'tracing off — start with --trace or AGENT_TRACE=1';
+                return true;
+            }
             case '/verbose':
                 verbose = !verbose;
                 notice = `verbose ${verbose ? 'on' : 'off'}`;

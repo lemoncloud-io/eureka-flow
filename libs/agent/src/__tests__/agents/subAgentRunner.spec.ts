@@ -30,12 +30,12 @@ const makeRunner = (registrations: AgentRegistration[]) =>
     });
 
 describe('createSubAgentRunner — fanOut failure paths', () => {
-    it('reports ok:false when no specialist of the requested type exists', async () => {
+    it('reports completed:false when no specialist of the requested type exists', async () => {
         const [result] = await makeRunner([]).fanOut([{ task: 'do it', agentType: 'ghost' }], noopBinding);
-        expect(result).toEqual({ ok: false, summary: 'no specialist of type "ghost" is available' });
+        expect(result).toEqual({ completed: false, summary: 'no specialist of type "ghost" is available' });
     });
 
-    it('reports ok:false with the message when a child throws', async () => {
+    it('reports completed:false with the message when a child throws', async () => {
         const throwing: Agent = {
             send: async () => {
                 throw new Error('kaboom');
@@ -48,7 +48,7 @@ describe('createSubAgentRunner — fanOut failure paths', () => {
             [{ task: 'do it', agentType: 'boom' }],
             noopBinding
         );
-        expect(result).toEqual({ ok: false, summary: 'kaboom' });
+        expect(result).toEqual({ completed: false, summary: 'kaboom' });
     });
 
     it('threads the abort signal through to each spawned child', async () => {
@@ -98,7 +98,7 @@ describe('createSubAgentRunner — generic block-agent fallback (hybrid roster)'
             binding
         );
 
-        expect(result.ok).toBe(true);
+        expect(result.completed).toBe(true);
         expect(nodeById(binding.readGraph(), IDS.buf).config?.delayMs).toBe('250'); // the generic block agent configured it
     });
 
@@ -120,6 +120,6 @@ describe('createSubAgentRunner — generic block-agent fallback (hybrid roster)'
         );
 
         expect(explicitRan).toBe(true);
-        expect(result.ok).toBe(true);
+        expect(result.completed).toBe(true);
     });
 });
