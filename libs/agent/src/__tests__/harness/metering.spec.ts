@@ -69,6 +69,24 @@ describe('createMeter — provider-neutral token accounting (§3.1)', () => {
         expect(t.roundTrips).toBe(1);
     });
 
+    it("treats a usage object that omits inputTokens as zero input (line 54's own `?? 0` fallback)", () => {
+        // The two fallback tests above already exercise `u.providerTotalTokens ?? input + (u.outputTokens
+        // ?? 0)` both ways — that branch is fully covered. The one still-uncovered branch is the earlier,
+        // separate fallback one line up: `const input = u.inputTokens ?? 0`. No existing test omits
+        // inputTokens itself (every usage above always supplies it), so this asserts a provider that
+        // reports a total but never reports its own input side still resolves to a defined, non-NaN
+        // input of 0 rather than leaving it undefined.
+        const meter = createMeter();
+        meter.addUsage({ providerTotalTokens: 9 });
+        meter.tick();
+
+        const t = meter.totals();
+        expect(t.inputTokens).toBe(0); // the ?? 0 fallback on line 54, not undefined/NaN
+        expect(t.totalTokens).toBe(9); // providerTotalTokens is present, so line 56's own fallback isn't involved
+        expect(t.outputTokens).toBe(9); // total(9) - input(0) = 9
+        expect(t.roundTrips).toBe(1);
+    });
+
     it('ignores a falsy usage and leaves round-trips to tick()', () => {
         const meter = createMeter();
         meter.addUsage(undefined);
