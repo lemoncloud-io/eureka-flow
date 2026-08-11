@@ -174,7 +174,9 @@ const toAnthropicRequest = (
         ...(systemTexts.length > 0 ? { system: systemTexts.join('\n\n') } : {}),
         ...(req.tools.length > 0 ? { tools: req.tools.map(toAnthropicTool) } : {}),
         ...(generation?.temperature !== undefined ? { temperature: generation.temperature } : {}),
-        ...(cacheControl ? { cache_control: { type: 'ephemeral', ...(cacheControl.ttl ? { ttl: cacheControl.ttl } : {}) } } : {}),
+        ...(cacheControl
+            ? { cache_control: { type: 'ephemeral', ...(cacheControl.ttl ? { ttl: cacheControl.ttl } : {}) } }
+            : {}),
     };
 };
 
@@ -252,15 +254,11 @@ const toUsageInfo = (
 
     const cacheWriteInputTokens = usage.cache_creation_input_tokens;
     const cacheWriteTtl =
-        cacheWriteInputTokens !== undefined && cacheWriteInputTokens > 0
-            ? (requestedCacheTtl ?? 'unknown')
-            : undefined;
+        cacheWriteInputTokens !== undefined && cacheWriteInputTokens > 0 ? (requestedCacheTtl ?? 'unknown') : undefined;
 
     const normalized: UsageInfo = {
         ...(usage.input_tokens !== undefined ? { inputTokens: usage.input_tokens } : {}),
-        ...(usage.cache_read_input_tokens !== undefined
-            ? { cachedInputTokens: usage.cache_read_input_tokens }
-            : {}),
+        ...(usage.cache_read_input_tokens !== undefined ? { cachedInputTokens: usage.cache_read_input_tokens } : {}),
         ...(cacheWriteInputTokens !== undefined ? { cacheWriteInputTokens } : {}),
         ...(cacheWriteTtl !== undefined ? { cacheWriteTtl } : {}),
         ...(usage.output_tokens !== undefined ? { outputTokens: usage.output_tokens } : {}),

@@ -31,25 +31,28 @@ Each gateway is additive and does not touch any existing text-only gateway.
 
 **OpenAI** (`OpenAiLlmGateway.ts`, also serves **OpenRouter** and any OpenAI-compatible provider
 via a `baseUrl` override):
+
 - `ToolDef` → `tools: [{ type: 'function', function: { name, description, parameters } }]`,
   `tool_choice: 'auto'`, omitted when there are no tools.
 - Assistant tool-call turn → `{ role: 'assistant', tool_calls: [{ id, type: 'function', function:
-  { name, arguments } }] }`; tool-result message → `{ role: 'tool', tool_call_id, content }`.
+{ name, arguments } }] }`; tool-result message → `{ role: 'tool', tool_call_id, content }`.
 - Response `tool_calls[].function.arguments` is already a JSON string, mapped straight to
   `Chunk.toolCall.argsDelta` with no re-encoding.
 
 **Gemini** (`GeminiToolLlmGateway.ts`, separate from the text-only `GeminiLlmGateway`):
+
 - `ToolDef` → `tools: [{ functionDeclarations: [...] }]`. Gemini's schema requires uppercase
   OpenAPI `Type` enums (`OBJECT`/`STRING`/...) where `JsonSchema.type` is lowercase; a recursive
   conversion uppercases `type` through nested `properties`/`items`.
 - Response `functionCall.args` is a parsed object (not a string like OpenAI's), so it's
   stringified to fit `Chunk.toolCall.argsDelta`. Gemini issues no call id, so one is generated
   per turn.
-- Gemini correlates a tool *result* to the call it answers by function **name**, not an id — the
+- Gemini correlates a tool _result_ to the call it answers by function **name**, not an id — the
   gateway recovers the name by scanning the assistant tool-call message earlier in the same
   request. A `toolCallId` with no matching entry throws rather than guessing.
 
 **Anthropic** (`AnthropicToolLlmGateway.ts`, native — not an OpenAI-compatible `baseUrl` reuse):
+
 - `ToolDef` → `tools[].input_schema` (plain lowercase JSON Schema, no case conversion needed).
 - An assistant tool-call turn becomes a `content[]` block array (a leading `text` block, if any,
   then one `tool_use` block per call); a tool-result message becomes a **user** message carrying a
@@ -86,16 +89,16 @@ its own byte-identical copy of the retired locator persona — narrowed to exact
 `list_nodes`/`move_node`, because the builder's full toolset would change what scenarios like
 `no-tool-refusal` are testing:
 
-| Scenario | What it checks |
-| --- | --- |
-| `list-nodes-read-only` | A read-only question triggers `list_nodes` with zero canvas mutation |
-| `move-node-right/-left/-up/-down` | Each cardinal direction maps to the correct delta via the real `directionToDelta` |
-| `move-node-absolute` | An absolute-position instruction produces an exact `to` target |
-| `no-tool-refusal` | An unsupported action produces a text refusal, no tool call |
-| `unknown-target` | A nonexistent node produces either a text refusal or an executor-rejected call — never a mutation of an unrelated node |
-| `selective-multi-node` | Only the named node moves; unrelated nodes stay byte-identical to their seed values |
-| `ambiguous-instruction` | An unresolvable reference produces a clarifying question, not a guess |
-| `no-op-instruction` | An explicit no-change instruction produces a confirmation with zero mutation |
+| Scenario                          | What it checks                                                                                                         |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `list-nodes-read-only`            | A read-only question triggers `list_nodes` with zero canvas mutation                                                   |
+| `move-node-right/-left/-up/-down` | Each cardinal direction maps to the correct delta via the real `directionToDelta`                                      |
+| `move-node-absolute`              | An absolute-position instruction produces an exact `to` target                                                         |
+| `no-tool-refusal`                 | An unsupported action produces a text refusal, no tool call                                                            |
+| `unknown-target`                  | A nonexistent node produces either a text refusal or an executor-rejected call — never a mutation of an unrelated node |
+| `selective-multi-node`            | Only the named node moves; unrelated nodes stay byte-identical to their seed values                                    |
+| `ambiguous-instruction`           | An unresolvable reference produces a clarifying question, not a guess                                                  |
+| `no-op-instruction`               | An explicit no-change instruction produces a confirmation with zero mutation                                           |
 
 Multi-turn scenarios (a single instruction requiring two sequential tool calls, e.g. "look up the
 node, then move it") are intentionally out of this matrix: it exercises one `gateway.chat()` call
@@ -115,15 +118,15 @@ See the "Real-verified model(s)" column for exactly which ones, and
 `libs/agent/src/llm/modelManifest.ts`/`providerRegistry.ts`'s `realVerifiedModels` for the
 authoritative per-model list.
 
-| Provider | Gateway | Gateway status | Real-verified model(s) |
-| --- | --- | --- | --- |
-| OpenAI | `createOpenAiLlmGateway` | Implemented, real-provider verified | `gpt-4o-mini` only — `gpt-4.1-mini`, `gpt-5-mini`, `gpt-4.1` are registered/confirmed-current but not yet real-key-verified |
-| Gemini | `createGeminiToolLlmGateway` | Implemented, real-provider verified | `gemini-2.5-flash` only — `gemini-2.5-pro`, `gemini-3-flash-preview`, `gemini-2.5-flash-lite`, `gemini-3.1-pro-preview` are registered/confirmed-current but not yet real-key-verified |
-| OpenRouter | `createOpenAiLlmGateway` + `baseUrl` override | Implemented, real-provider verified (OpenAI-wire-compatible, zero new gateway code) | `openrouter/free` only (a dynamic route, not a fixed model) — all 6 fixed OpenRouter models are registered but not yet real-key-verified |
-| Anthropic / Claude | `createAnthropicToolLlmGateway` | Implemented, offline-verified; not yet run against a live key | none |
-| DeepSeek | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; not yet run against a live key | none |
-| Qwen | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; not yet run against a live key | none |
-| GLM (Z.ai) | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; response `tool_calls[].function.arguments` shape not yet confirmed against a captured response | none |
+| Provider           | Gateway                                       | Gateway status                                                                                                            | Real-verified model(s)                                                                                                                                                                 |
+| ------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OpenAI             | `createOpenAiLlmGateway`                      | Implemented, real-provider verified                                                                                       | `gpt-4o-mini` only — `gpt-4.1-mini`, `gpt-5-mini`, `gpt-4.1` are registered/confirmed-current but not yet real-key-verified                                                            |
+| Gemini             | `createGeminiToolLlmGateway`                  | Implemented, real-provider verified                                                                                       | `gemini-2.5-flash` only — `gemini-2.5-pro`, `gemini-3-flash-preview`, `gemini-2.5-flash-lite`, `gemini-3.1-pro-preview` are registered/confirmed-current but not yet real-key-verified |
+| OpenRouter         | `createOpenAiLlmGateway` + `baseUrl` override | Implemented, real-provider verified (OpenAI-wire-compatible, zero new gateway code)                                       | `openrouter/free` only (a dynamic route, not a fixed model) — all 6 fixed OpenRouter models are registered but not yet real-key-verified                                               |
+| Anthropic / Claude | `createAnthropicToolLlmGateway`               | Implemented, offline-verified; not yet run against a live key                                                             | none                                                                                                                                                                                   |
+| DeepSeek           | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; not yet run against a live key                                                                 | none                                                                                                                                                                                   |
+| Qwen               | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; not yet run against a live key                                                                 | none                                                                                                                                                                                   |
+| GLM (Z.ai)         | `createOpenAiLlmGateway` + `baseUrl` override | Registered, offline-wired; response `tool_calls[].function.arguments` shape not yet confirmed against a captured response | none                                                                                                                                                                                   |
 
 The full per-provider model list, API key env var name, and any real-verified model ids live in
 `libs/agent/src/llm/providerRegistry.ts`, which is the source of truth this table summarizes —
@@ -232,7 +235,7 @@ that provider.
 
 ## 10. Browser production integration
 
-This document (§1-9) covers the provider-native *verification* gateways in `libs/agent` — used by
+This document (§1-9) covers the provider-native _verification_ gateways in `libs/agent` — used by
 this repo's own offline/real-key test suites, never by the running browser app directly. The
 browser app's own production gateway is a separate, app-layer piece:
 `createEurekaToolCallLlmGateway` (`apps/web/src/app/features/flows/utils/`), wired into

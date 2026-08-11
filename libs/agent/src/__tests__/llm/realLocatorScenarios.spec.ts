@@ -29,11 +29,7 @@ import { LOCATOR_SCENARIOS, runLocatorScenario } from '../../llm/verifyLocatorSc
 
 import type { RealProviderOutcome } from '../../llm/classifyRealProviderResult';
 import type { LlmGateway } from '../../llm/llmGateway';
-import type {
-    CapturedCallInfo,
-    VerificationMetricsReport,
-    VerificationRunRecord,
-} from '../../llm/verificationMetrics';
+import type { CapturedCallInfo, VerificationMetricsReport, VerificationRunRecord } from '../../llm/verificationMetrics';
 import type { LocatorScenarioResult } from '../../llm/verifyLocatorScenarios';
 
 /**
@@ -70,7 +66,8 @@ const LIVE_PROVIDER_FILTER = process.env['LIVE_PROVIDER_FILTER'];
  * to this repo's existing in-tree path (unchanged behavior); set to an absolute path outside the
  * working tree to keep live-run output out of `git status` entirely — see
  * docs/browser-agent/design/production-readiness.md for example commands. */
-const METRICS_DIR = process.env['LIVE_METRICS_OUTPUT_DIR'] ?? join(__dirname, '../../../../../docs/browser-agent/verification-metrics');
+const METRICS_DIR =
+    process.env['LIVE_METRICS_OUTPUT_DIR'] ?? join(__dirname, '../../../../../docs/browser-agent/verification-metrics');
 const METRICS_MD_PATH = join(METRICS_DIR, 'latest.md');
 const METRICS_JSON_PATH = join(METRICS_DIR, 'latest.json');
 const METRICS_CSV_PATH = join(METRICS_DIR, 'latest.csv');
@@ -335,7 +332,12 @@ for (const entry of PROVIDER_REGISTRY) {
 
     for (const model of resolveModelsToRun(entry, overrideValue)) {
         if (providerSelected) {
-            PLANNED_PAIRS.push({ provider: entry.displayName, providerId: entry.providerId, model, keyPresent: !!apiKey });
+            PLANNED_PAIRS.push({
+                provider: entry.displayName,
+                providerId: entry.providerId,
+                model,
+                keyPresent: !!apiKey,
+            });
         }
         const willRun = LIVE_RUN_OPTED_IN && !!apiKey && providerSelected;
 
@@ -369,7 +371,11 @@ for (const entry of PROVIDER_REGISTRY) {
         console.log('  no (provider, model) pairs match the current filter');
     } else {
         for (const pair of PLANNED_PAIRS) {
-            const status = !LIVE_RUN_OPTED_IN ? 'skipped: opt-in not set' : pair.keyPresent ? 'WILL RUN' : `skipped: ${pair.providerId} key not set`;
+            const status = !LIVE_RUN_OPTED_IN
+                ? 'skipped: opt-in not set'
+                : pair.keyPresent
+                  ? 'WILL RUN'
+                  : `skipped: ${pair.providerId} key not set`;
             console.log(`  - ${pair.provider} (${pair.providerId}) / ${pair.model} — ${status}`);
         }
     }
@@ -452,7 +458,12 @@ afterAll(() => {
         runLiveProviderTestsOptedIn: LIVE_RUN_OPTED_IN,
         liveProviderFilter: LIVE_PROVIDER_FILTER ?? null,
         scenarioCount: LOCATOR_SCENARIOS.length,
-        attemptedThisSession: ALL_METRIC_RECORDS.map(r => ({ provider: r.provider, model: r.model, scenarioId: r.scenarioId, outcome: r.outcome })),
+        attemptedThisSession: ALL_METRIC_RECORDS.map(r => ({
+            provider: r.provider,
+            model: r.model,
+            scenarioId: r.scenarioId,
+            outcome: r.outcome,
+        })),
         sourceSessions: sessions,
     };
 
@@ -475,7 +486,9 @@ afterAll(() => {
     console.log(
         `\n[verificationMetrics] wrote ${METRICS_MD_PATH}, ${METRICS_JSON_PATH}, ${METRICS_CSV_PATH}, ` +
             `${METRICS_JSONL_PATH}, ${RUN_MANIFEST_PATH}` +
-            (chart.points.length > 0 ? `, ${CHART_MMD_PATH}, and ${CHART_SVG_PATH}` : ' (no chart data to write this run)')
+            (chart.points.length > 0
+                ? `, ${CHART_MMD_PATH}, and ${CHART_SVG_PATH}`
+                : ' (no chart data to write this run)')
     );
     console.table(aggregates);
 });
