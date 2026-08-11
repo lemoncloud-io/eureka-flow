@@ -210,54 +210,76 @@ Sub-agents run concurrently on the shared canvas (`Promise.all` in `orchestrator
 
 Identical core, decorators, projectors, **and sink** — every entry point builds the same `createAgentTrace(enabled)` (a `redactingSink` over a `memorySink`). Only two things differ per runtime: the enable-flag source and how the projections are read back. (`jsonlSink`/`fanoutSink` exist as building blocks but are not part of the default `createAgentTrace` wiring.)
 
-| Layer                                   | Terminal (node)                     | Web (browser)                                   |
-| --------------------------------------- | ----------------------------------- | ----------------------------------------------- |
-| Tracer · decorators · projectors · sink | shared (`createAgentTrace`)         | shared (`createAgentTrace`)                     |
-| Enable flag                             | `AGENT_TRACE`                       | DEV, or `?trace=1` / `localStorage.agentTrace`  |
-| Read-back                               | projections rendered to the run log | `window.__flowAgentProjections()` (dev tooling) |
+| Layer                                   | Node (harness · terminal)                                            | Web (browser)                                   |
+| --------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------- |
+| Tracer · decorators · projectors · sink | shared (`createAgentTrace`)                                          | shared (`createAgentTrace`)                     |
+| Enable flag                             | `AGENT_TRACE` (harness) · `--trace`/`AGENT_TRACE` (terminal)         | DEV, or `?trace=1` / `localStorage.agentTrace`  |
+| Read-back                               | rendered to a file (`*.transcript.log` / `agent-terminal.trace.log`) | `window.__flowAgentProjections()` (dev tooling) |
 
 ## Using it — turn tracing on, read the projections
 
-Tracing is **one switch**: `createAgentTrace(enabled)` (`trace/agentTrace.ts`) turns a host's "should we trace?" flag into a ready-to-inject `Tracer` whose captured records read back as the three projections. `enabled === false` returns `NoopTracer` and empty projections — the production default, zero cost. Only the **flag source** is per-runtime; the capture and projection are identical everywhere.
+**Mental model — this is the part to get.** As the agent runs, its tracer fills an **in-memory buffer** (a redacted record stream). **Projecting** is a _pure read_ of that buffer into the three views — you do it _after_ (or during) a run, over whatever has accumulated so far. There is no separate "projector command" you run against a live run. Instead:
 
-### Node (scenario harness / terminal)
+- **Node (harness):** you run **one** command; when `AGENT_TRACE=1`, the harness projects the buffer for you at the end and **writes the result into a log file**. You just open the file.
+- **Web (browser):** nothing is written to disk — you call a **console function** whenever you want a snapshot of the buffer.
 
-The flag is the `AGENT_TRACE` env var. In the live eval harness (`__tests__/harness/scenarios/integration.live.spec.ts`) setting it captures the run and **appends the three projections to the saved transcript**.
+Tracing is **one switch**: `createAgentTrace(enabled)` (`trace/agentTrace.ts`) turns a "should we trace?" flag into a ready-to-inject `Tracer` whose buffer reads back as the three projections. `enabled === false` ⇒ `NoopTracer` + empty projections (production default, zero cost). Only the **flag source** differs per runtime; capture + projection are identical.
+
+### Node (scenario harness) — projected automatically into a file
+
+One command runs the scenario, and with `AGENT_TRACE=1` appends the three projections to the saved transcript. You never invoke a projector yourself — you read the file.
+
+**1. Run a scenario, traced** (needs `GEMINI_API_KEY` in repo-root `.env.local`, auto-loaded):
 
 ```bash
-# One live scenario, traced. Needs GEMINI_API_KEY in repo-root .env.local (auto-loaded).
 AGENT_TRACE=1 RUN_LIVE=1 BENCH_OUT="$(pwd)/bench-runs" \
   npx nx test @flows/agent --skip-nx-cache -- integration.live -t "T4.build-pipeline"
+# drop -t "…" to run (and trace) every scenario
+```
 
-# All scenarios, traced (drop the -t filter):
-AGENT_TRACE=1 RUN_LIVE=1 BENCH_OUT="$(pwd)/bench-runs" \
-  npx nx test @flows/agent --skip-nx-cache -- integration.live
+**2. Open the result** — the three projections are at the **bottom**, under `trace · 1/3 … 3/3` headers:
+
+```bash
+bench-runs/latest.transcript.log
 ```
 
 | Env var                                     | Effect                                                                          |
 | ------------------------------------------- | ------------------------------------------------------------------------------- |
 | `RUN_LIVE=1`                                | **Required** to hit the real API; unset ⇒ the live suite stays offline/skipped. |
-| `AGENT_TRACE=1`                             | Capture the trace and render the three projections into the transcript.         |
+| `AGENT_TRACE=1`                             | Capture the trace and append the three projections to the transcript.           |
 | `GEMINI_API_KEY`                            | In repo-root `.env.local` (loaded on import); or inline as a command prefix.    |
 | `BENCH_OUT=<dir>`                           | Where the run is written (default `<cwd>/bench-runs`).                          |
 | `GEMINI_MODEL` · `BENCH_N` · `LIVE_VERBOSE` | model override · runs per scenario · also stream the transcript to the console. |
 
-Each run writes `latest.{json,txt,transcript.log}` (plus a timestamped triple) under `BENCH_OUT`. With `AGENT_TRACE=1` the three projections are appended to the end of every `*.transcript.log`. Run via `nx test` (not bare `npx vitest`) so the workspace resolves `@flows/*` deps.
+Each run writes `latest.{json,txt,transcript.log}` + a timestamped triple under `BENCH_OUT`. Use `nx test` (not bare `npx vitest`) so the workspace resolves `@flows/*` deps.
 
-The projectors are pure and need no key — exercise them offline:
+> `npx nx test @flows/agent -- projectors` runs the projector **unit tests** (pure functions over hand-written records — no key, no live run). It verifies the projectors; it does **not** project a real run.
+
+### Terminal (interactive) — projected to a file on `/trace` or exit
+
+`yarn agent:terminal` drives the orchestrator by hand (two-pane: live canvas JSON + chat). Add `--trace` (or set `AGENT_TRACE=1`) to capture the session.
 
 ```bash
-npx nx test @flows/agent -- projectors
+AGENT_TRACE=1 yarn agent:terminal        # or: yarn agent:terminal --trace  [--trace <file>]
+# …drive some turns, then type /trace to write the projections — or just /quit (it writes on exit)
 ```
 
-### Web (browser)
+Both `/trace` and exit write **`agent-terminal.trace.log`** (override with `--trace <file>`) — the same three `trace · N/3` views the harness produces, over everything captured so far. Same one switch (`createAgentTrace`), same renderer (`trace/renderProjections.ts`); only the flag and the output path differ.
 
-On automatically in dev builds; in any build (including a deploy) opt in at runtime with `?trace=1` in the URL or `localStorage.agentTrace = '1'` (see `useAgentTrace.ts`). When on, read the live capture from the console:
+### Web (browser) — projected on demand in the console
+
+Nothing is written to a file. The tracer fills the in-memory buffer as you use the panel; you read a snapshot whenever you want by calling a console function — during or after a turn.
+
+1. **Start the app in dev** (`nx serve web`). Tracing is auto-on in DEV; in any other build add `?trace=1` to the URL or run `localStorage.agentTrace = '1'` in the console, then reload. (Source: `useAgentTrace.ts`.)
+2. **Open a flow in the editor** so the agent panel mounts (it is DEV-gated there), then **send it a message** and let the turn finish.
+3. **Open DevTools → Console** and call:
 
 ```js
-window.__flowAgentTrace(); // the redacted record stream (level · event · ts)
-window.__flowAgentProjections(); // { transcripts, tree, diff }
+window.__flowAgentProjections(); // { transcripts, tree, diff } — a snapshot of everything captured so far
+window.__flowAgentTrace(); // the raw redacted record stream (level · event · ts)
 ```
+
+Expand the returned object in the console. Call it again after another message for an updated snapshot — the buffer **accumulates for the page's lifetime**, and a reload clears it. (Off ⇒ these functions are absent.)
 
 ### The three projections
 
@@ -268,8 +290,6 @@ One record stream, three read-time views (`trace/project/`):
 | **Transcripts** | `toTranscripts` | one chat per agent instance — every user / assistant / tool turn, verbatim (never truncated), tool calls inline.                                                               |
 | **Trace tree**  | `toTraceTree`   | the agent call tree (who spawned whom), each node tagged with its per-event-type record counts.                                                                                |
 | **Graph diff**  | `toGraphDiff`   | the canvas before → after — a **cumulative** whole-session delta plus one **per turn** — **naming which** nodes (`id (type)`) and edges (`source:port → target:port`) changed. |
-
-In the node harness these render to the end of `*.transcript.log` under three `trace · N/3` headers.
 
 ## Removing the environment — impact
 

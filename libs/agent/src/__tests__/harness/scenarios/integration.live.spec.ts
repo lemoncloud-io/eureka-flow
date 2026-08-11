@@ -44,6 +44,7 @@ import { join } from 'node:path';
 
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
+import { renderProjections } from '../../../trace';
 import { GENERATOR_MODELS, IDS, makeInitialGraph } from '../fixtures';
 import { liveProvider, resolveLiveGateway } from '../liveGateway';
 import { createMeter, meteringGateway, price } from '../metering';
@@ -53,7 +54,7 @@ import { outcomeText } from '../turnOutcome';
 import type { Graph } from '../../../canvas/canvasBinding';
 import type { ChatMessage, ChatRequest, Chunk, LlmGateway } from '../../../llm/llmGateway';
 import type { AgentGrant } from '../../../permissions';
-import type { AgentTrace, EdgeChange, GraphDiff, NodeChange, TraceNode, TraceProjections } from '../../../trace';
+import type { AgentTrace } from '../../../trace';
 import type { TurnCost } from '../metering';
 import type { TurnOutcome } from '../turnOutcome';
 
@@ -129,84 +130,8 @@ const recordingGateway = (inner: LlmGateway, label: string): LlmGateway => {
     };
 };
 
-// ── the three trace projections (rendered per run ONLY when AGENT_TRACE is set) ─────────────────────
-// Nothing here truncates: a trace is for reading the WHOLE conversation, so every message/arg prints verbatim.
-const asText = (v: unknown): string => (typeof v === 'string' ? v : JSON.stringify(v));
-/** Prefix every physical line of a (possibly multi-line) block, so a long untrimmed message stays visually inside its turn. */
-const gutter = (text: string, prefix: string): string[] => text.split('\n').map(line => `${prefix}${line}`);
-
-// 1/3 · one chat per agent instance. A continuous `┃` gutter groups each agent's block; numbered `[n] ROLE`
-// headers with a blank gutter line between them make each user/assistant/tool turn its own visible unit.
-const renderTranscripts = (p: TraceProjections, out: string[]): void => {
-    out.push('', '════════════ trace · 1/3 · TRANSCRIPTS (chat per agent instance) ════════════');
-    if (!p.transcripts.length) {
-        out.push('  (no records)');
-        return;
-    }
-    for (const t of p.transcripts) {
-        out.push('', `┏━ agent: ${t.agentType || '(root)'} · ${t.agentId}`);
-        t.chat.forEach((e, i) => {
-            out.push('┃'); // blank gutter line separates one turn from the next
-            const label = e.role === 'tool' ? `TOOL ◂ (result of ${e.toolCallId ?? '?'})` : `${e.role.toUpperCase()} ▸`;
-            out.push(`┃ [${i + 1}] ${label}`);
-            if (e.text) out.push(...gutter(e.text, '┃     '));
-            for (const c of e.toolCalls ?? []) out.push(...gutter(`→ calls ${c.name}(${asText(c.args)})`, '┃     '));
-        });
-        out.push(`┗━ end: ${t.agentType || '(root)'} · ${t.agentId}`);
-    }
-};
-
-// 2/3 · the agent call tree (who spawned whom), each node tagged with its per-event-type record counts.
-const renderTree = (p: TraceProjections, out: string[]): void => {
-    out.push('', '════════════ trace · 2/3 · TRACE TREE (who spawned whom) ════════════');
-    const walk = (n: TraceNode, d: number): void => {
-        const counts = new Map<string, number>();
-        for (const r of n.records) counts.set(r.name, (counts.get(r.name) ?? 0) + 1);
-        const summary = [...counts].map(([k, v]) => `${k}×${v}`).join(' ');
-        out.push(`  ${'  '.repeat(d)}▸ ${n.agentType || '(root)'} · ${n.agentId}  [${n.records.length}: ${summary}]`);
-        n.children.forEach(c => walk(c, d + 1));
-    };
-    if (p.tree) walk(p.tree, 0);
-    else out.push('  (no records)');
-};
-
-// One graph delta — names WHICH nodes/edges were added/removed/changed (with node type + edge endpoints),
-// not just how many.
-const renderOneDiff = (heading: string, d: GraphDiff, out: string[]): void => {
-    const nodeLine = (sign: string, n: NodeChange): string => `    ${sign} node ${n.id} (${n.type || '?'})`;
-    const edgeLine = (sign: string, e: EdgeChange): string =>
-        `    ${sign} edge ${e.id || '?'}: ${e.sourceNodeId}:${e.sourcePortId} → ${e.targetNodeId}:${e.targetPortId}`;
-    const rows = [
-        ...d.addedNodes.map(n => nodeLine('+', n)),
-        ...d.removedNodes.map(n => nodeLine('-', n)),
-        ...d.changedNodes.map(n => nodeLine('~', n)),
-        ...d.addedEdges.map(e => edgeLine('+', e)),
-        ...d.removedEdges.map(e => edgeLine('-', e)),
-    ];
-    out.push(
-        `${heading}  totals: ${d.before.nodes.length}n/${d.before.edges.length}e → ${d.after.nodes.length}n/${d.after.edges.length}e`
-    );
-    out.push(...(rows.length ? rows : ['    (no structural change)']));
-};
-
-// 3/3 · the canvas delta — the cumulative whole-session delta on top, then one delta per turn.
-const renderDiff = (p: TraceProjections, out: string[]): void => {
-    out.push('', '════════════ trace · 3/3 · GRAPH DIFF (canvas before → after) ════════════');
-    if (!p.diff.cumulative) {
-        out.push('  (no diff)');
-        return;
-    }
-    renderOneDiff('  cumulative (whole session) ·', p.diff.cumulative, out);
-    for (const turn of p.diff.perTurn) renderOneDiff(`  ${turn.runId} ·`, turn, out);
-};
-
-const renderProjections = (p: TraceProjections): string => {
-    const out: string[] = [];
-    renderTranscripts(p, out);
-    renderTree(p, out);
-    renderDiff(p, out);
-    return out.join('\n');
-};
+// The three projections render via the shared `renderProjections` (trace/renderProjections.ts) — the same
+// text the terminal prints. Appended per run below only when AGENT_TRACE is set.
 
 // ── the run adapter — the ONE shipped design (default hybrid roster), metered + recorded ────────────
 interface RunInput {
