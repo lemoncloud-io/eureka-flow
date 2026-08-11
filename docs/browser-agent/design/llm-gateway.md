@@ -44,7 +44,7 @@ definitions or tool messages.
 
 ```mermaid
 sequenceDiagram
-    participant Agent as BaseAgent / LocatorAgent
+    participant Agent as BaseAgent / BuilderAgent
     participant GW as LlmGateway (fake | gemini | generate-api)
     participant EX as ToolExecutor
     participant CV as CanvasBinding

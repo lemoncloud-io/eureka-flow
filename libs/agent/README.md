@@ -1,16 +1,18 @@
 # @flows/agent
 
 In-browser flow agents. The entry point is the **orchestrator agent**: it owns the turn,
-reads the canvas, and delegates every edit to specialists — the **locator** (moves an
-existing node from a plain-language request, e.g. "nudge the Fetch node 10px to the right",
-"put Email at x=100, y=100") and the **property** specialist (rename / config edits). The
-orchestrator carries no write tools of its own; the specialists write through the shared
-`CanvasBinding`.
+reads the canvas, and delegates every edit to specialists split by STRUCTURE vs CONTENT — the
+**builder** takes a whole structural plan (add · delete · wire · reroute · move · lay out · label),
+and a **block agent** owns one node's config, either a named specialist (the AI generator) or a
+generic one synthesized from the catalog on demand. There are no cross-block operation agents: an
+operation is a tool the right agent carries, not an agent of its own. The orchestrator carries no
+write tools; the specialists write through the shared `CanvasBinding`.
 
 Design: [`design/harness-spec.md`](../../docs/browser-agent/design/harness-spec.md) +
 [`design/harness-interfaces.md`](../../docs/browser-agent/design/harness-interfaces.md) (builds on
-[`design/architecture.md`](../../docs/browser-agent/design/architecture.md)); the `locator` specialist also
-has its own [SPEC](../../docs/browser-agent/agents/locator.md).
+[`design/architecture.md`](../../docs/browser-agent/design/architecture.md)); the specialists have their
+own specs — [`agents/builder.md`](../../docs/browser-agent/agents/builder.md) and
+[`agents/blockAgent.md`](../../docs/browser-agent/agents/blockAgent.md).
 
 ## What's here
 
@@ -22,7 +24,7 @@ has its own [SPEC](../../docs/browser-agent/agents/locator.md).
 | Tool providers                   | `src/tools/`                      | Providers classified by type + operation, applied straight through the binding (no draft): node read/move/config (`nodeTools`), block catalog (`catalogTools`), and the agent directory + `spawn` (`spawnTools`).                                      |
 | Move semantics                   | `src/canvas/moveSemantics.ts`     | Pure position math: direction→delta, relative/absolute. (A vague "nudge" resolves to a concrete step in the orchestrator, not here.)                                                                                                                   |
 | Base agent                       | `src/agents/baseAgent.ts`         | `BaseAgent` — the generic think/act turn loop shared by every agent. Subclasses supply an `AgentConfig` (persona + tools + grant) and an optional per-turn context hook.                                                                               |
-| Specialists                      | `src/agents/`                     | `LocatorAgent` (node read + move) and `PropertyAgent` (node read + config/rename) — each `extends BaseAgent`, applies edits live, ends on the model's confirmation.                                                                                    |
+| Specialists                      | `src/agents/`                     | `BuilderAgent` (structure: add/delete · wire/reroute · move · lay out · label) and the block agents for content — `SingleOutputGeneratorAgent` plus the generic `BlockAgent` the runner synthesizes per block type. `registrations.ts` is the roster.    |
 | Orchestrator                     | `src/agents/orchestratorAgent.ts` | The main agent: reads the canvas, discovers the specialist roster, and delegates every edit via `spawn`; ends the turn with a plain-text message (there is no `finish` tool — the eval re-asks for the outcome).                                       |
 | Session                          | `src/session/session.ts`          | `SessionState` the panel renders from + in-memory `SessionStore` (`createInMemorySessionStore`).                                                                                                                                                       |
 

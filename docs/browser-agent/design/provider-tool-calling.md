@@ -80,7 +80,11 @@ pure (no test-runner assertions inside it), so identical logic runs from both th
 the env-gated real-key spec.
 
 `verifyLocatorScenarios.ts` extends this into an 11-scenario matrix exercising the real
-`LocatorAgent`/`ToolExecutor`/`CanvasBinding`:
+`ToolExecutor`/`CanvasBinding`. It drives them from a fixed `AgentConfig` rather than an agent
+class: the structural-agents refactor folded node-moving into the `builder`, so the benchmark keeps
+its own byte-identical copy of the retired locator persona — narrowed to exactly
+`list_nodes`/`move_node`, because the builder's full toolset would change what scenarios like
+`no-tool-refusal` are testing:
 
 | Scenario | What it checks |
 | --- | --- |
