@@ -137,7 +137,10 @@ const toAnthropicMessage = (message: ChatMessage): AnthropicMessage => {
         if (message.content) {
             blocks.push({ type: 'text', text: message.content });
         }
-        for (const call of message.toolCalls ?? []) {
+        // The `?? []` fallback below is unreachable: the guard above already proves
+        // `message.toolCalls` is defined and non-empty (`(message.toolCalls?.length ?? 0) > 0`),
+        // so `message.toolCalls` can never be nullish by the time this loop runs.
+        for (const call of /* v8 ignore next */ message.toolCalls ?? []) {
             blocks.push({ type: 'tool_use', id: call.id, name: call.name, input: JSON.parse(call.args) });
         }
         return { role: 'assistant', content: blocks };

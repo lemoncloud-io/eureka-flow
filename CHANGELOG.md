@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-08-11] - root@0.68.1, @flows/web@0.68.1, @flows/admin@0.42.1
+
+### Other
+
+- test: (agent) close remaining LLM verification coverage gaps
+
 ## [2026-08-11] - root@0.68.0, @flows/web@0.68.0, @flows/admin@0.42.0
 
 ### Features

@@ -182,7 +182,10 @@ const toGeminiToolRequest = (req: ChatRequest, generation?: GeminiToolLlmGateway
             if (message.content) {
                 parts.push({ text: message.content });
             }
-            for (const call of message.toolCalls ?? []) {
+            // The `?? []` fallback below is unreachable: the guard above already proves
+            // `message.toolCalls` is defined and non-empty (`(message.toolCalls?.length ?? 0) > 0`),
+            // so `message.toolCalls` can never be nullish by the time this loop runs.
+            for (const call of /* v8 ignore next */ message.toolCalls ?? []) {
                 parts.push({
                     functionCall: { name: call.name, args: JSON.parse(call.args) },
                     ...(call.thoughtSignature !== undefined ? { thoughtSignature: call.thoughtSignature } : {}),

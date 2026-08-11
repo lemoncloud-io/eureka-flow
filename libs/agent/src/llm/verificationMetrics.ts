@@ -201,7 +201,8 @@ export const accumulateExtendedUsage = (calls: readonly CapturedCallInfo[]): Cap
         if (c.toolUseInputTokens !== undefined) {
             toolUseInputTokens = (toolUseInputTokens ?? 0) + c.toolUseInputTokens;
         }
-        if (c.providerTotalTokens !== undefined) providerTotalTokens = (providerTotalTokens ?? 0) + c.providerTotalTokens;
+        if (c.providerTotalTokens !== undefined)
+            {providerTotalTokens = (providerTotalTokens ?? 0) + c.providerTotalTokens;}
 
         const cost = effectiveCost(c);
         if (cost !== undefined) {
@@ -213,8 +214,17 @@ export const accumulateExtendedUsage = (calls: readonly CapturedCallInfo[]): Cap
         if (c.cacheWriteTtl !== undefined) cacheWriteTtlsSeen.add(c.cacheWriteTtl);
     }
 
+    // The final `: undefined` below is unreachable: every update to totalCost (in the loop above)
+    // unconditionally sets sawEstimated or sawProviderReported, so once totalCost !== undefined,
+    // it is impossible for both flags to still be false.
     const costSource: 'provider-reported' | 'estimated' | undefined =
-        totalCost === undefined ? undefined : sawEstimated ? 'estimated' : sawProviderReported ? 'provider-reported' : undefined;
+        totalCost === undefined
+            ? undefined
+            : sawEstimated
+              ? 'estimated'
+              : sawProviderReported
+                ? 'provider-reported'
+                : /* v8 ignore next */ undefined;
     // A single pricingVersion/cacheWriteTtl is only meaningful when every contributing call
     // agrees — mixing within one accumulated record has no single honest value to report, so it's
     // left absent rather than picking one arbitrarily (same reasoning as costSource's own mixing
@@ -401,7 +411,10 @@ const groupKey = (provider: string, model: string): string => `${provider}::${mo
 
 /** Sums an optional numeric field across a group, tracking whether any record was missing it —
  * the shared shape behind every `total*` field below (tokens and cost alike). */
-const sumOptional = <T>(group: readonly T[], pick: (r: T) => number | undefined): { total: number | null; incomplete: boolean } => {
+const sumOptional = <T>(
+    group: readonly T[],
+    pick: (r: T) => number | undefined
+): { total: number | null; incomplete: boolean } => {
     let total: number | null = null;
     let incomplete = false;
     for (const r of group) {
@@ -575,9 +588,9 @@ export const formatMetricsMarkdownTable = (aggregates: readonly ProviderModelAgg
     const mixedModelRows = aggregates.filter(a => a.distinctActualModels.length > 1);
     const modelFootnote =
         mixedModelRows.length > 0
-            ? '\n\n`†` = this row\'s requested model/route resolved to more than one actual model across ' +
+            ? "\n\n`†` = this row's requested model/route resolved to more than one actual model across " +
               'the scenarios summed here — totals still add up correctly, but no longer describe one ' +
-              'consistent model\'s pricing: ' +
+              "consistent model's pricing: " +
               mixedModelRows.map(a => `${a.provider} ${a.model} (${a.distinctActualModels.join(', ')})`).join('; ') +
               '.'
             : '';
@@ -585,10 +598,12 @@ export const formatMetricsMarkdownTable = (aggregates: readonly ProviderModelAgg
     const mixedVersionRows = aggregates.filter(a => a.distinctPricingVersions.length > 1);
     const versionFootnote =
         mixedVersionRows.length > 0
-            ? '\n\n`‡` = this row\'s cost sums estimates computed under more than one pricing snapshot ' +
+            ? "\n\n`‡` = this row's cost sums estimates computed under more than one pricing snapshot " +
               '(see PRICING_CONFIG_VERSION in pricing.ts) — mathematically correct, but not all computed ' +
               'under the same rates: ' +
-              mixedVersionRows.map(a => `${a.provider} ${a.model} (${a.distinctPricingVersions.join(', ')})`).join('; ') +
+              mixedVersionRows
+                  .map(a => `${a.provider} ${a.model} (${a.distinctPricingVersions.join(', ')})`)
+                  .join('; ') +
               '.'
             : '';
 
@@ -630,8 +645,8 @@ export const formatTokenDiagnosticsTable = (aggregates: readonly ProviderModelAg
 
     const needsUnknownFootnote = aggregates.some(a => a.distinctCacheWriteTtls.includes('unknown'));
     const unknownFootnote = needsUnknownFootnote
-        ? "\n\n`unknown` Cache-write TTL = cache-write tokens were reported with no determinable " +
-          'rate tier (the gateway never requested a specific TTL for that call) — that scenario\'s ' +
+        ? '\n\n`unknown` Cache-write TTL = cache-write tokens were reported with no determinable ' +
+          "rate tier (the gateway never requested a specific TTL for that call) — that scenario's " +
           'cost could not be estimated and is excluded from Total cost above, not silently priced ' +
           'at either rate.'
         : '';
@@ -658,8 +673,10 @@ export const formatCostRanking = (aggregates: readonly ProviderModelAggregate[])
 
     const lines = ranked.map((a, i) => {
         const suffix = a.costIncomplete ? '*' : '';
-        return `${i + 1}. **${a.provider} ${a.model}** — ${formatUsd(a.totalCost)}${suffix} total, ` +
-            `${formatUsd(a.avgCostPerScenario as number)}${suffix}/scenario`;
+        return (
+            `${i + 1}. **${a.provider} ${a.model}** — ${formatUsd(a.totalCost)}${suffix} total, ` +
+            `${formatUsd(a.avgCostPerScenario as number)}${suffix}/scenario`
+        );
     });
 
     const unrankedNote =
@@ -1098,7 +1115,8 @@ export const buildElapsedVsTokensChart = (records: readonly VerificationRunRecor
 
 const csvEscape = (value: string): string => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
 
-const numberOrEmpty = (value: number | null | undefined): string => (value === null || value === undefined ? '' : String(value));
+const numberOrEmpty = (value: number | null | undefined): string =>
+    value === null || value === undefined ? '' : String(value);
 
 /**
  * One row per scenario attempt — the exact-value companion to {@link formatMetricsMarkdownTable},
