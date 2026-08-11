@@ -963,6 +963,26 @@ const findAnyScenario = (
     return scenario;
 };
 
+/**
+ * Test-only escape hatch: exposes a scenario's private `check()` directly. `verifyLocatorScenarios.spec.ts`
+ * uses this for a small set of defensive branches (missing `dispatchResult`, canvas mutation with no
+ * dispatch) that `runLocatorScenario` and `runMultiTurnLocatorScenario` can never produce themselves —
+ * both runners guarantee a `dispatchResult` whenever `dispatchAllToolCalls` dispatches anything, and no
+ * mutation happens without a dispatch. Those guards are still real scenario-contract validation, so
+ * they're exercised directly rather than deleted or left permanently uncovered. Never used by production
+ * code or by any other test — those all go through the real runners.
+ */
+export const __getScenarioCheckForTesting = (
+    scenarioId: LocatorScenarioId | MultiTurnOnlyScenarioId
+): ((outcome: {
+    toolCall: { id: string; name: string; args: unknown } | null;
+    dispatchResult?: ToolResult;
+    toolCalls: readonly DispatchedToolCall[];
+    positionsBefore: Record<string, XY>;
+    positionsAfter: Record<string, XY>;
+    textPresent: boolean;
+}) => { pass: boolean; path?: 'refusal' | 'executor-error'; error?: string }) => findAnyScenario(scenarioId).check;
+
 /** How a multi-turn run ended. Decided ONLY from `scenario.check()`'s pass/fail result (or a
  * turn-count/provider exhaustion) — never from `knownVariance`, which this runner does not consult. */
 export type MultiTurnTaskOutcome = 'success' | 'failure' | 'provider-error' | 'max-turns';
@@ -1036,6 +1056,15 @@ const DEFAULT_MAX_TURNS = 3;
  */
 const toolResultToMessageContent = (result: ToolResult): string =>
     result.ok ? JSON.stringify(result.data ?? { ok: true }) : JSON.stringify({ error: result.error });
+
+/**
+ * Test-only escape hatch: exposes {@link toolResultToMessageContent} directly. Its `result.data ?? { ok:
+ * true }` fallback only matters for a tool whose SUCCESS handler omits `data` — neither tool this file's
+ * scenarios ever dispatch (`move_node`, `list_nodes`) does that, both always populate `data` on success —
+ * so no scripted scenario response can reach that fallback through the real runner. Tested directly for
+ * the same reason as {@link __getScenarioCheckForTesting} above.
+ */
+export const __toolResultToMessageContentForTesting = toolResultToMessageContent;
 
 /** Only a successful, non-mutating `list_nodes` lookup earns another turn — see the module doc above. */
 const isContinuableLookup = (toolCall: ToolCall, dispatchResult: ToolResult): boolean =>

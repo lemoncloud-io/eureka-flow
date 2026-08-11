@@ -1,9 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
-import { LOCATOR_SCENARIOS, runAllLocatorScenarios, runLocatorScenario } from '../../llm/verifyLocatorScenarios';
+import { createInMemoryCanvasBinding } from '../../canvas/inMemoryCanvasBinding';
+import { createCatalogLookup } from '../../catalog';
+import {
+    LOCATOR_SCENARIOS,
+    __getScenarioCheckForTesting,
+    __toolResultToMessageContentForTesting,
+    collectToolCallChunks,
+    dispatchAllToolCalls,
+    runAllLocatorScenarios,
+    runLocatorScenario,
+    runMultiTurnLocatorScenario,
+} from '../../llm/verifyLocatorScenarios';
+import { LIST_NODES, MOVE_NODE } from '../../tools/nodeTools';
+import { createToolExecutor } from '../../tools/toolExecutor';
+import { toolset } from '../../tools/toolset';
 
+import type { AgentConfig } from '../../agent';
 import type { ChatRequest, Chunk, LlmGateway } from '../../llm/llmGateway';
 import type { LocatorScenarioResult } from '../../llm/verifyLocatorScenarios';
+import type { AgentGrant } from '../../permissions';
+import type { ToolResult } from '../../tools/types';
 
 /** A minimal fake gateway that ignores the request and streams a scripted response. */
 const fakeGateway = (chunks: Chunk[]): LlmGateway => ({
@@ -587,5 +604,216 @@ describe('runAllLocatorScenarios', () => {
         const gateway = fakeGateway([{ text: 'ok' }, { done: true }]);
         const results = await runAllLocatorScenarios(gateway);
         expect(results.map(r => r.scenarioId)).toEqual(LOCATOR_SCENARIOS.map(s => s.id));
+    });
+});
+
+describe('collectToolCallChunks: merging argsDelta fragments that share an id', () => {
+    it('merges a second chunk for the same id into the first, concatenating argsDelta', () => {
+        // No existing test ever sends two Chunks for the SAME tool-call id — every other test's
+        // batched-call cases use distinct ids. Real providers can stream one call's arguments
+        // across multiple chunks, so the accumulator's merge path (as opposed to its far more
+        // common "first chunk for this id" path) needs its own direct coverage.
+        const chunks: Chunk[] = [
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1",' } },
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '"by":{"dx":10,"dy":0}}' } },
+        ];
+        const collected = collectToolCallChunks(chunks);
+        expect(collected).toEqual([
+            { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"text-1","by":{"dx":10,"dy":0}}' },
+        ]);
+    });
+
+    it("keeps the first chunk's thoughtSignature when a later fragment for the same id omits it", () => {
+        const chunks: Chunk[] = [
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"a":1', thoughtSignature: 'sig-1' } },
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '}' } },
+        ];
+        const collected = collectToolCallChunks(chunks);
+        expect(collected).toEqual([{ id: 'c1', name: 'move_node', argsDelta: '{"a":1}', thoughtSignature: 'sig-1' }]);
+    });
+});
+
+describe('dispatchAllToolCalls: thoughtSignature survives an invalid-JSON call', () => {
+    it('preserves thoughtSignature on the synthetic dispatchResult when argsDelta fails to parse', async () => {
+        // Every existing invalid-JSON test (in this file and multiTurnLocatorScenarios.spec.ts)
+        // scripts a call with no thoughtSignature. Gemini's "thinking" models attach one to every
+        // call, including a malformed one, and it must still ride along on the dispatched record —
+        // a later multi-turn replay needs it verbatim even for a call that never reached the
+        // executor (see the comment on `DispatchedToolCall.argsDelta`).
+        const binding = createInMemoryCanvasBinding({ nodes: [], edges: [] });
+        const executor = createToolExecutor();
+        const config: AgentConfig = {
+            id: 'test-config',
+            description: 'test',
+            systemPrompt: 'test',
+            grant: { canModifyCanvas: true },
+            tools: [toolset({ binding, catalog: createCatalogLookup([]) }, [LIST_NODES, MOVE_NODE])],
+        };
+        const userPermissions: AgentGrant = { canModifyCanvas: true };
+        const chunks: Chunk[] = [
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: 'not valid json', thoughtSignature: 'sig-1' } },
+        ];
+
+        const dispatched = await dispatchAllToolCalls(chunks, executor, config, userPermissions);
+
+        expect(dispatched).toEqual([
+            {
+                id: 'c1',
+                name: 'move_node',
+                args: undefined,
+                argsDelta: 'not valid json',
+                argsValid: false,
+                dispatchResult: { toolCallId: 'c1', ok: false, error: 'tool call arguments were not valid JSON' },
+                thoughtSignature: 'sig-1',
+            },
+        ]);
+    });
+});
+
+describe('runLocatorScenario: selective-multi-node — note distractor via a real batched turn', () => {
+    it('fails when a second move_node call moves the note node, using the real dispatch path (no bypass)', async () => {
+        // The existing "fails when a second move_node call also mutates an untargeted node" test
+        // (above) covers the TEXT-INPUT distractor via the same batched-call mechanism. The NOTE
+        // distractor is only reached once the text-input check has already passed, so it needs its
+        // own batched-call script rather than reusing that one.
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"http-1","by":{"dx":0,"dy":50}}' } },
+            { toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"note-1","by":{"dx":5,"dy":5}}' } },
+            { done: true },
+        ]);
+        const result = await runLocatorScenario(gateway, 'selective-multi-node');
+        expect(result.pass).toBe(false);
+        expect(result.error).toBe('the untargeted note node was also moved');
+        expect(result.positionsAfter['http-1']).toEqual({ x: 300, y: 150 });
+        expect(result.positionsAfter['text-1']).toEqual(result.positionsBefore['text-1']);
+        expect(result.positionsAfter['note-1']).not.toEqual(result.positionsBefore['note-1']);
+    });
+});
+
+describe('runMultiTurnLocatorScenario: move-named-node-without-id — distractor via a real batched turn', () => {
+    it('fails when a second move_node call in the same turn moves a distractor, using the real dispatch path', async () => {
+        // Mirrors the selective-multi-node batched-call regression test above, for the multi-turn
+        // runner: the model correctly moves the named target AND, in the SAME turn, also moves a
+        // distractor — dispatchAllToolCalls dispatches both, so this is a real, reachable failure
+        // through the actual runner, not a synthetic outcome.
+        const gateway = fakeGateway([
+            { toolCall: { id: 'c1', name: 'move_node', argsDelta: '{"nodeId":"node-a17","by":{"dx":100,"dy":0}}' } },
+            { toolCall: { id: 'c2', name: 'move_node', argsDelta: '{"nodeId":"node-b42","by":{"dx":1,"dy":1}}' } },
+            { done: true },
+        ]);
+        const result = await runMultiTurnLocatorScenario(gateway, 'move-named-node-without-id');
+        expect(result.taskOutcome).toBe('failure');
+        expect(result.error).toBe('distractor node node-b42 was also moved');
+        expect(result.positionsAfter['node-a17']).toEqual({ x: 300, y: 300 });
+        expect(result.positionsAfter['node-b42']).not.toEqual(result.positionsBefore['node-b42']);
+        expect(result.positionsAfter['node-c88']).toEqual(result.positionsBefore['node-c88']);
+    });
+});
+
+/**
+ * Defensive `check()` branches that `runLocatorScenario`/`runMultiTurnLocatorScenario` cannot produce
+ * through any scripted gateway response — see `__getScenarioCheckForTesting`'s doc comment in
+ * verifyLocatorScenarios.ts for the exact invariant each group defends against. These call `check()`
+ * directly with a hand-built outcome rather than driving a real scenario run; every other test in this
+ * file goes through the real runners.
+ */
+describe('scenario.check(): defensive branches the real runners can never produce', () => {
+    describe('dispatchResult missing (a tool call happened, but no dispatch result was recorded)', () => {
+        // This state cannot be produced by the normal scenario runner because a toolCall always
+        // causes dispatch (dispatchAllToolCalls dispatches every collected call unconditionally,
+        // and dispatchResult = primary?.dispatchResult is only ever undefined when there was no
+        // primary call at all — in which case toolCall is also null) — but the defensive check is
+        // tested directly to ensure the scenario contract remains robust if that invariant ever
+        // changes.
+        it.each([
+            ['list-nodes-read-only', 'list_nodes', 'list_nodes dispatch failed'],
+            ['move-node-right', 'move_node', 'no dispatch result'], // shared factory body — covers move-node-{left,up,down} too
+            ['move-node-absolute', 'move_node', 'no dispatch result'],
+            ['selective-multi-node', 'move_node', 'no dispatch result'],
+            ['unknown-target', 'move_node', 'no dispatch result'],
+            ['move-named-node-without-id', 'move_node', 'no dispatch result'],
+        ] as const)('%s: fails with %j when dispatchResult is undefined', (scenarioId, toolName, expectedError) => {
+            const check = __getScenarioCheckForTesting(scenarioId);
+            const result = check({
+                toolCall: { id: 'c1', name: toolName, args: {} },
+                dispatchResult: undefined,
+                toolCalls: [],
+                positionsBefore: {},
+                positionsAfter: {},
+                textPresent: false,
+            });
+            expect(result.pass).toBe(false);
+            expect(result.error).toBe(expectedError);
+        });
+    });
+
+    describe('canvas mutated when the scenario contract says it must not be', () => {
+        // Normal runners cannot create a canvas mutation without a dispatch: no tool call means no
+        // dispatch at all (ambiguous-instruction/no-tool-refusal/no-op-instruction all require
+        // toolCall === null to reach this check), and a successful list_nodes dispatch never
+        // mutates the binding (list-nodes-read-only). This directly validates the defensive
+        // scenario checker for a mutation that, by construction, should never happen.
+        it.each([
+            [
+                'ambiguous-instruction',
+                { toolCall: null, textPresent: true },
+                'canvas was mutated despite the target being ambiguous',
+            ],
+            [
+                'no-tool-refusal',
+                { toolCall: null, textPresent: true },
+                'canvas was mutated despite no tool call being recorded',
+            ],
+            [
+                'no-op-instruction',
+                { toolCall: null, textPresent: true },
+                'canvas was mutated despite an explicit no-op instruction',
+            ],
+        ] as const)(
+            '%s: fails with %j when positions differ despite no dispatch',
+            (scenarioId, base, expectedError) => {
+                const check = __getScenarioCheckForTesting(scenarioId);
+                const result = check({
+                    ...base,
+                    toolCalls: [],
+                    positionsBefore: { n1: { x: 0, y: 0 } },
+                    positionsAfter: { n1: { x: 1, y: 0 } },
+                });
+                expect(result.pass).toBe(false);
+                expect(result.error).toBe(expectedError);
+            }
+        );
+
+        it('list-nodes-read-only: fails when positions differ despite a successful (read-only) list_nodes dispatch', () => {
+            // Different shape from the group above: this scenario's mutation guard sits AFTER a
+            // successful dispatch, not after "no tool call" — list_nodes itself never mutates the
+            // binding, so this state is unreachable through the real ToolExecutor.
+            const check = __getScenarioCheckForTesting('list-nodes-read-only');
+            const result = check({
+                toolCall: { id: 'c1', name: 'list_nodes', args: {} },
+                dispatchResult: { toolCallId: 'c1', ok: true, data: { nodes: [] } },
+                toolCalls: [],
+                positionsBefore: { n1: { x: 0, y: 0 } },
+                positionsAfter: { n1: { x: 1, y: 0 } },
+                textPresent: false,
+            });
+            expect(result.pass).toBe(false);
+            expect(result.error).toBe('canvas was mutated by a read-only scenario');
+        });
+    });
+});
+
+describe('toolResultToMessageContent: the data-omitted-on-success fallback', () => {
+    it('falls back to { ok: true } when a successful ToolResult omits data', () => {
+        // Both tools this file's scenarios ever dispatch (move_node, list_nodes) always populate
+        // `data` on success, so no scripted scenario response reaches this fallback through the
+        // real runner — see __toolResultToMessageContentForTesting's doc comment.
+        const okNoData: ToolResult = { toolCallId: 'c1', ok: true, data: undefined };
+        expect(__toolResultToMessageContentForTesting(okNoData)).toBe(JSON.stringify({ ok: true }));
+    });
+
+    it('still serializes real success data unchanged (data present is the common, already-covered case)', () => {
+        const okWithData: ToolResult = { toolCallId: 'c1', ok: true, data: { nodeId: 'n1' } };
+        expect(__toolResultToMessageContentForTesting(okWithData)).toBe(JSON.stringify({ nodeId: 'n1' }));
     });
 });
