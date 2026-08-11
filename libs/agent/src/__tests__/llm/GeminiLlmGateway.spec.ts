@@ -83,6 +83,85 @@ describe('createGeminiLlmGateway', () => {
         expect(chunks).toEqual([{ text: 'the answer' }, { done: true, usage: { inputTokens: 12, outputTokens: 34 } }]);
     });
 
+    // Regression coverage: the producer must emit the canonical UsageInfo field names
+    // (`providerTotalTokens`/`cachedInputTokens`), not the non-existent `totalTokens`/`cachedTokens`
+    // it emitted before the fix — every real consumer (wireLog.ts, verificationMetrics.ts,
+    // metering.ts) reads the canonical names and would otherwise silently receive `undefined`.
+    describe('usage field mapping', () => {
+        it('providerTotalTokens survives under its canonical name, not "totalTokens"', async () => {
+            const http = new ScriptedHttpClient([
+                {
+                    json: {
+                        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+                        usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 34, totalTokenCount: 46 },
+                    },
+                },
+            ]);
+
+            const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+            const done = chunks.find(c => c.done);
+            expect(done?.usage).toEqual({ inputTokens: 12, outputTokens: 34, providerTotalTokens: 46 });
+            expect(done?.usage).not.toHaveProperty('totalTokens');
+        });
+
+        it('cachedInputTokens survives under its canonical name, and inputTokens excludes it (never double-counted)', async () => {
+            const http = new ScriptedHttpClient([
+                {
+                    json: {
+                        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+                        usageMetadata: {
+                            promptTokenCount: 1000, // already includes the 300 cached below
+                            candidatesTokenCount: 50,
+                            cachedContentTokenCount: 300,
+                        },
+                    },
+                },
+            ]);
+
+            const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+            const done = chunks.find(c => c.done);
+            expect(done?.usage).toEqual({ inputTokens: 700, outputTokens: 50, cachedInputTokens: 300 });
+            expect(done?.usage).not.toHaveProperty('cachedTokens');
+        });
+
+        it('thinking/reasoning token cost baked into totalTokenCount is not accidentally lost', async () => {
+            // Gemini's totalTokenCount is prompt + candidates + toolUsePrompt + thoughts, four
+            // additive terms — here it is deliberately larger than promptTokenCount +
+            // candidatesTokenCount alone, simulating hidden thinking-token cost. metering.ts derives
+            // "visible output + thinking" as `providerTotalTokens - inputTokens`, so a producer that
+            // silently dropped or recomputed the total (rather than passing it through as reported)
+            // would erase that hidden cost from every downstream cost/metering consumer.
+            const http = new ScriptedHttpClient([
+                {
+                    json: {
+                        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+                        usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 34, totalTokenCount: 90 },
+                    },
+                },
+            ]);
+
+            const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+            const done = chunks.find(c => c.done);
+            expect(done?.usage?.providerTotalTokens).toBe(90);
+            expect(done?.usage?.providerTotalTokens).toBeGreaterThan(
+                (done?.usage?.inputTokens ?? 0) + (done?.usage?.outputTokens ?? 0)
+            );
+        });
+
+        it('omits providerTotalTokens/cachedInputTokens entirely when the provider does not report them, never fabricating 0', async () => {
+            const http = new ScriptedHttpClient([{ json: geminiReply('the answer') }]);
+
+            const chunks = await drain(createGateway(http).chat(userSays('q')));
+
+            const done = chunks.find(c => c.done);
+            expect(done?.usage).not.toHaveProperty('providerTotalTokens');
+            expect(done?.usage).not.toHaveProperty('cachedInputTokens');
+        });
+    });
+
     it('honors model and baseUrl overrides (the proxy path)', async () => {
         const http = new ScriptedHttpClient([{ json: geminiReply('ok') }]);
         const gateway = createGeminiLlmGateway({

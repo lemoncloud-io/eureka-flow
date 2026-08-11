@@ -69,6 +69,11 @@ const gateway = resolveLiveGateway({
 });
 // Opt-in gate: a key in .env.local is not enough (else `nx test` would run these) — RUN_LIVE must be set too.
 const SKIP_LIVE = !gateway || !process.env.RUN_LIVE;
+/** The live gateway, narrowed — SKIP_LIVE already skips every case when it is undefined. */
+const liveGateway = (): LlmGateway => {
+    if (!gateway) throw new Error('live gateway unavailable — SKIP_LIVE should have skipped this spec');
+    return gateway;
+};
 const N = Math.max(1, Number(process.env.BENCH_N ?? '1')); // runs per scenario; smoke default 1
 const VERBOSE = !!process.env.LIVE_VERBOSE; // ALSO echo the transcript to the console (it is ALWAYS saved to file)
 const TRACE = !!process.env.AGENT_TRACE; // ALSO capture the structured trace and render the 3 projections per run
@@ -159,7 +164,7 @@ const runOnce = async ({ objective, initialGraph, userPermissions }: RunInput): 
         userPermissions,
         // No roster → createOrchestratorAgent's default (shipped hybrid). Compose metering INSIDE the transcript
         // recorder — both are pure pass-through observers over the one gateway seam.
-        makeGateway: (agentType: string) => recordingGateway(meteringGateway(gateway!, meter), agentType),
+        makeGateway: (agentType: string) => recordingGateway(meteringGateway(liveGateway(), meter), agentType),
     });
     const elapsedMs = performance.now() - started;
     const totals = meter.totals();

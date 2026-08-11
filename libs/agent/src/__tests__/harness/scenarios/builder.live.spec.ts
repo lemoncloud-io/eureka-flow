@@ -16,10 +16,11 @@ import { describe, expect, it } from 'vitest';
 import { createBuilderAgent } from '../../../agents/builderAgent';
 import { createInMemoryCanvasBinding } from '../../../canvas/inMemoryCanvasBinding';
 import { createInMemorySessionStore } from '../../../session/session';
-import { createFixtureCatalog } from '../fixtures';
+import { createFixtureCatalog, nodeOfType } from '../fixtures';
 import { resolveLiveGateway } from '../liveGateway';
 
 import type { Graph } from '../../../canvas/canvasBinding';
+import type { LlmGateway } from '../../../llm/llmGateway';
 
 const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
 // One seam resolves the gateway: the Gemini Developer API when GEMINI_API_KEY is set, else undefined (skip).
@@ -29,13 +30,18 @@ const gateway = resolveLiveGateway({
 });
 // Opt-in gate: live specs hit the real API, so they run only when RUN_LIVE is set (else `nx test` would run them).
 const SKIP_LIVE = !gateway || !process.env.RUN_LIVE;
+/** The live gateway, narrowed — SKIP_LIVE already skips every case when it is undefined. */
+const liveGateway = (): LlmGateway => {
+    if (!gateway) throw new Error('live gateway unavailable — SKIP_LIVE should have skipped this spec');
+    return gateway;
+};
 const TIMEOUT_MS = 180_000;
 
 /** Run the builder DIRECTLY (no orchestrator) with a concrete plan over a starting graph; return the post-turn graph. */
 const runBuilder = async (plan: string, initial: Graph): Promise<Graph> => {
     const binding = createInMemoryCanvasBinding(structuredClone(initial));
     const agent = createBuilderAgent({
-        gateway: gateway!,
+        gateway: liveGateway(),
         binding,
         catalog: createFixtureCatalog(),
         storage: createInMemorySessionStore(),
@@ -59,16 +65,14 @@ describe.skipIf(SKIP_LIVE)('Builder — LIVE against a real Gemini key', () => {
                     'and the generator feeds the preview.',
                 EMPTY
             );
-            const typeOf = (t: string) => after.nodes.find(n => n.type === t);
-            const txt = typeOf('input-text');
-            const gen = typeOf('single-output-generator');
-            const prev = typeOf('output-preview');
-            expect(txt).toBeDefined();
-            expect(gen).toBeDefined();
-            expect(prev).toBeDefined();
+            // nodeOfType throws (naming the types actually present) when a stage is missing, so the three
+            // lookups below carry the presence assertions the explicit toBeDefined calls used to make.
+            const txt = nodeOfType(after, 'input-text');
+            const gen = nodeOfType(after, 'single-output-generator');
+            const prev = nodeOfType(after, 'output-preview');
             // wired in dependency order (relational shape — never assert minted ids or exact positions)
-            expect(after.edges.some(e => e.sourceNodeId === txt!.id && e.targetNodeId === gen!.id)).toBe(true);
-            expect(after.edges.some(e => e.sourceNodeId === gen!.id && e.targetNodeId === prev!.id)).toBe(true);
+            expect(after.edges.some(e => e.sourceNodeId === txt.id && e.targetNodeId === gen.id)).toBe(true);
+            expect(after.edges.some(e => e.sourceNodeId === gen.id && e.targetNodeId === prev.id)).toBe(true);
         },
         TIMEOUT_MS
     );

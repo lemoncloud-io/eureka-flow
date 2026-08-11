@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { GENERATOR_MODELS } from '../fixtures';
-import { IDS, makeInitialGraph, nodeById } from '../fixtures';
+import { IDS, makeInitialGraph, nodeById, nodeOfType } from '../fixtures';
 import { runScenario } from '../runScenario';
 
 import type { FakeScript, TurnResult } from '../runScenario';
@@ -305,14 +305,14 @@ describe('Harness scenarios — outcome coverage', () => {
         expect(result.outcome.status).toBe('applied');
         expect(result.committed).toBe(true);
         const g = result.graph;
-        const typeOf = (t: string) => g.nodes.find(n => n.type === t);
-        const txt = typeOf('input-text');
-        const gen = typeOf('single-output-generator');
-        const prev = typeOf('output-preview');
-        expect(txt && gen && prev).toBeTruthy();
-        expect(gen?.config?.model).toBe('gemini-2.5-pro');
-        expect(g.edges.some(e => e.sourceNodeId === txt!.id && e.targetNodeId === gen!.id)).toBe(true);
-        expect(g.edges.some(e => e.sourceNodeId === gen!.id && e.targetNodeId === prev!.id)).toBe(true);
+        // nodeOfType throws (naming the types actually present) when a stage is missing, so it both
+        // asserts presence and narrows the type — no separate toBeTruthy line, no non-null assertions.
+        const txt = nodeOfType(g, 'input-text');
+        const gen = nodeOfType(g, 'single-output-generator');
+        const prev = nodeOfType(g, 'output-preview');
+        expect(gen.config?.model).toBe('gemini-2.5-pro');
+        expect(g.edges.some(e => e.sourceNodeId === txt.id && e.targetNodeId === gen.id)).toBe(true);
+        expect(g.edges.some(e => e.sourceNodeId === gen.id && e.targetNodeId === prev.id)).toBe(true);
     });
 
     // ── refused — needs a decision from the user (ambiguity / invalid input) ────────────────────────

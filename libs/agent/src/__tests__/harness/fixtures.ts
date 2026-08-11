@@ -49,6 +49,20 @@ export const nodeById = (graph: Graph, id: string): NodeData => {
     return found;
 };
 
+/**
+ * Find a node in a graph by block TYPE (throws if absent — a test-only convenience, like {@link nodeById}).
+ * A build scenario asserts on shape rather than on minted ids, so it looks its nodes up by type; throwing
+ * here both narrows away the `undefined` and reports what the canvas actually held when the lookup fails.
+ */
+export const nodeOfType = (graph: Graph, type: string): NodeData => {
+    const found = graph.nodes.find(n => n.type === type);
+    if (!found) {
+        const present = graph.nodes.map(n => n.type).join(', ') || '(none)';
+        throw new Error(`test fixture: no node of type "${type}" — canvas holds: ${present}`);
+    }
+    return found;
+};
+
 /** The model options the fixture generator block accepts (a select field). */
 export const GENERATOR_MODELS = [
     'gemini-2.5-flash',

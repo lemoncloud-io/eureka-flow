@@ -9,8 +9,11 @@ export interface Message {
     id: string;
     role: 'user' | 'assistant' | 'tool' | 'system';
     content?: string;
-    /** On assistant messages that call tools; `args` is the raw JSON string sent to the tool. */
-    toolCalls?: { id: string; name: string; args: string; status: 'ok' | 'error' }[];
+    /** On assistant messages that call tools; `args` is the raw JSON string sent to the tool.
+     * `thoughtSignature` — see `ChatMessage.toolCalls`'s doc in `llmGateway.ts`; persisted here so
+     * it survives a reload and can be replayed back to Gemini on a later turn. Opaque; only Gemini's
+     * "thinking" models currently populate it. */
+    toolCalls?: { id: string; name: string; args: string; status: 'ok' | 'error'; thoughtSignature?: string }[];
     /** On tool-result messages: the assistant tool-call id this answers. */
     toolCallId?: string;
     ts: number;

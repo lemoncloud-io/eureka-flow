@@ -13,9 +13,9 @@ describe('createMeter — provider-neutral token accounting (§3.1)', () => {
     // Three crafted per-call usages, mirroring the §3.1 worked example. `outputTokens` here is the VISIBLE
     // output only (candidatesTokenCount); the Meter must derive output = total − input so thinking counts.
     const usages: NonNullable<Chunk['usage']>[] = [
-        { inputTokens: 1050, outputTokens: 15, totalTokens: 1185, cachedTokens: 0 }, // total > input + visible → thinking
-        { inputTokens: 1125, outputTokens: 25, totalTokens: 1230, cachedTokens: 1050 }, // carries a cache hit
-        { inputTokens: 1158, outputTokens: 15, totalTokens: 1213, cachedTokens: 1125 },
+        { inputTokens: 1050, outputTokens: 15, providerTotalTokens: 1185, cachedInputTokens: 0 }, // total > input + visible → thinking
+        { inputTokens: 1125, outputTokens: 25, providerTotalTokens: 1230, cachedInputTokens: 1050 }, // carries a cache hit
+        { inputTokens: 1158, outputTokens: 15, providerTotalTokens: 1213, cachedInputTokens: 1125 },
     ];
 
     it('sums input/cached/total, derives output as Σ(total − input), and counts one round-trip per call', () => {
@@ -38,6 +38,37 @@ describe('createMeter — provider-neutral token accounting (§3.1)', () => {
         expect(t.roundTrips).toBe(usages.length); // K = 3
     });
 
+    it('falls back to inputTokens + outputTokens for totalTokens when a provider omits providerTotalTokens', () => {
+        // Documented fallback (see the comment on line 56): a provider that never reports its own
+        // total must not leave totalTokens undefined — it's reconstructed from the two buckets we
+        // do have. cachedTokens still sums normally (0, since this usage carries none).
+        const meter = createMeter();
+        meter.addUsage({ inputTokens: 100, outputTokens: 20 });
+        meter.tick();
+
+        const t = meter.totals();
+        expect(t.inputTokens).toBe(100);
+        expect(t.totalTokens).toBe(120); // 100 + 20 — the fallback path, not providerTotalTokens
+        expect(t.outputTokens).toBe(20); // total(120) - input(100) = 20, matches the visible figure here
+        expect(t.cachedTokens).toBe(0);
+        expect(t.roundTrips).toBe(1);
+    });
+
+    it('falls back to inputTokens alone (outputTokens also omitted) when both providerTotalTokens and outputTokens are absent', () => {
+        // The fallback expression is `input + (u.outputTokens ?? 0)` — the OUTER providerTotalTokens
+        // fallback is only half the story; a provider that omits BOTH must still resolve totalTokens
+        // to a defined number (never NaN/undefined) via the INNER ?? 0 on outputTokens too.
+        const meter = createMeter();
+        meter.addUsage({ inputTokens: 100 });
+        meter.tick();
+
+        const t = meter.totals();
+        expect(t.inputTokens).toBe(100);
+        expect(t.totalTokens).toBe(100); // 100 + 0 — both fallbacks taken
+        expect(t.outputTokens).toBe(0); // total(100) - input(100) = 0
+        expect(t.roundTrips).toBe(1);
+    });
+
     it('ignores a falsy usage and leaves round-trips to tick()', () => {
         const meter = createMeter();
         meter.addUsage(undefined);
@@ -53,7 +84,7 @@ describe('createMeter — provider-neutral token accounting (§3.1)', () => {
     it('totals() returns a fresh copy each call (no shared mutable state)', () => {
         const meter = createMeter();
         const before = meter.totals();
-        meter.addUsage({ inputTokens: 10, totalTokens: 30 });
+        meter.addUsage({ inputTokens: 10, providerTotalTokens: 30 });
         expect(before.inputTokens).toBe(0); // the earlier snapshot is untouched
         expect(meter.totals().inputTokens).toBe(10);
     });
@@ -93,7 +124,7 @@ describe('price — the single pricing seam over PRICES (§2)', () => {
 
 describe('meteringGateway — thin usage tap over one LlmGateway (§3.2)', () => {
     it('counts one round-trip and captures the done-chunk usage exactly once', async () => {
-        const usage = { inputTokens: 120, outputTokens: 30, totalTokens: 180, cachedTokens: 40 };
+        const usage = { inputTokens: 120, outputTokens: 30, providerTotalTokens: 180, cachedInputTokens: 40 };
         // A fake inner gateway: a text chunk (no usage), then the final done chunk carrying usage.
         const inner: LlmGateway = {
             capabilities: { toolCalls: true },
