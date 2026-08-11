@@ -38,6 +38,17 @@ export const findNodeAtPoint = (
 };
 
 /**
+ * The rectangle spanned by two corners, whichever way round they were dragged.
+ * Idempotent, so a rect that is already normalized survives a second pass unchanged.
+ */
+export const normalizeRect = (rect: CanvasRect): CanvasRect => ({
+    x: Math.min(rect.x, rect.x + rect.width),
+    y: Math.min(rect.y, rect.y + rect.height),
+    width: Math.abs(rect.width),
+    height: Math.abs(rect.height),
+});
+
+/**
  * The nodes a selection rectangle touches, in graph order.
  *
  * Touching is enough — a node clipped by the box counts, the way every canvas editor
@@ -48,10 +59,9 @@ export const findNodeAtPoint = (
 export const nodesInRect = (nodes: GraphNode[], rect: CanvasRect, sizeOf: (node: GraphNode) => NodeSize): string[] => {
     if (rect.width === 0 || rect.height === 0) return [];
 
-    const left = Math.min(rect.x, rect.x + rect.width);
-    const right = Math.max(rect.x, rect.x + rect.width);
-    const top = Math.min(rect.y, rect.y + rect.height);
-    const bottom = Math.max(rect.y, rect.y + rect.height);
+    const { x: left, y: top, width, height } = normalizeRect(rect);
+    const right = left + width;
+    const bottom = top + height;
 
     return nodes
         .filter(node => {

@@ -14,12 +14,11 @@ interface CanvasContextMenuProps {
     onSelect: (type: string) => void;
     onClose: () => void;
     /**
-     * Port type the menu was opened from, when a dragged link landed on empty canvas.
-     * Narrows the list to blocks that link can actually feed; `onClearFilter` lets the
-     * user see everything again, so the filter never becomes a dead end.
+     * Set when a dragged link landed on empty canvas: narrows the list to the blocks
+     * that link can feed. `onClear` widens it again, so the filter is never a dead end —
+     * the two travel together because neither is useful alone.
      */
-    portTypeFilter?: string;
-    onClearFilter?: () => void;
+    portFilter?: { type: string; onClear: () => void };
 }
 
 const MENU_WIDTH = 240;
@@ -31,15 +30,14 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
     screenY,
     onSelect,
     onClose,
-    portTypeFilter,
-    onClearFilter,
+    portFilter,
 }) => {
     const { t } = useTranslation(['flows', 'blocks']);
     const [searchQuery, setSearchQuery] = useState('');
     const menuRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    const blockGroups = useBlockGroups(searchQuery, { acceptsPortType: portTypeFilter });
+    const blockGroups = useBlockGroups(searchQuery, { acceptsPortType: portFilter?.type });
 
     const adjustedX = Math.min(screenX, window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING);
     const adjustedY = Math.min(screenY, window.innerHeight - MENU_MAX_HEIGHT - VIEWPORT_PADDING);
@@ -111,20 +109,18 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
                 </div>
             </div>
 
-            {portTypeFilter && (
+            {portFilter && (
                 <div className="flex items-center gap-1.5 px-3 pt-1.5">
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium">
                         <Filter className="w-2.5 h-2.5" />
-                        {t('canvasMenu.portFilter', { type: portTypeFilter })}
+                        {t('canvasMenu.portFilter', { type: portFilter.type })}
                     </span>
-                    {onClearFilter && (
-                        <button
-                            onClick={onClearFilter}
-                            className="text-[10px] text-muted-foreground hover:text-foreground underline underline-offset-2"
-                        >
-                            {t('canvasMenu.showAll')}
-                        </button>
-                    )}
+                    <button
+                        onClick={portFilter.onClear}
+                        className="text-[10px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                    >
+                        {t('canvasMenu.showAll')}
+                    </button>
                 </div>
             )}
 
@@ -178,7 +174,7 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
                 })}
                 {totalResults === 0 && (
                     <div className="text-center py-4 text-muted-foreground text-xs">
-                        {portTypeFilter ? t('canvasMenu.noCompatibleBlocks') : t('sidebar.noResults')}
+                        {portFilter ? t('canvasMenu.noCompatibleBlocks') : t('sidebar.noResults')}
                     </div>
                 )}
             </div>

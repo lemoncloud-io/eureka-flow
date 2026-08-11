@@ -21,8 +21,11 @@ export const useBlockGroups = (searchQuery: string, options?: BlockGroupOptions)
             .map(([, block]) => block);
 
         const query = searchQuery.toLowerCase().trim();
-        const matched = query ? blocks.filter(b => blockMatchesQuery(t, b, query)) : blocks;
-        const filtered = acceptsPortType ? matched.filter(b => blockAcceptsPortType(b, acceptsPortType)) : matched;
+        const filtered = blocks.filter(
+            b =>
+                (!query || blockMatchesQuery(t, b, query)) &&
+                (!acceptsPortType || blockAcceptsPortType(b, acceptsPortType))
+        );
 
         return {
             inputs: filtered.filter(b => b.stereo === 'input' || (!b.stereo && b.type.startsWith('input-'))),

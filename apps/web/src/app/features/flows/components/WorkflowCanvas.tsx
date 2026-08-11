@@ -21,6 +21,7 @@ import {
     hydrateInputsFromUpstream,
     loadFlow,
     nodesInRect,
+    normalizeRect,
     pasteOffsetTo,
     runFlow,
     runNode,
@@ -166,6 +167,17 @@ const snapToGrid = (point: { x: number; y: number }) => ({
     x: Math.round(point.x / GRID_SIZE) * GRID_SIZE,
     y: Math.round(point.y / GRID_SIZE) * GRID_SIZE,
 });
+
+interface MarqueeCorners {
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+}
+
+/** The two dragged corners as a rectangle — the one shape both the box and the hit test use. */
+const marqueeRect = (m: MarqueeCorners) =>
+    normalizeRect({ x: m.startX, y: m.startY, width: m.currentX - m.startX, height: m.currentY - m.startY });
 
 /** Touch port hit detection threshold in world coordinates */
 const TOUCH_PORT_HIT_THRESHOLD = 50;
@@ -400,25 +412,38 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             screenY: number;
             worldX: number;
             worldY: number;
-            // Set when the menu came from a link dropped on empty canvas: the block list is
-            // filtered to what this port can feed, and picking one wires it up on the spot.
+            // Set when the menu came from a link dropped on empty canvas: whatever block
+            // the user picks gets wired to this port. Survives "show all blocks".
             fromDraft?: { sourceNodeId: string; sourcePortId: string; sourceType: string };
-            // "Show all blocks" widens the list only. The draft stays, so a block picked
-            // afterwards is still wired to the port the user dragged from.
-            filterCleared?: boolean;
+            // What the block list is narrowed to. Seeded from the draft's port type and
+            // cleared on its own, so widening the list never forgets the wiring.
+            portTypeFilter?: string;
         } | null>(null);
 
         // Shift-drag selection box, in world coordinates so it stays put while zooming.
         // Shift is also what adds a node to the selection by click, so the box adds too.
-        const [marquee, setMarquee] = useState<{
-            startX: number;
-            startY: number;
-            currentX: number;
-            currentY: number;
-        } | null>(null);
+        //
+        // The rectangle lives in a ref and is written straight onto the overlay's style,
+        // for the same reason the viewport does: a state update per mouse move would
+        // re-render every node on the canvas at drag frame rate. Only `isMarqueeActive`
+        // is state, and it changes exactly twice per gesture.
+        const marqueeRef = useRef<MarqueeCorners | null>(null);
+        const marqueeBoxRef = useRef<HTMLDivElement>(null);
+        const [isMarqueeActive, setIsMarqueeActive] = useState(false);
 
-        // Where the pointer last was over the canvas, in world coordinates. Null while it
-        // is elsewhere, which is what tells paste to fall back instead of guessing.
+        const paintMarquee = useCallback(() => {
+            const box = marqueeBoxRef.current;
+            const corners = marqueeRef.current;
+            if (!box || !corners) return;
+            const { x, y, width, height } = marqueeRect(corners);
+            box.style.left = `${x}px`;
+            box.style.top = `${y}px`;
+            box.style.width = `${width}px`;
+            box.style.height = `${height}px`;
+        }, []);
+
+        // Where the pointer last was, in screen coordinates — converting to world here
+        // would force a layout on every mouse move for a value only paste reads.
         const lastCanvasPointRef = useRef<{ x: number; y: number } | null>(null);
 
         const portMouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -1515,7 +1540,8 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             if (e.button === 0 && e.shiftKey) {
                 setContextMenu(null);
                 const world = screenToWorld(e.clientX, e.clientY);
-                setMarquee({ startX: world.x, startY: world.y, currentX: world.x, currentY: world.y });
+                marqueeRef.current = { startX: world.x, startY: world.y, currentX: world.x, currentY: world.y };
+                setIsMarqueeActive(true);
                 return;
             }
 
@@ -1726,11 +1752,14 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         }, [dragState, commitDrag, handleSelectionChange]);
 
         const handleMouseMove = (e: React.MouseEvent) => {
-            lastCanvasPointRef.current = screenToWorld(e.clientX, e.clientY);
+            lastCanvasPointRef.current = { x: e.clientX, y: e.clientY };
 
+            const marquee = marqueeRef.current;
             if (marquee) {
                 const world = screenToWorld(e.clientX, e.clientY);
-                setMarquee(prev => (prev ? { ...prev, currentX: world.x, currentY: world.y } : prev));
+                marquee.currentX = world.x;
+                marquee.currentY = world.y;
+                paintMarquee();
                 return;
             }
 
@@ -1774,18 +1803,11 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const handleMouseUp = (e: React.MouseEvent) => {
             setIsPanning(false);
 
+            const marquee = marqueeRef.current;
             if (marquee) {
-                const covered = nodesInRect(
-                    nodes,
-                    {
-                        x: marquee.startX,
-                        y: marquee.startY,
-                        width: marquee.currentX - marquee.startX,
-                        height: marquee.currentY - marquee.startY,
-                    },
-                    nodeBounds
-                );
-                setMarquee(null);
+                const covered = nodesInRect(nodes, marqueeRect(marquee), nodeBounds);
+                marqueeRef.current = null;
+                setIsMarqueeActive(false);
                 // A box that caught nothing leaves the selection alone — treating it as
                 // "deselect everything" would punish a misaimed drag.
                 if (covered.length > 0) selectNodeIds([...new Set([...selectedNodeIds, ...covered])]);
@@ -1830,6 +1852,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         sourcePortId: connectionDraft.sourcePortId,
                         sourceType: connectionDraft.sourceType,
                     },
+                    portTypeFilter: connectionDraft.sourceType,
                 });
             }
 
@@ -2035,12 +2058,15 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 // Escape only lets go of what is selected, so a viewer gets it too —
                 // gating it behind edit permission left them with no way to close a panel.
                 if (e.key === 'Escape') {
-                    if (connectionDraft) {
+                    // Read both through refs: they change on every mouse move of a drag,
+                    // and as deps they would re-register this listener at frame rate.
+                    if (connectionDraftRef.current) {
                         setConnectionDraft(null);
                         return;
                     }
-                    if (marquee) {
-                        setMarquee(null);
+                    if (marqueeRef.current) {
+                        marqueeRef.current = null;
+                        setIsMarqueeActive(false);
                         return;
                     }
                     handleSelectionChange(null);
@@ -2068,9 +2094,9 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     if (payload && payload.nodes.length > 0) {
                         // Land the copy under the pointer. Off-canvas (keyboard-only paste,
                         // or the pointer over a panel) falls back to a visible nudge.
-                        const cursor = lastCanvasPointRef.current;
-                        const offset = cursor
-                            ? snapToGrid(pasteOffsetTo(payload.nodes, cursor))
+                        const screen = lastCanvasPointRef.current;
+                        const offset = screen
+                            ? snapToGrid(pasteOffsetTo(payload.nodes, screenToWorld(screen.x, screen.y)))
                             : { x: GRID_SIZE * 2, y: GRID_SIZE * 2 };
                         const pasted = engine.paste(payload, offset);
                         selectNodeIds(pasted);
@@ -2096,11 +2122,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             return () => window.removeEventListener('keydown', handleKeyDown);
         }, [
             engine,
+            screenToWorld,
             selectedNodeIds,
             selectedConnectionId,
             hoveredConnectionId,
-            connectionDraft,
-            marquee,
             permissions.canModifyCanvas,
             commit,
             handleSelectionChange,
@@ -2220,15 +2245,10 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             transform: `translate(${viewportRef.current.x}px, ${viewportRef.current.y}px) scale(${viewportRef.current.zoom})`,
                         }}
                     >
-                        {marquee && (
+                        {isMarqueeActive && (
                             <div
+                                ref={marqueeBoxRef}
                                 className="absolute border border-primary bg-primary/10 pointer-events-none z-30"
-                                style={{
-                                    left: Math.min(marquee.startX, marquee.currentX),
-                                    top: Math.min(marquee.startY, marquee.currentY),
-                                    width: Math.abs(marquee.currentX - marquee.startX),
-                                    height: Math.abs(marquee.currentY - marquee.startY),
-                                }}
                             />
                         )}
 
@@ -2502,9 +2522,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                                 setContextMenu(null);
                             }}
                             onClose={handleCloseContextMenu}
-                            portTypeFilter={contextMenu.filterCleared ? undefined : contextMenu.fromDraft?.sourceType}
-                            onClearFilter={() =>
-                                setContextMenu(prev => (prev ? { ...prev, filterCleared: true } : prev))
+                            portFilter={
+                                contextMenu.portTypeFilter
+                                    ? {
+                                          type: contextMenu.portTypeFilter,
+                                          onClear: () =>
+                                              setContextMenu(prev =>
+                                                  prev ? { ...prev, portTypeFilter: undefined } : prev
+                                              ),
+                                      }
+                                    : undefined
                             }
                         />
                     )}

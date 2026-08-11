@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findNodeAtPoint, nodesInRect, pasteOffsetTo } from './canvasGeometry';
+import { findNodeAtPoint, nodesInRect, normalizeRect, pasteOffsetTo } from './canvasGeometry';
 
 import type { GraphNode } from '../types';
 
@@ -33,6 +33,22 @@ describe('findNodeAtPoint', () => {
 
     it('returns undefined for an empty graph', () => {
         expect(findNodeAtPoint([], { x: 0, y: 0 }, size)).toBeUndefined();
+    });
+});
+
+describe('normalizeRect', () => {
+    it('turns a box dragged up and to the left into positive extents', () => {
+        expect(normalizeRect({ x: 250, y: 150, width: -250, height: -150 })).toEqual({
+            x: 0,
+            y: 0,
+            width: 250,
+            height: 150,
+        });
+    });
+
+    it('leaves an already-normalized box alone, so a second pass is safe', () => {
+        const rect = { x: 0, y: 0, width: 250, height: 150 };
+        expect(normalizeRect(normalizeRect(rect))).toEqual(rect);
     });
 });
 

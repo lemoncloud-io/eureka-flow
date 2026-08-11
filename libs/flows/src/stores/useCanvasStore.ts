@@ -467,7 +467,6 @@ export const useCanvasFlowId = () => useCanvasStore(state => state.flowId);
 export const useCanvasViewport = () => useCanvasStore(state => state.viewport);
 export const useCanvasSelectedNodeId = () => useCanvasStore(state => state.selectedNodeId);
 export const useCanvasSelectedConnectionId = () => useCanvasStore(state => state.selectedConnectionId);
-export const useCanvasClipboard = () => useCanvasStore(state => state.clipboard);
 export const useCanvasDragState = () => useCanvasStore(state => state.dragState);
 export const useCanvasConnectionDraft = () => useCanvasStore(state => state.connectionDraft);
 export const useUpdatedPortIds = () => useCanvasStore(state => state.updatedPortIds);
