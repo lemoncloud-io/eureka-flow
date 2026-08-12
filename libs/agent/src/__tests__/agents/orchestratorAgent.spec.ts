@@ -83,6 +83,6 @@ describe('createOrchestratorAgent — one agent drives the whole turn', () => {
         await agent.send('and again');
         const messages = deps.storage.load(FLOW_ID)?.messages ?? [];
         expect(messages.length).toBeGreaterThan(afterFirst);
-        expect(messages[0].content).toContain('nudge the input right'); // turn-1 history preserved (Approach 3 prepends the starting graph)
+        expect(messages[0].content).toContain('nudge the input right'); // turn-1 history preserved (the graph seed rides seedPrefix, not content)
     });
 });

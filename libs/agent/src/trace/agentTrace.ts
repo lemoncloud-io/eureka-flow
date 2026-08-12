@@ -1,5 +1,5 @@
 import { NoopTracer, createTracer } from './createTracer';
-import { toGraphDiff, toTraceTree, toTranscripts } from './project';
+import { toGraphDiff, toTraceForest, toTranscripts } from './project';
 import { memorySink, redactingSink } from './sinks';
 
 import type { AgentTranscript, GraphDiffProjection, TraceNode } from './project';
@@ -9,7 +9,8 @@ import type { Tracer } from './tracer';
 /** The three read-time views of a run's record stream. */
 export interface TraceProjections {
     transcripts: AgentTranscript[];
-    tree: TraceNode | null;
+    /** The agent call forest — one root per orchestrator instance/epoch (a reload or model switch adds a root). */
+    trees: TraceNode[];
     /** The graph delta as one cumulative whole-session view plus one per turn. */
     diff: GraphDiffProjection;
 }
@@ -20,11 +21,11 @@ export interface AgentTrace {
     tracer: Tracer;
     /** The captured records (already redacted). Empty when disabled. */
     records: () => TraceRecord[];
-    /** The captured stream projected 3 ways: chat per agent, the call tree, the graph before→after. */
+    /** The captured stream projected 3 ways: chat per agent, the call forest, the graph before→after. */
     project: () => TraceProjections;
 }
 
-const EMPTY: TraceProjections = { transcripts: [], tree: null, diff: { cumulative: null, perTurn: [] } };
+const EMPTY: TraceProjections = { transcripts: [], trees: [], diff: { cumulative: null, perTurn: [] } };
 
 /**
  * The ONE place any entry point (web, scenario harness, terminal) turns a "should we trace?" flag into a
@@ -53,7 +54,7 @@ export const createAgentTrace = (enabled: boolean): AgentTrace => {
             const runIds = [...new Set(records.map(r => String(r.context.runId ?? '')).filter(Boolean))];
             return {
                 transcripts: toTranscripts(records),
-                tree: toTraceTree(records),
+                trees: toTraceForest(records),
                 diff: {
                     cumulative: records.length ? toGraphDiff(records) : null,
                     perTurn: runIds.map(runId => toGraphDiff(records, runId)),

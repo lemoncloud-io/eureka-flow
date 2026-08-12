@@ -124,6 +124,8 @@ export const getBezierPath = (x1: number, y1: number, x2: number, y2: number): s
 
 export { captureCanvasAsDataUrl, captureCanvasForThumbnail, exportCanvasAsPng } from './exportImage';
 export { createGenerateApiLlmGateway } from './createGenerateApiLlmGateway';
+export { resolveBrowserAgentModelConfig } from './resolveBrowserAgentModelConfig';
+export type { BrowserAgentModelConfig } from './resolveBrowserAgentModelConfig';
 export { createFlowJSONTransportReceiver } from './createFlowJSONTransportReceiver';
 export type {
     FlowJSONTransportReceiver,

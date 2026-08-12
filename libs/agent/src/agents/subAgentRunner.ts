@@ -80,7 +80,12 @@ export interface SubAgentRunnerDeps {
     catalog: CatalogLookup;
     /** One gateway per child, keyed by agentType. */
     gatewayFor: (agentType: string) => LlmGateway;
+    /** Resolved model per child agentType, for the trace `gen_ai.request.model`; undefined ⇒ untagged. */
+    modelFor?: (agentType: string) => string | undefined;
     flowId: string;
+    /** The parent's current flowPath (e.g. the orchestrator's `${flowId}#${epoch}`), so children nest
+     *  under the right instance; defaults to {@link flowId}. Called fresh per spawn. */
+    flowPathFor?: () => string;
     /** Dispatch mode: parallel barrier fan-out (default) or serial. */
     dispatchMode?: 'parallel' | 'serial';
     maxIterations?: number;
@@ -93,6 +98,7 @@ export interface SubAgentRunnerDeps {
 /** Build a {@link SubAgentRunner}: each child gets its own isolated storage + flowId, its own gateway, and its own fixed grant, with `userPermissions` riding along for the executor to gate on. */
 export const createSubAgentRunner = (deps: SubAgentRunnerDeps): SubAgentRunner => {
     const { roster, catalog, gatewayFor, flowId, dispatchMode = 'parallel', maxIterations, userPermissions } = deps;
+    const flowPathFor = deps.flowPathFor ?? (() => flowId);
     let spawnSeq = 0;
     const nextSpawnId = deps.nextSpawnId ?? (() => (spawnSeq += 1));
 
@@ -109,14 +115,17 @@ export const createSubAgentRunner = (deps: SubAgentRunnerDeps): SubAgentRunner =
             return { completed: false, summary: `no specialist of type "${spec.agentType}" is available` };
         }
 
-        // Bind the child's identity: a run-monotonic instance id, and a flowPath that nests under the parent —
-        // so two same-type children never collide, in one batch or across steps.
+        // Bind the child's identity: a run-monotonic instance id, and a flowPath that nests under the parent's
+        // current path (epoch-qualified) — so two same-type children never collide, in one batch, across
+        // steps, or across a reload/switch. Tag the child with its resolved model for the trace.
         const agentId = `${spec.agentType}#${nextSpawnId()}`;
-        const childFlowId = `${flowId}:${agentId}`;
+        const childFlowId = `${flowPathFor()}:${agentId}`;
+        const childModel = deps.modelFor?.(spec.agentType);
         const childTracer = parentTracer.child({
             'gen_ai.agent.name': spec.agentType,
             'gen_ai.agent.id': agentId,
             flowPath: childFlowId,
+            ...(childModel ? { 'gen_ai.request.model': childModel } : {}),
         });
         parentTracer.emit({ name: AGENT_SPAWN, level: 'info', fields: { agentType: spec.agentType, task: spec.task } });
 

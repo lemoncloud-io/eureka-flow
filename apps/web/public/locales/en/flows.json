@@ -1,10 +1,10 @@
 {
     "agentPanel": {
         "title": "Assistant",
-        "subtitle": "Move nodes with commands like move(Fetch, up, 10).",
-        "empty": "Type a command to move a node:\nmove(Fetch, up, 10)\nmove(Email, to, 100, 200)\nlist",
+        "subtitle": "Ask in plain language to build, edit, and arrange your flow.",
+        "empty": "Ask in plain language, e.g.\n“add an HTTP request after the input”\n“generate a summary from the fetched text”\n“rename the preview to Result”\n“line the nodes up in one column”",
         "thinking": "Thinking…",
-        "placeholder": "Move a node…",
+        "placeholder": "Ask the assistant to build or edit your flow…",
         "send": "Send"
     },
     "header": {

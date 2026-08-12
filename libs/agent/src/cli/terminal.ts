@@ -111,6 +111,7 @@ const main = async (): Promise<void> => {
         !fake && (Object.keys(modelConfig.deploymentModels).length > 0 || !!modelConfig.defaultModel);
     let roster: AgentRoster | undefined;
     let gatewayFor: ((agentType: string) => LlmGatewayType) | undefined;
+    let modelFor: ((agentType: string) => string | undefined) | undefined;
     if (hasPerAgentConfig) {
         if (modelConfig.defaultModel) assertKnownModels([modelConfig.defaultModel]);
         roster = createAgentRoster(withModels(DEFAULT_REGISTRATIONS, modelConfig.deploymentModels));
@@ -119,14 +120,16 @@ const main = async (): Promise<void> => {
             if (!g) throw new Error('resolveLiveGateway returned no gateway (missing GEMINI_API_KEY?)');
             return wire ? wire.gateway(g) : g;
         };
+        // The builder (reasoning tier) is exempt from defaultModel → inherits the orchestrator gateway.
+        // The same resolver drives both the gateway routing and the per-child trace `gen_ai.request.model`.
+        modelFor = agentModelResolver(
+            roster,
+            modelConfig.deploymentModels,
+            modelConfig.defaultModel,
+            ORCHESTRATOR_MODEL_TIER
+        );
         gatewayFor = createModelGatewayFor({
-            // The builder (reasoning tier) is exempt from defaultModel → inherits the orchestrator gateway.
-            modelForType: agentModelResolver(
-                roster,
-                modelConfig.deploymentModels,
-                modelConfig.defaultModel,
-                ORCHESTRATOR_MODEL_TIER
-            ),
+            modelForType: modelFor,
             defaultGateway: gateway,
             gatewayFactory: buildChildGateway,
         });
@@ -163,8 +166,10 @@ const main = async (): Promise<void> => {
         userPermissions: { canModifyCanvas: true, canEditConfig: true },
         loadGraph: graph => stack.engine.loadGraph(graph),
         tracer: trace.tracer,
+        ...(reasoningModel ? { model: reasoningModel } : {}),
         ...(roster ? { roster } : {}),
         ...(gatewayFor ? { gatewayFor } : {}),
+        ...(modelFor ? { modelFor } : {}),
     });
     if (wire) run.onChange(state => wire.chat(state)); // stream the transcript into the log as chat turns
 

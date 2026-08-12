@@ -8,8 +8,6 @@ import type { LlmGateway } from '../llm/llmGateway';
  * `defaultGateway` (the orchestrator's own gateway/model), so the builder is tied to the
  * orchestrator for free by leaving its model unset. Composed at the composition root and passed to
  * the orchestrator as `gatewayFor`; the orchestrator itself needs no change.
- *
- * See docs/browser-agent/design/per-agent-model-selection.md.
  */
 
 /** Build (or reuse) a gateway bound to one model id. Environment-specific, so it is injected. */

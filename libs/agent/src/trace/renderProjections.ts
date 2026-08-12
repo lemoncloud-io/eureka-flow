@@ -32,17 +32,21 @@ const renderTranscripts = (p: TraceProjections, out: string[]): void => {
     }
 };
 
-// 2/3 · the agent call tree (who spawned whom), each node tagged with its per-event-type record counts.
-const renderTree = (p: TraceProjections, out: string[]): void => {
-    out.push('', '════════════ trace · 2/3 · TRACE TREE (who spawned whom) ════════════');
+// 2/3 · the agent call forest (who spawned whom) — one tree per orchestrator instance/epoch, each node
+// tagged with its model + per-event-type record counts.
+const renderForest = (p: TraceProjections, out: string[]): void => {
+    out.push('', '════════════ trace · 2/3 · TRACE FOREST (who spawned whom) ════════════');
     const walk = (n: TraceNode, d: number): void => {
         const counts = new Map<string, number>();
         for (const r of n.records) counts.set(r.name, (counts.get(r.name) ?? 0) + 1);
         const summary = [...counts].map(([k, v]) => `${k}×${v}`).join(' ');
-        out.push(`  ${'  '.repeat(d)}▸ ${n.agentType || '(root)'} · ${n.agentId}  [${n.records.length}: ${summary}]`);
+        const model = n.model ? ` [${n.model}]` : '';
+        out.push(
+            `  ${'  '.repeat(d)}▸ ${n.agentType || '(root)'} · ${n.agentId}${model}  [${n.records.length}: ${summary}]`
+        );
         n.children.forEach(c => walk(c, d + 1));
     };
-    if (p.tree) walk(p.tree, 0);
+    if (p.trees.length) p.trees.forEach(t => walk(t, 0));
     else out.push('  (no records)');
 };
 
@@ -78,11 +82,11 @@ const renderDiff = (p: TraceProjections, out: string[]): void => {
     for (const turn of p.diff.perTurn) renderOneDiff(`  ${turn.runId} ·`, turn, out);
 };
 
-/** The three projections rendered to one plain-text block (transcripts, then tree, then graph diff). */
+/** The three projections rendered to one plain-text block (transcripts, then forest, then graph diff). */
 export const renderProjections = (p: TraceProjections): string => {
     const out: string[] = [];
     renderTranscripts(p, out);
-    renderTree(p, out);
+    renderForest(p, out);
     renderDiff(p, out);
     return out.join('\n');
 };

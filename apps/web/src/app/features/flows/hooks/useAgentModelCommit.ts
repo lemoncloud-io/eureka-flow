@@ -6,8 +6,6 @@ import { useEffect } from 'react';
  * turn always finishes on the model it started with (never swapped mid-flight). A change made
  * mid-turn is held until the turn settles, then committed. React dedupes a `commit` to the current
  * value, so a plain `useState` setter is a safe `commit`.
- *
- * See docs/browser-agent/design/per-agent-model-selection.md §4.
  */
 export const useAgentModelCommit = ({
     selected,

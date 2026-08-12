@@ -8,11 +8,12 @@ const parentPath = (flowPath: string): string | null => {
 };
 
 /**
- * Project the record stream into the agent call tree: one {@link TraceNode} per instance (flowPath),
- * nested by flowPath prefix, records kept in emission (file) order. Returns the root, or null if empty.
- * If several roots exist (multiple runs in one stream) the first-seen root is returned.
+ * Project the record stream into the agent call FOREST: one {@link TraceNode} per instance (flowPath),
+ * nested by flowPath prefix, records kept in emission (file) order. Returns every root in first-seen order
+ * — a stream can hold several (one per orchestrator instance/epoch across a reload or model switch, each
+ * `<flowId>#<epoch>`), so callers render them all rather than dropping every root but the first.
  */
-export const toTraceTree = (records: TraceRecord[]): TraceNode | null => {
+export const toTraceForest = (records: TraceRecord[]): TraceNode[] => {
     const nodes = new Map<string, TraceNode>();
 
     for (const record of records) {
@@ -20,10 +21,12 @@ export const toTraceTree = (records: TraceRecord[]): TraceNode | null => {
         if (!flowPath) continue; // context-less lifecycle records (e.g. web agent.run.*) are not agent nodes
         let node = nodes.get(flowPath);
         if (!node) {
+            const model = record.context['gen_ai.request.model'];
             node = {
                 agentType: String(record.context['gen_ai.agent.name'] ?? ''),
                 agentId: String(record.context['gen_ai.agent.id'] ?? flowPath),
                 flowPath,
+                ...(typeof model === 'string' && model ? { model } : {}),
                 records: [],
                 children: [],
             };
@@ -33,15 +36,15 @@ export const toTraceTree = (records: TraceRecord[]): TraceNode | null => {
     }
 
     // Map iterates in first-insertion order, so this preserves emission order without a parallel array.
-    let root: TraceNode | null = null;
+    const roots: TraceNode[] = [];
     for (const node of nodes.values()) {
         const parentFlowPath = parentPath(node.flowPath);
         const parent = parentFlowPath !== null ? nodes.get(parentFlowPath) : undefined;
         if (parent) {
             parent.children.push(node);
-        } else if (!root) {
-            root = node;
+        } else {
+            roots.push(node);
         }
     }
-    return root;
+    return roots;
 };

@@ -1,6 +1,6 @@
 /**
  * Read per-agent model config from the environment for a Node composition root (the terminal). The
- * scheme is discrete `AGENT_MODEL_*` vars — see docs/browser-agent/design/per-agent-model-selection.md §5:
+ * scheme is discrete `AGENT_MODEL_*` vars:
  *
  *   AGENT_MODEL_REASONING   → orchestrator + builder (the builder inherits, so setting the
  *                             orchestrator's model covers both); overridden by `--model`.

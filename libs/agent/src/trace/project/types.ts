@@ -1,10 +1,12 @@
 import type { TraceRecord } from '../sink';
 
-/** A node in the agent call tree — one per instance (flowPath), nested by flowPath prefix. */
+/** A node in the agent call forest — one per instance (flowPath), nested by flowPath prefix. */
 export interface TraceNode {
     agentType: string;
     agentId: string;
     flowPath: string;
+    /** The model this instance ran on (`gen_ai.request.model`), when tagged. */
+    model?: string;
     records: TraceRecord[];
     children: TraceNode[];
 }

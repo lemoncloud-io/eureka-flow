@@ -35,10 +35,14 @@ export interface TerminalRunDeps {
     binding: CanvasBinding;
     catalog: CatalogLookup;
     userPermissions: AgentGrant;
+    /** The model `gateway` runs on — surfaced in the trace as `gen_ai.request.model` and inherited as the child model fallback. */
+    model?: string;
     /** The specialist roster (e.g. from `withModels`); omit ⇒ the orchestrator's default roster. */
     roster?: AgentRoster;
     /** Per-child gateway by agentType (e.g. from `createModelGatewayFor`); omit ⇒ every child inherits `gateway`. */
     gatewayFor?: (agentType: string) => LlmGateway;
+    /** Resolved model per child agentType (for the trace); omit ⇒ children tagged with the orchestrator's model. */
+    modelFor?: (agentType: string) => string | undefined;
     /**
      * Re-seed the canvas graph on `reset` — the entry passes `engine.loadGraph` (the engine's single ingress).
      * Omit and `reset` only clears the session; the graph is left as-is.
@@ -71,8 +75,10 @@ export const createTerminalRun = (deps: TerminalRunDeps): TerminalRun => {
             catalog: deps.catalog,
             userPermissions: deps.userPermissions,
             tracer: deps.tracer,
+            ...(deps.model ? { model: deps.model } : {}),
             ...(deps.roster ? { roster: deps.roster } : {}),
             ...(deps.gatewayFor ? { gatewayFor: deps.gatewayFor } : {}),
+            ...(deps.modelFor ? { modelFor: deps.modelFor } : {}),
         });
 
     let orchestrator = build();

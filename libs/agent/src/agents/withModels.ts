@@ -3,13 +3,11 @@ import { buildModelManifest } from '../llm/modelManifest';
 import type { AgentRegistration } from './roster';
 
 /**
- * Declarative per-agent model config (Option B): stamp a model id onto matching registrations, and
- * fail fast on an unknown id. Deployment supplies a `Record<agentType, modelId>` (from
- * `AGENT_MODEL_*` env / server config); every id is checked against the static model manifest so a
- * bad value surfaces at startup, not mid-turn. `DEFAULT_REGISTRATIONS` ships model-free — an empty
- * map leaves every agent inheriting the one gateway.
- *
- * See docs/browser-agent/design/per-agent-model-selection.md §5.
+ * Declarative per-agent model config: stamp a model id onto matching registrations, and fail fast on
+ * an unknown id. Deployment supplies a `Record<agentType, modelId>` (from `AGENT_MODEL_*` env / server
+ * config); every id is checked against the static model manifest so a bad value surfaces at startup,
+ * not mid-turn. `DEFAULT_REGISTRATIONS` ships model-free — an empty map leaves every agent inheriting
+ * the one gateway.
  */
 
 /** The set of model ids the codebase knows about — the union of every provider's registered models. */
