@@ -8,11 +8,8 @@ generic one synthesized from the catalog on demand. There are no cross-block ope
 operation is a tool the right agent carries, not an agent of its own. The orchestrator carries no
 write tools; the specialists write through the shared `CanvasBinding`.
 
-Design: [`design/harness-spec.md`](../../docs/browser-agent/design/harness-spec.md) +
-[`design/harness-interfaces.md`](../../docs/browser-agent/design/harness-interfaces.md) (builds on
-[`design/architecture.md`](../../docs/browser-agent/design/architecture.md)); the specialists have their
-own specs — [`agents/builder.md`](../../docs/browser-agent/agents/builder.md) and
-[`agents/blockAgent.md`](../../docs/browser-agent/agents/blockAgent.md).
+Design docs — the shared architecture, interfaces, per-agent specs, tracing, and model selection —
+live in the team knowledge repository.
 
 ## What's here
 
@@ -29,9 +26,7 @@ own specs — [`agents/builder.md`](../../docs/browser-agent/agents/builder.md) 
 | Session                          | `src/session/session.ts`          | `SessionState` the panel renders from + in-memory `SessionStore` (`createInMemorySessionStore`).                                                                                                                                                       |
 
 The package also hosts the shared subsystems used across agents, each its own module: the **HTTP port**
-(`src/http/`), **storage** (`src/storage/`) and **tracing** (`src/trace/`). See
-[llm-gateway.md](../../docs/browser-agent/design/llm-gateway.md) and
-[trace-spec.md](../../docs/browser-agent/design/trace-spec.md).
+(`src/http/`), **storage** (`src/storage/`) and **tracing** (`src/trace/`).
 
 ## Design notes
 
