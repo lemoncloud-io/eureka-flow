@@ -1,7 +1,7 @@
 import type { Chunk, LlmGateway } from '../../llm/llmGateway';
 
 /**
- * Metering — the eval benchmark's efficiency axis (eval-benchmark.md §4.2). Provider-neutral,
+ * Metering — the eval efficiency axis (evaluation.md §6). Provider-neutral,
  * decorator-composed: the {@link Meter} accumulates `Chunk.usage` and counts `chat()` calls (pure counting,
  * no dollars), {@link price} is the single seam that turns those counts into cost, and {@link meteringGateway}
  * is a thin {@link LlmGateway} tap composed alongside the recorder. No provider field names live here — the
@@ -70,7 +70,7 @@ export const createMeter = (): Meter => {
 };
 
 /**
- * Rates WE own (eval-benchmark.md §4.1) — raw tokens are the ground-truth axis; these only scale the
+ * Rates WE own (evaluation.md §6) — raw tokens are the ground-truth axis; these only scale the
  * derived $ columns. Keyed by model so a bigger model reprices without touching the {@link Meter}. `cachedPerM`
  * is the discounted rate charged on cachedTokens: Gemini 2.5 bills implicit-cache hits at 10% of the standard
  * input rate (a 90% discount) — $0.30/M input → $0.03/M cached.

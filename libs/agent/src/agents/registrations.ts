@@ -33,3 +33,12 @@ export const DEFAULT_REGISTRATIONS: AgentRegistration[] = [
 
 /** The default roster: the builder (structure) + named content specialists (generic block agents resolve on demand). */
 export const createDefaultRoster = (): AgentRoster => createAgentRoster(DEFAULT_REGISTRATIONS);
+
+/**
+ * Agent types that run on the ORCHESTRATOR's (reasoning) model by inheritance — the reasoning tier.
+ * The builder is the hard structural-composition turn and is always paired with the orchestrator
+ * (design §5), so it is exempt from the worker `AGENT_MODEL_DEFAULT` fallback: with no explicit
+ * model it resolves to `undefined` and inherits the orchestrator's gateway. An explicit
+ * `AGENT_MODEL_BUILDER` still overrides. See {@link agentModelResolver}'s `inheritTypes`.
+ */
+export const ORCHESTRATOR_MODEL_TIER = ['builder'];

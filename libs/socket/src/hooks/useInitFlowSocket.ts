@@ -40,12 +40,7 @@ const DEFAULT_CHANNEL = '0000';
 const parseWebSocketMessage = (data: unknown): WebSocketMessage | null => {
     if (typeof data !== 'object' || data === null) return null;
 
-    const raw = data as Record<string, unknown>;
-    if (typeof raw['type'] === 'string' && raw['type'].startsWith('json:') && typeof raw['tid'] === 'string') {
-        return { id: raw['tid'], data: raw };
-    }
-
-    const { payload, action } = unwrapSocketEnvelope(raw);
+    const { payload, action } = unwrapSocketEnvelope(data as Record<string, unknown>);
     const messageId = (payload['id'] as string) || (payload['nodeId'] as string);
 
     if (messageId) return { id: messageId, data: payload, action };

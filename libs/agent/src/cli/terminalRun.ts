@@ -2,6 +2,7 @@ import { createObservableSessionStore } from './observableSessionStore';
 import { createOrchestratorAgent } from '../agents/orchestratorAgent';
 import { emptySession } from '../session/session';
 
+import type { AgentRoster } from '../agents/roster';
 import type { CanvasBinding, Graph } from '../canvas';
 import type { CatalogLookup } from '../catalog';
 import type { LlmGateway } from '../llm/llmGateway';
@@ -34,6 +35,10 @@ export interface TerminalRunDeps {
     binding: CanvasBinding;
     catalog: CatalogLookup;
     userPermissions: AgentGrant;
+    /** The specialist roster (e.g. from `withModels`); omit ⇒ the orchestrator's default roster. */
+    roster?: AgentRoster;
+    /** Per-child gateway by agentType (e.g. from `createModelGatewayFor`); omit ⇒ every child inherits `gateway`. */
+    gatewayFor?: (agentType: string) => LlmGateway;
     /**
      * Re-seed the canvas graph on `reset` — the entry passes `engine.loadGraph` (the engine's single ingress).
      * Omit and `reset` only clears the session; the graph is left as-is.
@@ -66,6 +71,8 @@ export const createTerminalRun = (deps: TerminalRunDeps): TerminalRun => {
             catalog: deps.catalog,
             userPermissions: deps.userPermissions,
             tracer: deps.tracer,
+            ...(deps.roster ? { roster: deps.roster } : {}),
+            ...(deps.gatewayFor ? { gatewayFor: deps.gatewayFor } : {}),
         });
 
     let orchestrator = build();

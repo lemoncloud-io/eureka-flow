@@ -1,5 +1,5 @@
 import { splitJSON } from 'lemon-model';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createFlowJSONTransportReceiver } from './createFlowJSONTransportReceiver';
 
@@ -26,6 +26,8 @@ class TestToolSocketConnection implements ToolSocketConnection {
 }
 
 describe('createFlowJSONTransportReceiver', () => {
+    afterEach(() => vi.useRealTimers());
+
     it('reassembles socket packets and resolves the matching generate request', async () => {
         const connection = new TestToolSocketConnection();
         const receiver = createFlowJSONTransportReceiver(connection);
@@ -36,12 +38,54 @@ describe('createFlowJSONTransportReceiver', () => {
             const pending = receiver.generateReceiver.wait(payload.requestId, async () => undefined);
             const { manifest, chunks, complete } = splitJSON(payload, { largeValueBytes: 16, chunkBytes: 64 });
 
-            connection.publish({ type: 'node' });
+            connection.publish({ type: 'node' }); // unrelated traffic is ignored
             [manifest, ...chunks, complete].forEach(packet => connection.publish(packet));
 
             await expect(pending).resolves.toEqual(payload);
         } finally {
             receiver.close();
         }
+    });
+
+    it('rejects a request that never receives a socket result within the timeout', async () => {
+        vi.useFakeTimers();
+        const connection = new TestToolSocketConnection();
+        const receiver = createFlowJSONTransportReceiver(connection, { timeoutMs: 50 });
+        receiver.attach();
+
+        try {
+            const pending = receiver.generateReceiver.wait('request-1', async () => undefined);
+            const assertion = expect(pending).rejects.toThrow(/timed out/);
+            await vi.advanceTimersByTimeAsync(50);
+            await assertion;
+        } finally {
+            receiver.close();
+        }
+    });
+
+    it('rejects the fire failure and stops the timeout', async () => {
+        const connection = new TestToolSocketConnection();
+        const receiver = createFlowJSONTransportReceiver(connection);
+        receiver.attach();
+
+        try {
+            const pending = receiver.generateReceiver.wait('request-1', async () => {
+                throw new Error('post failed');
+            });
+            await expect(pending).rejects.toThrow(/post failed/);
+        } finally {
+            receiver.close();
+        }
+    });
+
+    it('rejects still-pending requests when the receiver is closed', async () => {
+        const connection = new TestToolSocketConnection();
+        const receiver = createFlowJSONTransportReceiver(connection);
+        receiver.attach();
+
+        const pending = receiver.generateReceiver.wait('request-1', async () => undefined);
+        receiver.close();
+
+        await expect(pending).rejects.toThrow(/closed/);
     });
 });

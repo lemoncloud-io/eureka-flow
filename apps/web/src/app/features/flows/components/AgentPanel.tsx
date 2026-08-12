@@ -1,18 +1,89 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Send, Sparkles } from 'lucide-react';
+import { ChevronDown, Send, Sparkles } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@flows/ui-kit';
 
 import type { Message, SessionState } from '@flows/agent';
+
+/** A model the agent can run on — the minimal shape the view needs (from the live catalog). */
+export interface AgentModelOption {
+    name: string;
+    label: string;
+}
 
 interface AgentPanelProps {
     /** The session to render; null before the first turn / while the transcript is hydrating. */
     session: SessionState | null;
     /** Emit a user message. The container owns the agent; this panel is a pure view. */
     onSend: (text: string) => void;
+    /** Reasoning-model options for the composer picker; empty/undefined hides it (still loading). */
+    models?: AgentModelOption[];
+    /** The current pick (highlighted). */
+    selectedModel?: string;
+    /** Choose a model; the container decides when it reaches the agent (next turn). */
+    onSelectModel?: (name: string) => void;
 }
+
+/**
+ * Composer model picker — the agent's reasoning model, ChatGPT/Claude-style, bottom-left of the
+ * input. Purely presentational: options + selection come from the container. Hidden until the
+ * catalog has options. Distinct from the generator block's `ModelSelect`: that picks the model the
+ * built workflow runs (which needs the user's BYO provider key, hence its lock affordance); this
+ * picks the model the assistant reasons with, which runs server-side and needs no user key — so
+ * every catalog model here is selectable.
+ */
+const ModelPicker = ({
+    options,
+    value,
+    onChange,
+}: {
+    options: AgentModelOption[];
+    value?: string;
+    onChange?: (name: string) => void;
+}) => {
+    const { t } = useTranslation(['flows']);
+    const [open, setOpen] = useState(false);
+    if (options.length === 0) {
+        return null;
+    }
+    const selected = options.find(o => o.name === value);
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    className="flex min-w-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/60"
+                >
+                    <span className="max-w-[150px] truncate">
+                        {selected?.label ?? value ?? t('agentPanel.model', 'Model')}
+                    </span>
+                    <ChevronDown className={cn('h-3 w-3 shrink-0 transition-transform', open && 'rotate-180')} />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" sideOffset={4} className="max-h-64 w-56 overflow-y-auto p-1">
+                {options.map(o => (
+                    <button
+                        key={o.name}
+                        type="button"
+                        onClick={() => {
+                            onChange?.(o.name);
+                            setOpen(false);
+                        }}
+                        className={cn(
+                            'flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-xs transition-colors',
+                            o.name === value ? 'bg-primary/10 font-medium text-primary' : 'hover:bg-muted/60'
+                        )}
+                    >
+                        <span className="truncate">{o.label}</span>
+                    </button>
+                ))}
+            </PopoverContent>
+        </Popover>
+    );
+};
 
 /** Messages the user should see: their own turns and the agent's text replies. */
 const isVisible = (m: Message): boolean =>
@@ -22,7 +93,7 @@ const isVisible = (m: Message): boolean =>
  * The right-docked assistant panel — a pure view over the agent session: it renders the transcript
  * and emits `onSend`, owning no agent or wiring (a container like `FlowAgentPanel` supplies both).
  */
-export const AgentPanel = ({ session, onSend }: AgentPanelProps) => {
+export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSelectModel }: AgentPanelProps) => {
     const { t } = useTranslation(['flows']);
     const [draft, setDraft] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -116,24 +187,27 @@ export const AgentPanel = ({ session, onSend }: AgentPanelProps) => {
 
             {/* Composer */}
             <div className="border-t border-border/40 p-3">
-                <div className="flex items-end gap-2 rounded-xl border border-border/40 bg-muted/30 px-2 py-1.5 focus-within:border-primary/60">
+                <div className="flex flex-col gap-1 rounded-xl border border-border/40 bg-muted/30 px-2 py-1.5 focus-within:border-primary/60">
                     <textarea
                         value={draft}
                         onChange={e => setDraft(e.target.value)}
                         onKeyDown={onKeyDown}
                         rows={1}
                         placeholder={t('agentPanel.placeholder', 'Ask the assistant…')}
-                        className="max-h-32 flex-1 resize-none bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
+                        className="max-h-32 w-full resize-none bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
                     />
-                    <button
-                        type="button"
-                        aria-label={t('agentPanel.send', 'Send')}
-                        onClick={submit}
-                        disabled={isThinking || draft.trim().length === 0}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
-                    >
-                        <Send className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center justify-between gap-2">
+                        <ModelPicker options={models} value={selectedModel} onChange={onSelectModel} />
+                        <button
+                            type="button"
+                            aria-label={t('agentPanel.send', 'Send')}
+                            onClick={submit}
+                            disabled={isThinking || draft.trim().length === 0}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+                        >
+                            <Send className="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
         </aside>

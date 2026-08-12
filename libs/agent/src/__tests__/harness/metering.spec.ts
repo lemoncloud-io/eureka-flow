@@ -5,7 +5,7 @@ import { createMeter, meteringGateway, price } from './metering';
 import type { TokenTotals } from './metering';
 import type { Chunk, LlmGateway } from '../../llm/llmGateway';
 
-// Metering is the eval benchmark's efficiency axis (eval-benchmark.md §4.2). These offline tests
+// Metering is the eval efficiency axis (evaluation.md §6). These offline tests
 // guard every number the benchmark quotes, one responsibility each: the Meter counts (no rates), `price` prices
 // (no gateway), and `meteringGateway` taps usage into a shared Meter without touching the stream.
 

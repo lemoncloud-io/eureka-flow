@@ -17,16 +17,16 @@ const READY_CONNECTION: GenerateConnectionSnapshot = {
     generateReceiver: null, // set per-test
 };
 
-/** A fake receiver: runs `fire` (the POST), then resolves/rejects with a scripted result. */
+/** A fake receiver: records the requestId, runs `fire` (the POST), then resolves with a scripted result. */
 const makeFakeReceiver = (
-    resolveWith: GenerateResponse | (() => Promise<GenerateResponse>)
-): { receiver: GenerateReceiver<GenerateResponse>; waits: { correlationId: string }[] } => {
-    const waits: { correlationId: string }[] = [];
+    resolveWith: GenerateResponse
+): { receiver: GenerateReceiver<GenerateResponse>; waits: { requestId: string }[] } => {
+    const waits: { requestId: string }[] = [];
     const receiver: GenerateReceiver<GenerateResponse> = {
-        wait: async (correlationId, fire) => {
-            waits.push({ correlationId });
+        wait: async (requestId, fire) => {
+            waits.push({ requestId });
             await fire();
-            return typeof resolveWith === 'function' ? resolveWith() : resolveWith;
+            return resolveWith;
         },
     };
     return { receiver, waits };
@@ -47,192 +47,57 @@ const createGateway = (
     post: GeneratePostFn
 ) => {
     const connection: GenerateConnectionSnapshot = { ...READY_CONNECTION, ...overrides.connection };
-    return createGenerateApiLlmGateway({
-        getConnection: () => connection,
-        post,
-        ...overrides,
-    });
+    return createGenerateApiLlmGateway({ getConnection: () => connection, post, ...overrides });
 };
 
 const userSays = (content: string): ChatRequest => ({ messages: [{ role: 'user', content }], tools: [] });
+const wsGateway = (resolveWith: GenerateResponse, post = vi.fn().mockResolvedValue(undefined)) => {
+    const { receiver, waits } = makeFakeReceiver(resolveWith);
+    return { gateway: createGateway({ connection: { generateReceiver: receiver } }, post), post, waits };
+};
 
 describe('createGenerateApiLlmGateway', () => {
-    it('declares itself text-only', () => {
-        const { receiver } = makeFakeReceiver(textResponse('x'));
-        const gateway = createGateway({ connection: { generateReceiver: receiver } }, vi.fn());
-        expect(gateway.capabilities).toEqual({ toolCalls: false });
+    it('declares itself tool-capable', () => {
+        const { gateway } = wsGateway(textResponse('x'));
+        expect(gateway.capabilities).toEqual({ toolCalls: true });
     });
 
     describe('readiness guard', () => {
-        it('throws a clear error when the socket is not connected', async () => {
+        it('throws when a connection id exists but the socket is not connected', async () => {
             const { receiver } = makeFakeReceiver(textResponse('x'));
             const gateway = createGateway({ connection: { isConnected: false, generateReceiver: receiver } }, vi.fn());
             await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/not connected/);
         });
 
-        it('preserves the legacy error when connectionId is missing', async () => {
-            const post = vi.fn().mockResolvedValue({ data: textResponse('http') });
-            const gateway = createGateway(
-                { connection: { isConnected: false, connectionId: null, generateReceiver: null } },
-                post
-            );
-
-            await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/not connected/);
-            expect(post).not.toHaveBeenCalled();
-        });
-
-        it('preserves the legacy no-connectionId error after the socket reports connected', async () => {
-            const post = vi.fn();
-            const gateway = createGateway(
-                { connection: { isConnected: true, connectionId: null, generateReceiver: null } },
-                post
-            );
-
-            await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/no connectionId/);
-            expect(post).not.toHaveBeenCalled();
-        });
-
-        it('uses the HTTP response for tool calls when connectionId is missing', async () => {
-            const post = vi.fn().mockResolvedValue({ data: textResponse('http') });
-            const gateway = createGateway(
-                { toolCalls: true, connection: { isConnected: false, connectionId: null, generateReceiver: null } },
-                post
-            );
-
-            expect(await drain(gateway.chat(userSays('hi')))).toEqual([{ text: 'http' }, { done: true }]);
-            expect(post.mock.calls[0][2]).toEqual({ params: {} });
-        });
-
-        it('throws a clear error when the generate receiver is missing', async () => {
+        it('throws when a connection id exists but no receiver is registered', async () => {
             const gateway = createGateway({ connection: { generateReceiver: null } }, vi.fn());
             await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/no generate receiver/);
         });
     });
 
-    describe('request mapping', () => {
-        it('maps a single user message to a plain string prompt', async () => {
-            const { receiver } = makeFakeReceiver(textResponse('ok'));
-            const post = vi.fn().mockResolvedValue(undefined);
-            const gateway = createGateway({ connection: { generateReceiver: receiver } }, post);
-
-            await drain(gateway.chat(userSays('hello there')));
-
-            const body = post.mock.calls[0][1];
-            expect(body.prompt).toBe('hello there');
-        });
-
-        it('maps multi-turn user/assistant messages to GenerateContent[], assistant as model role', async () => {
-            const { receiver } = makeFakeReceiver(textResponse('ok'));
-            const post = vi.fn().mockResolvedValue(undefined);
-            const gateway = createGateway({ connection: { generateReceiver: receiver } }, post);
-
-            await drain(
-                gateway.chat({
-                    messages: [
-                        { role: 'user', content: 'question' },
-                        { role: 'assistant', content: 'earlier answer' },
-                        { role: 'user', content: 'follow-up' },
-                    ],
-                    tools: [],
-                })
-            );
-
-            const body = post.mock.calls[0][1];
-            expect(body.prompt).toEqual({
-                content: [
-                    { role: 'user', parts: [{ text: 'question' }] },
-                    { role: 'model', parts: [{ text: 'earlier answer' }] },
-                    { role: 'user', parts: [{ text: 'follow-up' }] },
-                ],
-            });
-        });
-
-        it('joins system messages with \\n\\n into GenerateRequestBody.system', async () => {
-            const { receiver } = makeFakeReceiver(textResponse('ok'));
-            const post = vi.fn().mockResolvedValue(undefined);
-            const gateway = createGateway({ connection: { generateReceiver: receiver } }, post);
-
-            await drain(
-                gateway.chat({
-                    messages: [
-                        { role: 'system', content: 'be brief' },
-                        { role: 'system', content: 'answer in English' },
-                        { role: 'user', content: 'hi' },
-                    ],
-                    tools: [],
-                })
-            );
-
-            const body = post.mock.calls[0][1];
-            expect(body.system).toBe('be brief\n\nanswer in English');
-        });
-
-        it('maps temperature into config.temperature and honors a model override', async () => {
-            const { receiver } = makeFakeReceiver(textResponse('ok'));
-            const post = vi.fn().mockResolvedValue(undefined);
-            const gateway = createGateway(
-                {
-                    connection: { generateReceiver: receiver },
-                    model: 'gemini-2.5-pro',
-                    generation: { temperature: 0.3 },
-                },
-                post
-            );
-
-            await drain(gateway.chat(userSays('hi')));
-
-            const body = post.mock.calls[0][1];
-            expect(body.model).toBe('gemini-2.5-pro');
-            expect(body.config).toEqual({ temperature: 0.3 });
-        });
-
-        it('defaults the model to gemini-2.5-flash', async () => {
-            const { receiver } = makeFakeReceiver(textResponse('ok'));
-            const post = vi.fn().mockResolvedValue(undefined);
-            const gateway = createGateway({ connection: { generateReceiver: receiver } }, post);
-
-            await drain(gateway.chat(userSays('hi')));
-
-            expect(post.mock.calls[0][1].model).toBe('gemini-2.5-flash');
-        });
-    });
-
-    describe('transport', () => {
-        it('calls the receiver before post (receiver wraps the trigger) and posts to /runs/0/generate', async () => {
+    describe('socket delivery (transport=1)', () => {
+        it('waits on the receiver (keyed on the request id) before posting to /runs/0/generate', async () => {
             const order: string[] = [];
             const receiver: GenerateReceiver<GenerateResponse> = {
-                wait: async (correlationId, fire) => {
-                    order.push(`wait:${correlationId}`);
+                wait: async (requestId, fire) => {
+                    order.push(`wait:${requestId}`);
                     await fire();
                     return textResponse('ok');
                 },
             };
-            const post = vi.fn().mockImplementation(async () => {
-                order.push('post');
-            });
+            const post = vi.fn().mockImplementation(async () => order.push('post'));
             const gateway = createGateway({ connection: { generateReceiver: receiver } }, post);
 
             await drain(gateway.chat(userSays('hi')));
 
-            expect(order).toEqual(['wait:conn-1', 'post']);
+            const requestId = post.mock.calls[0][1].requestId;
+            expect(order).toEqual([`wait:${requestId}`, 'post']);
             expect(post.mock.calls[0][0]).toBe('/runs/0/generate');
-            expect(post.mock.calls[0][1]).not.toHaveProperty('requestId');
-        });
-
-        it('includes connection and transport=1 in post params', async () => {
-            const { receiver } = makeFakeReceiver(textResponse('ok'));
-            const post = vi.fn().mockResolvedValue(undefined);
-            const gateway = createGateway({ connection: { generateReceiver: receiver } }, post);
-
-            await drain(gateway.chat(userSays('hi')));
-
             expect(post.mock.calls[0][2]).toMatchObject({ params: { connection: 'conn-1', transport: 1 } });
         });
 
         it('passes the AbortSignal through to post', async () => {
-            const { receiver } = makeFakeReceiver(textResponse('ok'));
-            const post = vi.fn().mockResolvedValue(undefined);
-            const gateway = createGateway({ connection: { generateReceiver: receiver } }, post);
+            const { gateway, post } = wsGateway(textResponse('ok'));
             const controller = new AbortController();
 
             await drain(gateway.chat(userSays('hi'), { signal: controller.signal }));
@@ -258,148 +123,134 @@ describe('createGenerateApiLlmGateway', () => {
         });
     });
 
+    describe('HTTP-only delivery (no connection id)', () => {
+        it('posts with no connection/transport params and reads the completed body', async () => {
+            const post = vi.fn().mockResolvedValue({ data: textResponse('http') });
+            const gateway = createGateway(
+                { connection: { isConnected: false, connectionId: null, generateReceiver: null } },
+                post
+            );
+
+            expect(await drain(gateway.chat(userSays('hi')))).toEqual([{ text: 'http' }, { done: true }]);
+            expect(post.mock.calls[0][2]).toEqual({ params: {} });
+        });
+    });
+
+    describe('request mapping', () => {
+        it('maps a single user message to a plain string prompt and always includes messages + tools + requestId', async () => {
+            const { gateway, post } = wsGateway(textResponse('ok'));
+            const req: ChatRequest = {
+                messages: [{ role: 'user', content: 'hello there' }],
+                tools: [{ name: 'move_node', description: 'move', parameters: { type: 'object' } }],
+            };
+
+            await drain(gateway.chat(req));
+
+            const body = post.mock.calls[0][1];
+            expect(body.prompt).toBe('hello there');
+            expect(body.messages).toEqual(req.messages);
+            expect(body.tools).toEqual(req.tools);
+            expect(typeof body.requestId).toBe('string');
+        });
+
+        it('maps multi-turn user/assistant messages to GenerateContent[], assistant as model role', async () => {
+            const { gateway, post } = wsGateway(textResponse('ok'));
+
+            await drain(
+                gateway.chat({
+                    messages: [
+                        { role: 'user', content: 'question' },
+                        { role: 'assistant', content: 'earlier answer' },
+                        { role: 'user', content: 'follow-up' },
+                    ],
+                    tools: [],
+                })
+            );
+
+            expect(post.mock.calls[0][1].prompt).toEqual({
+                content: [
+                    { role: 'user', parts: [{ text: 'question' }] },
+                    { role: 'model', parts: [{ text: 'earlier answer' }] },
+                    { role: 'user', parts: [{ text: 'follow-up' }] },
+                ],
+            });
+        });
+
+        it('joins system messages, honors model + temperature, and defaults the model', async () => {
+            const withOverrides = (opts: Partial<CreateGenerateApiLlmGatewayOptions>) => {
+                const { receiver } = makeFakeReceiver(textResponse('ok'));
+                const post = vi.fn().mockResolvedValue(undefined);
+                return { gateway: createGateway({ connection: { generateReceiver: receiver }, ...opts }, post), post };
+            };
+
+            const tuned = withOverrides({ model: 'gemini-2.5-pro', generation: { temperature: 0.3 } });
+            await drain(
+                tuned.gateway.chat({
+                    messages: [
+                        { role: 'system', content: 'be brief' },
+                        { role: 'system', content: 'answer in English' },
+                        { role: 'user', content: 'hi' },
+                    ],
+                    tools: [],
+                })
+            );
+            const tunedBody = tuned.post.mock.calls[0][1];
+            expect(tunedBody.system).toBe('be brief\n\nanswer in English');
+            expect(tunedBody.model).toBe('gemini-2.5-pro');
+            expect(tunedBody.config).toEqual({ temperature: 0.3 });
+
+            const def = withOverrides({});
+            await drain(def.gateway.chat(userSays('hi')));
+            expect(def.post.mock.calls[0][1].model).toBe('gemini-2.5-flash');
+        });
+    });
+
     describe('response mapping', () => {
         it('maps a text response to a text chunk then a done chunk with usage', async () => {
-            const { receiver } = makeFakeReceiver({
+            const { gateway } = wsGateway({
                 output: { content: 'the answer' },
                 usage: { promptToken: 12, completionToken: 34, totalToken: 46 },
             });
-            const gateway = createGateway(
-                { connection: { generateReceiver: receiver } },
-                vi.fn().mockResolvedValue(undefined)
-            );
 
-            const chunks = await drain(gateway.chat(userSays('hi')));
-
-            expect(chunks).toEqual([
+            expect(await drain(gateway.chat(userSays('hi')))).toEqual([
                 { text: 'the answer' },
                 { done: true, usage: { inputTokens: 12, outputTokens: 34 } },
             ]);
         });
 
-        it('omits usage on the done chunk when the response has none', async () => {
-            const { receiver } = makeFakeReceiver({ output: { content: 'ok' } });
-            const gateway = createGateway(
-                { connection: { generateReceiver: receiver } },
-                vi.fn().mockResolvedValue(undefined)
-            );
-
-            const chunks = await drain(gateway.chat(userSays('hi')));
-
-            expect(chunks).toEqual([{ text: 'ok' }, { done: true }]);
+        it('omits usage and an empty text chunk when the response has neither', async () => {
+            const { gateway } = wsGateway(textResponse(''));
+            expect(await drain(gateway.chat(userSays('hi')))).toEqual([{ done: true }]);
         });
 
-        it('preserves an empty text chunk in legacy mode', async () => {
-            const { receiver } = makeFakeReceiver(textResponse(''));
-            const gateway = createGateway(
-                { connection: { generateReceiver: receiver } },
-                vi.fn().mockResolvedValue(undefined)
+        it('emits returned tool calls (a tool-only turn needs no output.content)', async () => {
+            const { gateway, post, waits } = wsGateway({
+                output: {} as GenerateResponse['output'],
+                toolCalls: [{ id: 'call-1', name: 'move_node', args: { nodeId: 'n1' } }],
+            });
+
+            const chunks = await drain(
+                gateway.chat({
+                    messages: [{ role: 'user', content: 'Move the node.' }],
+                    tools: [{ name: 'move_node', description: 'Move a node', parameters: { type: 'object' } }],
+                })
             );
 
-            expect(await drain(gateway.chat(userSays('hi')))).toEqual([{ text: '' }, { done: true }]);
+            expect(waits).toEqual([{ requestId: post.mock.calls[0][1].requestId }]);
+            expect(chunks).toEqual([
+                { toolCall: { id: 'call-1', name: 'move_node', argsDelta: '{"nodeId":"n1"}' } },
+                { done: true },
+            ]);
         });
 
-        it('throws a text-only error when output.content is an object (image result)', async () => {
-            const { receiver } = makeFakeReceiver({ output: { content: { data: 'data:image/png;base64,abc' } } });
-            const gateway = createGateway(
-                { connection: { generateReceiver: receiver } },
-                vi.fn().mockResolvedValue(undefined)
-            );
-
-            await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/text-only/);
+        it('throws when output.content is a non-text object (image result)', async () => {
+            const { gateway } = wsGateway({ output: { content: { data: 'data:image/png;base64,abc' } } });
+            await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/not text/);
         });
 
-        it('throws a clear error when output.content is missing', async () => {
-            const { receiver } = makeFakeReceiver({ output: {} } as unknown as GenerateResponse);
-            const gateway = createGateway(
-                { connection: { generateReceiver: receiver } },
-                vi.fn().mockResolvedValue(undefined)
-            );
-
+        it('throws when there is neither content nor tool calls', async () => {
+            const { gateway } = wsGateway({ output: {} } as unknown as GenerateResponse);
             await expect(drain(gateway.chat(userSays('hi')))).rejects.toThrow(/missing output.content/);
-        });
-    });
-
-    it('sends tools through run generate and emits returned tool calls when enabled', async () => {
-        const { receiver, waits } = makeFakeReceiver({
-            output: { content: '' },
-            toolCalls: [{ id: 'call-1', name: 'move_node', args: { nodeId: 'n1' } }],
-        });
-        const post = vi.fn().mockResolvedValue(undefined);
-        const gateway = createGateway({ toolCalls: true, connection: { generateReceiver: receiver } }, post);
-        const request: ChatRequest = {
-            messages: [{ role: 'user', content: 'Move the node.' }],
-            tools: [{ name: 'move_node', description: 'Move a node', parameters: { type: 'object' } }],
-        };
-
-        const chunks = await drain(gateway.chat(request));
-
-        expect(gateway.capabilities).toEqual({ toolCalls: true });
-        expect(post.mock.calls[0][0]).toBe('/runs/0/generate');
-        expect(post.mock.calls[0][1]).toMatchObject({ messages: request.messages, tools: request.tools });
-        expect(waits).toEqual([{ correlationId: post.mock.calls[0][1].requestId }]);
-        expect(chunks).toEqual([
-            { toolCall: { id: 'call-1', name: 'move_node', argsDelta: '{"nodeId":"n1"}' } },
-            { done: true },
-        ]);
-    });
-
-    describe('tool rejection (text-only)', () => {
-        it('rejects requests carrying tool definitions', async () => {
-            const { receiver } = makeFakeReceiver(textResponse('ok'));
-            const gateway = createGateway(
-                { connection: { generateReceiver: receiver } },
-                vi.fn().mockResolvedValue(undefined)
-            );
-
-            await expect(
-                drain(
-                    gateway.chat({
-                        messages: [{ role: 'user', content: 'hi' }],
-                        tools: [{ name: 'move_node', description: 'move', parameters: { type: 'object' } }],
-                    })
-                )
-            ).rejects.toThrow(/text-only.*tool definitions/);
-        });
-
-        it('rejects requests carrying tool messages', async () => {
-            const { receiver } = makeFakeReceiver(textResponse('ok'));
-            const gateway = createGateway(
-                { connection: { generateReceiver: receiver } },
-                vi.fn().mockResolvedValue(undefined)
-            );
-
-            await expect(
-                drain(
-                    gateway.chat({
-                        messages: [{ role: 'tool', content: '{}', toolCallId: 'c1' }],
-                        tools: [],
-                    })
-                )
-            ).rejects.toThrow(/text-only.*tool messages/);
-        });
-
-        it('rejects requests carrying assistant tool calls', async () => {
-            const { receiver } = makeFakeReceiver(textResponse('ok'));
-            const gateway = createGateway(
-                { connection: { generateReceiver: receiver } },
-                vi.fn().mockResolvedValue(undefined)
-            );
-
-            await expect(
-                drain(
-                    gateway.chat({
-                        messages: [
-                            {
-                                role: 'assistant',
-                                content: null,
-                                toolCalls: [{ id: 'c1', name: 'move_node', args: '{}' }],
-                            },
-                        ],
-                        tools: [],
-                    })
-                )
-            ).rejects.toThrow(/text-only.*tool messages/);
         });
     });
 });

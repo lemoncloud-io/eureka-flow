@@ -3,33 +3,26 @@ import { api } from '@flows/web-core';
 import type { ChatMessage, ChatRequest, Chunk, LlmGateway, ToolDef } from '@flows/agent';
 
 /**
- * Frontend adapter foundation for eureka-flow's Generate API (item 7, GenAI adaptor with
- * eureka-flows-api). Implements the shared {@link LlmGateway} `chat()` contract; text-only
- * for now (`capabilities.toolCalls = false`).
+ * Frontend gateway for eureka-flows-api's Generate endpoint (`POST /runs/0/generate`). Implements
+ * the shared {@link LlmGateway} `chat()` contract and is tool-capable: it sends the provider-neutral
+ * `messages` + `tools` transcript and surfaces the model's tool calls back to the browser, so it can
+ * drive the orchestrator's client-side tool loop.
  *
- * Per Claire's spec, the HTTP call is only an ACK — the model's actual answer is meant to
- * arrive over the existing flow WebSocket, reassembled by a "generate receiver" keyed on
- * the socket's `connectionId`. That receiver does not exist in the socket layer yet, so
- * this gateway depends on a small local interface ({@link GenerateReceiver}) instead of
- * importing one — real socket wiring is a TODO once `libs/socket` grows one.
+ * The HTTP call is an ACK; the completed result is delivered one of two ways, chosen by whether a
+ * tool-socket connection is available (read fresh on every call via {@link GenerateConnectionSnapshot}):
+ * - **connection present** → `transport=1`: the result arrives over the tool WebSocket as a
+ *   JSONTransport payload, reassembled by the injected {@link GenerateReceiver} and correlated by a
+ *   per-request `requestId`.
+ * - **no connection** → HTTP-only: the completed result comes back in the POST response body.
  *
- * Real-API smoke testing confirmed the HTTP path works (ACK 200, inner `StatusCode: 202` =
- * async acceptance) but **no WS result
- * frames were observed** in local dev. The inline ACK body is not the model's answer — an
- * empty `text`/`output.content` and the async-acceptance status rule that out — so this
- * gateway does not fall back to it. Until a real receiver is wired, `chat()` will hang
- * waiting on `generateReceiver.wait(...)`, exactly reflecting that unresolved state; nothing
- * here fabricates a result.
- *
- * This file lives in the app layer, not `libs/agent`, because it depends on the app's API
- * client (`@flows/web-core`) and on a socket/receiver concept the agent core knows nothing
- * about.
+ * This file lives in the app layer, not `libs/agent`, because it depends on the app's API client
+ * (`@flows/web-core`, which owns `x-api-key` + base URL) and on the socket receiver concept.
  */
 
-/** Structural stand-in for the eventual real receiver (e.g. `ProxyTransportReceiver`). */
+/** The injected result receiver: registers interest for a `requestId`, runs the HTTP trigger, and
+ * resolves with the reassembled {@link GenerateResponse} once the socket delivers it. */
 export interface GenerateReceiver<T> {
-    /** Registers interest for a connection ID or request ID (tool calls), then runs the HTTP trigger. */
-    wait(correlationId: string, fire: () => Promise<unknown>): Promise<T>;
+    wait(requestId: string, fire: () => Promise<unknown>): Promise<T>;
 }
 
 export interface GenerateContent {
@@ -73,8 +66,8 @@ export interface GenerateResponse {
     toolCalls?: Array<{ id: string; name: string; args: unknown }>;
 }
 
-/** The live flow socket's state, read fresh on every `chat()` call — never cached, since a
- * reconnect issues a new `connectionId` (spec: "after reconnecting, use the latest value"). */
+/** The live tool-socket state, read fresh on every `chat()` call — never cached, since a reconnect
+ * issues a new `connectionId` (spec: "after reconnecting, use the latest value"). */
 export interface GenerateConnectionSnapshot {
     isConnected: boolean;
     connectionId: string | null;
@@ -92,23 +85,19 @@ export interface CreateGenerateApiLlmGatewayOptions {
     /** Defaults to `gemini-2.5-flash`. */
     model?: string;
     generation?: { temperature?: number };
-    /** Enables the provider-neutral messages/tools fields and tool-call response chunks. */
-    toolCalls?: boolean;
     /** Generate route; defaults to the production Run endpoint. */
     endpointPath?: string;
 }
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
-const TEXT_ONLY = 'Generate API gateway is text-only in this slice (capabilities.toolCalls = false)';
 
 const defaultPost: GeneratePostFn = (url, body, config) => api.post(url, body, config);
 
 const toGenerateRequestBody = (
     req: ChatRequest,
-    requestId: string | undefined,
+    requestId: string,
     model: string,
-    generation?: { temperature?: number },
-    toolCalls?: boolean
+    generation?: { temperature?: number }
 ): GenerateRequestBody => {
     const systemTexts = req.messages.filter(message => message.role === 'system').map(message => message.content ?? '');
     const turnMessages = req.messages.filter(message => message.role === 'user' || message.role === 'assistant');
@@ -126,96 +115,73 @@ const toGenerateRequestBody = (
               };
 
     return {
-        ...(requestId ? { requestId } : {}),
+        requestId,
         model,
         prompt,
         ...(systemTexts.length > 0 ? { system: systemTexts.join('\n\n') } : {}),
         ...(generation?.temperature !== undefined ? { config: { temperature: generation.temperature } } : {}),
-        ...(toolCalls ? { messages: req.messages, tools: req.tools } : {}),
+        messages: req.messages,
+        tools: req.tools,
     };
 };
 
-/**
- * Implements the shared `chat()` contract over Generate HTTP ACK + WebSocket result delivery.
- */
+/** Implements the shared `chat()` contract over Generate HTTP ACK + WebSocket result delivery. */
 export const createGenerateApiLlmGateway = (options: CreateGenerateApiLlmGatewayOptions): LlmGateway => {
     const {
         getConnection,
         post = defaultPost,
         model = DEFAULT_MODEL,
         generation,
-        toolCalls = false,
         endpointPath = '/runs/0/generate',
     } = options;
 
     async function* chat(req: ChatRequest, opts?: { signal?: AbortSignal }): AsyncIterable<Chunk> {
         const { isConnected, connectionId, generateReceiver } = getConnection();
-
-        if (!toolCalls && !isConnected) {
-            throw new Error('Generate API gateway unavailable: the flow socket is not connected');
-        }
-        if (!toolCalls && !connectionId) {
-            throw new Error('Generate API gateway unavailable: no connectionId (socket not ready yet)');
-        }
-        if (toolCalls && connectionId && !isConnected) {
-            throw new Error('Generate API gateway unavailable: the flow socket is not connected');
-        }
-        if (!toolCalls && !generateReceiver) {
-            throw new Error('Generate API gateway unavailable: no generate receiver registered on the socket');
-        }
-        if (!toolCalls && req.tools.length > 0) {
-            throw new Error(`${TEXT_ONLY}: tool definitions are not supported`);
-        }
-        if (
-            !toolCalls &&
-            req.messages.some(message => message.role === 'tool' || (message.toolCalls?.length ?? 0) > 0)
-        ) {
-            throw new Error(`${TEXT_ONLY}: tool messages are not supported`);
+        if (connectionId && !isConnected) {
+            throw new Error('Generate API gateway unavailable: the tool socket is not connected');
         }
 
-        const requestId = toolCalls ? crypto.randomUUID() : undefined;
-        const body = toGenerateRequestBody(req, requestId, model, generation, toolCalls);
+        const requestId = crypto.randomUUID();
+        const body = toGenerateRequestBody(req, requestId, model, generation);
 
-        const _request = async (): Promise<GenerateResponse> => {
-            if (!connectionId) {
-                const $http = await post(endpointPath, body, {
-                    params: {},
-                    ...(opts?.signal ? { signal: opts.signal } : {}),
-                });
-                return (($http as { data?: unknown })?.data ?? $http) as GenerateResponse;
-            }
+        // Socket delivery when a connection exists (result reassembled by the receiver, keyed on
+        // requestId); otherwise HTTP-only (the completed result comes back in the POST body).
+        let response: GenerateResponse;
+        if (connectionId) {
             if (!generateReceiver) {
                 throw new Error('Generate API gateway unavailable: no generate receiver registered on the socket');
             }
-            return generateReceiver.wait(requestId ?? connectionId, async () => {
-                await post(endpointPath, body, {
+            response = await generateReceiver.wait(requestId, () =>
+                post(endpointPath, body, {
                     params: { connection: connectionId, transport: 1 },
                     ...(opts?.signal ? { signal: opts.signal } : {}),
-                });
+                })
+            );
+        } else {
+            const http = await post(endpointPath, body, {
+                params: {},
+                ...(opts?.signal ? { signal: opts.signal } : {}),
             });
-        };
-        const response = await _request();
+            response = ((http as { data?: unknown })?.data ?? http) as GenerateResponse;
+        }
 
         if (opts?.signal?.aborted) {
             throw new DOMException('Aborted', 'AbortError');
         }
 
         const content = response.output?.content;
-        if (content === undefined || content === null) {
+        const calls = response.toolCalls ?? [];
+        if (typeof content === 'string') {
+            if (content) yield { text: content };
+        } else if (content != null) {
+            throw new Error('Generate API response content is not text (image/object output)');
+        } else if (calls.length === 0) {
             throw new Error('Generate API response is missing output.content');
         }
-        if (typeof content !== 'string') {
-            throw new Error(`${TEXT_ONLY}: response content is not text (image/object output)`);
-        }
 
-        if (content || !toolCalls) yield { text: content };
-        for (const toolCall of response.toolCalls ?? []) {
+        for (const toolCall of calls) {
             yield {
-                toolCall: {
-                    id: toolCall.id,
-                    name: toolCall.name,
-                    argsDelta: JSON.stringify(toolCall.args ?? {}),
-                },
+                toolCall: { id: toolCall.id, name: toolCall.name, argsDelta: JSON.stringify(toolCall.args ?? {}) },
             };
         }
 
@@ -231,7 +197,7 @@ export const createGenerateApiLlmGateway = (options: CreateGenerateApiLlmGateway
     }
 
     return {
-        capabilities: { toolCalls },
+        capabilities: { toolCalls: true },
         chat,
     };
 };

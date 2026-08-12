@@ -14,7 +14,11 @@ export type { OrchestratorAgentDeps } from './orchestratorAgent';
 // Agent roster (registry) + sub-agent runner (spawn)
 export { createAgentRoster } from './roster';
 export type { AgentCard, AgentRegistration, AgentRoster, SpecialistTurnDeps } from './roster';
-export { DEFAULT_REGISTRATIONS, createDefaultRoster } from './registrations';
+export { DEFAULT_REGISTRATIONS, createDefaultRoster, ORCHESTRATOR_MODEL_TIER } from './registrations';
+// Per-agent model selection: declarative config (withModels) + the memoized gatewayFor resolver.
+export { withModels, assertKnownModels } from './withModels';
+export { createModelGatewayFor, agentModelResolver } from './modelGatewayFor';
+export type { GatewayFactory, ModelForType, ModelGatewayForDeps } from './modelGatewayFor';
 export { createSubAgentRunner } from './subAgentRunner';
 export type {
     SpawnChildSpec,

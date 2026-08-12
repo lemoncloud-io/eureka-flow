@@ -15,10 +15,17 @@ export type SpecialistTurnDeps = BaseAgentDeps;
 
 /** One specialist registration — everything `list_agents` and `spawn` need; `create` builds the concrete agent bound to the live canvas. */
 export interface AgentRegistration {
-    /** Spawn key, e.g. 'locator'. */
+    /** Spawn key, e.g. 'builder'. */
     type: string;
     /** The one-line capability that becomes the {@link AgentCard}. */
     summary: string;
+    /**
+     * The LLM model this specialist runs on, e.g. 'gemini-2.5-pro'. Omit to INHERIT the
+     * orchestrator's gateway/model (the common case). Stamped from deployment config by
+     * {@link withModels}; resolved to a gateway by `createModelGatewayFor`. Deliberately NOT part of
+     * {@link AgentCard}, so it never leaks into the roster prompt.
+     */
+    model?: string;
     /** Build the concrete specialist agent for one sub-turn, bound to the live canvas. */
     create(deps: SpecialistTurnDeps): Agent;
 }
