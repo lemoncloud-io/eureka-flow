@@ -68,6 +68,11 @@
         "run": "실행",
         "metadata": "이름변경·게시"
     },
+    "canvasMenu": {
+        "portFilter": "{{type}} 입력 가능",
+        "showAll": "전체 블록 보기",
+        "noCompatibleBlocks": "이 포트를 받을 수 있는 블록이 없습니다"
+    },
     "sidebar": {
         "library": "라이브러리",
         "libraryShort": "Lib",
@@ -251,11 +256,11 @@
         "failedToCopyLink": "링크 복사 실패",
         "confirmClearCanvas": "캔버스를 지우시겠습니까?",
         "canvasCleared": "캔버스가 지워졌습니다",
-        "autoLayoutApplied": "자동 정렬이 적용되었습니다",
+        "autoLayoutApplied": "자동 정렬 적용 (Cmd/Ctrl + Shift + L)",
         "exportedToJson": "JSON으로 내보내기 완료",
-        "workflowImported": "워크플로우를 성공적으로 가져왔습니다",
-        "invalidWorkflowFile": "유효하지 않은 워크플로우 파일",
-        "failedToParseJson": "JSON 파일 파싱 실패",
+        "importedFromJson": "노드 {{count}}개를 불러왔습니다",
+        "importFailed": "{{file}}을(를) 불러오지 못했습니다: {{reason}}",
+        "importReplaceConfirm": "가져오기는 현재 그래프를 통째로 교체합니다. 저장하지 않은 변경이 있습니다. 계속할까요?",
         "runningAllNodes": "모든 노드 실행 중...",
         "executionStopped": "실행이 중지되었습니다",
         "savedAs": "\"{{flowName}}\"(으)로 저장됨",
@@ -429,7 +434,15 @@
                 },
                 "autoLayout": {
                     "label": "자동 정렬",
+                    "keys": ["Cmd/Ctrl", "Shift", "L"]
+                },
+                "selectAll": {
+                    "label": "전체 노드 선택",
                     "keys": ["Cmd/Ctrl", "A"]
+                },
+                "boxSelect": {
+                    "label": "범위 선택",
+                    "keys": ["Shift", "드래그"]
                 },
                 "delete": {
                     "label": "선택 항목 삭제",

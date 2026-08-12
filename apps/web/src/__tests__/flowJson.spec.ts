@@ -33,8 +33,19 @@ describe('serializeFlowJson / parseFlowJson round-trip', () => {
         expect(result.graph.edges[0].id).toBe(graph.edges[0].id);
     });
 
-    it('keeps the node id in the serialized text (unlike the id-stripping Header export)', () => {
+    it('keeps the node id in the serialized text — the edges reference it', () => {
         expect(serializeFlowJson(graph)).toContain('n' + 'a'.repeat(32));
+    });
+
+    it('accepts what the File menu export writes, so the round-trip closes', () => {
+        // The Header export is this same serializer now. It used to strip ids, which left
+        // edges pointing at nodes that no longer had one — unimportable by construction.
+        const exported = serializeFlowJson(graph);
+        const result = parseFlowJson(exported);
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.graph.edges[0].sourceNodeId).toBe(result.graph.nodes[0].id);
     });
 });
 

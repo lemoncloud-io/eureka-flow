@@ -11,6 +11,7 @@ import {
     LAYOUT_CONFIG,
     PORT_LAYOUT,
     estimateNodeHeight,
+    findNodeAtPoint,
     flowStorage,
     getEffectiveState,
     getNode,
@@ -19,6 +20,9 @@ import {
     getPortData,
     hydrateInputsFromUpstream,
     loadFlow,
+    nodesInRect,
+    normalizeRect,
+    pasteOffsetTo,
     runFlow,
     runNode,
     shouldUpdateState,
@@ -53,7 +57,7 @@ import {
     getVisiblePorts,
 } from '../utils';
 
-import type { ClipboardPayload, FlowEngine } from '@flows/engine';
+import type { FlowEngine } from '@flows/engine';
 import type { FlowRole, GraphNode, GraphSnapshot, LoadFlowPortData, NodeState } from '@flows/flows';
 import type { NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
 
@@ -77,8 +81,15 @@ interface WorkflowStateWithLegacyEdges extends WorkflowState {
     connections?: WorkflowState['edges'];
 }
 
+/** The output port a new node should be wired to, when the caller already knows it. */
+export interface LinkSource {
+    nodeId: string;
+    portId: string;
+    portType: string;
+}
+
 export interface WorkflowCanvasRef {
-    addNode: (type: string, position?: { x: number; y: number }) => void;
+    addNode: (type: string, position?: { x: number; y: number }, source?: LinkSource) => void;
     getWorkflow: () => GraphSnapshot;
     /** Load workflow from server data. Fetches missing port data (data: null) via API. */
     loadWorkflow: (state: WorkflowStateWithPorts) => Promise<void>;
@@ -88,6 +99,8 @@ export interface WorkflowCanvasRef {
     redo: () => void;
     autoLayout: () => void;
     selectNode: (nodeId: string | null) => void;
+    /** Select every node on the canvas. */
+    selectAll: () => void;
     /** Execute a specific node by ID */
     executeNode: (nodeId: string) => Promise<void>;
     /** Update node from server data (used for socket node update notifications) */
@@ -146,6 +159,25 @@ const MAX_ZOOM = 5;
 
 /** Mouse movement threshold (px) to distinguish click from drag */
 const CLICK_THRESHOLD = 5;
+
+/** World-space gap left between a node and one inserted beside it */
+const NEW_NODE_GAP = 80;
+
+const snapToGrid = (point: { x: number; y: number }) => ({
+    x: Math.round(point.x / GRID_SIZE) * GRID_SIZE,
+    y: Math.round(point.y / GRID_SIZE) * GRID_SIZE,
+});
+
+interface MarqueeCorners {
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+}
+
+/** The two dragged corners as a rectangle — the one shape both the box and the hit test use. */
+const marqueeRect = (m: MarqueeCorners) =>
+    normalizeRect({ x: m.startX, y: m.startY, width: m.currentX - m.startX, height: m.currentY - m.startY });
 
 /** Touch port hit detection threshold in world coordinates */
 const TOUCH_PORT_HIT_THRESHOLD = 50;
@@ -265,9 +297,6 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         const connections = useCanvasConnections();
         const setNodes = useCanvasStore(state => state.setNodes);
 
-        // Nothing renders from the copied payload, so it lives in a ref: holding it in
-        // state would re-render the whole canvas on Ctrl+C.
-        const clipboardRef = useRef<ClipboardPayload | null>(null);
         const [resizingNode, setResizingNode] = useState<{ nodeId: string; width: number } | null>(null);
 
         const executeNodeRef = useRef<(nodeId: string) => Promise<void> | undefined>(undefined);
@@ -383,7 +412,39 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             screenY: number;
             worldX: number;
             worldY: number;
+            // Set when the menu came from a link dropped on empty canvas: whatever block
+            // the user picks gets wired to this port. Survives "show all blocks".
+            fromDraft?: { sourceNodeId: string; sourcePortId: string; sourceType: string };
+            // What the block list is narrowed to. Seeded from the draft's port type and
+            // cleared on its own, so widening the list never forgets the wiring.
+            portTypeFilter?: string;
         } | null>(null);
+
+        // Shift-drag selection box, in world coordinates so it stays put while zooming.
+        // Shift is also what adds a node to the selection by click, so the box adds too.
+        //
+        // The rectangle lives in a ref and is written straight onto the overlay's style,
+        // for the same reason the viewport does: a state update per mouse move would
+        // re-render every node on the canvas at drag frame rate. Only `isMarqueeActive`
+        // is state, and it changes exactly twice per gesture.
+        const marqueeRef = useRef<MarqueeCorners | null>(null);
+        const marqueeBoxRef = useRef<HTMLDivElement>(null);
+        const [isMarqueeActive, setIsMarqueeActive] = useState(false);
+
+        const paintMarquee = useCallback(() => {
+            const box = marqueeBoxRef.current;
+            const corners = marqueeRef.current;
+            if (!box || !corners) return;
+            const { x, y, width, height } = marqueeRect(corners);
+            box.style.left = `${x}px`;
+            box.style.top = `${y}px`;
+            box.style.width = `${width}px`;
+            box.style.height = `${height}px`;
+        }, []);
+
+        // Where the pointer last was, in screen coordinates — converting to world here
+        // would force a layout on every mouse move for a value only paste reads.
+        const lastCanvasPointRef = useRef<{ x: number; y: number } | null>(null);
 
         const portMouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -497,6 +558,19 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             [onNodeSelect]
         );
 
+        /**
+         * Select a whole set at once (marquee, select-all). The detail panel follows a
+         * single selection only, so it is told about the node just when there is one.
+         */
+        const selectNodeIds = useCallback(
+            (ids: string[]) => {
+                setSelectedNodeIds(new Set(ids));
+                setSelectedConnectionId(null);
+                onNodeSelect?.(ids.length === 1 ? ids[0] : null);
+            },
+            [onNodeSelect, setSelectedConnectionId]
+        );
+
         const screenToWorld = useCallback((clientX: number, clientY: number) => {
             const rect = canvasRef.current?.getBoundingClientRect();
             if (!rect) return { x: 0, y: 0 };
@@ -507,11 +581,20 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             };
         }, []);
 
+        /** A node's on-canvas box, measured the same way the canvas draws it. */
+        const nodeBounds = useCallback(
+            (node: GraphNode) => ({
+                width: getNodeWidth(node),
+                height: estimateNodeHeight(node, blockRegistry[node.type]),
+            }),
+            [blockRegistry]
+        );
+
         // eslint-disable-next-line @typescript-eslint/no-empty-function -- initialized before useImperativeHandle sets the real function
-        const addNodeRef = useRef<(type: string, position?: { x: number; y: number }) => void>(() => {});
+        const addNodeRef = useRef<WorkflowCanvasRef['addNode']>(() => {});
 
         useImperativeHandle(ref, () => {
-            const addNode = (type: string, position?: { x: number; y: number }) => {
+            const addNode = (type: string, position?: { x: number; y: number }, source?: LinkSource) => {
                 if (!permissions.canModifyCanvas) return;
 
                 const newDef = blockRegistry[type];
@@ -521,10 +604,21 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 let sourcePortId: string | undefined;
                 let targetPortId: string | undefined;
 
+                // A link dropped on empty canvas already says which port feeds the new node,
+                // so there is nothing to infer — the guesswork below is for the other paths.
+                if (source) {
+                    sourceNode = nodes.find(n => n.id === source.nodeId);
+                    const input = newDef.inputs.find(i => arePortTypesCompatible(source.portType, i.type));
+                    if (sourceNode && input) {
+                        sourcePortId = source.portId;
+                        targetPortId = input.id;
+                    }
+                }
+
                 // Auto-connect only when intent is clear:
                 // - 0-1 nodes: always auto-connect (obvious target)
                 // - 2+ nodes: only if a node is selected (explicit intent)
-                const shouldAutoConnect = nodes.length <= 1 || !!selectedNodeId;
+                const shouldAutoConnect = !source && (nodes.length <= 1 || !!selectedNodeId);
 
                 if (shouldAutoConnect && newDef.inputs.length > 0) {
                     const firstInput = newDef.inputs[0];
@@ -577,8 +671,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     startY = centerY - 50 + (Math.random() * 40 - 20);
                 }
 
-                const snappedX = Math.round(startX / GRID_SIZE) * GRID_SIZE;
-                const snappedY = Math.round(startY / GRID_SIZE) * GRID_SIZE;
+                const { x: snappedX, y: snappedY } = snapToGrid({ x: startX, y: startY });
 
                 const feedsNewNode = !!(sourceNode && sourcePortId && targetPortId);
 
@@ -745,6 +838,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     handleSelectionChange(nodeId);
                     if (nodeId) setSelectedConnectionId(null);
                 },
+                selectAll: () => selectNodeIds(nodes.map(n => n.id)),
                 autoLayout: () => {
                     if (!permissions.canModifyCanvas) return;
                     if (nodes.length === 0) return;
@@ -985,14 +1079,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
             nodes,
             connections,
             permissions,
-            flowId,
             undo,
             redo,
             engine,
             commit,
             selectedNodeId,
+            selectNodeIds,
             handleSelectionChange,
             blockRegistry,
+            connectionId,
+            updateViewport,
         ]);
 
         const executeNode = useCallback(
@@ -1339,10 +1435,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                 commit('node:duplicate', ops => {
                     id = ops.addNode({
                         type: node.type,
-                        position: {
-                            x: Math.round((node.position.x + 40) / GRID_SIZE) * GRID_SIZE,
-                            y: Math.round((node.position.y + 40) / GRID_SIZE) * GRID_SIZE,
-                        },
+                        position: snapToGrid({ x: node.position.x + 40, y: node.position.y + 40 }),
                         config: node.config,
                         customLabel: node.customLabel ? `${node.customLabel} (copy)` : undefined,
                     });
@@ -1437,6 +1530,16 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
             if (connectionDraft?.clickMode) {
                 setConnectionDraft(null);
+                return;
+            }
+
+            // Shift-drag draws a selection box. Plain drag keeps panning, so the gesture
+            // people already have in their hands does not change under them.
+            if (e.button === 0 && e.shiftKey) {
+                setContextMenu(null);
+                const world = screenToWorld(e.clientX, e.clientY);
+                marqueeRef.current = { startX: world.x, startY: world.y, currentX: world.x, currentY: world.y };
+                setIsMarqueeActive(true);
                 return;
             }
 
@@ -1591,18 +1694,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         const initialPos = dragState.initialPositions.get(n.id);
                         if (!initialPos) return n;
 
-                        const rawX = initialPos.x + dx;
-                        const rawY = initialPos.y + dy;
-                        const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
-                        const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
-
-                        return { ...n, position: { x: snappedX, y: snappedY } };
+                        return { ...n, position: snapToGrid({ x: initialPos.x + dx, y: initialPos.y + dy }) };
                     })
                 );
 
                 lastTouchPosRef.current = { x: touch.clientX, y: touch.clientY };
             },
-            [dragState, permissions.canDragNodes]
+            [dragState, permissions.canDragNodes, setNodes]
         );
 
         /**
@@ -1647,6 +1745,17 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
         }, [dragState, commitDrag, handleSelectionChange]);
 
         const handleMouseMove = (e: React.MouseEvent) => {
+            lastCanvasPointRef.current = { x: e.clientX, y: e.clientY };
+
+            const marquee = marqueeRef.current;
+            if (marquee) {
+                const world = screenToWorld(e.clientX, e.clientY);
+                marquee.currentX = world.x;
+                marquee.currentY = world.y;
+                paintMarquee();
+                return;
+            }
+
             if (isPanning) {
                 const dx = e.clientX - lastMousePosRef.current.x;
                 const dy = e.clientY - lastMousePosRef.current.y;
@@ -1668,12 +1777,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         const initialPos = dragState.initialPositions.get(n.id);
                         if (!initialPos) return n;
 
-                        const rawX = initialPos.x + dx;
-                        const rawY = initialPos.y + dy;
-                        const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
-                        const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
-
-                        return { ...n, position: { x: snappedX, y: snappedY } };
+                        return { ...n, position: snapToGrid({ x: initialPos.x + dx, y: initialPos.y + dy }) };
                     })
                 );
             }
@@ -1686,6 +1790,17 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         const handleMouseUp = (e: React.MouseEvent) => {
             setIsPanning(false);
+
+            const marquee = marqueeRef.current;
+            if (marquee) {
+                const covered = nodesInRect(nodes, marqueeRect(marquee), nodeBounds);
+                marqueeRef.current = null;
+                setIsMarqueeActive(false);
+                // A box that caught nothing leaves the selection alone — treating it as
+                // "deselect everything" would punish a misaimed drag.
+                if (covered.length > 0) selectNodeIds([...new Set([...selectedNodeIds, ...covered])]);
+                return;
+            }
 
             if (dragState) commitDrag(dragState.initialPositions);
 
@@ -1702,6 +1817,31 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     portMouseDownPosRef.current = null;
                     return;
                 }
+            }
+
+            // Reaching here means the link was dragged past the click threshold and released
+            // outside any port — a port release never gets this far, PortItem stops it. Offer
+            // the blocks this port can feed instead of dropping the link on the floor.
+            if (connectionDraft && permissions.canModifyCanvas) {
+                const worldPos = screenToWorld(e.clientX, e.clientY);
+                // Released over a node's body rather than empty canvas: place the new node
+                // clear of it, or it would be born underneath the one it was dropped on.
+                const covered = findNodeAtPoint(nodes, worldPos, nodeBounds);
+                const insertAt = covered
+                    ? { x: covered.position.x + nodeBounds(covered).width + NEW_NODE_GAP, y: covered.position.y }
+                    : worldPos;
+                setContextMenu({
+                    screenX: e.clientX,
+                    screenY: e.clientY,
+                    worldX: insertAt.x,
+                    worldY: insertAt.y,
+                    fromDraft: {
+                        sourceNodeId: connectionDraft.sourceNodeId,
+                        sourcePortId: connectionDraft.sourcePortId,
+                        sourceType: connectionDraft.sourceType,
+                    },
+                    portTypeFilter: connectionDraft.sourceType,
+                });
             }
 
             portMouseDownPosRef.current = null;
@@ -1899,25 +2039,55 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
 
         useEffect(() => {
             const handleKeyDown = (e: KeyboardEvent) => {
-                if (!permissions.canModifyCanvas) return;
                 const target = e.target as HTMLElement;
                 const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
                 if (isInput) return;
+
+                // Escape only lets go of what is selected, so a viewer gets it too —
+                // gating it behind edit permission left them with no way to close a panel.
+                if (e.key === 'Escape') {
+                    // Read both through refs: they change on every mouse move of a drag,
+                    // and as deps they would re-register this listener at frame rate.
+                    if (connectionDraftRef.current) {
+                        setConnectionDraft(null);
+                        return;
+                    }
+                    if (marqueeRef.current) {
+                        marqueeRef.current = null;
+                        setIsMarqueeActive(false);
+                        return;
+                    }
+                    handleSelectionChange(null);
+                    setSelectedConnectionId(null);
+                    return;
+                }
+
+                if (!permissions.canModifyCanvas) return;
 
                 const isCtrlOrCmd = e.ctrlKey || e.metaKey;
 
                 if (isCtrlOrCmd && e.key.toLowerCase() === 'c') {
                     // The payload carries the edges running between the copied nodes, so a
-                    // pasted copy of a wired-up selection arrives wired up.
-                    if (selectedNodeIds.size > 0) clipboardRef.current = engine.copy([...selectedNodeIds]);
+                    // pasted copy of a wired-up selection arrives wired up. It goes to the
+                    // store rather than a local ref so it survives the canvas unmounting.
+                    if (selectedNodeIds.size > 0) {
+                        useCanvasStore.getState().setClipboard(engine.copy([...selectedNodeIds]));
+                    }
                 }
 
                 if (isCtrlOrCmd && e.key.toLowerCase() === 'v') {
-                    const payload = clipboardRef.current;
+                    // Read through getState: subscribing would put the clipboard in this
+                    // effect's deps and re-register the listener on every copy.
+                    const payload = useCanvasStore.getState().clipboard;
                     if (payload && payload.nodes.length > 0) {
-                        const pasted = engine.paste(payload, { x: 40, y: 40 });
-                        // Select all pasted nodes
-                        setSelectedNodeIds(new Set(pasted));
+                        // Land the copy under the pointer. Off-canvas (keyboard-only paste,
+                        // or the pointer over a panel) falls back to a visible nudge.
+                        const screen = lastCanvasPointRef.current;
+                        const offset = screen
+                            ? snapToGrid(pasteOffsetTo(payload.nodes, screenToWorld(screen.x, screen.y)))
+                            : { x: GRID_SIZE * 2, y: GRID_SIZE * 2 };
+                        const pasted = engine.paste(payload, offset);
+                        selectNodeIds(pasted);
                     }
                 }
 
@@ -1934,27 +2104,20 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                         setTooltip(null);
                     }
                 }
-
-                if (e.key === 'Escape') {
-                    if (connectionDraft) {
-                        setConnectionDraft(null);
-                        return;
-                    }
-                    handleSelectionChange(null);
-                    setSelectedConnectionId(null);
-                }
             };
 
             window.addEventListener('keydown', handleKeyDown);
             return () => window.removeEventListener('keydown', handleKeyDown);
         }, [
             engine,
+            screenToWorld,
             selectedNodeIds,
             selectedConnectionId,
             hoveredConnectionId,
             permissions.canModifyCanvas,
             commit,
             handleSelectionChange,
+            selectNodeIds,
         ]);
 
         // Pre-compute connected ports per node — avoids O(connections) per node per render
@@ -1990,6 +2153,7 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                     ref={canvasRef}
                     className={`relative flex-1 bg-canvas overflow-hidden outline-none ${role === 'anonymous' ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
                     onMouseMove={handleMouseMove}
+                    onMouseLeave={() => (lastCanvasPointRef.current = null)}
                     onMouseDown={handleCanvasMouseDown}
                     onContextMenu={handleCanvasContextMenu}
                     onTouchStart={handleCanvasTouchStart}
@@ -2069,6 +2233,13 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             transform: `translate(${viewportRef.current.x}px, ${viewportRef.current.y}px) scale(${viewportRef.current.zoom})`,
                         }}
                     >
+                        {isMarqueeActive && (
+                            <div
+                                ref={marqueeBoxRef}
+                                className="absolute border border-primary bg-primary/10 pointer-events-none z-30"
+                            />
+                        )}
+
                         <svg className="absolute overflow-visible top-0 left-0 w-full h-full">
                             {connections.map(conn => {
                                 const start = getPortPosition(conn.sourceNodeId, conn.sourcePortId, 'output');
@@ -2326,10 +2497,30 @@ export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>
                             screenX={contextMenu.screenX}
                             screenY={contextMenu.screenY}
                             onSelect={type => {
-                                addNodeRef.current(type, { x: contextMenu.worldX, y: contextMenu.worldY });
+                                const draft = contextMenu.fromDraft;
+                                addNodeRef.current(
+                                    type,
+                                    { x: contextMenu.worldX, y: contextMenu.worldY },
+                                    draft && {
+                                        nodeId: draft.sourceNodeId,
+                                        portId: draft.sourcePortId,
+                                        portType: draft.sourceType,
+                                    }
+                                );
                                 setContextMenu(null);
                             }}
                             onClose={handleCloseContextMenu}
+                            portFilter={
+                                contextMenu.portTypeFilter
+                                    ? {
+                                          type: contextMenu.portTypeFilter,
+                                          onClear: () =>
+                                              setContextMenu(prev =>
+                                                  prev ? { ...prev, portTypeFilter: undefined } : prev
+                                              ),
+                                      }
+                                    : undefined
+                            }
                         />
                     )}
                 </div>

@@ -1,3 +1,5 @@
+import { arePortTypesCompatible } from '@flows/engine';
+
 import { fieldKey, translateField } from './i18nServerKey';
 
 import type { BlockDefinitionWithFrontend } from '../types';
@@ -35,6 +37,17 @@ export const blockMatchesQuery = (
         fieldKey(block, 'description'),
         block.type,
     ].some(value => value?.toLowerCase().includes(query));
+
+/**
+ * Can a link dragged from an output port of type `portType` land on this block?
+ * True when the block has at least one input the port would be allowed to feed.
+ *
+ * A block with no inputs is never a candidate: there is nowhere for the link to go.
+ */
+export const blockAcceptsPortType = (
+    block: Pick<BlockDefinitionWithFrontend, 'inputs'>,
+    portType: string | undefined
+): boolean => (block.inputs ?? []).some(input => arePortTypesCompatible(portType, input.type));
 
 /**
  * Find block definition by config keys when node.type doesn't match registry
