@@ -8,9 +8,6 @@ generic one synthesized from the catalog on demand. There are no cross-block ope
 operation is a tool the right agent carries, not an agent of its own. The orchestrator carries no
 write tools; the specialists write through the shared `CanvasBinding`.
 
-Design docs — the shared architecture, interfaces, per-agent specs, tracing, and model selection —
-live in the team knowledge repository.
-
 ## What's here
 
 | Piece                            | File                              | Role                                                                                                                                                                                                                                                   |
