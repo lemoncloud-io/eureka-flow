@@ -9,6 +9,8 @@ type Pending = {
     resolve: (value: GenerateResponse) => void;
     reject: (error: unknown) => void;
     timer: ReturnType<typeof setTimeout>;
+    /** Detaches the abort listener; a no-op when the request carried no signal. Run on every settle. */
+    cleanup: () => void;
 };
 
 /** No socket result within this window ⇒ fail the request rather than leak a pending entry forever. */
@@ -82,6 +84,7 @@ class FlowJSONTransportReceiverAdapter implements FlowJSONTransportReceiver {
         const pending = this.waits.get(requestId);
         if (!pending) return undefined;
         clearTimeout(pending.timer);
+        pending.cleanup();
         this.waits.delete(requestId);
         return pending;
     };
@@ -91,13 +94,26 @@ class FlowJSONTransportReceiverAdapter implements FlowJSONTransportReceiver {
     };
 
     public readonly generateReceiver: GenerateReceiver<GenerateResponse> = {
-        wait: (requestId, fire) =>
+        wait: (requestId, fire, opts) =>
             new Promise<GenerateResponse>((resolve, reject) => {
+                const signal = opts?.signal;
+                if (signal?.aborted) {
+                    reject(new DOMException('Aborted', 'AbortError'));
+                    return;
+                }
                 const timer = setTimeout(() => {
                     this.settle(requestId);
                     reject(new Error(`Generate request timed out after ${this.timeoutMs}ms (no socket result)`));
                 }, this.timeoutMs);
-                this.waits.set(requestId, { resolve, reject, timer });
+                // Observe the signal for the whole wait, not just the POST: once the ACK resolves the
+                // request lingers on the socket result, and an aborted turn must drop it now — not in 120s.
+                const onAbort = (): void => {
+                    this.settle(requestId);
+                    reject(new DOMException('Aborted', 'AbortError'));
+                };
+                signal?.addEventListener('abort', onAbort);
+                const cleanup = (): void => signal?.removeEventListener('abort', onAbort);
+                this.waits.set(requestId, { resolve, reject, timer, cleanup });
                 fire().catch(error => {
                     this.settle(requestId);
                     reject(error);
