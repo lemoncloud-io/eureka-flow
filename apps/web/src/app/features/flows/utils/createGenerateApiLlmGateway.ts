@@ -20,9 +20,11 @@ import type { ChatMessage, ChatRequest, Chunk, LlmGateway, ToolDef } from '@flow
  */
 
 /** The injected result receiver: registers interest for a `requestId`, runs the HTTP trigger, and
- * resolves with the reassembled {@link GenerateResponse} once the socket delivers it. */
+ * resolves with the reassembled {@link GenerateResponse} once the socket delivers it. Aborting
+ * `opts.signal` settles the pending wait immediately (rejects with an `AbortError`) so a cancelled
+ * turn never holds its entry until the socket result or the timeout arrives. */
 export interface GenerateReceiver<T> {
-    wait(requestId: string, fire: () => Promise<unknown>): Promise<T>;
+    wait(requestId: string, fire: () => Promise<unknown>, opts?: { signal?: AbortSignal }): Promise<T>;
 }
 
 export interface GenerateContent {
@@ -151,11 +153,14 @@ export const createGenerateApiLlmGateway = (options: CreateGenerateApiLlmGateway
             if (!generateReceiver) {
                 throw new Error('Generate API gateway unavailable: no generate receiver registered on the socket');
             }
-            response = await generateReceiver.wait(requestId, () =>
-                post(endpointPath, body, {
-                    params: { connection: connectionId, transport: 1 },
-                    ...(opts?.signal ? { signal: opts.signal } : {}),
-                })
+            response = await generateReceiver.wait(
+                requestId,
+                () =>
+                    post(endpointPath, body, {
+                        params: { connection: connectionId, transport: 1 },
+                        ...(opts?.signal ? { signal: opts.signal } : {}),
+                    }),
+                opts?.signal ? { signal: opts.signal } : undefined
             );
         } else {
             const http = await post(endpointPath, body, {

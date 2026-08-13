@@ -40,11 +40,11 @@ export type { OpenAiLlmGateway, OpenAiLlmGatewayOptions } from './OpenAiLlmGatew
 export { createAnthropicToolLlmGateway } from './AnthropicToolLlmGateway';
 export type { AnthropicToolLlmGateway, AnthropicToolLlmGatewayOptions } from './AnthropicToolLlmGateway';
 
-// Shared provider-native tool-call verification — see provider-tool-calling.md §4
+// Shared provider-native tool-call verification
 export { verifyMoveNodeToolCall } from './verifyProviderToolCall';
 export type { VerifyMoveNodeResult } from './verifyProviderToolCall';
 
 // Tool-selection scenario matrix (list_nodes vs move_node, directions, absolute position,
-// refusal, unknown-target) — see provider-tool-calling.md §4
+// refusal, unknown-target)
 export { LOCATOR_SCENARIOS, runAllLocatorScenarios, runLocatorScenario } from './verifyLocatorScenarios';
 export type { LocatorScenarioId, LocatorScenarioResult, SeedNode } from './verifyLocatorScenarios';

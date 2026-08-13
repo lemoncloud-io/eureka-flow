@@ -211,7 +211,7 @@ describe('builder agent — progressive disclosure', () => {
 
 describe('builder agent — Approach 3: initial graph in the first user message + get_graph', () => {
     it('seeds the starting canvas into the first user message and offers get_graph (no per-turn injection)', async () => {
-        // Seed-once + pull (context-strategy-and-composition.md): the graph is not pushed every turn. It rides the FIRST user
+        // Seed-once + pull: the graph is not pushed every turn. It rides the FIRST user
         // message as the starting state, and the builder pulls fresh state on demand via get_graph — so the
         // transcript stays append-only and no volatile block sits in the cached prefix.
         const initial: Graph = {

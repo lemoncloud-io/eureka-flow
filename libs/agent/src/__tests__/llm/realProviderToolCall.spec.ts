@@ -20,8 +20,7 @@ import type { UsageTotals } from '../../llm/verificationMetrics';
  * offline `*.spec.ts` files (and `verifyProviderToolCall.spec.ts`) prove only the mapping/
  * parsing/scoring logic, not the models' behavior.
  *
- * The verification scenario itself lives in `verifyMoveNodeToolCall`
- * (docs/browser-agent/design/provider-tool-calling.md) so there is exactly one
+ * The verification scenario itself lives in `verifyMoveNodeToolCall`, so there is exactly one
  * implementation of "ask the model to move the node, dispatch the result, check the position".
  *
  * Each `it` below logs its own elapsed time (measured at the call site, around

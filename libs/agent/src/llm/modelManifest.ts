@@ -7,8 +7,7 @@ import type { ProviderModelEntry } from './providerRegistry';
  * `providerRegistry.ts` plus curated discovery metadata (source + timestamp) added alongside each
  * registry entry. This is additive over `ProviderModelEntry` — it does not replace or duplicate
  * the registry, only projects it into the richer per-model shape a benchmark/qualification report
- * needs (see docs/browser-agent/design/production-readiness.md for the qualification policy
- * this status vocabulary implements).
+ * needs (its status vocabulary implements a qualification policy).
  *
  * Every model id here traces to a real discovery source (a provider's own docs/pricing page, or
  * OpenRouter's public Models API — `GET https://openrouter.ai/api/v1/models`, no auth required,

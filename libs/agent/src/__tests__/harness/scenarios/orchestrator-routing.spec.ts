@@ -1,5 +1,5 @@
 /**
- * The shipped HYBRID orchestrator (architecture.md · context-strategy-and-composition.md §7): ONE system prompt
+ * The shipped HYBRID orchestrator: ONE system prompt
  * that splits a request by the KIND of work — the whole STRUCTURE to the builder as one plan, each node's
  * CONTENT to that block's own specialist by its type string. The routing lives in the prompt itself;
  * renderRoster just lists the available specialists in the head context. Offline: pure over the constant + roster.

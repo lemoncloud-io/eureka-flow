@@ -88,4 +88,44 @@ describe('createFlowJSONTransportReceiver', () => {
 
         await expect(pending).rejects.toThrow(/closed/);
     });
+
+    it('rejects with AbortError and drops the pending entry when the signal aborts mid-wait', async () => {
+        const connection = new TestToolSocketConnection();
+        const receiver = createFlowJSONTransportReceiver(connection);
+        receiver.attach();
+        const controller = new AbortController();
+
+        try {
+            const pending = receiver.generateReceiver.wait('request-1', async () => undefined, {
+                signal: controller.signal,
+            });
+            controller.abort();
+
+            await expect(pending).rejects.toThrow(/Aborted/);
+
+            // The entry is gone: a late socket result for the same request is ignored, not settled twice.
+            const payload = { requestId: 'request-1', output: { content: 'late' } };
+            const { manifest, chunks, complete } = splitJSON(payload, { largeValueBytes: 16, chunkBytes: 64 });
+            expect(() => [manifest, ...chunks, complete].forEach(packet => connection.publish(packet))).not.toThrow();
+        } finally {
+            receiver.close();
+        }
+    });
+
+    it('rejects immediately without firing the POST when the signal is already aborted', async () => {
+        const connection = new TestToolSocketConnection();
+        const receiver = createFlowJSONTransportReceiver(connection);
+        receiver.attach();
+        const controller = new AbortController();
+        controller.abort();
+        const fire = vi.fn(async () => undefined);
+
+        try {
+            const pending = receiver.generateReceiver.wait('request-1', fire, { signal: controller.signal });
+            await expect(pending).rejects.toThrow(/Aborted/);
+            expect(fire).not.toHaveBeenCalled();
+        } finally {
+            receiver.close();
+        }
+    });
 });
