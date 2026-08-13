@@ -152,7 +152,7 @@ export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSele
                     <div className="whitespace-pre-line pt-6 text-center text-xs text-muted-foreground/60">
                         {t(
                             'agentPanel.empty',
-                            'Ask in plain language, e.g.\n“add an HTTP request after the input”\n“generate a summary from the fetched text”\n“rename the preview to Result”\n“line the nodes up in one column”'
+                            'Ask in plain language, e.g.\n“create a flow that writes a blog title”\n“make the titles short and punchy”\n“rename the preview to Result”\n“line the nodes up in one column”'
                         )}
                     </div>
                 ) : (

@@ -2,7 +2,7 @@
     "agentPanel": {
         "title": "Assistant",
         "subtitle": "Ask in plain language to build, edit, and arrange your flow.",
-        "empty": "Ask in plain language, e.g.\n“add an HTTP request after the input”\n“generate a summary from the fetched text”\n“rename the preview to Result”\n“line the nodes up in one column”",
+        "empty": "Ask in plain language, e.g.\n“create a flow that writes a blog title”\n“make the titles short and punchy”\n“rename the preview to Result”\n“line the nodes up in one column”",
         "thinking": "Thinking…",
         "placeholder": "Ask the assistant to build or edit your flow…",
         "send": "Send"
