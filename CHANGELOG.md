@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-08-13] - root@0.71.0, @flows/web@0.71.0, @flows/admin@0.45.0
+
+### Features
+
+- (agent) per-agent model selection + epoch trace/context handoff
+- (agent) per-agent model selection with in-app reasoning-model picker
+- (web) add dedicated tool websocket support
+- (agent) enable tool calls through Generate API
+- (socket) receive JSON transport messages
+
+### Bug Fixes
+
+- (web) ground assistant panel examples in shipped blocks
+- (web) preserve legacy gateway behavior
+
+### Documentation
+
+- (agent) drop the design-docs pointer from the agent README
+- (agent) remove in-repo browser-agent docs (moved to knowledge repo)
+
 ## [2026-08-12] - root@0.70.0, @flows/web@0.70.0, @flows/admin@0.44.0
 
 ### Features
