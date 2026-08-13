@@ -34,6 +34,13 @@ export interface BaseAgentDeps {
     maxIterations?: number;
     /** Override the persona defaults (id/description/systemPrompt/grant). Tools are fixed by the agent. */
     config?: Partial<Omit<AgentConfig, 'tools'>>;
+    /**
+     * The model this agent's gateway runs on — supplied by the composition root that built the gateway.
+     * Surfaced in the trace as `gen_ai.request.model` (the orchestrator tags itself; the runner tags each
+     * child via `modelFor`, falling back to this). Omit ⇒ untagged. It is NOT used to detect a reload or
+     * switch — that is driven by instance identity (epoch), not by comparing model values.
+     */
+    model?: string;
 }
 
 /** One tool call drained from the stream: parsed `args` plus the `rawArgs` we persist.
@@ -102,16 +109,47 @@ export const collect = async (stream: AsyncIterable<Chunk>): Promise<CollectedRe
     };
 };
 
-/** Map the persisted transcript into the provider-neutral chat message list. */
-const mapTranscript = (messages: Message[]): ChatMessage[] => {
+/** Prepend a message's hidden {@link Message.seedPrefix} to its content when sending to the model. */
+const withSeed = (msg: Message): string | null => {
+    const body = msg.content ?? null;
+    if (!msg.seedPrefix) {
+        return body;
+    }
+    return body ? `${msg.seedPrefix}\n\n${body}` : msg.seedPrefix;
+};
+
+/**
+ * Map the persisted transcript into the provider-neutral chat message list.
+ *
+ * `baseIndex` is the context boundary: messages before it are sent as CONVERSATION ONLY — user turns
+ * and assistant text, with their tool-call/tool-result trace (and `thoughtSignature`s) dropped —
+ * while messages at/after it are sent in full. Default 0 ⇒ the whole transcript is sent in full
+ * (a same-instance turn). A continuation (reload or model switch) advances the boundary so the prior
+ * epoch's tool trace never reaches the new instance; the current graph rides the new turn's
+ * {@link Message.seedPrefix} instead.
+ */
+const mapTranscript = (messages: Message[], baseIndex = 0): ChatMessage[] => {
     const chat: ChatMessage[] = [];
-    for (const msg of messages) {
+    messages.forEach((msg, i) => {
+        if (i < baseIndex) {
+            // Pre-boundary: conversation only. Drop tool-result messages, tool calls, and the now-stale
+            // graph seed (a prior epoch's `seedPrefix`) — send just the message's own text.
+            if (msg.role === 'tool') {
+                return;
+            }
+            const body = msg.content ?? null;
+            if (msg.role === 'assistant' && !body) {
+                return; // a tool-call-only assistant turn has no conversational content to carry
+            }
+            chat.push({ role: msg.role, content: body });
+            return;
+        }
         if (msg.role === 'tool') {
             chat.push({ role: 'tool', content: msg.content ?? '', toolCallId: msg.toolCallId });
         } else if (msg.role === 'assistant' && msg.toolCalls?.length) {
             chat.push({
                 role: 'assistant',
-                content: msg.content ?? null,
+                content: withSeed(msg),
                 toolCalls: msg.toolCalls.map(tc => ({
                     id: tc.id,
                     name: tc.name,
@@ -120,9 +158,9 @@ const mapTranscript = (messages: Message[]): ChatMessage[] => {
                 })),
             });
         } else {
-            chat.push({ role: msg.role, content: msg.content ?? null });
+            chat.push({ role: msg.role, content: withSeed(msg) });
         }
-    }
+    });
     return chat;
 };
 
@@ -144,6 +182,12 @@ export abstract class BaseAgent implements Agent {
     protected readonly maxIterations: number;
     /** Persona + tools + grant — what varies per agent. The merge of the subclass `base` + `deps.config`. */
     protected readonly config: AgentConfig;
+    /** The model this agent runs on — surfaced in the trace (`gen_ai.request.model`); undefined ⇒ untagged. */
+    protected readonly model?: string;
+    /** Turns this INSTANCE has run; `0` on its first send. First send on a non-empty session ⇒ a continuation. */
+    private turnsRun = 0;
+    /** The current epoch (instance number): 1 fresh, +1 per new-instance continuation. Read by {@link beginRunContext}. */
+    protected currentEpoch = 1;
 
     /** Monotonic id counter for messages; seeded past the persisted transcript in {@link send}. */
     private seq = 0;
@@ -169,6 +213,7 @@ export abstract class BaseAgent implements Agent {
         this.executor = deps.executor ?? createToolExecutor(() => this.turnTracerHolder.current);
         this.maxIterations = deps.maxIterations ?? DEFAULT_MAX_ITERATIONS;
         this.config = { ...base, ...(deps.config ?? {}), tools: base.tools };
+        this.model = deps.model;
     }
 
     /**
@@ -183,10 +228,13 @@ export abstract class BaseAgent implements Agent {
     }
 
     /**
-     * Prepended once to the first user message of a fresh conversation — the initial state an agent is handed
-     * up front (seed-once + pull). Default none: a long-lived top-level agent (builder / orchestrator) seeds the
-     * starting graph here and then pulls fresh state via get_graph; a short-lived block specialist carries no
-     * get_graph and instead re-seeds its type-scoped canvas each turn via buildContextMessages.
+     * The graph seed carried on a (re)seed turn's hidden {@link Message.seedPrefix} — the current state
+     * an agent is handed up front (seed-then-pull). Rendered on a fresh conversation and again on a
+     * continuation (reload or model switch), where the once-seeded state is stale and the prior epoch's
+     * tool trace — which carried the current graph — was just dropped at the context boundary. Default none:
+     * a long-lived top-level agent (builder / orchestrator) seeds the graph here and then pulls fresh
+     * state via get_graph; a short-lived block specialist carries no get_graph and instead re-seeds its
+     * type-scoped canvas each turn via buildContextMessages.
      */
     protected initialUserPreamble(): string {
         return '';
@@ -295,17 +343,42 @@ export abstract class BaseAgent implements Agent {
         }
         this.onTurnSignal(signal);
 
-        // One request = one runId (the root mints it via beginRunContext; children inherit their parent's).
+        // Epoch = instance number. Fresh chat ⇒ 1; the first turn of a NEW instance over an existing session
+        // (a reload or model switch) opens the next epoch — a context boundary that re-seeds the graph and
+        // drops the prior epoch's tool trace. Later turns of the same instance keep their epoch.
+        const isFresh = state.messages.length === 0;
+        const isContinuation = !isFresh && this.turnsRun === 0;
+        this.turnsRun += 1;
+        if (isFresh) {
+            state.epoch = 1;
+        } else if (isContinuation) {
+            state.epoch = (state.epoch ?? 1) + 1;
+        }
+        this.currentEpoch = state.epoch ?? 1;
+
+        // One request = one runId (the root mints it via beginRunContext, which reads currentEpoch; children
+        // inherit their parent's).
         const runTracer = this.identityTracer.child(this.beginRunContext());
         this.setTurnTracer(runTracer);
         runTracer.emit({ name: TURN_START, fields: { graph: this.binding.readGraph() } });
 
-        // Seed the initial state into the first user message of a fresh conversation; later turns pull current
-        // state via get_graph, so the transcript stays append-only.
-        const preamble = state.messages.length === 0 ? this.initialUserPreamble() : '';
-        const userContent = preamble ? `${preamble}\n\n${text}` : text;
-        const userMsg: Message = { id: this.nextId('u'), role: 'user', content: userContent, ts: this.stamp() };
+        // Seed the CURRENT graph onto this turn's user message via the hidden `seedPrefix`, at each epoch
+        // boundary (fresh chat ⇒ first message; continuation ⇒ latest message, end of chatlog). Within an
+        // epoch later turns pull fresh state via get_graph, so the transcript stays cacheable.
+        const seedPrefix = isFresh || isContinuation ? this.initialUserPreamble() : '';
+        const userMsg: Message = {
+            id: this.nextId('u'),
+            role: 'user',
+            content: text,
+            ...(seedPrefix ? { seedPrefix } : {}),
+            ts: this.stamp(),
+        };
         state.messages.push(userMsg);
+        if (isContinuation) {
+            // Everything before this turn becomes conversation-only for the new epoch (drop the prior epoch's
+            // tool trace and its now-stale graph seed).
+            state.contextBaseIndex = state.messages.length - 1;
+        }
         state.phase = 'thinking';
         state.error = undefined;
         storage.save(state);
@@ -330,7 +403,7 @@ export abstract class BaseAgent implements Agent {
                 const chatMessages: ChatMessage[] = [
                     { role: 'system', content: config.systemPrompt },
                     ...this.buildContextMessages(),
-                    ...mapTranscript(state.messages),
+                    ...mapTranscript(state.messages, state.contextBaseIndex ?? 0),
                 ];
                 // Only send tool definitions to gateways that can act on them; a gateway that
                 // declares toolCalls: false would otherwise error on every turn just for

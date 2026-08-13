@@ -88,6 +88,9 @@ export interface OrchestratorAgentDeps extends BaseAgentDeps {
     roster?: AgentRoster;
     /** Per-child gateway; defaults to the orchestrator's own gateway (fine for a stateless real model). */
     gatewayFor?: (agentType: string) => LlmGateway;
+    /** Resolved model per child agentType (for the trace `gen_ai.request.model`); undefined ⇒ the child
+     *  inherits the orchestrator's `model`. Typically the same resolver used to build `gatewayFor`. */
+    modelFor?: (agentType: string) => string | undefined;
     /** Sub-agent dispatch — parallel barrier fan-out (default) or serial. */
     dispatchMode?: 'parallel' | 'serial';
 }
@@ -122,15 +125,24 @@ export class OrchestratorAgent extends BaseAgent {
     private readonly signalHolder: { current?: AbortSignal };
     /** Holds the current turn's tracer so spawned children hang under the right run/turn (set in {@link onTurnTracer}). */
     private readonly tracerHolder: { current: Tracer };
+    /** Holds the current epoch's flowPath (`${flowId}#${epoch}`) so spawned children nest under the right
+     *  orchestrator instance in the trace tree (set in {@link beginRunContext}). */
+    private readonly epochHolder: { current: string };
     /** Run-monotonic counter minting one runId per user request (see {@link beginRunContext}). */
     private runSeq = 0;
 
     constructor(deps: OrchestratorAgentDeps) {
         const roster = deps.roster ?? createDefaultRoster();
+        const epochHolder = { current: `${deps.flowId}#1` };
         const runner = createSubAgentRunner({
             roster,
             catalog: deps.catalog,
             flowId: deps.flowId,
+            // Children nest under the current orchestrator instance (epoch), so two turns across a
+            // reload/switch get distinct trace identities instead of colliding.
+            flowPathFor: () => epochHolder.current,
+            // Tag each child with its resolved model (inheriting the orchestrator's when unset).
+            modelFor: (agentType: string) => deps.modelFor?.(agentType) ?? deps.model,
             dispatchMode: deps.dispatchMode,
             maxIterations: deps.maxIterations,
             gatewayFor: deps.gatewayFor ?? (() => deps.gateway),
@@ -171,6 +183,7 @@ export class OrchestratorAgent extends BaseAgent {
         this.roster = roster;
         this.signalHolder = signalHolder;
         this.tracerHolder = tracerHolder;
+        this.epochHolder = epochHolder;
     }
 
     /** Republish the in-flight turn's tracer so the spawn tool hands children the right run/turn parent. */
@@ -179,18 +192,23 @@ export class OrchestratorAgent extends BaseAgent {
     }
 
     /**
-     * Bind the ROOT identity and mint one runId per request. Identity (agent name/id `orchestrator`, and
-     * `flowPath = this flow's id`) is what lets the record stream project without any per-caller wiring:
-     * spawned children nest under `${flowId}:${agentId}`, so the root must carry `flowPath = flowId` for the
-     * tree to link and the diff to root. NoopTracer ignores all of it, so it costs nothing when tracing is off.
+     * Bind the ROOT identity and mint one runId per request. Identity (agent name `orchestrator`, id
+     * `orchestrator#${epoch}`, and `flowPath = ${flowId}#${epoch}`) is what lets the record stream project
+     * without any per-caller wiring: spawned children nest under `${flowId}#${epoch}:${agentId}`, so each
+     * orchestrator instance (a reload or model switch bumps the epoch) is a distinct root in the forest, and
+     * the diffs root correctly. NoopTracer ignores all of it, so it costs nothing when tracing is off.
      */
     protected override beginRunContext(): TraceContext {
         this.runSeq += 1;
+        const epoch = this.currentEpoch;
+        const flowPath = `${this.flowId}#${epoch}`;
+        this.epochHolder.current = flowPath; // spawned children nest under this instance
         return {
-            runId: `run-${this.runSeq}`,
+            runId: `run-${epoch}.${this.runSeq}`,
             'gen_ai.agent.name': 'orchestrator',
-            'gen_ai.agent.id': 'orchestrator',
-            flowPath: this.flowId,
+            'gen_ai.agent.id': `orchestrator#${epoch}`,
+            flowPath,
+            ...(this.model ? { 'gen_ai.request.model': this.model } : {}),
         };
     }
 

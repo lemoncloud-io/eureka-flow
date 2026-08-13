@@ -196,41 +196,27 @@ const createScriptedGateway = (script: ScriptedTurn[]): LlmGateway & { requests:
     };
 };
 
-describe('BaseAgent.send() — thoughtSignature end-to-end (session reload → gateway request)', () => {
-    it("replays a prior turn's thoughtSignature from storage onto the outgoing request, unchanged, on the correct tool call only", async () => {
+describe('BaseAgent.send() — thoughtSignature end-to-end (same-instance replay → gateway request)', () => {
+    it("replays a prior turn's thoughtSignature onto a later same-instance turn, unchanged, on the correct call only", async () => {
         const binding = createInMemoryCanvasBinding({ nodes: [], edges: [] });
         const storage = createInMemorySessionStore();
-        const flowId = 'flow-reload-test';
+        const flowId = 'flow-sig-replay';
 
-        // Seed a session as if a prior Gemini turn already ran: an assistant message with two tool
-        // calls (one carrying a signature, one — a plain, non-Gemini-style call — without), each
-        // answered by its own tool-result message, exactly the shape BaseAgent itself persists.
-        storage.save({
-            flowId,
-            phase: 'idle',
-            messages: [
-                { id: 'u-1', role: 'user', content: 'list then move', ts: 1 },
-                {
-                    id: 'a-1',
-                    role: 'assistant',
-                    toolCalls: [
-                        {
-                            id: 'call_1',
-                            name: 'list_nodes',
-                            args: '{}',
-                            status: 'ok',
-                            thoughtSignature: 'opaque-sig-prior',
-                        },
-                        { id: 'call_2', name: 'move_node', args: '{"nodeId":"x"}', status: 'ok' },
-                    ],
-                    ts: 2,
-                },
-                { id: 't-1', role: 'tool', content: '{"nodes":[]}', toolCallId: 'call_1', ts: 3 },
-                { id: 't-2', role: 'tool', content: '{"ok":true}', toolCallId: 'call_2', ts: 4 },
-            ],
-        });
-
-        const gateway = createScriptedGateway([{ text: 'continuing' }]);
+        // Turn 1 emits an assistant turn with two tool calls — one carrying a Gemini "thinking" signature,
+        // one a plain call without — then ends. Turn 2 (the SAME instance, so NOT an epoch boundary — a
+        // reload/switch would condense and drop the trace) must replay them from storage onto the outgoing
+        // request unchanged. A tool that errors is fine: the assistant message (with its signatures) is
+        // persisted before dispatch.
+        const gateway = createScriptedGateway([
+            {
+                toolCalls: [
+                    { id: 'call_1', name: 'list_nodes', args: {}, thoughtSignature: 'opaque-sig-prior' },
+                    { id: 'call_2', name: 'move_node', args: { nodeId: 'x' } },
+                ],
+            },
+            { text: 'listed' }, // ends turn 1
+            { text: 'done' }, // turn 2
+        ]);
         const agent = createBuilderAgent({
             gateway,
             storage,
@@ -240,10 +226,10 @@ describe('BaseAgent.send() — thoughtSignature end-to-end (session reload → g
             userPermissions: { canModifyCanvas: true },
         });
 
-        await agent.send('what happened?');
+        await agent.send('list then move'); // turn 1 → persists the signed tool calls
+        await agent.send('what happened?'); // turn 2 → replays them (same instance, full replay)
 
-        expect(gateway.requests).toHaveLength(1);
-        const sentMessages = gateway.requests[0].messages;
+        const sentMessages = gateway.requests.at(-1)?.messages ?? [];
         const replayedAssistantMsg = sentMessages.find(
             m => m.role === 'assistant' && m.toolCalls?.some(tc => tc.id === 'call_1')
         );
@@ -265,27 +251,16 @@ describe('BaseAgent.send() — thoughtSignature end-to-end (session reload → g
         expect(replayedCall2).not.toHaveProperty('thoughtSignature');
     });
 
-    it('omits thoughtSignature on replay when the stored tool call never had one (every non-Gemini session)', async () => {
+    it('omits thoughtSignature on replay when the tool call never had one (every non-Gemini session)', async () => {
         const binding = createInMemoryCanvasBinding({ nodes: [], edges: [] });
         const storage = createInMemorySessionStore();
-        const flowId = 'flow-reload-no-signature';
+        const flowId = 'flow-no-sig';
 
-        storage.save({
-            flowId,
-            phase: 'idle',
-            messages: [
-                { id: 'u-1', role: 'user', content: 'go', ts: 1 },
-                {
-                    id: 'a-1',
-                    role: 'assistant',
-                    toolCalls: [{ id: 'call_1', name: 'list_nodes', args: '{}', status: 'ok' }],
-                    ts: 2,
-                },
-                { id: 't-1', role: 'tool', content: '{"nodes":[]}', toolCallId: 'call_1', ts: 3 },
-            ],
-        });
-
-        const gateway = createScriptedGateway([{ text: 'ok' }]);
+        const gateway = createScriptedGateway([
+            { toolCalls: [{ id: 'call_1', name: 'list_nodes', args: {} }] }, // no signature
+            { text: 'ok' }, // ends turn 1
+            { text: 'done' }, // turn 2
+        ]);
         const agent = createBuilderAgent({
             gateway,
             storage,
@@ -295,9 +270,10 @@ describe('BaseAgent.send() — thoughtSignature end-to-end (session reload → g
             userPermissions: { canModifyCanvas: true },
         });
 
+        await agent.send('go');
         await agent.send('continue');
 
-        const sentMessages = gateway.requests[0].messages;
+        const sentMessages = gateway.requests.at(-1)?.messages ?? [];
         const replayedAssistantMsg = sentMessages.find(
             m => m.role === 'assistant' && m.toolCalls?.some(tc => tc.id === 'call_1')
         );

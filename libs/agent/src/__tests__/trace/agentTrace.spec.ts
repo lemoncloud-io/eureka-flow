@@ -11,7 +11,7 @@ describe('createAgentTrace', () => {
         expect(trace.records()).toEqual([]);
         const p = trace.project();
         expect(p.transcripts).toEqual([]);
-        expect(p.tree).toBeNull();
+        expect(p.trees).toEqual([]);
         expect(p.diff).toEqual({ cumulative: null, perTurn: [] });
     });
 

@@ -72,7 +72,7 @@ export const GENERATOR_MODELS = [
 ] as const;
 
 /**
- * The four catalog types the scenarios exercise (harness-scenarios.md "Blocks used"): `input-text`,
+ * The four catalog types the scenarios exercise (scenario-ladder.md): `input-text`,
  * `buffer`, `single-output-generator`, `output-preview`. Test fixture only — the app builds its
  * catalog from the real `blockRegistry` (see `createBlockCatalogLookup`).
  */

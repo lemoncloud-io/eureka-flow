@@ -1,6 +1,6 @@
 /**
  * The structured result of a turn. `status` is an enum (robust to phrasing) so the same oracle runs
- * against a real model. Each status carries the invariant the oracle enforces (harness-scenarios.md).
+ * against a real model. Each status carries the invariant the oracle enforces (evaluation.md).
  *
  * There is **no `finish` tool**: production ends a turn with the orchestrator's plain-text message. This
  * type is the shape the EVAL parses an outcome into — `runScenario` re-asks the orchestrator for the

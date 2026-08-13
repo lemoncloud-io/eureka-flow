@@ -16,7 +16,7 @@ export interface AgentTracing {
     tracer: Tracer;
     /** Dev/test trace snapshot: level + event name + ts (redacted). Empty when tracing is off. */
     getTraceEntries: () => AgentTraceEntrySnapshot[];
-    /** The captured run projected 3 ways (chat per agent, call tree, graph diff). Empty when tracing is off. */
+    /** The captured run projected 3 ways (chat per agent, call forest, graph diff). Empty when tracing is off. */
     getProjections: () => TraceProjections;
 }
 

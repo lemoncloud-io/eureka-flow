@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createTracer } from '../../trace/createTracer';
 import { CANVAS_MUTATE, MESSAGE, TOOL_CALL, TOOL_RESULT, TURN_DONE, TURN_START } from '../../trace/events';
-import { toGraphDiff, toTraceTree, toTranscripts } from '../../trace/project';
+import { toGraphDiff, toTraceForest, toTranscripts } from '../../trace/project';
 import { memorySink } from '../../trace/sinks';
 
 import type { TraceRecord } from '../../trace/sink';
@@ -67,15 +67,15 @@ describe('trace projectors', () => {
         expect(builder?.chat[2].toolCallId).toBe('tc7');
     });
 
-    it('toTraceTree: orchestrator root with builder#1 nested under it by flowPath', () => {
-        const root = toTraceTree(records);
+    it('toTraceForest: orchestrator root with builder#1 nested under it by flowPath', () => {
+        const [root] = toTraceForest(records);
         expect(root?.agentId).toBe('orchestrator');
         expect(root?.flowPath).toBe('r42');
         expect(root?.children.map(c => c.agentId)).toEqual(['builder#1']);
         expect(root?.children[0].flowPath).toBe('r42:builder#1');
     });
 
-    it('toTraceTree ignores context-less lifecycle records (empty flowPath) when choosing the root', () => {
+    it('toTraceForest ignores context-less lifecycle records (empty flowPath) when choosing roots', () => {
         const sink = memorySink();
         const tracer = createTracer(sink);
         tracer.emit({ name: 'agent.run.start', fields: {} }); // web lifecycle event on the bare tracer: no flowPath
@@ -87,9 +87,10 @@ describe('trace projectors', () => {
         });
         root.emit({ name: TURN_START, fields: { graph: { nodes: [], edges: [] } } });
 
-        const tree = toTraceTree(sink.records);
-        expect(tree?.agentId).toBe('orchestrator'); // not a phantom '' lifecycle root
-        expect(tree?.flowPath).toBe('flow');
+        const forest = toTraceForest(sink.records);
+        expect(forest).toHaveLength(1); // not a phantom '' lifecycle root
+        expect(forest[0].agentId).toBe('orchestrator');
+        expect(forest[0].flowPath).toBe('flow');
     });
 
     it('toGraphDiff: root before/after delta = the added node, self-describing (id + type)', () => {

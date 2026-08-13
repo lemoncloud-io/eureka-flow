@@ -9,5 +9,5 @@ export type {
     EdgeChange,
 } from './types';
 export { toTranscripts } from './toTranscripts';
-export { toTraceTree } from './toTraceTree';
+export { toTraceForest } from './toTraceForest';
 export { toGraphDiff } from './toGraphDiff';

@@ -6,13 +6,20 @@ import pc from 'picocolors';
 
 import { assembleStack } from './assembleStack';
 import { composeFrame } from './render';
+import { resolveAgentModelConfig } from './resolveAgentModelConfig';
 import { createTerminalRun } from './terminalRun';
 import { createWireLog } from './wireLog';
+import { agentModelResolver, createModelGatewayFor } from '../agents/modelGatewayFor';
+import { DEFAULT_REGISTRATIONS, ORCHESTRATOR_MODEL_TIER } from '../agents/registrations';
+import { createAgentRoster } from '../agents/roster';
+import { assertKnownModels, withModels } from '../agents/withModels';
 import { liveModel, liveProvider, resolveLiveGateway } from '../llm/resolveLiveGateway';
 import { createAgentTrace, renderProjections } from '../trace';
 import { errorMessage } from '../utils/errors';
 
+import type { AgentRoster } from '../agents/roster';
 import type { Graph } from '../canvas';
+import type { LlmGateway as LlmGatewayType } from '../llm/llmGateway';
 import type { Chunk, LlmGateway } from '../llm/llmGateway';
 import type { SessionState } from '../session/session';
 
@@ -66,13 +73,25 @@ const main = async (): Promise<void> => {
     // Persist the built flow to the backend after each completed turn (connected mode only); `--no-autosave` opts out.
     const autosave = connected && !hasFlag('--no-autosave');
 
+    // Per-agent model config from AGENT_MODEL_* env (live only). `--model` overrides the reasoning
+    // model (the orchestrator's, which the builder inherits); other agents come from the config.
+    const modelConfig = fake
+        ? { deploymentModels: {}, defaultModel: undefined, reasoningModel: undefined }
+        : resolveAgentModelConfig();
+    const reasoningModel = flagValue('--model') ?? modelConfig.reasoningModel;
+
     // Gateway: direct Gemini from env, or the fake for UI dev. No credential and no --fake ⇒ print + exit.
-    const rawGateway = fake ? makeFakeGateway(FAKE_REPLY) : resolveLiveGateway({ model: flagValue('--model') });
+    const rawGateway = fake ? makeFakeGateway(FAKE_REPLY) : resolveLiveGateway({ model: reasoningModel });
     if (!rawGateway) {
         console.error(ENV_CONTRACT);
         process.exitCode = 1;
         return;
     }
+    // Fail fast on a typo'd reasoning model (from --model or AGENT_MODEL_REASONING) with a clear
+    // startup error naming known ids — not a provider 404 mid-turn. Ungated: this must run even when
+    // no other AGENT_MODEL_* config is set. (Building rawGateway above does no network, so this is
+    // still before any request.)
+    if (!fake && reasoningModel) assertKnownModels([reasoningModel]);
 
     // Wire log (on by default): records the chat transcript, canvas edits, model token usage, and every
     // flow-API request/response. The file is truncated each run. `--no-log` disables; `--log <file>` sets the path.
@@ -84,6 +103,37 @@ const main = async (): Promise<void> => {
     );
 
     const gateway = wire ? wire.gateway(rawGateway) : rawGateway;
+
+    // Per-agent model routing (live + when AGENT_MODEL_* config is present): a roster stamped with
+    // named-specialist models + a memoized gatewayFor that builds a wire-logged gateway per model.
+    // With no config the common path is byte-identical to before — every agent shares `gateway`.
+    const hasPerAgentConfig =
+        !fake && (Object.keys(modelConfig.deploymentModels).length > 0 || !!modelConfig.defaultModel);
+    let roster: AgentRoster | undefined;
+    let gatewayFor: ((agentType: string) => LlmGatewayType) | undefined;
+    let modelFor: ((agentType: string) => string | undefined) | undefined;
+    if (hasPerAgentConfig) {
+        if (modelConfig.defaultModel) assertKnownModels([modelConfig.defaultModel]);
+        roster = createAgentRoster(withModels(DEFAULT_REGISTRATIONS, modelConfig.deploymentModels));
+        const buildChildGateway = (model: string): LlmGatewayType => {
+            const g = resolveLiveGateway({ model });
+            if (!g) throw new Error('resolveLiveGateway returned no gateway (missing GEMINI_API_KEY?)');
+            return wire ? wire.gateway(g) : g;
+        };
+        // The builder (reasoning tier) is exempt from defaultModel → inherits the orchestrator gateway.
+        // The same resolver drives both the gateway routing and the per-child trace `gen_ai.request.model`.
+        modelFor = agentModelResolver(
+            roster,
+            modelConfig.deploymentModels,
+            modelConfig.defaultModel,
+            ORCHESTRATOR_MODEL_TIER
+        );
+        gatewayFor = createModelGatewayFor({
+            modelForType: modelFor,
+            defaultGateway: gateway,
+            gatewayFactory: buildChildGateway,
+        });
+    }
 
     // The real flow stack — same as the browser's FlowAgentPanel (engine + binding + catalog).
     const stack = await assembleStack({
@@ -116,6 +166,10 @@ const main = async (): Promise<void> => {
         userPermissions: { canModifyCanvas: true, canEditConfig: true },
         loadGraph: graph => stack.engine.loadGraph(graph),
         tracer: trace.tracer,
+        ...(reasoningModel ? { model: reasoningModel } : {}),
+        ...(roster ? { roster } : {}),
+        ...(gatewayFor ? { gatewayFor } : {}),
+        ...(modelFor ? { modelFor } : {}),
     });
     if (wire) run.onChange(state => wire.chat(state)); // stream the transcript into the log as chat turns
 
