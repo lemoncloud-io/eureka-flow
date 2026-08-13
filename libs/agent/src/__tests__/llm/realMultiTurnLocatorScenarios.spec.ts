@@ -20,11 +20,24 @@ import {
     resolveEffectiveCost,
 } from '../../llm/multiTurnVerificationMetrics';
 import { PRICING_CONFIG_VERSION } from '../../llm/pricing';
-import { PROVIDER_REGISTRY, createGatewayForEntry, deriveGenerationConfiguration, resolveModelsToRun } from '../../llm/providerRegistry';
+import {
+    PROVIDER_REGISTRY,
+    createGatewayForEntry,
+    deriveGenerationConfiguration,
+    resolveModelsToRun,
+} from '../../llm/providerRegistry';
 import { accumulateExtendedUsage, wrapGatewayWithUsageCapture } from '../../llm/verificationMetrics';
-import { LOCATOR_SCENARIOS, MULTI_TURN_ONLY_SCENARIO_IDS, runMultiTurnLocatorScenario } from '../../llm/verifyLocatorScenarios';
+import {
+    LOCATOR_SCENARIOS,
+    MULTI_TURN_ONLY_SCENARIO_IDS,
+    runMultiTurnLocatorScenario,
+} from '../../llm/verifyLocatorScenarios';
 
-import type { MultiTurnLiveRecord, MultiTurnReportingOutcome, MultiTurnRunManifest } from '../../llm/multiTurnVerificationMetrics';
+import type {
+    MultiTurnLiveRecord,
+    MultiTurnReportingOutcome,
+    MultiTurnRunManifest,
+} from '../../llm/multiTurnVerificationMetrics';
 import type { GenerationConfiguration, ProviderModelEntry } from '../../llm/providerRegistry';
 import type { CapturedCallInfo } from '../../llm/verificationMetrics';
 import type { LocatorScenarioId, MultiTurnOnlyScenarioId } from '../../llm/verifyLocatorScenarios';
@@ -62,7 +75,11 @@ const MODEL_FILTER = process.env['LIVE_MULTI_TURN_MODEL_FILTER'];
 
 const DEFAULT_REPETITIONS = 5;
 const DEFAULT_MAX_TURNS = 3;
-const DEFAULT_SCENARIO_IDS: readonly LocatorScenarioId[] = ['move-node-right', 'ambiguous-instruction', 'unknown-target'];
+const DEFAULT_SCENARIO_IDS: readonly LocatorScenarioId[] = [
+    'move-node-right',
+    'ambiguous-instruction',
+    'unknown-target',
+];
 /** Outer per-TASK timeout (the whole multi-turn conversation, not one turn) — see the timeout doc
  * further down for exactly what this does and does not guarantee. */
 const DEFAULT_TASK_TIMEOUT_MS = 60_000;
@@ -70,7 +87,13 @@ const DEFAULT_TASK_TIMEOUT_MS = 60_000;
  * our race always settles first and always pushes a record, so this should never actually fire. */
 const VITEST_TIMEOUT_BUFFER_MS = 15_000;
 
-const parseIntegerInRange = (raw: string | undefined, fallback: number, min: number, max: number, name: string): number => {
+const parseIntegerInRange = (
+    raw: string | undefined,
+    fallback: number,
+    min: number,
+    max: number,
+    name: string
+): number => {
     if (raw === undefined) return fallback;
     const trimmed = raw.trim();
     if (!/^-?\d+$/.test(trimmed)) {
@@ -78,13 +101,27 @@ const parseIntegerInRange = (raw: string | undefined, fallback: number, min: num
     }
     const parsed = Number.parseInt(trimmed, 10);
     if (parsed < min || parsed > max) {
-        throw new Error(`realMultiTurnLocatorScenarios: ${name} must be an integer from ${min} to ${max}, got ${parsed}`);
+        throw new Error(
+            `realMultiTurnLocatorScenarios: ${name} must be an integer from ${min} to ${max}, got ${parsed}`
+        );
     }
     return parsed;
 };
 
-const REPETITIONS = parseIntegerInRange(process.env['LIVE_MULTI_TURN_REPETITIONS'], DEFAULT_REPETITIONS, 1, 50, 'LIVE_MULTI_TURN_REPETITIONS');
-const MAX_TURNS = parseIntegerInRange(process.env['LIVE_MULTI_TURN_MAX_TURNS'], DEFAULT_MAX_TURNS, 1, 10, 'LIVE_MULTI_TURN_MAX_TURNS');
+const REPETITIONS = parseIntegerInRange(
+    process.env['LIVE_MULTI_TURN_REPETITIONS'],
+    DEFAULT_REPETITIONS,
+    1,
+    50,
+    'LIVE_MULTI_TURN_REPETITIONS'
+);
+const MAX_TURNS = parseIntegerInRange(
+    process.env['LIVE_MULTI_TURN_MAX_TURNS'],
+    DEFAULT_MAX_TURNS,
+    1,
+    10,
+    'LIVE_MULTI_TURN_MAX_TURNS'
+);
 
 const parseScenarioIds = (raw: string | undefined): AnyMultiTurnScenarioId[] => {
     const requested = raw
@@ -116,7 +153,7 @@ const SELECTED_SCENARIOS = parseScenarioIds(process.env['LIVE_MULTI_TURN_SCENARI
 const OUTPUT_DIR_OVERRIDE = process.env['LIVE_MULTI_TURN_OUTPUT_DIR'];
 /** Deliberately a SEPARATE directory from the single-turn report's `METRICS_DIR` — never the same
  * path, so this file can never overwrite `latest.md`/`latest.json` from `realLocatorScenarios.spec.ts`. */
-const METRICS_DIR = OUTPUT_DIR_OVERRIDE ?? join(__dirname, '../../../../../docs/browser-agent/verification-metrics/multi-turn');
+const METRICS_DIR = OUTPUT_DIR_OVERRIDE ?? join(__dirname, '../../../../../verification-metrics/multi-turn');
 const METRICS_MD_PATH = join(METRICS_DIR, 'latest.md');
 const METRICS_JSON_PATH = join(METRICS_DIR, 'latest.json');
 const METRICS_CSV_PATH = join(METRICS_DIR, 'latest.csv');
@@ -158,7 +195,8 @@ const MODEL_SELECTION = planMultiTurnModelSelection({
     registry: PROVIDER_REGISTRY,
     providerFilter: PROVIDER_FILTER,
     modelFilter: MODEL_FILTER,
-    resolveModelsToRun: entry => resolveModelsToRun(entry, entry.modelEnvOverride ? process.env[entry.modelEnvOverride] : undefined),
+    resolveModelsToRun: entry =>
+        resolveModelsToRun(entry, entry.modelEnvOverride ? process.env[entry.modelEnvOverride] : undefined),
 });
 
 const PLANNED_PAIRS: PlannedPair[] = [];
@@ -200,7 +238,11 @@ for (const { entry, model } of MODEL_SELECTION.pairs) {
         console.log('  no (provider, model) pairs match the current filter(s)');
     } else {
         for (const pair of PLANNED_PAIRS) {
-            const status = !LIVE_RUN_OPTED_IN ? 'skipped: opt-in not set' : pair.keyPresent ? 'WILL RUN' : `skipped: ${pair.providerId} key not set`;
+            const status = !LIVE_RUN_OPTED_IN
+                ? 'skipped: opt-in not set'
+                : pair.keyPresent
+                  ? 'WILL RUN'
+                  : `skipped: ${pair.providerId} key not set`;
             console.log(`  - ${pair.provider} (${pair.providerId}) / ${pair.model} — ${status}`);
         }
     }
@@ -321,7 +363,9 @@ const runOneAttempt = async (
             outputTokens: usage.outputTokens,
             totalTokens: usage.totalTokens,
             ...(usage.cachedInputTokens !== undefined ? { cachedInputTokens: usage.cachedInputTokens } : {}),
-            ...(usage.cacheWriteInputTokens !== undefined ? { cacheWriteInputTokens: usage.cacheWriteInputTokens } : {}),
+            ...(usage.cacheWriteInputTokens !== undefined
+                ? { cacheWriteInputTokens: usage.cacheWriteInputTokens }
+                : {}),
             ...(usage.cacheWriteTtl !== undefined ? { cacheWriteTtl: usage.cacheWriteTtl } : {}),
             ...(usage.reasoningTokens !== undefined ? { reasoningTokens: usage.reasoningTokens } : {}),
             ...(usage.toolUseInputTokens !== undefined ? { toolUseInputTokens: usage.toolUseInputTokens } : {}),
@@ -421,7 +465,10 @@ const readGitState = (): { sha: string | null; dirty: boolean | null } => {
         const sha = execSync('git rev-parse HEAD', { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] })
             .toString()
             .trim();
-        const status = execSync('git status --porcelain', { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+        const status = execSync('git status --porcelain', {
+            cwd: repoRoot,
+            stdio: ['ignore', 'pipe', 'ignore'],
+        }).toString();
         return { sha: sha || null, dirty: status.trim().length > 0 };
     } catch {
         return { sha: null, dirty: null };
@@ -430,7 +477,9 @@ const readGitState = (): { sha: string | null; dirty: boolean | null } => {
 
 afterAll(() => {
     if (ALL_MULTI_TURN_RECORDS.length === 0) {
-        console.log('\n[realMultiTurnLocatorScenarios] no live multi-turn tasks ran this session — no artifact written.');
+        console.log(
+            '\n[realMultiTurnLocatorScenarios] no live multi-turn tasks ran this session — no artifact written.'
+        );
         return;
     }
 
@@ -441,7 +490,7 @@ afterAll(() => {
         `# Multi-turn locator pilot — generated ${report.generatedAt}\n\n` +
         `Source: \`realMultiTurnLocatorScenarios.spec.ts\` (registry-driven multi-turn pilot, up to ` +
         `${MAX_TURNS} turns/task, ${REPETITIONS} repetition(s)/scenario). Separate from, and never merged ` +
-        `with, the single-turn report at \`docs/browser-agent/verification-metrics/latest.md\`. Overwrites ` +
+        `with, the single-turn report at \`verification-metrics/latest.md\`. Overwrites ` +
         `only this session's own output in \`multi-turn/\` — no cross-session carry-forward yet (see the ` +
         `run manifest for exactly what this session covered).\n\n` +
         `A lookup-first attempt counts toward \`Success\`/\`Lookup-first\` only when its task outcome is ` +

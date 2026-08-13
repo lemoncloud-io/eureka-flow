@@ -20,8 +20,7 @@ import type {
  * from OpenAI's in every place that matters here — `x-api-key` instead of `Authorization: Bearer`,
  * a required `anthropic-version` header, `input_schema` instead of `parameters`, a required
  * `max_tokens`, a top-level `system` field instead of a `role: 'system'` message, and a response
- * `content` array mixing text and `tool_use` blocks instead of separate fields. See
- * docs/browser-agent/design/provider-tool-calling.md §2 for the full mapping.
+ * `content` array mixing text and `tool_use` blocks instead of separate fields.
  *
  * Single-turn tool calling and multi-turn tool-result mapping are both implemented. Unlike Gemini
  * (which correlates tool results by function *name* and has no way to map `toolCallId`-keyed tool

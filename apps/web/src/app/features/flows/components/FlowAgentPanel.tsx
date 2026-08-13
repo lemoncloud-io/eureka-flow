@@ -44,7 +44,7 @@ interface FlowAgentPanelProps {
  * Its result is delivered over the dedicated tool WebSocket ({@link useToolSocketConnection}),
  * reassembled by a {@link createFlowJSONTransportReceiver} JSONTransport receiver and correlated by
  * request id. When the tool socket has no connection id the gateway falls back to HTTP-only delivery
- * (the completed result in the POST body). See `docs/browser-agent/docs/flow-api-gateway.md`.
+ * (the completed result in the POST body).
  */
 export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelProps) => {
     // Reads cannot lag a projection that pauses mid-drag; edits land in `transact`, so they

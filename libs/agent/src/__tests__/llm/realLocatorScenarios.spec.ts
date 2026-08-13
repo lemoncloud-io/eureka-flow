@@ -63,11 +63,9 @@ const LIVE_RUN_OPTED_IN = process.env['RUN_LIVE_PROVIDER_TESTS'] === '1';
 const LIVE_PROVIDER_FILTER = process.env['LIVE_PROVIDER_FILTER'];
 
 /** Output directory for every generated artifact (Markdown/JSON/CSV/JSONL/run-manifest). Defaults
- * to this repo's existing in-tree path (unchanged behavior); set to an absolute path outside the
- * working tree to keep live-run output out of `git status` entirely — see
- * docs/browser-agent/design/production-readiness.md for example commands. */
-const METRICS_DIR =
-    process.env['LIVE_METRICS_OUTPUT_DIR'] ?? join(__dirname, '../../../../../docs/browser-agent/verification-metrics');
+ * to an in-tree `verification-metrics/` under the repo root; set `LIVE_METRICS_OUTPUT_DIR` to an
+ * absolute path outside the working tree to keep live-run output out of `git status` entirely. */
+const METRICS_DIR = process.env['LIVE_METRICS_OUTPUT_DIR'] ?? join(__dirname, '../../../../../verification-metrics');
 const METRICS_MD_PATH = join(METRICS_DIR, 'latest.md');
 const METRICS_JSON_PATH = join(METRICS_DIR, 'latest.json');
 const METRICS_CSV_PATH = join(METRICS_DIR, 'latest.csv');
@@ -76,7 +74,7 @@ const RUN_MANIFEST_PATH = join(METRICS_DIR, 'run-manifest.json');
 /** Canonical, editable Mermaid source for the elapsed-vs-tokens chart — the actual `.mmd` file, no
  * code fence, no Markdown wrapper. `latest.md` links to this file rather than re-embedding the
  * Mermaid text inline, since inline-fenced Mermaid is exactly what an editor/extension rendering
- * quirk (see production-readiness.md's Mermaid-rendering note) can fail on inconsistently — an SVG
+ * quirk can fail on inconsistently — an SVG
  * embed always renders, everywhere, and this file stays the one place the raw source lives. */
 const CHART_MMD_PATH = join(METRICS_DIR, 'elapsed-vs-tokens.mmd');
 /** Rendered SVG of the identical chart, generated from the same aggregate/point data
@@ -97,8 +95,7 @@ const CHART_SVG_PATH = join(METRICS_DIR, 'elapsed-vs-tokens.svg');
  * Deliberately does NOT include a multi-step `list_nodes` -> `move_node` conversation: that needs
  * the real tool-result round-trip, a structurally different harness than this file's
  * single-`chat()`-call-per-scenario shape. This file's own matrix stays single-turn by design, not
- * because either provider can't do a second turn. See
- * docs/browser-agent/design/provider-tool-calling.md §4.
+ * because either provider can't do a second turn.
  *
  * Gemini has an observed lookup-first *target-resolution* strategy: given a prompt that requires
  * resolving a specific node, it may call `list_nodes` before committing to the scenario's expected
@@ -388,8 +385,7 @@ for (const entry of PROVIDER_REGISTRY) {
 // File-level afterAll (not nested inside runMatrix/describe — see the module doc above): fires
 // once after every provider/model block in this file finishes. Writes the monitoring report only
 // when at least one scenario actually ran against a real key this run — an empty
-// ALL_METRIC_RECORDS (no keys set) means nothing is written, not an empty/placeholder file. See
-// docs/browser-agent/design/provider-tool-calling.md §6 for the reporting semantics.
+// ALL_METRIC_RECORDS (no keys set) means nothing is written, not an empty/placeholder file.
 afterAll(() => {
     if (ALL_METRIC_RECORDS.length === 0) {
         console.log('\n[verificationMetrics] no real-key scenarios ran this session — no artifact written.');
@@ -444,8 +440,7 @@ afterAll(() => {
         `Source: \`realLocatorScenarios.spec.ts\` (registry-driven scenario matrix). Regenerated on ` +
         `every real-key run; (provider, model) pairs re-run this session are replaced, pairs not ` +
         `re-run are carried forward from the previously-generated report — never silently dropped. ` +
-        `See provider-tool-calling.md §6 for how to read this table and its known ` +
-        `limits (a \`*\` on a cell means partial data, not a fabricated number). Cost is the ` +
+        `A \`*\` on a cell means partial data, not a fabricated number. Cost is the ` +
         `primary comparison metric below; token counts are diagnostic detail — see the token ` +
         `table and existing chart further down.${sessionsNote}\n\n` +
         `${formatMetricsMarkdownTable(report.aggregates)}\n\n` +

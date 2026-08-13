@@ -382,7 +382,7 @@ const GEMINI_ENTRY: ProviderModelEntry = {
     ],
     notes:
         'Real-key runs have also observed a lookup-first target-resolution tool-choice variance ' +
-        'and a one-off "no candidates" provider error (see provider-tool-calling.md §9); neither ' +
+        'and a one-off "no candidates" provider error; neither ' +
         'affects this registry entry. realVerifiedModels above is about the single-turn scenario ' +
         'matrix; multi-turn real-key status is tracked separately (supportsMultiTurnToolResults ' +
         'note above), not implied by this field. ' +
