@@ -68,6 +68,11 @@
         "run": "Run",
         "metadata": "Rename/Publish"
     },
+    "canvasMenu": {
+        "portFilter": "Accepts {{type}}",
+        "showAll": "Show all blocks",
+        "noCompatibleBlocks": "No block accepts this port type"
+    },
     "sidebar": {
         "library": "Library",
         "libraryShort": "Lib",
@@ -251,11 +256,11 @@
         "failedToCopyLink": "Failed to copy link",
         "confirmClearCanvas": "Clear the canvas?",
         "canvasCleared": "Canvas cleared",
-        "autoLayoutApplied": "Auto-layout applied",
+        "autoLayoutApplied": "Auto-layout applied (Cmd/Ctrl + Shift + L)",
         "exportedToJson": "Exported to JSON",
-        "workflowImported": "Workflow imported successfully",
-        "invalidWorkflowFile": "Invalid workflow file",
-        "failedToParseJson": "Failed to parse JSON file",
+        "importedFromJson": "Imported {{count}} nodes",
+        "importFailed": "Could not import {{file}}: {{reason}}",
+        "importReplaceConfirm": "Importing replaces the current graph and you have unsaved changes. Continue?",
         "runningAllNodes": "Running all nodes...",
         "executionStopped": "Execution stopped",
         "savedAs": "Saved as \"{{flowName}}\"",
@@ -429,7 +434,15 @@
                 },
                 "autoLayout": {
                     "label": "Auto layout",
+                    "keys": ["Cmd/Ctrl", "Shift", "L"]
+                },
+                "selectAll": {
+                    "label": "Select all nodes",
                     "keys": ["Cmd/Ctrl", "A"]
+                },
+                "boxSelect": {
+                    "label": "Box select",
+                    "keys": ["Shift", "Drag"]
                 },
                 "delete": {
                     "label": "Delete selected",

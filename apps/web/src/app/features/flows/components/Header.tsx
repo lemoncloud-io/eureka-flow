@@ -22,6 +22,7 @@ import {
     Save,
     Trash2,
     Undo2,
+    Upload,
 } from 'lucide-react';
 
 import { getPermissions, useSystemInfoQuery } from '@flows/flows';
@@ -59,6 +60,8 @@ export interface FileActionsProps {
     onSave: () => void;
     onExport: () => void;
     onExportPng?: () => void;
+    /** Load a flow from a JSON file. Absent for roles that cannot replace the graph. */
+    onImport?: () => void;
 }
 
 export interface EditActionsProps {
@@ -526,6 +529,12 @@ export const Header: React.FC<HeaderProps> = ({
                                     <Save className="w-4 h-4 mr-2" />
                                     {t('header.saveFlow')}
                                     <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+                                </DropdownMenuItem>
+                            )}
+                            {canModifyCanvas && fileActions.onImport && (
+                                <DropdownMenuItem onClick={fileActions.onImport}>
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    {t('header.importJson')}
                                 </DropdownMenuItem>
                             )}
                             {canRun && (

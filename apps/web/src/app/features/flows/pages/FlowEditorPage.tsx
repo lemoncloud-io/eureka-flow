@@ -13,6 +13,8 @@ import {
     diffAgainstBaseline,
     getPermissions,
     getProfile,
+    parseFlowJson,
+    serializeFlowJson,
     toAiKeyStatus,
     useBlocks,
     useFlows,
@@ -67,6 +69,7 @@ export const FlowEditorPage = () => {
     const { t } = useTranslation(['flows']);
     const canvasRef = useRef<WorkflowCanvasRef>(null);
     const sidebarRef = useRef<SidebarRef>(null);
+    const importInputRef = useRef<HTMLInputElement>(null);
 
     const { loadBlocks, blockRegistry } = useBlocks();
 
@@ -431,13 +434,13 @@ export const FlowEditorPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps -- refs are stable, no need to trigger re-creation
     }, [isAutoSaveEnabled, saveCurrentFlow]);
 
-    const showNotification = (message: string, type: 'success' | 'error') => {
+    const showNotification = useCallback((message: string, type: 'success' | 'error') => {
         if (type === 'success') {
             toast.success(message);
         } else {
             toast.error(message);
         }
-    };
+    }, []);
 
     const handleSave = async () => {
         if (!canvasRef.current) return;
@@ -519,7 +522,7 @@ export const FlowEditorPage = () => {
         } catch {
             showNotification(t('flowEditor.failedToRunFlow', 'Failed to run flow'), 'error');
         }
-    }, [handleBeforeRun, t]);
+    }, [handleBeforeRun, showNotification, t]);
 
     const handleSelectionChange = (nodeId: string | null) => {
         updateUrl(currentFlowId, nodeId);
@@ -536,7 +539,7 @@ export const FlowEditorPage = () => {
                 showNotification(t('flowEditor.circularConnectionError'), 'error');
             }
         },
-        [t]
+        [showNotification, t]
     );
 
     const handleExportPng = async () => {
@@ -557,15 +560,40 @@ export const FlowEditorPage = () => {
         // through the normal path — that round-trip is the whole point of the dev panel.
     }, []);
 
+    const handleImportFile = useCallback(
+        async (e: React.ChangeEvent<HTMLInputElement>) => {
+            const file = e.target.files?.[0];
+            // Clearing the input first lets the same file be picked twice in a row.
+            e.target.value = '';
+            if (!file || !canvasRef.current) return;
+
+            const result = parseFlowJson(await file.text());
+            if (!result.ok) {
+                showNotification(t('flowEditor.importFailed', { file: file.name, reason: result.error }), 'error');
+                return;
+            }
+
+            await canvasRef.current.loadWorkflow(result.graph);
+            // The baseline stays where it was, so the imported graph reads unsaved and the
+            // user decides whether it replaces what the server holds.
+            showNotification(t('flowEditor.importedFromJson', { count: result.graph.nodes.length }), 'success');
+        },
+        [showNotification, t]
+    );
+
+    const handleImport = () => {
+        // An import replaces the whole graph, so unsaved work would go with it.
+        const hasUnsavedWork = !!canvasRef.current && !diffAgainstBaseline(canvasRef.current.getWorkflow()).isEmpty;
+        if (hasUnsavedWork && !window.confirm(t('flowEditor.importReplaceConfirm'))) return;
+        importInputRef.current?.click();
+    };
+
     const handleExport = () => {
         if (!canvasRef.current) return;
 
-        const data = canvasRef.current.getWorkflow();
-        const exportData = {
-            nodes: data.nodes.map(({ id, ...rest }) => rest),
-            edges: data.edges.map(({ id, ...rest }) => rest),
-        };
-        const jsonString = JSON.stringify(exportData, null, 2);
+        // Ids are kept: the edges reference them, so stripping them made the file
+        // impossible to import back.
+        const jsonString = serializeFlowJson(canvasRef.current.getWorkflow());
         const blob = new Blob([jsonString], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
 
@@ -642,6 +670,9 @@ export const FlowEditorPage = () => {
                 e.preventDefault();
                 canvasRef.current?.redo();
             } else if (key === 'a') {
+                e.preventDefault();
+                canvasRef.current?.selectAll();
+            } else if (key === 'l' && e.shiftKey) {
                 e.preventDefault();
                 canvasRef.current?.autoLayout();
                 handlersRef.current.showNotification(t('flowEditor.autoLayoutApplied'), 'success');
@@ -775,6 +806,14 @@ export const FlowEditorPage = () => {
 
                 <ProductProgressBanner />
 
+                <input
+                    ref={importInputRef}
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={handleImportFile}
+                />
+
                 {/* Floating Header */}
                 <Header
                     flowInfo={{
@@ -786,6 +825,7 @@ export const FlowEditorPage = () => {
                         onSave: handleSave,
                         onExport: handleExport,
                         onExportPng: handleExportPng,
+                        onImport: handleImport,
                     }}
                     editActions={{
                         onUndo: () => canvasRef.current?.undo(),

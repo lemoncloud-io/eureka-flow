@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-08-12] - root@0.70.0, @flows/web@0.70.0, @flows/admin@0.44.0
+
+### Features
+
+- (canvas) restore Flow JSON import and make export round-trippable
+- (canvas) keep the clipboard across remounts and paste at the cursor
+- (canvas) add box selection and select-all
+- (canvas) offer compatible blocks when a link is dropped on empty canvas
+
+### Documentation
+
+- (adr) record why flow JSON export keeps ids
+
+### Refactor
+
+- (canvas) route every grid snap through snapToGrid and settle the hook deps
+- (canvas) paint the marquee through a ref and drop the duplicated geometry
+
 ## [2026-08-11] - root@0.69.0, @flows/web@0.69.0, @flows/admin@0.43.0
 
 ### Features
