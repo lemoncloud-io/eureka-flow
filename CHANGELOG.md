@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-13] - root@0.71.1, @flows/web@0.71.1, @flows/admin@0.45.1
+
+### Bug Fixes
+
+- (web) cancel the pending generate wait on abort
+
+### Documentation
+
+- drop references to the relocated browser-agent docs
+
 ## [2026-08-13] - root@0.71.0, @flows/web@0.71.0, @flows/admin@0.45.0
 
 ### Features
