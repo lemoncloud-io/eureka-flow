@@ -2,10 +2,56 @@
     "agentPanel": {
         "title": "Assistant",
         "subtitle": "Ask in plain language to build, edit, and arrange your flow.",
-        "empty": "Ask in plain language, e.g.\n“create a flow that writes a blog title”\n“make the titles short and punchy”\n“rename the preview to Result”\n“line the nodes up in one column”",
+        "empty": "Ask in plain language. For example:",
         "thinking": "Thinking…",
         "placeholder": "Ask the assistant to build or edit your flow…",
-        "send": "Send"
+        "send": "Send",
+        "errorTitle": "The turn stopped",
+        "suggestions": {
+            "build": "Create a flow that writes a blog title",
+            "tighten": "Make the titles short and punchy",
+            "rename": "Rename the preview to Result",
+            "tidy": "Line the nodes up in one column"
+        },
+        "ledger": {
+            "changes_one": "{{count}} change",
+            "changes_other": "{{count}} changes"
+        },
+        "op": {
+            "add": {
+                "running": "Adding <s>{{subject}}</s>…",
+                "done": "Added <s>{{subject}}</s>"
+            },
+            "delete": {
+                "running": "Deleting <s>{{subject}}</s>…",
+                "done": "Deleted <s>{{subject}}</s>"
+            },
+            "connect": {
+                "running": "Connecting <s>{{subject}}</s> to <o>{{object}}</o>…",
+                "done": "Connected <s>{{subject}}</s> to <o>{{object}}</o>"
+            },
+            "disconnect": {
+                "running": "Disconnecting <s>{{subject}}</s>…",
+                "done": "Disconnected <s>{{subject}}</s>"
+            },
+            "move": {
+                "running": "Moving <s>{{subject}}</s>…",
+                "done": "Moved <s>{{subject}}</s>"
+            },
+            "rename": {
+                "running": "Renaming <s>{{subject}}</s> to <o>{{object}}</o>…",
+                "done": "Renamed <s>{{subject}}</s> to <o>{{object}}</o>"
+            },
+            "configure": {
+                "running": "Configuring <s>{{subject}}</s>…",
+                "done": "Configured <s>{{subject}}</s>"
+            },
+            "delegate": {
+                "running": "Delegating to <s>{{subject}}</s>…",
+                "done": "Delegated to <s>{{subject}}</s>"
+            },
+            "unknownTarget": "a node"
+        }
     },
     "header": {
         "title": "EurekaFlow",

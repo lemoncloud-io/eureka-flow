@@ -1,0 +1,176 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { I18nextProvider, initReactI18next } from 'react-i18next';
+
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import i18n from 'i18next';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { AgentPanel } from './AgentPanel';
+
+import type { Message, SessionState } from '@flows/agent';
+
+/**
+ * Renders against the shipped `en/flows.json` rather than a stub, so a row that reads correctly here
+ * is a row the user sees — and a key missing from the locale file fails the test instead of silently
+ * falling back to the in-code default.
+ */
+const LOCALE = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../public/locales/en/flows.json');
+
+beforeAll(async () => {
+    await i18n.use(initReactI18next).init({
+        lng: 'en',
+        fallbackLng: 'en',
+        ns: ['flows'],
+        defaultNS: 'flows',
+        resources: { en: { flows: JSON.parse(readFileSync(LOCALE, 'utf-8')) } },
+        interpolation: { escapeValue: false },
+    });
+});
+
+const session = (messages: Message[], phase: SessionState['phase']): SessionState => ({
+    flowId: 'f1',
+    messages,
+    phase,
+});
+
+const renderPanel = (state: SessionState | null, onSend = vi.fn()) =>
+    render(
+        <I18nextProvider i18n={i18n}>
+            <AgentPanel session={state} onSend={onSend} />
+        </I18nextProvider>
+    );
+
+describe('AgentPanel', () => {
+    it('offers a first request to send when the transcript is empty', () => {
+        const onSend = vi.fn();
+        renderPanel(null, onSend);
+
+        const suggestion = screen.getByRole('button', { name: 'Create a flow that writes a blog title' });
+        fireEvent.click(suggestion);
+
+        // The suggestion fills the composer rather than sending — the user stays in control of the ask.
+        expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(
+            'Create a flow that writes a blog title'
+        );
+        expect(onSend).not.toHaveBeenCalled();
+    });
+
+    it('shows what the agent is doing to the canvas instead of a bare spinner', () => {
+        renderPanel(
+            session(
+                [
+                    { id: 'u1', role: 'user', content: 'build it', ts: 0 },
+                    {
+                        id: 'a1',
+                        role: 'assistant',
+                        toolCalls: [
+                            {
+                                id: 'c1',
+                                name: 'add_node',
+                                args: JSON.stringify({ type: 'generate' }),
+                                status: 'ok',
+                            },
+                            {
+                                id: 'c2',
+                                name: 'move_node',
+                                args: JSON.stringify({ nodeId: 'n2' }),
+                                status: 'ok',
+                            },
+                        ],
+                        ts: 0,
+                    },
+                    { id: 't1', role: 'tool', content: 'ok', toolCallId: 'c1', ts: 0 },
+                ],
+                'thinking'
+            )
+        );
+
+        const live = screen.getByRole('status');
+        expect(within(live).getByText(/Added/)).toBeTruthy();
+        expect(within(live).getByText('generate')).toBeTruthy();
+        // The unsettled call is the one still happening, and it reads as present tense.
+        expect(within(live).getByText(/Moving/)).toBeTruthy();
+        // The generic fallback line is suppressed while there is real work to show.
+        expect(screen.queryByText('Thinking…')).toBeNull();
+    });
+
+    it('folds a finished turn into a count the user can open', () => {
+        renderPanel(
+            session(
+                [
+                    { id: 'u1', role: 'user', content: 'build it', ts: 0 },
+                    {
+                        id: 'a1',
+                        role: 'assistant',
+                        toolCalls: [
+                            { id: 'c1', name: 'add_node', args: JSON.stringify({ type: 'input' }), status: 'ok' },
+                            { id: 'c2', name: 'add_node', args: JSON.stringify({ type: 'generate' }), status: 'ok' },
+                        ],
+                        ts: 0,
+                    },
+                    { id: 't1', role: 'tool', content: 'ok', toolCallId: 'c1', ts: 0 },
+                    { id: 't2', role: 'tool', content: 'ok', toolCallId: 'c2', ts: 0 },
+                    { id: 'a2', role: 'assistant', content: 'Done — two blocks added.', ts: 0 },
+                ],
+                'done'
+            )
+        );
+
+        const summary = screen.getByRole('button', { name: /2 changes/ });
+        expect(summary.getAttribute('aria-expanded')).toBe('false');
+        expect(screen.queryByText('generate')).toBeNull();
+
+        fireEvent.click(summary);
+        expect(summary.getAttribute('aria-expanded')).toBe('true');
+        expect(screen.getByText('generate')).toBeTruthy();
+    });
+
+    it('leaves an earlier turn folded while a new one runs', () => {
+        renderPanel(
+            session(
+                [
+                    { id: 'u1', role: 'user', content: 'build it', ts: 0 },
+                    {
+                        id: 'a1',
+                        role: 'assistant',
+                        toolCalls: [
+                            { id: 'c1', name: 'add_node', args: JSON.stringify({ type: 'input' }), status: 'ok' },
+                        ],
+                        ts: 0,
+                    },
+                    { id: 't1', role: 'tool', content: 'ok', toolCallId: 'c1', ts: 0 },
+                    { id: 'a2', role: 'assistant', content: 'Added one block.', ts: 0 },
+                    { id: 'u2', role: 'user', content: 'now move it', ts: 0 },
+                    {
+                        id: 'a3',
+                        role: 'assistant',
+                        toolCalls: [
+                            { id: 'c2', name: 'move_node', args: JSON.stringify({ nodeId: 'n1' }), status: 'ok' },
+                        ],
+                        ts: 0,
+                    },
+                ],
+                'thinking'
+            )
+        );
+
+        const [past, current] = screen.getAllByRole('button', { name: /1 change/ });
+        expect(past.getAttribute('aria-expanded')).toBe('false');
+        expect(current.getAttribute('aria-expanded')).toBe('true');
+        // Only the running turn announces itself.
+        expect(screen.getAllByRole('status')).toHaveLength(1);
+        expect(screen.getByText(/Moving/)).toBeTruthy();
+        expect(screen.queryByText('input')).toBeNull();
+    });
+
+    it('says a turn stopped, and why', () => {
+        const failed: SessionState = { ...session([], 'error'), error: 'exceeded 12 reasoning iterations' };
+        renderPanel(failed);
+
+        expect(screen.getByText('The turn stopped')).toBeTruthy();
+        expect(screen.getByText('exceeded 12 reasoning iterations')).toBeTruthy();
+    });
+});

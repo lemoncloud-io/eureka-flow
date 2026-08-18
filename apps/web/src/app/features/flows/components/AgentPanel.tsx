@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ChevronDown, Send, Sparkles } from 'lucide-react';
@@ -6,7 +6,10 @@ import { ChevronDown, Send, Sparkles } from 'lucide-react';
 import { cn } from '@flows/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@flows/ui-kit';
 
-import type { Message, SessionState } from '@flows/agent';
+import { AgentTurnLedger } from './AgentTurnLedger';
+import { buildTranscript } from '../utils/agentTurnLedger';
+
+import type { SessionState } from '@flows/agent';
 
 /** A model the agent can run on — the minimal shape the view needs (from the live catalog). */
 export interface AgentModelOption {
@@ -85,9 +88,15 @@ const ModelPicker = ({
     );
 };
 
-/** Messages the user should see: their own turns and the agent's text replies. */
-const isVisible = (m: Message): boolean =>
-    m.role === 'user' || (m.role === 'assistant' && !!m.content && m.content.trim().length > 0);
+/** Cold start is the panel's hardest moment: give the user a first request to send, not a wall of quotes. */
+const SUGGESTION_KEYS = ['build', 'tighten', 'rename', 'tidy'] as const;
+
+const SUGGESTION_DEFAULTS: Record<(typeof SUGGESTION_KEYS)[number], string> = {
+    build: 'Create a flow that writes a blog title',
+    tighten: 'Make the titles short and punchy',
+    rename: 'Rename the preview to Result',
+    tidy: 'Line the nodes up in one column',
+};
 
 /**
  * The right-docked assistant panel — a pure view over the agent session: it renders the transcript
@@ -97,10 +106,23 @@ export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSele
     const { t } = useTranslation(['flows']);
     const [draft, setDraft] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
 
     const phase = session?.phase ?? 'idle';
     const isThinking = phase === 'thinking';
-    const messages = (session?.messages ?? []).filter(isVisible);
+    const items = useMemo(() => buildTranscript(session), [session]);
+    // Only the turn in progress is live: an earlier turn's ledger stays folded and silent while a new
+    // one runs, or every past request would spring open and announce itself again.
+    const liveLedgerId = useMemo(() => {
+        if (!isThinking) {
+            return null;
+        }
+        const last = [...items].reverse().find(i => i.kind === 'ledger');
+        return last?.id ?? null;
+    }, [items, isThinking]);
+    // The ledger rows are the progress indicator while they exist; the bare "Thinking…" line covers
+    // the stretch before the first tool call, when there is nothing yet to show.
+    const hasLiveOps = items.some(i => i.kind === 'ledger' && i.ops.some(op => op.status === 'running'));
 
     // Keep the latest message in view as the transcript grows.
     // (`scrollTo` is guarded — jsdom / older engines may not implement it.)
@@ -108,6 +130,22 @@ export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSele
         const el = scrollRef.current;
         el?.scrollTo?.({ top: el.scrollHeight });
     }, [session]);
+
+    /** Grow the composer with the draft, up to the same ceiling the scroll area used to impose. */
+    const resize = (el: HTMLTextAreaElement | null): void => {
+        if (!el) {
+            return;
+        }
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+    };
+
+    const applySuggestion = (text: string): void => {
+        setDraft(text);
+        const el = inputRef.current;
+        el?.focus();
+        resize(el);
+    };
 
     const submit = () => {
         if (isThinking) {
@@ -118,6 +156,7 @@ export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSele
             return;
         }
         setDraft('');
+        resize(inputRef.current);
         onSend(text);
     };
 
@@ -148,30 +187,58 @@ export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSele
 
             {/* Transcript */}
             <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-                {messages.length === 0 ? (
-                    <div className="whitespace-pre-line pt-6 text-center text-xs text-muted-foreground/60">
-                        {t(
-                            'agentPanel.empty',
-                            'Ask in plain language, e.g.\n“create a flow that writes a blog title”\n“make the titles short and punchy”\n“rename the preview to Result”\n“line the nodes up in one column”'
-                        )}
+                {items.length === 0 ? (
+                    <div className="space-y-2 pt-4">
+                        <p className="text-xs text-muted-foreground/70">
+                            {t('agentPanel.empty', 'Ask in plain language. For example:')}
+                        </p>
+                        <div className="flex flex-col items-start gap-1.5">
+                            {SUGGESTION_KEYS.map(key => {
+                                const text = t(`agentPanel.suggestions.${key}`, SUGGESTION_DEFAULTS[key]);
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => applySuggestion(text)}
+                                        className={cn(
+                                            'rounded-full border border-border/50 bg-muted/30 px-3 py-1.5 text-left text-xs',
+                                            'text-muted-foreground transition-colors hover:border-primary/40',
+                                            'hover:bg-primary/5 hover:text-foreground focus-visible:outline-none',
+                                            'focus-visible:ring-1 focus-visible:ring-primary/60'
+                                        )}
+                                    >
+                                        {text}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 ) : (
-                    messages.map(m => (
-                        <div key={m.id} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                    items.map(item =>
+                        item.kind === 'ledger' ? (
+                            <AgentTurnLedger key={item.id} ops={item.ops} running={item.id === liveLedgerId} />
+                        ) : (
                             <div
-                                className={cn(
-                                    'max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm',
-                                    m.role === 'user' ? 'bg-primary/15 text-foreground' : 'bg-muted/40 text-foreground'
-                                )}
+                                key={item.id}
+                                className={cn('flex', item.message.role === 'user' ? 'justify-end' : 'justify-start')}
                             >
-                                {m.content}
+                                <div
+                                    className={cn(
+                                        'max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm',
+                                        item.message.role === 'user'
+                                            ? 'bg-primary/15 text-foreground'
+                                            : 'bg-muted/40 text-foreground'
+                                    )}
+                                >
+                                    {item.message.content}
+                                </div>
                             </div>
-                        </div>
-                    ))
+                        )
+                    )
                 )}
 
-                {isThinking && (
-                    <div className="flex justify-start">
+                {isThinking && !hasLiveOps && (
+                    <div role="status" aria-live="polite" className="flex justify-start">
                         <div className="rounded-2xl bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
                             {t('agentPanel.thinking', 'Thinking…')}
                         </div>
@@ -179,8 +246,9 @@ export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSele
                 )}
 
                 {phase === 'error' && session?.error && (
-                    <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                        {session.error}
+                    <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
+                        <p className="font-medium text-destructive">{t('agentPanel.errorTitle', 'The turn stopped')}</p>
+                        <p className="mt-0.5 text-destructive/85">{session.error}</p>
                     </div>
                 )}
             </div>
@@ -189,8 +257,12 @@ export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSele
             <div className="border-t border-border/40 p-3">
                 <div className="flex flex-col gap-1 rounded-xl border border-border/40 bg-muted/30 px-2 py-1.5 focus-within:border-primary/60">
                     <textarea
+                        ref={inputRef}
                         value={draft}
-                        onChange={e => setDraft(e.target.value)}
+                        onChange={e => {
+                            setDraft(e.target.value);
+                            resize(e.currentTarget);
+                        }}
                         onKeyDown={onKeyDown}
                         rows={1}
                         placeholder={t('agentPanel.placeholder', 'Ask the assistant to build or edit your flow…')}
@@ -203,7 +275,11 @@ export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSele
                             aria-label={t('agentPanel.send', 'Send')}
                             onClick={submit}
                             disabled={isThinking || draft.trim().length === 0}
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+                            className={cn(
+                                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary',
+                                'text-primary-foreground transition-opacity focus-visible:outline-none',
+                                'focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-40'
+                            )}
                         >
                             <Send className="h-4 w-4" />
                         </button>
