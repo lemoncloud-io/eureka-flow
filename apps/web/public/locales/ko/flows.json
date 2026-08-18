@@ -53,7 +53,8 @@
         },
         "stop": "중지",
         "open": "어시스턴트 열기",
-        "close": "어시스턴트 닫기"
+        "close": "어시스턴트 닫기",
+        "newChat": "새 대화 시작"
     },
     "header": {
         "title": "EurekaFlow",

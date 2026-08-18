@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChevronDown, PanelRightClose, Send, Sparkles, Square } from 'lucide-react';
+import { ChevronDown, PanelRightClose, Send, Sparkles, Square, SquarePen } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@flows/ui-kit';
@@ -32,6 +32,8 @@ interface AgentPanelProps {
     onAbort?: () => void;
     /** Collapse the panel back to its launcher. Omitted ⇒ the panel cannot be closed. */
     onClose?: () => void;
+    /** Forget the transcript and start over. Omitted ⇒ no such control. */
+    onNewChat?: () => void;
 }
 
 /**
@@ -114,6 +116,7 @@ export const AgentPanel = ({
     onSelectModel,
     onAbort,
     onClose,
+    onNewChat,
 }: AgentPanelProps) => {
     const { t } = useTranslation(['flows']);
     const [draft, setDraft] = useState('');
@@ -202,6 +205,22 @@ export const AgentPanel = ({
                         {t('agentPanel.subtitle', 'Ask in plain language to build, edit, and arrange your flow.')}
                     </span>
                 </div>
+                {onNewChat && items.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={onNewChat}
+                        disabled={isThinking}
+                        aria-label={t('agentPanel.newChat', 'Start a new conversation')}
+                        className={cn(
+                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground',
+                            'transition-colors hover:bg-muted/60 hover:text-foreground',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                            'disabled:pointer-events-none disabled:opacity-40'
+                        )}
+                    >
+                        <SquarePen className="h-4 w-4" />
+                    </button>
+                )}
                 {onClose && (
                     <button
                         type="button"

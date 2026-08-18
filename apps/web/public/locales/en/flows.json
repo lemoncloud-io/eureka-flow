@@ -54,7 +54,8 @@
         },
         "stop": "Stop",
         "open": "Open the assistant",
-        "close": "Close the assistant"
+        "close": "Close the assistant",
+        "newChat": "Start a new conversation"
     },
     "header": {
         "title": "EurekaFlow",

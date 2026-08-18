@@ -39,7 +39,7 @@ const session = (messages: Message[], phase: SessionState['phase']): SessionStat
 const renderPanel = (
     state: SessionState | null,
     onSend = vi.fn(),
-    extra: { onAbort?: () => void; onClose?: () => void } = {}
+    extra: { onAbort?: () => void; onClose?: () => void; onNewChat?: () => void } = {}
 ) =>
     render(
         <I18nextProvider i18n={i18n}>
@@ -240,6 +240,31 @@ describe('AgentPanel', () => {
 
         renderPanel(null);
         expect(screen.queryByRole('button', { name: 'Close the assistant' })).toBeNull();
+    });
+
+    it('offers a new conversation only once there is one to forget', () => {
+        const onNewChat = vi.fn();
+        const { unmount } = renderPanel(null, vi.fn(), { onNewChat });
+
+        // Nothing said yet: starting over would do nothing, so the control stays out of the way.
+        expect(screen.queryByRole('button', { name: 'Start a new conversation' })).toBeNull();
+        unmount();
+
+        renderPanel(session([{ id: 'u1', role: 'user', content: 'build it', ts: 0 }], 'done'), vi.fn(), { onNewChat });
+        fireEvent.click(screen.getByRole('button', { name: 'Start a new conversation' }));
+        expect(onNewChat).toHaveBeenCalledTimes(1);
+    });
+
+    it('will not start over mid-turn', () => {
+        const onNewChat = vi.fn();
+        renderPanel(session([{ id: 'u1', role: 'user', content: 'build it', ts: 0 }], 'thinking'), vi.fn(), {
+            onNewChat,
+        });
+
+        const button = screen.getByRole('button', { name: 'Start a new conversation' });
+        expect((button as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.click(button);
+        expect(onNewChat).not.toHaveBeenCalled();
     });
 
     it('says a turn stopped, and why', () => {
