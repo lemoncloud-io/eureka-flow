@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildTranscript } from './agentTurnLedger';
+import { buildTranscript, isFollowingTail } from './agentTurnLedger';
 
 import type { LedgerOp, TranscriptItem } from './agentTurnLedger';
 import type { Message, SessionState } from '@flows/agent';
@@ -171,5 +171,22 @@ describe('buildTranscript', () => {
     it('renders nothing for an empty or missing session', () => {
         expect(buildTranscript(null)).toEqual([]);
         expect(buildTranscript(session([]))).toEqual([]);
+    });
+});
+
+describe('isFollowingTail', () => {
+    const at = (scrollTop: number) => ({ scrollTop, scrollHeight: 1000, clientHeight: 400 });
+
+    it('follows while the reader is at the end', () => {
+        expect(isFollowingTail(at(600))).toBe(true);
+    });
+
+    it('still follows within a line of the end, so a rounding pixel does not unstick it', () => {
+        expect(isFollowingTail(at(560))).toBe(true);
+    });
+
+    it('lets go once the reader has scrolled back', () => {
+        expect(isFollowingTail(at(400))).toBe(false);
+        expect(isFollowingTail(at(0))).toBe(false);
     });
 });

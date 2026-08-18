@@ -153,3 +153,14 @@ export const buildTranscript = (session: SessionState | null): TranscriptItem[] 
 
     return items;
 };
+
+/** How close to the bottom still counts as "following along" — roughly one line of transcript. */
+const STICK_THRESHOLD_PX = 48;
+
+/**
+ * Whether a scroller is close enough to the end that new content should keep it pinned there. A turn
+ * saves after every tool result, so pinning unconditionally would drag the user back down each time
+ * they scrolled up to re-read something mid-turn.
+ */
+export const isFollowingTail = (el: Pick<HTMLElement, 'scrollTop' | 'scrollHeight' | 'clientHeight'>): boolean =>
+    el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD_PX;

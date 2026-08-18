@@ -25,11 +25,11 @@ export const AgentLauncher = ({ session, onOpen }: { session: SessionState | nul
         : 0;
 
     return (
-        <div className="pointer-events-auto absolute bottom-24 right-4 z-30 sm:bottom-auto sm:right-4 sm:top-1/2 sm:-translate-y-1/2">
+        <div className="pointer-events-auto absolute right-4 top-1/2 z-30 -translate-y-1/2">
             <div
                 className={cn(
-                    'rounded-2xl border border-border/40 bg-glass-bg p-1.5 backdrop-blur-2xl',
-                    'shadow-floating sm:p-2'
+                    'rounded-2xl border border-border/40 bg-glass-bg p-2 backdrop-blur-2xl',
+                    'shadow-floating'
                 )}
             >
                 <button
@@ -38,10 +38,10 @@ export const AgentLauncher = ({ session, onOpen }: { session: SessionState | nul
                     aria-expanded={false}
                     aria-label={t('agentPanel.open', 'Open the assistant')}
                     className={cn(
-                        'flex h-9 items-center justify-center gap-1.5 rounded-lg transition-all duration-150 sm:h-8',
+                        'flex h-8 items-center justify-center gap-1.5 rounded-lg transition-all duration-150',
                         'text-muted-foreground hover:bg-accent hover:text-foreground',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-                        running ? 'w-auto px-2 text-primary' : 'w-9 sm:w-8'
+                        running ? 'w-auto px-2 text-primary' : 'w-8'
                     )}
                 >
                     <Sparkles className="h-4 w-4 shrink-0" />

@@ -7,7 +7,7 @@ import { cn } from '@flows/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@flows/ui-kit';
 
 import { AgentTurnLedger } from './AgentTurnLedger';
-import { buildTranscript } from '../utils/agentTurnLedger';
+import { buildTranscript, isFollowingTail } from '../utils/agentTurnLedger';
 
 import type { SessionState } from '@flows/agent';
 
@@ -139,11 +139,15 @@ export const AgentPanel = ({
     // send slot is dead weight in exactly that window, so it becomes the way out of it.
     const canStop = isThinking && !!onAbort;
 
-    // Keep the latest message in view as the transcript grows.
+    // Follow the tail as the transcript grows, but only while the user is already at it — a turn saves
+    // after every tool result, and pinning unconditionally would yank them back down mid-read.
     // (`scrollTo` is guarded — jsdom / older engines may not implement it.)
+    const following = useRef(true);
     useEffect(() => {
         const el = scrollRef.current;
-        el?.scrollTo?.({ top: el.scrollHeight });
+        if (el && following.current) {
+            el.scrollTo?.({ top: el.scrollHeight });
+        }
     }, [session]);
 
     /** Grow the composer with the draft, up to the same ceiling the scroll area used to impose. */
@@ -215,7 +219,13 @@ export const AgentPanel = ({
             </div>
 
             {/* Transcript */}
-            <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+            <div
+                ref={scrollRef}
+                onScroll={e => {
+                    following.current = isFollowingTail(e.currentTarget);
+                }}
+                className="flex-1 space-y-3 overflow-y-auto px-4 py-3"
+            >
                 {items.length === 0 ? (
                     <div className="space-y-2 pt-4">
                         <p className="text-xs text-muted-foreground/70">
