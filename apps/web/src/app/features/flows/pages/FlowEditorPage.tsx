@@ -1014,9 +1014,10 @@ export const FlowEditorPage = () => {
                     />
                 )}
             </div>
-            {/* Dev-only: the Generate API gateway has no socket-layer receiver yet, so keep the panel
-                out of production bundles until that lands. */}
-            {import.meta.env.DEV && currentFlowId && (
+            {/* Not in production yet: the panel ships to local dev and the DEV deployment only, so the
+                agent gets real use before it reaches PROD users. Same gate as the Header's dev tools —
+                Vite drops the subtree from a PROD build rather than merely hiding it. */}
+            {(import.meta.env.DEV || import.meta.env.VITE_ENV === 'DEV') && currentFlowId && (
                 <FlowAgentPanel engine={engine} flowId={currentFlowId} permissions={permissions} />
             )}
         </div>

@@ -166,6 +166,39 @@ describe('AgentPanel', () => {
         expect(screen.queryByText('input')).toBeNull();
     });
 
+    it('keeps the step that failed in view', () => {
+        renderPanel(
+            session(
+                [
+                    { id: 'u1', role: 'user', content: 'rewire it', ts: 0 },
+                    {
+                        id: 'a1',
+                        role: 'assistant',
+                        toolCalls: [
+                            { id: 'c1', name: 'move_node', args: JSON.stringify({ nodeId: 'n1' }), status: 'ok' },
+                            {
+                                id: 'c2',
+                                name: 'delete_node',
+                                args: JSON.stringify({ nodeId: 'preview-1' }),
+                                status: 'error',
+                            },
+                        ],
+                        ts: 0,
+                    },
+                    { id: 't1', role: 'tool', content: 'ok', toolCallId: 'c1', ts: 0 },
+                    { id: 't2', role: 'tool', content: 'denied', toolCallId: 'c2', ts: 0 },
+                ],
+                'error'
+            )
+        );
+
+        // A failed turn does not fold: the row that failed is the one the user came for.
+        const summary = screen.getByRole('button', { name: /2 changes/ });
+        expect(summary.getAttribute('aria-expanded')).toBe('true');
+        expect((summary as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByText('preview-1')).toBeTruthy();
+    });
+
     it('says a turn stopped, and why', () => {
         const failed: SessionState = { ...session([], 'error'), error: 'exceeded 12 reasoning iterations' };
         renderPanel(failed);

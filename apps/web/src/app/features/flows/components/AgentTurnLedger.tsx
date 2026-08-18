@@ -77,8 +77,11 @@ const Row = ({ op }: { op: LedgerOp }) => {
 
 export const AgentTurnLedger = ({ ops, running }: { ops: LedgerOp[]; running: boolean }) => {
     const { t } = useTranslation(['flows']);
+    // A turn that failed stays open: the point of folding is that the work went fine, and the row
+    // that did not is the one thing the user needs to see without hunting for it.
+    const failed = ops.some(op => op.status === 'error');
     const [open, setOpen] = useState(false);
-    const expanded = running || open;
+    const expanded = running || failed || open;
 
     if (ops.length === 0) {
         return null;
@@ -89,7 +92,7 @@ export const AgentTurnLedger = ({ ops, running }: { ops: LedgerOp[]; running: bo
             <button
                 type="button"
                 onClick={() => setOpen(v => !v)}
-                disabled={running}
+                disabled={running || failed}
                 aria-expanded={expanded}
                 className={cn(
                     'flex items-center gap-1 rounded px-1 py-0.5 text-[11px] text-muted-foreground/80',
