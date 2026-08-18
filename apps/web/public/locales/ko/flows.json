@@ -50,7 +50,8 @@
                 "done": "<s>{{subject}}</s>에게 맡김"
             },
             "unknownTarget": "노드"
-        }
+        },
+        "stop": "중지"
     },
     "header": {
         "title": "EurekaFlow",

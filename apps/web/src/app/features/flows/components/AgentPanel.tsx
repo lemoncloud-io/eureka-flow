@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChevronDown, Send, Sparkles } from 'lucide-react';
+import { ChevronDown, Send, Sparkles, Square } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@flows/ui-kit';
@@ -28,6 +28,8 @@ interface AgentPanelProps {
     selectedModel?: string;
     /** Choose a model; the container decides when it reaches the agent (next turn). */
     onSelectModel?: (name: string) => void;
+    /** Stop the turn in flight. Omitted ⇒ no stop control (the composer just waits it out). */
+    onAbort?: () => void;
 }
 
 /**
@@ -102,7 +104,14 @@ const SUGGESTION_DEFAULTS: Record<(typeof SUGGESTION_KEYS)[number], string> = {
  * The right-docked assistant panel — a pure view over the agent session: it renders the transcript
  * and emits `onSend`, owning no agent or wiring (a container like `FlowAgentPanel` supplies both).
  */
-export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSelectModel }: AgentPanelProps) => {
+export const AgentPanel = ({
+    session,
+    onSend,
+    models = [],
+    selectedModel,
+    onSelectModel,
+    onAbort,
+}: AgentPanelProps) => {
     const { t } = useTranslation(['flows']);
     const [draft, setDraft] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -123,6 +132,9 @@ export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSele
     // The ledger rows are the progress indicator while they exist; the bare "Thinking…" line covers
     // the stretch before the first tool call, when there is nothing yet to show.
     const hasLiveOps = items.some(i => i.kind === 'ledger' && i.ops.some(op => op.status === 'running'));
+    // A turn runs up to a dozen reasoning iterations with the composer disabled the whole time. The
+    // send slot is dead weight in exactly that window, so it becomes the way out of it.
+    const canStop = isThinking && !!onAbort;
 
     // Keep the latest message in view as the transcript grows.
     // (`scrollTo` is guarded — jsdom / older engines may not implement it.)
@@ -272,16 +284,16 @@ export const AgentPanel = ({ session, onSend, models = [], selectedModel, onSele
                         <ModelPicker options={models} value={selectedModel} onChange={onSelectModel} />
                         <button
                             type="button"
-                            aria-label={t('agentPanel.send', 'Send')}
-                            onClick={submit}
-                            disabled={isThinking || draft.trim().length === 0}
+                            aria-label={canStop ? t('agentPanel.stop', 'Stop') : t('agentPanel.send', 'Send')}
+                            onClick={canStop ? onAbort : submit}
+                            disabled={isThinking ? !canStop : draft.trim().length === 0}
                             className={cn(
                                 'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary',
                                 'text-primary-foreground transition-opacity focus-visible:outline-none',
                                 'focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-40'
                             )}
                         >
-                            <Send className="h-4 w-4" />
+                            {canStop ? <Square className="h-3 w-3 fill-current" /> : <Send className="h-4 w-4" />}
                         </button>
                     </div>
                 </div>

@@ -100,7 +100,7 @@ export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelPr
     const blockRegistry = useBlockRegistry();
     const catalog = useMemo(() => createBlockCatalogLookup(blockRegistry), [blockRegistry]);
 
-    const { session, send } = useAgent({
+    const { session, send, abort } = useAgent({
         binding,
         flowId,
         gateway,
@@ -132,6 +132,7 @@ export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelPr
             models={modelOptions}
             selectedModel={selected}
             onSelectModel={setSelected}
+            onAbort={abort}
         />
     );
 };

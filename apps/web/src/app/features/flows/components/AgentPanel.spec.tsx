@@ -36,10 +36,10 @@ const session = (messages: Message[], phase: SessionState['phase']): SessionStat
     phase,
 });
 
-const renderPanel = (state: SessionState | null, onSend = vi.fn()) =>
+const renderPanel = (state: SessionState | null, onSend = vi.fn(), onAbort?: () => void) =>
     render(
         <I18nextProvider i18n={i18n}>
-            <AgentPanel session={state} onSend={onSend} />
+            <AgentPanel session={state} onSend={onSend} {...(onAbort ? { onAbort } : {})} />
         </I18nextProvider>
     );
 
@@ -197,6 +197,31 @@ describe('AgentPanel', () => {
         expect(summary.getAttribute('aria-expanded')).toBe('true');
         expect((summary as HTMLButtonElement).disabled).toBe(true);
         expect(screen.getByText('preview-1')).toBeTruthy();
+    });
+
+    it('offers a way out of a running turn', () => {
+        const onAbort = vi.fn();
+        renderPanel(session([{ id: 'u1', role: 'user', content: 'build it', ts: 0 }], 'thinking'), vi.fn(), onAbort);
+
+        // The send slot is what the user reaches for, and during a turn it is the stop control.
+        const stop = screen.getByRole('button', { name: 'Stop' });
+        expect((stop as HTMLButtonElement).disabled).toBe(false);
+        fireEvent.click(stop);
+        expect(onAbort).toHaveBeenCalledTimes(1);
+
+        expect(screen.queryByRole('button', { name: 'Send' })).toBeNull();
+    });
+
+    it('sends when the turn is not running', () => {
+        const onSend = vi.fn();
+        const onAbort = vi.fn();
+        renderPanel(null, onSend, onAbort);
+
+        fireEvent.change(screen.getByRole('textbox'), { target: { value: 'add a preview' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+        expect(onSend).toHaveBeenCalledWith('add a preview');
+        expect(onAbort).not.toHaveBeenCalled();
     });
 
     it('says a turn stopped, and why', () => {

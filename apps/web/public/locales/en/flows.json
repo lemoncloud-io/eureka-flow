@@ -51,7 +51,8 @@
                 "done": "Delegated to <s>{{subject}}</s>"
             },
             "unknownTarget": "a node"
-        }
+        },
+        "stop": "Stop"
     },
     "header": {
         "title": "EurekaFlow",
