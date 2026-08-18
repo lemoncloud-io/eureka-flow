@@ -197,6 +197,7 @@ jobs:
                   VITE_PROCESS_API: real
                   VITE_API_URL: ${{ secrets.VITE_PROD_API_URL }}
                   VITE_WS_ENDPOINT: ${{ secrets.VITE_PROD_WS_ENDPOINT }}
+                  VITE_TOOL_WS_ENDPOINT: ${{ secrets.VITE_PROD_TOOL_WS_ENDPOINT || 'wss://wss.eureka.codes/cht-v1' }}
                   VITE_CODES_URL: ${{ secrets.VITE_PROD_CODES_URL }}
                   VITE_OAUTH_ENDPOINT: ${{ secrets.VITE_PROD_OAUTH_ENDPOINT }}
                   VITE_SOCIAL_OAUTH_ENDPOINT: ${{ secrets.VITE_PROD_SOCIAL_OAUTH_ENDPOINT }}
