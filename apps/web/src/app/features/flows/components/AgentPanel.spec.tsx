@@ -36,10 +36,14 @@ const session = (messages: Message[], phase: SessionState['phase']): SessionStat
     phase,
 });
 
-const renderPanel = (state: SessionState | null, onSend = vi.fn(), onAbort?: () => void) =>
+const renderPanel = (
+    state: SessionState | null,
+    onSend = vi.fn(),
+    extra: { onAbort?: () => void; onClose?: () => void } = {}
+) =>
     render(
         <I18nextProvider i18n={i18n}>
-            <AgentPanel session={state} onSend={onSend} {...(onAbort ? { onAbort } : {})} />
+            <AgentPanel session={state} onSend={onSend} {...extra} />
         </I18nextProvider>
     );
 
@@ -201,7 +205,9 @@ describe('AgentPanel', () => {
 
     it('offers a way out of a running turn', () => {
         const onAbort = vi.fn();
-        renderPanel(session([{ id: 'u1', role: 'user', content: 'build it', ts: 0 }], 'thinking'), vi.fn(), onAbort);
+        renderPanel(session([{ id: 'u1', role: 'user', content: 'build it', ts: 0 }], 'thinking'), vi.fn(), {
+            onAbort,
+        });
 
         // The send slot is what the user reaches for, and during a turn it is the stop control.
         const stop = screen.getByRole('button', { name: 'Stop' });
@@ -215,13 +221,25 @@ describe('AgentPanel', () => {
     it('sends when the turn is not running', () => {
         const onSend = vi.fn();
         const onAbort = vi.fn();
-        renderPanel(null, onSend, onAbort);
+        renderPanel(null, onSend, { onAbort });
 
         fireEvent.change(screen.getByRole('textbox'), { target: { value: 'add a preview' } });
         fireEvent.click(screen.getByRole('button', { name: 'Send' }));
 
         expect(onSend).toHaveBeenCalledWith('add a preview');
         expect(onAbort).not.toHaveBeenCalled();
+    });
+
+    it('can be closed, and shows no close control when there is nowhere to collapse to', () => {
+        const onClose = vi.fn();
+        const { unmount } = renderPanel(null, vi.fn(), { onClose });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Close the assistant' }));
+        expect(onClose).toHaveBeenCalledTimes(1);
+        unmount();
+
+        renderPanel(null);
+        expect(screen.queryByRole('button', { name: 'Close the assistant' })).toBeNull();
     });
 
     it('says a turn stopped, and why', () => {

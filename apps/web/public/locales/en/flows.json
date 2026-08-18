@@ -52,7 +52,9 @@
             },
             "unknownTarget": "a node"
         },
-        "stop": "Stop"
+        "stop": "Stop",
+        "open": "Open the assistant",
+        "close": "Close the assistant"
     },
     "header": {
         "title": "EurekaFlow",

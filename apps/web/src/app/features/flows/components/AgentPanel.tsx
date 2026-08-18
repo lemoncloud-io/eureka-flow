@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChevronDown, Send, Sparkles, Square } from 'lucide-react';
+import { ChevronDown, PanelRightClose, Send, Sparkles, Square } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@flows/ui-kit';
@@ -30,6 +30,8 @@ interface AgentPanelProps {
     onSelectModel?: (name: string) => void;
     /** Stop the turn in flight. Omitted ⇒ no stop control (the composer just waits it out). */
     onAbort?: () => void;
+    /** Collapse the panel back to its launcher. Omitted ⇒ the panel cannot be closed. */
+    onClose?: () => void;
 }
 
 /**
@@ -111,6 +113,7 @@ export const AgentPanel = ({
     selectedModel,
     onSelectModel,
     onAbort,
+    onClose,
 }: AgentPanelProps) => {
     const { t } = useTranslation(['flows']);
     const [draft, setDraft] = useState('');
@@ -189,12 +192,26 @@ export const AgentPanel = ({
             {/* Header */}
             <div className="flex items-center gap-2 border-b border-border/40 px-4 py-3">
                 <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-                <div className="flex min-w-0 flex-col">
+                <div className="flex min-w-0 flex-1 flex-col">
                     <span className="text-sm font-semibold text-foreground">{t('agentPanel.title', 'Assistant')}</span>
                     <span className="truncate text-[11px] text-muted-foreground">
                         {t('agentPanel.subtitle', 'Ask in plain language to build, edit, and arrange your flow.')}
                     </span>
                 </div>
+                {onClose && (
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label={t('agentPanel.close', 'Close the assistant')}
+                        className={cn(
+                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground',
+                            'transition-colors hover:bg-muted/60 hover:text-foreground',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50'
+                        )}
+                    >
+                        <PanelRightClose className="h-4 w-4" />
+                    </button>
+                )}
             </div>
 
             {/* Transcript */}

@@ -10,6 +10,7 @@ import {
 } from '@flows/agent';
 import { useBlockRegistry } from '@flows/flows';
 
+import { AgentLauncher } from './AgentLauncher';
 import { AgentPanel } from './AgentPanel';
 import { useAgent } from '../hooks/useAgent';
 import { useAgentModelCommit } from '../hooks/useAgentModelCommit';
@@ -46,6 +47,26 @@ interface FlowAgentPanelProps {
  * request id. When the tool socket has no connection id the gateway falls back to HTTP-only delivery
  * (the completed result in the POST body).
  */
+/** Whether the editor opens with the assistant showing. Persisted so it stays where the user left it;
+ *  a storage failure (private mode, quota) just means the default, never a crash. */
+const PANEL_OPEN_KEY = 'flow-agent-panel-open';
+
+const readPanelOpen = (): boolean => {
+    try {
+        return localStorage.getItem(PANEL_OPEN_KEY) !== 'false';
+    } catch {
+        return true;
+    }
+};
+
+const writePanelOpen = (open: boolean): void => {
+    try {
+        localStorage.setItem(PANEL_OPEN_KEY, String(open));
+    } catch {
+        // Not worth surfacing: the panel still opens and closes, it just forgets across reloads.
+    }
+};
+
 export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelProps) => {
     // Reads cannot lag a projection that pauses mid-drag; edits land in `transact`, so they
     // checkpoint for undo like a user drag.
@@ -125,6 +146,18 @@ export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelPr
     // the generator block's ModelSelect is.
     const modelOptions = useMemo(() => models.map(m => ({ name: m.name, label: m.label })), [models]);
 
+    // Kept here, not in FlowEditorPage: `useAgent` lives in this component and unmounting it aborts the
+    // turn in flight (`useAgentSession`), so collapsing has to hide the panel without dropping the agent.
+    const [open, setOpen] = useState(() => readPanelOpen());
+    const setOpenPersisted = useCallback((next: boolean) => {
+        setOpen(next);
+        writePanelOpen(next);
+    }, []);
+
+    if (!open) {
+        return <AgentLauncher session={session} onOpen={() => setOpenPersisted(true)} />;
+    }
+
     return (
         <AgentPanel
             session={session}
@@ -133,6 +166,7 @@ export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelPr
             selectedModel={selected}
             onSelectModel={setSelected}
             onAbort={abort}
+            onClose={() => setOpenPersisted(false)}
         />
     );
 };

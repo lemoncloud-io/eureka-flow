@@ -51,7 +51,9 @@
             },
             "unknownTarget": "노드"
         },
-        "stop": "중지"
+        "stop": "중지",
+        "open": "어시스턴트 열기",
+        "close": "어시스턴트 닫기"
     },
     "header": {
         "title": "EurekaFlow",
