@@ -362,9 +362,12 @@ export const AgentPanel = ({
 
                 {isThinking && !hasLiveOps && (
                     <div role="status" aria-live="polite" className="flex justify-start">
-                        <div className="rounded-2xl bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                        {/* Unbubbled, on the left edge the reply itself will start from: the wait sits
+                            where the first token lands, instead of as a grey message that never
+                            resolves. The word carries the motion — no spinner over the canvas. */}
+                        <span className="animate-text-shimmer text-sm font-medium leading-relaxed">
                             {t('agentPanel.thinking', 'Thinking…')}
-                        </div>
+                        </span>
                     </div>
                 )}
 
