@@ -235,7 +235,13 @@ export const AgentPanel = ({
         <aside
             aria-label={t('agentPanel.title', 'Assistant')}
             style={{ width }}
-            className="relative z-30 flex h-full shrink-0 flex-col overflow-hidden border-l border-border/40 bg-glass-bg backdrop-blur-2xl"
+            className={cn(
+                'relative z-30 flex h-full shrink-0 flex-col overflow-hidden border-l border-border/40',
+                'bg-glass-bg backdrop-blur-2xl',
+                // Slides in from the edge it docks to, matching the node detail panel. `motion-safe`
+                // so a reduced-motion setting gets the panel without the travel.
+                'motion-safe:animate-in motion-safe:slide-in-from-right-4 motion-safe:duration-200'
+            )}
         >
             {onWidthChange && (
                 <div

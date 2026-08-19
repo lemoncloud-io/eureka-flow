@@ -25,7 +25,13 @@ export const AgentLauncher = ({ session, onOpen }: { session: SessionState | nul
         : 0;
 
     return (
-        <div className="pointer-events-auto absolute right-4 top-1/2 z-30 -translate-y-1/2">
+        <div
+            className={cn(
+                'pointer-events-auto absolute right-4 top-1/2 z-30 -translate-y-1/2',
+                // The counterpart to the panel's slide: the handle fades in where the panel left off.
+                'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200'
+            )}
+        >
             <div
                 className={cn(
                     'rounded-2xl border border-border/40 bg-glass-bg p-2 backdrop-blur-2xl',
