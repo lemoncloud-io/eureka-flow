@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { Sparkles } from 'lucide-react';
+import { Bot } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 
@@ -44,7 +44,7 @@ export const AgentLauncher = ({ session, onOpen }: { session: SessionState | nul
                         running ? 'w-auto px-2 text-primary' : 'w-8'
                     )}
                 >
-                    <Sparkles className="h-4 w-4 shrink-0" />
+                    <Bot className="h-4 w-4 shrink-0" />
                     {running && (
                         <>
                             <span className="text-[11px] font-medium tabular-nums">

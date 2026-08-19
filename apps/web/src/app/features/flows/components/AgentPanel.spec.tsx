@@ -39,11 +39,16 @@ const session = (messages: Message[], phase: SessionState['phase']): SessionStat
 const renderPanel = (
     state: SessionState | null,
     onSend = vi.fn(),
-    extra: { onAbort?: () => void; onClose?: () => void; onNewChat?: () => void } = {}
+    extra: {
+        onAbort?: () => void;
+        onClose?: () => void;
+        onNewChat?: () => void;
+        onWidthChange?: (width: number) => void;
+    } = {}
 ) =>
     render(
         <I18nextProvider i18n={i18n}>
-            <AgentPanel session={state} onSend={onSend} {...extra} />
+            <AgentPanel session={state} onSend={onSend} width={360} {...extra} />
         </I18nextProvider>
     );
 
@@ -265,6 +270,27 @@ describe('AgentPanel', () => {
         expect((button as HTMLButtonElement).disabled).toBe(true);
         fireEvent.click(button);
         expect(onNewChat).not.toHaveBeenCalled();
+    });
+
+    it('can be dragged wider, and says how wide it is', () => {
+        const onWidthChange = vi.fn();
+        renderPanel(null, vi.fn(), { onWidthChange });
+
+        const grip = screen.getByRole('separator', { name: 'Resize the assistant' });
+        expect(grip.getAttribute('aria-valuenow')).toBe('360');
+        expect(grip.getAttribute('aria-valuemin')).toBe('320');
+        expect(grip.getAttribute('aria-valuemax')).toBe('640');
+
+        // Toward the canvas is wider; the panel is on the right, so the keys are mirrored too.
+        fireEvent.keyDown(grip, { key: 'ArrowLeft' });
+        expect(onWidthChange).toHaveBeenLastCalledWith(376);
+        fireEvent.keyDown(grip, { key: 'ArrowRight' });
+        expect(onWidthChange).toHaveBeenLastCalledWith(344);
+    });
+
+    it('has no grip when the container does not own a width to change', () => {
+        renderPanel(null);
+        expect(screen.queryByRole('separator')).toBeNull();
     });
 
     it('says a turn stopped, and why', () => {

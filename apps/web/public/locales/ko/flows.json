@@ -2,7 +2,7 @@
     "agentPanel": {
         "title": "어시스턴트",
         "subtitle": "플로우를 만들고, 수정하고, 정렬하도록 자연어로 요청하세요.",
-        "empty": "평소 말하듯 요청하세요. 예를 들면:",
+        "empty": "예를 들면:",
         "thinking": "생각 중…",
         "placeholder": "어시스턴트에게 플로우 생성이나 수정을 요청하세요…",
         "send": "보내기",
@@ -54,7 +54,8 @@
         "stop": "중지",
         "open": "어시스턴트 열기",
         "close": "어시스턴트 닫기",
-        "newChat": "새 대화 시작"
+        "newChat": "새 대화 시작",
+        "resize": "어시스턴트 너비 조절"
     },
     "header": {
         "title": "EurekaFlow",

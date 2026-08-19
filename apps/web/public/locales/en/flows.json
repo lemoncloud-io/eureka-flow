@@ -2,7 +2,7 @@
     "agentPanel": {
         "title": "Assistant",
         "subtitle": "Ask in plain language to build, edit, and arrange your flow.",
-        "empty": "Ask in plain language. For example:",
+        "empty": "For example:",
         "thinking": "Thinking…",
         "placeholder": "Ask the assistant to build or edit your flow…",
         "send": "Send",
@@ -55,7 +55,8 @@
         "stop": "Stop",
         "open": "Open the assistant",
         "close": "Close the assistant",
-        "newChat": "Start a new conversation"
+        "newChat": "Start a new conversation",
+        "resize": "Resize the assistant"
     },
     "header": {
         "title": "EurekaFlow",

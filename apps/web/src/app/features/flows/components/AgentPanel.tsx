@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ChevronDown, PanelRightClose, Send, Sparkles, Square, SquarePen } from 'lucide-react';
+import { Bot, ChevronDown, PanelRightClose, Send, Square, SquarePen } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@flows/ui-kit';
 
 import { AgentTurnLedger } from './AgentTurnLedger';
-import { buildTranscript, isFollowingTail } from '../utils/agentTurnLedger';
+import {
+    PANEL_MAX_WIDTH,
+    PANEL_MIN_WIDTH,
+    buildTranscript,
+    clampPanelWidth,
+    isFollowingTail,
+} from '../utils/agentTurnLedger';
 
 import type { SessionState } from '@flows/agent';
 
@@ -34,6 +40,10 @@ interface AgentPanelProps {
     onClose?: () => void;
     /** Forget the transcript and start over. Omitted ⇒ no such control. */
     onNewChat?: () => void;
+    /** Panel width in px. The container owns it so a drag survives re-render and persists. */
+    width: number;
+    /** Report a dragged width. Omitted ⇒ the panel is not resizable. */
+    onWidthChange?: (width: number) => void;
 }
 
 /**
@@ -117,6 +127,8 @@ export const AgentPanel = ({
     onAbort,
     onClose,
     onNewChat,
+    width,
+    onWidthChange,
 }: AgentPanelProps) => {
     const { t } = useTranslation(['flows']);
     const [draft, setDraft] = useState('');
@@ -182,6 +194,34 @@ export const AgentPanel = ({
         onSend(text);
     };
 
+    // Dragging the left border toward the canvas widens the panel, so the delta is inverted.
+    const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!onWidthChange) {
+            return;
+        }
+        e.preventDefault();
+        const startX = e.clientX;
+        const startWidth = width;
+        const target = e.currentTarget;
+        target.setPointerCapture(e.pointerId);
+        const move = (ev: PointerEvent) => onWidthChange(clampPanelWidth(startWidth + (startX - ev.clientX)));
+        const stop = () => {
+            target.releasePointerCapture(e.pointerId);
+            target.removeEventListener('pointermove', move);
+            target.removeEventListener('pointerup', stop);
+        };
+        target.addEventListener('pointermove', move);
+        target.addEventListener('pointerup', stop);
+    };
+
+    const resizeKeys = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (!onWidthChange || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) {
+            return;
+        }
+        e.preventDefault();
+        onWidthChange(clampPanelWidth(width + (e.key === 'ArrowLeft' ? 16 : -16)));
+    };
+
     const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         // Ignore Enter while an IME candidate is composing (Korean/Japanese/Chinese) —
         // that Enter confirms the candidate, it must not send the message.
@@ -194,17 +234,32 @@ export const AgentPanel = ({
     return (
         <aside
             aria-label={t('agentPanel.title', 'Assistant')}
-            className="relative z-30 flex h-full w-[360px] shrink-0 flex-col overflow-hidden border-l border-border/40 bg-glass-bg backdrop-blur-2xl"
+            style={{ width }}
+            className="relative z-30 flex h-full shrink-0 flex-col overflow-hidden border-l border-border/40 bg-glass-bg backdrop-blur-2xl"
         >
+            {onWidthChange && (
+                <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label={t('agentPanel.resize', 'Resize the assistant')}
+                    aria-valuenow={width}
+                    aria-valuemin={PANEL_MIN_WIDTH}
+                    aria-valuemax={PANEL_MAX_WIDTH}
+                    tabIndex={0}
+                    onPointerDown={startResize}
+                    onKeyDown={resizeKeys}
+                    className={cn(
+                        'absolute inset-y-0 left-0 z-10 w-1.5 -translate-x-1/2 cursor-col-resize',
+                        'transition-colors hover:bg-primary/30 focus-visible:bg-primary/40 focus-visible:outline-none'
+                    )}
+                />
+            )}
             {/* Header */}
             <div className="flex items-center gap-2 border-b border-border/40 px-4 py-3">
-                <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-                <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-sm font-semibold text-foreground">{t('agentPanel.title', 'Assistant')}</span>
-                    <span className="truncate text-[11px] text-muted-foreground">
-                        {t('agentPanel.subtitle', 'Ask in plain language to build, edit, and arrange your flow.')}
-                    </span>
-                </div>
+                <Bot className="h-4 w-4 shrink-0 text-primary" />
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                    {t('agentPanel.title', 'Assistant')}
+                </span>
                 {onNewChat && items.length > 0 && (
                     <button
                         type="button"
@@ -247,9 +302,10 @@ export const AgentPanel = ({
             >
                 {items.length === 0 ? (
                     <div className="space-y-2 pt-4">
-                        <p className="text-xs text-muted-foreground/70">
-                            {t('agentPanel.empty', 'Ask in plain language. For example:')}
+                        <p className="text-xs text-muted-foreground">
+                            {t('agentPanel.subtitle', 'Ask in plain language to build, edit, and arrange your flow.')}
                         </p>
+                        <p className="pt-1 text-xs text-muted-foreground/70">{t('agentPanel.empty', 'For example:')}</p>
                         <div className="flex flex-col items-start gap-1.5">
                             {SUGGESTION_KEYS.map(key => {
                                 const text = t(`agentPanel.suggestions.${key}`, SUGGESTION_DEFAULTS[key]);
@@ -282,10 +338,13 @@ export const AgentPanel = ({
                             >
                                 <div
                                     className={cn(
-                                        'max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm',
+                                        'whitespace-pre-wrap text-sm text-foreground',
                                         item.message.role === 'user'
-                                            ? 'bg-primary/15 text-foreground'
-                                            : 'bg-muted/40 text-foreground'
+                                            ? 'max-w-[85%] rounded-2xl bg-primary/15 px-3 py-2'
+                                            : // Prose, not a bubble: the reply is the long half of the exchange, and a
+                                              // bubble at panel width reads as a wall. Capped so widening the panel
+                                              // gives the ledger and the canvas room, not a longer line to track.
+                                              'max-w-[30rem] leading-relaxed'
                                     )}
                                 >
                                     {item.message.content}

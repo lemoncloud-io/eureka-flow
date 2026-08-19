@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildTranscript, isFollowingTail } from './agentTurnLedger';
+import {
+    PANEL_DEFAULT_WIDTH,
+    PANEL_MAX_WIDTH,
+    PANEL_MIN_WIDTH,
+    buildTranscript,
+    clampPanelWidth,
+    isFollowingTail,
+} from './agentTurnLedger';
 
 import type { LedgerOp, TranscriptItem } from './agentTurnLedger';
 import type { Message, SessionState } from '@flows/agent';
@@ -188,5 +195,24 @@ describe('isFollowingTail', () => {
     it('lets go once the reader has scrolled back', () => {
         expect(isFollowingTail(at(400))).toBe(false);
         expect(isFollowingTail(at(0))).toBe(false);
+    });
+});
+
+describe('clampPanelWidth', () => {
+    it('keeps a width the user actually dragged to', () => {
+        expect(clampPanelWidth(420)).toBe(420);
+    });
+
+    it('holds the ends rather than letting the panel swallow or vanish', () => {
+        expect(clampPanelWidth(80)).toBe(PANEL_MIN_WIDTH);
+        expect(clampPanelWidth(4000)).toBe(PANEL_MAX_WIDTH);
+    });
+
+    it('rounds to whole pixels — a fractional width blurs the border it is dragged by', () => {
+        expect(clampPanelWidth(420.6)).toBe(421);
+    });
+
+    it('falls back to the default for a value that is not a width', () => {
+        expect(clampPanelWidth(Number.NaN)).toBe(PANEL_DEFAULT_WIDTH);
     });
 });

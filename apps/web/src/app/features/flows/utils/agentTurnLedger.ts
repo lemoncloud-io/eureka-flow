@@ -164,3 +164,17 @@ const STICK_THRESHOLD_PX = 48;
  */
 export const isFollowingTail = (el: Pick<HTMLElement, 'scrollTop' | 'scrollHeight' | 'clientHeight'>): boolean =>
     el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD_PX;
+
+/** What the assistant panel may be dragged to. Narrow enough to keep the canvas usable, wide enough
+ *  that a long reply and a deep ledger both fit without the transcript turning into a column of scraps. */
+export const PANEL_MIN_WIDTH = 320;
+export const PANEL_MAX_WIDTH = 640;
+export const PANEL_DEFAULT_WIDTH = 360;
+
+/** Clamps a dragged or restored width into the allowed range; anything unusable falls back to the default. */
+export const clampPanelWidth = (raw: number): number => {
+    if (!Number.isFinite(raw)) {
+        return PANEL_DEFAULT_WIDTH;
+    }
+    return Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, Math.round(raw)));
+};
