@@ -2,8 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import type { Agent, AgentStorage, SessionState, SessionStore, Tracer } from '@flows/agent';
 
-/** The narrow storage slice this hook needs — just the two JSON ops, per ISP. */
-type SessionStoragePort = Pick<AgentStorage, 'getJson' | 'setJson'>;
+/** The narrow storage slice this hook needs: read, write, and — for `reset` — drop the transcript. */
+type SessionStoragePort = Pick<AgentStorage, 'getJson' | 'setJson' | 'remove'>;
 
 // Per-flow session persistence through the injected storage port (survives reload).
 // Best-effort: storage errors are swallowed, and a stale `thinking` phase is cleared so the panel isn't stuck.
@@ -40,6 +40,8 @@ export interface UseAgentSessionResult {
     session: SessionState | null;
     send: (text: string) => void;
     abort: () => void;
+    /** Drop the transcript and start over on a fresh agent — the flow's graph is untouched. */
+    reset: () => void;
 }
 
 /**
@@ -56,8 +58,15 @@ export const useAgentSession = ({
     createAgent,
 }: UseAgentSessionArgs): UseAgentSessionResult => {
     const [session, setSession] = useState<SessionState | null>(null);
+    // Bumped by `reset`; a new value builds a new agent over an empty store, which the existing
+    // instance-change machinery below already treats like a flow switch (clear, dispose, rehydrate).
+    const [generation, setGeneration] = useState(0);
+    // The generation that must NOT restore from storage: the whole point of resetting is to forget.
+    // Compared by value rather than consumed, so StrictMode's double effect can't un-skip it.
+    const resetGenerationRef = useRef(-1);
 
     const instance = useMemo<AgentInstance>(() => {
+        const thisGeneration = generation;
         // The agent's working copy; hydrated asynchronously from the injected storage port below.
         let current: SessionState | null = null;
         // `alive` gates state writes: a disposed agent's late `save` can't touch the new flow's session.
@@ -94,6 +103,9 @@ export const useAgentSession = ({
             },
             // Applied only while live and nothing has produced state yet; invoked from an effect (pure memo through StrictMode).
             hydrate: async () => {
+                if (resetGenerationRef.current === thisGeneration) {
+                    return;
+                }
                 try {
                     const persisted = await storage.getJson<SessionState>(keyFor(flowId));
                     if (alive && current === null && persisted) {
@@ -107,7 +119,7 @@ export const useAgentSession = ({
             },
             getPhase: () => current?.phase ?? null,
         };
-    }, [flowId, storage, createAgent]);
+    }, [flowId, storage, createAgent, generation]);
 
     // `send` is blocked until this instance's transcript has been read; flipped true by the hydration effect below.
     const [hydrated, setHydrated] = useState(false);
@@ -167,5 +179,17 @@ export const useAgentSession = ({
 
     const abort = useCallback(() => instance.agent.abort(), [instance]);
 
-    return { session, send, abort };
+    const reset = useCallback(() => {
+        setGeneration(g => {
+            const next = g + 1;
+            // Marked before the new instance can hydrate, so a slow `remove` cannot race the read.
+            // If `remove` itself fails the transcript is gone for this mount and returns on reload —
+            // a storage failure, not a reset that half-worked.
+            resetGenerationRef.current = next;
+            return next;
+        });
+        void storage.remove(keyFor(flowId)).catch(() => undefined);
+    }, [storage, flowId]);
+
+    return { session, send, abort, reset };
 };

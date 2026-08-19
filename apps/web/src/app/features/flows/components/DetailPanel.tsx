@@ -815,9 +815,12 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             });
 
         return (
+            // Anchored to the canvas viewport (`WorkflowCanvas`'s `relative flex-1`), not the window:
+            // the canvas is no longer the last thing on the right — the assistant panel docks beside
+            // it — and a window-fixed detail panel would sit on top of whatever shares that edge.
             <div
                 className={cn(
-                    'fixed inset-y-0 right-0 w-full sm:w-80',
+                    'absolute inset-y-0 right-0 w-full sm:w-80',
                     'flex flex-col bg-glass-bg backdrop-blur-2xl border-l sm:border-l border-border/40',
                     'shadow-floating overflow-hidden',
                     'animate-in slide-in-from-right-4 duration-200 z-50'
@@ -1249,7 +1252,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         return (
             <div
                 className={cn(
-                    'fixed inset-y-0 right-0 w-full sm:w-72',
+                    'absolute inset-y-0 right-0 w-full sm:w-72',
                     'flex flex-col bg-glass-bg backdrop-blur-2xl border-l sm:border-l border-border/40',
                     'shadow-floating overflow-hidden',
                     'animate-in slide-in-from-right-4 duration-200 z-50'

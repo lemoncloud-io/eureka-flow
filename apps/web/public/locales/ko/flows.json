@@ -2,10 +2,60 @@
     "agentPanel": {
         "title": "어시스턴트",
         "subtitle": "플로우를 만들고, 수정하고, 정렬하도록 자연어로 요청하세요.",
-        "empty": "자연어로 요청하세요. 예:\n“블로그 제목을 만드는 플로우를 생성해줘”\n“제목을 짧고 강렬하게 만들어줘”\n“미리보기 이름을 Result로 바꿔줘”\n“노드들을 한 열로 정렬해줘”",
+        "empty": "예를 들면:",
         "thinking": "생각 중…",
         "placeholder": "어시스턴트에게 플로우 생성이나 수정을 요청하세요…",
-        "send": "보내기"
+        "send": "보내기",
+        "errorTitle": "작업이 중단됨",
+        "suggestions": {
+            "build": "블로그 제목을 쓰는 플로우를 만들어줘",
+            "tighten": "제목을 짧고 강렬하게 바꿔줘",
+            "rename": "프리뷰 이름을 Result로 바꿔줘",
+            "tidy": "노드를 한 줄로 정렬해줘"
+        },
+        "ledger": {
+            "changes_other": "{{count}}개 변경"
+        },
+        "op": {
+            "add": {
+                "running": "<s>{{subject}}</s> 추가하는 중…",
+                "done": "<s>{{subject}}</s> 추가함"
+            },
+            "delete": {
+                "running": "<s>{{subject}}</s> 삭제하는 중…",
+                "done": "<s>{{subject}}</s> 삭제함"
+            },
+            "connect": {
+                "running": "<s>{{subject}}</s>를 <o>{{object}}</o>에 연결하는 중…",
+                "done": "<s>{{subject}}</s>를 <o>{{object}}</o>에 연결함"
+            },
+            "disconnect": {
+                "running": "<s>{{subject}}</s> 연결 끊는 중…",
+                "done": "<s>{{subject}}</s> 연결 끊음"
+            },
+            "move": {
+                "running": "<s>{{subject}}</s> 옮기는 중…",
+                "done": "<s>{{subject}}</s> 옮김"
+            },
+            "rename": {
+                "running": "<s>{{subject}}</s> 이름을 <o>{{object}}</o>로 바꾸는 중…",
+                "done": "<s>{{subject}}</s> 이름을 <o>{{object}}</o>로 바꿈"
+            },
+            "configure": {
+                "running": "<s>{{subject}}</s> 설정하는 중…",
+                "done": "<s>{{subject}}</s> 설정함"
+            },
+            "delegate": {
+                "running": "<s>{{subject}}</s>에게 맡기는 중…",
+                "done": "<s>{{subject}}</s>에게 맡김"
+            },
+            "unknownTarget": "노드"
+        },
+        "stop": "중지",
+        "open": "어시스턴트 열기",
+        "close": "어시스턴트 닫기",
+        "newChat": "새 대화 시작",
+        "resize": "어시스턴트 너비 조절"
     },
     "header": {
         "title": "EurekaFlow",

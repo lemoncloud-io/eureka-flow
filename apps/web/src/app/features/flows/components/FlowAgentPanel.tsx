@@ -10,6 +10,7 @@ import {
 } from '@flows/agent';
 import { useBlockRegistry } from '@flows/flows';
 
+import { AgentLauncher } from './AgentLauncher';
 import { AgentPanel } from './AgentPanel';
 import { useAgent } from '../hooks/useAgent';
 import { useAgentModelCommit } from '../hooks/useAgentModelCommit';
@@ -23,6 +24,7 @@ import {
     createGenerateApiLlmGateway,
     resolveBrowserAgentModelConfig,
 } from '../utils';
+import { PANEL_DEFAULT_WIDTH, clampPanelWidth } from '../utils/agentTurnLedger';
 
 import type { FlowEngine } from '@flows/engine';
 import type { FlowPermissions } from '@flows/flows';
@@ -46,6 +48,43 @@ interface FlowAgentPanelProps {
  * request id. When the tool socket has no connection id the gateway falls back to HTTP-only delivery
  * (the completed result in the POST body).
  */
+/** Whether the editor opens with the assistant showing. Persisted so it stays where the user left it;
+ *  a storage failure (private mode, quota) just means the default, never a crash. */
+const PANEL_OPEN_KEY = 'flow-agent-panel-open';
+const PANEL_WIDTH_KEY = 'flow-agent-panel-width';
+
+const readPanelOpen = (): boolean => {
+    try {
+        return localStorage.getItem(PANEL_OPEN_KEY) !== 'false';
+    } catch {
+        return true;
+    }
+};
+
+const readPanelWidth = (): number => {
+    try {
+        return clampPanelWidth(Number(localStorage.getItem(PANEL_WIDTH_KEY) ?? PANEL_DEFAULT_WIDTH));
+    } catch {
+        return PANEL_DEFAULT_WIDTH;
+    }
+};
+
+const writePanelWidth = (width: number): void => {
+    try {
+        localStorage.setItem(PANEL_WIDTH_KEY, String(width));
+    } catch {
+        // Same as the open flag: the drag still works, it just forgets across reloads.
+    }
+};
+
+const writePanelOpen = (open: boolean): void => {
+    try {
+        localStorage.setItem(PANEL_OPEN_KEY, String(open));
+    } catch {
+        // Not worth surfacing: the panel still opens and closes, it just forgets across reloads.
+    }
+};
+
 export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelProps) => {
     // Reads cannot lag a projection that pauses mid-drag; edits land in `transact`, so they
     // checkpoint for undo like a user drag.
@@ -100,7 +139,7 @@ export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelPr
     const blockRegistry = useBlockRegistry();
     const catalog = useMemo(() => createBlockCatalogLookup(blockRegistry), [blockRegistry]);
 
-    const { session, send } = useAgent({
+    const { session, send, abort, reset } = useAgent({
         binding,
         flowId,
         gateway,
@@ -125,6 +164,23 @@ export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelPr
     // the generator block's ModelSelect is.
     const modelOptions = useMemo(() => models.map(m => ({ name: m.name, label: m.label })), [models]);
 
+    // Kept here, not in FlowEditorPage: `useAgent` lives in this component and unmounting it aborts the
+    // turn in flight (`useAgentSession`), so collapsing has to hide the panel without dropping the agent.
+    const [open, setOpen] = useState(() => readPanelOpen());
+    const [width, setWidth] = useState(() => readPanelWidth());
+    const setWidthPersisted = useCallback((next: number) => {
+        setWidth(next);
+        writePanelWidth(next);
+    }, []);
+    const setOpenPersisted = useCallback((next: boolean) => {
+        setOpen(next);
+        writePanelOpen(next);
+    }, []);
+
+    if (!open) {
+        return <AgentLauncher session={session} onOpen={() => setOpenPersisted(true)} />;
+    }
+
     return (
         <AgentPanel
             session={session}
@@ -132,6 +188,11 @@ export const FlowAgentPanel = ({ engine, flowId, permissions }: FlowAgentPanelPr
             models={modelOptions}
             selectedModel={selected}
             onSelectModel={setSelected}
+            onAbort={abort}
+            onClose={() => setOpenPersisted(false)}
+            onNewChat={reset}
+            width={width}
+            onWidthChange={setWidthPersisted}
         />
     );
 };
