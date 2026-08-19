@@ -1,5 +1,29 @@
 # Changelog
 
+## [2026-08-19] - root@0.72.0, @flows/web@0.72.0
+
+### Features
+
+- (web) let the thinking label carry the wait
+- (web) ease the assistant in and out of the edge
+- (web) make the assistant panel resizable and its replies readable
+- (web) start a new conversation with the assistant
+- (web) collapse the assistant to an edge handle
+- (web) let the user stop a running agent turn
+- (web) show the assistant panel on the DEV deployment
+- (web) show the agent's work in the assistant panel
+
+### Bug Fixes
+
+- (web) dock the node detail panel to the canvas, not the window
+- (web) pass VITE_TOOL_WS_ENDPOINT to every deploy build
+- (web) stop the assistant transcript from yanking the reader down
+
+### Documentation
+
+- add AGENTS.md as the tool-neutral entry point
+- (agent) add assistant panel screenshots
+
 ## [2026-08-13] - root@0.71.1, @flows/web@0.71.1, @flows/admin@0.45.1
 
 ### Bug Fixes
