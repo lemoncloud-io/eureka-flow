@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-08-25] - root@0.73.0, @flows/web@0.73.0
+
+### Features
+
+- (web) expose the assistant panel to production
+
+### Bug Fixes
+
+- (web) restrict the assistant panel to owner and editor
+
 ## [2026-08-19] - root@0.72.0, @flows/web@0.72.0
 
 ### Features
