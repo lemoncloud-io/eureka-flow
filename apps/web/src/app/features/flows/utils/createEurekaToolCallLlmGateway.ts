@@ -13,9 +13,9 @@ import type { ChatRequest, Chunk, LlmGateway, ToolDef } from '@flows/agent';
  *
  * **Endpoint status: not yet deployed.** This gateway is real, typed, and tested against a
  * scripted local HTTP server (`createEurekaToolCallLlmGateway.contract.spec.ts`) — it is not
- * yet wired to a live backend, because that backend doesn't exist yet. Selection into the
- * running app is feature-flagged (`FlowAgentPanel.tsx`, gated on `VITE_EUREKA_TOOL_CALL_ENDPOINT`
- * being set) so it never activates against a nonexistent endpoint by default.
+ * yet wired to a live backend, because that backend doesn't exist yet. Nothing in the running
+ * app selects it: `FlowAgentPanel.tsx` builds `createGenerateApiLlmGateway` unconditionally, so
+ * this gateway never activates against a nonexistent endpoint.
  *
  * This file lives in the app layer, not `libs/agent`, for the same reason
  * `createGenerateApiLlmGateway.ts` does: it depends on the app's API client (`@flows/web-core`),

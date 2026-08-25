@@ -1014,12 +1014,7 @@ export const FlowEditorPage = () => {
                     />
                 )}
             </div>
-            {/* Not in production yet: the panel ships to local dev and the DEV deployment only, so the
-                agent gets real use before it reaches PROD users. Same gate as the Header's dev tools —
-                Vite drops the subtree from a PROD build rather than merely hiding it. */}
-            {(import.meta.env.DEV || import.meta.env.VITE_ENV === 'DEV') && currentFlowId && (
-                <FlowAgentPanel engine={engine} flowId={currentFlowId} permissions={permissions} />
-            )}
+            {currentFlowId && <FlowAgentPanel engine={engine} flowId={currentFlowId} permissions={permissions} />}
         </div>
     );
 };
