@@ -1014,7 +1014,14 @@ export const FlowEditorPage = () => {
                     />
                 )}
             </div>
-            {currentFlowId && <FlowAgentPanel engine={engine} flowId={currentFlowId} permissions={permissions} />}
+            {/* Owner and editor only. `permissions` inside the panel is the executor's ceiling on each
+                tool, not a gate on the panel itself — without this a viewer on someone else's flow
+                would get a working assistant (and the LLM spend), and an anonymous visitor to a public
+                flow would get a launcher whose every send 403s. `canModifyCanvas` is the same line: it
+                is exactly the roles that can act on the graph the agent exists to edit. */}
+            {currentFlowId && permissions.canModifyCanvas && (
+                <FlowAgentPanel engine={engine} flowId={currentFlowId} permissions={permissions} />
+            )}
         </div>
     );
 };
