@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { ArrowRight, Globe, KeyRound, Lock, Search, ShieldX, X } from 'lucide-react';
 
+import { createFlowEngine } from '@flows/engine';
 import {
     deriveRole,
+    diffAgainstBaseline,
     getPermissions,
     useBlockRegistry,
     useCanvasStore,
@@ -23,7 +25,11 @@ import { AiKeyDialog } from '../../flows/components/AiKeyDialog';
 import { ContentPreviewModal } from '../../flows/components/ContentPreviewModal';
 import { DevSocketPanel } from '../../flows/components/DevSocketPanel';
 import { FlowListDialog } from '../../flows/components/FlowListDialog';
+import { useDraftPersistence } from '../../flows/hooks/useDraftPersistence';
+import { useEngineMirror } from '../../flows/hooks/useEngineMirror';
 import { useProductProgressToasts } from '../../flows/hooks/useProductProgressToasts';
+import { useReconnectNotice } from '../../flows/hooks/useReconnectNotice';
+import { useRunGate } from '../../flows/hooks/useRunGate';
 import { useSocketRecorder } from '../../flows/hooks/useSocketRecorder';
 import {
     MobileBlockLibrarySheet,
@@ -51,9 +57,6 @@ import { executeNodeWithToast } from '../utils';
 import type { FlowRole } from '@flows/flows';
 import type { WebSocketMessage } from '@flows/socket';
 import type { NodeData } from '@lemoncloud/eureka-flows-api';
-
-const serializeWorkflowState = (data: { nodes?: unknown[]; connections?: unknown[] }): string =>
-    JSON.stringify({ nodes: data.nodes ?? [], connections: data.connections ?? [] });
 
 const isPortTypeCompatible = (sourceType: string, targetType: string | undefined): boolean => {
     const target = targetType ?? 'any';
@@ -87,8 +90,19 @@ export const MobileFlowEditorPage = () => {
     const permissions = getPermissions(role);
 
     // Shared refs for cross-hook communication
-    const lastSavedStateRef = useRef<string | null>(null);
     const lastLocalUpdateTimestampRef = useRef<number | null>(null);
+
+    /**
+     * The graph, same as the desktop editor holds it. The registry goes in behind a getter
+     * because blocks arrive over the network — an engine built with the empty map would
+     * skip port-type checks for the rest of the session.
+     */
+    const blockRegistryRef = useRef(blockRegistry);
+    blockRegistryRef.current = blockRegistry;
+    const engine = useMemo(() => createFlowEngine({ getBlockRegistry: () => blockRegistryRef.current }), []);
+    // No drag preview on mobile, so the store is never ahead of the engine and the mirror
+    // never has to hold off.
+    useEngineMirror(engine, { paused: false });
 
     // UI state
     const [isFlowListOpen, setIsFlowListOpen] = useState(false);
@@ -105,24 +119,19 @@ export const MobileFlowEditorPage = () => {
     const stepNav = useStepNavigation();
 
     // Hooks
-    const {
-        isAppReady,
-        loadingText,
-        bootError,
-        isApiKeyDialogOpen,
-        setIsApiKeyDialogOpen,
-        handleApiKeySubmit,
-        reBoot,
-        updateUrl,
-    } = useMobileEditorBoot({ serializeWorkflowState, lastSavedStateRef });
+    const { isAppReady, bootError, isApiKeyDialogOpen, setIsApiKeyDialogOpen, handleApiKeySubmit, reBoot, updateUrl } =
+        useMobileEditorBoot({ engine });
 
     useMobileAutoSave({
         isAppReady,
         canSave: permissions.canSave,
-        serializeWorkflowState,
-        lastSavedStateRef,
         lastLocalUpdateTimestampRef,
     });
+
+    // Auto-save is off by default, so this is what stands between an unsaved flow and a
+    // refresh. Only for users who could save it.
+    useDraftPersistence({ enabled: isAppReady && permissions.canSave });
+    useReconnectNotice();
 
     const socketRecorder = useSocketRecorder();
     const { record: recordSocketMessage } = socketRecorder;
@@ -141,8 +150,7 @@ export const MobileFlowEditorPage = () => {
     );
 
     const { isSocketConnected, socketConnectionId, replayMessage } = useMobileSocketSync({
-        serializeWorkflowState,
-        lastSavedStateRef,
+        engine,
         lastLocalUpdateTimestampRef,
         canEdit: permissions.canEditStructure,
         onMessage: handleSocketMessage,
@@ -156,20 +164,20 @@ export const MobileFlowEditorPage = () => {
     }, [currentFlowId, clearProductProgress]);
 
     const resetAllNodesToIdle = useCallback(() => {
-        const { nodes, updateNodeData } = useCanvasStore.getState();
-        nodes.forEach(n => updateNodeData(n.id, { state: 'IDLE' } as Partial<NodeData>));
-    }, []);
+        // Clearing run state is not an edit — it leaves nothing for the next save to send.
+        engine.getGraph().nodes.forEach(n => engine.applyRuntime(n.id, { state: 'IDLE' } as Partial<NodeData>));
+    }, [engine]);
 
-    const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ socketConnectionId });
+    const runGate = useRunGate();
+    const { runProgress, isRunning, handleRunAll } = useMobileRunAll({ engine, socketConnectionId });
 
     const { handleSave, handleSelectFlow, handleAddBlock, handleExport, handleCreateNewFlow } = useMobileFlowActions({
+        engine,
         updateUrl,
-        serializeWorkflowState,
-        lastSavedStateRef,
         lastLocalUpdateTimestampRef,
     });
 
-    const connectionMode = useConnectionMode(blockRegistry, currentFlowId);
+    const connectionMode = useConnectionMode(blockRegistry, engine);
     const { recentIds, addRecent } = useRecentBlocks();
 
     // Pending auto-connect: when user adds a new block via "Add new block & connect"
@@ -196,32 +204,33 @@ export const MobileFlowEditorPage = () => {
         [stepNav]
     );
 
-    // Flush pending config edits before closing detail so refresh within the
-    // 500ms node-sync debounce (see useNodeConfig.syncNodeToServer) does not
-    // drop edits made in MobileStepDetail. Skipped when Auto Save is off —
-    // the flow reaches the server only through the header's save button.
+    // Save on close so a refresh before the autosave debounce fires does not drop
+    // edits made in MobileStepDetail. Skipped when Auto Save is off — the flow
+    // reaches the server only through the header's save button.
     const handleCloseStep = useCallback(async () => {
         if (useFlowsStore.getState().isAutoSaveEnabled) {
             const { nodes, connections } = useCanvasStore.getState();
-            const currentState = serializeWorkflowState({ nodes, connections });
-            if (currentState !== lastSavedStateRef.current) {
+            if (!diffAgainstBaseline({ nodes, connections }).isEmpty) {
                 lastLocalUpdateTimestampRef.current = Date.now();
-                const result = await saveCurrentFlow({ nodes, connections });
-                if (result.success) lastSavedStateRef.current = currentState;
+                await saveCurrentFlow({ nodes, connections });
             }
         }
         stepNav.closeStep();
     }, [stepNav, saveCurrentFlow]);
 
     const handleRunNode = useCallback(
-        (nodeId: string) => {
-            executeNodeWithToast(nodeId, {
-                flowId: currentFlowId,
+        async (nodeId: string, options?: { propagate?: boolean }) => {
+            const runFlowId = await runGate();
+            if (!runFlowId) return;
+            await executeNodeWithToast(nodeId, {
+                engine,
+                flowId: runFlowId,
                 socketConnectionId,
                 canEdit: permissions.canEditStructure,
+                propagate: options?.propagate,
             });
         },
-        [currentFlowId, socketConnectionId, permissions.canEditStructure]
+        [runGate, socketConnectionId, permissions.canEditStructure]
     );
 
     const handleAddBlockWithRecent = useCallback(
@@ -417,12 +426,12 @@ export const MobileFlowEditorPage = () => {
                 )}
                 <div className="pt-2">
                     <MobileStepList
+                        engine={engine}
                         onTapCard={handleTapCard}
                         onExpandContent={setPreviewContent}
                         onAddStep={() => setIsBlockLibraryOpen(true)}
                         onAddBlockDirect={handleAddBlockWithRecent}
                         onRunNode={handleRunNode}
-                        flowId={currentFlowId}
                         searchQuery={searchQuery}
                         role={role}
                     />
@@ -432,9 +441,9 @@ export const MobileFlowEditorPage = () => {
             {/* Full-screen step detail */}
             <MobileStepDetail
                 nodeId={stepNav.activeNodeId}
-                flowId={currentFlowId}
-                socketConnectionId={socketConnectionId}
+                engine={engine}
                 role={role}
+                onRun={handleRunNode}
                 onClose={handleCloseStep}
                 onOpenOutputConnection={connectionMode.openForPort}
                 onOpenInputConnection={connectionMode.openForInputPort}
@@ -557,7 +566,7 @@ export const MobileFlowEditorPage = () => {
                     replayState={socketRecorder.replayState}
                     onToggleRecording={socketRecorder.toggleRecording}
                     onClear={socketRecorder.clear}
-                    onReplay={msg => replayMessage(msg.raw)}
+                    onReplay={msg => replayMessage(msg)}
                     onReplayFromIndex={fromIndex => {
                         resetAllNodesToIdle();
                         socketRecorder.startReplayFromIndex(fromIndex, replayMessage);

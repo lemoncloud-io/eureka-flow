@@ -9,8 +9,9 @@ import { Badge, Button } from '@flows/ui-kit';
 import { NEXT_STATUS } from '../consts';
 
 import type { Stage, Status } from '@flows/flows';
+import type { LucideIcon } from 'lucide-react';
 
-const STATUS_NODE: Record<Status, { icon: React.ElementType; ring: string; bg: string; iconColor: string }> = {
+const STATUS_NODE: Record<Status, { icon: LucideIcon; ring: string; bg: string; iconColor: string }> = {
     todo: { icon: Circle, ring: 'ring-border', bg: 'bg-background', iconColor: 'text-muted-foreground' },
     doing: { icon: Loader2, ring: 'ring-blue-500', bg: 'bg-blue-500', iconColor: 'text-white' },
     done: { icon: Check, ring: 'ring-green-500', bg: 'bg-green-500', iconColor: 'text-white' },
@@ -93,10 +94,10 @@ export const StageCard = ({
                                 {stage.name}
                             </span>
                             {stage.stereo === 'iterative' && (
-                                <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" title="Iterative" />
+                                <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Iterative" />
                             )}
                             {stage.stereo === 'flow' && (
-                                <Zap className="h-3 w-3 shrink-0 text-amber-500" title="Automated" />
+                                <Zap className="h-3 w-3 shrink-0 text-amber-500" aria-label="Automated" />
                             )}
                             {unresolvedCount > 0 && (
                                 <Badge variant="destructive" className="h-5 gap-0.5 px-1.5 text-xs">

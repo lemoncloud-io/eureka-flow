@@ -16,6 +16,8 @@ import {
     getNodeWidth,
     isAiBlock,
     isMissingAiKey,
+    resolveNodeName,
+    translateField,
     useBlockRegistry,
     useCanvasStore,
     useNodeTraceLogs,
@@ -38,8 +40,7 @@ import {
 import { getVisiblePorts } from '../utils';
 
 import type { ConnectionDraftInfo } from '../utils';
-import type { ConfigValue } from './visualizations';
-import type { NodeData, NodeState } from '@flows/flows';
+import type { GraphNode, NodeState } from '@flows/flows';
 
 export interface NodePortHandlers {
     onPortMouseDown: (
@@ -61,7 +62,7 @@ export interface NodePortHandlers {
 }
 
 export interface NodeConfigHandlers {
-    onConfigChange: (key: string, value: ConfigValue) => void;
+    onConfigChange: (key: string, value: unknown) => void;
     onLabelChange: (label: string) => void;
     onToggleAuto: () => void;
 }
@@ -134,11 +135,14 @@ const getStatusStyles = (state: NodeState | undefined, isSelected: boolean, isFr
 };
 
 /** Duration badge auto-hide timing (ms) */
+/** Deploy phases after which there is no progress left to show. */
+const PRODUCT_TERMINAL_STATES = new Set(['done', 'error']);
+
 const DURATION_BADGE_VISIBLE_MS = 1000;
 const DURATION_BADGE_FADE_MS = 500;
 
 interface NodeBlockProps {
-    node: NodeData;
+    node: GraphNode;
     highlightState: NodeHighlightState;
     portHandlers: NodePortHandlers;
     configHandlers: NodeConfigHandlers;
@@ -202,7 +206,7 @@ export const NodeBlock = memo<NodeBlockProps>(
         isCollapsed = false,
         onToggleCollapsed,
     }) => {
-        const { t } = useTranslation(['nodes', 'flows']);
+        const { t } = useTranslation(['nodes', 'flows', 'blocks']);
         const blockRegistry = useBlockRegistry();
         const tutorialHint = useCanvasStore(s => s.tutorialHint);
         const productId = getNodeProductId(node);
@@ -236,11 +240,19 @@ export const NodeBlock = memo<NodeBlockProps>(
 
         // Memoize visible ports to avoid recalculating on every render
         const visibleInputPorts = useMemo(
-            () => getVisiblePorts(definition?.inputs ?? [], connectedPortIds, connectionDraft, node.id, 'input'),
+            () =>
+                getVisiblePorts(definition?.inputs ?? [], connectedPortIds, connectionDraft ?? null, node.id, 'input'),
             [definition?.inputs, connectedPortIds, connectionDraft, node.id]
         );
         const visibleOutputPorts = useMemo(
-            () => getVisiblePorts(definition?.outputs ?? [], connectedPortIds, connectionDraft, node.id, 'output'),
+            () =>
+                getVisiblePorts(
+                    definition?.outputs ?? [],
+                    connectedPortIds,
+                    connectionDraft ?? null,
+                    node.id,
+                    'output'
+                ),
             [definition?.outputs, connectedPortIds, connectionDraft, node.id]
         );
 
@@ -317,7 +329,7 @@ export const NodeBlock = memo<NodeBlockProps>(
         useEffect(() => {
             if (nodeState === 'RUNNING') {
                 setDurationBadgePhase('visible');
-                return;
+                return undefined;
             }
 
             if (nodeState === 'COMPLETED' || nodeState === 'ERROR') {
@@ -334,6 +346,7 @@ export const NodeBlock = memo<NodeBlockProps>(
             }
 
             setDurationBadgePhase('hidden');
+            return undefined;
         }, [nodeState]);
 
         // Resize state
@@ -503,19 +516,19 @@ export const NodeBlock = memo<NodeBlockProps>(
                                     <BlockIcon
                                         icon={definition?.icon}
                                         size={16}
-                                        fallback={<StatusIcon state={nodeState} />}
+                                        fallback={<StatusIcon state={nodeState ?? 'IDLE'} />}
                                     />
                                 )}
                             </button>
                             <div className="flex flex-col overflow-hidden min-w-0">
                                 <div className="flex items-center gap-1.5">
                                     <span className="font-semibold text-[13px] text-foreground truncate leading-tight">
-                                        {node.customLabel || definition.label}
+                                        {resolveNodeName(node, definition, t)}
                                     </span>
                                 </div>
                                 {node.customLabel && (
                                     <span className="text-[9px] text-muted-foreground/70 truncate font-mono leading-tight">
-                                        {definition.label}
+                                        {translateField(t, definition, 'label') || node.type}
                                     </span>
                                 )}
                             </div>
@@ -524,7 +537,7 @@ export const NodeBlock = memo<NodeBlockProps>(
 
                     {/* Compact Actions */}
                     <div className="flex items-center gap-0.5 shrink-0">
-                        {productProgress && !productProgress.isTerminal && (
+                        {productProgress && !PRODUCT_TERMINAL_STATES.has(productProgress.state) && (
                             <span
                                 className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-primary"
                                 title={`${productProgress.state} • ${productProgress.productId}`}

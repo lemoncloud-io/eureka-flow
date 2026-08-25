@@ -3,11 +3,22 @@
  * Credential keys persist to both sessionStorage and localStorage (survive refresh).
  * Non-credential keys go to sessionStorage only after first write.
  */
-export class EnhancedStorage {
+export class EnhancedStorage implements Storage {
     private readonly sessionStorage: Storage;
     private readonly localStorage: Storage;
-    private length: number;
     private initialSaveKeys: Set<string>;
+
+    /**
+     * Mirrors sessionStorage, which is what `key()` enumerates.
+     *
+     * This used to be a private field, re-counted after every write and never read by
+     * anyone. `Storage` requires it public, so a class that otherwise implements the
+     * interface could not say so — which is what forced the `as Storage` cast at the one
+     * place this is handed to `WebCoreFactory`.
+     */
+    get length(): number {
+        return this.sessionStorage.length;
+    }
 
     private readonly credentialKeys = [
         'account_id',
@@ -28,7 +39,6 @@ export class EnhancedStorage {
     constructor() {
         this.sessionStorage = window.sessionStorage;
         this.localStorage = window.localStorage;
-        this.length = this.sessionStorage.length;
         this.initialSaveKeys = new Set();
     }
 
@@ -67,7 +77,6 @@ export class EnhancedStorage {
 
         this.sessionStorage.removeItem(key);
         this.initialSaveKeys.delete(key);
-        this.length = this.sessionStorage.length;
     }
 
     setItem(key: string, value: string): void {
@@ -80,8 +89,6 @@ export class EnhancedStorage {
             this.localStorage.setItem(key, value);
             this.initialSaveKeys.add(key);
         }
-
-        this.length = this.sessionStorage.length;
     }
 
     private isCredentialKey(key: string): boolean {

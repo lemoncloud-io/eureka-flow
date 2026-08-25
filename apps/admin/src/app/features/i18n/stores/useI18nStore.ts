@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 
-import { DEFAULT_LANGUAGES, DEFAULT_NAMESPACES, fetchLocales } from '../consts';
-import { fetchTranslation, sortObjectKeys, unflattenJson, uploadTranslation } from '../consts';
-import { flattenJson } from '../consts';
+import { DEFAULT_LANGUAGES, DEFAULT_NAMESPACES, downloadTranslationFile, fetchTranslation } from '../consts';
+import { flattenJson, sortObjectKeys, unflattenJson } from '../consts';
 
 import type { FlatTranslations, NestedTranslations } from '../types';
 
@@ -16,14 +15,13 @@ interface I18nState {
     originals: Record<string, FlatTranslations>;
     edited: Record<string, FlatTranslations>;
     isLoading: boolean;
-    isSaving: boolean;
     error: string | null;
 
     isDirty: () => boolean;
-    initLocales: () => Promise<void>;
     setNamespace: (ns: string) => void;
     loadTranslations: () => Promise<void>;
-    saveTranslations: () => Promise<void>;
+    exportTranslations: () => void;
+    importTranslations: (lang: string, data: NestedTranslations) => void;
     updateValue: (key: string, lang: string, value: string) => void;
     addKey: (key: string, values: Record<string, string>) => void;
     deleteKey: (key: string) => void;
@@ -37,24 +35,11 @@ export const useI18nStore = create<I18nState>()((set, get) => ({
     originals: emptyByLang(DEFAULT_LANGUAGES),
     edited: emptyByLang(DEFAULT_LANGUAGES),
     isLoading: false,
-    isSaving: false,
     error: null,
 
     isDirty: () => {
         const { originals, edited, languages } = get();
         return languages.some(lang => JSON.stringify(originals[lang]) !== JSON.stringify(edited[lang]));
-    },
-
-    initLocales: async () => {
-        const { languages, namespaces } = await fetchLocales();
-        set({
-            languages,
-            namespaces,
-            originals: emptyByLang(languages),
-            edited: emptyByLang(languages),
-        });
-        // Load first namespace immediately after locale discovery
-        await get().loadTranslations();
     },
 
     setNamespace: (ns: string) => set({ namespace: ns }),
@@ -78,23 +63,22 @@ export const useI18nStore = create<I18nState>()((set, get) => ({
         }
     },
 
-    saveTranslations: async () => {
+    exportTranslations: () => {
         const { namespace, edited, languages } = get();
-        set({ isSaving: true, error: null });
-        try {
-            await Promise.all(
-                languages.map(lang => {
-                    const nested = sortObjectKeys(unflattenJson(edited[lang]) as NestedTranslations);
-                    return uploadTranslation(lang, namespace, nested);
-                })
-            );
-            set({
-                originals: Object.fromEntries(languages.map(lang => [lang, { ...edited[lang] }])),
-                isSaving: false,
-            });
-        } catch (e) {
-            set({ isSaving: false, error: e instanceof Error ? e.message : 'Failed to save translations' });
-        }
+        languages.forEach(lang => {
+            const nested = sortObjectKeys(unflattenJson(edited[lang]) as NestedTranslations);
+            downloadTranslationFile(lang, namespace, nested);
+        });
+        // Exported files ARE the new source of truth — mark editor state clean
+        set({
+            originals: Object.fromEntries(languages.map(lang => [lang, { ...edited[lang] }])),
+        });
+    },
+
+    importTranslations: (lang, data) => {
+        set(state => ({
+            edited: { ...state.edited, [lang]: flattenJson(data) },
+        }));
     },
 
     updateValue: (key, lang, value) => {

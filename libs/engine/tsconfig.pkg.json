@@ -1,0 +1,23 @@
+// Declarations for the published package. Separate from `tsconfig.lib.json` on purpose:
+// that one is a composite project reference driving `tsc -b`, emits into `dist/` with the
+// workspace-wide `rootDir: "."` (hence `dist/libs/engine/…`), and owns a tsbuildinfo.
+// The tarball needs a flat `build/` tree that nothing else writes to.
+//
+// Declarations come from tsc rather than a bundler because `src/types.ts` augments an
+// external module (`declare module '@lemoncloud/eureka-flows-api'`). A per-file emit keeps
+// it by construction; flattening is exactly the operation that drops an augmentation of a
+// module that is not in the export graph.
+{
+    "extends": "./tsconfig.lib.json",
+    "compilerOptions": {
+        "rootDir": "src",
+        "outDir": "./build",
+        "composite": false,
+        // Maps would point at `.ts` sources the tarball does not carry.
+        "declarationMap": false
+    },
+    "include": ["src/**/*.ts"],
+    // `cli/` reads `process.*` and is not exported from the barrel — it is the demo runner,
+    // not part of the package surface.
+    "exclude": ["**/*.spec.ts", "**/*.test.ts", "src/cli/**"]
+}

@@ -1,7 +1,10 @@
 import { create } from 'zustand';
+import { createStore } from 'zustand/vanilla';
 
 import type { EdgeView, RunContext, RunPortUpdate, TraceEntry } from '../types';
-import type { Connection, DataPacket, NodeData, WorkflowState } from '@lemoncloud/eureka-flows-api';
+import type { ClipboardPayload, GraphEdge, GraphLike, GraphNode } from '@flows/engine';
+import type { DataPacket, EdgeData, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { StateCreator } from 'zustand';
 
 const MAX_TRACE_ENTRIES = 500;
 const MAX_RUNS_PER_NODE = 20;
@@ -52,14 +55,14 @@ export interface Tooltip {
 
 interface CanvasState {
     // Core Data
-    nodes: NodeData[];
-    connections: Connection[];
+    nodes: GraphNode[];
+    connections: GraphEdge[];
 
     // Flow Context
     flowId: string | null;
 
-    // Clipboard
-    clipboard: NodeData | null;
+    // Clipboard — outlives a canvas remount, which a component-local ref could not
+    clipboard: ClipboardPayload | null;
 
     // Viewport
     viewport: Viewport;
@@ -96,10 +99,10 @@ interface CanvasState {
     tutorialHint: 'output-port' | 'run-button' | null;
 
     // Actions - Core Data
-    setNodes: (nodes: NodeData[] | ((prev: NodeData[]) => NodeData[])) => void;
-    setConnections: (connections: Connection[] | ((prev: Connection[]) => Connection[])) => void;
+    setNodes: (nodes: GraphNode[] | ((prev: GraphNode[]) => GraphNode[])) => void;
+    setConnections: (connections: GraphEdge[] | ((prev: GraphEdge[]) => GraphEdge[])) => void;
     setFlowId: (flowId: string | null) => void;
-    setClipboard: (node: NodeData | null) => void;
+    setClipboard: (payload: ClipboardPayload | null) => void;
 
     // Actions - Viewport
     setViewport: (viewport: Viewport | ((prev: Viewport) => Viewport)) => void;
@@ -151,7 +154,8 @@ interface CanvasState {
 
     // Compound Actions
     clearSelection: () => void;
-    loadWorkflow: (state: WorkflowState, flowId?: string) => void;
+    /** `GraphLike`, not `WorkflowState`: flows saved before the rename carry `connections`. */
+    loadWorkflow: (state: GraphLike, flowId?: string) => void;
     clearWorkflow: () => void;
     resetCanvas: () => void;
 
@@ -161,14 +165,14 @@ interface CanvasState {
     deleteNode: (nodeId: string) => void;
 
     // Connection Actions
-    addConnection: (connection: Connection) => void;
-    updateConnection: (connectionId: string, updates: Partial<Connection>) => void;
+    addConnection: (connection: GraphEdge) => void;
+    updateConnection: (connectionId: string, updates: Partial<EdgeData>) => void;
     deleteConnection: (connectionId: string) => void;
 }
 
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
 
-export const useCanvasStore = create<CanvasState>((set, _get) => ({
+export const canvasStateCreator: StateCreator<CanvasState> = (set, _get) => ({
     // Initial State
     nodes: [],
     connections: [],
@@ -366,8 +370,13 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
         const connections = workflowState?.connections || workflowState?.edges || [];
 
         set({
-            nodes: nodes as NodeData[],
-            connections: connections as Connection[],
+            // A node with no id cannot be selected, connected or addressed, so it is not a
+            // node this canvas can show. The engine mints one on the way in; this is the
+            // path that bypasses it, and dropping is the honest answer here — minting a
+            // second id for something the engine may already have minted one for would
+            // put the same node on screen twice.
+            nodes: nodes.filter((node): node is GraphNode => !!node.id),
+            connections: connections.filter((edge): edge is GraphEdge => !!edge.id),
             flowId: flowId || null,
             selectedNodeId: null,
             selectedConnectionId: null,
@@ -397,7 +406,8 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             viewport: DEFAULT_VIEWPORT,
             selectedNodeId: null,
             selectedConnectionId: null,
-            clipboard: null,
+            // The clipboard deliberately survives: copying in one flow and pasting into
+            // another is the reason it outlives the canvas in the first place.
             traceLogs: new Map(),
             nodeRuns: {},
             collapsedNodeIds: new Set(),
@@ -439,7 +449,16 @@ export const useCanvasStore = create<CanvasState>((set, _get) => ({
             connections: state.connections.filter(c => c.id !== connectionId),
             selectedConnectionId: state.selectedConnectionId === connectionId ? null : state.selectedConnectionId,
         })),
-}));
+});
+
+/** Live singleton: the canvas the user sees. */
+export const useCanvasStore = create<CanvasState>(canvasStateCreator);
+
+/**
+ * Headless instance sharing the live store's behavior but none of its state.
+ * Edit a graph off-screen (agent draft, working copy) without touching the canvas.
+ */
+export const createCanvasStore = () => createStore<CanvasState>(canvasStateCreator);
 
 // Selector hooks for better performance
 export const useCanvasNodes = () => useCanvasStore(state => state.nodes);
@@ -448,7 +467,6 @@ export const useCanvasFlowId = () => useCanvasStore(state => state.flowId);
 export const useCanvasViewport = () => useCanvasStore(state => state.viewport);
 export const useCanvasSelectedNodeId = () => useCanvasStore(state => state.selectedNodeId);
 export const useCanvasSelectedConnectionId = () => useCanvasStore(state => state.selectedConnectionId);
-export const useCanvasClipboard = () => useCanvasStore(state => state.clipboard);
 export const useCanvasDragState = () => useCanvasStore(state => state.dragState);
 export const useCanvasConnectionDraft = () => useCanvasStore(state => state.connectionDraft);
 export const useUpdatedPortIds = () => useCanvasStore(state => state.updatedPortIds);

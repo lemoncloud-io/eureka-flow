@@ -21,7 +21,7 @@ interface ApiKeyDialogProps {
     hideCreateButton?: boolean;
 }
 
-const resolveError = (err: string | null, t: (key: string) => string): string | null => {
+const resolveError = (err: string | null | undefined, t: (key: string) => string): string | null => {
     if (!err) return null;
     return err === 'POPUP_BLOCKED' ? t('apiKeyDialog.errors.popupBlocked') : err;
 };

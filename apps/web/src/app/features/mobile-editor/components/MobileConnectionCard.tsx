@@ -3,14 +3,14 @@ import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, Check, ChevronDown, ChevronUp, Unlink } from 'lucide-react';
 
-import { useBlockRegistry, useCanvasStore } from '@flows/flows';
+import { resolveNodeName, translateField, useBlockRegistry, useCanvasStore } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 
 import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
 import { useIsConnectionNew } from '../hooks';
 
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { GraphNode } from '@flows/flows';
 
 interface MobileConnectionCardProps {
     nodeId: string;
@@ -28,7 +28,7 @@ export const MobileConnectionCard = ({
     onTap,
 }: MobileConnectionCardProps) => {
     const isNew = useIsConnectionNew(connectionId);
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const [expanded, setExpanded] = useState(true);
     const blockRegistry = useBlockRegistry();
 
@@ -37,7 +37,7 @@ export const MobileConnectionCard = ({
 
     const contentPreview = useMemo(() => {
         if (!node) return null;
-        const outputData = (node as NodeData & { outputData?: Record<string, { value?: unknown }> }).outputData;
+        const outputData = (node as GraphNode & { outputData?: Record<string, { value?: unknown }> }).outputData;
         if (!outputData) return null;
         const entries = Object.entries(outputData);
         if (entries.length === 0) return null;
@@ -49,13 +49,13 @@ export const MobileConnectionCard = ({
     if (!node || !blockDef) return null;
 
     const stereo = blockDef.stereo ?? 'process';
-    const displayName = node.customLabel || blockDef.label || node.type;
-    const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${blockDef.label ?? node.type}`;
+    const displayName = resolveNodeName(node, blockDef, t);
+    const breadcrumb = `${STEREO_FALLBACK_LABEL[stereo] ?? stereo} · ${translateField(t, blockDef, 'label') || node.type}`;
     const nodeState = (node.state ?? 'IDLE') as string;
     const isError = nodeState === 'ERROR';
     const errorMessage =
-        (node as NodeData & { error?: string; errorMessage?: string }).error ||
-        (node as NodeData & { errorMessage?: string }).errorMessage ||
+        (node as GraphNode & { error?: string; errorMessage?: string }).error ||
+        (node as GraphNode & { errorMessage?: string }).errorMessage ||
         null;
 
     return (

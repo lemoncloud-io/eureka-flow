@@ -90,28 +90,6 @@ export const createFlow = async (body?: Partial<SaveFlowBody>): Promise<SaveFlow
 };
 
 /**
- * Upsert flow (batch update nodes and edges)
- * POST /flows/:id/upsert
- *
- * Use this for batch operations like:
- * - Moving multiple nodes at once
- * - Bulk node/edge updates
- *
- * @see eureka-flows-api v0.26.212
- * @param id - Flow ID to upsert into
- * @param body - SaveFlowBody { nodes: NodeData[], edges: EdgeData[] }
- * @returns SaveFlowView with updated nodes, edges, ports
- */
-export const upsertFlow = async (id: string, body: SaveFlowBody): Promise<SaveFlowView> => {
-    if (!id) {
-        throw new Error('Flow ID is required');
-    }
-    _log(`> upsertFlow(${id})`, { nodeCount: body.nodes?.length ?? 0, edgeCount: body.edges?.length ?? 0 });
-    const response = await api.post<SaveFlowView>(`/flows/${encodePathSegment(id)}/upsert`, body);
-    return response.data;
-};
-
-/**
  * Update flow metadata (name, description, isPublic, etc.)
  * POST /flows/:id/upsert
  *
@@ -186,6 +164,22 @@ export const runFlow = async (
     );
     return response.data;
 };
+
+/**
+ * Read a packet the server sent.
+ *
+ * `DataPacket.type` is a union, and the wire carries a plain string — the server is free
+ * to name a type this client does not know. Narrowing it here, in one place, keeps that
+ * from being decided again at every port that receives data. An unrecognised type is
+ * `any`, which is what the port compatibility rules already treat it as.
+ */
+export const toDataPacket = (data: { value: unknown; type?: string; timestamp?: number }): DataPacket => ({
+    value: data.value,
+    type: (DATA_TYPES.has(data.type ?? '') ? data.type : 'any') as DataPacket['type'],
+    timestamp: data.timestamp,
+});
+
+const DATA_TYPES = new Set(['text', 'image', 'number', 'json', 'any']);
 
 export const createPacket = (value: unknown, type: 'text' | 'image' | 'number'): DataPacket => ({
     value,

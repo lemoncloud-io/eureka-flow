@@ -1,46 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { getPermissions, upsertNode, useBlockRegistry, useCanvasStore, useFlowsStore } from '@flows/flows';
+import { getPermissions, useBlockRegistry, useCanvasStore } from '@flows/flows';
 
-import { isUnresolvedTempId, resolveTempId } from '../../flows/utils';
-
+import type { FlowEngine } from '@flows/engine';
 import type { FlowRole } from '@flows/flows';
-import type { NodeConfigItem, NodeData } from '@lemoncloud/eureka-flows-api';
+import type { ConfigField, NodeData } from '@lemoncloud/eureka-flows-api';
 
-export const useNodeConfig = (nodeId: string | null, flowId: string | null, role: FlowRole) => {
+export const useNodeConfig = (nodeId: string | null, role: FlowRole, engine: FlowEngine) => {
     const node = useCanvasStore(state => (nodeId ? state.nodes.find(n => n.id === nodeId) : undefined));
     const blockRegistry = useBlockRegistry();
     const [customLabel, setCustomLabel] = useState('');
 
     const blockDef = node ? blockRegistry[node.type] : undefined;
-    const syncTimerRef = useRef<number | null>(null);
     const { canEditConfig, canEditStructure, canRun } = useMemo(() => getPermissions(role), [role]);
 
-    const configFields: NodeConfigItem[] = blockDef?.config$$ ?? node?.config$$ ?? [];
-
-    const syncNodeToServer = useCallback(
-        (updates: Record<string, unknown>) => {
-            // Owner + Editor may sync config; for an Editor the server routes /nodes/:id/upsert
-            // into their session overlay (CASE B). Viewer/Anonymous: blocked.
-            if (!canEditConfig || !nodeId || !flowId || isUnresolvedTempId(nodeId)) return;
-            if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
-            syncTimerRef.current = window.setTimeout(() => {
-                // resolveTempId: the server may have assigned the real ID while the UI
-                // state still holds the temp ID — upserting the temp ID would re-create it
-                upsertNode(resolveTempId(nodeId), flowId, updates).catch(err => {
-                    console.error('[useNodeConfig] Failed to sync node:', err);
-                });
-            }, 500);
-        },
-        [canEditConfig, nodeId, flowId]
-    );
-
-    useEffect(
-        () => () => {
-            if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
-        },
-        [nodeId]
-    );
+    // Field *definitions*, which only the block carries — a node's stored config is
+    // key/val pairs, a shape this list cannot render. `configSchema` is where they live;
+    // the `config$$` this used to read exists on neither type, so it was always undefined
+    // and the node fallback behind it is what actually rendered.
+    const configFields: ConfigField[] = blockDef?.configSchema ?? [];
 
     useEffect(() => {
         setCustomLabel(node?.customLabel ?? '');
@@ -48,16 +26,17 @@ export const useNodeConfig = (nodeId: string | null, flowId: string | null, role
 
     const handleConfigChange = useCallback(
         (key: string, value: unknown) => {
-            // Owner + Editor edit any node config (Editor's change persists via session overlay)
+            // Owner + Editor edit any node config; Viewer/Anonymous are blocked.
             if (!canEditConfig || !nodeId) return;
-            const currentNode = useCanvasStore.getState().nodes.find(n => n.id === nodeId);
+            // Read from the engine, not the store: the store is its projection, and the
+            // merge below has to start from the copy the write lands on.
+            const currentNode = engine.getGraph().nodes.find(n => n.id === nodeId);
             if (!currentNode) return;
 
             const newConfig = { ...currentNode.config, [key]: value };
-            useCanvasStore.getState().updateNodeData(nodeId, { config: newConfig } as Partial<NodeData>);
-            syncNodeToServer({ config: newConfig });
+            engine.transact('config:set', ops => ops.updateNode(nodeId, { config: newConfig } as Partial<NodeData>));
         },
-        [canEditConfig, nodeId, syncNodeToServer]
+        [canEditConfig, nodeId, engine]
     );
 
     const handleCustomLabelChange = useCallback(
@@ -65,31 +44,25 @@ export const useNodeConfig = (nodeId: string | null, flowId: string | null, role
             if (!canEditStructure) return;
             setCustomLabel(value);
             if (!nodeId) return;
-            useCanvasStore.getState().updateNodeData(nodeId, { customLabel: value } as Partial<NodeData>);
-            // Auto Save off: keep the rename local; /flows/:id/save persists it on manual save
-            if (useFlowsStore.getState().isAutoSaveEnabled) {
-                syncNodeToServer({ customLabel: value || undefined });
-            }
+            engine.transact('node:label', ops => ops.updateNode(nodeId, { customLabel: value }));
         },
-        [canEditStructure, nodeId, syncNodeToServer]
+        [canEditStructure, nodeId, engine]
     );
 
     const handleDescriptionChange = useCallback(
         (value: string) => {
             if (!canEditStructure || !nodeId) return;
-            useCanvasStore.getState().updateNodeData(nodeId, { description: value } as Partial<NodeData>);
-            syncNodeToServer({ description: value || undefined });
+            engine.transact('node:description', ops => ops.updateNode(nodeId, { description: value }));
         },
-        [canEditStructure, nodeId, syncNodeToServer]
+        [canEditStructure, nodeId, engine]
     );
 
     const handleToggleAuto = useCallback(
         (auto: boolean) => {
             if (!canEditStructure || !nodeId) return;
-            useCanvasStore.getState().updateNodeData(nodeId, { auto } as Partial<NodeData>);
-            syncNodeToServer({ auto });
+            engine.transact('node:auto', ops => ops.updateNode(nodeId, { auto } as Partial<NodeData>));
         },
-        [canEditStructure, nodeId, syncNodeToServer]
+        [canEditStructure, nodeId, engine]
     );
 
     return {

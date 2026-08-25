@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AlertTriangle, Loader2, Maximize2, MoreVertical, Play, Trash2 } from 'lucide-react';
 
-import { getPermissions, isAiBlock, isMissingAiKey, useBlockRegistry, useS3Image } from '@flows/flows';
+import { getPermissions, isAiBlock, isMissingAiKey, translateField, useBlockRegistry, useS3Image } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
@@ -11,8 +11,7 @@ import { useWebCoreStore } from '@flows/web-core';
 import { STEREO_FALLBACK_LABEL, STEREO_ICON_BG } from './consts';
 import { BlockIcon } from '../../flows/components/BlockIcon';
 
-import type { FlowRole } from '@flows/flows';
-import type { NodeData, NodeState } from '@lemoncloud/eureka-flows-api';
+import type { FlowRole, GraphNode, NodeState } from '@flows/flows';
 
 interface ContentPreviewData {
     type: 'text' | 'image' | 'waiting';
@@ -65,7 +64,7 @@ const CardImagePreview = ({ src }: { src: string }) => {
 };
 
 interface MobileStepCardProps {
-    node: NodeData;
+    node: GraphNode;
     displayName: string;
     onTapCard: (nodeId: string) => void;
     onExpandContent?: (content: { value: unknown; type?: string }) => void;
@@ -76,7 +75,7 @@ interface MobileStepCardProps {
 
 export const MobileStepCard = React.memo(
     ({ node, displayName, onTapCard, onExpandContent, onRun, onDelete, role = 'owner' }: MobileStepCardProps) => {
-        const { t } = useTranslation(['flows']);
+        const { t } = useTranslation(['flows', 'blocks']);
         const blockRegistry = useBlockRegistry();
         const { canEditStructure, canRun } = useMemo(() => getPermissions(role), [role]);
         const blockDef = blockRegistry[node.type];
@@ -151,8 +150,8 @@ export const MobileStepCard = React.memo(
         // Error message — check both error and errorMessage fields
         const errorMessage = useMemo(() => {
             const err =
-                (node as NodeData & { error?: string; errorMessage?: string }).error ||
-                (node as NodeData & { errorMessage?: string }).errorMessage;
+                (node as GraphNode & { error?: string; errorMessage?: string }).error ||
+                (node as GraphNode & { errorMessage?: string }).errorMessage;
             return typeof err === 'string' && err ? err : null;
         }, [node]);
 
@@ -176,12 +175,22 @@ export const MobileStepCard = React.memo(
                 : 'border-border';
 
         return (
-            <button
-                type="button"
+            // A div, not a button: the card holds interactive children (expand, menu), and
+            // HTML forbids interactive content inside a button — React flags it as a
+            // nested-button hydration error.
+            <div
+                role="button"
+                tabIndex={0}
                 data-node-id={node.id}
                 onClick={() => onTapCard(node.id)}
+                onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onTapCard(node.id);
+                    }
+                }}
                 className={cn(
-                    'w-full rounded-xl border bg-card text-left',
+                    'w-full rounded-xl border bg-card text-left cursor-pointer',
                     'transition-colors overflow-hidden',
                     borderColor
                 )}
@@ -248,7 +257,7 @@ export const MobileStepCard = React.memo(
                 <div className="px-3 pb-1.5">
                     <div className="text-sm font-semibold truncate leading-tight">{displayName}</div>
                     <div className="text-[10px] text-muted-foreground mt-0.5">
-                        {STEREO_FALLBACK_LABEL[stereo] ?? stereo} · {blockDef?.label ?? node.type}
+                        {STEREO_FALLBACK_LABEL[stereo] ?? stereo} · {translateField(t, blockDef, 'label') || node.type}
                     </div>
                 </div>
 
@@ -288,7 +297,7 @@ export const MobileStepCard = React.memo(
                         <div className="text-[11px] text-destructive line-clamp-2 mt-0.5">{errorMessage}</div>
                     </div>
                 )}
-            </button>
+            </div>
         );
     }
 );

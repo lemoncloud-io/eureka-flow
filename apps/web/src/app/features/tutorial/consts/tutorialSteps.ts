@@ -1,3 +1,4 @@
+import type { EdgeData, NodeData } from '@flows/flows';
 export type TutorialHint = 'output-port' | 'run-button' | null;
 
 export interface TutorialStep {
@@ -98,7 +99,7 @@ export const FALLBACK_BLOCKS = [
 ];
 
 /** Pre-built tutorial workflow: Text Input → Preview (user connects and runs) */
-export const TUTORIAL_WORKFLOW = {
+export const TUTORIAL_WORKFLOW: { nodes: NodeData[]; edges: EdgeData[] } = {
     nodes: [
         {
             id: 'tutorial-input',
@@ -117,5 +118,5 @@ export const TUTORIAL_WORKFLOW = {
             config: {},
         },
     ],
-    edges: [] as unknown[], // loadWorkflow accepts WorkflowState from external API package; empty array needs no concrete type
+    edges: [] as EdgeData[],
 };

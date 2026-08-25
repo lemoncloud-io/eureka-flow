@@ -1,13 +1,15 @@
-import { isAiBlock } from '@flows/flows';
+import { useTranslation } from 'react-i18next';
+
+import { isAiBlock, translateField } from '@flows/flows';
 import { Input, Label, Switch, Textarea } from '@flows/ui-kit';
 
 import { MobileFileField } from './MobileFileField';
 import { ModelSelect } from '../../flows/components/ModelSelect';
 
-import type { NodeConfigItem } from '@lemoncloud/eureka-flows-api';
+import type { ConfigField } from '@lemoncloud/eureka-flows-api';
 
 interface ConfigFieldListProps {
-    fields: NodeConfigItem[];
+    fields: ConfigField[];
     config: Record<string, unknown>;
     onConfigChange: (key: string, value: unknown) => void;
     /** Block type — used to filter redundant fields for input-image/input-text */
@@ -15,6 +17,7 @@ interface ConfigFieldListProps {
 }
 
 export const ConfigFieldList = ({ fields, config, onConfigChange, blockType }: ConfigFieldListProps) => {
+    const { t } = useTranslation(['flows', 'blocks']);
     const isInputSpecial = blockType === 'input-image' || blockType === 'input-text';
 
     return (
@@ -33,7 +36,7 @@ export const ConfigFieldList = ({ fields, config, onConfigChange, blockType }: C
                                 <div className="flex-1 h-px bg-border/50" />
                                 {field.label && (
                                     <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">
-                                        {field.label}
+                                        {translateField(t, field, 'label')}
                                     </span>
                                 )}
                                 <div className="flex-1 h-px bg-border/50" />
@@ -44,7 +47,7 @@ export const ConfigFieldList = ({ fields, config, onConfigChange, blockType }: C
                     return (
                         <div key={field.key}>
                             <Label className="text-xs text-muted-foreground mb-1.5 block">
-                                {field.label || field.key}
+                                {translateField(t, field, 'label') || field.key}
                             </Label>
 
                             {field.type === 'boolean' || field.type === 'checkbox' ? (
@@ -64,7 +67,7 @@ export const ConfigFieldList = ({ fields, config, onConfigChange, blockType }: C
                                 >
                                     {field.options.map(opt => (
                                         <option key={opt.value} value={opt.value}>
-                                            {opt.label}
+                                            {translateField(t, opt, 'label') || opt.value}
                                         </option>
                                     ))}
                                 </select>

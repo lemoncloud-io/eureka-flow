@@ -11,10 +11,10 @@ import { Label } from '@flows/ui-kit';
 import { S3Image } from '../../flows/components/S3Image';
 import { INPUT_FILE_ACCEPT, clearFileConfig, getUploadErrorMessage, processUploadedFile } from '../../flows/utils';
 
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import type { GraphNode } from '@flows/flows';
 
 interface MobileImageUploadProps {
-    node: NodeData;
+    node: GraphNode;
     onConfigChange: (key: string, value: unknown) => void;
 }
 

@@ -10,8 +10,9 @@ import { Badge, Button, Card, CardContent, Switch } from '@flows/ui-kit';
 import { ToolFormDialog } from '../components/ToolFormDialog';
 
 import type { Tool } from '@flows/flows';
+import type { LucideIcon } from 'lucide-react';
 
-const STEREO_CONFIG: Record<Tool['stereo'], { label: string; icon: React.ElementType }> = {
+const STEREO_CONFIG: Record<Tool['stereo'], { label: string; icon: LucideIcon }> = {
     link: { label: 'Link', icon: ExternalLink },
     embed: { label: 'Embed', icon: Maximize2 },
     flow: { label: 'Flow', icon: GitBranch },

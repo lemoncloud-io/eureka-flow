@@ -18,7 +18,16 @@ export type {
 // Re-export from sockets API package
 export type { SocketActionType, SocketModelMeta, SocketPayload, SocketResponse } from '@lemoncloud/eureka-sockets-api';
 
-import type { SocketEvent, SocketNodeEvent, SocketTraceEvent } from '@flows/flows';
+// `ProgressEvent` is aliased because the DOM declares one too, and this file is read in a
+// browser context where that is the name a reader expects.
+import type {
+    LogFrameEntry,
+    NodeEvent,
+    PortEvent,
+    ProgressEvent as ProgressFrameData,
+    TraceFrameData,
+} from '@flows/engine';
+import type { SocketEvent, SocketNodeEvent, SocketTraceEvent, TraceStage } from '@flows/flows';
 import type { SocketResponse } from '@lemoncloud/eureka-sockets-api';
 
 /**
@@ -170,6 +179,79 @@ export interface SocketResponseTrace<T = unknown> extends SocketResponse<T> {
 }
 
 export type RawSocketMessage = SocketResponseTrace<SocketDataMessage | unknown>;
+
+// ============================================================================
+// Parsed frame payloads handed to subscribers
+// ============================================================================
+// Moved out of `useInitFlowSocket` so the dispatcher can be tested without React.
+//
+// Each of these is the engine's event plus what only a subscriber needs. They extend
+// rather than restate it because they are handed straight to the reducer — `NodeEvent`
+// is literally what `reduceNodeEvent` takes — and a field added to an engine event has
+// to reach the callback that carries it. Restating the shapes made that a hand-sync.
+
+/**
+ * Trace update info parsed from WebSocket message
+ * Used by onTraceUpdate callback for agent block trace display
+ */
+export interface TraceUpdateInfo extends TraceFrameData {
+    /** Execution stage (from SocketTraceEvent.stage), narrowed to the stages the UI knows */
+    stage?: TraceStage;
+}
+
+export interface NodeUpdateInfo extends NodeEvent {
+    timestamp?: number;
+    /** Computed: true if id contains ':' (port update piggybacked on node event) */
+    isPort: boolean;
+}
+
+/**
+ * Port update info parsed from WebSocket message
+ * Used by onPortUpdate callback for port data synchronization
+ */
+export interface PortUpdateInfo extends PortEvent {
+    /** Port name/key (e.g., "in", "out", "data") — always resolved by the parser */
+    portName: string;
+    /** Port direction (from @suffix: "in" or "out") */
+    direction?: 'in' | 'out';
+}
+
+/**
+ * Progress snapshot info parsed from a lemon-model `progress:*` envelope.
+ * Emitted by eureka-flows-api processors and codes-goods-api deploy steps.
+ */
+export interface ProgressUpdateInfo extends ProgressFrameData {
+    label?: string;
+    error?: string;
+    ts?: number;
+    /** Live product view from codes-goods-api (merge into block out data) */
+    product$?: Record<string, unknown>;
+}
+
+/**
+ * One log line parsed from a lemon-model `log:*` envelope batch.
+ */
+export interface LogTraceEntryInfo extends LogFrameEntry {
+    /** Node ID of the traced block */
+    nodeId: string;
+    /** Reporter identity (per server invocation) */
+    source?: string;
+}
+
+/**
+ * Product deployment progress info parsed from WebSocket message.
+ * Emitted for `action: 'progress'` payloads from codes-goods-api.
+ */
+export interface ProductProgressInfo {
+    /** Product ID from codes-goods-api */
+    productId: string;
+    /** Phase → percent map (e.g., { upload: 100, refactor: 60, build: 20, deploy: 0 }) */
+    progress$: Record<string, number>;
+    /** Current phase state (e.g., 'uploading', 'building', 'done', 'error') */
+    state: string;
+    /** Last few ms-epoch timestamps for ETA computation */
+    timestamps: number[];
+}
 
 /**
  * Configuration for WebSocket worker

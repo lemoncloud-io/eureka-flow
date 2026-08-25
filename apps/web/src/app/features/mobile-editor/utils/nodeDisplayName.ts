@@ -1,5 +1,7 @@
-import type { BlockDefinitionWithFrontend } from '@flows/flows';
-import type { NodeData } from '@lemoncloud/eureka-flows-api';
+import { translateField } from '@flows/flows';
+
+import type { BlockDefinitionWithFrontend, GraphNode } from '@flows/flows';
+import type { TFunction } from 'i18next';
 
 /**
  * Build a map of nodeId → disambiguated display name.
@@ -7,8 +9,9 @@ import type { NodeData } from '@lemoncloud/eureka-flows-api';
  * Nodes sharing the same block label get a suffix: "텍스트 입력 #1", "텍스트 입력 #2"
  */
 export const buildNodeDisplayNames = (
-    nodes: NodeData[],
-    blockRegistry: Record<string, BlockDefinitionWithFrontend>
+    nodes: GraphNode[],
+    blockRegistry: Record<string, BlockDefinitionWithFrontend>,
+    t: TFunction
 ): Map<string, string> => {
     const result = new Map<string, string>();
 
@@ -22,7 +25,7 @@ export const buildNodeDisplayNames = (
         }
 
         const def = blockRegistry[node.type];
-        const baseLabel = def?.label || node.type;
+        const baseLabel = translateField(t, def, 'label') || node.type;
         const group = labelGroups.get(baseLabel) ?? [];
         group.push(node.id);
         labelGroups.set(baseLabel, group);

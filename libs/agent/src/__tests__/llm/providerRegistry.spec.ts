@@ -1,0 +1,771 @@
+import { describe, expect, it } from 'vitest';
+
+import { ScriptedHttpClient } from '../../http/ScriptedHttpClient';
+import { planMultiTurnModelSelection } from '../../llm/multiTurnRunSelection';
+import { getModelPricing } from '../../llm/pricing';
+import {
+    PROVIDER_REGISTRY,
+    createGatewayForEntry,
+    deriveGenerationConfiguration,
+    resolveModelsToRun,
+} from '../../llm/providerRegistry';
+
+import type { Chunk } from '../../llm/llmGateway';
+import type { GatewayType, ProviderModelEntry, ProviderStatus } from '../../llm/providerRegistry';
+
+const VALID_STATUSES: ProviderStatus[] = ['implemented', 'planned', 'blocked'];
+
+const drain = async (stream: AsyncIterable<Chunk>): Promise<Chunk[]> => {
+    const chunks: Chunk[] = [];
+    for await (const chunk of stream) {
+        chunks.push(chunk);
+    }
+    return chunks;
+};
+
+const findEntry = (providerId: string): ProviderModelEntry => {
+    const entry = PROVIDER_REGISTRY.find(e => e.providerId === providerId);
+    if (!entry) throw new Error(`test setup: no registry entry for providerId "${providerId}"`);
+    return entry;
+};
+
+describe('PROVIDER_REGISTRY', () => {
+    it('registers OpenAI, Gemini, OpenRouter, DeepSeek, Qwen, Claude, and GLM — nothing else yet', () => {
+        expect(PROVIDER_REGISTRY.map(e => e.providerId).sort()).toEqual([
+            'anthropic',
+            'deepseek',
+            'gemini',
+            'glm',
+            'openai',
+            'openrouter',
+            'qwen',
+        ]);
+    });
+
+    it('OpenAI, Gemini, and OpenRouter are implemented; DeepSeek, Qwen, Claude, and GLM are planned only', () => {
+        const statuses = Object.fromEntries(PROVIDER_REGISTRY.map(e => [e.providerId, e.status]));
+        expect(statuses).toEqual({
+            openai: 'implemented',
+            gemini: 'implemented',
+            openrouter: 'implemented',
+            deepseek: 'planned',
+            qwen: 'planned',
+            anthropic: 'planned',
+            glm: 'planned',
+        });
+    });
+
+    it('OpenRouter is implemented and real-verified for openrouter/free, plus every other model as of the 2026-08-07 full-matrix live run', () => {
+        const entry = findEntry('openrouter');
+
+        expect(entry.status).toBe('implemented');
+        expect(entry.offlineVerified).toBe(true);
+        expect(entry.realVerifiedModels).toEqual([
+            'openrouter/free',
+            'openai/gpt-4o-mini',
+            'google/gemini-2.5-flash',
+            'anthropic/claude-haiku-4.5',
+            'openai/gpt-oss-20b:free',
+            'meta-llama/llama-3.3-70b-instruct',
+            'deepseek/deepseek-chat-v3.1',
+            'anthropic/claude-sonnet-5',
+            'anthropic/claude-opus-5',
+            'google/gemini-3.6-flash',
+        ]);
+        // openai/gpt-4o-mini is now a real-verified model too (2026-08-07 full-matrix live run),
+        // not merely a registered candidate — this used to be the untested case this test guarded.
+        expect(entry.models).toContain('openai/gpt-4o-mini');
+        expect(entry.realVerifiedModels).toContain('openai/gpt-4o-mini');
+    });
+
+    describe('DeepSeek entry (planned, offline-wired only — no real-key run yet)', () => {
+        const entry = findEntry('deepseek');
+
+        it('exists in the registry, planned (not implemented) — offline-verified but not real-verified', () => {
+            expect(entry).toBeDefined();
+            expect(entry.status).toBe('planned');
+            // The dispatcher-wiring test below passes offline (scripted HTTP, no network) — that's
+            // what offlineVerified means. It is NOT a real-provider claim; realVerifiedModels below
+            // stays empty until an actual funded key runs against the live API.
+            expect(entry.offlineVerified).toBe(true);
+            expect(entry.realVerifiedModels).toEqual([]);
+        });
+
+        it('apiKeyEnv is DEEPSEEK_API_KEY, never VITE_-prefixed', () => {
+            expect(entry.apiKeyEnv).toBe('DEEPSEEK_API_KEY');
+            expect(entry.apiKeyEnv.startsWith('VITE_')).toBe(false);
+            expect(entry.modelEnvOverride?.startsWith('VITE_') ?? false).toBe(false);
+        });
+
+        it('defaultModel is a member of models', () => {
+            expect(entry.models).toContain(entry.defaultModel);
+        });
+
+        it(
+            'createGatewayForEntry dispatches through the OpenAI-compatible gateway to the DeepSeek ' +
+                'baseUrl, not the OpenAI default — and never touches the real network',
+            async () => {
+                const http = new ScriptedHttpClient([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
+
+                const gateway = createGatewayForEntry(entry, {
+                    apiKey: 'test-deepseek-key',
+                    model: entry.defaultModel,
+                    http,
+                });
+
+                // Same gateway shape as OpenAI (it IS createOpenAiLlmGateway) — only baseUrl/key differ.
+                expect(gateway.capabilities).toEqual({ toolCalls: true });
+                await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+                // ScriptedHttpClient never touches the network; exactly one scripted call proves the
+                // gateway made no additional/hidden requests either.
+                expect(http.requests).toHaveLength(1);
+                expect(http.requests[0].url).toBe('https://api.deepseek.com/chat/completions');
+                expect(http.requests[0].url).not.toBe('https://api.openai.com/v1/chat/completions');
+                expect(http.requests[0].url).not.toContain('test-deepseek-key');
+                expect(http.requests[0].headers?.['authorization']).toBe('Bearer test-deepseek-key');
+                expect(http.requests[0].body).toMatchObject({ model: entry.defaultModel });
+            }
+        );
+    });
+
+    describe('Qwen entry (planned, offline-wired only — no real-key run yet)', () => {
+        const entry = findEntry('qwen');
+
+        it('exists in the registry, planned (not implemented) — offline-verified but not real-verified', () => {
+            expect(entry).toBeDefined();
+            expect(entry.status).toBe('planned');
+            // Same reasoning as DeepSeek's entry: the dispatcher-wiring test below passes offline
+            // (scripted HTTP, no network) — that's what offlineVerified means, not a real-provider
+            // claim. realVerifiedModels stays empty until an actual funded key runs live.
+            expect(entry.offlineVerified).toBe(true);
+            expect(entry.realVerifiedModels).toEqual([]);
+        });
+
+        it('apiKeyEnv is QWEN_API_KEY, never VITE_-prefixed', () => {
+            expect(entry.apiKeyEnv).toBe('QWEN_API_KEY');
+            expect(entry.apiKeyEnv.startsWith('VITE_')).toBe(false);
+            expect(entry.modelEnvOverride?.startsWith('VITE_') ?? false).toBe(false);
+        });
+
+        it('defaultModel is a member of models', () => {
+            expect(entry.models).toContain(entry.defaultModel);
+        });
+
+        it(
+            'createGatewayForEntry dispatches through the OpenAI-compatible gateway to the Qwen/DashScope ' +
+                'baseUrl, not the OpenAI default — and never touches the real network',
+            async () => {
+                const http = new ScriptedHttpClient([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
+
+                const gateway = createGatewayForEntry(entry, {
+                    apiKey: 'test-qwen-key',
+                    model: entry.defaultModel,
+                    http,
+                });
+
+                // Same gateway shape as OpenAI (it IS createOpenAiLlmGateway) — only baseUrl/key differ.
+                expect(gateway.capabilities).toEqual({ toolCalls: true });
+                await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+                // ScriptedHttpClient never touches the network; exactly one scripted call proves the
+                // gateway made no additional/hidden requests either.
+                expect(http.requests).toHaveLength(1);
+                expect(http.requests[0].url).toBe(
+                    'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions'
+                );
+                expect(http.requests[0].url).not.toBe('https://api.openai.com/v1/chat/completions');
+                expect(http.requests[0].url).not.toContain('test-qwen-key');
+                expect(http.requests[0].headers?.['authorization']).toBe('Bearer test-qwen-key');
+                expect(http.requests[0].body).toMatchObject({ model: entry.defaultModel });
+            }
+        );
+    });
+
+    describe('Claude entry (planned, offline-wired only — no real-key run yet; native gateway, not an openai-compatible reuse)', () => {
+        const entry = findEntry('anthropic');
+
+        it('exists in the registry, planned (not implemented) — offline-verified but not real-verified', () => {
+            expect(entry).toBeDefined();
+            expect(entry.gatewayType).toBe('anthropic-native');
+            expect(entry.status).toBe('planned');
+            // AnthropicToolLlmGateway.spec.ts passes offline (scripted HTTP, no network) — that's
+            // what offlineVerified means, same reasoning as DeepSeek/Qwen. Not a real-provider claim.
+            expect(entry.offlineVerified).toBe(true);
+            expect(entry.realVerifiedModels).toEqual([]);
+            // Multi-turn tool-result mapping is implemented and offline-verified — see
+            // AnthropicToolLlmGateway.spec.ts's multi-turn request-mapping tests. Still not
+            // real-key-verified, which is exactly why status stays 'planned' and
+            // realVerifiedModels stays empty above.
+            expect(entry.supportsMultiTurnToolResults).toBe(true);
+        });
+
+        it('apiKeyEnv is ANTHROPIC_API_KEY, never VITE_-prefixed', () => {
+            expect(entry.apiKeyEnv).toBe('ANTHROPIC_API_KEY');
+            expect(entry.apiKeyEnv.startsWith('VITE_')).toBe(false);
+            expect(entry.modelEnvOverride?.startsWith('VITE_') ?? false).toBe(false);
+        });
+
+        it('defaultModel is a member of models', () => {
+            expect(entry.models).toContain(entry.defaultModel);
+        });
+
+        it(
+            'createGatewayForEntry dispatches through the native Anthropic gateway to the Claude ' +
+                'baseUrl, not the OpenAI default — and never touches the real network',
+            async () => {
+                const http = new ScriptedHttpClient([{ json: { content: [{ type: 'text', text: 'hi' }] } }]);
+
+                const gateway = createGatewayForEntry(entry, {
+                    apiKey: 'test-anthropic-key',
+                    model: entry.defaultModel,
+                    http,
+                });
+
+                expect(gateway.capabilities).toEqual({ toolCalls: true });
+                await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+                // ScriptedHttpClient never touches the network; exactly one scripted call proves the
+                // gateway made no additional/hidden requests either.
+                expect(http.requests).toHaveLength(1);
+                expect(http.requests[0].url).toBe('https://api.anthropic.com/v1/messages');
+                expect(http.requests[0].url).not.toBe('https://api.openai.com/v1/chat/completions');
+                expect(http.requests[0].url).not.toContain('test-anthropic-key');
+                // Anthropic-specific: x-api-key, not Authorization: Bearer — proves this really
+                // went through the native gateway, not accidentally the OpenAI-compatible one.
+                expect(http.requests[0].headers?.['x-api-key']).toBe('test-anthropic-key');
+                expect(http.requests[0].headers?.['authorization']).toBeUndefined();
+                expect(http.requests[0].headers?.['anthropic-version']).toBe('2023-06-01');
+                expect(http.requests[0].body).toMatchObject({ model: entry.defaultModel });
+            }
+        );
+    });
+
+    describe('GLM entry (planned, offline-wired only — no real-key run yet)', () => {
+        const entry = findEntry('glm');
+
+        it('exists in the registry, planned (not implemented) — offline-verified but not real-verified', () => {
+            expect(entry).toBeDefined();
+            expect(entry.status).toBe('planned');
+            // The dispatcher-wiring test below passes offline (scripted HTTP, no network) — that's
+            // what offlineVerified means, same reasoning as DeepSeek/Qwen. Not a real-provider claim.
+            expect(entry.offlineVerified).toBe(true);
+            expect(entry.realVerifiedModels).toEqual([]);
+        });
+
+        it('apiKeyEnv is GLM_API_KEY, never VITE_-prefixed', () => {
+            expect(entry.apiKeyEnv).toBe('GLM_API_KEY');
+            expect(entry.apiKeyEnv.startsWith('VITE_')).toBe(false);
+            expect(entry.modelEnvOverride?.startsWith('VITE_') ?? false).toBe(false);
+        });
+
+        it('defaultModel is a member of models', () => {
+            expect(entry.models).toContain(entry.defaultModel);
+        });
+
+        it(
+            'createGatewayForEntry dispatches through the OpenAI-compatible gateway to the Z.ai ' +
+                'baseUrl, not the OpenAI default — and never touches the real network',
+            async () => {
+                const http = new ScriptedHttpClient([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
+
+                const gateway = createGatewayForEntry(entry, {
+                    apiKey: 'test-glm-key',
+                    model: entry.defaultModel,
+                    http,
+                });
+
+                // Same gateway shape as OpenAI (it IS createOpenAiLlmGateway) — only baseUrl/key differ.
+                expect(gateway.capabilities).toEqual({ toolCalls: true });
+                await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+                // ScriptedHttpClient never touches the network; exactly one scripted call proves the
+                // gateway made no additional/hidden requests either.
+                expect(http.requests).toHaveLength(1);
+                expect(http.requests[0].url).toBe('https://api.z.ai/api/paas/v4/chat/completions');
+                expect(http.requests[0].url).not.toBe('https://api.openai.com/v1/chat/completions');
+                expect(http.requests[0].url).not.toContain('test-glm-key');
+                expect(http.requests[0].headers?.['authorization']).toBe('Bearer test-glm-key');
+                expect(http.requests[0].body).toMatchObject({ model: entry.defaultModel });
+            }
+        );
+    });
+
+    it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
+        '%s: has every required field, non-empty/well-typed',
+        (_providerId, entry) => {
+            expect(entry.providerId.length).toBeGreaterThan(0);
+            expect(entry.displayName.length).toBeGreaterThan(0);
+            expect(['openai-compatible', 'gemini-native', 'anthropic-native']).toContain(entry.gatewayType);
+            expect(Array.isArray(entry.models)).toBe(true);
+            expect(entry.models.length).toBeGreaterThan(0);
+            expect(entry.defaultModel.length).toBeGreaterThan(0);
+            expect(entry.apiKeyEnv.length).toBeGreaterThan(0);
+            expect(typeof entry.supportsToolCalls).toBe('boolean');
+            expect(typeof entry.supportsMultiTurnToolResults).toBe('boolean');
+            expect(VALID_STATUSES).toContain(entry.status);
+            expect(typeof entry.offlineVerified).toBe('boolean');
+            expect(Array.isArray(entry.realVerifiedModels)).toBe(true);
+        }
+    );
+
+    it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
+        '%s: defaultModel is a member of models',
+        (_providerId, entry) => {
+            expect(entry.models).toContain(entry.defaultModel);
+        }
+    );
+
+    it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
+        '%s: apiKeyEnv is never a VITE_-prefixed var (must not reach the browser bundle)',
+        (_providerId, entry) => {
+            expect(entry.apiKeyEnv.startsWith('VITE_')).toBe(false);
+            expect(entry.modelEnvOverride?.startsWith('VITE_') ?? false).toBe(false);
+        }
+    );
+
+    it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
+        '%s: requiredGenerationOverrides only names models that are actually in models',
+        (_providerId, entry) => {
+            for (const overriddenModel of Object.keys(entry.requiredGenerationOverrides ?? {})) {
+                expect(entry.models).toContain(overriddenModel);
+            }
+        }
+    );
+
+    it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
+        '%s: status "implemented" implies offlineVerified is true',
+        (_providerId, entry) => {
+            if (entry.status === 'implemented') {
+                expect(entry.offlineVerified).toBe(true);
+            }
+        }
+    );
+
+    it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
+        '%s: realVerifiedModels only names models that are actually in models',
+        (_providerId, entry) => {
+            for (const verified of entry.realVerifiedModels) {
+                expect(entry.models).toContain(verified);
+            }
+        }
+    );
+
+    it('createGatewayForEntry builds a real OpenAI gateway (openai-compatible) hitting api.openai.com', async () => {
+        const entry = findEntry('openai');
+        const http = new ScriptedHttpClient([
+            { json: { choices: [{ message: { content: 'hi' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } },
+        ]);
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-openai-key',
+            model: 'gpt-4.1-mini',
+            http,
+        });
+
+        expect(gateway.capabilities).toEqual({ toolCalls: true });
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+        expect(http.requests).toHaveLength(1);
+        expect(http.requests[0].url).toBe('https://api.openai.com/v1/chat/completions');
+        expect(http.requests[0].body).toMatchObject({ model: 'gpt-4.1-mini' });
+    });
+
+    it('createGatewayForEntry applies requiredGenerationOverrides for gpt-5.6-sol (reasoning_effort fix)', async () => {
+        const entry = findEntry('openai');
+        const http = new ScriptedHttpClient([
+            { json: { choices: [{ message: { content: 'hi' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } },
+        ]);
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-openai-key',
+            model: 'gpt-5.6-sol',
+            http,
+        });
+
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+        expect(http.requests[0].body).toMatchObject({ model: 'gpt-5.6-sol', reasoning_effort: 'none' });
+    });
+
+    it('createGatewayForEntry does NOT apply a generation override for a model that has none (gpt-4o-mini)', async () => {
+        const entry = findEntry('openai');
+        const http = new ScriptedHttpClient([
+            { json: { choices: [{ message: { content: 'hi' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } } },
+        ]);
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-openai-key',
+            model: 'gpt-4o-mini',
+            http,
+        });
+
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+        expect(http.requests[0].body).not.toHaveProperty('reasoning_effort');
+    });
+
+    it('createGatewayForEntry builds a real Gemini gateway (gemini-native) hitting generativelanguage.googleapis.com', async () => {
+        const entry = findEntry('gemini');
+        const http = new ScriptedHttpClient([{ json: { candidates: [{ content: { parts: [{ text: 'hi' }] } }] } }]);
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-gemini-key',
+            model: 'gemini-2.5-pro',
+            http,
+        });
+
+        expect(gateway.capabilities).toEqual({ toolCalls: true });
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+        expect(http.requests).toHaveLength(1);
+        expect(http.requests[0].url).toBe(
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent'
+        );
+    });
+
+    it("createGatewayForEntry passes OpenRouter's baseUrl through to the OpenAI-compatible gateway (not the default OpenAI URL)", async () => {
+        const entry = findEntry('openrouter');
+        const http = new ScriptedHttpClient([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-openrouter-key',
+            model: 'openrouter/free',
+            http,
+        });
+
+        // Same gateway shape as OpenAI (it IS createOpenAiLlmGateway) — only the URL differs.
+        expect(gateway.capabilities).toEqual({ toolCalls: true });
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+        expect(http.requests).toHaveLength(1);
+        expect(http.requests[0].url).toBe('https://openrouter.ai/api/v1/chat/completions');
+        expect(http.requests[0].url).not.toBe('https://api.openai.com/v1/chat/completions');
+        expect(http.requests[0].url).not.toContain('test-openrouter-key');
+        expect(http.requests[0].headers?.['authorization']).toBe('Bearer test-openrouter-key');
+        expect(http.requests[0].body).toMatchObject({ model: 'openrouter/free' });
+    });
+
+    it('createGatewayForEntry builds the gemini-native gateway against a custom baseUrl when the entry carries one (the real GEMINI_ENTRY never does, so this branch needs a synthetic entry)', async () => {
+        // GEMINI_ENTRY (the only gemini-native registry entry) never sets baseUrl, so the
+        // `entry.baseUrl ? { baseUrl: entry.baseUrl } : {}` TRUE branch inside the gemini-native
+        // case is otherwise unreachable through the real registry — construct a synthetic entry
+        // (a copy of the real one with baseUrl added) to exercise it.
+        const entry: ProviderModelEntry = { ...findEntry('gemini'), baseUrl: 'https://gemini-proxy.example.com' };
+        const http = new ScriptedHttpClient([{ json: { candidates: [{ content: { parts: [{ text: 'hi' }] } }] } }]);
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-gemini-key',
+            model: entry.defaultModel,
+            http,
+        });
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+        expect(http.requests).toHaveLength(1);
+        expect(http.requests[0].url).toBe(
+            `https://gemini-proxy.example.com/v1beta/models/${entry.defaultModel}:generateContent`
+        );
+        expect(http.requests[0].url).not.toContain('generativelanguage.googleapis.com');
+    });
+
+    it('createGatewayForEntry falls back to the default Anthropic baseUrl when the entry has none (the real ANTHROPIC_ENTRY always sets one, so this branch needs a synthetic entry)', async () => {
+        // ANTHROPIC_ENTRY (the only anthropic-native registry entry) always sets baseUrl, so the
+        // `entry.baseUrl ? { baseUrl: entry.baseUrl } : {}` FALSE branch inside the anthropic-native
+        // case is otherwise unreachable through the real registry — construct a synthetic entry
+        // (a copy of the real one with baseUrl removed) to exercise it.
+        const entry: ProviderModelEntry = { ...findEntry('anthropic'), baseUrl: undefined };
+        const http = new ScriptedHttpClient([{ json: { content: [{ type: 'text', text: 'hi' }] } }]);
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-anthropic-key',
+            model: entry.defaultModel,
+            http,
+        });
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools: [] }));
+
+        expect(http.requests).toHaveLength(1);
+        expect(http.requests[0].url).toBe('https://api.anthropic.com/v1/messages');
+    });
+
+    it('createGatewayForEntry throws the exhaustiveness-guard error for a gatewayType outside the known union — never silently falls through', () => {
+        // Same reasoning as deriveGenerationConfiguration's own exhaustiveness guard: no valid
+        // GatewayType can reach this branch, so a synthetic entry with an invalid gatewayType
+        // (forced through the type system) is the only way to exercise the runtime guard itself.
+        const entry: ProviderModelEntry = {
+            ...findEntry('openai'),
+            gatewayType: 'made-up-gateway-type' as unknown as GatewayType,
+        };
+
+        expect(() =>
+            createGatewayForEntry(entry, {
+                apiKey: 'test-key',
+                model: entry.defaultModel,
+                http: new ScriptedHttpClient([]),
+            })
+        ).toThrow('providerRegistry: no gateway dispatcher for gatewayType "made-up-gateway-type"');
+    });
+});
+
+describe('anthropic/claude-fable-5 registration (OpenRouter route, added for the four-Claude-model runtime comparison)', () => {
+    it('is present in OPENROUTER_ENTRY.models alongside every pre-existing model — nothing was removed', () => {
+        const entry = findEntry('openrouter');
+        expect(entry.models).toContain('anthropic/claude-fable-5');
+        // The 10 models this entry carried before Fable was added — asserted individually (not via
+        // a single toEqual on the whole array) so this test fails on an accidental removal without
+        // being coupled to array order or to any future model this entry gains.
+        for (const preExisting of [
+            'openrouter/free',
+            'openai/gpt-4o-mini',
+            'google/gemini-2.5-flash',
+            'anthropic/claude-haiku-4.5',
+            'openai/gpt-oss-20b:free',
+            'meta-llama/llama-3.3-70b-instruct',
+            'deepseek/deepseek-chat-v3.1',
+            'anthropic/claude-sonnet-5',
+            'anthropic/claude-opus-5',
+            'google/gemini-3.6-flash',
+        ]) {
+            expect(entry.models).toContain(preExisting);
+        }
+    });
+
+    it('is NOT in realVerifiedModels — no live call has verified it yet', () => {
+        const entry = findEntry('openrouter');
+        expect(entry.realVerifiedModels).not.toContain('anthropic/claude-fable-5');
+    });
+
+    it('carries no Fable-specific generation override — this gateway never sends temperature/top_p/thinking regardless', () => {
+        const entry = findEntry('openrouter');
+        expect(entry.requiredGenerationOverrides?.['anthropic/claude-fable-5']).toBeUndefined();
+    });
+
+    it('planMultiTurnModelSelection, run against the REAL registry, selects exactly this one pair for an exact provider+model filter — never a substring match onto claude-opus-5/claude-sonnet-5', () => {
+        const selection = planMultiTurnModelSelection({
+            registry: PROVIDER_REGISTRY,
+            providerFilter: 'openrouter',
+            modelFilter: 'anthropic/claude-fable-5',
+            resolveModelsToRun: entry => resolveModelsToRun(entry, undefined),
+        });
+        expect(selection.pairs).toHaveLength(1);
+        expect(selection.pairs[0].model).toBe('anthropic/claude-fable-5');
+        expect(selection.pairs[0].entry.providerId).toBe('openrouter');
+    });
+
+    it('createGatewayForEntry dispatches with the exact model string, same OpenRouter baseUrl, no leaked generation params, and passes tool definitions through unchanged', async () => {
+        const entry = findEntry('openrouter');
+        const http = new ScriptedHttpClient([{ json: { choices: [{ message: { content: 'hi' } }] } }]);
+        const tools = [
+            {
+                name: 'move_node',
+                description: 'move a node',
+                parameters: {
+                    type: 'object' as const,
+                    properties: { nodeId: { type: 'string' as const } },
+                    required: ['nodeId'],
+                },
+            },
+        ];
+
+        const gateway = createGatewayForEntry(entry, {
+            apiKey: 'test-openrouter-key',
+            model: 'anthropic/claude-fable-5',
+            http,
+        });
+
+        // Same gateway shape as every other OpenRouter model — createOpenAiLlmGateway, zero new code.
+        expect(gateway.capabilities).toEqual({ toolCalls: true });
+        await drain(gateway.chat({ messages: [{ role: 'user', content: 'hi' }], tools }));
+
+        expect(http.requests).toHaveLength(1);
+        expect(http.requests[0].url).toBe('https://openrouter.ai/api/v1/chat/completions');
+        expect(http.requests[0].headers?.['authorization']).toBe('Bearer test-openrouter-key');
+        const body = http.requests[0].body as Record<string, unknown>;
+        expect(body).toMatchObject({ model: 'anthropic/claude-fable-5' });
+        // No Fable-specific metadata (reasoning_effort, temperature, top_p, thinking) leaks into the
+        // shared OpenAI-compatible request shape — this gateway simply never sets any of these
+        // unless a generation option is explicitly passed, which createGatewayForEntry does not do
+        // here.
+        expect(body).not.toHaveProperty('reasoning_effort');
+        expect(body).not.toHaveProperty('temperature');
+        expect(body).not.toHaveProperty('top_p');
+        expect(body).not.toHaveProperty('thinking');
+        // Tool definitions pass through the same generic mapping as every other OpenRouter model —
+        // no Fable-specific tool-shape transformation exists or is needed.
+        expect(body['tools']).toEqual([
+            {
+                type: 'function',
+                function: { name: 'move_node', description: 'move a node', parameters: tools[0].parameters },
+            },
+        ]);
+    });
+
+    it("getModelPricing returns null for anthropic/claude-fable-5 via openrouter — cost must come from OpenRouter's own provider-reported usage.cost, never a fabricated local estimate", () => {
+        expect(getModelPricing('openrouter', 'anthropic/claude-fable-5')).toBeNull();
+    });
+});
+
+describe('Old/new model-version compatibility (Part B)', () => {
+    // A provider is exempt from the "multiple models" bar only if its notes explain why, rather
+    // than being silently left at one model. Claude was exempt here until 2026-08-04 for an open,
+    // not-yet-confirmed question about whether claude-haiku-4-5 needed a date suffix — once that
+    // was confirmed (Anthropic's own docs: it's a valid alias), the entry gained a genuine
+    // old/new-tier spread (claude-haiku-4-5 + claude-sonnet-5) instead, so nothing is exempt here
+    // anymore. This keeps the structural check honest: it fails loudly for a provider that's just
+    // been left at one model with no explanation, rather than silently passing everything.
+    const EXEMPT_SINGLE_MODEL_PROVIDERS = new Set<string>([]);
+
+    it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
+        '%s: has at least one current model entry',
+        (_providerId, entry) => {
+            expect(entry.models.length).toBeGreaterThanOrEqual(1);
+        }
+    );
+
+    it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
+        '%s: represents old/current/new model coverage, or documents why it cannot yet',
+        (providerId, entry) => {
+            if (entry.models.length >= 2) {
+                // Old/new spread present — defaultModel must still be one of the covered models
+                // (already asserted elsewhere, re-checked here as the load-bearing assumption of
+                // this test).
+                expect(entry.models).toContain(entry.defaultModel);
+                return;
+            }
+
+            // Single-model providers must be an explicitly acknowledged exemption, with a note
+            // explaining why a second (older or newer) model id isn't registered yet — never a
+            // silent gap.
+            expect(EXEMPT_SINGLE_MODEL_PROVIDERS.has(providerId)).toBe(true);
+            expect(entry.notes ?? '').toMatch(/pending official model ID confirmation/i);
+        }
+    );
+
+    it.each(PROVIDER_REGISTRY.map(entry => [entry.providerId, entry] as const))(
+        '%s: real verification is never claimed without status "implemented" backing it',
+        (_providerId, entry) => {
+            // realVerifiedModels is meant to be the strongest claim this registry can make. It
+            // should never be non-empty for an entry still sitting at 'planned'/'blocked' —
+            // that would be exactly the overclaiming this registry's three-field split (status /
+            // offlineVerified / realVerifiedModels) exists to prevent.
+            if (entry.realVerifiedModels.length > 0) {
+                expect(entry.status).toBe('implemented');
+            }
+        }
+    );
+
+    it('newest-generation additions do not silently replace defaultModel or drop an existing realVerifiedModels entry', () => {
+        // Adding a newer-generation model id to a provider's models[] must never move that
+        // provider's defaultModel, nor silently drop an existing realVerifiedModels entry. Checked
+        // via containment (not exact-array equality) on purpose: realVerifiedModels legitimately
+        // grows every time a new real-key run adds more verified models (most recently the
+        // 2026-08-07 full-matrix live run, which added gpt-4.1/gpt-4.1-mini/gpt-5.5 for OpenAI and
+        // all seven remaining Gemini models) — an exact-array assertion would force an update to
+        // this test on every honest new verification, which is exactly the kind of test-maintenance
+        // tax that would tempt someone into skipping it. What must never regress is the anchor
+        // entries below silently disappearing.
+        expect(findEntry('openai').defaultModel).toBe('gpt-4o-mini');
+        expect(findEntry('openai').realVerifiedModels).toContain('gpt-4o-mini');
+        expect(findEntry('openai').realVerifiedModels).toContain('gpt-5-mini');
+        expect(findEntry('gemini').defaultModel).toBe('gemini-2.5-flash');
+        expect(findEntry('gemini').realVerifiedModels).toContain('gemini-2.5-flash');
+    });
+});
+
+describe('resolveModelsToRun', () => {
+    const entry = findEntry('openai');
+
+    it('returns every configured model when no override value is given', () => {
+        expect(resolveModelsToRun(entry, undefined)).toEqual(entry.models);
+    });
+
+    it('narrows to exactly the override model when one is given, even if not in models', () => {
+        expect(resolveModelsToRun(entry, 'gpt-5-mini')).toEqual(['gpt-5-mini']);
+    });
+
+    it('treats an empty-string override as "no override" (falsy)', () => {
+        expect(resolveModelsToRun(entry, '')).toEqual(entry.models);
+    });
+});
+
+describe('deriveGenerationConfiguration', () => {
+    it('openai-compatible, no generation configured: matches the confirmed default-config OpenAI baseline exactly', () => {
+        // The exact representation confirmed for the real gpt-4o-mini/gpt-5-mini baseline run —
+        // never claiming a numeric provider default this codebase doesn't actually know.
+        expect(deriveGenerationConfiguration('openai-compatible')).toEqual({
+            temperature: { status: 'provider-default' },
+            topP: { status: 'provider-default' },
+            topK: { status: 'unsupported' },
+            maxOutputTokens: { status: 'provider-default' },
+            reasoningEffort: { status: 'provider-default' },
+        });
+    });
+
+    it('openai-compatible with explicit generation options: reports the exact configured values, never a default', () => {
+        const config = deriveGenerationConfiguration('openai-compatible', { temperature: 0.2, maxOutputTokens: 512 });
+        expect(config.temperature).toEqual({ status: 'explicit', value: 0.2 });
+        expect(config.maxOutputTokens).toEqual({ status: 'explicit', value: 512 });
+        // Configuring temperature/maxOutputTokens never changes top_p/top_k/reasoningEffort — each
+        // parameter's status is independent.
+        expect(config.topP).toEqual({ status: 'provider-default' });
+        expect(config.topK).toEqual({ status: 'unsupported' });
+        expect(config.reasoningEffort).toEqual({ status: 'provider-default' });
+    });
+
+    it('anthropic-native, no generation configured: maxOutputTokens is EXPLICIT (1024) — never provider-default, since Anthropic requires the field and this gateway always sends a concrete number', () => {
+        const config = deriveGenerationConfiguration('anthropic-native');
+        expect(config.maxOutputTokens).toEqual({ status: 'explicit', value: 1024 });
+    });
+
+    it('anthropic-native with an explicit maxOutputTokens: reports the caller value, not the gateway default', () => {
+        const config = deriveGenerationConfiguration('anthropic-native', { maxOutputTokens: 2048 });
+        expect(config.maxOutputTokens).toEqual({ status: 'explicit', value: 2048 });
+    });
+
+    it("anthropic-native: top_k is provider-default (Anthropic's Messages API documents it), NOT unsupported — the opposite of OpenAI", () => {
+        const config = deriveGenerationConfiguration('anthropic-native');
+        expect(config.topK).toEqual({ status: 'provider-default' });
+        expect(config.topK.status).not.toBe('unsupported');
+    });
+
+    it("anthropic-native: reasoningEffort is unsupported — Claude's extended thinking is a different, token-budget mechanism this gateway never sends", () => {
+        const config = deriveGenerationConfiguration('anthropic-native');
+        expect(config.reasoningEffort).toEqual({ status: 'unsupported' });
+    });
+
+    it('gemini-native: maxOutputTokens/temperature are provider-default when unset, matching the optional-field gatewayTypes (never explicit-by-default like Anthropic)', () => {
+        const config = deriveGenerationConfiguration('gemini-native');
+        expect(config.temperature).toEqual({ status: 'provider-default' });
+        expect(config.maxOutputTokens).toEqual({ status: 'provider-default' });
+        expect(config.topP).toEqual({ status: 'provider-default' });
+        expect(config.topK).toEqual({ status: 'provider-default' });
+        expect(config.reasoningEffort).toEqual({ status: 'unsupported' });
+    });
+
+    it('never reports a numeric value for a provider-default or unsupported status (no guessed defaults)', () => {
+        for (const gatewayType of ['openai-compatible', 'anthropic-native', 'gemini-native'] as const) {
+            const config = deriveGenerationConfiguration(gatewayType);
+            for (const param of Object.values(config)) {
+                if (param.status !== 'explicit') {
+                    expect(param.value).toBeUndefined();
+                }
+            }
+        }
+    });
+
+    it('round-trips cleanly through JSON (exactly what run-manifest.json persists)', () => {
+        const config = deriveGenerationConfiguration('anthropic-native');
+        const roundTripped = JSON.parse(JSON.stringify(config));
+        expect(roundTripped).toEqual(config);
+    });
+
+    it('throws the exhaustiveness-guard error for a gatewayType outside the known union — never silently falls through', () => {
+        // No valid GatewayType can reach this branch (enforced at compile time by the `never`
+        // exhaustiveCheck) — this deliberately forces an invalid value through the type system to
+        // prove the runtime guard itself fires with the documented message, in case a future
+        // gatewayType is added to the union without a matching case here.
+        const invalidGatewayType = 'made-up-gateway-type' as unknown as GatewayType;
+        expect(() => deriveGenerationConfiguration(invalidGatewayType)).toThrow(
+            'deriveGenerationConfiguration: no derivation for gatewayType "made-up-gateway-type"'
+        );
+    });
+});

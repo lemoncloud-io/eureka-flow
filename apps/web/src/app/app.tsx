@@ -43,9 +43,9 @@ export const App = () => {
                 <meta name="description" content="Build, run, and share AI workflows visually. No code required." />
                 <meta property="og:site_name" content="Eureka Flow" />
                 <meta name="twitter:card" content="summary_large_image" />
-                <link rel="alternate" hreflang="en" href={`${SITE_URL}/`} />
-                <link rel="alternate" hreflang="ko" href={`${SITE_URL}/`} />
-                <link rel="alternate" hreflang="x-default" href={`${SITE_URL}/`} />
+                <link rel="alternate" hrefLang="en" href={`${SITE_URL}/`} />
+                <link rel="alternate" hrefLang="ko" href={`${SITE_URL}/`} />
+                <link rel="alternate" hrefLang="x-default" href={`${SITE_URL}/`} />
             </Helmet>
             <Routes>
                 <Route path="/" element={<HomePage />} />
@@ -69,11 +69,10 @@ export const App = () => {
                 <Route path="/editor" element={<FlowEditorRouter />} />
                 <Route path="/flows/:id" element={<FlowEditorRouter />} />
 
-                {/* Apps: the list only. `/apps/:id` is served by CloudFront (the deployed App's
-                    own bundle), never by this SPA — see docs/adr/0003-apps-route-ownership.md.
-                    Local dev only for now: `import.meta.env.DEV` is a build-time constant, so the
-                    route (and its AppsPage import) is dropped from every deployed bundle. */}
-                {import.meta.env.DEV && <Route path="/apps" element={<AppsPage />} />}
+                {/* Apps: the public gallery list only. `/apps/:id` is served by CloudFront (the
+                    deployed App's own bundle), never by this SPA — see
+                    docs/adr/0003-apps-route-ownership.md. */}
+                <Route path="/apps" element={<AppsPage />} />
 
                 {/* Other routes */}
                 <Route path="/tutorial" element={<TutorialRouter />} />

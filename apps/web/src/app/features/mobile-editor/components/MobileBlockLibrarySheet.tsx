@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChevronDown, ChevronRight, Clock, Eye, FileInput, Puzzle, RefreshCw, Search, X } from 'lucide-react';
 
-import { useBlockGroups, useBlockRegistry } from '@flows/flows';
+import { translateField, useBlockGroups, useBlockRegistry } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Sheet, SheetContent, SheetTitle } from '@flows/ui-kit';
 
@@ -32,7 +32,7 @@ export const MobileBlockLibrarySheet = ({
     onAddBlock,
     recentBlockIds,
 }: MobileBlockLibrarySheetProps) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedCategories, setExpandedCategories] = useState<Set<keyof typeof CATEGORY_CONFIG>>(
         new Set(CATEGORIES)
@@ -47,7 +47,7 @@ export const MobileBlockLibrarySheet = ({
     );
 
     const handleAddBlock = (block: BlockDefinitionWithFrontend) => {
-        onAddBlock(block.id);
+        onAddBlock(block.type);
         onOpenChange(false);
         setSearchQuery('');
     };
@@ -126,7 +126,7 @@ export const MobileBlockLibrarySheet = ({
                                         <BlockIcon icon={block.icon} size={14} />
                                     </div>
                                     <span className="text-[10px] font-medium text-foreground/70 truncate max-w-[64px]">
-                                        {block.label}
+                                        {translateField(t, block, 'label')}
                                     </span>
                                 </button>
                             ))}
@@ -199,10 +199,10 @@ export const MobileBlockLibrarySheet = ({
                                                         </div>
                                                         <div className="min-w-0 flex-1">
                                                             <div className="text-sm font-medium truncate">
-                                                                {block.label}
+                                                                {translateField(t, block, 'label')}
                                                             </div>
                                                             <div className="text-xs text-muted-foreground truncate">
-                                                                {block.description}
+                                                                {translateField(t, block, 'description')}
                                                             </div>
                                                         </div>
                                                         <span className="text-[10px] text-muted-foreground/60 shrink-0">

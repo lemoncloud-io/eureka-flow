@@ -31,7 +31,6 @@ export const JsonViewer = ({ data, maxHeight = 180, collapsed = 2, className }: 
                 displayDataTypes={false}
                 displayObjectSize={false}
                 enableClipboard={false}
-                editable={false}
             />
         </div>
     );

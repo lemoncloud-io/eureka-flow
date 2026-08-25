@@ -281,6 +281,47 @@
     animation: shimmer 1.5s ease-in-out infinite;
 }
 
+/* The assistant is thinking: a slow sweep of light across the word itself. The wait is the one
+   moment the panel has nothing to show, so the label carries the motion rather than a spinner
+   competing with the canvas behind it. */
+@keyframes text-shimmer {
+    from {
+        background-position: 150% 0;
+    }
+    to {
+        background-position: -50% 0;
+    }
+}
+
+.animate-text-shimmer {
+    background-image: linear-gradient(
+        90deg,
+        hsl(var(--muted-foreground)) 0%,
+        hsl(var(--muted-foreground)) 35%,
+        hsl(var(--foreground)) 50%,
+        hsl(var(--muted-foreground)) 65%,
+        hsl(var(--muted-foreground)) 100%
+    );
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: text-shimmer 2.2s linear infinite;
+}
+
+/* Stopping the sweep is not enough: the label paints through a gradient clipped to the glyphs, so
+   a frozen animation leaves transparent text. Hand the colour back. */
+@media (prefers-reduced-motion: reduce) {
+    .animate-text-shimmer {
+        animation: none;
+        background-image: none;
+        color: hsl(var(--muted-foreground));
+        -webkit-text-fill-color: currentColor;
+    }
+}
+
 /* Progress bar pulse */
 @keyframes progress-pulse {
     0%,

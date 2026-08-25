@@ -6,6 +6,9 @@
     "files": [],
     "references": [
         {
+            "path": "./libs/agent"
+        },
+        {
             "path": "./apps/web"
         },
         {
@@ -22,6 +25,9 @@
         },
         {
             "path": "./libs/flows"
+        },
+        {
+            "path": "./libs/engine"
         },
         {
             "path": "./libs/socket"

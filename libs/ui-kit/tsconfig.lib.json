@@ -6,12 +6,11 @@
         "outDir": "dist",
         "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
         "emitDeclarationOnly": true,
-        "module": "nodenext",
-        "moduleResolution": "nodenext",
         "forceConsistentCasingInFileNames": true,
-        "types": ["node"]
+        "types": ["node"],
+        "jsx": "react-jsx"
     },
-    "include": ["src/**/*.ts"],
+    "include": ["src/**/*.ts", "src/**/*.tsx"],
     "references": [
         {
             "path": "../theme/tsconfig.lib.json"

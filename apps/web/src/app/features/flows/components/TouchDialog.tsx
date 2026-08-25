@@ -16,16 +16,29 @@ import {
     Switch,
 } from '@flows/ui-kit';
 
-import type { Connection, NodeData, TouchNodeBody } from '@flows/flows';
+import type { GraphEdge, GraphNode, Position, TouchNodeBody } from '@flows/flows';
+
+/** Server-model fields on a node that the wire type does not describe. */
+interface TouchNodeExtras {
+    required: boolean;
+    enterNo: number;
+    exitNo: number;
+    name: string;
+}
 
 interface TouchDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     nodeId: string;
-    /** Initial node data to populate form defaults */
-    initialNode?: NodeData | null;
-    /** Initial connection/edge data to populate form defaults */
-    initialConnection?: Connection | null;
+    /**
+     * Initial node data to populate form defaults.
+     *
+     * The extras are server-model fields this dialog surfaces for inspection; a node the
+     * canvas built carries none of them, which is why every read below has a fallback.
+     */
+    initialNode?: (GraphNode & Partial<TouchNodeExtras>) | null;
+    /** Initial connection/edge data. `position` is on the server's edge model, not the wire type. */
+    initialConnection?: (GraphEdge & { position?: Position }) | null;
     onSuccess: (message: string) => void;
     onError: (error: string) => void;
 }

@@ -3,9 +3,13 @@ import { useTranslation } from 'react-i18next';
 
 import { toast } from 'sonner';
 
-import { runFlow, useCanvasStore, useFlows, useFlowsStore } from '@flows/flows';
+import { runFlow, useCanvasStore, useFlowsStore } from '@flows/flows';
 
-import type { NodeData, NodeState } from '@lemoncloud/eureka-flows-api';
+import { useRunGate } from '../../flows/hooks/useRunGate';
+
+import type { FlowEngine } from '@flows/engine';
+import type { NodeState } from '@flows/flows';
+import type { NodeData } from '@lemoncloud/eureka-flows-api';
 
 interface UseMobileRunAllReturn {
     runProgress: { current: number; total: number; currentNodeId?: string } | null;
@@ -17,20 +21,22 @@ interface UseMobileRunAllReturn {
  * Delegates to server via `runFlow()`. Node state updates arrive via WebSocket.
  */
 interface UseMobileRunAllParams {
+    engine: FlowEngine;
     socketConnectionId?: string;
 }
 
-export const useMobileRunAll = ({ socketConnectionId }: UseMobileRunAllParams = {}): UseMobileRunAllReturn => {
+export const useMobileRunAll = ({ engine, socketConnectionId }: UseMobileRunAllParams): UseMobileRunAllReturn => {
     const { t } = useTranslation(['flows']);
-    const { currentFlowId } = useFlows();
+    const runGate = useRunGate();
     const [runProgress, setRunProgress] = useState<{ current: number; total: number; currentNodeId?: string } | null>(
         null
     );
 
     const handleRunAll = useCallback(async () => {
-        if (!currentFlowId) return;
+        const runFlowId = await runGate();
+        if (!runFlowId) return;
 
-        const { nodes, updateNodeData } = useCanvasStore.getState();
+        const { nodes } = useCanvasStore.getState();
         const blockRegistry = useFlowsStore.getState().blockRegistry;
 
         // Collect input nodes with auto-execution enabled (same filter as desktop)
@@ -47,22 +53,22 @@ export const useMobileRunAll = ({ socketConnectionId }: UseMobileRunAllParams = 
 
         // Set input nodes to RUNNING state
         for (const id of inputNodeIds) {
-            updateNodeData(id, { state: 'RUNNING' as NodeState } as Partial<NodeData>);
+            engine.applyRuntime(id, { state: 'RUNNING' as NodeState } as Partial<NodeData>);
         }
         setRunProgress({ current: 0, total });
 
         try {
-            await runFlow(currentFlowId, inputNodeIds, { connection: socketConnectionId });
+            await runFlow(runFlowId, inputNodeIds, { connection: socketConnectionId });
         } catch {
             // Reset input nodes to IDLE on failure
             for (const id of inputNodeIds) {
-                updateNodeData(id, { state: 'IDLE' as NodeState } as Partial<NodeData>);
+                engine.applyRuntime(id, { state: 'IDLE' as NodeState } as Partial<NodeData>);
             }
             toast.error(t('mobile.runAllFailed', { defaultValue: 'Failed to run flow' }));
         } finally {
             setRunProgress(null);
         }
-    }, [currentFlowId, socketConnectionId, t]);
+    }, [engine, runGate, socketConnectionId, t]);
 
     return {
         runProgress,

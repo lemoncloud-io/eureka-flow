@@ -12,6 +12,9 @@ dist/
 build/
 *.local
 
+# `npm pack` in libs/engine drops the tarball next to package.json
+*.tgz
+
 # Environment variables
 .env
 .env.local

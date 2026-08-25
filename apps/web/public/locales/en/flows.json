@@ -1,4 +1,63 @@
 {
+    "agentPanel": {
+        "title": "Assistant",
+        "subtitle": "Ask in plain language to build, edit, and arrange your flow.",
+        "empty": "For example:",
+        "thinking": "Thinking…",
+        "placeholder": "Ask the assistant to build or edit your flow…",
+        "send": "Send",
+        "errorTitle": "The turn stopped",
+        "suggestions": {
+            "build": "Create a flow that writes a blog title",
+            "tighten": "Make the titles short and punchy",
+            "rename": "Rename the preview to Result",
+            "tidy": "Line the nodes up in one column"
+        },
+        "ledger": {
+            "changes_one": "{{count}} change",
+            "changes_other": "{{count}} changes"
+        },
+        "op": {
+            "add": {
+                "running": "Adding <s>{{subject}}</s>…",
+                "done": "Added <s>{{subject}}</s>"
+            },
+            "delete": {
+                "running": "Deleting <s>{{subject}}</s>…",
+                "done": "Deleted <s>{{subject}}</s>"
+            },
+            "connect": {
+                "running": "Connecting <s>{{subject}}</s> to <o>{{object}}</o>…",
+                "done": "Connected <s>{{subject}}</s> to <o>{{object}}</o>"
+            },
+            "disconnect": {
+                "running": "Disconnecting <s>{{subject}}</s>…",
+                "done": "Disconnected <s>{{subject}}</s>"
+            },
+            "move": {
+                "running": "Moving <s>{{subject}}</s>…",
+                "done": "Moved <s>{{subject}}</s>"
+            },
+            "rename": {
+                "running": "Renaming <s>{{subject}}</s> to <o>{{object}}</o>…",
+                "done": "Renamed <s>{{subject}}</s> to <o>{{object}}</o>"
+            },
+            "configure": {
+                "running": "Configuring <s>{{subject}}</s>…",
+                "done": "Configured <s>{{subject}}</s>"
+            },
+            "delegate": {
+                "running": "Delegating to <s>{{subject}}</s>…",
+                "done": "Delegated to <s>{{subject}}</s>"
+            },
+            "unknownTarget": "a node"
+        },
+        "stop": "Stop",
+        "open": "Open the assistant",
+        "close": "Close the assistant",
+        "newChat": "Start a new conversation",
+        "resize": "Resize the assistant"
+    },
     "header": {
         "title": "EurekaFlow",
         "autoSave": "Auto Save",
@@ -59,6 +118,11 @@
         "config": "Node config",
         "run": "Run",
         "metadata": "Rename/Publish"
+    },
+    "canvasMenu": {
+        "portFilter": "Accepts {{type}}",
+        "showAll": "Show all blocks",
+        "noCompatibleBlocks": "No block accepts this port type"
     },
     "sidebar": {
         "library": "Library",
@@ -243,11 +307,11 @@
         "failedToCopyLink": "Failed to copy link",
         "confirmClearCanvas": "Clear the canvas?",
         "canvasCleared": "Canvas cleared",
-        "autoLayoutApplied": "Auto-layout applied",
+        "autoLayoutApplied": "Auto-layout applied (Cmd/Ctrl + Shift + L)",
         "exportedToJson": "Exported to JSON",
-        "workflowImported": "Workflow imported successfully",
-        "invalidWorkflowFile": "Invalid workflow file",
-        "failedToParseJson": "Failed to parse JSON file",
+        "importedFromJson": "Imported {{count}} nodes",
+        "importFailed": "Could not import {{file}}: {{reason}}",
+        "importReplaceConfirm": "Importing replaces the current graph and you have unsaved changes. Continue?",
         "runningAllNodes": "Running all nodes...",
         "executionStopped": "Execution stopped",
         "savedAs": "Saved as \"{{flowName}}\"",
@@ -264,7 +328,13 @@
         "signInWithApiKey": "Sign in with API Key",
         "browsePublicFlows": "Browse public flows",
         "signInToEdit": "Sign in to edit this flow",
-        "failedToRunFlow": "Failed to run flow"
+        "failedToRunFlow": "Failed to run flow",
+        "runNeedsOwnerForStructure": "Added and deleted steps are not saved with editor access, so this flow cannot run. Ask the owner to make the change.",
+        "savedWithoutStructure": "Saved the step settings only. Added and deleted steps need owner access.",
+        "draftRecovered": "Restored your unsaved changes.",
+        "draftUndo": "Undo",
+        "draftDiscarded": "Discarded unsaved changes.",
+        "backOnlineRetrySave": "Back online. Save again to send your changes."
     },
     "publicFlows": {
         "title": "Public Flows",
@@ -415,7 +485,15 @@
                 },
                 "autoLayout": {
                     "label": "Auto layout",
+                    "keys": ["Cmd/Ctrl", "Shift", "L"]
+                },
+                "selectAll": {
+                    "label": "Select all nodes",
                     "keys": ["Cmd/Ctrl", "A"]
+                },
+                "boxSelect": {
+                    "label": "Box select",
+                    "keys": ["Shift", "Drag"]
                 },
                 "delete": {
                     "label": "Delete selected",

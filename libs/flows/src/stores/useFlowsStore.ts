@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { flowStorage } from '../utils/flowStorage';
 
 import type { BlockDefinitionWithFrontend, FlowView } from '../types';
+import type { FlowSnapshot } from '@flows/engine';
 
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 
@@ -24,8 +25,6 @@ interface FlowsState {
     isAutoSaveEnabled: boolean;
     saveStatus: SaveStatus;
     saveError: Error | null;
-    /** WebSocket channel ID for real-time node status updates */
-    channelId: string | null;
     /** Whether this flow is publicly accessible */
     isPublic: boolean;
     /** Whether the current user has edit permission (Owner OR same-workspace Editor) */
@@ -34,6 +33,12 @@ interface FlowsState {
     hasOwned: boolean;
     /** Thumbnail URL (http or s3) */
     flowThumbnail: string;
+    /**
+     * The flow as the server last confirmed it — set on load, and again on a successful
+     * save. What the canvas holds is the working copy; the gap between the two is the
+     * unsaved work. `null` until a flow is loaded or created.
+     */
+    baseline: FlowSnapshot | null;
 
     setBlockRegistry: (blocks: BlockDefinitionWithFrontend[]) => void;
     setBlocksLoaded: (loaded: boolean) => void;
@@ -46,11 +51,11 @@ interface FlowsState {
     toggleAutoSave: () => void;
     setSaveStatus: (status: SaveStatus) => void;
     setSaveError: (error: Error | null) => void;
-    setChannelId: (channelId: string | null) => void;
     setIsPublic: (isPublic: boolean) => void;
     setIsEditable: (isEditable: boolean) => void;
     setHasOwned: (hasOwned: boolean) => void;
     setFlowThumbnail: (thumbnail: string) => void;
+    setBaseline: (baseline: FlowSnapshot | null) => void;
 }
 
 export const useFlowsStore = create<FlowsState>(set => ({
@@ -64,11 +69,11 @@ export const useFlowsStore = create<FlowsState>(set => ({
     isAutoSaveEnabled: flowStorage.getAutoSaveEnabled(),
     saveStatus: 'idle',
     saveError: null,
-    channelId: '0000',
     isPublic: false,
     isEditable: false,
     hasOwned: false,
     flowThumbnail: '',
+    baseline: null,
 
     setBlockRegistry: blocks => {
         const registry = blocks.reduce<Record<string, BlockDefinitionWithFrontend>>((acc, block) => {
@@ -112,8 +117,6 @@ export const useFlowsStore = create<FlowsState>(set => ({
 
     setSaveError: error => set({ saveError: error }),
 
-    setChannelId: channelId => set({ channelId }),
-
     setIsPublic: isPublic => set({ isPublic }),
 
     setIsEditable: isEditable => set({ isEditable }),
@@ -121,6 +124,8 @@ export const useFlowsStore = create<FlowsState>(set => ({
     setHasOwned: hasOwned => set({ hasOwned }),
 
     setFlowThumbnail: thumbnail => set({ flowThumbnail: thumbnail }),
+
+    setBaseline: baseline => set({ baseline }),
 }));
 
 export const useBlockRegistry = () => useFlowsStore(state => state.blockRegistry);
@@ -132,7 +137,6 @@ export const useLastSavedAt = () => useFlowsStore(state => state.lastSavedAt);
 export const useIsAutoSaveEnabled = () => useFlowsStore(state => state.isAutoSaveEnabled);
 export const useSaveStatus = () => useFlowsStore(state => state.saveStatus);
 export const useSaveError = () => useFlowsStore(state => state.saveError);
-export const useChannelId = () => useFlowsStore(state => state.channelId);
 export const useFlowDescription = () => useFlowsStore(state => state.flowDescription);
 export const useIsPublic = () => useFlowsStore(state => state.isPublic);
 export const useIsEditable = () => useFlowsStore(state => state.isEditable);

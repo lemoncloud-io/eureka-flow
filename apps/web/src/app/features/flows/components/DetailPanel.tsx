@@ -32,6 +32,7 @@ import {
     isAiBlock,
     isMissingAiKey,
     processImageWithConfig,
+    translateField,
     useBlockRegistry,
     useS3Image,
 } from '@flows/flows';
@@ -59,15 +60,15 @@ import {
     tryParseJson,
 } from '../utils';
 
-import type { BlockDefinition, ConfigField, Connection, DataPacket, FlowRole, NodeData } from '@flows/flows';
+import type { BlockDefinition, ConfigField, DataPacket, FlowRole, GraphEdge, GraphNode } from '@flows/flows';
 
 interface DetailPanelProps {
     /** User role for permission-based UI controls */
     role?: FlowRole;
-    selectedNode: NodeData | null;
-    selectedConnection: Connection | null;
-    nodes: NodeData[];
-    connections: Connection[];
+    selectedNode: GraphNode | null;
+    selectedConnection: GraphEdge | null;
+    nodes: GraphNode[];
+    connections: GraphEdge[];
     onConfigChange: (nodeId: string, key: string, value: unknown) => void;
     onDescriptionChange: (nodeId: string, description: string) => void;
     onLabelChange: (nodeId: string, label: string) => void;
@@ -166,7 +167,7 @@ const FileImagePreview = ({ src, onRemove, t }: { src: string; onRemove: () => v
 };
 
 interface InputImageConfigProps {
-    node: NodeData;
+    node: GraphNode;
     onConfigChange: (key: string, value: unknown) => void;
     t: (key: string) => string;
 }
@@ -405,12 +406,12 @@ const InputImageConfig: React.FC<InputImageConfigProps> = ({ node, onConfigChang
 };
 
 interface InputTextConfigProps {
-    node: NodeData;
+    node: GraphNode;
     onConfigChange: (key: string, value: unknown) => void;
 }
 
 const InputTextConfig: React.FC<InputTextConfigProps> = ({ node, onConfigChange }) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const [localHeight, setLocalHeight] = useState<number | undefined>(undefined);
     const heightRef = useRef<number>(0);
     const text = (node.config?.text as string) || '';
@@ -528,11 +529,11 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     onShowNotification,
     onOpenAiKeyDialog,
 }) => {
-    const { t } = useTranslation(['flows', 'common']);
+    const { t } = useTranslation(['flows', 'common', 'blocks']);
     const blockRegistry = useBlockRegistry();
     const hasGeminiKey = useWebCoreStore(s => s.hasGeminiKey);
     const hasOpenaiKey = useWebCoreStore(s => s.hasOpenaiKey);
-    const { canEditConfig, canModifyCanvas, canEditStructure, canRun } = getPermissions(role);
+    const { canEditConfig, canModifyCanvas, canRun } = getPermissions(role);
     const [isTouchDialogOpen, setIsTouchDialogOpen] = useState(false);
     const [touchPortId, setTouchPortId] = useState<string | null>(null);
     const [previewContent, setPreviewContent] = useState<{ value: unknown; type?: string } | null>(null);
@@ -618,7 +619,9 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             );
         }
 
-        if (packet.type === 'markdown' || isMarkdownContent(packet.value)) {
+        // `markdown` is not one of the port data types the server defines, so the type
+        // check that used to sit here never held — content detection is what decides.
+        if (isMarkdownContent(packet.value)) {
             return (
                 <div
                     className="relative group bg-muted/10 p-2 rounded-md border border-border/30 mt-1.5"
@@ -653,7 +656,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         );
     };
 
-    const renderConfigInput = (node: NodeData, field: ConfigField, definition: BlockDefinition) => {
+    const renderConfigInput = (node: GraphNode, field: ConfigField, definition: BlockDefinition) => {
         const value = node.config?.[field.key] ?? definition.defaultConfig[field.key];
         // Owner + Editor edit node config (Editor's change persists via session overlay)
         const isDisabled = !canEditConfig;
@@ -685,7 +688,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
-                        placeholder={field.placeholder}
+                        placeholder={translateField(t, field, 'placeholder')}
                         disabled={isDisabled}
                     />
                 ) : (
@@ -694,7 +697,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
-                        placeholder={field.placeholder}
+                        placeholder={translateField(t, field, 'placeholder')}
                         disabled={isDisabled}
                     />
                 );
@@ -706,7 +709,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         value={value || ''}
                         onChange={e => handleChange(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
-                        placeholder={field.placeholder}
+                        placeholder={translateField(t, field, 'placeholder')}
                         disabled={isDisabled}
                     />
                 );
@@ -755,7 +758,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     >
                         {field.options?.map(opt => (
                             <option key={opt.value} value={opt.value}>
-                                {opt.label}
+                                {translateField(t, opt, 'label') || opt.value}
                             </option>
                         ))}
                     </select>
@@ -782,7 +785,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         <div className="flex-1 h-px bg-border/50" />
                         {field.label && (
                             <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">
-                                {field.label}
+                                {translateField(t, field, 'label')}
                             </span>
                         )}
                         <div className="flex-1 h-px bg-border/50" />
@@ -812,9 +815,12 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             });
 
         return (
+            // Anchored to the canvas viewport (`WorkflowCanvas`'s `relative flex-1`), not the window:
+            // the canvas is no longer the last thing on the right — the assistant panel docks beside
+            // it — and a window-fixed detail panel would sit on top of whatever shares that edge.
             <div
                 className={cn(
-                    'fixed inset-y-0 right-0 w-full sm:w-80',
+                    'absolute inset-y-0 right-0 w-full sm:w-80',
                     'flex flex-col bg-glass-bg backdrop-blur-2xl border-l sm:border-l border-border/40',
                     'shadow-floating overflow-hidden',
                     'animate-in slide-in-from-right-4 duration-200 z-50'
@@ -831,7 +837,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                             </div>
                             <input
                                 type="text"
-                                value={selectedNode.customLabel || def.label}
+                                value={selectedNode.customLabel || translateField(t, def, 'label')}
                                 onChange={e => onLabelChange(selectedNode.id, e.target.value)}
                                 disabled={!canModifyCanvas}
                                 className="bg-transparent font-semibold text-sm text-foreground focus:bg-muted/30 outline-none rounded px-1.5 py-0.5 -ml-1 flex-1 min-w-0 border border-transparent focus:border-primary/40 transition-colors disabled:opacity-60 disabled:cursor-default"
@@ -994,7 +1000,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                         ) : (
                                             <div key={field.key}>
                                                 <label className="text-[10px] text-muted-foreground/80 font-medium mb-1.5 block uppercase tracking-wider">
-                                                    {field.label}
+                                                    {translateField(t, field, 'label') || field.key}
                                                 </label>
                                                 {renderConfigInput(selectedNode, field, def)}
                                             </div>
@@ -1030,7 +1036,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                             <div className="flex justify-between items-center mb-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[11px] font-semibold text-foreground">
-                                                        {input.label}
+                                                        {translateField(t, input, 'label') || input.id}
                                                     </span>
                                                     {incomingConn && (
                                                         <button
@@ -1090,7 +1096,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                             <div className="flex justify-between items-center mb-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[11px] font-semibold text-foreground">
-                                                        {output.label}
+                                                        {translateField(t, output, 'label') || output.id}
                                                     </span>
                                                     {outgoingConns.length > 0 && (
                                                         <div className="flex gap-1">
@@ -1246,7 +1252,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         return (
             <div
                 className={cn(
-                    'fixed inset-y-0 right-0 w-full sm:w-72',
+                    'absolute inset-y-0 right-0 w-full sm:w-72',
                     'flex flex-col bg-glass-bg backdrop-blur-2xl border-l sm:border-l border-border/40',
                     'shadow-floating overflow-hidden',
                     'animate-in slide-in-from-right-4 duration-200 z-50'
@@ -1281,10 +1287,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 {t('flows:detailPanel.from')}
                             </div>
                             <div className="font-semibold text-sm text-primary group-hover:text-foreground transition-colors">
-                                {sourceDef?.label || t('flows:detailPanel.unknown')}
+                                {translateField(t, sourceDef, 'label') || t('flows:detailPanel.unknown')}
                             </div>
                             <div className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 bg-muted/50 px-2 py-0.5 rounded">
-                                {sourcePort?.label}
+                                {translateField(t, sourcePort, 'label')}
                             </div>
                         </div>
 
@@ -1310,10 +1316,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                                 {t('flows:detailPanel.to')}
                             </div>
                             <div className="font-semibold text-sm text-status-completed group-hover:text-foreground transition-colors">
-                                {targetDef?.label || t('flows:detailPanel.unknown')}
+                                {translateField(t, targetDef, 'label') || t('flows:detailPanel.unknown')}
                             </div>
                             <div className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 bg-muted/50 px-2 py-0.5 rounded">
-                                {targetPort?.label}
+                                {translateField(t, targetPort, 'label')}
                             </div>
                         </div>
                     </div>

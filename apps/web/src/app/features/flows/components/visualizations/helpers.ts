@@ -2,17 +2,20 @@ import { DebugLogVisualization } from './DebugLogVisualization';
 import { PreviewVisualization } from './PreviewVisualization';
 
 import type { VisualizationProps } from './types';
-import type { BlockDefinitionWithFrontend, DataPacket, NodeData, TraceEntry, TraceStage } from '@flows/flows';
+import type { BlockDefinitionWithFrontend, DataPacket, GraphNode, TraceEntry, TraceStage } from '@flows/flows';
 import type React from 'react';
 
 /** Get first input data from node using definition's port ID or fallback to first available */
-export const getFirstInputData = (node: NodeData, definition: BlockDefinitionWithFrontend) => {
+export const getFirstInputData = (node: GraphNode, definition: BlockDefinitionWithFrontend) => {
     const inputPortId = definition.inputs?.[0]?.id;
     return inputPortId ? node.inputData?.[inputPortId] : Object.values(node.inputData ?? {})[0];
 };
 
 /** Get first output data from node */
-export const getFirstOutputData = (node: NodeData, definition: BlockDefinitionWithFrontend): DataPacket | undefined => {
+export const getFirstOutputData = (
+    node: GraphNode,
+    definition: BlockDefinitionWithFrontend
+): DataPacket | undefined => {
     const outputPortId = definition.outputs?.[0]?.id;
     return outputPortId ? node.outputData?.[outputPortId] : Object.values(node.outputData ?? {})[0];
 };

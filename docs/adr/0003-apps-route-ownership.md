@@ -1,5 +1,27 @@
 # Apps route: the SPA owns `/apps` only, never `/apps/:id`
 
+> ## Amendment (2026-07-21) — `/apps` is a public, all-Apps gallery
+>
+> The original decision below scoped `/apps` to **the signed-in user's workspace** ("My Apps"),
+> behind the API-key gate, dev-only, `noindex`, with a **relative** `/apps/{id}` href — all
+> anticipating a `GET /apps?view=mine` endpoint that never shipped. The server instead shipped a
+> **public SEO list**, `GET /_seo_/apps/0/list`, which returns **every** published App (codes
+> products with `service=eureka-flows-api`), unauthenticated. We repurposed `/apps` to match it:
+>
+> - **Public + indexable.** `/apps` is in `isPublicRoute()`; the `import.meta.env.DEV` route gate
+>   and the `noindex` meta are removed. Renders logged-out.
+> - **Data source:** `listAppsSeo()` calls the SEO list at the **bare** API base directly and
+>   unauthenticated — never through the shared `api` client (the `_seo_` proxy 404s under `/public`
+>   and 403s under `/_api_`; sending no key also means a stray 403 can't clear a user's key).
+> - **Card href = the server-provided absolute `url`** (e.g. `https://flow-dev.eureka.codes/{id}`),
+>   used verbatim. It is environment-correct (the DEV API returns DEV urls), which resolves the
+>   relative-vs-absolute tension below without hardwiring production.
+> - **Types:** `AppView` is replaced by `AppSeoMeta`/`AppsSeoListResult`; the mock is deleted.
+>
+> **Still in force:** the SPA owns only `/apps`, never `/apps/:id` (CloudFront serves it — see below);
+> and Apps have no per-App preview image (the SEO `image` is one shared static screenshot), so cards
+> stay text-first with a slug-derived monogram.
+
 An **App** (a deployed AI Studio web app, see `CONTEXT.md`) is already reachable at
 `https://flow.eureka.codes/apps/:id`, but that URL is **not served by this SPA**. CloudFront routes
 `/apps/:id` to `eureka-flows-api`, whose `AppsAPIController` (`src/modules/flows/api-apps.ts`) reads
@@ -49,12 +71,11 @@ half-manager that can only destroy is worse than a launcher.
 
 - Any future work that "adds an App detail page" must change CloudFront first. The absence of a
   `/apps/:id` route in `app.tsx` is intentional; do not add one.
-- The list endpoint (`GET /apps?view=mine`) does not exist yet. Until it does, `libs/flows/src/api/apps.ts`
-  returns mock rows behind a `VITE_APPS_API === 'real'` flag (the same mock/real swap convention the
-  Process Navigator uses). Only App ids verified to resolve belong in that mock — a card whose link
-  404s is worse than no card.
-- `AppView`'s fields are inferred from the codes `ProductModel` and are expected to be corrected once
-  the real endpoint ships. They are treated as a guess, not a contract.
+- ~~The list endpoint (`GET /apps?view=mine`) does not exist yet. Until it does, `libs/flows/src/api/apps.ts`
+  returns mock rows behind a `VITE_APPS_API === 'real'` flag.~~ **Superseded by the 2026-07-21 amendment:**
+  the shipped endpoint is `GET /_seo_/apps/0/list` (public, all Apps); the mock is deleted.
+- ~~`AppView`'s fields are inferred from the codes `ProductModel` and are a guess, not a contract.~~
+  **Superseded:** replaced by `AppSeoMeta`/`AppsSeoListResult`, which mirror the SEO list spec exactly.
 - App links **404 on `localhost`** by construction. Verify them on a deployed environment. A Vite dev
   proxy forwarding `/apps/:id` to the API would close the gap if it ever becomes worth the setup.
 - Apps have no per-App preview image (the server's OG tag uses a single static screenshot for all of

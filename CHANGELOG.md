@@ -1,5 +1,517 @@
 # Changelog
 
+## [2026-08-25] - root@0.73.0, @flows/web@0.73.0
+
+### Features
+
+- (web) expose the assistant panel to production
+
+### Bug Fixes
+
+- (web) restrict the assistant panel to owner and editor
+
+## [2026-08-19] - root@0.72.0, @flows/web@0.72.0
+
+### Features
+
+- (web) let the thinking label carry the wait
+- (web) ease the assistant in and out of the edge
+- (web) make the assistant panel resizable and its replies readable
+- (web) start a new conversation with the assistant
+- (web) collapse the assistant to an edge handle
+- (web) let the user stop a running agent turn
+- (web) show the assistant panel on the DEV deployment
+- (web) show the agent's work in the assistant panel
+
+### Bug Fixes
+
+- (web) dock the node detail panel to the canvas, not the window
+- (web) pass VITE_TOOL_WS_ENDPOINT to every deploy build
+- (web) stop the assistant transcript from yanking the reader down
+
+### Documentation
+
+- add AGENTS.md as the tool-neutral entry point
+- (agent) add assistant panel screenshots
+
+## [2026-08-13] - root@0.71.1, @flows/web@0.71.1, @flows/admin@0.45.1
+
+### Bug Fixes
+
+- (web) cancel the pending generate wait on abort
+
+### Documentation
+
+- drop references to the relocated browser-agent docs
+
+## [2026-08-13] - root@0.71.0, @flows/web@0.71.0, @flows/admin@0.45.0
+
+### Features
+
+- (agent) per-agent model selection + epoch trace/context handoff
+- (agent) per-agent model selection with in-app reasoning-model picker
+- (web) add dedicated tool websocket support
+- (agent) enable tool calls through Generate API
+- (socket) receive JSON transport messages
+
+### Bug Fixes
+
+- (web) ground assistant panel examples in shipped blocks
+- (web) preserve legacy gateway behavior
+
+### Documentation
+
+- (agent) drop the design-docs pointer from the agent README
+- (agent) remove in-repo browser-agent docs (moved to knowledge repo)
+
+## [2026-08-12] - root@0.70.0, @flows/web@0.70.0, @flows/admin@0.44.0
+
+### Features
+
+- (canvas) restore Flow JSON import and make export round-trippable
+- (canvas) keep the clipboard across remounts and paste at the cursor
+- (canvas) add box selection and select-all
+- (canvas) offer compatible blocks when a link is dropped on empty canvas
+
+### Documentation
+
+- (adr) record why flow JSON export keeps ids
+
+### Refactor
+
+- (canvas) route every grid snap through snapToGrid and settle the hook deps
+- (canvas) paint the marquee through a ref and drop the duplicated geometry
+
+## [2026-08-11] - root@0.69.0, @flows/web@0.69.0, @flows/admin@0.43.0
+
+### Features
+
+- (agent) wire the terminal into the trace switch
+- (agent) project the graph diff as a cumulative session delta plus one per turn
+- (agent) single tracing switch with self-describing, verbatim projections
+- (agent) add the trace module + wire the agent core (Track 2a)
+
+### Bug Fixes
+
+- (agent) the PR review follow-ups — fail the redactor and the diff closed
+- (agent) repair eureka tool-call contract spec onto the toolset API
+- (agent) measure terminal panes by display width so wide chars don't overflow
+- (agent) redact secrets at any depth; consolidate trace docs + cleanup
+
+### Documentation
+
+- (agent) retire the locator/property specialist description
+- (agent) document how to turn tracing on and read the projections
+
+### Refactor
+
+- (web) remove the dev agent-harness page; move llm-gateway doc into design/
+- (agent) rename HTTP adapters to *HttpClient to match the HttpClient port
+- (web) split useAgentPorts into useAgentTrace + useAgentStorage
+- rename unclear names for fresh-reader clarity
+- (web) rename useAgentHost -> useAgentPorts
+- (agent) tighten types and simplify the trace/storage surface
+- (agent) clarify names across the trace/storage surface
+- (agent) remove the Agent Environment; migrate gateway + web to discrete ports (Track 2b)
+- (agent) extract storage into its own leaf module
+
+### Other
+
+- style: prettier the files this branch left unformatted
+
+## [2026-08-11] - root@0.68.1, @flows/web@0.68.1, @flows/admin@0.42.1
+
+### Other
+
+- test: (agent) close remaining LLM verification coverage gaps
+
+## [2026-08-11] - root@0.68.0, @flows/web@0.68.0, @flows/admin@0.42.0
+
+### Features
+
+- (agent) add multi-turn verification metrics, dashboard, and reporting
+- (agent) extend provider registry with generation-parameter compatibility
+- (agent) add benchmark generation metadata and Anthropic support
+- (agent) add multi-turn LLM benchmark and dashboard
+- (agent,web) add tool-calling verification and Eureka integration groundwork
+- (agent) add provider-native HTTP tool calling and verification
+- (agent) add LLM verification usage, cost, and elapsed-time monitoring
+
+### Bug Fixes
+
+- (agent) dispatch every batched tool call, fix Gemini call-id reuse and usage field names
+- (agent) preserve Gemini thoughtSignature across multi-turn tool calls
+
+### Documentation
+
+- (agent) add LLM tool-calling production-readiness status
+
+### Refactor
+
+- (agent) rebuild locator verification scenarios against BaseAgent
+
+### Chores
+
+- (deps) align @vitest/coverage-v8 with installed vitest 4.x
+
+### Other
+
+- test: (agent) close coverage gaps in wireLog and metering fallbacks
+
+## [2026-08-07] - root@0.67.1, @flows/web@0.67.1, @flows/admin@0.41.1
+
+### Chores
+
+- the mechanical follow-ups from the #126 review
+
+## [2026-08-07] - root@0.67.0, @flows/web@0.67.0, @flows/admin@0.41.0
+
+### Features
+
+- (agent) ship the hybrid writer layer; retire the fan-out A/B
+- (agent) local terminal to drive the flow-agent headless
+- (agent) pull the graph via get_graph — the Approach-3 context variant
+- (agent) live canvas to the tail — cacheable transcript, ~halves builder cost
+- (agent) checkpoint — builder+skills, two-prompt orchestrator, catalog fold, eval harness
+- (agent) correctness-only eval-benchmark comparing the two roster designs
+- (agent) on-demand skill playbooks + the Builder that composes them
+- (agent) block-oriented agents composed from skills
+- (agent) structural node & edge specialist agents over the live canvas
+
+### Bug Fixes
+
+- (agent) run agent:terminal without a .env.local
+- (agent) align agent prompts and tool descriptions with the shipped design
+- (agent) group parallel tool results into one user content (both Gemini APIs)
+- (agent) reroute at the right altitude; orchestrator/builder own destruction correctly
+- (agent) builder finishes multi-node builds; orchestrator routes + reroutes correctly
+- (agent) fail loudly on unknown id and skip the empty-patch transaction
+
+### Documentation
+
+- (agent) doc↔code accuracy pass for PR + local-terminal diagrams
+- (agent) terminal-vs-web architecture diagram
+- (agent) design + impl-notes for the local terminal
+
+### Refactor
+
+- (engine) one edge-validation rule, owned by the engine
+- (agent) compose agent tools from self-named tool values
+- (agent) rename is the builder's, added at build time
+- (agent) rename generator specialist → single-output-generator
+- (agent) agents complete completable requests; refuse only the impossible
+- (agent) orchestrator composes canvas read from the inspect skill
+- (agent) orchestrator delegates intent; specialists own schema validation
+
+### Chores
+
+- keep bench-runs/ + manifest prettierignore rules local-only
+- (agent) reconcile branch WIP — prompts, docs, tests; un-churn manifests
+- (agent) wip edge reject-occupied-input
+
+### Other
+
+- test: (agent) consolidate live scenarios into integration.live; retire the eval-benchmark A/B
+- test: (agent) enforce that every write tool declares its capability
+- test: (agent) gate live Gemini specs behind RUN_LIVE
+
+## [2026-07-30] - root@0.66.2, @flows/web@0.66.2, @flows/admin@0.40.2
+
+### Bug Fixes
+
+- (engine) 가드가 재로드를 모르는 것과, ERROR 프레임이 error 를 지우는 것
+- (engine) 모르는 state가 노드를 지우거나 늦은 프레임이 되돌리지 않게
+
+### Documentation
+
+- (engine) §15 참조 오타와 과한 단정 하나
+- (engine) state 갭의 결정을 기록한다 — PLAN §16, types.ts, GUIDE 양쪽
+- (engine) 모바일 행을 §5에 나눠 적는다 — 리듀서를 안 탄다
+- (engine) 와이어는 SKIPPED를 안 싣는다 — 슬라이스 0 판정
+- (engine) the state model as it is, and a plan for the gap
+
+## [2026-07-30] - root@0.66.1, @flows/web@0.66.1, @flows/admin@0.40.1
+
+### Documentation
+
+- (agent) retitle the canvas-binding index entry to match the doc
+- (agent) drop the last two pre-engine claims from the browser-agent docs
+- (agent) point the in-memory binding's note at the engine binding
+
+### Refactor
+
+- (agent) bind the canvas seam to the engine, not the desktop canvas ref
+
+## [2026-07-29] - root@0.66.0, @flows/web@0.66.0, @flows/admin@0.40.0
+
+### Features
+
+- (mobile) route every mobile graph write through the engine
+- (mobile) load the mobile editor's graph through the engine, so port values arrive
+- (engine) publish the engine as @lemoncloud/flow-engine, ESM and CJS from one source
+- (engine) let the host supply the UUID source, so the engine reaches every runtime
+- (engine) the repository keeps what the load response says about the flow
+- (engine) carry the connection id, so a headless run can be streamed back
+- (engine) connect the socket adapter in --real, and stop it writing by default
+- (engine) headless execution — frame parser, run session, runNode (Phase 4)
+- (engine) socket port and the execution state reducer (Phase 3, in-repo half)
+- (engine) persistence ports and the headless Node proof (Phase 2)
+- (engine) implement the FlowEngine core (Phase 1, P1-1)
+
+### Bug Fixes
+
+- (engine) export the socket port, and read the agent's canvas from the engine
+- (engine) report a run against the node, and keep the status on a non-JSON error body
+- (mobile) merge the port map instead of replacing it on a socket port update
+- (mobile) stop the empty-state quick-add offering the same block twice
+- (engine) give adapters a barrel, and stop pointing at a function the package doesn't ship
+- (engine) run the published package before calling it published
+- (engine) build request URLs without URL, which React Native cannot be trusted for
+- (engine) the block registry was keyed on a field the server never sends
+- (engine) a run reset names the node, and the run session carries it out
+- (flows) a connected input takes what its source is producing now
+- (engine) settle the waiters a closing session drops, and stop copying the whole graph
+- (web) typecheck reaches zero
+- (web) carry the graph's guarantees into the components
+- (libs) every library now emits declarations
+- (build) align lib tsconfigs with the workspace, clearing two known defects
+- (flows) read getWorkflow from the engine, not the render closure
+
+### Documentation
+
+- (engine) point the README guide link back at develop
+- (engine) pin the README guide link to a resolvable commit
+- reconcile the engine and agent docs with what the merge actually did
+- (engine) document the edit/runtime split and the load ingress
+- retract the "mobile has no engine" notes — it does now
+- (engine) tell consumers the two things that will otherwise cost them an afternoon
+- say that the mobile editor is not on the engine
+- (engine) name the published specifier where a reader outside the repo will copy it
+- (engine) record the three places this landed differently from the plan
+- (engine) say what the package actually installs, and link a branch that has the guide
+- (engine) the browser smoke ran, and it showed the load ingress working
+- (engine) close the two ports that were deferred and then forgotten
+- (readme) put the engine on the dependency diagram
+- the store is a projection, not the graph's home
+- (engine) add a one-page map of where the graph lives
+- (engine) record that the channelId wire was removed, and what it was doing
+- (engine) correct the channelId finding — it was never a server contract issue
+- (engine) unbreak the section numbering, and record Phases 5-6 in the checklist
+- (engine) correct the half-adopted claim — the rules were already shared
+- (engine) record Phase 6 — what the real server found that the stub hid
+- (engine) retitle PLAN for Phase 0-5
+- (engine) record Phase 5 — three rule slices, and what stays gated
+- (engine) record the stale-input defect, with its reproduction
+- (engine) retitle PLAN for Phase 0-2 and note Phase 3 is unspecified
+- (engine) add flow engine design doc and phase 0-1 execution plan
+
+### Refactor
+
+- (flows) drop the channelId wire, and name the default channel where it is used
+- (flows) the load response port row is the engine's, plus what the client adds
+- (engine) loadGraph is the single ingress, ports and propagation included
+- (engine) decode the HTTP node view where the socket one is decoded
+- (flows) drop the override nobody passed, and share the hydrator
+- (engine) let the engine's types and rules have one home each
+- (graph) the graph guarantees its nodes have ids
+- (socket) test the dispatch path, and restore a guard the strangler dropped
+- (flows) hand the canvas graph to the engine (Phase 1, P1-2/P1-3)
+- (engine) extract headless graph core into @flows/engine (Phase 0)
+
+### Chores
+
+- (merge) develop into mobile-engine
+- (merge) develop into mobile-engine
+- ignore npm pack tarballs
+
+### Other
+
+- ci: (engine) publish on develop merge, gated on the version being new
+- ci: (engine) add a publish workflow, and declare the tools prepack was borrowing
+- test: (engine) cover the request timeout, the last untested platform global
+- style: (socket) group the parsed frame payloads with the messages they come from
+
+## [2026-07-29] - root@0.65.0, @flows/web@0.65.0, @flows/admin@0.39.0
+
+### Features
+
+- (agent) orchestrator harness — one main agent + spawned specialists over the live canvas
+
+### Refactor
+
+- (agent) scope branch to the feature — revert unrelated churn vs develop
+
+## [2026-07-29] - root@0.64.0, @flows/web@0.64.0, @flows/admin@0.38.0
+
+### Features
+
+- (agent) add Generate API LlmGateway adapter foundation
+- (agent) wire BrowserAgentEnvironment into AgentPanel flow
+- (agent) add capability metadata to llm gateway contract
+- (agent) locator agent — @flows/agent core + flow-editor panel
+- (agent) add environment self-check for storage and trace
+- (agent) add llm gateway with gemini 2.5 flash provider
+- (agent) add http request port with fetch and scripted implementations
+- (flows) add CanvasBinding + dev validation panel
+- (agent) add browser/virtual environment foundation
+
+### Bug Fixes
+
+- (agent) gate FlowAgentPanel behind import.meta.env.DEV
+- (agent) address PR review — checkpoint agent moves, store-sourced reads, role-derived grant
+- (agent) redact api key from provider error bodies
+
+### Documentation
+
+- (agent) reconcile browser-agent docs with the store-sourced code
+- (agent) drop stale spec/section/milestone citations from comments
+- (agent) clarify Capability is a deliberate standalone mirror
+- (agent) refine architecture diagrams and reconcile docs with code
+- (agent) reconcile llm gateway brief with shared contract
+- (agent) drop W04 tag from gemini model comment
+- (agent) trim locator IMPLEMENTATION, add at-a-glance diagram
+- (agent) move browser agent briefs to docs root
+- (agent) locator agent spec + implementation record
+- (agent) soften browser verification wording in W04 brief
+- (agent) add W04 llm gateway brief
+- (agent-chat) redesign around agent-owns-turn + single ToolExecutor
+- (agent-chat) reconcile diagrams and section numbering
+- (agent-chat) rewrite spec as SPEC.md + README.md, archive prior iterations
+- (agent-chat) reorganize component interfaces top-down and reconcile spec
+- (agent) clarify reactive useAgentStore vs StorageInterface persistence port
+- (agent) polish meeting brief for review
+- (agent) add spec-driven development specs for agent chat feature
+- (agent) add acceptance criteria to meeting brief
+
+### Refactor
+
+- (agent) align @flows/agent with repo conventions, dedupe types, trim comments
+- (flows) make AgentPanel presentational; containers own the agent
+- (flows) extract agent wiring into a FlowAgentPanel adaptor
+- (agent) refit gemini gateway onto shared chat contract
+- (agent) extract generic BaseAgent + useAgentSession for multi-agent reuse
+- (flows) rename makeDesktopCanvasBinding → createDesktopCanvasBinding
+
+### Chores
+
+- (agent) clean internal verification wording
+- (agent) prune redundant tests, relocate web specs, tighten docs
+- (agent) centralize lib tests + reorganize browser-agent docs
+- drop manual libs/agent reference from root tsconfig (nx sync)
+- (agent) verify environment build compatibility
+
+### Other
+
+- test: (agent) verify fake gateway tool call through tool executor
+- test: (agent) prove both storages share one contract
+
+## [2026-07-21] - root@0.63.0, @flows/web@0.63.0, @flows/admin@0.37.0
+
+### Features
+
+- (apps) relative time, New badge, search/sort, and a11y on the gallery
+- (apps) make /apps a public gallery on the SEO list endpoint
+
+### Refactor
+
+- (apps) apply /simplify cleanups + extract useInfiniteScrollObserver
+
+## [2026-07-21] - root@0.62.0, @flows/web@0.62.0, @flows/admin@0.36.0
+
+### Features
+
+- (admin) give name its own language key
+- (admin) edit select options and suggest existing keys
+- (admin) let the editor set the config placeholder and its key
+- (admin) carry and edit the *En language keys
+- (i18n) add translateField resolver for *En language-key fields
+- (admin) redesign UI as a dataflow instrument panel
+- (admin) extend block migration to port/config labels
+- (i18n) seed port/config field keys in blocks.json
+- (admin) add dev-only block label→key migration tool
+- (i18n) seed blocks.json with label/description translations
+- (admin) enable block update (full CRUD, assuming server remote update)
+- (admin) wire block editor to server API (list + create)
+- (i18n) translate server block text via language keys at render time
+
+### Bug Fixes
+
+- (admin) stop saving a block from clearing its required ports
+- (i18n) fall back to an identifier when a label resolves to nothing
+- (admin) align sidebar wire through node marker centers
+
+### Refactor
+
+- mount the key suggestion list once, and finish the label fallbacks
+- (admin) make an empty placeholder mean one thing
+- (i18n) correct the centralization claim and drop a magic indent
+- (admin) tidy the key dictionary hook after review
+- (i18n) drop the label-as-key resolver and its migration tool
+- (i18n) read mobile editor block text through translateField
+- (i18n) read desktop editor block text through translateField
+- (i18n) replace S3/presign storage with repo files + JSON export/import
+- (i18n) consolidate supported languages into one constant
+
+### Other
+
+- style: (admin) shrink inner-page table type and unify row density
+- style: (admin) drop background grid, tighten spacing
+
+## [2026-07-20] - root@0.61.0, @flows/web@0.61.0, @flows/admin@0.35.0
+
+### Features
+
+- (flows) add dev graph panel to inspect and round-trip the JSON graph
+- (flows) keep the working copy across a refresh
+- (flows) save before running, and stop runs a save cannot rescue
+- (flows) start flows locally and track saves against a baseline
+- (flows) add the workspace baseline and diff
+- (flows) generate node and edge IDs on the client
+- (flows) add headless canvas store factory
+
+### Bug Fixes
+
+- (mobile) stop nesting buttons inside the step card
+- (mobile) destructure the onRun prop MobileStepDetail already declares
+- (flows) surface a failed blocks fetch as the boot error
+
+### Documentation
+
+- (flows) correct the boot-join comment — settled, not surfaced
+- (plan) record boot parallelization done, staged-render B/C deferred
+- (plan) defer S8 staged loading with rationale
+- (plan) record the DEV smoke results
+- (plan) record what S7 recon overturned
+- (plan) prove the run surface rather than assert it
+- (plan) mark D-C retired where it was decided
+- (plan) record S6 and retire D-C
+- (plan) fold the S5 wiring check into the pre-ship DEV smoke
+- (plan) record S5 and re-aim D-C at the slice that can carry it
+- (plan) pin the baseline provenance questions S5 has to answer
+- (plan) record the run regression S3 opens
+- (plan) record S2 browser smoke results
+
+### Refactor
+
+- refactor code
+- (flows) save and run without the confirm prompt
+- (flows) auto-restore the draft silently with an undo instead of prompting
+- (flows) offer draft recovery as a non-blocking toast, not a modal confirm
+- (flows) make dev graph panel import/export file-based
+- (flows) remove dead canvas engine/history/layout hooks
+- (flows) let the run gate hand back the id it mints
+- (flows) drop the draft timestamp nobody reads
+- (flows) source the desktop canvas graph from the store
+
+### Chores
+
+- (docs) move local-json-graph working docs out of the repo
+
+### Other
+
+- perf: (flows) fetch blocks and flow in parallel during boot
+- test: (flows) cover the save body and the store's write notifications
+
 ## [2026-07-16] - root@0.60.0, @flows/web@0.60.0, @flows/admin@0.34.0
 
 ### Features

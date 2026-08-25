@@ -4,31 +4,33 @@ import { useTranslation } from 'react-i18next';
 import { AlertCircle, ArrowLeft, ArrowRight, FileText, Loader2, Play, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-import { isAiBlock, isMissingAiKey, useCanvasConnections } from '@flows/flows';
+import { isAiBlock, isMissingAiKey, resolveNodeName, translateField, useCanvasConnections } from '@flows/flows';
 import { cn } from '@flows/lib/utils';
 import { Input, Label, Switch } from '@flows/ui-kit';
 import { useWebCoreStore } from '@flows/web-core';
 
-import { AiKeyWarningBanner } from '../../flows/components/AiKeyWarningBanner';
-import { BlockIcon } from '../../flows/components/BlockIcon';
-import { getPortStyleKey } from '../../flows/utils';
-import { useNodeConfig } from '../hooks/useNodeConfig';
-import { deleteNodeWithSync, executeNodeWithToast } from '../utils';
 import { AddConnectionRow } from './AddConnectionRow';
 import { ConfigFieldList } from './ConfigFieldList';
 import { STEREO_FALLBACK_LABEL, STEREO_I18N_KEY, STEREO_ICON_BG, TYPE_DOT } from './consts';
 import { MobileConnectionCard } from './MobileConnectionCard';
 import { MobileImageUpload } from './MobileImageUpload';
 import { MobileTextInput } from './MobileTextInput';
+import { AiKeyWarningBanner } from '../../flows/components/AiKeyWarningBanner';
+import { BlockIcon } from '../../flows/components/BlockIcon';
+import { getPortStyleKey } from '../../flows/utils';
+import { useNodeConfig } from '../hooks/useNodeConfig';
 
-import type { FlowRole } from '@flows/flows';
-import type { NodeState } from '@lemoncloud/eureka-flows-api';
+import type { FlowEngine } from '@flows/engine';
+import type { BlockDefinitionWithFrontend, FlowRole, NodeState } from '@flows/flows';
+import type { TFunction } from 'i18next';
 
 interface MobileStepDetailProps {
     nodeId: string | null;
-    flowId: string | null;
-    socketConnectionId?: string;
+    /** Config edits are graph edits, so they go through the engine like every other one. */
+    engine: FlowEngine;
     role?: FlowRole;
+    /** Runs the node, once the page has cleared it with the server. */
+    onRun?: (nodeId: string, options?: { propagate?: boolean }) => Promise<void>;
     onClose: () => void;
     onOpenOutputConnection?: (
         nodeId: string,
@@ -49,15 +51,15 @@ interface MobileStepDetailProps {
 
 export const MobileStepDetail = ({
     nodeId,
-    flowId,
-    socketConnectionId,
+    engine,
     role = 'owner',
+    onRun,
     onClose,
     onOpenOutputConnection,
     onOpenInputConnection,
     onOpenAiKeyDialog,
 }: MobileStepDetailProps) => {
-    const { t } = useTranslation(['flows']);
+    const { t } = useTranslation(['flows', 'blocks']);
     const {
         node,
         blockDef,
@@ -68,19 +70,14 @@ export const MobileStepDetail = ({
         handleConfigChange,
         handleCustomLabelChange,
         handleToggleAuto,
-    } = useNodeConfig(nodeId, flowId, role);
+    } = useNodeConfig(nodeId, role, engine);
 
     const handleRun = useCallback(
         async (options?: { propagate?: boolean }) => {
             if (!canRun || !nodeId) return;
-            await executeNodeWithToast(nodeId, {
-                flowId,
-                socketConnectionId,
-                canEdit: canEditStructure,
-                propagate: options?.propagate,
-            });
+            await onRun?.(nodeId, options);
         },
-        [canRun, canEditStructure, nodeId, flowId, socketConnectionId]
+        [canRun, nodeId, onRun]
     );
     const isRunning = (node?.state as string) === 'RUNNING';
 
@@ -112,7 +109,7 @@ export const MobileStepDetail = ({
             setConfirmingDelete(true);
             return;
         }
-        deleteNodeWithSync(nodeId, flowId);
+        engine.transact('node:remove', ops => ops.removeNodes([nodeId]));
         onClose();
     };
 
@@ -143,7 +140,7 @@ export const MobileStepDetail = ({
                         <div className="flex items-center gap-1.5 min-w-0">
                             <span className="text-sm font-semibold text-muted-foreground shrink-0">{stereoLabel}</span>
                             <span className="text-sm font-semibold text-foreground truncate">
-                                {blockDef.label || node.type}
+                                {translateField(t, blockDef, 'label') || node.type}
                             </span>
                         </div>
                     </header>
@@ -168,7 +165,7 @@ export const MobileStepDetail = ({
                                     <Input
                                         value={customLabel}
                                         onChange={e => handleCustomLabelChange(e.target.value)}
-                                        placeholder={blockDef.label}
+                                        placeholder={translateField(t, blockDef, 'label')}
                                         className="h-9 text-sm"
                                         disabled={!canEditStructure}
                                     />
@@ -355,7 +352,7 @@ const PortButton = ({
     connectedNames: string | null;
     canEdit: boolean;
     onConnect?: () => void;
-    t: (key: string, defaultValue?: string) => string;
+    t: TFunction;
 }) => {
     const styleKey = getPortStyleKey(port.type ?? 'any');
     const isConnected = connectedNames !== null;
@@ -375,7 +372,7 @@ const PortButton = ({
         >
             <Icon className={cn('w-3 h-3 shrink-0', isConnected ? 'text-success' : 'text-primary/40')} />
             <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', TYPE_DOT[styleKey])} />
-            <span className="font-medium">{port.label || port.id}</span>
+            <span className="font-medium">{translateField(t, port, 'label') || port.id}</span>
             {isConnected ? (
                 <span className="text-success truncate flex-1">
                     {arrow} {connectedNames}
@@ -416,7 +413,7 @@ interface PortGroupParams {
     canEdit: boolean;
     displayName: string;
     onOpen?: PortConnectionFn;
-    t: (key: string, defaultValue?: string) => string;
+    t: TFunction;
 }
 
 const renderPortGroup = ({ nodeId, ports, conns, direction, canEdit, displayName, onOpen, t }: PortGroupParams) => {
@@ -425,7 +422,8 @@ const renderPortGroup = ({ nodeId, ports, conns, direction, canEdit, displayName
 
     return ports.map(port => {
         const portConns = conns.filter(c => (isInput ? c.targetPortId : c.sourcePortId) === port.id);
-        const open = () => onOpen?.(nodeId, port.id, port.type ?? 'any', displayName, port.label || port.id);
+        const open = () =>
+            onOpen?.(nodeId, port.id, port.type ?? 'any', displayName, translateField(t, port, 'label') || port.id);
 
         if (portConns.length === 0) {
             return (
@@ -479,12 +477,12 @@ const ConnectionsSection = ({
 }: {
     nodeId: string | null;
     node: { customLabel?: string; type: string };
-    blockDef: { inputs?: Port[]; outputs?: Port[]; label?: string };
+    blockDef: BlockDefinitionWithFrontend | undefined;
     allConnections: Conn[];
     canEdit: boolean;
     onOpenOutputConnection?: PortConnectionFn;
     onOpenInputConnection?: PortConnectionFn;
-    t: (key: string, defaultValue?: string) => string;
+    t: TFunction;
 }) => {
     if (!blockDef || !nodeId) return null;
 
@@ -494,7 +492,7 @@ const ConnectionsSection = ({
 
     const inConns = allConnections.filter(c => c.targetNodeId === nodeId);
     const outConns = allConnections.filter(c => c.sourceNodeId === nodeId);
-    const displayName = node.customLabel || blockDef.label || node.type;
+    const displayName = resolveNodeName(node, blockDef, t);
 
     return (
         <div className="space-y-2">
@@ -538,13 +536,7 @@ const ConnectionsSection = ({
 };
 
 /** Output data preview — shows result after node execution */
-const OutputPreviewSection = ({
-    node,
-    t,
-}: {
-    node: { outputData?: unknown; state?: string };
-    t: (key: string, defaultValue?: string) => string;
-}) => {
+const OutputPreviewSection = ({ node, t }: { node: { outputData?: unknown; state?: string }; t: TFunction }) => {
     const outputData = node.outputData as Record<string, { value?: unknown; type?: string }> | undefined;
     if (!outputData) return null;
 

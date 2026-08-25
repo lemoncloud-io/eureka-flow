@@ -1,6 +1,6 @@
 {
   "name": "@flows/source",
-  "version": "0.60.0",
+  "version": "0.73.0",
   "license": "Apache-2.0",
   "private": true,
   "scripts": {
@@ -13,6 +13,8 @@
     "build:all:dev": "npx nx run-many --target=build --configuration=dev --all",
     "build:all:prod": "npx nx run-many --target=build --configuration=prod --all",
     "graph": "nx graph",
+    "engine:demo": "esbuild libs/engine/src/cli/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/engine-cli/demo.mjs && node dist/engine-cli/demo.mjs",
+    "agent:terminal": "node libs/agent/src/cli/build.mjs && node --env-file-if-exists=.env.local dist/agent-cli/terminal.mjs",
     "!web": "------------- web scripts -------------",
     "web:start": "yarn clean:cache && npx nx serve web --port 3000",
     "web:build": "npx nx build web",
@@ -114,7 +116,7 @@
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.6",
     "@vitejs/plugin-react": "^4.2.0",
-    "@vitest/coverage-v8": "^1.0.4",
+    "@vitest/coverage-v8": "4.0.16",
     "@vitest/ui": "^4.0.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.8.0",

@@ -15,6 +15,9 @@ export default defineConfig(() => ({
 
     define: {
         __APP_VERSION__: JSON.stringify(adminPkg.version),
+        // Shim Node globals for browser deps pulled in via @flows/web-core (lemon-web-core references `process`/`global`)
+        'process.env': {},
+        global: 'window',
     },
 
     resolve: {

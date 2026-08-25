@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ImagePlus, Loader2, X } from 'lucide-react';
+import { ImagePlus, X } from 'lucide-react';
 
 import { cn } from '@flows/lib/utils';
 import { Input, Label, Sheet, SheetContent, SheetTitle, Textarea } from '@flows/ui-kit';
@@ -9,7 +9,7 @@ import { Input, Label, Sheet, SheetContent, SheetTitle, Textarea } from '@flows/
 interface MobileNewFlowSheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onCreate: () => Promise<string | null>;
+    onCreate: () => void;
     onNameChange: (name: string) => void;
 }
 
@@ -18,7 +18,6 @@ export const MobileNewFlowSheet = ({ open, onOpenChange, onCreate, onNameChange 
     const [name, setName] = useState('Untitled Flow');
     const [description, setDescription] = useState('');
     const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [isCreating, setIsCreating] = useState(false);
 
     // Reset state when sheet closes
     useEffect(() => {
@@ -40,19 +39,11 @@ export const MobileNewFlowSheet = ({ open, onOpenChange, onCreate, onNameChange 
         e.target.value = '';
     };
 
-    const handleCreate = async () => {
-        if (isCreating) return;
-        setIsCreating(true);
-        try {
-            const newId = await onCreate();
-            if (newId) {
-                const finalName = name.trim() || 'Untitled Flow';
-                onNameChange(finalName);
-                onOpenChange(false);
-            }
-        } finally {
-            setIsCreating(false);
-        }
+    // Nothing to wait on: the new flow is local until its first save.
+    const handleCreate = () => {
+        onCreate();
+        onNameChange(name.trim() || 'Untitled Flow');
+        onOpenChange(false);
     };
 
     return (
@@ -147,15 +138,13 @@ export const MobileNewFlowSheet = ({ open, onOpenChange, onCreate, onNameChange 
                         {/* Create button */}
                         <button
                             onClick={handleCreate}
-                            disabled={isCreating}
                             className={cn(
                                 'w-full flex items-center justify-center gap-2 h-[51px] rounded-xl',
                                 'text-sm font-semibold transition-all',
-                                'active:scale-[0.98] disabled:opacity-60',
+                                'active:scale-[0.98]',
                                 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
                             )}
                         >
-                            {isCreating && <Loader2 className="w-4 h-4 animate-spin" />}
                             <span>{t('mobile.newFlow.create', '플로우 만들기')}</span>
                         </button>
                     </div>

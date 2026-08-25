@@ -1,52 +1,23 @@
-import { toPortVariantData, upsertFlow, upsertPortNode, useCanvasStore } from '@flows/flows';
+import { hydrateInputsFromUpstream, toPortVariantData, upsertPortNode } from '@flows/flows';
 
-import { isUnresolvedTempId, resolveTempId } from '../../flows/utils';
-
-import type { Connection } from '@lemoncloud/eureka-flows-api';
-
-/**
- * Delete a node and its connected edges from the server.
- * Uses the `#` prefix convention to signal deletion via upsertFlow.
- */
-export const deleteNodeWithSync = (nodeId: string, flowId: string | null): void => {
-    const { connections, deleteNode } = useCanvasStore.getState();
-    const connectedEdges = connections.filter(c => c.sourceNodeId === nodeId || c.targetNodeId === nodeId);
-
-    deleteNode(nodeId);
-
-    if (flowId && !isUnresolvedTempId(nodeId)) {
-        const serverEdgeIds = connectedEdges
-            .map((e: Connection) => e.id)
-            .filter((id): id is string => !!id && !isUnresolvedTempId(id));
-        upsertFlow(flowId, {
-            nodes: [{ id: `#${resolveTempId(nodeId)}` }] as never[],
-            edges: serverEdgeIds.map(id => ({ id: `#${resolveTempId(id)}` })) as never[],
-        }).catch(err => {
-            console.error('[deleteNodeWithSync] Failed to delete node:', err);
-        });
-    }
-};
+import type { DataPacket } from '@flows/flows';
 
 /**
  * Save input port data to the server before node execution.
  * Server's hydrateInputs() reads from these port nodes.
+ *
+ * Which packet each port gets is `hydrateInputsFromUpstream`'s answer, not a second one.
+ * This used to walk the edges itself — the two agreed, but only by coincidence, and the
+ * desktop copy had already drifted into skipping a port that held a value.
  */
 export const hydrateInputPorts = async (
     nodeId: string,
     flowId: string,
     connections: Array<{ sourceNodeId: string; sourcePortId: string; targetNodeId: string; targetPortId: string }>,
-    nodes: Array<{ id: string; outputData?: Record<string, { value: unknown; type: string }> }>,
-    existingInputData: Record<string, { value: unknown; type: string }>
+    nodes: Array<{ id: string; outputData?: Record<string, DataPacket> }>,
+    existingInputData: Record<string, DataPacket>
 ): Promise<void> => {
-    const inputData: Record<string, { value: unknown; type: string }> = { ...existingInputData };
-
-    for (const conn of connections.filter(c => c.targetNodeId === nodeId)) {
-        const sourceNode = nodes.find(n => n.id === conn.sourceNodeId);
-        const sourceOutput = sourceNode?.outputData?.[conn.sourcePortId];
-        if (sourceOutput) {
-            inputData[conn.targetPortId] = sourceOutput;
-        }
-    }
+    const inputData = hydrateInputsFromUpstream(nodeId, connections, nodes, existingInputData);
 
     if (Object.keys(inputData).length > 0) {
         await Promise.all(

@@ -1,4 +1,62 @@
 {
+    "agentPanel": {
+        "title": "어시스턴트",
+        "subtitle": "플로우를 만들고, 수정하고, 정렬하도록 자연어로 요청하세요.",
+        "empty": "예를 들면:",
+        "thinking": "생각 중…",
+        "placeholder": "어시스턴트에게 플로우 생성이나 수정을 요청하세요…",
+        "send": "보내기",
+        "errorTitle": "작업이 중단됨",
+        "suggestions": {
+            "build": "블로그 제목을 쓰는 플로우를 만들어줘",
+            "tighten": "제목을 짧고 강렬하게 바꿔줘",
+            "rename": "프리뷰 이름을 Result로 바꿔줘",
+            "tidy": "노드를 한 줄로 정렬해줘"
+        },
+        "ledger": {
+            "changes_other": "{{count}}개 변경"
+        },
+        "op": {
+            "add": {
+                "running": "<s>{{subject}}</s> 추가하는 중…",
+                "done": "<s>{{subject}}</s> 추가함"
+            },
+            "delete": {
+                "running": "<s>{{subject}}</s> 삭제하는 중…",
+                "done": "<s>{{subject}}</s> 삭제함"
+            },
+            "connect": {
+                "running": "<s>{{subject}}</s>를 <o>{{object}}</o>에 연결하는 중…",
+                "done": "<s>{{subject}}</s>를 <o>{{object}}</o>에 연결함"
+            },
+            "disconnect": {
+                "running": "<s>{{subject}}</s> 연결 끊는 중…",
+                "done": "<s>{{subject}}</s> 연결 끊음"
+            },
+            "move": {
+                "running": "<s>{{subject}}</s> 옮기는 중…",
+                "done": "<s>{{subject}}</s> 옮김"
+            },
+            "rename": {
+                "running": "<s>{{subject}}</s> 이름을 <o>{{object}}</o>로 바꾸는 중…",
+                "done": "<s>{{subject}}</s> 이름을 <o>{{object}}</o>로 바꿈"
+            },
+            "configure": {
+                "running": "<s>{{subject}}</s> 설정하는 중…",
+                "done": "<s>{{subject}}</s> 설정함"
+            },
+            "delegate": {
+                "running": "<s>{{subject}}</s>에게 맡기는 중…",
+                "done": "<s>{{subject}}</s>에게 맡김"
+            },
+            "unknownTarget": "노드"
+        },
+        "stop": "중지",
+        "open": "어시스턴트 열기",
+        "close": "어시스턴트 닫기",
+        "newChat": "새 대화 시작",
+        "resize": "어시스턴트 너비 조절"
+    },
     "header": {
         "title": "EurekaFlow",
         "autoSave": "자동 저장",
@@ -59,6 +117,11 @@
         "config": "노드 설정값",
         "run": "실행",
         "metadata": "이름변경·게시"
+    },
+    "canvasMenu": {
+        "portFilter": "{{type}} 입력 가능",
+        "showAll": "전체 블록 보기",
+        "noCompatibleBlocks": "이 포트를 받을 수 있는 블록이 없습니다"
     },
     "sidebar": {
         "library": "라이브러리",
@@ -243,11 +306,11 @@
         "failedToCopyLink": "링크 복사 실패",
         "confirmClearCanvas": "캔버스를 지우시겠습니까?",
         "canvasCleared": "캔버스가 지워졌습니다",
-        "autoLayoutApplied": "자동 정렬이 적용되었습니다",
+        "autoLayoutApplied": "자동 정렬 적용 (Cmd/Ctrl + Shift + L)",
         "exportedToJson": "JSON으로 내보내기 완료",
-        "workflowImported": "워크플로우를 성공적으로 가져왔습니다",
-        "invalidWorkflowFile": "유효하지 않은 워크플로우 파일",
-        "failedToParseJson": "JSON 파일 파싱 실패",
+        "importedFromJson": "노드 {{count}}개를 불러왔습니다",
+        "importFailed": "{{file}}을(를) 불러오지 못했습니다: {{reason}}",
+        "importReplaceConfirm": "가져오기는 현재 그래프를 통째로 교체합니다. 저장하지 않은 변경이 있습니다. 계속할까요?",
         "runningAllNodes": "모든 노드 실행 중...",
         "executionStopped": "실행이 중지되었습니다",
         "savedAs": "\"{{flowName}}\"(으)로 저장됨",
@@ -264,7 +327,13 @@
         "signInWithApiKey": "API 키로 로그인",
         "browsePublicFlows": "공개 플로우 둘러보기",
         "signInToEdit": "로그인하여 편집하기",
-        "failedToRunFlow": "플로우 실행 실패"
+        "failedToRunFlow": "플로우 실행 실패",
+        "runNeedsOwnerForStructure": "편집자 권한에서는 추가·삭제한 단계가 저장되지 않아 실행할 수 없습니다. 소유자에게 요청하세요.",
+        "savedWithoutStructure": "단계 설정만 저장했습니다. 추가·삭제한 단계는 소유자 권한이 필요합니다.",
+        "draftRecovered": "저장되지 않은 변경사항을 복구했습니다.",
+        "draftUndo": "되돌리기",
+        "draftDiscarded": "저장되지 않은 변경사항을 삭제했습니다.",
+        "backOnlineRetrySave": "다시 연결됐습니다. 저장을 눌러 변경사항을 보내세요."
     },
     "publicFlows": {
         "title": "공개 플로우",
@@ -415,7 +484,15 @@
                 },
                 "autoLayout": {
                     "label": "자동 정렬",
+                    "keys": ["Cmd/Ctrl", "Shift", "L"]
+                },
+                "selectAll": {
+                    "label": "전체 노드 선택",
                     "keys": ["Cmd/Ctrl", "A"]
+                },
+                "boxSelect": {
+                    "label": "범위 선택",
+                    "keys": ["Shift", "드래그"]
                 },
                 "delete": {
                     "label": "선택 항목 삭제",

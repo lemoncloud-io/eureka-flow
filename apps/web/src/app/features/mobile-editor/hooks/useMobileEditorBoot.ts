@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FLOW_FORBIDDEN, getProfile, toAiKeyStatus, useBlocks, useCanvasStore, useFlows } from '@flows/flows';
+import { FLOW_FORBIDDEN, captureBaseline, getProfile, toAiKeyStatus, useBlocks, useFlows } from '@flows/flows';
 import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 
-import type { SerializeWorkflowFn } from './types';
+import { useDraftRecovery } from '../../flows/hooks/useDraftRecovery';
+import { loadFlowIntoEngine } from '../utils';
+
+import type { FlowEngine } from '@flows/engine';
 
 interface UseMobileEditorBootParams {
-    serializeWorkflowState: SerializeWorkflowFn;
-    lastSavedStateRef: React.MutableRefObject<string | null>;
+    engine: FlowEngine;
 }
 
 interface UseMobileEditorBootReturn {
@@ -22,14 +24,12 @@ interface UseMobileEditorBootReturn {
     updateUrl: (flowId: string | null) => void;
 }
 
-export const useMobileEditorBoot = ({
-    serializeWorkflowState,
-    lastSavedStateRef,
-}: UseMobileEditorBootParams): UseMobileEditorBootReturn => {
+export const useMobileEditorBoot = ({ engine }: UseMobileEditorBootParams): UseMobileEditorBootReturn => {
     const { t } = useTranslation(['flows']);
     const { loadBlocks } = useBlocks();
     const { initializeFlow, loadFlowById } = useFlows();
-    const { apiKey, setApiKey } = useWebCoreStore();
+    const recoverDraft = useDraftRecovery();
+    const { setApiKey } = useWebCoreStore();
 
     const [isAppReady, setIsAppReady] = useState(false);
     const [loadingText, setLoadingText] = useState('');
@@ -109,9 +109,18 @@ export const useMobileEditorBoot = ({
             }
 
             if (initialFlow) {
-                useCanvasStore.getState().loadWorkflow(initialFlow);
-                lastSavedStateRef.current = serializeWorkflowState(initialFlow);
+                loadFlowIntoEngine(engine, initialFlow);
+                // Baseline off the engine, not off initialFlow, and only here — after
+                // loadBlocks. The registry resolves each node's type on the way into a
+                // snapshot, so a baseline taken any earlier reads dirty against a flow
+                // nobody has touched, and every load would trip auto-save.
+                const { nodes, edges } = engine.getGraph();
+                captureBaseline({ nodes, connections: edges });
             }
+
+            // After the baseline: the draft is judged against it, and before it exists
+            // every flow looks unsaved.
+            await recoverDraft(working => loadFlowIntoEngine(engine, working));
 
             if (loadedId) {
                 updateUrl(loadedId);

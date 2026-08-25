@@ -26,6 +26,9 @@
     "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
     "references": [
         {
+            "path": "../../libs/agent/tsconfig.lib.json"
+        },
+        {
             "path": "../../libs/policy/tsconfig.lib.json"
         },
         {
@@ -45,6 +48,9 @@
         },
         {
             "path": "../../libs/flows/tsconfig.lib.json"
+        },
+        {
+            "path": "../../libs/engine/tsconfig.lib.json"
         }
     ]
 }

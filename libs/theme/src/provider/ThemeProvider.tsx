@@ -44,8 +44,6 @@ export function ThemeProvider({
     };
 
     return (
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
         <ThemeProviderContext.Provider {...props} value={value}>
             {children}
         </ThemeProviderContext.Provider>

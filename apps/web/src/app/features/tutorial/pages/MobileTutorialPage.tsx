@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
+import { createFlowEngine } from '@flows/engine';
 import { useBlocks, useCanvasStore, useFlowsStore } from '@flows/flows';
 import { useWebCoreStore, validateApiKey } from '@flows/web-core';
 
+import { useEngineMirror } from '../../flows/hooks/useEngineMirror';
 import { MobileConnectionSheet, MobileStepList } from '../../mobile-editor/components';
 import { useConnectionMode } from '../../mobile-editor/hooks';
+import { loadFlowIntoEngine } from '../../mobile-editor/utils';
 import { CompletionScreen } from '../components/CompletionScreen';
 import { MobileTutorialOverlay } from '../components/MobileTutorialOverlay';
 import { FALLBACK_BLOCKS, TUTORIAL_WORKFLOW } from '../consts/tutorialSteps';
@@ -35,7 +38,17 @@ export const MobileTutorialPage = () => {
         return () => useCanvasStore.getState().setTutorialHint(null);
     }, []);
 
-    const connectionMode = useConnectionMode(blockRegistry as Record<string, BlockDefinitionWithFrontend>, null);
+    // The tutorial edits a canned graph with the same hooks the editor uses, so it needs
+    // the same engine behind them. Nothing here is saved — it is thrown away on exit.
+    // The registry goes in for the same reason the editor passes it: without it `connect`
+    // never raises INCOMPATIBLE_PORTS, and the tutorial is where a wrong connection is
+    // most likely to be tried on purpose.
+    const blockRegistryRef = useRef(blockRegistry);
+    blockRegistryRef.current = blockRegistry as Record<string, BlockDefinitionWithFrontend>;
+    const engine = useMemo(() => createFlowEngine({ getBlockRegistry: () => blockRegistryRef.current }), []);
+    useEngineMirror(engine, { paused: false });
+
+    const connectionMode = useConnectionMode(blockRegistry as Record<string, BlockDefinitionWithFrontend>, engine);
     const handleTapCard = useCallback(() => {
         /* intentionally empty — tutorial doesn't open config */
     }, []);
@@ -54,7 +67,7 @@ export const MobileTutorialPage = () => {
                 store.setBlocksLoaded(true);
             }
 
-            useCanvasStore.getState().loadWorkflow(TUTORIAL_WORKFLOW);
+            loadFlowIntoEngine(engine, TUTORIAL_WORKFLOW);
             setIsReady(true);
         };
         boot();
@@ -96,11 +109,11 @@ export const MobileTutorialPage = () => {
 
             <div className="pt-3 pb-40">
                 <MobileStepList
+                    engine={engine}
                     onTapCard={handleTapCard}
                     onAddStep={() => {
                         /* tutorial does not allow adding steps */
                     }}
-                    flowId={null}
                     role="editor"
                 />
             </div>
