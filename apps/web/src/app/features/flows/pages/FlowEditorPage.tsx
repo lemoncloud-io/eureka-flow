@@ -1014,10 +1014,12 @@ export const FlowEditorPage = () => {
                     />
                 )}
             </div>
-            {/* Not in production yet: the panel ships to local dev and the DEV deployment only, so the
-                agent gets real use before it reaches PROD users. Same gate as the Header's dev tools —
-                Vite drops the subtree from a PROD build rather than merely hiding it. */}
-            {(import.meta.env.DEV || import.meta.env.VITE_ENV === 'DEV') && currentFlowId && (
+            {/* Owner and editor only. `permissions` inside the panel is the executor's ceiling on each
+                tool, not a gate on the panel itself — without this a viewer on someone else's flow
+                would get a working assistant (and the LLM spend), and an anonymous visitor to a public
+                flow would get a launcher whose every send 403s. `canModifyCanvas` is the same line: it
+                is exactly the roles that can act on the graph the agent exists to edit. */}
+            {currentFlowId && permissions.canModifyCanvas && (
                 <FlowAgentPanel engine={engine} flowId={currentFlowId} permissions={permissions} />
             )}
         </div>

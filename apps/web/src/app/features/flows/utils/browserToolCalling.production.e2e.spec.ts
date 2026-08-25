@@ -26,8 +26,9 @@ import { describe, it } from 'vitest';
  *      yet; a repo-level decision, not something to add silently alongside this placeholder.
  *   2. eureka-flows-api's tool-calling endpoint actually deployed and reachable from wherever this
  *      suite runs.
- *   3. `VITE_EUREKA_TOOL_CALL_ENDPOINT` (and friends — see `FlowAgentPanel.tsx`) configured for
- *      the build under test, pointed at that deployed endpoint.
+ *   3. `FlowAgentPanel.tsx` actually selecting `createEurekaToolCallLlmGateway` for the build
+ *      under test, pointed at that deployed endpoint — today it always builds
+ *      `createGenerateApiLlmGateway`, so no configuration alone reaches this path.
  *   4. An explicit opt-in env var for this specific suite, e.g. `E2E_DEPLOYED_EUREKA_TOOL_CALL=1`
  *      — mirroring this repo's `RUN_LIVE_PROVIDER_TESTS`-style convention of never running a
  *      real-network suite just because some other precondition (a key, a URL) happens to be set.
