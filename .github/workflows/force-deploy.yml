@@ -233,10 +233,10 @@ jobs:
                   chmod +x scripts/deploy.sh scripts/deploy-${{ matrix.project }}.sh
                   NODE_OPTIONS="--max-old-space-size=4096" yarn ${{ matrix.project }}:deploy:prod
 
-    notify-slack:
+    notify-dou:
         needs: [get-versions, deploy-dev, deploy-prod]
         if: ${{ !cancelled() && (needs.deploy-dev.result == 'success' || needs.deploy-prod.result == 'success') }}
-        name: Notify Slack
+        name: Notify DoU
         runs-on: ubuntu-latest
 
         steps:
@@ -278,8 +278,8 @@ jobs:
                     echo "prod_success=${{ needs.deploy-prod.result == 'success' }}"
                   } >> $GITHUB_OUTPUT
 
-            - name: Build Slack blocks
-              id: slack-blocks
+            - name: Build deploy blocks
+              id: deploy-blocks
               run: |
                   set -e
 
@@ -362,37 +362,31 @@ jobs:
                       ]
                   }]'
 
-                  # Wrap blocks inside attachments structure
-                  ATTACHMENTS='[{ "color": "#6952E0", "blocks": '"$BLOCKS"' }]'
-
-                  echo "$ATTACHMENTS" | jq empty 2>/dev/null || {
-                      echo "Error: Invalid JSON attachments"
+                  echo "$BLOCKS" | jq empty 2>/dev/null || {
+                      echo "Error: Invalid JSON blocks"
                       exit 1
                   }
 
                   {
-                      echo "attachments<<EOF"
-                      echo "$ATTACHMENTS"
+                      echo "blocks<<EOF"
+                      echo "$BLOCKS"
                       echo "EOF"
                   } >> $GITHUB_OUTPUT
 
-            - name: Post to Slack
-              continue-on-error: true
-              uses: slackapi/slack-github-action@v2.1.1
+            - name: Notify DoU
+              uses: lemoncloud-io/actions/notify-dou@v1
               with:
-                  method: chat.postMessage
-                  token: ${{ secrets.RELEASE_BOT_TOKEN }}
-                  payload: |
-                      channel: ${{ secrets.EUREKACODES_CHANNEL }}
-                      text: ":eurekabox: Eureka Flows 수동 배포 완료"
-                      unfurl_links: false
-                      unfurl_media: false
-                      attachments: ${{ steps.slack-blocks.outputs.attachments }}
+                  url: ${{ secrets.DOU_WEBHOOK_URL }}
+                  token: ${{ secrets.DOU_WEBHOOK_TOKEN }}
+                  channel-id: ${{ secrets.DOU_CHANNEL_ID }}
+                  status: success
+                  stage: manual
+                  blocks: ${{ steps.deploy-blocks.outputs.blocks }}
 
-    notify-slack-failure:
+    notify-dou-failure:
         needs: [get-versions, deploy-dev, deploy-prod]
         if: ${{ !cancelled() && (needs.deploy-dev.result == 'failure' || needs.deploy-prod.result == 'failure') }}
-        name: Notify Slack - Failure
+        name: Notify DoU - Failure
         runs-on: ubuntu-latest
 
         steps:
@@ -519,29 +513,23 @@ jobs:
                       ]
                   }]'
 
-                  # Wrap blocks inside attachments structure
-                  ATTACHMENTS='[{ "color": "#ff0000", "blocks": '"$BLOCKS"' }]'
-
-                  echo "$ATTACHMENTS" | jq empty 2>/dev/null || {
-                      echo "Error: Invalid JSON attachments"
+                  echo "$BLOCKS" | jq empty 2>/dev/null || {
+                      echo "Error: Invalid JSON blocks"
                       exit 1
                   }
 
                   {
-                      echo "attachments<<EOF"
-                      echo "$ATTACHMENTS"
+                      echo "blocks<<EOF"
+                      echo "$BLOCKS"
                       echo "EOF"
                   } >> $GITHUB_OUTPUT
 
-            - name: Post failure to Slack
-              continue-on-error: true
-              uses: slackapi/slack-github-action@v2.1.1
+            - name: Notify DoU - failure
+              uses: lemoncloud-io/actions/notify-dou@v1
               with:
-                  method: chat.postMessage
-                  token: ${{ secrets.RELEASE_BOT_TOKEN }}
-                  payload: |
-                      channel: ${{ secrets.EUREKACODES_CHANNEL }}
-                      text: "Eureka Flows 수동 배포 실패"
-                      unfurl_links: false
-                      unfurl_media: false
-                      attachments: ${{ steps.failure-blocks.outputs.attachments }}
+                  url: ${{ secrets.DOU_WEBHOOK_URL }}
+                  token: ${{ secrets.DOU_WEBHOOK_TOKEN }}
+                  channel-id: ${{ secrets.DOU_CHANNEL_ID }}
+                  status: failure
+                  stage: manual
+                  blocks: ${{ steps.failure-blocks.outputs.blocks }}
